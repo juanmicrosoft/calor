@@ -13,6 +13,15 @@ All notable changes to Calor, organized by release.
 ### Changed
 - **`ConversionContext.UseImplicitCallCloser` now defaults to `true`** (was `false` in v0.6.0). The C# → Calor converter now elides `§/C` for zero-argument calls by default, producing more idiomatic Calor output. The opt-out (`UseImplicitCallCloser = false`) is preserved.
 
+### Compatibility
+- **Calor source emitted by v0.6.1 may not parse on v0.6.0 or earlier `calor` toolchains.** The new default emits more zero-arg `§C` calls without explicit `§/C`. Sources that exercise the newly-fixed parser layouts (zero-arg `§C` immediately before `Dedent`, or followed by a same-column sibling opener) will mis-parse on v0.6.0. To produce v0.6.0-compatible output from v0.6.1, use any of:
+  - **CLI single-file:** `calor convert --explicit-call-closers <input.cs>`
+  - **CLI project migration:** `calor migrate --explicit-call-closers <path>`
+  - **MCP `calor_convert` / `calor_migrate`:** `"explicitCallClosers": true`
+  - **SDK:** `new ConversionOptions { UseImplicitCallCloser = false }`
+
+  Round-trip (`C# → Calor → C#`) remains semantic/structural; the intermediate `.calr` is intentionally *not* byte-identical to v0.6.0 converter output unless the opt-out is used.
+
 ### Fixed
 - **Parser: `§C` standard form no longer swallows trailing `Dedent`.** Previously, a zero-arg `§C` immediately followed by the end of its enclosing block could corrupt the structural parse of the surrounding method or `§IF` body. Now correctly distinguished from indent-aware block terminators.
 - **Parser: `§C` no longer absorbs a same-column sibling structural opener on the next line.** A sibling `§IF` / `§MATCH` / `§NEW` on the next line at the same indent is no longer silently absorbed as the call's inline argument. Both `ParseCallExpression` and `ParseCallStatement` now gate the inline-arg form on the candidate argument starting on the *same source line* as `§C{target}`. See [Calls reference](/syntax-reference/calls/) rule 6.

@@ -955,6 +955,113 @@ public class CallExpressionImplicitCloseTests
             string.Join("\n", violations));
     }
 
+    [Fact]
+    public void RoundTrip_IsPatternOperand_ZeroArgCall_KeepsExplicitCloser()
+    {
+        // BLOCKER from loop-4 devil's-advocate finding #2.
+        // (is §C{Foo} §/C str) parses to IsPatternNode, whose emitter
+        // previously used raw node.Operand.Accept(this). Re-emit could
+        // produce (is §C{Foo} str) which re-parses with str as inline arg.
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:bool}
+      §O{bool}
+      §B{x} (is §C{Foo} §/C str)
+      §R x
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+
+        var fullEmitter = new Migration.CalorEmitter(
+            new Migration.ConversionContext { UseImplicitCallCloser = true });
+        var emitted = module.Accept<string>(fullEmitter);
+        // Emitted form must still close the operand call.
+        Assert.Contains("(is §C{Foo} §/C str)", emitted);
+
+        // And it must re-parse identically.
+        var module2 = Parse(emitted, out var diags2);
+        Assert.False(diags2.HasErrors,
+            $"Re-parse errors: {string.Join("; ", diags2.Errors.Select(e => e.Message))}");
+        var bind = module2.Functions[0].Body.OfType<BindStatementNode>().First();
+        var isPattern = Assert.IsType<IsPatternNode>(bind.Initializer);
+        var operandCall = Assert.IsType<CallExpressionNode>(isPattern.Operand);
+        Assert.Equal("Foo", operandCall.Target);
+        Assert.Empty(operandCall.Arguments);
+        Assert.Equal("str", isPattern.TargetType);
+    }
+
+    [Fact]
+    public void Emitter_RangeExpression_StartEndAreInlineSiblings_HoistsCalls()
+    {
+        // Loop-4 devil's-advocate finding #3 defense-in-depth.
+        // §RANGE start end emits two space-separated operands. The parser
+        // restricts range operands to lightweight primaries (IsRangeOperandStart
+        // excludes §C), so the emitter relies on HoistToTempVar to lift any
+        // call operands. The AcceptInInlineSibling wrap is defense-in-depth
+        // so that — even if hoisting were ever disabled or bypassed — a
+        // zero-arg call left in start position would not absorb end.
+        var range = new RangeExpressionNode(
+            default,
+            start: new CallExpressionNode(default, "Lo", new List<ExpressionNode>()),
+            end: new CallExpressionNode(default, "Hi", new List<ExpressionNode>()));
+
+        var emitted = EmitWithImplicitCloser(range);
+        // Either both calls are hoisted to temps OR — if any §C{...} sneaks
+        // through — it must keep its §/C closer (no naked elision).
+        Assert.DoesNotContain("§C{Lo} §C", emitted); // would mean Lo absorbed Hi
+        Assert.DoesNotContain("§C{Lo} INT", emitted);
+        // Sanity: result starts with §RANGE and contains both operands' names
+        // somewhere (either as hoisted temps or as inline §C{...} §/C).
+        Assert.Contains("§RANGE", emitted);
+    }
+
+    [Fact]
+    public void RoundTrip_InlineLambdaStatementBody_ZeroArgCall_KeepsExplicitCloser()
+    {
+        // BLOCKER from loop-4 devil's-advocate finding #1.
+        // §LAM with a short statement body emits all statements on a single
+        // space-separated line. A bind/assign/return ending in a zero-arg
+        // §C{A} previously elided §/C and absorbed the next statement (which
+        // typically starts with another expression-start token) as inline arg.
+        //
+        // Construct the AST directly to bypass any C# → Calor frontend nuance.
+        // Lambda body: { §B{x} §C{A}; §C{B}; } — two statements, both calling
+        // zero-arg functions. After elision on the first, the second §C{B}
+        // could be absorbed.
+        var lam = new LambdaExpressionNode(
+            default,
+            id: "l001",
+            parameters: new List<LambdaParameterNode>(),
+            effects: null,
+            isAsync: false,
+            expressionBody: null,
+            statementBody: new List<StatementNode>
+            {
+                new BindStatementNode(
+                    default,
+                    name: "x",
+                    typeName: null,
+                    isMutable: false,
+                    initializer: new CallExpressionNode(default, "A", new List<ExpressionNode>()),
+                    attributes: new AttributeCollection()),
+                new CallStatementNode(
+                    default,
+                    target: "B",
+                    fallible: false,
+                    arguments: new List<ExpressionNode>(),
+                    attributes: new AttributeCollection()),
+            },
+            attributes: new AttributeCollection());
+
+        var emitted = EmitWithImplicitCloser(lam);
+
+        // Both inner calls must keep §/C — otherwise §C{A} absorbs §C{B}
+        // as inline arg.
+        Assert.Contains("§C{A} §/C", emitted);
+        Assert.Contains("§C{B} §/C", emitted);
+    }
+
     private static string LocateEmitterSourceFile()
     {
         // Walk up from the test assembly dir until we find the repo root,

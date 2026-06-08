@@ -124,4 +124,10 @@ public sealed class MigrationPlanOptions
 
     /// <summary>When true, wraps unsupported constructs in §CSHARP blocks instead of emitting broken Calor.</summary>
     public bool PassthroughOnError { get; set; }
+
+    /// <summary>
+    /// When true (default), the emitter elides redundant §/C closers for zero-arg §C calls (v0.6.1 default).
+    /// Set to false to emit v0.6.0-compatible output where every §C has an explicit §/C.
+    /// </summary>
+    public bool UseImplicitCallCloser { get; set; } = true;
 }

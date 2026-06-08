@@ -2615,7 +2615,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var hasMultiLineStmt = node.StatementBody.Any(s => s is FallbackCommentNode);
             if (node.StatementBody.Count <= 2 && !hasMultiLineStmt)
             {
-                var stmts = node.StatementBody.Select(s => CaptureStatementOutput(s).Trim()).ToList();
+                // Inline-sibling context: each statement is space-joined on a single
+                // emitted line, so any nested zero-arg §C{...} inside a statement
+                // must keep §/C — otherwise the next statement's leading token
+                // (which may be §C{...} or other expression-start) is absorbed as
+                // the call's inline argument.
+                // Defect: v0.6.1 loop-4 devil's-advocate finding #1.
+                _inInlineSiblingContext++;
+                List<string> stmts;
+                try
+                {
+                    stmts = node.StatementBody.Select(s => CaptureStatementOutput(s).Trim()).ToList();
+                }
+                finally
+                {
+                    _inInlineSiblingContext--;
+                }
                 sb.Append(" ");
                 sb.Append(string.Join(" ", stmts));
                 sb.Append($" §/LAM{{{node.Id}}}");
@@ -3098,14 +3113,17 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var parts = new List<string> { "§RANGE" };
         if (node.Start != null)
         {
-            var start = node.Start.Accept(this);
+            // AcceptInInlineSibling: §RANGE start end emits space-separated operands;
+            // a naked zero-arg §C{Foo} start would absorb end as inline arg on re-parse.
+            // Defect: v0.6.1 loop-4 devil's-advocate finding #3.
+            var start = AcceptInInlineSibling(node.Start);
             if (ContainsSectionMarker(start))
                 start = HoistToTempVar(start);
             parts.Add(start);
         }
         if (node.End != null)
         {
-            var end = node.End.Accept(this);
+            var end = AcceptInInlineSibling(node.End);
             // Don't hoist §^ expressions — they're lightweight range operands
             if (ContainsSectionMarker(end) && !end.StartsWith("§^"))
                 end = HoistToTempVar(end);
@@ -3595,7 +3613,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(IsPatternNode node)
     {
-        var operand = node.Operand.Accept(this);
+        // AcceptInInlineSibling: operand is space-separated from the type in
+        // Lisp `(is OPERAND Type)` form. A naked zero-arg §C{Foo} operand would
+        // absorb the type as its inline arg on re-parse.
+        // Defect: v0.6.1 loop-4 devil's-advocate finding #2.
+        var operand = AcceptInInlineSibling(node.Operand);
         return node.VariableName != null
             ? $"(is {operand} {node.TargetType} {node.VariableName})"
             : $"(is {operand} {node.TargetType})";
