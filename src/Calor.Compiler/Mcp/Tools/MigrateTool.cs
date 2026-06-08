@@ -49,6 +49,11 @@ public sealed class MigrateTool : McpToolBase
                     "type": "boolean",
                     "description": "Whether to auto-fix common errors after conversion (default: true)",
                     "default": true
+                },
+                "explicitCallClosers": {
+                    "type": "boolean",
+                    "description": "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision (default: false — v0.6.1 default elides zero-arg §/C)",
+                    "default": false
                 }
             },
             "required": ["projectPath"],
@@ -68,6 +73,7 @@ public sealed class MigrateTool : McpToolBase
         var phase = GetString(arguments, "phase") ?? "full";
         var maxFiles = GetInt(arguments, "maxFiles", defaultValue: 0);
         var autoFix = GetBool(arguments, "autoFix", defaultValue: true);
+        var explicitCallClosers = GetBool(arguments, "explicitCallClosers", defaultValue: false);
 
         // Resolve directory from .csproj or directory path
         var directory = ResolveDirectory(projectPath);
@@ -79,10 +85,10 @@ public sealed class MigrateTool : McpToolBase
             return phase switch
             {
                 "assess" => RunAssess(directory, maxFiles, cancellationToken),
-                "convert" => await RunConvertAsync(directory, projectPath, maxFiles, cancellationToken),
+                "convert" => await RunConvertAsync(directory, projectPath, maxFiles, explicitCallClosers, cancellationToken),
                 "compile" => RunCompile(directory, maxFiles, cancellationToken),
                 "fix" => await RunFixAsync(directory, maxFiles, cancellationToken),
-                "full" => await RunFullAsync(directory, projectPath, maxFiles, autoFix, cancellationToken),
+                "full" => await RunFullAsync(directory, projectPath, maxFiles, autoFix, explicitCallClosers, cancellationToken),
                 _ => McpToolResult.Error($"Unknown phase: '{phase}'. Must be 'assess', 'convert', 'compile', 'fix', or 'full'.")
             };
         }
@@ -143,13 +149,14 @@ public sealed class MigrateTool : McpToolBase
 
     // ── Phase: convert ──────────────────────────────────────────────
 
-    internal async Task<McpToolResult> RunConvertAsync(string directory, string projectPath, int maxFiles, CancellationToken ct)
+    internal async Task<McpToolResult> RunConvertAsync(string directory, string projectPath, int maxFiles, bool explicitCallClosers, CancellationToken ct)
     {
         var options = new MigrationPlanOptions
         {
             IncludeTests = true,
             MaxFiles = maxFiles,
-            PassthroughOnError = false
+            PassthroughOnError = false,
+            UseImplicitCallCloser = !explicitCallClosers
         };
 
         var migrator = new ProjectMigrator(options);
@@ -288,7 +295,7 @@ public sealed class MigrateTool : McpToolBase
     // ── Phase: full ─────────────────────────────────────────────────
 
     internal async Task<McpToolResult> RunFullAsync(
-        string directory, string projectPath, int maxFiles, bool autoFix, CancellationToken ct)
+        string directory, string projectPath, int maxFiles, bool autoFix, bool explicitCallClosers, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         var allPerFile = new Dictionary<string, MigrateFileResult>(StringComparer.OrdinalIgnoreCase);
@@ -329,7 +336,8 @@ public sealed class MigrateTool : McpToolBase
         {
             IncludeTests = true,
             MaxFiles = maxFiles,
-            PassthroughOnError = false
+            PassthroughOnError = false,
+            UseImplicitCallCloser = !explicitCallClosers
         };
 
         var migrator = new ProjectMigrator(options);

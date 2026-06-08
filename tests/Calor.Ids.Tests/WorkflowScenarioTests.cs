@@ -72,9 +72,7 @@ public class WorkflowScenarioTests : IDisposable
               §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Calculate:pub}
                   §I{i32:x}
                   §O{i32}
-                  §B{result} §C{Square}
-                    §A x
-                  §/C
+                  §B{result} §C{Square} §A x §/C
                   §R result
               §F{f_01J5X7K9M2NPQRSTABWXYZ9912:Square:pri}
                   §I{i32:n}

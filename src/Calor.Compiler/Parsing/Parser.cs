@@ -1381,14 +1381,35 @@ public sealed class Parser
 
         var arguments = new List<ExpressionNode>();
 
-        // Support implicit closing - if a single expression follows without §A, treat it as the argument
-        // §C[Console.WriteLine] "Hello" is equivalent to §C[Console.WriteLine] §A "Hello" §/C
-        if (IsExpressionStart() && !Check(TokenKind.Arg))
+        // v0.6 call-closer-elision RFC §3.2 (statement context).
+        //
+        // Three accepted shapes after §C{target}:
+        //   (a) Inline single arg, same line:  §C{target} primary_expr
+        //   (b) Zero-arg implicit close:       §C{target}<EOL or next sibling token>
+        //   (c) Standard form:                 §C{target} §A ... §A ... [§/C | Dedent | Eof]
+        //
+        // The inline-arg path REQUIRES the argument to start on the same line
+        // as §C{target}; otherwise a following sibling statement that begins
+        // with an expression-starter token (e.g. §IF/§MATCH on the next line
+        // at the same indent) would be wrongly absorbed because
+        // IsExpressionStart returns true for §IF/§MATCH/§NEW/etc. RFC v0.6
+        // §3.2 / v0.6.1 — mirrors the guard in ParseCallExpression.
+        bool inlineArgOnSameLine = Current.Span.Line == startToken.Span.Line;
+        if (inlineArgOnSameLine && IsExpressionStart() && !Check(TokenKind.Arg))
         {
-            // Single expression argument without §A prefix - implicit closing
             arguments.Add(ParseExpression());
             var span = startToken.Span.Union(arguments[0].Span);
             return new CallStatementNode(span, target, fallible, arguments, attrs);
+        }
+
+        // Zero-arg implicit close: §C{target} followed by anything other than
+        // §A or §/C (e.g. a sibling statement opener on the next line). The
+        // standard-form branch below would error with Calor0100 since it
+        // requires §/C/Dedent/Eof; emit an empty-args call here instead.
+        if (!Check(TokenKind.Arg) && !Check(TokenKind.EndCall)
+            && !Check(TokenKind.Dedent) && !Check(TokenKind.Eof))
+        {
+            return new CallStatementNode(startToken.Span, target, fallible, arguments, attrs);
         }
 
         // Standard format with explicit §A and §/C
@@ -7900,8 +7921,21 @@ public sealed class Parser
 
         // Phase 1 (v0.6 call-closer-elision): try implicit-close forms first.
         // Skip the implicit path only when the next token is §A or §/C
-        // (canonical forms still apply).
-        bool tryImplicit = !Check(TokenKind.Arg) && !IsBlockEnd(TokenKind.EndCall);
+        // (canonical forms still apply). Note: §C is an inline expression,
+        // not an indent-aware block — Dedent/Eof must NOT terminate the
+        // implicit path (they signal that we're at the call's end and the
+        // zero-arg implicit close should be taken). RFC v0.6 §3.2 / v0.6.1.
+        //
+        // CRITICAL (v0.6.1): A §A on a *different* line than §C{target}
+        // belongs to an outer call's argument list (e.g. §BASE / §THIS / §NEW
+        // emit each §A on its own indented line), not to this call. Without
+        // this guard, the standard-form branch would greedily consume the
+        // outer's §A as if it were this call's argument — silent corruption
+        // when emitter elides §/C by default.
+        bool nextArgIsOnSameLine = Check(TokenKind.Arg)
+                                && Current.Span.Line == startToken.Span.Line;
+        bool tryImplicit = !Check(TokenKind.EndCall)
+                        && (!Check(TokenKind.Arg) || !nextArgIsOnSameLine);
 
         // Trailing-member-access markers (.member, ?.member) after
         // §C{target} attach to the zero-arg call result. Take the implicit
@@ -7914,7 +7948,15 @@ public sealed class Parser
         bool isTrailingMember = Check(TokenKind.Dot)
                              || Check(TokenKind.NullConditional);
 
-        if (tryImplicit && !isTrailingMember && IsExpressionStart())
+        // Inline implicit-arg form requires the argument to start on the same
+        // line as §C{target}. Without this guard, a following sibling
+        // statement that begins with an expression-starter token (e.g. §IF on
+        // the next line at the same indent) would be incorrectly absorbed as
+        // the call's inline argument because IsExpressionStart is true for
+        // §IF/§MATCH/§NEW/etc. RFC v0.6 §3.2 / v0.6.1.
+        bool inlineArgOnSameLine = Current.Span.Line == startToken.Span.Line;
+
+        if (tryImplicit && !isTrailingMember && inlineArgOnSameLine && IsExpressionStart())
         {
             // §C{target} primary_expr — one inline argument, implicit close.
             var argExpr = ParseExpression();
