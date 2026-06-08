@@ -1381,14 +1381,35 @@ public sealed class Parser
 
         var arguments = new List<ExpressionNode>();
 
-        // Support implicit closing - if a single expression follows without §A, treat it as the argument
-        // §C[Console.WriteLine] "Hello" is equivalent to §C[Console.WriteLine] §A "Hello" §/C
-        if (IsExpressionStart() && !Check(TokenKind.Arg))
+        // v0.6 call-closer-elision RFC §3.2 (statement context).
+        //
+        // Three accepted shapes after §C{target}:
+        //   (a) Inline single arg, same line:  §C{target} primary_expr
+        //   (b) Zero-arg implicit close:       §C{target}<EOL or next sibling token>
+        //   (c) Standard form:                 §C{target} §A ... §A ... [§/C | Dedent | Eof]
+        //
+        // The inline-arg path REQUIRES the argument to start on the same line
+        // as §C{target}; otherwise a following sibling statement that begins
+        // with an expression-starter token (e.g. §IF/§MATCH on the next line
+        // at the same indent) would be wrongly absorbed because
+        // IsExpressionStart returns true for §IF/§MATCH/§NEW/etc. RFC v0.6
+        // §3.2 / v0.6.1 — mirrors the guard in ParseCallExpression.
+        bool inlineArgOnSameLine = Current.Span.Line == startToken.Span.Line;
+        if (inlineArgOnSameLine && IsExpressionStart() && !Check(TokenKind.Arg))
         {
-            // Single expression argument without §A prefix - implicit closing
             arguments.Add(ParseExpression());
             var span = startToken.Span.Union(arguments[0].Span);
             return new CallStatementNode(span, target, fallible, arguments, attrs);
+        }
+
+        // Zero-arg implicit close: §C{target} followed by anything other than
+        // §A or §/C (e.g. a sibling statement opener on the next line). The
+        // standard-form branch below would error with Calor0100 since it
+        // requires §/C/Dedent/Eof; emit an empty-args call here instead.
+        if (!Check(TokenKind.Arg) && !Check(TokenKind.EndCall)
+            && !Check(TokenKind.Dedent) && !Check(TokenKind.Eof))
+        {
+            return new CallStatementNode(startToken.Span, target, fallible, arguments, attrs);
         }
 
         // Standard format with explicit §A and §/C

@@ -59,7 +59,15 @@ arguments use form (3) or (4).
    `NullConditional(Call("Maybe"), "Length")`, because the parser sees
    `?.`, takes the zero-arg implicit-close path, then runs trailing
    member access on the call result.
-6. **Both `§/C` and abbreviated `§/C{id}` are still accepted** for
+6. **The inline argument must start on the same source line as
+   `§C{target}`.** A candidate argument that begins on a later line is
+   treated as a sibling statement / expression, not as the call's
+   argument. Without this rule, a `§IF` / `§MATCH` / `§NEW` on the next
+   line at the same indent would be silently absorbed as the argument
+   (because each of those tokens is also an expression-start). Writing
+   `§C{Foo}` on one line and `§IF{c} ... §EL → ...` on the next always
+   parses as two siblings — zero-arg call, then a separate `§IF`.
+7. **Both `§/C` and abbreviated `§/C{id}` are still accepted** for
    forms (1), (2), (3), and (4) — no source file needs to be rewritten.
 
 ---

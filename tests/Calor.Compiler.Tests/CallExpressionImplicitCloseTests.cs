@@ -491,6 +491,95 @@ public class CallExpressionImplicitCloseTests
     }
 
     [Fact]
+    public void Emitter_ZeroArgCall_AsLastStatementBeforeDedent_RoundTripsCorrectly()
+    {
+        // v0.6.1 regression test for the Dedent-swallowing parser bug.
+        // Before the fix, ParseCallExpression treated `Dedent` as a valid
+        // EndCall token (via `IsBlockEnd(EndCall)`), routing the zero-arg
+        // call through the standard-form branch which then consumed the
+        // Dedent thinking it was an indent-only end-of-block. The enclosing
+        // method body terminator vanished, and the next sibling member
+        // would fail to parse. RFC v0.6 §3.2 / v0.6.1.
+        var source = @"§M{Demo}
+  §CL{c:C:pub}
+    §MT{m1:M1:pub}
+      §C{Foo}
+    §MT{m2:M2:pub}
+      §C{Bar}
+";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+
+        var cls = module.Classes.First();
+        Assert.Equal(2, cls.Methods.Count);
+        Assert.Equal("M1", cls.Methods[0].Name);
+        Assert.Equal("M2", cls.Methods[1].Name);
+    }
+
+    [Fact]
+    public void Emitter_ZeroArgCallAsArgInMultiArgCall_KeepsExplicitCloser()
+    {
+        // v0.6.1 BLOCKER #1 regression: zero-arg call as one of several §A
+        // arguments to an outer call MUST keep its explicit §/C. Otherwise
+        // `§C{M} §A §C{A} §A 2 §/C` would re-parse as `M(A(2))` instead of
+        // `M(A(), 2)` — silent semantic corruption. The emitter tracks an
+        // inline-sibling-context counter to suppress elision in such places.
+        var args = new List<ExpressionNode>
+        {
+            new CallExpressionNode(default, "A", new List<ExpressionNode>()),
+            new IntLiteralNode(default, 2),
+        };
+        var outer = new CallExpressionNode(default, "M", args);
+        var emitter = new Migration.CalorEmitter();
+        var output = outer.Accept<string>(emitter);
+        // Inner zero-arg A() must keep its §/C inside the §A chain.
+        Assert.Contains("§C{A} §/C", output);
+        Assert.EndsWith("§/C", output);
+    }
+
+    [Fact]
+    public void Emitter_AdjacentZeroArgCallsInArrayInitializer_KeepsExplicitClosers()
+    {
+        // v0.6.1 BLOCKER #2 regression: array initializer with multiple
+        // zero-arg calls. Without keeping §/C, `§ARR{...} §C{A} §C{B} §/ARR`
+        // would re-parse as a SINGLE element `A(B())` instead of TWO
+        // elements `A(), B()` — devastating silent corruption.
+        var elements = new List<ExpressionNode>
+        {
+            new CallExpressionNode(default, "A", new List<ExpressionNode>()),
+            new CallExpressionNode(default, "B", new List<ExpressionNode>()),
+        };
+        var arr = new ArrayCreationNode(
+            default,
+            id: "arr1",
+            name: "arr1",
+            elementType: "any",
+            size: null,
+            initializer: elements,
+            attributes: new AttributeCollection());
+        var emitter = new Migration.CalorEmitter();
+        var output = arr.Accept<string>(emitter);
+        // Both inner calls must keep §/C inside §ARR initializer.
+        Assert.Contains("§C{A} §/C", output);
+        Assert.Contains("§C{B} §/C", output);
+    }
+
+    [Fact]
+    public void Emitter_ZeroArgCallAsTopLevelExpression_StillElidesCloser()
+    {
+        // Pin that the context-aware fix does NOT regress the v0.6.1 default
+        // behavior at top-level expression positions (binding initializer,
+        // return value). The flag's purpose is to shorten these "leaf"
+        // occurrences; nesting inside §A / §ARR forces the closer.
+        var call = new CallExpressionNode(default, "Foo", new List<ExpressionNode>());
+        var emitter = new Migration.CalorEmitter();
+        var output = call.Accept<string>(emitter);
+        // Leaf-position call: §/C elided by v0.6.1 default.
+        Assert.Equal("§C{Foo}", output);
+    }
+
+    [Fact]
     public void Emitter_ZeroArgCall_ImplicitCloserFlagTrue_ElidesCloser()
     {
         // With the flag set, zero-arg calls drop §/C.
@@ -521,10 +610,12 @@ public class CallExpressionImplicitCloseTests
     [Fact]
     public void Emitter_OneArgCall_ImplicitCloserFlagTrue_StillEmitsCloser()
     {
-        // v0.6.0 deliberately implements zero-arg-only emitter elision.
-        // The one-arg path needs context-aware safety (a §C inside a Lisp
-        // (+ a b) arg-list would consume its sibling) and is deferred to
-        // v0.6.1. This test pins that intentional limitation.
+        // v0.6.1 ships zero-arg-only emitter elision (RFC §6). The one-arg
+        // path needs context-aware safety (a §C inside a Lisp `(+ a b)`
+        // arg-list would consume its sibling) — that work tracks separately
+        // in CHANGELOG.md under "Out of scope for v0.6.1". This test pins
+        // the intentional zero-arg-only limitation so it can't silently
+        // expand without a deliberate decision.
         var args = new List<ExpressionNode>
         {
             new IntLiteralNode(default, 42),
