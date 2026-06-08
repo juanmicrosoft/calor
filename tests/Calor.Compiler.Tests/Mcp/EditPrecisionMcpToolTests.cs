@@ -27,10 +27,7 @@ public class EditPrecisionMcpToolTests
   §F{f003:computeTotal:pub}
       §I{i32:x, i32:y, i32:z}
       §O{i32}
-      §B{partial:i32} §C{add}
-        §A x
-        §A y
-      §/C
+      §B{partial:i32} §C{add} §A x §A y §/C
       §R (* partial z)
 ";
 
@@ -48,11 +45,8 @@ public class EditPrecisionMcpToolTests
   §F{f012:main:pub}
       §O{void}
       §E{cw, cr}
-      §B{data:str} §C{readInput}
-      §/C
-      §C{processAndPrint}
-        §A data
-      §/C
+      §B{data:str} §C{readInput} §/C
+      §C{processAndPrint} §A data §/C
 ";
 
     #region ImpactAnalysisTool Tests
