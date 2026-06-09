@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-09
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.29x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.85x ± 0.00 (Calor wins, large effect d=1.84)
+  - ErrorDetection: 1.52x ± 0.00 (Calor wins, large effect d=1.26)
+  - RefactoringStability: 1.38x ± 0.00 (Calor wins, large effect d=7.10)
+  - EditPrecision: 1.36x ± 0.00 (Calor wins, large effect d=4.83)
+  - Correctness: 1.31x ± 0.00 (Calor wins, large effect d=1.40)
+- **Programs Tested**: 207
+
 ### Changed
 - **`ConversionContext.UseImplicitCallCloser` now defaults to `true`** (was `false` in v0.6.0). The C# → Calor converter (`CalorEmitter.Visit(CallExpressionNode)`) now elides `§/C` for zero-argument calls by default, producing more idiomatic Calor output. The opt-out (`UseImplicitCallCloser = false`) is preserved and tested (`CallExpressionImplicitCloseTests.Emitter_ZeroArgCall_ImplicitCloserFlagFalse_PinsExplicitCloser`). One-argument elision remains intentionally deferred — see `docs/plans/v0.6-call-closer-elision.md` §2.2.
 
