@@ -55,7 +55,7 @@ public sealed class ContractVerificationPass
         using var verifier = new Z3Verifier(ctx, _options.TimeoutMs);
         using var cache = new VerificationCache(_options.CacheOptions);
 
-        foreach (var function in module.Functions)
+        foreach (var function in EnumerateContractBearers(module))
         {
             _options.CancellationToken.ThrowIfCancellationRequested();
 
@@ -219,11 +219,73 @@ public sealed class ContractVerificationPass
         }
     }
 
+    /// <summary>
+    /// Yields all contract-bearing subjects in the module: top-level functions
+    /// plus class methods (and methods on nested classes). Each MethodNode is
+    /// adapted as a FunctionNode so the verifier sees a uniform shape — methods
+    /// are functions with an implicit `this` receiver, but contracts in §Q/§S
+    /// reference parameters and `result`, neither of which depends on `this`.
+    /// </summary>
+    private static IEnumerable<FunctionNode> EnumerateContractBearers(ModuleNode module)
+    {
+        foreach (var f in module.Functions)
+            yield return f;
+
+        foreach (var cls in module.Classes)
+        {
+            foreach (var fn in EnumerateClassMethodsAsFunctions(cls))
+                yield return fn;
+        }
+    }
+
+    private static IEnumerable<FunctionNode> EnumerateClassMethodsAsFunctions(ClassDefinitionNode cls)
+    {
+        foreach (var m in cls.Methods)
+        {
+            if (!m.HasContracts)
+                continue;
+            yield return AdaptMethodAsFunction(m, cls);
+        }
+
+        foreach (var nested in cls.NestedClasses)
+        {
+            foreach (var fn in EnumerateClassMethodsAsFunctions(nested))
+                yield return fn;
+        }
+    }
+
+    /// <summary>
+    /// Wraps a MethodNode in a FunctionNode shape for the contract verifier.
+    /// Preserves Id, Name, Parameters, Output, Preconditions, Postconditions, Body
+    /// — the verifier touches only these. The method's receiver (`this`) is
+    /// modelled implicitly: contracts cannot currently reference `self.X` on
+    /// receiver state, only parameters and `result`. That matches what the
+    /// existing free-function verifier already supports.
+    /// </summary>
+    private static FunctionNode AdaptMethodAsFunction(MethodNode m, ClassDefinitionNode owner)
+    {
+        // Use a synthetic name so cache keys distinguish methods on different classes.
+        var qualifiedName = owner.Name + "." + m.Name;
+        return new FunctionNode(
+            m.Span,
+            m.Id,
+            qualifiedName,
+            m.Visibility,
+            m.TypeParameters,
+            m.Parameters,
+            m.Output,
+            m.Effects,
+            m.Preconditions,
+            m.Postconditions,
+            m.Body,
+            m.Attributes);
+    }
+
     private static ModuleVerificationResult CreateSkippedResult(ModuleNode module)
     {
         var results = new List<FunctionVerificationResult>();
 
-        foreach (var function in module.Functions)
+        foreach (var function in EnumerateContractBearers(module))
         {
             if (!function.HasContracts)
                 continue;

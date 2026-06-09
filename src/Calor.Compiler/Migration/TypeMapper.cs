@@ -496,6 +496,14 @@ public static class TypeMapper
             return $"{mappedPointee}*";
         }
 
+        // Handle suffix nullable T? -> T_mapped? (e.g., str? -> string?, i32? -> int?)
+        if (calorType.EndsWith("?") && calorType.Length > 1)
+        {
+            var innerType = calorType[..^1];
+            var mappedInner = CalorToCSharp(innerType);
+            return $"{mappedInner}?";
+        }
+
         // Handle generic types
         var genericIndex = calorType.IndexOf('<');
         if (genericIndex > 0)

@@ -155,28 +155,17 @@ public static class Z3ContextFactory
             var testExpr = ctx.MkIntConst("__z3_test__");
             return testExpr != null;
         }
-        catch (DllNotFoundException)
+        catch (Exception ex)
         {
-            return false;
-        }
-        catch (TypeInitializationException)
-        {
-            return false;
-        }
-        catch (FileNotFoundException)
-        {
-            return false;
-        }
-        catch (FileLoadException)
-        {
-            return false;
-        }
-        catch (BadImageFormatException)
-        {
-            return false;
-        }
-        catch (Exception)
-        {
+            // Optional diagnosis path — set CALOR_Z3_DEBUG=1 to surface the real load failure.
+            if (Environment.GetEnvironmentVariable("CALOR_Z3_DEBUG") == "1")
+            {
+                Console.Error.WriteLine($"[Z3 load failure] {ex.GetType().Name}: {ex.Message}");
+                if (ex.InnerException != null)
+                    Console.Error.WriteLine($"[Z3 inner] {ex.InnerException.GetType().Name}: {ex.InnerException.Message}");
+                Console.Error.WriteLine($"[Z3 base path] {AppContext.BaseDirectory}");
+                Console.Error.WriteLine($"[Z3 native handle] 0x{_z3NativeHandle.ToInt64():X}");
+            }
             return false;
         }
     }
