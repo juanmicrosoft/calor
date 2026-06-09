@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.6.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.6.1</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">Token-economics release: §C call-closer elision (zero/one-arg), formalized §B inference, and four new diagnostics (Calor0150, Calor0250–0253).</span>
+            <span className="text-foreground">Implicit `§/C` for zero-arg `§C` calls is now the default — more idiomatic Calor by default; opt-out via `--explicit-call-closers`.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
