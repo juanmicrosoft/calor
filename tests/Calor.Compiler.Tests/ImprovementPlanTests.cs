@@ -24,7 +24,7 @@ public class ImprovementPlanTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -39,7 +39,7 @@ public class ImprovementPlanTests
     {
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         Assert.Empty(diag.Errors);
         var parser = new Parser(tokens, diag);
         var ast = parser.Parse();
@@ -55,7 +55,7 @@ public class ImprovementPlanTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         if (diagnostics.HasErrors) return null;
 
         var parser = new Parser(tokens, diagnostics);
@@ -112,17 +112,13 @@ public class Service
         // Verify that codegen emits `throw new InvalidOperationException(...)`
         var source = @"
 §M{m001:Test}
-§CL{c001:Svc:pub}
-§MT{m001:Validate:pub}
-§I{str:name}
-§O{str}
-§IF{i1} (== name null)
-§TH §NEW{InvalidOperationException} §A ""name is null"" §/NEW
-§/I{i1}
-§R name
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Svc:pub}
+    §MT{m001:Validate:pub}
+      §I{str:name}
+      §O{str}
+      §IF{i1} (== name null)
+        §TH §NEW{InvalidOperationException} §A ""name is null"" §/NEW
+      §R name
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("throw new InvalidOperationException", csharp);
@@ -159,12 +155,9 @@ public class Service
         // Parse inline method syntax with default parameter
         var source = @"
 §M{m001:Test}
-§CL{c001:Calculator:pub}
-§MT{m001:Add:pub} (i32:x, i32:y = 0) -> i32
-§R (+ x y)
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Calculator:pub}
+    §MT{m001:Add:pub} (i32:x, i32:y = 0) -> i32
+      §R (+ x y)
 ";
         var module = ParseCalor(source);
         var cls = Assert.Single(module.Classes);
@@ -180,12 +173,9 @@ public class Service
     {
         var source = @"
 §M{m001:Test}
-§CL{c001:Calculator:pub}
-§MT{m001:Add:pub} (i32:x, i32:y = 0) -> i32
-§R (+ x y)
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Calculator:pub}
+    §MT{m001:Add:pub} (i32:x, i32:y = 0) -> i32
+      §R (+ x y)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("int y = 0", csharp);
@@ -347,15 +337,11 @@ public class DataProcessor
         // (+ a b) should generate `a + b` without unnecessary parentheses
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§BODY
-§R (+ a b)
-§END_BODY
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("a + b", csharp);
@@ -367,16 +353,12 @@ public class DataProcessor
         // (+ (* a b) c) should generate `a * b + c` (no parens needed since * binds tighter)
         var source = @"
 §M{m001:Test}
-§F{f001:Calc:pub}
-§I{i32:a}
-§I{i32:b}
-§I{i32:c}
-§O{i32}
-§BODY
-§R (+ (* a b) c)
-§END_BODY
-§/F{f001}
-§/M{m001}
+  §F{f001:Calc:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §I{i32:c}
+    §O{i32}
+    §R (+ (* a b) c)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("a * b + c", csharp);
@@ -390,16 +372,12 @@ public class DataProcessor
         // (* (+ a b) c) should generate `(a + b) * c` (parens needed since + has lower precedence)
         var source = @"
 §M{m001:Test}
-§F{f001:Calc:pub}
-§I{i32:a}
-§I{i32:b}
-§I{i32:c}
-§O{i32}
-§BODY
-§R (* (+ a b) c)
-§END_BODY
-§/F{f001}
-§/M{m001}
+  §F{f001:Calc:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §I{i32:c}
+    §O{i32}
+    §R (* (+ a b) c)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("(a + b) * c", csharp);
@@ -415,12 +393,10 @@ public class DataProcessor
         // A simple program without LINQ usage should NOT have `using System.Linq;`
         var source = @"
 §M{m001:Test}
-§F{f001:Main:pub}
-§O{void}
-§E{cw}
-§P ""Hello""
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §P ""Hello""
 ";
         var result = Program.Compile(source);
         Assert.False(result.HasErrors, FormatDiagnostics(result));
@@ -434,14 +410,11 @@ public class DataProcessor
         // We can trigger this by including code that generates .Any(), .All(), .Select(), etc.
         var source = @"
 §M{m001:Test}
-§CL{c001:Svc:pub}
-§MT{m001:HasPositive:pub}
-§I{List<i32>:items}
-§O{bool}
-§R §CS{items.Any(x => x > 0)}
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Svc:pub}
+    §MT{m001:HasPositive:pub}
+      §I{List<i32>:items}
+      §O{bool}
+      §R §CS{items.Any(x => x > 0)}
 ";
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
@@ -461,13 +434,9 @@ public class DataProcessor
         // Parse §CS{DateTime.Now.Ticks} and verify it round-trips correctly
         var source = @"
 §M{m001:Test}
-§F{f001:GetTicks:pub}
-§O{i64}
-§BODY
-§R §CS{DateTime.Now.Ticks}
-§END_BODY
-§/F{f001}
-§/M{m001}
+  §F{f001:GetTicks:pub}
+    §O{i64}
+    §R §CS{DateTime.Now.Ticks}
 ";
         var module = ParseCalor(source);
         var func = Assert.Single(module.Functions);
@@ -480,13 +449,9 @@ public class DataProcessor
         // Verify codegen emits `DateTime.Now.Ticks` verbatim
         var source = @"
 §M{m001:Test}
-§F{f001:GetTicks:pub}
-§O{i64}
-§BODY
-§R §CS{DateTime.Now.Ticks}
-§END_BODY
-§/F{f001}
-§/M{m001}
+  §F{f001:GetTicks:pub}
+    §O{i64}
+    §R §CS{DateTime.Now.Ticks}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("DateTime.Now.Ticks", csharp);
@@ -497,13 +462,9 @@ public class DataProcessor
     {
         var source = @"
 §M{m001:Test}
-§F{f001:GetEnv:pub}
-§O{str}
-§BODY
-§R §CS{Environment.GetEnvironmentVariable(""HOME"") ?? ""/tmp""}
-§END_BODY
-§/F{f001}
-§/M{m001}
+  §F{f001:GetEnv:pub}
+    §O{str}
+    §R §CS{Environment.GetEnvironmentVariable(""HOME"") ?? ""/tmp""}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("Environment.GetEnvironmentVariable", csharp);
@@ -519,15 +480,12 @@ public class DataProcessor
         // Parse §PP{DEBUG} ... §/PP{DEBUG} and verify codegen emits #if DEBUG ... #endif
         var source = @"
 §M{m001:Test}
-§CL{c001:Logger:pub}
-§MT{m001:Log:pub}
-§I{str:msg}
-§PP{DEBUG}
-§C{Console.WriteLine} msg
-§/PP{DEBUG}
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Logger:pub}
+    §MT{m001:Log:pub}
+      §I{str:msg}
+      §PP{DEBUG}
+      §C{Console.WriteLine} msg
+      §/PP{DEBUG}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("#if DEBUG", csharp);
@@ -541,17 +499,14 @@ public class DataProcessor
         // Test with else body: §PP{DEBUG} ... §PPE ... §/PP{DEBUG}
         var source = @"
 §M{m001:Test}
-§CL{c001:Logger:pub}
-§MT{m001:GetLevel:pub}
-  §O{str}
-  §PP{DEBUG}
-  §R ""debug""
-  §PPE
-  §R ""release""
-  §/PP{DEBUG}
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Logger:pub}
+    §MT{m001:GetLevel:pub}
+        §O{str}
+        §PP{DEBUG}
+        §R ""debug""
+        §PPE
+        §R ""release""
+        §/PP{DEBUG}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("#if DEBUG", csharp);
@@ -566,17 +521,14 @@ public class DataProcessor
     {
         var source = @"
 §M{m001:Test}
-§CL{c001:Config:pub}
-§MT{m001:GetEndpoint:pub}
-  §O{str}
-  §PP{RELEASE}
-  §R ""https://prod.example.com""
-  §PPE
-  §R ""https://dev.example.com""
-  §/PP{RELEASE}
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Config:pub}
+    §MT{m001:GetEndpoint:pub}
+        §O{str}
+        §PP{RELEASE}
+        §R ""https://prod.example.com""
+        §PPE
+        §R ""https://dev.example.com""
+        §/PP{RELEASE}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("#if RELEASE", csharp);
@@ -670,17 +622,13 @@ public class Test
         // A throw statement inside a preprocessor-guarded block
         var source = @"
 §M{m001:Test}
-§CL{c001:Guard:pub}
-§MT{m001:Check:pub}
-§I{bool:flag}
-§PP{DEBUG}
-§IF{if1} (! flag)
-§TH §NEW{InvalidOperationException} §A ""debug check failed"" §/NEW
-§/I{if1}
-§/PP{DEBUG}
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Guard:pub}
+    §MT{m001:Check:pub}
+      §I{bool:flag}
+      §PP{DEBUG}
+      §IF{if1} (! flag)
+        §TH §NEW{InvalidOperationException} §A ""debug check failed"" §/NEW
+      §/PP{DEBUG}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("#if DEBUG", csharp);
@@ -694,12 +642,9 @@ public class Test
         // Inline method with default params and inline C# expression
         var source = @"
 §M{m001:Test}
-§CL{c001:TimeHelper:pub}
-§MT{m001:GetTime:pub} (i32:offset = 0) -> i64
-§R §CS{DateTimeOffset.UtcNow.ToUnixTimeSeconds() + offset}
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:TimeHelper:pub}
+    §MT{m001:GetTime:pub} (i32:offset = 0) -> i64
+      §R §CS{DateTimeOffset.UtcNow.ToUnixTimeSeconds() + offset}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("int offset = 0", csharp);
@@ -712,12 +657,9 @@ public class Test
         // Compile a program with several features and verify the generated C# is syntactically valid
         var source = @"
 §M{m001:Test}
-§CL{c001:Utility:pub}
-§MT{m001:Greet:pub} (str:name, str:greeting = ""Hello"") -> str
-§R §CS{$""{greeting}, {name}!""}
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Utility:pub}
+    §MT{m001:Greet:pub} (str:name, str:greeting = ""Hello"") -> str
+      §R §CS{$""{greeting}, {name}!""}
 ";
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {

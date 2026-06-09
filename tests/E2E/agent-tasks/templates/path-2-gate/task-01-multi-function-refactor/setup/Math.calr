@@ -1,0 +1,9 @@
+§M{m001:MathOps}
+  §F{f001:Calculate:pub} (i32:val, i32:prior) -> i32
+    §Q (>= val 0)
+    §S (>= result prior)
+    §B{validated} val
+    §B{scaled} (* validated 2)
+    §B{total} (+ scaled prior)
+    §R total
+

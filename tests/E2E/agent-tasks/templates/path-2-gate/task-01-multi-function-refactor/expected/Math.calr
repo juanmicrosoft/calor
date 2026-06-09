@@ -1,0 +1,19 @@
+§M{m001:MathOps}
+  §F{f001:Calculate:pub} (i32:val, i32:prior) -> i32
+    §Q (>= val 0)
+    §S (>= result prior)
+    §B{validated} §C{ValidateInput} §A val §/C
+    §B{scaled} §C{ScaleInput} §A validated §/C
+    §B{total} §C{RunningTotal} §A scaled §A prior §/C
+    §R total
+
+  §F{f002:ValidateInput:pub} (i32:val) -> i32
+    §Q (>= val 0)
+    §R val
+
+  §F{f003:ScaleInput:pub} (i32:val) -> i32
+    §R (* val 2)
+
+  §F{f004:RunningTotal:pub} (i32:scaled, i32:prior) -> i32
+    §R (+ scaled prior)
+

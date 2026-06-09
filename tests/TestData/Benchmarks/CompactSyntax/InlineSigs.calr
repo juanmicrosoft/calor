@@ -1,24 +1,13 @@
 §M{m001:InlineSigs}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§F{f002:Multiply:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f002}
-§F{f003:Negate:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (- 0 x)
-§/F{f003}
-§F{f004:IsZero:pub}
-  §I{i32:x}
-  §O{bool}
-  §R (== x 0)
-§/F{f004}
-§/M{m001}
+  §F{f001:Add:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{f002:Multiply:pub} (i32:a, i32:b) -> i32
+    §R (* a b)
+
+  §F{f003:Negate:pub} (i32:x) -> i32
+    §R (- 0 x)
+
+  §F{f004:IsZero:pub} (i32:x) -> bool
+    §R (== x 0)
+

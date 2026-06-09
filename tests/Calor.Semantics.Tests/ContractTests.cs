@@ -20,11 +20,9 @@ public class ContractTests
         // For now, just verify a simple function compiles and runs
         var source = @"
 §M{m001:Test}
-§F{f001:getNone:pub}
-  §O{i32}
-  §R INT:0
-§/F{f001}
-§/M{m001}
+  §F{f001:getNone:pub}
+      §O{i32}
+      §R INT:0
 ";
 
         // For now, just verify compilation succeeds
@@ -45,13 +43,11 @@ public class ContractTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:positiveOnly:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (> x INT:0)
-  §R x
-§/F{f001}
-§/M{m001}
+  §F{f001:positiveOnly:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (> x INT:0)
+      §R x
 ";
 
         // With x = -1, precondition should fail
@@ -79,13 +75,11 @@ public class ContractTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:positiveOnly:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (> x INT:0)
-  §R (* x INT:2)
-§/F{f001}
-§/M{m001}
+  §F{f001:positiveOnly:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (> x INT:0)
+      §R (* x INT:2)
 ";
 
         // With x = 5, precondition should pass
@@ -103,14 +97,12 @@ public class ContractTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:bounded:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (> x INT:0)
-  §Q (< x INT:100)
-  §R x
-§/F{f001}
-§/M{m001}
+  §F{f001:bounded:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (> x INT:0)
+      §Q (< x INT:100)
+      §R x
 ";
 
         // x = 50 should pass both
@@ -139,13 +131,11 @@ public class ContractTests
         // since message syntax may not be supported
         var source = @"
 §M{m001:Test}
-§F{f001:withMessage:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (> x INT:0)
-  §R x
-§/F{f001}
-§/M{m001}
+  §F{f001:withMessage:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (> x INT:0)
+      §R x
 ";
 
         var result = SemanticsTestHarness.Execute(source, "withMessage", new object[] { -1 });

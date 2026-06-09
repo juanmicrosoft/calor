@@ -32,21 +32,20 @@ Traditional languages make agents *infer* these answers through complex analysis
 |-----------|------------------------|---------------|
 | **Explicit over implicit** | Effects declared with `§E{cw, fs:r, net:rw}` | Know side effects without reading implementation |
 | **Contracts are code** | First-class `§Q` (requires) and `§S` (ensures) | Generate tests from specs, verify correctness |
-| **Everything has an ID** | `§F{f001:Main}`, `§L{l001:i:1:100:1}` | Precise references that survive refactoring |
-| **Unambiguous structure** | Matched tags `§F{}...§/F{}` | Parse without semantic analysis |
+| **Stable IDs when you want them** | `§F{f001:Main}`, `§L{l001:i:1:100:1}` (IDs are optional) | Precise references that survive refactoring |
+| **Indent-based blocks** | Python-style indentation — no closer tags to mismatch | Lower edit cost (~16% fewer tokens in our studies) |
 | **Machine-readable semantics** | Lisp-style operators `(+ a b)` | Symbolic manipulation without text parsing |
 
 ### Side-by-Side: What Agents See
 
 **Calor** — Everything explicit:
 ```
-§F{f002:Square:pub}
+§F{Square:pub}
   §I{i32:x}
   §O{i32}
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
-§/F{f002}
 ```
 
 **C#** — Contracts buried in implementation:
@@ -63,10 +62,11 @@ public static int Square(int x)
 ```
 
 **What Calor tells the agent directly:**
-- Function ID: `f002`, can reference precisely
+- Optional ID slot: `§F{f002:Square:pub}` if you need a stable handle for tooling; otherwise just `§F{Square:pub}`
 - Precondition (`§Q`): `x >= 0`
 - Postcondition (`§S`): `result >= 0`
 - No side effects (no `§E` declaration)
+- Block ends at dedent — no closer tag to forget
 
 **What C# requires the agent to infer:**
 - Parse exception patterns to find contracts
@@ -129,12 +129,10 @@ calor --input program.calr --output program.g.cs
 
 ```
 §M{m001:Hello}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §P "Hello from Calor!"
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+    §O{void}
+    §E{cw}
+    §P "Hello from Calor!"
 ```
 
 Save as `hello.calr`, then:

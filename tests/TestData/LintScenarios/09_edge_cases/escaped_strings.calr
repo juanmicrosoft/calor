@@ -1,10 +1,8 @@
 §M{m1:Escaped}
-§F{f1:Escapes:pub}
-§O{void}
-§E{cw}
-§P "line1\nline2"
-§P "tab\there"
-§P "quote\"inside"
-§P "backslash\\"
-§/F{f1}
-§/M{m1}
+  §F{f1:Escapes:pub} () -> void
+    §E{cw}
+    §P "line1\nline2"
+    §P "tab\there"
+    §P "quote\"inside"
+    §P "backslash\\"
+

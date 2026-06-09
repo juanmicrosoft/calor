@@ -71,14 +71,13 @@ Defined in `ExpressionNodes.cs:141-146`:
 §IF{id001}
   §COND §OP{kind=GT} §REF{name=x} 0
   §THEN
-    §R INT:1
+  §R INT:1
   §ELSEIF
-    §COND §OP{kind=LT} §REF{name=x} 0
-    §THEN
-      §R INT:-1
+  §COND §OP{kind=LT} §REF{name=x} 0
+  §THEN
+  §R INT:-1
   §ELSE
-    §R INT:0
-§/IF{id001}
+  §R INT:0
 ```
 
 ### 3.2 Loops
@@ -92,12 +91,12 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 ```calor
 §FOR{for1}{var=i}{from=0}{to=10}{step=1}
-  §PRINT §REF{name=i}
+§PRINT §REF{name=i}
 §/FOR{for1}
 
 §WHILE{while1}
-  §COND §OP{kind=LT} §REF{name=i} 100
-  ...
+§COND §OP{kind=LT} §REF{name=i} 100
+...
 §/WHILE{while1}
 ```
 
@@ -122,12 +121,12 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 ```calor
 §MATCH{m001} §REF{name=shape}
-  §CASE §PATTERN{Some} §VAR{s}
-    §BODY §R §REF{name=s}
-  §/CASE
-  §CASE §PATTERN{None}
-    §BODY §R STR:"none"
-  §/CASE
+§CASE §PATTERN{Some} §VAR{s}
+§BODY §R §REF{name=s}
+§/CASE
+§CASE §PATTERN{None}
+§BODY §R STR:"none"
+§/CASE
 §/MATCH{m001}
 ```
 
@@ -199,7 +198,6 @@ Defined in `ExpressionNodes.cs:141-146`:
   §REQUIRES §OP{kind=GTE} §REF{name=a} 0
   §ENSURES §OP{kind=GT} result 0
   §R §OP{kind=ADD} §REF{name=a} §REF{name=b}
-§/F{f001}
 ```
 
 ### 6.2 Parameters
@@ -258,13 +256,13 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 ```calor
 §TRY{try1}
-  §C{RiskyOperation} §/C
+§C{RiskyOperation} §/C
 §CA{IOException:ex}
-  §PRINT §REF{name=ex}
+§PRINT §REF{name=ex}
 §CA
-  §RETHROW
+§RETHROW
 §FI
-  §C{Cleanup} §/C
+§C{Cleanup} §/C
 §/TRY{try1}
 ```
 

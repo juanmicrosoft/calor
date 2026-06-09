@@ -8,6 +8,4 @@
     ALL_ACCESS = (0xFFFF)
     MEDIUM = 2 * 1024
     LARGE = 4 * 1024
-  §/EN{e001}
 
-§/M{m001}

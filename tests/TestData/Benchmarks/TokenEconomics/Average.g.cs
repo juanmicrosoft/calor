@@ -7,22 +7,20 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Average
 {
     public static class AverageModule
     {
-        public static double Average(int count, int total)
+        public static float Average(int count, int total)
         {
-            if (!((count > 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (count > 0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 82, length: 14, sourceFile: null, line: 6, column: 3, condition: "(count > 0)");
-            return ((double)total / (double)count);
+            if (!(count > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: count > 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 76, length: 14, sourceFile: null, line: 3, column: 5, condition: "count > 0");
+            return (double)total / (double)count;
         }
 
         public static int Sum(int a, int b)
         {
-            return (a + b);
+            return a + b;
         }
 
     }

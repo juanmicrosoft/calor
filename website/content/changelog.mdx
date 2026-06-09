@@ -8,6 +8,76 @@ All notable changes to Calor, organized by release.
 
 ---
 
+## [Unreleased]
+
+## [0.6.1] - 2026-06-09
+
+### Changed
+- **`ConversionContext.UseImplicitCallCloser` now defaults to `true`** (was `false` in v0.6.0). The C# → Calor converter now elides `§/C` for zero-argument calls by default, producing more idiomatic Calor output. The opt-out (`UseImplicitCallCloser = false`) is preserved.
+
+### Compatibility
+- **Calor source emitted by v0.6.1 may not parse on v0.6.0 or earlier `calor` toolchains.** The new default emits more zero-arg `§C` calls without explicit `§/C`. Sources that exercise the newly-fixed parser layouts (zero-arg `§C` immediately before `Dedent`, or followed by a same-column sibling opener) will mis-parse on v0.6.0. To produce v0.6.0-compatible output from v0.6.1, use any of:
+  - **CLI single-file:** `calor convert --explicit-call-closers <input.cs>`
+  - **CLI project migration:** `calor migrate --explicit-call-closers <path>`
+  - **MCP `calor_convert` / `calor_migrate`:** `"explicitCallClosers": true`
+  - **SDK:** `new ConversionOptions { UseImplicitCallCloser = false }`
+
+  Round-trip (`C# → Calor → C#`) remains semantic/structural; the intermediate `.calr` is intentionally *not* byte-identical to v0.6.0 converter output unless the opt-out is used.
+
+### Fixed
+- **Parser: `§C` standard form no longer swallows trailing `Dedent`.** Previously, a zero-arg `§C` immediately followed by the end of its enclosing block could corrupt the structural parse of the surrounding method or `§IF` body. Now correctly distinguished from indent-aware block terminators.
+- **Parser: `§C` no longer absorbs a same-column sibling structural opener on the next line.** A sibling `§IF` / `§MATCH` / `§NEW` on the next line at the same indent is no longer silently absorbed as the call's inline argument. Both `ParseCallExpression` and `ParseCallStatement` now gate the inline-arg form on the candidate argument starting on the *same source line* as `§C{target}`. See [Calls reference](/syntax-reference/calls/) rule 6.
+- **Emitter: zero-arg `§C` inside an inline-sibling context now keeps explicit `§/C`.** With the new default, naively eliding `§/C` from a zero-arg call emitted inside another call's `§A` chain or inside an array/`§ARR`/`§ROW`/`§SALLOC`/`§IDX2D` initializer caused silent AST corruption (e.g. `M(A(), 2)` round-tripping as `M(A(2))`). The emitter now tracks an inline-sibling-context counter; zero-arg `§/C` elision is suppressed whenever a call is emitted inside such a context. Top-level / leaf-position calls (binding initializers, return values) still elide as before.
+- **Parser: `§C` statement form now supports zero-arg implicit close before sibling statements.** Previously a zero-arg `§C{target}` followed by a sibling statement on the next line at the same indent reported `Calor0100`. The statement-form parser now recognizes the zero-arg implicit close when the current token is not `§A`, `§/C`, `Dedent`, or `Eof`.
+
+---
+
+## [0.6.0] - 2026-06-04
+
+### Added
+- **`§C` call-closer elision (RFC `v0.6-call-closer-elision`).** Expression-context `§C{target}` calls may now omit the trailing `§/C` in two cases: (1) zero arguments — `§B{n} §C{items.Count}` is equivalent to `§B{n} §C{items.Count} §/C`; (2) exactly one inline argument (no `§A`) — `§B{y} §C{Math.Abs} x` is equivalent to `§B{y} §C{Math.Abs} §A x §/C`. The parser disambiguates nested elided calls (e.g., `§C{Foo.bar} §C{Baz.qux} y` ≡ `Foo.bar(Baz.qux(y))`) by counting consecutive `§/C` closers relative to enclosing `§A` depth. Trailing member access on inline arguments binds to the argument (`§C{Identity} obj?.Length` ≡ `Identity(obj?.Length)`); trailing member access on zero-arg calls binds to the call result (`§C{Maybe}?.Length` ≡ `Maybe()?.Length`). The explicit `§A` / `§/C` form continues to parse unchanged. See [Calls reference](/syntax-reference/calls/).
+- **`Calor0150 AmbiguousCallContinuation`** — New diagnostic in the reserved `Calor0150-0159` range. Fires when an elided `§C` already consumed one inline argument and is followed by either a second expression-start token or a `§A` token. The fix message recommends the explicit form.
+- **`ConversionContext.UseImplicitCallCloser` emitter flag.** Opt-in property on `Migration/ConversionContext`. When `true`, `CalorEmitter` elides `§/C` for zero-argument calls. Default `false` for backward compatibility. One-argument elision is intentionally deferred to v0.6.1 pending context-aware tracking inside Lisp argument lists.
+- **`§B` bind-inference formalization (RFC `v0.6-bind-inference-formalization`).** The four supported `§B` forms — `§B{name}` (requires initializer), `§B{name} initializer` (inferred), `§B{name:type}` (explicit, no initializer), `§B{name:type} initializer` (explicit wins) — and the binder's shallow inference rule are now documented at [Bindings](/syntax-reference/binding/).
+- **`Calor0250 BindRequiresTypeOrInitializer`** — `§B{name}` with no `:type` and no initializer is now a hard error reported through `BindValidationPass`. Replaces the pre-v0.6 silent fallback that bound `x` as `INT` and produced wrong-typed C# with no diagnostic.
+- **`Calor0251` / `Calor0252` / `Calor0253` strict-mode bind-inference diagnostics (opt-in via `--strict-bind-inference`).** Three new diagnostics in the `Calor0250-0259` range, each silenced by an explicit `:type` annotation, scheduled to become default-on in v0.7:
+  - **`Calor0251 BindCannotInferNullLiteral`** — fires on `§B{x} §NN` or `§B{x} null`.
+  - **`Calor0252 BindCannotInferGenericReturn`** — fires on `§B{x} §C{Vec.empty} §/C` and other well-known generic factory targets.
+  - **`Calor0253 BindAmbiguousNumeric`** — fires on `§B{x} (+ INT:0 FLOAT:0.0)` — a binary op mixing integer and floating-point literal operands.
+- **Two new syntax-reference pages** — [Bindings](/syntax-reference/binding/) and [Calls](/syntax-reference/calls/), with full disambiguation tables, examples, and diagnostic catalogues.
+- **v6 compact stable identifiers (default).** `IdGenerator.Generate(IdKind)` now mints 12-char Crockford-lowercase compact IDs (`f_7k9m2npqrstv`). The legacy 26-char Crockford-uppercase ULID form (`f_01J5X7K9M2NPQRSTABWXYZ12`) remains accepted by the parser, validator, and migration tooling. Saves ~9.7 tokens per ID in agent-facing serialisations.
+- **`calor fix --compact-ids <root>`** — bulk repo-wide migrator from legacy ULID payloads to v6 compact payloads. Two-pass design with deterministic compact derivation, within-file and cross-file collision detection, and byte-exact revert via `--revert --log <file>`. Idempotent on already-migrated source.
+- **`IdValidator` accepts both compact and legacy ULID forms.** New predicates `IsCompactId`, `IsLegacyUlidId`, and `IsCanonicalId`. New `Calor0821 LegacyUlidPayload` diagnostic code reserved for the opt-in lint that flags ULID payloads.
+
+### Changed
+- **`Migration/CalorEmitter.Visit(CallExpressionNode)`** — Zero-argument calls in expression context now conditionally elide `§/C` when `ConversionContext.UseImplicitCallCloser` is `true`. Multi-argument and one-argument paths are unchanged in v0.6.0 (zero-arg-only elision) pending the v0.6.1 context-aware enablement.
+
+### Fixed
+- **Binder no longer silently defaults `§B{x}` to `INT`.** A `§B{name}` with neither a `:type` annotation nor an initializer was silently treated as `INT` by the pre-v0.6 binder, producing wrong-typed C# with no diagnostic. v0.6 surfaces this as `Calor0250`.
+
+---
+
+## [0.5.1] - 2026-06-03
+
+### Added
+- **Indent-only Calor source** — Calor source is now indent-delimited end to end. The parser, migration emitter (`Migration/CalorEmitter`), and `calor format` all produce/accept indent form as canonical. Closer-form structural tags (`§/F{id}`, `§/M{id}`, `§/I{id}`, `§/L{id}`, …) have been removed from the emitter and rejected by the strict CLI compile path. The `09_codegen_bugfixes` self-test fixture was migrated alongside; round-trip emission stays byte-identical.
+- **`calor --input … --output … --allow-legacy-closers`** — Escape hatch on the CLI compile path for users mid-migration. Default is strict (legacy closer form produces `Calor0830`); `calor format` rewrites a file in canonical indent form.
+- **`CompilationOptions.RejectLegacyClosers`** — Opt-in compilation flag; the CLI sets it to `true` by default, other API surfaces (MSBuild `<CompileCalor>`, MCP tools, LSP) keep the lax default for now.
+- **`calor fix --drop-structural-ids <root>`** — Bulk, mechanical, byte-reversible source rewriter that strips `{id}` from structural closing tags. Records every removal in a `migration.log.json` and supports `--revert --log <file>` to restore the original bytes exactly. See [`docs/cli/fix.md`](/docs/cli/fix/).
+- **`Calor0820 LegacyStructuralId` / `Calor0830 LegacyCloserForm`** — Opt-in lints flagging legacy IDs on closing tags and legacy closer-form structural tags, with `fix` patches pointing at `calor fix` and `calor format` respectively.
+- **Optional closing-tag IDs everywhere** — Structural closing tags (`§/M`, `§/F`, `§/AF`, `§/L`, `§/I`, `§/TR`, `§/CL`, `§/IN`, `§/PR`, `§/MT`) may omit the trailing `{id}` block. Both forms continue to parse; the parser pairs closers with their nearest matching opener by structural nesting.
+- **Phase 5 — Product docs migrated to indent-only syntax.** README, `docs/`, and `website/content/` now teach indent-form Calor as the canonical surface; closer-form is mentioned only in legacy callouts that point at `calor fix` for migration.
+
+### Changed
+- **Lint no longer flags leading indentation or blank lines.** With indent form now canonical, the two formatting lint rules introduced for the closer-form "agent-optimized" surface (leading whitespace, blank lines) have been removed from both `calor lint` and the `check` MCP tool. Indentation and blank lines are first-class.
+- **Benchmark metric calculators score indent form, not closer tags.** The four heuristic calculators under `tests/Calor.Evaluation/Metrics/` used to award credit for the presence of paired structural closing tags as a proxy for "scope boundaries are explicit". With indent form canonical, the dedent IS the scope-boundary signal, so those bonuses now reward indented body lines per structural opener. Net score magnitude is preserved.
+
+### Fixed
+- **`Migration/CalorEmitter.Visit(CatchClauseNode)`** — Catch filters now emit `§WHEN` (matching the token form the parser produces and the `§WHEN` already emitted by match-arm guards). Previously emitted a bare lowercase `WHEN` that did not round-trip cleanly.
+- **`MatchExpressionNode` as a `§B` binding initializer** — match expressions used as binding initializers now emit indented `§K` arms relative to the enclosing block. Previously hardcoded 2/4-space indents could trigger `Calor0099` dedent errors when the binding lived inside a deeper function body.
+
+---
+
 ## [0.5.0] - 2026-04-22
 
 ### Added

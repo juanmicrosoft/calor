@@ -44,7 +44,6 @@ Functions can have multiple preconditions:
   §Q (>= age 0)                          // age non-negative
   §Q (<= age 150)                        // age reasonable
   // ...
-§/F{f001}
 ```
 
 ---
@@ -79,8 +78,6 @@ In postconditions, `result` refers to the return value:
   §S (>= result 0)                       // absolute value is non-negative
   §IF{if1} (>= x 0) → §R x
   §EL → §R (- 0 x)
-  §/I{if1}
-§/F{f001}
 ```
 
 ---
@@ -102,7 +99,6 @@ In postconditions, `result` refers to the return value:
   §S (<= result dividend)                // result doesn't exceed dividend
 
   §R (/ dividend divisor)
-§/F{f001}
 ```
 
 ---
@@ -121,7 +117,6 @@ In postconditions, `result` refers to the return value:
   §S (>= result min)                     // result at least min
   §S (<= result max)                     // result at most max
   // ...
-§/F{f001}
 ```
 
 ### Non-Empty Collection
@@ -133,7 +128,6 @@ In postconditions, `result` refers to the return value:
   §Q (> (count items) 0)                 // list not empty
   §S (!= result null)                    // result exists
   // ...
-§/F{f001}
 ```
 
 ### State Preservation
@@ -144,7 +138,6 @@ In postconditions, `result` refers to the return value:
   §O{i32}
   §S (== result (+ x 1))                 // result is exactly x + 1
   §R (+ x 1)
-§/F{f001}
 ```
 
 ### Balance Transfers
@@ -160,7 +153,6 @@ In postconditions, `result` refers to the return value:
   §Q (>= from.balance amount)            // sufficient funds
   // Balance conservation would be expressed if Calor supported old_ values
   // ...
-§/F{f001}
 ```
 
 ---
@@ -227,7 +219,6 @@ Implication `p -> q` is equivalent to `!p || q`.
   §O{bool}
   §Q (forall ((i i32)) (-> (&& (>= i INT:0) (< i n)) (>= arr{i} INT:0)))
   §R true
-§/F{f001}
 ```
 
 #### Array Contains Target (Search Precondition)
@@ -241,7 +232,6 @@ Implication `p -> q` is equivalent to `!p || q`.
   §S (>= result INT:0)
   §S (< result n)
   // ...
-§/F{f001}
 ```
 
 #### Matrix Symmetry (Multiple Variables)
@@ -251,10 +241,9 @@ Implication `p -> q` is equivalent to `!p || q`.
   §I{i32:n}
   §O{bool}
   §Q (forall ((i i32) (j i32))
-       (-> (&& (>= i INT:0) (< i n) (>= j INT:0) (< j n))
-           (== matrix{i}{j} matrix{j}{i})))
+  (-> (&& (>= i INT:0) (< i n) (>= j INT:0) (< j n))
+  (== matrix{i}{j} matrix{j}{i})))
   §R true
-§/F{f001}
 ```
 
 ### Runtime vs Static Verification
@@ -301,7 +290,6 @@ An agent can understand function behavior without reading implementation:
   §S (>= result 0)                       // Result is non-negative
   §S (<= (- (* result result) x) 0.0001) // result² ≈ x
   // ...
-§/F{f001}
 ```
 
 ### 2. For Bug Detection
@@ -348,7 +336,6 @@ Recommended order in function definition:
   §Q ...            // 4. Preconditions (0 or more)
   §S ...            // 5. Postconditions (0 or more)
   // body           // 6. Implementation
-§/F{id}
 ```
 
 ---
@@ -429,7 +416,6 @@ A common question: Do contracts count as effects?
   §O{i32}
   §Q (!= b 0)       // No §E needed
   §R (/ a b)
-§/F{f001}
 ```
 
 This function is pure (no `§E` declaration) even though the precondition might throw. The `throw` effect in `§E` is only for intentional `§TH` statements in business logic, not contract violations.

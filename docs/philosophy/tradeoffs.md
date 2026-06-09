@@ -35,7 +35,7 @@ This is a fundamental design choice, not a flaw to be fixed.
 | **Error Detection** | First-class preconditions/postconditions | Better than C# |
 | **Edit Precision** | Unique IDs for every element | Better than C# |
 | **Refactoring Stability** | Stable IDs across changes | Better than C# |
-| **Parseability** | Matched tags, prefix notation | Trivial to parse |
+| **Parseability** | Indentation + prefix notation | Trivial to parse |
 | **Verifiability** | Contracts in syntax, not comments | Machine-checkable specs |
 
 [See current benchmark results →](/calor/benchmarking/results/)
@@ -89,7 +89,6 @@ Calor's tradeoff pays off when:
   §S (== from.balance (- old_from_balance amount))
   §S (== to.balance (+ old_to_balance amount))
   // ...
-§/F{f001}
 ```
 
 An agent can reason about this function's behavior without reading the implementation:
@@ -111,7 +110,6 @@ An agent can reason about this function's behavior without reading the implement
   §S (>= result 0)
   §S (<= result price)
   §R (* price (- 1 (/ discount_percent 100)))
-§/F{f001}
 ```
 
 An agent can immediately verify:
@@ -158,7 +156,7 @@ Calor's syntax is optimized for machine parsing:
 if (x > 0) return x;
 
 // Less familiar
-§IF{if1} (> x 0) → §R x §/I{if1}
+§IF{if1} (> x 0) → §R x
 ```
 
 ### 3. You Need Library Ecosystem

@@ -1,0 +1,5 @@
+§M{m001:DataAccess}
+  §F{f001:LoadUserSettings:pub} (i32:userId) -> str
+    §E{db}
+    §R "settings-stub"
+

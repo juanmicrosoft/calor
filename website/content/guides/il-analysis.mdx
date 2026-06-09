@@ -37,7 +37,6 @@ And your Calor code calls it:
   §O{void}
   §E{db:w}
   §C{UserRepository.Save} §A name §/C
-§/F{f001}
 ```
 
 Without IL analysis, the compiler doesn't know that `UserRepository.Save` has `db:w` — it would flag it as an Unknown external call (Calor0411). You'd need to write a custom manifest for every intermediate method.

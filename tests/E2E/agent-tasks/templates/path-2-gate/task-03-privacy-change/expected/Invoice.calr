@@ -1,0 +1,9 @@
+§M{m003:Invoice}
+  §F{f004:InvoiceLine:pub} (i32:price) -> i32
+    §B{t} §C{ComputeTax} §A price §/C
+    §R (+ price t)
+
+  §F{f005:InvoiceFooter:pub} (i32:subtotal) -> i32
+    §B{t} §C{ComputeTax} §A subtotal §/C
+    §R t
+

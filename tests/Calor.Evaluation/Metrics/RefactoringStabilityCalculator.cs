@@ -243,27 +243,35 @@ public class RefactoringStabilityCalculator : IMetricCalculator
         var earnedBonus = 0.0;
         var applicableBonus = 0.0;
 
+        // Indent form (Phase 4): every structural opener (§M{, §F{,
+        // §MT{, …) is terminated by a dedent. The "earned" signal is
+        // that there is at least one indented body line following the
+        // opener — that's how Calor encodes a complete, well-scoped
+        // block now. We approximate "has indented body" with a single
+        // file-level regex (`^[ \t]+\S` in multiline mode) since the
+        // calculators are heuristic, not parser-based.
+        var hasIndentedBody = System.Text.RegularExpressions.Regex.IsMatch(
+            source, @"^[ \t]+\S", System.Text.RegularExpressions.RegexOptions.Multiline);
+
         // Module boundaries
         if (source.Contains("§M{"))
         {
             applicableBonus += 0.125;
-            if (source.Contains("§/M{")) earnedBonus += 0.125;
+            if (hasIndentedBody) earnedBonus += 0.125;
         }
 
         // Type boundaries (class, interface)
         if (source.Contains("§CL{") || source.Contains("§IFACE{"))
         {
             applicableBonus += 0.125;
-            if ((source.Contains("§CL{") && source.Contains("§/CL{")) ||
-                (source.Contains("§IFACE{") && source.Contains("§/IFACE{")))
-                earnedBonus += 0.125;
+            if (hasIndentedBody) earnedBonus += 0.125;
         }
 
         // Function boundaries
         if (source.Contains("§F{"))
         {
             applicableBonus += 0.125;
-            if (source.Contains("§/F{")) earnedBonus += 0.125;
+            if (hasIndentedBody) earnedBonus += 0.125;
         }
 
         // Member boundaries (method, async function, constructor, operator)
@@ -271,11 +279,7 @@ public class RefactoringStabilityCalculator : IMetricCalculator
             source.Contains("§CTOR{") || source.Contains("§OP{"))
         {
             applicableBonus += 0.125;
-            if ((source.Contains("§MT{") && source.Contains("§/MT{")) ||
-                (source.Contains("§AF{") && source.Contains("§/AF{")) ||
-                (source.Contains("§CTOR{") && source.Contains("§/CTOR{")) ||
-                (source.Contains("§OP{") && source.Contains("§/OP{")))
-                earnedBonus += 0.125;
+            if (hasIndentedBody) earnedBonus += 0.125;
         }
 
         // Normalize bonus to the 0.50 budget, scaled by applicable groups

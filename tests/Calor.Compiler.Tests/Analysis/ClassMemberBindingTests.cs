@@ -19,7 +19,7 @@ public class ClassMemberBindingTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -51,13 +51,10 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Calculator:pub}
-    §MT{m002:Add:pub} (i32:x, i32:y) -> i32
-      §E{*}
-      §R (+ x y)
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Calculator:pub}
+        §MT{m002:Add:pub} (i32:x, i32:y) -> i32
+            §E{*}
+            §R (+ x y)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -75,17 +72,13 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Converter:pub}
-    §MT{m002:Convert:pub} (i32:x) -> str
-      §E{*}
-      §R (str x)
-    §/MT{m002}
-    §MT{m003:Convert:pub} (i32:x, str:format) -> str
-      §E{*}
-      §R (str x)
-    §/MT{m003}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Converter:pub}
+        §MT{m002:Convert:pub} (i32:x) -> str
+            §E{*}
+            §R (str x)
+        §MT{m003:Convert:pub} (i32:x, str:format) -> str
+            §E{*}
+            §R (str x)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -100,11 +93,8 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Base:pub:abs}
-    §MT{m002:DoWork:pub:abs}
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Base:pub:abs}
+        §MT{m002:DoWork:pub:abs}
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -120,13 +110,11 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Widget:pub}
-    §FLD{i32:_count:priv}
-    §CTOR{ctor002:pub} (i32:count)
-      §ASSIGN _count count
-    §/CTOR{ctor002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Widget:pub}
+        §FLD{i32:_count:priv}
+        §CTOR{ctor002:pub} (i32:count)
+          §ASSIGN _count count
+        §/CTOR{ctor002}
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -144,14 +132,11 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Widget:pub}
-    §FLD{i32:_count:priv}
-    §MT{m002:UseCount:pub}
-      §E{*}
-      §C{Console.WriteLine} §A _count §/C
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Widget:pub}
+        §FLD{i32:_count:priv}
+        §MT{m002:UseCount:pub}
+            §E{*}
+            §C{Console.WriteLine} §A _count §/C
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -171,15 +156,13 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Config:pub}
-    §FLD{str:_name:priv}
-    §PROP{p002:Name:str:pub}
-      §GET{pub}
-        §R _name
-      §/GET
-    §/PROP{p002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Config:pub}
+        §FLD{str:_name:priv}
+        §PROP{p002:Name:str:pub}
+          §GET{pub}
+            §R _name
+          §/GET
+        §/PROP{p002}
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -194,18 +177,16 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Config:pub}
-    §FLD{str:_name:priv}
-    §PROP{p002:Name:str:pub}
-      §GET{pub}
-        §R _name
-      §/GET
-      §SET{pub}
-        §ASSIGN _name value
-      §/SET
-    §/PROP{p002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Config:pub}
+        §FLD{str:_name:priv}
+        §PROP{p002:Name:str:pub}
+          §GET{pub}
+            §R _name
+          §/GET
+          §SET{pub}
+            §ASSIGN _name value
+          §/SET
+        §/PROP{p002}
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -228,14 +209,12 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Vector:pub}
-    §FLD{f64:X:pub}
-    §FLD{f64:Y:pub}
-    §OP{op002:+:pub} (Vector:a, Vector:b) -> Vector
-      §R §NEW{Vector} §/NEW
-    §/OP{op002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Vector:pub}
+        §FLD{f64:X:pub}
+        §FLD{f64:Y:pub}
+        §OP{op002:+:pub} (Vector:a, Vector:b) -> Vector
+          §R §NEW{Vector} §/NEW
+        §/OP{op002}
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -308,14 +287,11 @@ public class ClassMemberBindingTests
         // resolve to the parameter (innermost scope wins)
         var source = @"
 §M{m001:Test}
-  §CL{c001:Foo:pub}
-    §FLD{i32:x:priv}
-    §MT{m002:Set:pub} (i32:x)
-      §E{*}
-      §C{Console.WriteLine} §A x §/C
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Foo:pub}
+        §FLD{i32:x:priv}
+        §MT{m002:Set:pub} (i32:x)
+            §E{*}
+            §C{Console.WriteLine} §A x §/C
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -355,14 +331,11 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Counter:pub}
-    §FLD{i32:_count:priv}
-    §MT{m002:Increment:pub}
-      §E{*}
-      §ASSIGN _count (+ _count 1)
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Counter:pub}
+        §FLD{i32:_count:priv}
+        §MT{m002:Increment:pub}
+            §E{*}
+            §ASSIGN _count (+ _count 1)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -379,13 +352,10 @@ public class ClassMemberBindingTests
         // it should produce BoundUnsupportedStatement + Calor0931, not throw
         var source = @"
 §M{m001:Test}
-  §CL{c001:MyClass:pub}
-    §MT{m002:DoWork:pub}
-      §E{*}
-      §C{Console.WriteLine} §A ""hello"" §/C
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:MyClass:pub}
+        §MT{m002:DoWork:pub}
+            §E{*}
+            §C{Console.WriteLine} §A ""hello"" §/C
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -402,10 +372,8 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §F{f001:add:pub} (i32:x, i32:y) -> i32
-    §R (+ x y)
-  §/F{f001}
-§/M{m001}
+    §F{f001:add:pub} (i32:x, i32:y) -> i32
+        §R (+ x y)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -419,25 +387,22 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:MyClass:pub}
-    §FLD{i32:_x:priv}
-    §MT{m002:Foo:pub}
-      §E{*}
-      §C{Console.WriteLine} §A ""hello"" §/C
-    §/MT{m002}
-    §CTOR{ctor003:pub} (i32:x)
-      §ASSIGN _x x
-    §/CTOR{ctor003}
-    §PROP{p004:X:i32:pub}
-      §GET{pub}
-        §R _x
-      §/GET
-      §SET{pub}
-        §ASSIGN _x value
-      §/SET
-    §/PROP{p004}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:MyClass:pub}
+        §FLD{i32:_x:priv}
+        §MT{m002:Foo:pub}
+            §E{*}
+            §C{Console.WriteLine} §A ""hello"" §/C
+        §CTOR{ctor003:pub} (i32:x)
+          §ASSIGN _x x
+        §/CTOR{ctor003}
+        §PROP{p004:X:i32:pub}
+          §GET{pub}
+            §R _x
+          §/GET
+          §SET{pub}
+            §ASSIGN _x value
+          §/SET
+        §/PROP{p004}
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -461,13 +426,10 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Math:pub}
-    §MT{m002:Divide:pub} (i32:x, i32:y) -> i32
-      §E{*}
-      §R (/ x y)
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Math:pub}
+        §MT{m002:Divide:pub} (i32:x, i32:y) -> i32
+            §E{*}
+            §R (/ x y)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -492,13 +454,10 @@ public class ClassMemberBindingTests
         // but not be added to the functions list
         var source = @"
 §M{m001:Test}
-  §CL{c001:Good:pub}
-    §MT{m002:WorkingMethod:pub}
-      §E{*}
-      §C{Console.WriteLine} §A ""ok"" §/C
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Good:pub}
+        §MT{m002:WorkingMethod:pub}
+            §E{*}
+            §C{Console.WriteLine} §A ""ok"" §/C
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -515,10 +474,8 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §F{f001:abs:pub} (i32:x) -> i32
-    §R (? (>= x 0) x (- 0 x))
-  §/F{f001}
-§/M{m001}
+    §F{f001:abs:pub} (i32:x) -> i32
+        §R (? (>= x 0) x (- 0 x))
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -541,15 +498,11 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Processor:pub}
-    §MT{m002:Process:pub} (List<str>:items)
-      §E{*}
-      §EACH{each003:item:str} items
-        §C{Console.WriteLine} §A item §/C
-      §/EACH{each003}
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Processor:pub}
+        §MT{m002:Process:pub} (List<str>:items)
+            §E{*}
+            §EACH{each003:item:str} items
+                §C{Console.WriteLine} §A item §/C
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -563,15 +516,11 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Guard:pub}
-    §MT{m002:Check:pub} (i32:x)
-      §E{*,throw}
-      §IF{if003} (< x 0)
-        §TH §NEW{ArgumentException} §A ""negative"" §/NEW
-      §/I{if003}
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Guard:pub}
+        §MT{m002:Check:pub} (i32:x)
+            §E{*,throw}
+            §IF{if003} (< x 0)
+                §TH §NEW{ArgumentException} §A ""negative"" §/NEW
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -584,15 +533,12 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:FileHandler:pub}
-    §MT{m002:ReadFile:pub} (str:path) -> str
-      §E{*}
-      §USE{use003:reader:StreamReader} §C{File.OpenText} §A path §/C
-        §R §C{reader.ReadToEnd} §/C
-      §/USE{use003}
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:FileHandler:pub}
+        §MT{m002:ReadFile:pub} (str:path) -> str
+            §E{*}
+            §USE{use003:reader:StreamReader} §C{File.OpenText} §A path §/C
+              §R §C{reader.ReadToEnd} §/C
+            §/USE{use003}
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -693,14 +639,11 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Config:pub}
-    §PROP{p002:Name:str:pub:get,set}
-    §MT{m003:UseProperty:pub}
-      §E{*}
-      §C{Console.WriteLine} §A Name §/C
-    §/MT{m003}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Config:pub}
+        §PROP{p002:Name:str:pub:get,set}
+        §MT{m003:UseProperty:pub}
+            §E{*}
+            §C{Console.WriteLine} §A Name §/C
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -719,10 +662,8 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §F{f001:convert:pub} (dec:amount) -> dec
-    §R (/ amount DEC:100)
-  §/F{f001}
-§/M{m001}
+    §F{f001:convert:pub} (dec:amount) -> dec
+        §R (/ amount DEC:100)
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -747,13 +688,10 @@ public class ClassMemberBindingTests
         // Uses ReportOnlyVerified=false to see heuristic findings
         var source = @"
 §M{m001:Test}
-  §CL{c001:Calculator:pub}
-    §MT{m002:Divide:pub} (i32:x, i32:y) -> i32
-      §E{*}
-      §R (/ x y)
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Calculator:pub}
+        §MT{m002:Divide:pub} (i32:x, i32:y) -> i32
+            §E{*}
+            §R (/ x y)
 ";
         var module = Parse(source, out var parseDiags);
         Assert.False(parseDiags.HasErrors, $"Parse errors: {string.Join(", ", parseDiags.Errors.Select(e => e.Message))}");
@@ -772,14 +710,12 @@ public class ClassMemberBindingTests
         // Constructor with : base(args) — initializer args should be visible to analysis
         var source = @"
 §M{m001:Test}
-  §CL{c001:Widget:pub}
-    §FLD{i32:_value:priv}
-    §CTOR{ctor002:pub} (i32:v)
-      §BASE §A v §/BASE
-      §ASSIGN _value v
-    §/CTOR{ctor002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Widget:pub}
+        §FLD{i32:_value:priv}
+        §CTOR{ctor002:pub} (i32:v)
+          §BASE §A v §/BASE
+          §ASSIGN _value v
+        §/CTOR{ctor002}
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);
@@ -799,14 +735,11 @@ public class ClassMemberBindingTests
     {
         var source = @"
 §M{m001:Test}
-  §CL{c001:Utils:pub}
-    §FLD{i32:_counter:priv}
-    §MT{m002:StaticMethod:pub:stat}
-      §E{*}
-      §C{Console.WriteLine} §A §THIS §/C
-    §/MT{m002}
-  §/CL{c001}
-§/M{m001}
+    §CL{c001:Utils:pub}
+        §FLD{i32:_counter:priv}
+        §MT{m002:StaticMethod:pub:stat}
+            §E{*}
+            §C{Console.WriteLine} §A §THIS §/C
 ";
         var bound = Bind(source, out var diagnostics);
         Assert.NotNull(bound);

@@ -1331,7 +1331,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
     {
         foreach (var cls in ast.Classes)
         {
-            if (offset >= cls.Span.Start && offset < cls.Span.End)
+            if (offset >= cls.Span.Start && offset <= cls.Span.End)
             {
                 return cls;
             }
@@ -1420,7 +1420,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
     {
         foreach (var func in ast.Functions)
         {
-            if (offset >= func.Span.Start && offset < func.Span.End)
+            if (offset >= func.Span.Start && offset <= func.Span.End)
             {
                 return func;
             }
@@ -1434,7 +1434,7 @@ public sealed class CompletionHandler : CompletionHandlerBase
         {
             foreach (var method in cls.Methods)
             {
-                if (offset >= method.Span.Start && offset < method.Span.End)
+                if (offset >= method.Span.Start && offset <= method.Span.End)
                 {
                     return (cls, method);
                 }
@@ -1449,15 +1449,13 @@ public sealed class CompletionHandler : CompletionHandlerBase
         {
             foreach (var ctor in cls.Constructors)
             {
-                // Check constructor span
-                if (offset >= ctor.Span.Start && offset < ctor.Span.End)
+                if (offset >= ctor.Span.Start && offset <= ctor.Span.End)
                 {
                     return (cls, ctor);
                 }
-                // Also check body statements (constructor body may have separate spans)
                 foreach (var stmt in ctor.Body)
                 {
-                    if (offset >= stmt.Span.Start && offset < stmt.Span.End)
+                    if (offset >= stmt.Span.Start && offset <= stmt.Span.End)
                     {
                         return (cls, ctor);
                     }
@@ -1495,14 +1493,12 @@ public sealed class CompletionHandler : CompletionHandlerBase
 
     private static bool IsOffsetInAccessor(PropertyAccessorNode accessor, int offset)
     {
-        // Check if in the accessor tag span itself
-        if (offset >= accessor.Span.Start && offset < accessor.Span.End)
+        if (offset >= accessor.Span.Start && offset <= accessor.Span.End)
             return true;
 
-        // Check if in any body statement (accessor body may have separate spans)
         foreach (var stmt in accessor.Body)
         {
-            if (offset >= stmt.Span.Start && offset < stmt.Span.End)
+            if (offset >= stmt.Span.Start && offset <= stmt.Span.End)
                 return true;
         }
 

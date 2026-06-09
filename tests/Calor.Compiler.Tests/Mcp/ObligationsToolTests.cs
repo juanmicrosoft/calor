@@ -52,13 +52,11 @@ public sealed class ObligationsToolTests
     {
         var source = """
             §M{m001:Test}
-            §RTYPE{r1:NatInt:i32} (>= # INT:0)
-            §F{f001:Main:pub}
-              §I{i32:x} | (>= # INT:0)
-              §O{void}
-              §PROOF{p1:check} (>= x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §RTYPE{r1:NatInt:i32} (>= # INT:0)
+              §F{f001:Main:pub}
+                  §I{i32:x} | (>= # INT:0)
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -98,11 +96,9 @@ public sealed class ObligationsToolTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -126,15 +122,12 @@ public sealed class ObligationsToolTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Func1:pub}
-              §I{i32:x} | (>= # INT:0)
-              §O{void}
-            §/F{f001}
-            §F{f002:Func2:pub}
-              §I{i32:y} | (> # INT:0)
-              §O{void}
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Func1:pub}
+                  §I{i32:x} | (>= # INT:0)
+                  §O{void}
+              §F{f002:Func2:pub}
+                  §I{i32:y} | (> # INT:0)
+                  §O{void}
             """;
 
         var args = JsonDocument.Parse($$"""
@@ -173,12 +166,10 @@ public sealed class ObligationsToolTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{i32:x} | (>= # INT:0)
-              §O{void}
-              §PROOF{p1:always-positive} (> x INT:0)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{i32:x} | (>= # INT:0)
+                  §O{void}
+                  §PROOF{p1:always-positive} (> x INT:0)
             """;
 
         var args = JsonDocument.Parse($$"""

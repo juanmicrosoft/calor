@@ -15,7 +15,7 @@ public class ConverterQualityTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     private static string GetErrorMessage(ConversionResult result)
@@ -57,11 +57,9 @@ public class ConverterQualityTests
         // A .calr file containing §ERR should parse with only warnings, not cascading errors
         var calorSource = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §O{void}
-              §B{x:i32} §ERR "TODO: unknown-expression -- C#: checked(1 + 2)"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x:i32} §ERR "TODO: unknown-expression -- C#: checked(1 + 2)"
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -79,11 +77,9 @@ public class ConverterQualityTests
     {
         var calorSource = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §O{str}
-              §R §ERR "TODO: throw-expression -- C#: throw new Exception()"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §O{str}
+                  §R §ERR "TODO: throw-expression -- C#: throw new Exception()"
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -100,13 +96,11 @@ public class ConverterQualityTests
         // Multiple §ERR tokens in one file should each produce one error, not cascade
         var calorSource = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §O{void}
-              §B{x:i32} §ERR "TODO: feature-a -- C#: something"
-              §B{y:str} §ERR "TODO: feature-b -- C#: something else"
-              §B{z:bool} §ERR "TODO: feature-c -- C#: yet another"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x:i32} §ERR "TODO: feature-a -- C#: something"
+                  §B{y:str} §ERR "TODO: feature-b -- C#: something else"
+                  §B{z:bool} §ERR "TODO: feature-c -- C#: yet another"
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -304,11 +298,9 @@ public class ConverterQualityTests
     {
         var calorSource = """
             §M{m001:Test}
-            §F{f001:Configure:pub}
-              §O{void}
-              §C{Register} §A[name] "en-US" §A[flag] true §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Configure:pub}
+                  §O{void}
+                  §C{Register} §A[name] "en-US" §A[flag] true §/C
             """;
 
         var compileResult = Program.Compile(calorSource);
@@ -1060,7 +1052,7 @@ public class Foo
         Assert.Contains("default", result.CalorSource);
         // Should compile without Calor0104 errors
         var diag = new DiagnosticBag();
-        var tokens = new Lexer(result.CalorSource!, diag).TokenizeAll();
+        var tokens = new Lexer(result.CalorSource!, diag).TokenizeAllForParser();
         new Parser(tokens, diag).Parse();
         Assert.False(diag.HasErrors, "Should parse without errors");
     }
@@ -1068,7 +1060,7 @@ public class Foo
     [Fact]
     public void ScientificNotation_ParsesCorrectly()
     {
-        var source = "§M{m1:Test}\n  §CL{c1:Foo:pub}\n    §MT{m1:Foo:pub} () -> f64\n      §B{f64:epsilon} 2.2204460492503131E-16\n      §R epsilon\n    §/MT{m1}\n  §/CL{c1}\n§/M{m1}";
+        var source = "§M{m1:Test}\n  §CL{c1:Foo:pub}\n    §MT{m1:Foo:pub} () -> f64\n      §B{f64:epsilon} 2.2204460492503131E-16\n      §R epsilon\n\n\n";
         var diag = new DiagnosticBag();
         var tokens = new Lexer(source, diag).TokenizeAll();
         // Check lexer recognized the scientific notation as a float literal

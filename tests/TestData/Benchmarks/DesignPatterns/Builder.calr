@@ -1,19 +1,10 @@
 §M{m001:Builder}
-§F{f001:IsComplete:pub}
-  §I{bool:hasName}
-  §I{bool:hasAge}
-  §O{bool}
-  §R (&& hasName hasAge)
-§/F{f001}
-§F{f002:SetStep:pub}
-  §I{i32:currentStep}
-  §O{i32}
-  §R (+ currentStep 1)
-§/F{f002}
-§F{f003:CanBuild:pub}
-  §I{i32:requiredSteps}
-  §I{i32:completedSteps}
-  §O{bool}
-  §R (>= completedSteps requiredSteps)
-§/F{f003}
-§/M{m001}
+  §F{f001:IsComplete:pub} (bool:hasName, bool:hasAge) -> bool
+    §R (&& hasName hasAge)
+
+  §F{f002:SetStep:pub} (i32:currentStep) -> i32
+    §R (+ currentStep 1)
+
+  §F{f003:CanBuild:pub} (i32:requiredSteps, i32:completedSteps) -> bool
+    §R (>= completedSteps requiredSteps)
+

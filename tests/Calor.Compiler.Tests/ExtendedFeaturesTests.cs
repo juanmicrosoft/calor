@@ -23,7 +23,7 @@ public class ExtendedFeaturesTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -50,13 +50,11 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a} §I{i32:b}
-  §O{i32}
-  §EX (+ 2 3) → 5
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a} §I{i32:b}
+      §O{i32}
+      §EX (+ 2 3) → 5
+      §R (+ a b)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -73,13 +71,11 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a} §I{i32:b}
-  §O{i32}
-  §EX{ex001} (+ 2 3) → 5
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a} §I{i32:b}
+      §O{i32}
+      §EX{ex001} (+ 2 3) → 5
+      §R (+ a b)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -94,13 +90,11 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a} §I{i32:b}
-  §O{i32}
-  §EX (+ 2 3) → 5
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a} §I{i32:b}
+      §O{i32}
+      §EX (+ 2 3) → 5
+      §R (+ a b)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -146,12 +140,10 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§TD{t001:perf:high} ""Optimize for large n""
-§F{f001:Calc:pub}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §TD{t001:perf:high} ""Optimize for large n""
+  §F{f001:Calc:pub}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -171,12 +163,10 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Calc:pub}
-  §FX{x001:bug:critical} ""Integer overflow""
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:Calc:pub}
+      §FX{x001:bug:critical} ""Integer overflow""
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -194,12 +184,10 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§TD{t001:perf:high} ""Optimize for large n""
-§F{f001:Calc:pub}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §TD{t001:perf:high} ""Optimize for large n""
+  §F{f001:Calc:pub}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -236,12 +224,10 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ProcessOrder:pub}
-  §US{ValidateOrder}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:ProcessOrder:pub}
+      §US{ValidateOrder}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -258,12 +244,10 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ProcessOrder:pub}
-  §UB{OrderController}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:ProcessOrder:pub}
+      §UB{OrderController}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -279,13 +263,11 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:ProcessOrder:pub}
-  §US{ValidateOrder}
-  §UB{OrderController}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:ProcessOrder:pub}
+      §US{ValidateOrder}
+      §UB{OrderController}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -315,13 +297,11 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§AS{env} ""Database connection pool initialized""
-§F{f001:GetOrder:pub}
-  §AS{data} ""orderId exists in database""
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §AS{env} ""Database connection pool initialized""
+  §F{f001:GetOrder:pub}
+      §AS{data} ""orderId exists in database""
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -354,12 +334,10 @@ public class ExtendedFeaturesTests
         // v2 positional format: {timeComplexity:spaceComplexity}
         var source = @"
 §M{m001:Test}
-§F{f001:BinarySearch:pub}
-  §CX{O(logn):O(1)}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:BinarySearch:pub}
+      §CX{O(logn):O(1)}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -377,12 +355,10 @@ public class ExtendedFeaturesTests
         // v2 positional format: {timeComplexity}
         var source = @"
 §M{m001:Test}
-§F{f001:BinarySearch:pub}
-  §CX{O(n)}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:BinarySearch:pub}
+      §CX{O(n)}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -421,12 +397,10 @@ public class ExtendedFeaturesTests
         // Use quoted values for version
         var source = @"
 §M{m001:Test}
-§F{f001:NewMethod:pub}
-  §SN{""1.5.0""}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:NewMethod:pub}
+      §SN{""1.5.0""}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -443,12 +417,10 @@ public class ExtendedFeaturesTests
         // v2 positional format: {version:replacement}
         var source = @"
 §M{m001:Test}
-§F{f001:OldMethod:pub}
-  §DP{""1.5.0"":NewMethod}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:OldMethod:pub}
+      §DP{""1.5.0"":NewMethod}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -466,12 +438,10 @@ public class ExtendedFeaturesTests
         // v2 positional format: {version:replacement}
         var source = @"
 §M{m001:Test}
-§F{f001:OldMethod:pub}
-  §DP{""1.5.0"":NewMethod}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:OldMethod:pub}
+      §DP{""1.5.0"":NewMethod}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -505,18 +475,16 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§DC{d001} ""Algorithm selection""
-  §CHOSEN ""QuickSort""
-  §REASON ""Best average-case performance""
-  §REJECTED ""MergeSort""
-    §REASON ""Requires O(n) extra space""
-  §CT ""Typical input: 1000-10000 items""
-§/DC{d001}
-§F{f001:Sort:pub}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §DC{d001} ""Algorithm selection""
+    §CHOSEN ""QuickSort""
+    §REASON ""Best average-case performance""
+    §REJECTED ""MergeSort""
+      §REASON ""Requires O(n) extra space""
+    §CT ""Typical input: 1000-10000 items""
+  §/DC{d001}
+  §F{f001:Sort:pub}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -554,17 +522,15 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§CT{partial}
-  §VS
-    §FILE{OrderService.calr}
-  §/VS
-  §FC{OrderService.ProcessOrder}
-§/CT
-§F{f001:Process:pub}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §CT{partial}
+    §VS
+      §FILE{OrderService.calr}
+    §/VS
+    §FC{OrderService.ProcessOrder}
+  §/CT
+  §F{f001:Process:pub}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -595,12 +561,10 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Reverse:pub}
-  §PT (== 1 1)
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:Reverse:pub}
+      §PT (== 1 1)
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -632,12 +596,10 @@ public class ExtendedFeaturesTests
         // v2 positional format: {agentId}
         var source = @"
 §M{m001:Test}
-§F{f001:SharedFunc:pub}
-  §LK{agent123}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:SharedFunc:pub}
+      §LK{agent123}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -654,12 +616,10 @@ public class ExtendedFeaturesTests
         // v2 positional format: {agentId:taskId}
         var source = @"
 §M{m001:Test}
-§F{f001:SharedFunc:pub}
-  §AU{agent456:PROJ789}
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:SharedFunc:pub}
+      §AU{agent456:PROJ789}
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -676,12 +636,10 @@ public class ExtendedFeaturesTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SharedFunc:pub}
-  §TASK{PROJ789} ""Implement validation""
-  §O{i32}
-  §R 42
-§/F{f001}
-§/M{m001}
+  §F{f001:SharedFunc:pub}
+      §TASK{PROJ789} ""Implement validation""
+      §O{i32}
+      §R 42
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -703,28 +661,25 @@ public class ExtendedFeaturesTests
         // Updated to v2 positional format
         var source = @"
 §M{m001:Demo}
-§TD{t001:docs:medium} ""Add examples""
+  §TD{t001:docs:medium} ""Add examples""
 
-§F{f001:Add:pub}
-  §SN{""1.0.0""}
-  §CX{O(1):O(1)}
-  §US{ValidateInput}
-  §AS{data} ""Inputs are within i32 range""
-  §I{i32:a} §I{i32:b}
-  §O{i32}
-  §EX (+ 2 3) → 5
-  §EX (+ 0 0) → 0
-  §R (+ a b)
-§/F{f001}
+  §F{f001:Add:pub}
+      §SN{""1.0.0""}
+      §CX{O(1):O(1)}
+      §US{ValidateInput}
+      §AS{data} ""Inputs are within i32 range""
+      §I{i32:a} §I{i32:b}
+      §O{i32}
+      §EX (+ 2 3) → 5
+      §EX (+ 0 0) → 0
+      §R (+ a b)
 
-§F{f002:OldAdd:pub}
-  §SN{""0.5.0""}
-  §DP{""1.0.0"":Add}
-  §I{i32:x} §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f002}
-§/M{m001}
+  §F{f002:OldAdd:pub}
+      §SN{""0.5.0""}
+      §DP{""1.0.0"":Add}
+      §I{i32:x} §I{i32:y}
+      §O{i32}
+      §R (+ x y)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -752,24 +707,21 @@ public class ExtendedFeaturesTests
         // Updated to v2 positional format
         var source = @"
 §M{m001:Demo}
-§TD{t001:docs:medium} ""Add examples""
+  §TD{t001:docs:medium} ""Add examples""
 
-§F{f001:Add:pub}
-  §SN{""1.0.0""}
-  §CX{O(1)}
-  §I{i32:a} §I{i32:b}
-  §O{i32}
-  §EX (+ 2 3) → 5
-  §R (+ a b)
-§/F{f001}
+  §F{f001:Add:pub}
+      §SN{""1.0.0""}
+      §CX{O(1)}
+      §I{i32:a} §I{i32:b}
+      §O{i32}
+      §EX (+ 2 3) → 5
+      §R (+ a b)
 
-§F{f002:OldAdd:pub}
-  §DP{""1.0.0"":Add}
-  §I{i32:x} §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f002}
-§/M{m001}
+  §F{f002:OldAdd:pub}
+      §DP{""1.0.0"":Add}
+      §I{i32:x} §I{i32:y}
+      §O{i32}
+      §R (+ x y)
 ";
 
         var module = Parse(source, out var diagnostics);

@@ -48,7 +48,7 @@ public sealed class CodeExecutor : IDisposable
 
             // Lexical analysis
             var lexer = new Lexer(calorSource, diagnostics);
-            var tokens = lexer.TokenizeAll();
+            var tokens = lexer.TokenizeAllForParser();
 
             if (diagnostics.HasErrors)
             {

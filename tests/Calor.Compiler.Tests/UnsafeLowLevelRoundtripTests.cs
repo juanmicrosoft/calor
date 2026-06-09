@@ -22,7 +22,7 @@ public class UnsafeLowLevelRoundtripTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -136,12 +136,10 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:StackAllocTest}
-              §F{f001:Alloc:pub}
-                §O{i32}
-                §B{~sum:i32} INT:0
-                §R sum
-              §/F{f001}
-            §/M{m001}
+                §F{f001:Alloc:pub}
+                    §O{i32}
+                    §B{~sum:i32} INT:0
+                    §R sum
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -153,13 +151,10 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:StackAllocTest}
-              §CL{c001:Test:pub}
-                §MT{m001:Alloc:pub:unsafe}
-                  §O{void}
-                  §B{span:Span<i32>} §SALLOC{i32:10}
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:Alloc:pub:unsafe}
+                        §O{void}
+                        §B{span:Span<i32>} §SALLOC{i32:10}
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -171,11 +166,9 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:SizeOfTest}
-              §F{f001:GetSize:pub}
-                §O{i32}
-                §R §SIZEOF{i32}
-              §/F{f001}
-            §/M{m001}
+                §F{f001:GetSize:pub}
+                    §O{i32}
+                    §R §SIZEOF{i32}
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -187,14 +180,11 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:AddrTest}
-              §CL{c001:Test:pub}
-                §MT{m001:GetAddr:pub:unsafe}
-                  §O{void}
-                  §B{~x:i32} INT:42
-                  §B{ptr:i32*} §ADDR x
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:GetAddr:pub:unsafe}
+                        §O{void}
+                        §B{~x:i32} INT:42
+                        §B{ptr:i32*} §ADDR x
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -206,14 +196,11 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:DerefTest}
-              §CL{c001:Test:pub}
-                §MT{m001:ReadPtr:pub:unsafe}
-                  §I{ptr:i32*}
-                  §O{i32}
-                  §R §DEREF ptr
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:ReadPtr:pub:unsafe}
+                        §I{ptr:i32*}
+                        §O{i32}
+                        §R §DEREF ptr
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -229,15 +216,12 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:UnsafeBlockTest}
-              §CL{c001:Test:pub}
-                §MT{m001:DoUnsafe:pub}
-                  §O{void}
-                  §UNSAFE{u1}
-                    §B{~x:i32} INT:42
-                  §/UNSAFE{u1}
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:DoUnsafe:pub}
+                        §O{void}
+                        §UNSAFE{u1}
+                          §B{~x:i32} INT:42
+                        §/UNSAFE{u1}
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -250,16 +234,13 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:FixedTest}
-              §CL{c001:Test:pub}
-                §MT{m001:DoFixed:pub:unsafe}
-                  §I{arr:[i32]}
-                  §O{void}
-                  §FIXED{f1:ptr:i32*:arr}
-                    §B{val:i32} §DEREF ptr
-                  §/FIXED{f1}
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:DoFixed:pub:unsafe}
+                        §I{arr:[i32]}
+                        §O{void}
+                        §FIXED{f1:ptr:i32*:arr}
+                          §B{val:i32} §DEREF ptr
+                        §/FIXED{f1}
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -275,13 +256,10 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:ArrayTest}
-              §CL{c001:Test:pub}
-                §MT{m001:Create:pub}
-                  §O{void}
-                  §B{grid:i32} §ARR2D{a1:grid:i32:3:4}
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:Create:pub}
+                        §O{void}
+                        §B{grid:i32} §ARR2D{a1:grid:i32:3:4}
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -293,16 +271,13 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:ArrayInitTest}
-              §CL{c001:Test:pub}
-                §MT{m001:Create:pub}
-                  §O{void}
-                  §B{grid:i32} §ARR2D{a1:grid:i32}
-                    §ROW INT:1 INT:2
-                    §ROW INT:3 INT:4
-                  §/ARR2D{a1}
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:Create:pub}
+                        §O{void}
+                        §B{grid:i32} §ARR2D{a1:grid:i32}
+                          §ROW INT:1 INT:2
+                          §ROW INT:3 INT:4
+                        §/ARR2D{a1}
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -316,14 +291,11 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:IndexTest}
-              §CL{c001:Test:pub}
-                §MT{m001:Get:pub}
-                  §I{grid:i32}
-                  §O{i32}
-                  §R §IDX2D grid INT:1 INT:2
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:Get:pub}
+                        §I{grid:i32}
+                        §O{i32}
+                        §R §IDX2D grid INT:1 INT:2
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -550,12 +522,9 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:UnsafeMethodTest}
-              §CL{c001:Test:pub}
-                §MT{m001:DoStuff:pub:stat,unsafe}
-                  §O{void}
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:DoStuff:pub:stat,unsafe}
+                        §O{void}
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -568,12 +537,9 @@ public class UnsafeLowLevelRoundtripTests
     {
         var calorSource = """
             §M{m001:ExternMethodTest}
-              §CL{c001:Test:pub}
-                §MT{m001:NativeCall:pub:stat,ext}
-                  §O{void}
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:NativeCall:pub:stat,ext}
+                        §O{void}
             """;
 
         var csharp = ParseAndEmit(calorSource);
@@ -713,13 +679,10 @@ public class UnsafeLowLevelRoundtripTests
         // Verifies that (cast i32* expr) parses correctly with pointer type
         var calorSource = """
             §M{m001:CastTest}
-              §CL{c001:Test:pub}
-                §MT{m001:CastPtr:pub:unsafe}
-                  §O{i32*}
-                  §R (cast i32* 0)
-                §/MT{m001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Test:pub}
+                    §MT{m001:CastPtr:pub:unsafe}
+                        §O{i32*}
+                        §R (cast i32* 0)
             """;
 
         var csharp = ParseAndEmit(calorSource);

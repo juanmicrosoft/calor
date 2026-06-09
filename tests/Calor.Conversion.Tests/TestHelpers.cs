@@ -42,7 +42,7 @@ public static class TestHelpers
             diagnostics.SetFilePath("test.calr");
 
             var lexer = new Lexer(calorSource, diagnostics);
-            var tokens = lexer.TokenizeAll();
+            var tokens = lexer.TokenizeAllForParser();
             if (diagnostics.HasErrors) return null;
 
             var parser = new Parser(tokens, diagnostics);

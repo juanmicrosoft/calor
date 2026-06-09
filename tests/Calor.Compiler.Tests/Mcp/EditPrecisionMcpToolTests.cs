@@ -14,53 +14,39 @@ public class EditPrecisionMcpToolTests
 {
     private static readonly string SampleSource = @"
 §M{m001:MathModule}
-§F{f001:add:pub}
-  §I{i32:x, i32:y}
-  §O{i32}
-  §Q (>= x INT:0)
-  §S (>= result INT:0)
-  §R (+ x y)
-§/F{f001}
-§F{f002:multiply:pub}
-  §I{i32:a, i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f002}
-§F{f003:computeTotal:pub}
-  §I{i32:x, i32:y, i32:z}
-  §O{i32}
-  §B{partial:i32} §C{add}
-    §A x
-    §A y
-  §/C
-  §R (* partial z)
-§/F{f003}
-§/M{m001}
+  §F{f001:add:pub}
+      §I{i32:x, i32:y}
+      §O{i32}
+      §Q (>= x INT:0)
+      §S (>= result INT:0)
+      §R (+ x y)
+  §F{f002:multiply:pub}
+      §I{i32:a, i32:b}
+      §O{i32}
+      §R (* a b)
+  §F{f003:computeTotal:pub}
+      §I{i32:x, i32:y, i32:z}
+      §O{i32}
+      §B{partial:i32} §C{add} §A x §A y §/C
+      §R (* partial z)
 ";
 
     private static readonly string SampleSourceWithEffects = @"
 §M{m002:IoModule}
-§F{f010:readInput:pub}
-  §O{str}
-  §E{cr}
-  §R STR:""hello""
-§/F{f010}
-§F{f011:processAndPrint:pub}
-  §I{str:input}
-  §O{void}
-  §E{cw}
-  §P input
-§/F{f011}
-§F{f012:main:pub}
-  §O{void}
-  §E{cw, cr}
-  §B{data:str} §C{readInput}
-  §/C
-  §C{processAndPrint}
-    §A data
-  §/C
-§/F{f012}
-§/M{m002}
+  §F{f010:readInput:pub}
+      §O{str}
+      §E{cr}
+      §R STR:""hello""
+  §F{f011:processAndPrint:pub}
+      §I{str:input}
+      §O{void}
+      §E{cw}
+      §P input
+  §F{f012:main:pub}
+      §O{void}
+      §E{cw, cr}
+      §B{data:str} §C{readInput} §/C
+      §C{processAndPrint} §A data §/C
 ";
 
     #region ImpactAnalysisTool Tests

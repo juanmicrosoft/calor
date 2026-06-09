@@ -1,0 +1,70 @@
+{
+  "$schema_comment": "Pinned operator configuration for the §10 Phase 2 gate. This file is the single source of truth for the parameters supplied at gate kickoff (scripts/run_phase_2_gate.py). Any change to this file before kickoff MUST be reflected by a corresponding amendment to docs/plans/phase-2-measurement-protocol-v2.md and a fresh §9.a-style 4-hour cool-off before the kickoff command is run. After kickoff, this file is read-only for the duration of the run.",
+
+  "version": 1,
+  "status": "DRAFT — awaiting operator signature in docs/plans/phase-2-spend-authorisation.md",
+
+  "model": {
+    "id": "claude-sonnet-4-6",
+    "_id_comment": "Verified callable on the operator's host via `claude --model claude-sonnet-4-6 --print --output-format json` on 2026-05-27 ($0.048 for a 'say hi' trial). This is a fully-qualified Claude Code 2.1.144 model id, NOT an alias such as 'sonnet'. Aliases MUST NOT be used — they resolve to whatever Anthropic ships, breaking the 'identical inputs across arms' invariant.",
+    "fallback_id": "claude-sonnet-4-6",
+    "_fallback_comment": "Per v6 §4.4, if the pinned model becomes unavailable mid-run the operator MUST halt, NOT switch silently. A non-null fallback would break arm-comparability. The value here is documented as same-as-primary to make this explicit; the driver does NOT pass --fallback-model to the agent CLI.",
+    "cli_invocation": "claude --print --output-format json --dangerously-skip-permissions --model claude-sonnet-4-6",
+    "_cli_comment": "Exact agent invocation used by tests/E2E/agent-tasks/run.sh. --dangerously-skip-permissions is acceptable because each trial runs in an isolated, ephemeral work-dir (copied fixture). The agent has no access to the repo or the operator's machine outside the sandbox."
+  },
+
+  "trial_grid": {
+    "trials_per_arm": 30,
+    "seeds_per_trial": 10,
+    "arms": 3,
+    "total_runs": 900,
+    "_total_comment": "Matches protocol v2 §1.1. Driven by tests/E2E/agent-tasks/phase-2-gate-tasks.txt (24 task: + 6 template: = 30 trials) × seeds {0..9} × arms {A,B,C}."
+  },
+
+  "arms": {
+    "A": "main",
+    "B": "release/phase-1-only",
+    "C": "feature/compact-ids-v6",
+    "_comment": "Driver pins these to commit SHAs at kickoff via freeze_arm_shas() and writes them into the pre-registration doc. The branch names above are starting points; the SHA is what the driver uses for every subsequent trial."
+  },
+
+  "budget": {
+    "hard_ceiling_usd": 5000,
+    "soft_target_usd": 3000,
+    "_target_comment": "Per RFC §10.1 the gate is expected to cost $2–4k. Per-trial calibration (using claude-sonnet-4-6 on a representative task) MUST be performed before kickoff and recorded in docs/plans/phase-2-spend-authorisation.md §2.",
+    "per_trial_estimate_usd": 4.00,
+    "_per_trial_comment": "Placeholder. The pre-flight pre_flight_calibration() routine in docs/plans/phase-2-spend-authorisation.md §2 will populate this with a real measurement before kickoff."
+  },
+
+  "abort_triggers": {
+    "_comment": "If any of these conditions hold mid-run, the operator MUST stop the gate (Ctrl-C the driver process) and consult docs/plans/path-2-drop-ids-v6-implementation.md §9.c before resuming.",
+    "spend_ceiling_usd": 5000,
+    "harness_crash_rate_pct": 10,
+    "_harness_crash_comment": "Per protocol v2 §3.1 the analyser flags >5% as a data-quality warning; >10% is a halt trigger. Computed as (records with harness_crash=true) / (records written so far) × 100.",
+    "harness_error_rate_pct": 20,
+    "_harness_error_comment": "Includes any non-empty harness_error tag other than 'dry_run'. Substrate gaps (no_task_contract, agent_cli_missing) should be zero in production; if they reappear, the trial substrate has regressed and a halt is required.",
+    "consecutive_failures": 30,
+    "_consecutive_comment": "30 consecutive trials failing (success=false) across all seeds is a structural failure, not a stochastic one. Halt and triage."
+  },
+
+  "monitoring": {
+    "tick_interval_minutes": 240,
+    "_tick_comment": "Per v6 §3.3 ('scheduled polling via ScheduleWakeup every 4 hours'). The operator schedules scripts/monitor_phase_2_gate.ps1 (Windows) or .sh (POSIX) at this cadence. See docs/plans/phase-2-monitoring-tick.md for setup.",
+    "alert_log_path": "results/phase-2-gate/monitor.log",
+    "runs_jsonl_glob": "results/phase-2-gate/runs.jsonl"
+  },
+
+  "kickoff_command_template": {
+    "_comment": "The exact command the operator will run at kickoff. Bracketed values are placeholders to be substituted at the moment of kickoff (after working-tree-clean check and §9.a cool-off).",
+    "cmd": "python3 scripts/run_phase_2_gate.py --output-dir results/phase-2-gate-<DATE> --pre-reg docs/plans/phase-2-measurement-protocol-v2.md --tasks-manifest tests/E2E/agent-tasks/phase-2-gate-tasks.txt --arm-a-ref <ARM_A_SHA> --arm-b-ref <ARM_B_SHA> --arm-c-ref <ARM_C_SHA> --model claude-sonnet-4-6 --seeds 0,1,2,3,4,5,6,7,8,9"
+  },
+
+  "kickoff_prerequisites": [
+    "1. Docs-only PR (#621) merged to main, freezing the pre-registration",
+    "2. docs/plans/phase-2-spend-authorisation.md signed by maintainer (per-trial calibration recorded)",
+    "3. This file (phase-2-gate-config.json) reviewed and committed",
+    "4. Monitoring tick scheduled per docs/plans/phase-2-monitoring-tick.md",
+    "5. §9.a-style kickoff cool-off issue opened and >=4 hours elapsed since the issue body was written",
+    "6. Working tree clean on Arm C checkout (operator step in protocol v2 §10.1.a)"
+  ]
+}

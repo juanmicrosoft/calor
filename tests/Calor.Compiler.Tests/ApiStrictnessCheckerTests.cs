@@ -12,7 +12,7 @@ public class ApiStrictnessCheckerTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -24,10 +24,8 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -44,10 +42,8 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pri}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pri}
+      §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -68,10 +64,8 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -89,10 +83,8 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:PrivateHelper:pri}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:PrivateHelper:pri}
+      §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -113,7 +105,6 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§/M{m001}
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -137,10 +128,8 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -160,14 +149,12 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (/ a b)
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -193,10 +180,8 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -220,10 +205,8 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{void}
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -246,12 +229,10 @@ public class ApiStrictnessCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x
 ";
         var oldModule = Parse(source, out var oldDiagnostics);
         var newModule = Parse(source, out var newDiagnostics);
@@ -271,21 +252,17 @@ public class ApiStrictnessCheckerTests
     {
         var oldSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x
 ";
         var newSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{str:x}
-  §O{i32}
-  §R 0
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{str:x}
+      §O{i32}
+      §R 0
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);
@@ -305,22 +282,18 @@ public class ApiStrictnessCheckerTests
     {
         var oldSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x
 ";
         var newSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ x y)
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);
@@ -340,20 +313,15 @@ public class ApiStrictnessCheckerTests
     {
         var oldSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{void}
-§/F{f001}
-§F{f002:Helper:pub}
-  §O{void}
-§/F{f002}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{void}
+  §F{f002:Helper:pub}
+      §O{void}
 ";
         var newSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{void}
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);
@@ -373,20 +341,15 @@ public class ApiStrictnessCheckerTests
     {
         var oldSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{void}
 ";
         var newSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{void}
-§/F{f001}
-§F{f002:NewFunction:pub}
-  §O{void}
-§/F{f002}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{void}
+  §F{f002:NewFunction:pub}
+      §O{void}
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);
@@ -406,19 +369,15 @@ public class ApiStrictnessCheckerTests
     {
         var oldSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{i32}
-  §R 0
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{i32}
+      §R 0
 ";
         var newSource = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §O{str}
-  §R ""hello""
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §O{str}
+      §R ""hello""
 ";
         var oldModule = Parse(oldSource, out var oldDiagnostics);
         var newModule = Parse(newSource, out var newDiagnostics);

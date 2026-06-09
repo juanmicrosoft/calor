@@ -145,7 +145,6 @@ In Calor, effects are explicit in the signature:
   §C{Log} (concat "Retrieved user " (str id))
   §C{CacheSet} user
   §R user
-§/F{f001}
 ```
 
 An agent (or human) reading this function knows immediately:
@@ -178,7 +177,6 @@ Calor contracts are always enforced:
   §O{i32}
   §Q{message="divisor must not be zero"} (!= b 0)   // ALWAYS enforced
   §R (/ a b)
-§/F{f001}
 ```
 
 The generated C# includes runtime checks:
@@ -218,7 +216,6 @@ The compiler traces effect violations through any depth of calls. You can't hide
 
   §C{SaveOrder} order       // OK: SaveOrder has db effect
   §C{SendEmail} order       // ERROR: SendEmail has net effect
-§/F{f001}                   //        not declared in §E{db}
 ```
 
 **The compiler catches this.** Not a linter warning. Not a code review comment. A hard error that blocks compilation.

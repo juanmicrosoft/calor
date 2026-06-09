@@ -65,14 +65,12 @@ All documented syntax was tested against `Parser.cs` to confirm full parser supp
   §O{str}
   §B{str:result} §AWAIT §C{GetStringAsync}§/C
   §R result
-§/AF{1}
 
 # Try/Catch - PASSES
 §TR{t1}
   §R (/ a b)
 §CA{DivideByZeroException:ex}
   §R 0
-§/TR{t1}
 
 # Collections - PASSES
 §LIST{items:i32}
@@ -108,7 +106,7 @@ The following features were **fully documented** in this update:
 - Full template with working syntax in `calor.md`
 
 ### ✅ Exception Handling - NOW DOCUMENTED
-- `§TR{id}...§CA{Type:var}...§FI...§/TR{id}`
+- `§TR{id}` with indented body, `§CA{Type:var}`, and optional `§FI` clauses
 - `§TH "message"` - Throw
 - `§RT` - Rethrow
 - `§WHEN condition` - Exception filter
@@ -116,7 +114,7 @@ The following features were **fully documented** in this update:
 
 ### ✅ Lambdas & Delegates - NOW DOCUMENTED
 - `§LAM{id:param:type}...§/LAM{id}` - Lambda expressions
-- `§DEL{id:Name:vis}...§/DEL{id}` - Delegate definitions
+- `§DEL{id:Name:vis}` - Delegate definitions (body indents below)
 - Inline lambda syntax: `(x:i32) → (+ x 1)`
 - Full template with working syntax in `calor.md`
 

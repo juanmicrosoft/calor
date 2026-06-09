@@ -15,7 +15,7 @@ public class DiagnosticCodeClassificationTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -24,12 +24,10 @@ public class DiagnosticCodeClassificationTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{{{inputType}}:x}
-              §O{{{outputType}}}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{{{inputType}}:x}
+                  §O{{{outputType}}}
+                  {{body}}
             """;
     }
 
@@ -252,11 +250,9 @@ public class DiagnosticCodeClassificationTests
     {
         var source = """
             §M{m001:Test}
-            §CL{c001:MyClass:pub}<T>
-              §WHERE U : class
-              §FLD{T:_item:pri}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:MyClass:pub}<T>
+                  §WHERE U : class
+                  §FLD{T:_item:pri}
             """;
         Parse(source, out var diagnostics);
 

@@ -19,15 +19,13 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{MyType}
-    §R left
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{MyType}
+        §R left
+      §/OP{op001}
 ";
 
         var module = ParseModule(source);
@@ -50,14 +48,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:-:pub}
-    §I{MyType:value}
-    §O{MyType}
-    §R value
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:-:pub}
+        §I{MyType:value}
+        §O{MyType}
+        §R value
+      §/OP{op001}
 ";
 
         var module = ParseModule(source);
@@ -76,14 +72,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:implicit:pub}
-    §I{MyType:value}
-    §O{i32}
-    §R 0
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:implicit:pub}
+        §I{MyType:value}
+        §O{i32}
+        §R 0
+      §/OP{op001}
 ";
 
         var module = ParseModule(source);
@@ -102,14 +96,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:explicit:pub}
-    §I{i32:value}
-    §O{MyType}
-    §R value
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:explicit:pub}
+        §I{i32:value}
+        §O{MyType}
+        §R value
+      §/OP{op001}
 ";
 
         var module = ParseModule(source);
@@ -126,17 +118,15 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{MyType}
-    §Q (>= left 0)
-    §S (>= result 0)
-    §R left
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{MyType}
+        §Q (>= left 0)
+        §S (>= result 0)
+        §R left
+      §/OP{op001}
 ";
 
         var module = ParseModule(source);
@@ -152,21 +142,19 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{MyType}
-    §R left
-  §/OP{op002}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{MyType}
+        §R left
+      §/OP{op002}
 ";
 
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath("test.calr");
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         parser.Parse();
 
@@ -193,15 +181,12 @@ public class OperatorOverloadTests
     {
         var source = $@"
 §M{{m1:Test}}
-§CL{{c1:MyType}}
-  §OP{{op001:{operatorSymbol}:pub}}
-    §I{{MyType:left}}
-    §I{{MyType:right}}
-    §O{{MyType}}
-    §R left
-  §/OP{{op001}}
-§/CL{{c1}}
-§/M{{m1}}
+  §CL{{c1:MyType}}
+    §OP{{op001:{operatorSymbol}:pub}}
+      §I{{MyType:left}}
+      §I{{MyType:right}}
+      §O{{MyType}}
+      §R left
 ";
 
         var module = ParseModule(source);
@@ -220,14 +205,11 @@ public class OperatorOverloadTests
     {
         var source = $@"
 §M{{m1:Test}}
-§CL{{c1:MyType}}
-  §OP{{op001:{operatorSymbol}:pub}}
-    §I{{MyType:value}}
-    §O{{MyType}}
-    §R value
-  §/OP{{op001}}
-§/CL{{c1}}
-§/M{{m1}}
+  §CL{{c1:MyType}}
+    §OP{{op001:{operatorSymbol}:pub}}
+      §I{{MyType:value}}
+      §O{{MyType}}
+      §R value
 ";
 
         var module = ParseModule(source);
@@ -247,14 +229,11 @@ public class OperatorOverloadTests
     {
         var source = $@"
 §M{{m1:Test}}
-§CL{{c1:MyType}}
-  §OP{{op001:{operatorSymbol}:pub}}
-    §I{{MyType:value}}
-    §O{{bool}}
-    §R {operatorSymbol}
-  §/OP{{op001}}
-§/CL{{c1}}
-§/M{{m1}}
+  §CL{{c1:MyType}}
+    §OP{{op001:{operatorSymbol}:pub}}
+      §I{{MyType:value}}
+      §O{{bool}}
+      §R {operatorSymbol}
 ";
 
         var module = ParseModule(source);
@@ -274,14 +253,11 @@ public class OperatorOverloadTests
     {
         var source = $@"
 §M{{m1:Test}}
-§CL{{c1:MyType}}
-  §OP{{op001:{operatorSymbol}:pub}}
-    §I{{MyType:value}}
-    §O{{MyType}}
-    §R value
-  §/OP{{op001}}
-§/CL{{c1}}
-§/M{{m1}}
+  §CL{{c1:MyType}}
+    §OP{{op001:{operatorSymbol}:pub}}
+      §I{{MyType:value}}
+      §O{{MyType}}
+      §R value
 ";
 
         var module = ParseModule(source);
@@ -303,15 +279,13 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{MyType}
-    §R left
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{MyType}
+        §R left
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -324,14 +298,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:-:pub}
-    §I{MyType:value}
-    §O{MyType}
-    §R value
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:-:pub}
+        §I{MyType:value}
+        §O{MyType}
+        §R value
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -344,15 +316,13 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:==:pub}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{bool}
-    §R true
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:==:pub}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{bool}
+        §R true
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -365,14 +335,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:implicit:pub}
-    §I{MyType:value}
-    §O{i32}
-    §R 0
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:implicit:pub}
+        §I{MyType:value}
+        §O{i32}
+        §R 0
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -385,14 +353,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:explicit:pub}
-    §I{i32:value}
-    §O{MyType}
-    §R value
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:explicit:pub}
+        §I{i32:value}
+        §O{MyType}
+        §R value
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -405,16 +371,14 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{i32:left}
-    §I{i32:right}
-    §O{i32}
-    §Q (>= left 0)
-    §R (+ left right)
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{i32:left}
+        §I{i32:right}
+        §O{i32}
+        §Q (>= left 0)
+        §R (+ left right)
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -429,27 +393,25 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{MyType}
-    §R left
-  §/OP{op001}
-  §OP{op002:-:pub}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{MyType}
-    §R left
-  §/OP{op002}
-  §OP{op003:==:pub}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{bool}
-    §R true
-  §/OP{op003}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{MyType}
+        §R left
+      §/OP{op001}
+      §OP{op002:-:pub}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{MyType}
+        §R left
+      §/OP{op002}
+      §OP{op003:==:pub}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{bool}
+        §R true
+      §/OP{op003}
 ";
 
         var result = ParseAndEmit(source);
@@ -464,16 +426,14 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{i32:left}
-    §I{i32:right}
-    §O{i32}
-    §S (>= result 0)
-    §R (+ left right)
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{i32:left}
+        §I{i32:right}
+        §O{i32}
+        §S (>= result 0)
+        §R (+ left right)
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -489,14 +449,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:!:pub}
-    §I{MyType:value}
-    §O{MyType}
-    §R value
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:!:pub}
+        §I{MyType:value}
+        §O{MyType}
+        §R value
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -509,14 +467,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:~:pub}
-    §I{MyType:value}
-    §O{MyType}
-    §R value
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:~:pub}
+        §I{MyType:value}
+        §O{MyType}
+        §R value
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -529,14 +485,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:true:pub}
-    §I{MyType:value}
-    §O{bool}
-    §R true
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:true:pub}
+        §I{MyType:value}
+        §O{bool}
+        §R true
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -549,14 +503,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{MyType:value}
-    §O{MyType}
-    §R value
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{MyType:value}
+        §O{MyType}
+        §R value
+      §/OP{op001}
 ";
 
         var module = ParseModule(source);
@@ -576,15 +528,13 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:priv}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{MyType}
-    §R left
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:priv}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{MyType}
+        §R left
+      §/OP{op001}
 ";
 
         var module = ParseModule(source);
@@ -603,14 +553,12 @@ public class OperatorOverloadTests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:++:pub}
-    §I{MyType:value}
-    §O{MyType}
-    §R value
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:++:pub}
+        §I{MyType:value}
+        §O{MyType}
+        §R value
+      §/OP{op001}
 ";
 
         var result = ParseAndEmit(source);
@@ -640,7 +588,7 @@ public class Money
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":+:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -661,7 +609,7 @@ public class Money
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":-:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -682,7 +630,7 @@ public class Money
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":implicit:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -703,7 +651,7 @@ public class Money
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":explicit:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -724,7 +672,7 @@ public class Counter
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":++:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -771,7 +719,7 @@ public class MyBool
 
         Assert.Contains("§OP{", result);
         Assert.Contains(":!:", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -791,7 +739,7 @@ public class Vector
         Assert.Contains(":+:", result);
         // Expression body should be converted to a return statement
         Assert.Contains("§R", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     [Fact]
@@ -811,7 +759,7 @@ public class Wrapper
         Assert.Contains(":implicit:", result);
         // Expression body should be converted to a return statement
         Assert.Contains("§R", result);
-        Assert.Contains("§/OP{", result);
+        Assert.DoesNotContain("§/OP{", result);
     }
 
     #endregion
@@ -823,15 +771,13 @@ public class Wrapper
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{MyType:left}
-    §I{MyType:right}
-    §O{MyType}
-    §R left
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{MyType:left}
+        §I{MyType:right}
+        §O{MyType}
+        §R left
+      §/OP{op001}
 ";
 
         // Parse original
@@ -859,17 +805,15 @@ public class Wrapper
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{i32:left}
-    §I{i32:right}
-    §O{i32}
-    §Q (>= left 0)
-    §S (>= result 0)
-    §R (+ left right)
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{i32:left}
+        §I{i32:right}
+        §O{i32}
+        §Q (>= left 0)
+        §S (>= result 0)
+        §R (+ left right)
+      §/OP{op001}
 ";
 
         // Parse original
@@ -899,14 +843,12 @@ public class Wrapper
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:implicit:pub}
-    §I{MyType:value}
-    §O{i32}
-    §R 0
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:implicit:pub}
+        §I{MyType:value}
+        §O{i32}
+        §R 0
+      §/OP{op001}
 ";
 
         var module1 = ParseModule(source);
@@ -929,17 +871,15 @@ public class Wrapper
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{i32:left}
-    §I{i32:right}
-    §O{i32}
-    §Q (>= left 0)
-    §S (>= result 0)
-    §R (+ left right)
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{i32:left}
+        §I{i32:right}
+        §O{i32}
+        §Q (>= left 0)
+        §S (>= result 0)
+        §R (+ left right)
+      §/OP{op001}
 ";
 
         var module = ParseModule(source);
@@ -949,7 +889,7 @@ public class Wrapper
         Assert.Contains("§OP{", formatted);
         Assert.Contains("§Q", formatted);
         Assert.Contains("§S", formatted);
-        Assert.Contains("§/OP{", formatted);
+        // Phase 4b: indent form — the operator block ends by dedent, not §/OP.
     }
 
     [Fact]
@@ -957,17 +897,15 @@ public class Wrapper
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyType}
-  §OP{op001:+:pub}
-    §I{i32:left}
-    §I{i32:right}
-    §O{i32}
-    §Q (>= left 0)
-    §S (>= result 0)
-    §R (+ left right)
-  §/OP{op001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{i32:left}
+        §I{i32:right}
+        §O{i32}
+        §Q (>= left 0)
+        §S (>= result 0)
+        §R (+ left right)
+      §/OP{op001}
 ";
 
         var module = ParseModule(source);
@@ -995,7 +933,7 @@ public class Wrapper
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -1011,7 +949,7 @@ public class Wrapper
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -1146,21 +1084,19 @@ public class Wrapper
     {
         var calor = """
             §M{m001:TestModule}
-              §CL{c001:Vector<T>:pub}
-                §WHERE T : struct
-                §OP{op001:+:pub}
-                  §I{Vector<T>:a}
-                  §I{Vector<T>:b}
-                  §O{Vector<T>}
-                  §R §NEW{Vector<T>} §/NEW
-                §/OP{op001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Vector<T>:pub}
+                    §WHERE T : struct
+                    §OP{op001:+:pub}
+                      §I{Vector<T>:a}
+                      §I{Vector<T>:b}
+                      §O{Vector<T>}
+                      §R §NEW{Vector<T>} §/NEW
+                    §/OP{op001}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calor, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -1184,7 +1120,7 @@ public class Wrapper
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorCode, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 

@@ -540,7 +540,7 @@ public static class HookCommand
             diagnostics.SetFilePath(path);
 
             var lexer = new Lexer(content, diagnostics);
-            var tokens = lexer.TokenizeAll();
+            var tokens = lexer.TokenizeAllForParser();
 
             if (diagnostics.HasErrors)
             {
@@ -582,7 +582,7 @@ public static class HookCommand
                 existingDiagnostics.SetFilePath(path);
 
                 var existingLexer = new Lexer(existingContent, existingDiagnostics);
-                var existingTokens = existingLexer.TokenizeAll();
+                var existingTokens = existingLexer.TokenizeAllForParser();
 
                 if (!existingDiagnostics.HasErrors)
                 {

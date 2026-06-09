@@ -60,6 +60,11 @@ public static class MigrateCommand
             description: "Z3 verification timeout per contract in milliseconds",
             getDefaultValue: () => (int)VerificationOptions.DefaultTimeoutMs);
 
+        var explicitCallClosersOption = new Option<bool>(
+            aliases: new[] { "--explicit-call-closers" },
+            description: "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision",
+            getDefaultValue: () => false);
+
         var command = new Command("migrate", "Migrate an entire project between C# and Calor")
         {
             pathArgument,
@@ -71,7 +76,8 @@ public static class MigrateCommand
             verboseOption,
             skipAnalyzeOption,
             skipVerifyOption,
-            verificationTimeoutOption
+            verificationTimeoutOption,
+            explicitCallClosersOption
         };
 
         command.SetHandler(async (InvocationContext ctx) =>
@@ -86,9 +92,11 @@ public static class MigrateCommand
             var skipAnalyze = ctx.ParseResult.GetValueForOption(skipAnalyzeOption);
             var skipVerify = ctx.ParseResult.GetValueForOption(skipVerifyOption);
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
+            var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
 
             await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
-                reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout);
+                reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout,
+                explicitCallClosers);
         });
 
         return command;
@@ -104,7 +112,8 @@ public static class MigrateCommand
         bool verbose,
         bool skipAnalyze,
         bool skipVerify,
-        uint verificationTimeout)
+        uint verificationTimeout,
+        bool explicitCallClosers)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("migrate");
@@ -135,7 +144,8 @@ public static class MigrateCommand
             IncludeBenchmark = benchmark,
             SkipAnalyze = skipAnalyze,
             SkipVerify = skipVerify,
-            VerificationTimeoutMs = verificationTimeout
+            VerificationTimeoutMs = verificationTimeout,
+            UseImplicitCallCloser = !explicitCallClosers
         };
 
         var migrator = new ProjectMigrator(options);

@@ -15,14 +15,14 @@ public class ExtensionMethodTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -164,12 +164,10 @@ public class ExtensionMethodTests
         // §I{string:input:this} — third position is semantic/modifier
         var source = """
             §M{m1:TestModule}
-              §F{f1:Reverse:pub}
-                §I{string:input:this}
-                §O{string}
-                §R input
-              §/F{f1}
-            §/M{m1}
+                §F{f1:Reverse:pub}
+                    §I{string:input:this}
+                    §O{string}
+                    §R input
             """;
 
         var module = Parse(source, out var diagnostics);

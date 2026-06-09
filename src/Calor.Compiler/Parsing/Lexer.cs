@@ -364,6 +364,179 @@ public sealed class Lexer
     public List<Token> TokenizeAll()
         => Tokenize().ToList();
 
+    /// <summary>
+    /// Phase 3 (RFC §4.1) — tokenize with INDENT/DEDENT markers derived
+    /// from leading-whitespace deltas at line boundaries. Brackets / parens
+    /// / braces suppress indent tracking (implicit line continuation).
+    /// Mixed tabs+spaces in the leading whitespace of a single indented
+    /// line emits <see cref="DiagnosticCode.MixedIndentation"/>.
+    ///
+    /// This method is opt-in. The plain <see cref="Tokenize"/> entry point
+    /// is unchanged (Phase 1 compatibility).
+    /// </summary>
+    public IEnumerable<Token> TokenizeWithIndent()
+    {
+        // Collect raw tokens including Newline + Whitespace.
+        var raw = new List<Token>();
+        while (!IsAtEnd)
+        {
+            var token = NextToken();
+            raw.Add(token);
+        }
+        StartToken();
+        raw.Add(MakeToken(TokenKind.Eof));
+
+        return PostProcessIndent(raw);
+    }
+
+    private IEnumerable<Token> PostProcessIndent(List<Token> raw)
+    {
+        var indentStack = new Stack<int>();
+        indentStack.Push(0);
+
+        int bracketDepth = 0;
+        bool atLineStart = true;
+        int currentIndent = 0;
+        bool sawMixedIndent = false;
+
+        for (int i = 0; i < raw.Count; i++)
+        {
+            var tok = raw[i];
+
+            if (atLineStart && tok.Kind == TokenKind.Whitespace)
+            {
+                // Measure indent. Tabs count as 1; spaces count as 1.
+                // Mixed tabs+spaces in a single line's leading whitespace
+                // triggers Calor0099.
+                var text = tok.Text;
+                bool hasTab = text.Contains('\t');
+                bool hasSpace = text.Contains(' ');
+                if (hasTab && hasSpace && !sawMixedIndent)
+                {
+                    sawMixedIndent = true;
+                    _diagnostics.ReportError(tok.Span, DiagnosticCode.MixedIndentation,
+                        "Mixed tabs and spaces in leading whitespace. Use one or the other consistently.");
+                }
+                currentIndent = text.Length;
+                continue; // do not emit whitespace
+            }
+
+            if (tok.Kind == TokenKind.Newline)
+            {
+                if (bracketDepth == 0)
+                {
+                    yield return tok;
+                    atLineStart = true;
+                    currentIndent = 0;
+                }
+                else
+                {
+                    // Inside brackets: swallow newlines as implicit continuation.
+                }
+                continue;
+            }
+
+            // Skip whitespace mid-line.
+            if (tok.Kind == TokenKind.Whitespace)
+            {
+                continue;
+            }
+
+            // First non-trivia token on a line: emit INDENT/DEDENT as needed
+            // (only at bracketDepth == 0).
+            if (atLineStart && tok.Kind != TokenKind.Eof && bracketDepth == 0)
+            {
+                int top = indentStack.Peek();
+                if (currentIndent > top)
+                {
+                    indentStack.Push(currentIndent);
+                    yield return new Token(TokenKind.Indent, "",
+                        new TextSpan(tok.Span.Start, 0, tok.Span.Line, 1));
+                }
+                else
+                {
+                    while (indentStack.Peek() > currentIndent)
+                    {
+                        indentStack.Pop();
+                        yield return new Token(TokenKind.Dedent, "",
+                            new TextSpan(tok.Span.Start, 0, tok.Span.Line, 1));
+                    }
+                    if (indentStack.Peek() != currentIndent)
+                    {
+                        if (!sawMixedIndent)
+                        {
+                            sawMixedIndent = true;
+                            _diagnostics.ReportError(tok.Span, DiagnosticCode.MixedIndentation,
+                                $"Dedent to column {currentIndent} does not match any enclosing indent level.");
+                        }
+                    }
+                }
+                atLineStart = false;
+            }
+
+            // Track bracket depth (() [] {}).
+            switch (tok.Kind)
+            {
+                case TokenKind.OpenParen:
+                case TokenKind.OpenBracket:
+                case TokenKind.OpenBrace:
+                    bracketDepth++;
+                    break;
+                case TokenKind.CloseParen:
+                case TokenKind.CloseBracket:
+                case TokenKind.CloseBrace:
+                    if (bracketDepth > 0) bracketDepth--;
+                    break;
+            }
+
+            if (tok.Kind == TokenKind.Eof)
+            {
+                // Drain remaining indent stack.
+                while (indentStack.Count > 1)
+                {
+                    indentStack.Pop();
+                    yield return new Token(TokenKind.Dedent, "",
+                        new TextSpan(tok.Span.Start, 0, tok.Span.Line, 1));
+                }
+                // Phase 3 (indent-aware): always emit one final implicit
+                // Dedent at EOF. This lets the outermost block (typically
+                // §M{...}) terminate naturally in indent form without
+                // requiring an explicit §/M. Closer-form code parsed via
+                // TokenizeWithIndent will have already consumed its §/M
+                // before this token; the trailing Dedent is harmless because
+                // Parse() does not inspect tokens after ParseModule returns.
+                yield return new Token(TokenKind.Dedent, "",
+                    new TextSpan(tok.Span.Start, 0, tok.Span.Line, 1));
+                yield return tok;
+                yield break;
+            }
+
+            yield return tok;
+        }
+    }
+
+    public List<Token> TokenizeWithIndentAll()
+        => TokenizeWithIndent().ToList();
+
+    /// <summary>
+    /// Phase 1b (RFC §4.2) — parser-ready indent-aware token stream:
+    /// <see cref="TokenizeWithIndent"/> output minus <see cref="TokenKind.Newline"/>
+    /// and <see cref="TokenKind.Indent"/> tokens. The parser is newline-insensitive
+    /// (every statement is anchored by a § marker) and treats <c>Indent</c> as
+    /// decorative (every block-opener is already an explicit tag). Only
+    /// <see cref="TokenKind.Dedent"/> is structurally significant — it signals
+    /// block-end alongside the legacy explicit closers (§/F, §/M, etc.).
+    ///
+    /// This is the production entry point for the indent-aware compiler
+    /// pipeline. Closer-form source still works because the parser's
+    /// <c>ExpectBlockEnd</c> helper consumes Dedent followed by the
+    /// explicit closer in sequence.
+    /// </summary>
+    public List<Token> TokenizeAllForParser()
+        => TokenizeWithIndent()
+            .Where(t => t.Kind != TokenKind.Newline && t.Kind != TokenKind.Indent)
+            .ToList();
+
     private Token NextToken()
     {
         StartToken();

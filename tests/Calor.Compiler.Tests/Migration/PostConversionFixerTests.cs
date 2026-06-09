@@ -25,12 +25,10 @@ public class PostConversionFixerTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §O{i32}
-              §R 42
-            §/F{f001}
-            §/NEW{n1}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §O{i32}
+                  §R 42
+              §/NEW{n1}
             """;
 
         var result = _fixer.Fix(source);
@@ -46,12 +44,10 @@ public class PostConversionFixerTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §O{i32}
-              §R 42
-            §/F{f001}
-            §/C{c1}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §O{i32}
+                  §R 42
+              §/C{c1}
             """;
 
         var result = _fixer.Fix(source);
@@ -70,12 +66,10 @@ public class PostConversionFixerTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §I{i32:n}
-              §O{i32}
-              §R (+ n 1))
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §I{i32:n}
+                  §O{i32}
+                  §R (+ n 1))
             """;
 
         var result = _fixer.Fix(source);
@@ -98,13 +92,11 @@ public class PostConversionFixerTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a, b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a, b)
             """;
 
         var result = _fixer.Fix(source);
@@ -156,12 +148,10 @@ public class PostConversionFixerTests
         // Fixer should extract it to a §B{__autoErr1} binding on the preceding line.
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §O{i32}
-              §C{Bar} §A §ERR{e1} "oops" §/C
-              §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §O{i32}
+                  §C{Bar} §A §ERR{e1} "oops" §/C
+                  §R 0
             """;
 
         var result = _fixer.Fix(source);
@@ -189,14 +179,11 @@ public class PostConversionFixerTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Abs:pub}
-              §I{i32:n}
-              §O{i32}
-              §IF{if1} (< n 0) §R (- 0 n)
-              §EL → §R n
-              §/I{if1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Abs:pub}
+                  §I{i32:n}
+                  §O{i32}
+                  §IF{if1} (< n 0) §R (- 0 n)
+                  §EL → §R n
             """;
 
         var result = _fixer.Fix(source);
@@ -217,13 +204,11 @@ public class PostConversionFixerTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
             """;
 
         var result = _fixer.Fix(source);
@@ -239,13 +224,11 @@ public class PostConversionFixerTests
         // Source with two problems: extra paren AND comma
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a, b))
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a, b))
             """;
 
         var result = _fixer.Fix(source);
@@ -269,12 +252,10 @@ public class PostConversionFixerTests
         // If the fixer can't handle it perfectly, it should at least not crash.
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §I{str:name}
-              §O{i32}
-              §R (len name)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §I{str:name}
+                  §O{i32}
+                  §R (len name)
             """;
 
         // This source is already valid — just verify fixer doesn't break it
@@ -289,14 +270,12 @@ public class PostConversionFixerTests
         // Combines orphaned closing tag + extra paren — realistic multi-error scenario
         var source = """
             §M{m001:Test}
-            §F{f001:Process:pub}
-              §I{i32:x}
-              §O{i32}
-              §B{y} (* x 2))
-              §R y
-            §/F{f001}
-            §/NEW{n1}
-            §/M{m001}
+              §F{f001:Process:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §B{y} (* x 2))
+                  §R y
+              §/NEW{n1}
             """;
 
         var result = _fixer.Fix(source);

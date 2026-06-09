@@ -686,14 +686,11 @@ public class ConverterImprovementTests
     {
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Service}
-            §MT{m2:Create:pub}
-              §O{string}
-              §B{string:x} §NEW{StringBuilder} §A "hello" §/NEW
-              §R x
-            §/MT{m2}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Service}
+                §MT{m2:Create:pub}
+                    §O{string}
+                    §B{string:x} §NEW{StringBuilder} §A "hello" §/NEW
+                    §R x
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -707,14 +704,11 @@ public class ConverterImprovementTests
     {
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Service}
-            §MT{m2:Create:pub}
-              §O{string}
-              §B{List<i32>:items} §NEW{List<i32>} §/NEW
-              §R items
-            §/MT{m2}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Service}
+                §MT{m2:Create:pub}
+                    §O{string}
+                    §B{List<i32>:items} §NEW{List<i32>} §/NEW
+                    §R items
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -729,14 +723,11 @@ public class ConverterImprovementTests
         // Backward compatibility: §/NEW is optional
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Service}
-            §MT{m2:Create:pub}
-              §O{string}
-              §B{string:x} §NEW{StringBuilder} §A "hello"
-              §R x
-            §/MT{m2}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Service}
+                §MT{m2:Create:pub}
+                    §O{string}
+                    §B{string:x} §NEW{StringBuilder} §A "hello"
+                    §R x
             """;
 
         var compilationResult = Program.Compile(calorSource);
@@ -1261,9 +1252,7 @@ public class ConverterImprovementTests
     {
         var source = """
             §M{m1:TestMod}
-            §CL{c1:Helper:pub:stat}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Helper:pub:stat}
             """;
 
         var ast = Parse(source);
@@ -1279,9 +1268,7 @@ public class ConverterImprovementTests
     {
         var source = """
             §M{m1:TestMod}
-            §CL{c1:Final:pub:seal}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Final:pub:seal}
             """;
 
         var ast = Parse(source);
@@ -1297,9 +1284,7 @@ public class ConverterImprovementTests
     {
         var source = """
             §M{m1:TestMod}
-            §CL{c1:Helper:pub:stat}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Helper:pub:stat}
             """;
 
         // Step 1: Parse original
@@ -1349,10 +1334,8 @@ public class ConverterImprovementTests
     {
         var source = """
             §M{m1:TestMod}
-            §CL{c1:Counter:pub}
-              §FLD{i32:Count:pub:stat}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Counter:pub}
+                  §FLD{i32:Count:pub:stat}
             """;
 
         var ast = Parse(source);
@@ -1370,13 +1353,11 @@ public class ConverterImprovementTests
         // emits "stat" in the PROP tag (not "static")
         var source = """
             §M{m1:TestMod}
-            §CL{c1:Counter:pub}
-              §PROP{p1:Count:i32:pub:stat}
-                §GET
-                §SET
-              §/PROP{p1}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Counter:pub}
+                  §PROP{p1:Count:i32:pub:stat}
+                    §GET
+                    §SET
+                  §/PROP{p1}
             """;
 
         var ast = Parse(source);
@@ -1393,13 +1374,11 @@ public class ConverterImprovementTests
     {
         var source = """
             §M{m1:TestMod}
-            §CL{c1:Counter:pub}
-              §PROP{p1:Instance:Counter:pub:stat}
-                §GET
-                §SET
-              §/PROP{p1}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Counter:pub}
+                  §PROP{p1:Instance:Counter:pub:stat}
+                    §GET
+                    §SET
+                  §/PROP{p1}
             """;
 
         // Parse → emit → reparse
@@ -1639,15 +1618,12 @@ public class ConverterImprovementTests
     {
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Service:pub}
-            §MT{m1:Greet:pub}
-              §I{str:name}
-              §I{str:greeting} = "Hello"
-              §O{str}
-              §R greeting
-            §/MT{m1}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Service:pub}
+                §MT{m1:Greet:pub}
+                    §I{str:name}
+                    §I{str:greeting} = "Hello"
+                    §O{str}
+                    §R greeting
             """;
 
         var ast = Parse(calorSource);
@@ -1666,15 +1642,12 @@ public class ConverterImprovementTests
     {
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Service:pub}
-            §MT{m1:Add:pub}
-              §I{i32:a}
-              §I{i32:b} = 0
-              §O{i32}
-              §R (+ a b)
-            §/MT{m1}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Service:pub}
+                §MT{m1:Add:pub}
+                    §I{i32:a}
+                    §I{i32:b} = 0
+                    §O{i32}
+                    §R (+ a b)
             """;
 
         var ast = Parse(calorSource);
@@ -1779,15 +1752,12 @@ public class ConverterImprovementTests
         // Existing Calor files without default values should continue to parse correctly
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Service:pub}
-            §MT{m1:Greet:pub}
-              §I{str:name}
-              §I{str:greeting}
-              §O{str}
-              §R greeting
-            §/MT{m1}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Service:pub}
+                §MT{m1:Greet:pub}
+                    §I{str:name}
+                    §I{str:greeting}
+                    §O{str}
+                    §R greeting
             """;
 
         var ast = Parse(calorSource);
@@ -1806,16 +1776,13 @@ public class ConverterImprovementTests
     {
         var calorSource = """
             §M{m1:Test}
-            §CL{c1:Service:pub}
-            §MT{m1:Compare:pub}
-              §I{str:a}
-              §I{str:b}
-              §I{StringComparison:comparison} = StringComparison.Ordinal
-              §O{bool}
-              §R true
-            §/MT{m1}
-            §/CL{c1}
-            §/M{m1}
+              §CL{c1:Service:pub}
+                §MT{m1:Compare:pub}
+                    §I{str:a}
+                    §I{str:b}
+                    §I{StringComparison:comparison} = StringComparison.Ordinal
+                    §O{bool}
+                    §R true
             """;
 
         // Parse → emit → reparse

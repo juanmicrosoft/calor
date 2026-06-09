@@ -320,8 +320,8 @@ namespace Calor.Runtime
 **Calor:**
 ```calor
 §MATCH{m1} §REF{name=opt}
-  §CASE §SOME{x} => §R §REF{name=x}
-  §CASE §NONE => §R INT:0
+§CASE §SOME{x} => §R §REF{name=x}
+§CASE §NONE => §R INT:0
 §/MATCH{m1}
 ```
 
@@ -394,7 +394,6 @@ catch (IOException ex) when (ex.Message == "Not found")
 §F{f1:fetchData:pub:async}
   §O{Task{string}}
   ...
-§/F{f1}
 ```
 
 **C#:**
@@ -438,12 +437,12 @@ await expr.ConfigureAwait(false)
 **Calor:**
 ```calor
 §CLASS{c1:Circle:seal}
-  §EXT{Shape}
-  §IMPL{IDrawable}
-  §FLD{f64:Radius:pri}
-  §METHOD{m1:Area:pub:over} §O{f64} §E{}
-    §R §OP{kind=MUL} 3.14159 §OP{kind=MUL} §REF{name=Radius} §REF{name=Radius}
-  §/METHOD{m1}
+§EXT{Shape}
+§IMPL{IDrawable}
+§FLD{f64:Radius:pri}
+§METHOD{m1:Area:pub:over} §O{f64} §E{}
+§R §OP{kind=MUL} 3.14159 §OP{kind=MUL} §REF{name=Radius} §REF{name=Radius}
+§/METHOD{m1}
 §/CLASS{c1}
 ```
 
@@ -479,8 +478,8 @@ public sealed class Circle : Shape, IDrawable
 **Calor:**
 ```calor
 §RECORD{r1:Person}
-  §FIELD{Name}{STRING}
-  §FIELD{Age}{INT}
+§FIELD{Name}{STRING}
+§FIELD{Age}{INT}
 §/RECORD{r1}
 ```
 
@@ -495,7 +494,6 @@ public record Person(string Name, int Age);
 ```calor
 §WITH §REF{name=person}
   §SET{Age} 30
-§/WITH
 ```
 
 **C#:**

@@ -15,7 +15,7 @@ void TestRoundTrip(string label, string csharpInput)
     var diag = new DiagnosticBag();
     diag.SetFilePath("test.calr");
     var lexer = new Lexer(result.CalorSource!, diag);
-    var tokens = lexer.TokenizeAll();
+    var tokens = lexer.TokenizeAllForParser();
     var parser = new Parser(tokens, diag);
     var module = parser.Parse();
     if (diag.HasErrors)

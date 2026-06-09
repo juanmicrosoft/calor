@@ -1,0 +1,214 @@
+---
+title: "Calls"
+section: "syntax-reference"
+order: 4
+---
+
+The `§C` tag invokes a function or method. Calls work in **statement**
+context (the call's result is discarded) and **expression** context
+(the call's result is used by the surrounding expression — typically as
+the initializer of a `§B`, an argument to another call, or the right
+side of an operation).
+
+> **Reference for RFC** `v0.6-call-closer-elision`. The behavior on
+> this page is what the parser does today and is pinned by
+> `tests/Calor.Compiler.Tests/CallStatementImplicitCloseTests.cs` and
+> `tests/Calor.Compiler.Tests/CallExpressionImplicitCloseTests.cs`.
+
+---
+
+## Syntax
+
+```
+§C{target}                           // (1) zero arguments, implicit close
+§C{target} arg                       // (2) one inline argument, implicit close
+§C{target} §A arg1 §A arg2 §/C       // (3) explicit form, any arity
+§C{target} §A arg1 §A arg2           // (4) explicit form, no §/C (closes at dedent)
+```
+
+`target` is a dotted name or a generic invocation:
+`Console.WriteLine`, `Math.Max`, `items.Cast<i32>`.
+
+The argument in form (2) is any **primary expression** — a literal,
+identifier, dotted reference, member access, indexer access, or a
+parenthesized expression. It is **not** a `§A`-list; for two or more
+arguments use form (3) or (4).
+
+---
+
+## Rules
+
+1. **A call without arguments needs no `§/C`.** Both
+   `§C{Logger.Flush}` and `§C{Logger.Flush} §/C` parse to the same
+   `CallExpressionNode`.
+2. **A call with exactly one argument supplied inline (no `§A`) needs
+   no `§/C`.** Both `§C{Identity} x` and `§C{Identity} §A x §/C` parse
+   to the same `CallExpressionNode` (form (2) vs (3)).
+3. **A call with two or more arguments must use `§A`.** The inline-arg
+   form (2) is limited to a single primary expression by construction.
+4. **Trailing member access attaches to the argument, not to the call
+   result.** After `§C{Identity} obj?.Length`, the `?.Length` belongs
+   to `obj` because the inline-arg parser greedily consumes a full
+   primary expression including its trailing member chain. See
+   [Disambiguation](#disambiguation) for the corner cases.
+5. **Trailing member access after a zero-arg call attaches to the call
+   result.** `§C{Maybe}?.Length` parses as
+   `NullConditional(Call("Maybe"), "Length")`, because the parser sees
+   `?.`, takes the zero-arg implicit-close path, then runs trailing
+   member access on the call result.
+6. **The inline argument must start on the same source line as
+   `§C{target}`.** A candidate argument that begins on a later line is
+   treated as a sibling statement / expression, not as the call's
+   argument. Without this rule, a `§IF` / `§MATCH` / `§NEW` on the next
+   line at the same indent would be silently absorbed as the argument
+   (because each of those tokens is also an expression-start). Writing
+   `§C{Foo}` on one line and `§IF{c} ... §EL → ...` on the next always
+   parses as two siblings — zero-arg call, then a separate `§IF`.
+7. **Both `§/C` and abbreviated `§/C{id}` are still accepted** for
+   forms (1), (2), (3), and (4) — no source file needs to be rewritten.
+
+---
+
+## Disambiguation
+
+The implicit-close forms introduce two parser decisions. The
+disambiguation rules below match RFC §3.2.
+
+### Case A — trailing member on an inline argument
+
+```
+§B{n} §C{Identity} obj?.Length
+```
+
+Reads as `Identity(obj?.Length)`, not `Identity(obj)?.Length`. The
+inline-arg branch calls the same expression parser used everywhere
+else, which greedily consumes `?.Length` as part of the primary
+expression `obj?.Length`.
+
+If you intended `Identity(obj)?.Length` instead, write either:
+
+```
+§B{n} §C{Identity} §A obj §/C ?.Length     // explicit form
+§B{n} §C{Identity}.Length                  // zero-arg call + access
+```
+
+### Case B — two consecutive expression-start tokens (Calor0150)
+
+```
+§B{n} §C{Identity} a b           // ambiguous — second expression-start follows inline arg
+```
+
+This is **ambiguous** — once the inline form has consumed one positional
+argument, any second expression-start token (a literal, identifier,
+nested `§C` call, `§NEW`, etc.) cannot be unambiguously attributed to
+the call. Calor0150 also fires if the next token is `§A`, signalling
+the user mixed the inline and explicit forms. The parser reports
+
+```
+Calor0150  AmbiguousCallContinuation
+Closer-less call '§C{Identity}' already took one inline argument; a
+second positional argument is ambiguous. Use the explicit form
+'§C{Identity} §A a §A b §/C' instead.
+```
+
+and stops consuming tokens at the second expression, leaving it for
+the surrounding statement parser. To fix, rewrite using the explicit
+form:
+
+```
+§B{n} §C{Identity} §A a §A b §/C
+```
+
+### Case C — nested implicit-close calls
+
+```
+§B{x} §C{Foo.bar} §C{Baz.qux} y
+```
+
+Reads right-to-left as `Foo.bar(Baz.qux(y))`. The parser disambiguates
+nested implicit-close calls by counting the number of consecutive
+`§/C` closers after the deepest inline argument and comparing to the
+depth of enclosing `§A`-style calls. When all calls in the chain use
+the inline form, no closers are required.
+
+The mixed case
+`§B{x} §C{Foo.bar} §A §C{Baz.qux} y §/C §/C`
+also works: the inner `§C{Baz.qux} y §/C` is a standard
+one-inline-arg-plus-closer form, and the outer `§A ... §/C` is the
+explicit form for `Foo.bar`.
+
+---
+
+## Examples
+
+### Statement context
+
+```
+§F{Greet:pub}
+  §I{name:string}
+  §O{void}
+  §E{cw}
+
+  §C{Console.WriteLine} (concat "Hello, " name)   // implicit close
+```
+
+### Expression context — zero-arg
+
+```
+§F{Count:pub}
+  §O{i32}
+
+  §B{n:i32} §C{items.Count}            // zero-arg, implicit close
+  §R n
+```
+
+### Expression context — one inline arg
+
+```
+§F{Doubled:pub}
+  §I{x:i32}
+  §O{i32}
+
+  §B{y:i32} §C{Math.Abs} x             // one inline arg, implicit close
+  §R (* y 2)
+```
+
+### Expression context — two or more args (explicit form)
+
+```
+§F{Clamp:pub}
+  §I{x:i32}
+  §O{i32}
+
+  §B{lo:i32} INT:0
+  §B{hi:i32} INT:100
+  §B{r:i32} §C{Math.Clamp} §A x §A lo §A hi §/C
+  §R r
+```
+
+### Trailing member access
+
+```
+§B{len} §C{GetMessage}.Length          // zero-arg call, then .Length
+§B{up}  §C{GetMessage}?.ToUpper        // zero-arg call, then ?.ToUpper
+§B{tag} §C{Identity} obj?.Tag          // inline arg = obj?.Tag
+```
+
+---
+
+## Diagnostics
+
+| Code | Name | Description |
+|:-----|:-----|:------------|
+| `Calor0150` | AmbiguousCallContinuation | Two consecutive expression-start tokens follow a closer-less `§C{target} arg` — second positional argument is ambiguous. Use the explicit `§A` / `§/C` form. |
+
+---
+
+## Related
+
+- [Bindings](/syntax-reference/binding/) — the most common
+  expression-call context (`§B{name} §C{...}`).
+- [Expressions](/syntax-reference/expressions/) — Lisp-style
+  operations that frequently embed `§C` calls as arguments.
+- [Structure Tags](/syntax-reference/structure-tags/) — block
+  closer rules in general.

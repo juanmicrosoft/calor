@@ -348,7 +348,7 @@ public static class IdsCommand
             diagnostics.SetFilePath(filePath);
 
             var lexer = new Lexer(content, diagnostics);
-            var tokens = lexer.TokenizeAll();
+            var tokens = lexer.TokenizeAllForParser();
 
             if (diagnostics.HasErrors)
             {

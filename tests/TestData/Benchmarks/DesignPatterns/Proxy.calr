@@ -1,23 +1,15 @@
 §M{m001:Proxy}
-§F{f001:HasAccess:pub}
-  §I{i32:userRole}
-  §I{i32:requiredRole}
-  §O{bool}
-  §R (>= userRole requiredRole)
-§/F{f001}
-§F{f002:LogAccess:pub}
-  §I{i32:userId}
-  §I{bool:granted}
-  §O{i32}
-  §E{cw}
-  §IF{if1} granted → §P "Access granted"
-  §EL → §P "Access denied"
-  §/I{if1}
-  §R userId
-§/F{f002}
-§F{f003:CacheHit:pub}
-  §I{bool:isCached}
-  §O{bool}
-  §R isCached
-§/F{f003}
-§/M{m001}
+  §F{f001:HasAccess:pub} (i32:userRole, i32:requiredRole) -> bool
+    §R (>= userRole requiredRole)
+
+  §F{f002:LogAccess:pub} (i32:userId, bool:granted) -> i32
+    §E{cw}
+    §IF{if1} granted
+      §P "Access granted"
+    §EL
+      §P "Access denied"
+    §R userId
+
+  §F{f003:CacheHit:pub} (bool:isCached) -> bool
+    §R isCached
+

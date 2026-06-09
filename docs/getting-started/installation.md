@@ -278,7 +278,6 @@ ls src/
   §F{f001:Main:pub}
     §O{void}
     // ...
-  §/F{f001}
   ```
 
 ---

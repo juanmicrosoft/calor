@@ -9,6 +9,16 @@ nav_order: 1
 
 Structure tags define the organization of Calor code: modules, functions, and their boundaries.
 
+> **Indent-only block structure.** Calor uses Python-style significant
+> indentation: a block opens with `§M`, `§F`, `§CL`, `§L`, `§IF`, … and
+> ends at the first line that **dedents** back to the parent column. No
+> closing tags are required. The compiler default is `2` spaces per
+> nesting level (mixing tabs and spaces is rejected). Legacy closer tags
+> (`§/M`, `§/F`, `§/L`, `§/I`, …) are still accepted during the
+> transition window, but all examples below use the indent-only form;
+> bulk-migrate older corpora with
+> [`calor format`](/calor/cli/format/).
+
 ---
 
 ## Modules
@@ -18,24 +28,24 @@ Modules are like C# namespaces. They group related functions.
 ### Syntax
 
 ```
-§M{id:name}
+§M{name}
   // contents
-§/M{id}
 ```
 
 ### Example
 
 ```
-§M{m001:Calculator}
+§M{Calculator}
   // functions go here
-§/M{m001}
 ```
 
 ### Rules
 
-- `id` must be unique within the file
 - `name` becomes the C# namespace
-- Every `§M` must have a matching `§/M` with the same ID
+- The module block extends until the next line that dedents back to
+  column 0 (or end of file)
+- Legacy `§/M` closers are still accepted but discouraged; migrate
+  with [`calor format`](/calor/cli/format/)
 
 ---
 
@@ -46,14 +56,13 @@ Functions are the primary code containers.
 ### Syntax
 
 ```
-§F{id:name:visibility}
+§F{name:visibility}
   §I{type:param}       // inputs (0 or more)
   §O{type}             // output (required)
   §E{effects}          // effects (optional)
   §Q condition         // preconditions (0 or more)
   §S condition         // postconditions (0 or more)
   // body
-§/F{id}
 ```
 
 ### Visibility
@@ -67,34 +76,31 @@ Functions are the primary code containers.
 
 **Simple function:**
 ```
-§F{f001:Add:pub}
+§F{Add:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
   §R (+ a b)
-§/F{f001}
 ```
 
 **Function with effects:**
 ```
-§F{f001:PrintSum:pub}
+§F{PrintSum:pub}
   §I{i32:a}
   §I{i32:b}
   §O{void}
   §E{cw}
   §P (+ a b)
-§/F{f001}
 ```
 
 **Function with contracts:**
 ```
-§F{f001:Divide:pub}
+§F{Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
   §Q (!= b 0)
   §R (/ a b)
-§/F{f001}
 ```
 
 ---
@@ -106,23 +112,21 @@ Async functions use `§AF` instead of `§F` and automatically wrap return types 
 ### Syntax
 
 ```
-§AF{id:name:visibility}
+§AF{name:visibility}
   §I{type:param}       // inputs (0 or more)
   §O{type}             // output (auto-wrapped to Task<T>)
   // body with §AWAIT expressions
-§/AF{id}
 ```
 
 ### Examples
 
 **Simple async function:**
 ```
-§AF{f001:FetchDataAsync:pub}
+§AF{FetchDataAsync:pub}
   §I{str:url}
   §O{str}
   §B{result} §AWAIT §C{httpClient.GetStringAsync} §A url §/C
   §R result
-§/AF{f001}
 ```
 
 Emits C#:
@@ -136,10 +140,9 @@ public static async Task<string> FetchDataAsync(string url)
 
 **Async void function (returns Task):**
 ```
-§AF{f001:ProcessAsync:pub}
+§AF{ProcessAsync:pub}
   §O{void}
   §AWAIT §C{Task.Delay} §A 1000 §/C
-§/AF{f001}
 ```
 
 ### Automatic Task Wrapping
@@ -164,7 +167,6 @@ Async methods in classes use `§AMT` instead of `§MT`.
   §I{type:param}
   §O{type}
   // body
-§/AMT{id}
 ```
 
 ### Example
@@ -176,8 +178,6 @@ Async methods in classes use `§AMT` instead of `§MT`.
     §O{User}
     §B{user} §AWAIT §C{_repository.FindAsync} §A id §/C
     §R user
-  §/AMT{mt001}
-§/CL{c001}
 ```
 
 ### Modifiers
@@ -223,7 +223,6 @@ Emits: `var data = await client.GetAsync(url).ConfigureAwait(false);`
 ```
 §IF{if1} §AWAIT §C{IsValidAsync} §A id §/C
   §P "Valid"
-§/I{if1}
 
 §R §AWAIT §C{ComputeAsync} §A x §/C
 ```
@@ -289,8 +288,8 @@ For multi-statement bodies, include statements between the tags:
 
 ```
 §B{printer} §LAM{lam1:x:i32}
-  §P x
-  §P (* x 2)
+§P x
+§P (* x 2)
 §/LAM{lam1}
 ```
 
@@ -300,8 +299,8 @@ Add `async` after the ID, before parameters:
 
 ```
 §LAM{lam1:async:x:i32}
-  §B{result} §AWAIT §C{ProcessAsync} §A x §/C
-  §R result
+§B{result} §AWAIT §C{ProcessAsync} §A x §/C
+§R result
 §/LAM{lam1}
 ```
 
@@ -322,7 +321,6 @@ Delegates define function signatures that can be passed as values.
   §I{type:param}       // parameters (0 or more)
   §O{type}             // return type (optional for void)
   §E{effects}          // effects (optional)
-§/DEL{id}
 ```
 
 ### Examples
@@ -333,7 +331,6 @@ Delegates define function signatures that can be passed as values.
   §I{i32:a}
   §I{i32:b}
   §O{i32}
-§/DEL{d001}
 ```
 
 Emits: `public delegate int Calculator(int a, int b);`
@@ -342,7 +339,6 @@ Emits: `public delegate int Calculator(int a, int b);`
 ```
 §DEL{d001:Logger}
   §I{str:message}
-§/DEL{d001}
 ```
 
 Emits: `public delegate void Logger(string message);`
@@ -353,7 +349,6 @@ Emits: `public delegate void Logger(string message);`
   §I{str:path}
   §O{bool}
   §E{fs:rw}
-§/DEL{d001}
 ```
 
 ---
@@ -369,14 +364,12 @@ Enums define a set of named constants.
   Member1
   Member2 = 1
   Member3 = 2
-§/EN{id}
 ```
 
 With underlying type:
 ```
 §EN{id:Name:underlyingType}
   ...
-§/EN{id}
 ```
 
 ### Examples
@@ -387,7 +380,6 @@ With underlying type:
   Red
   Green
   Blue
-§/EN{e001}
 ```
 
 Emits:
@@ -406,7 +398,6 @@ public enum Color
   Ok = 200
   NotFound = 404
   Error = 500
-§/EN{e001}
 ```
 
 **Enum with underlying type:**
@@ -415,7 +406,6 @@ public enum Color
   None = 0
   Read = 1
   Write = 2
-§/EN{e001}
 ```
 
 Emits:
@@ -442,8 +432,6 @@ Extension methods can be added to enums using `§EEXT` (Enum EXTension).
     §I{EnumName:self}
     §O{returnType}
     // body using self
-  §/F{f001}
-§/EEXT{id}
 ```
 
 The first parameter with the enum type (or named `self`) becomes the `this` parameter.
@@ -455,25 +443,20 @@ The first parameter with the enum type (or named `self`) becomes the `this` para
   Red
   Green
   Blue
-§/EN{e001}
 
 §EEXT{ext001:Color}
   §F{f001:ToHex:pub}
     §I{Color:self}
     §O{str}
     §W{sw1} self
-      §K Color.Red → §R "#FF0000"
-      §K Color.Green → §R "#00FF00"
-      §K Color.Blue → §R "#0000FF"
-    §/W{sw1}
-  §/F{f001}
+    §K Color.Red → §R "#FF0000"
+    §K Color.Green → §R "#00FF00"
+    §K Color.Blue → §R "#0000FF"
 
   §F{f002:IsPrimary:pub}
     §I{Color:self}
     §O{bool}
     §R (|| (== self Color.Red) (|| (== self Color.Green) (== self Color.Blue)))
-  §/F{f002}
-§/EEXT{ext001}
 ```
 
 Emits:
@@ -529,8 +512,7 @@ Events allow objects to notify subscribers of state changes.
 ```
 §CL{c001:Button:pub}
   §EVT{e001:Click:pub:EventHandler}
-  §EVT{e002:ValueChanged:pub:EventHandler<ValueChangedEventArgs>}
-§/CL{c001}
+    §EVT{e002:ValueChanged:pub:EventHandler<ValueChangedEventArgs>}
 ```
 
 Emits:
@@ -595,8 +577,8 @@ Input parameters define function arguments.
 §I{str:name}        // string name
 §I{bool:flag}       // bool flag
 §I{?i32:maybeVal}   // int? maybeVal (nullable)
-§I{[u8]:data}       // byte[] data
-§I{[str]:args}      // string[] args
+§I{[u8}:data}       // byte[] data
+§I{[str}:args}      // string[] args
 ```
 
 ### Multiple Parameters
@@ -608,7 +590,6 @@ Input parameters define function arguments.
   §I{i32:c}
   §O{i32}
   §R (+ (+ a b) c)
-§/F{f001}
 ```
 
 ---
@@ -631,8 +612,8 @@ Every function must declare its output type.
 §O{str}      // returns string
 §O{?i32}     // returns nullable int
 §O{i32!str}  // returns Result<int, string>
-§O{[u8]}     // returns byte[]
-§O{[str]}    // returns string[]
+§O{[u8}}     // returns byte[]
+§O{[str}}    // returns string[]
 ```
 
 ---
@@ -662,72 +643,76 @@ Calor uses bracket notation `[T]` for array types, which aligns with common prog
 
 ```
 §CL{c001:DataProcessor}
-  §FLD{[u8]:_buffer:priv}       // private byte[] _buffer
-  §FLD{[i32]:_indices:priv}     // private int[] _indices
+  §FLD{[u8}:_buffer:priv}       // private byte[] _buffer
+  §FLD{[i32}:_indices:priv}     // private int[] _indices
 
   §MT{m001:ProcessData:pub}
-    §I{[str]:args}              // string[] args parameter
+    §I{[str}:args}              // string[] args parameter
     §O{i32}
     §R args.Length
-  §/MT{m001}
-§/CL{c001}
 ```
 
 ---
 
-## Closing Tags
+## Block Structure (Indentation)
 
-Every structural element must be closed with a matching tag.
+Calor blocks are delimited by **indentation**, like Python. A block
+opens with one of the structural tags (`§M`, `§F`, `§AF`, `§MT`,
+`§AMT`, `§CL`, `§IFACE`, `§L`, `§WH`, `§DO`, `§IF`, `§W`, `§TR`,
+`§LAM`, `§DEL`, `§EN`, `§EEXT`, `§PROP`) and ends at the next line that
+dedents back to (or past) the parent column.
 
 ### Rules
 
-1. Opening `§X{id:...}` must have closing `§/X{id}`
-2. IDs must match exactly
-3. Nesting must be proper (no overlapping scopes)
+1. The compiler default is **2 spaces per nesting level**
+2. Tabs and spaces must not be mixed within a block
+3. Chain continuations (`§EI`, `§EL`, `§K`, `§WHEN`, `§CA`, `§FI`)
+   sit at the **same** column as their parent (`§IF`, `§W`, `§TR`),
+   not indented inside it
+4. Legacy `§/X` closers are still accepted and ignored
 
-### Correct Nesting
+### Example
 
 ```
-§M{m001:Example}
-  §F{f001:Main:pub}
-    §L{for1:i:1:10:1}
-      §IF{if1} (> i 5)
+§M{Example}
+  §F{Main:pub}
+    §O{void}
+    §E{cw}
+    §L{i:1:10:1}
+      §IF (> i 5)
         §P i
-      §/I{if1}
-    §/L{for1}
-  §/F{f001}
-§/M{m001}
+      §EL
+        §P "small"
 ```
 
-### Incorrect (Overlapping)
+The `§/I`, `§/L`, `§/F`, `§/M` closers are inferred from the dedents.
+If you write them explicitly, the lexer drops them silently — but
+calorfmt will strip them in a future release.
 
-```
-// WRONG: if1 closed after for1
-§L{for1:i:1:10:1}
-  §IF{if1} (> i 5)
-§/L{for1}
-  §/I{if1}     // Error: if1 overlaps for1
-```
+### Tag Reference
 
----
-
-## Tag Reference
-
-| Opening | Closing | Purpose |
-|:--------|:--------|:--------|
-| `§M{id:name}` | `§/M{id}` | Module |
-| `§F{id:name:vis}` | `§/F{id}` | Function |
-| `§AF{id:name:vis}` | `§/AF{id}` | Async function |
-| `§MT{id:name:vis}` | `§/MT{id}` | Method |
-| `§AMT{id:name:vis}` | `§/AMT{id}` | Async method |
-| `§DEL{id:name}` | `§/DEL{id}` | Delegate definition |
-| `§LAM{id:params}` | `§/LAM{id}` | Lambda (block body) |
-| `§EVT{id:name:vis:type}` | - | Event definition |
-| `§L{id:var:from:to:step}` | `§/L{id}` | For loop |
-| `§WH{id} cond` | `§/WH{id}` | While loop |
-| `§DO{id}` | `§/DO{id} cond` | Do-while loop |
-| `§IF{id} cond` | `§/I{id}` | Conditional |
-| `§C{target}` | `§/C` | Call (no ID needed) |
+| Opener | Purpose |
+|:-------|:--------|
+| `§M{name}` | Module |
+| `§F{name:vis}` | Function |
+| `§AF{name:vis}` | Async function |
+| `§CL{name}` | Class |
+| `§IFACE{name}` | Interface |
+| `§MT{name:vis}` | Method |
+| `§AMT{name:vis}` | Async method |
+| `§L{var:from:to:step}` | For loop |
+| `§WH cond` | While loop |
+| `§DO` | Do-while loop (condition on closing line during transition) |
+| `§IF cond` | Conditional (with `§EI` / `§EL` continuations) |
+| `§W expr` | Switch (with `§K` cases) |
+| `§TR` | Try (with `§CA` / `§FI`) |
+| `§LAM{params}` | Lambda (block body) |
+| `§DEL{name}` | Delegate definition |
+| `§EN{name}` | Enum |
+| `§EEXT{enumName}` | Enum extension methods |
+| `§PROP{name:type:vis}` | Property |
+| `§EVT{name:vis:type}` | Event (single line, no block) |
+| `§C{target}` | Call expression (`§/C` ends the argument list) |
 
 ---
 
@@ -785,7 +770,6 @@ Generic types are written inline using angle bracket syntax.
   §I{T:value}
   §O{T}
   §R value
-§/F{f001}
 ```
 
 **Generic class with constraint:**
@@ -798,13 +782,10 @@ Generic types are written inline using angle bracket syntax.
     §I{T:item}
     §O{void}
     §C{_items.Add} §A item §/C
-  §/MT{m001}
 
   §MT{m002:GetAll:pub}
     §O{IReadOnlyList<T>}
     §R _items
-  §/MT{m002}
-§/CL{c001}
 ```
 
 **Generic interface:**
@@ -814,8 +795,6 @@ Generic types are written inline using angle bracket syntax.
   §MT{m001:Get}
     §I{i32:id}
     §O{T}
-  §/MT{m001}
-§/IFACE{i001}
 ```
 
 ---
@@ -838,16 +817,13 @@ C# attributes are preserved during conversion using inline bracket syntax `[@Att
 ```
 §CL{c001:JoinController:ControllerBase}[@Route("api/[controller]")][@ApiController]
   §MT{m001:Post:pub}[@HttpPost]
-  §/MT{m001}
-§/CL{c001}
 ```
 
 **Property with validation:**
 ```
 §PROP{p001:Email:str:pub}[@Required][@EmailAddress]
   §GET
-  §SET
-§/PROP{p001}
+    §SET
 ```
 
 ### Attribute Arguments
@@ -871,12 +847,12 @@ Attributes can be attached to:
 
 ---
 
-## Why Explicit Closing Tags?
+## Why Indent-Based Blocks?
 
-1. **Unambiguous parsing** - No brace-counting needed
-2. **ID verification** - Compiler catches mismatches
-3. **Agent-friendly** - Easy to identify scope boundaries
-4. **Refactoring safe** - IDs survive code movement
+1. **Familiar to agents** - LLMs trained on Python have strong priors for indentation
+2. **Tag-light** - No `§/X` to type, no mismatched-closer errors
+3. **Refactoring safe** - Stable IDs on openers still survive code movement
+4. **Lower edit cost** - In edit-workload studies, indent form reduced agent token cost by ~16% with no regression in correctness
 
 ---
 

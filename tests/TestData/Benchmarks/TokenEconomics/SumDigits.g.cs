@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace SumDigits
 {
@@ -18,10 +16,10 @@ namespace SumDigits
         {
             int __result__ = default;
 
-            var r = (n % 10);
-            if ((r < 0))
+            var r = n % 10;
+            if (r < 0)
             {
-                return (0 - r);
+                return 0 - r;
             }
             else
             {
@@ -29,30 +27,30 @@ namespace SumDigits
             }
 
 
-            if (!((__result__ >= 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 66, length: 16, sourceFile: null, line: 5, column: 3, condition: "(__result__ >= 0)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 65, length: 16, sourceFile: null, line: 3, column: 5, condition: "__result__ >= 0");
             return __result__;
         }
 
         public static int RemoveLastDigit(int n)
         {
-            return (n / 10);
+            return n / 10;
         }
 
         public static int SumDigitsPositive(int n)
         {
-            if (!((n >= 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (n >= 0)", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 296, length: 11, sourceFile: null, line: 19, column: 3, condition: "(n >= 0)");
+            if (!(n >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: n >= 0", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 285, length: 11, sourceFile: null, line: 14, column: 5, condition: "n >= 0");
             int __result__ = default;
 
-            if ((n == 0))
+            if (n == 0)
             {
                 return 0;
             }
 
             var digit = LastDigit(n);
-            var remaining = SumDigitsPositive((n / 10));
-            __result__ = (digit + remaining);
+            var remaining = SumDigitsPositive(n / 10);
+            __result__ = digit + remaining;
 
-            if (!((__result__ >= 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0)", "f003", Calor.Runtime.ContractKind.Ensures, startOffset: 310, length: 16, sourceFile: null, line: 20, column: 3, condition: "(__result__ >= 0)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f003", Calor.Runtime.ContractKind.Ensures, startOffset: 302, length: 16, sourceFile: null, line: 15, column: 5, condition: "__result__ >= 0");
             return __result__;
         }
 
@@ -60,15 +58,15 @@ namespace SumDigits
         {
             int __result__ = default;
 
-            if ((n < 0))
+            if (n < 0)
             {
-                var posN = (0 - n);
+                var posN = 0 - n;
                 return SumDigitsPositive(posN);
             }
 
             __result__ = SumDigitsPositive(n);
 
-            if (!((__result__ >= 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0)", "f004", Calor.Runtime.ContractKind.Ensures, startOffset: 536, length: 16, sourceFile: null, line: 30, column: 3, condition: "(__result__ >= 0)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f004", Calor.Runtime.ContractKind.Ensures, startOffset: 525, length: 16, sourceFile: null, line: 23, column: 5, condition: "__result__ >= 0");
             return __result__;
         }
 

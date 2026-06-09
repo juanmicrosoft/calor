@@ -12,7 +12,7 @@ public class NullCoalescingTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -21,12 +21,10 @@ public class NullCoalescingTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              {{parameters}}
-              §O{{{returnType}}}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  {{parameters}}
+                  §O{{{returnType}}}
+                  {{body}}
             """;
     }
 
@@ -35,7 +33,7 @@ public class NullCoalescingTests
     {
         var source = WrapInFunction(
             "§R (?? a b)",
-            "§I{object:a}\n  §I{object:b}");
+            "§I{object:a}\n      §I{object:b}");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -55,7 +53,7 @@ public class NullCoalescingTests
     {
         var source = WrapInFunction(
             "§R (?? a b)",
-            "§I{object:a}\n  §I{object:b}");
+            "§I{object:a}\n      §I{object:b}");
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join(", ", result.Diagnostics.Select(d => d.Message)));
@@ -67,7 +65,7 @@ public class NullCoalescingTests
     {
         var source = WrapInFunction(
             "§R (?? a (?? b c))",
-            "§I{object:a}\n  §I{object:b}\n  §I{object:c}");
+            "§I{object:a}\n      §I{object:b}\n      §I{object:c}");
         var module = Parse(source, out var diagnostics);
 
         Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
@@ -88,7 +86,7 @@ public class NullCoalescingTests
     {
         var source = WrapInFunction(
             "§R (?? a (?? b c))",
-            "§I{object:a}\n  §I{object:b}\n  §I{object:c}");
+            "§I{object:a}\n      §I{object:b}\n      §I{object:c}");
         var result = Program.Compile(source);
 
         Assert.False(result.HasErrors, string.Join(", ", result.Diagnostics.Select(d => d.Message)));

@@ -13,7 +13,7 @@ public class PatternCheckerTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -25,17 +25,14 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K §SM _
-        §R 1
-      §K §NN
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K §SM _
+              §R 1
+            §K §NN
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -54,15 +51,12 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K §NN
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K §NN
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -86,15 +80,12 @@ public class PatternCheckerTests
         // is mandatory syntax.
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K §NN
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K §NN
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -115,15 +106,12 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K §SM _
-        §R 1
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K §SM _
+              §R 1
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -147,17 +135,14 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K §OK _
-        §R 1
-      §K §ERR _
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K §OK _
+              §R 1
+            §K §ERR _
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -176,15 +161,12 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K §ERR _
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K §ERR _
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -204,15 +186,12 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K §OK _
-        §R 1
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K §OK _
+              §R 1
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -236,17 +215,14 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{bool:x}
-  §O{i32}
-    §W{m1} x
-      §K BOOL:true
-        §R 1
-      §K BOOL:false
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{bool:x}
+      §O{i32}
+        §W{m1} x
+            §K BOOL:true
+              §R 1
+            §K BOOL:false
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -265,15 +241,12 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{bool:x}
-  §O{i32}
-    §W{m1} x
-      §K BOOL:false
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{bool:x}
+      §O{i32}
+        §W{m1} x
+            §K BOOL:false
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -293,15 +266,12 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{bool:x}
-  §O{i32}
-    §W{m1} x
-      §K BOOL:true
-        §R 1
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{bool:x}
+      §O{i32}
+        §W{m1} x
+            §K BOOL:true
+              §R 1
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -325,15 +295,12 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K _
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K _
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -352,15 +319,12 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K y
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K y
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -383,17 +347,14 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K _
-        §R 0
-      §K §SM _
-        §R 1
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K _
+              §R 0
+            §K §SM _
+              §R 1
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));
@@ -410,19 +371,16 @@ public class PatternCheckerTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K INT:1
-        §R 1
-      §K INT:1
-        §R 2
-      §K _
-        §R 0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K INT:1
+              §R 1
+            §K INT:1
+              §R 2
+            §K _
+              §R 0
 ";
         var module = Parse(source, out var parseDiagnostics);
         Assert.False(parseDiagnostics.HasErrors, string.Join("\n", parseDiagnostics.Select(d => d.Message)));

@@ -1,21 +1,13 @@
 §M{m001:LCS}
-§F{f001:CharsMatch:pub}
-  §I{i32:charA}
-  §I{i32:charB}
-  §O{bool}
-  §R (== charA charB)
-§/F{f001}
-§F{f002:ExtendMatch:pub}
-  §I{i32:prevLen}
-  §O{i32}
-  §R (+ prevLen 1)
-§/F{f002}
-§F{f003:BestOfTwo:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §IF{if1} (> a b) → §R a
-  §EL → §R b
-  §/I{if1}
-§/F{f003}
-§/M{m001}
+  §F{f001:CharsMatch:pub} (i32:charA, i32:charB) -> bool
+    §R (== charA charB)
+
+  §F{f002:ExtendMatch:pub} (i32:prevLen) -> i32
+    §R (+ prevLen 1)
+
+  §F{f003:BestOfTwo:pub} (i32:a, i32:b) -> i32
+    §IF{if1} (> a b)
+      §R a
+    §EL
+      §R b
+

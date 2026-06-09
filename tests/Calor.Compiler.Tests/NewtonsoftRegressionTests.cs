@@ -196,7 +196,7 @@ namespace Test
 }";
         var calor = ConvertToCalor(csharp);
         Assert.Contains("§SYNC", calor);
-        Assert.Contains("§/SYNC", calor);
+        Assert.DoesNotContain("§/SYNC", calor);
 
         var generated = RoundTrip(csharp);
         Assert.Contains("lock", generated);
@@ -292,15 +292,12 @@ namespace Test
         // Parse Calor §SYNC directly, verify AST
         var calorSource = @"
 §M{m1:Test}
-  §CL{c1:Foo:pub}
-    §FLD{object:_obj:priv}
-    §MT{mt1:Bar:pub}
-      §SYNC{s1} (_obj)
-        §B{~x:i32} INT:1
-      §/SYNC{s1}
-    §/MT{mt1}
-  §/CL{c1}
-§/M{m1}
+    §CL{c1:Foo:pub}
+        §FLD{object:_obj:priv}
+        §MT{mt1:Bar:pub}
+            §SYNC{s1} (_obj)
+              §B{~x:i32} INT:1
+            §/SYNC{s1}
 ";
         var compileResult = Program.Compile(calorSource, "sync-test.calr", new CompilationOptions
         {
@@ -351,15 +348,12 @@ namespace Test
         // Parse Calor with §U inside §PP directly
         var calorSource = @"
 §M{m1:Test}
-  §PP{NET6_0_OR_GREATER}
-  §U{System.Text.Json}
-  §/PP{NET6_0_OR_GREATER}
-  §CL{c1:Foo:pub}
-    §MT{mt1:Bar:pub}
-      §B{~x:i32} INT:1
-    §/MT{mt1}
-  §/CL{c1}
-§/M{m1}
+    §PP{NET6_0_OR_GREATER}
+    §U{System.Text.Json}
+    §/PP{NET6_0_OR_GREATER}
+    §CL{c1:Foo:pub}
+        §MT{mt1:Bar:pub}
+            §B{~x:i32} INT:1
 ";
         var compileResult = Program.Compile(calorSource, "conditional-using.calr", new CompilationOptions
         {
@@ -381,16 +375,13 @@ namespace Test
         // Parse Calor with both §U and type declarations inside §PP
         var calorSource = @"
 §M{m1:Test}
-  §PP{NET6_0_OR_GREATER}
-  §U{System.Text.Json}
-  §CL{c1:JsonHelper:pub}
-    §MT{mt1:GetValue:pub}
-      §O{i32}
-      §R INT:42
-    §/MT{mt1}
-  §/CL{c1}
-  §/PP{NET6_0_OR_GREATER}
-§/M{m1}
+    §PP{NET6_0_OR_GREATER}
+    §U{System.Text.Json}
+    §CL{c1:JsonHelper:pub}
+        §MT{mt1:GetValue:pub}
+            §O{i32}
+            §R INT:42
+    §/PP{NET6_0_OR_GREATER}
 ";
         var compileResult = Program.Compile(calorSource, "mixed-pp.calr", new CompilationOptions
         {

@@ -1,22 +1,13 @@
 §M{m001:Zip}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§F{f002:Multiply:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f002}
-§F{f003:ZipLength:pub}
-  §I{i32:lenA}
-  §I{i32:lenB}
-  §O{i32}
-  §IF{if1} (< lenA lenB) → §R lenA
-  §EL → §R lenB
-  §/I{if1}
-§/F{f003}
-§/M{m001}
+  §F{f001:Add:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{f002:Multiply:pub} (i32:a, i32:b) -> i32
+    §R (* a b)
+
+  §F{f003:ZipLength:pub} (i32:lenA, i32:lenB) -> i32
+    §IF{if1} (< lenA lenB)
+      §R lenA
+    §EL
+      §R lenB
+

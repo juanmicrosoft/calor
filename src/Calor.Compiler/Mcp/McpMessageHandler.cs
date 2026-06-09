@@ -552,6 +552,49 @@ public sealed class McpMessageHandler
 
         §/CL{c_01JWDG3PABCDEFGHJKMNPQRST}
 
+        ── CHAIN STATEMENTS — IF/ELSE-IF/ELSE (CRITICAL) ────
+
+        §IF ALWAYS requires an {id} attribute. The condition follows in parentheses.
+        §EI (else-if) and §EL (else) are continuation keywords — they do NOT take {id}.
+        The "else" keyword in Calor is §EL — there is no §K or §ELSE.
+
+        CORRECT:
+          §IF{i01} (< x INT:0)
+            §R (- INT:0 x)
+          §EL
+            §R x
+          §/I{i01}
+
+          §IF{i02} (< value min)
+            §R min
+          §EI (> value max)
+            §R max
+          §EL
+            §R value
+          §/I{i02}
+
+        WRONG:
+          §IF (< x INT:0)           ← missing {id}
+          §K                         ← no such keyword; use §EL
+          §ELSE                      ← no such keyword; use §EL
+          §IF{i01}{x < 0}            ← condition goes in (parens), not braces
+
+        ── CONTRACTS (CRITICAL) ─────────────────────────────
+
+        §Q is a precondition. It takes a Lisp-style expression in parentheses.
+        §S is a postcondition. Same form. §RESULT or `result` is the return value.
+
+        CORRECT:    §Q (>= x INT:0)   §S (== §RESULT a)   §S (&& (>= §RESULT a) (>= §RESULT b))
+        WRONG:      §Q{x >= 0}        §S{result >= 0}     §S (= result ...)
+
+        The condition is NEVER inside {...} braces — only function/binding NAMES go in braces.
+
+        ── EXPRESSIONS (Lisp prefix form) ───────────────────
+
+        arithmetic:  (+ a b)  (- a b)  (* a b)  (/ a b)  (% a b)
+        comparison:  (== x y)  (!= x y)  (< x y)  (<= x y)  (> x y)  (>= x y)
+        logical:     (&& a b)  (|| a b)  (! a)
+
         ── Key rules ───────────────────────────────────────
 
         CLOSING TAGS: §/F (function), §/M (module), §/CL (class),

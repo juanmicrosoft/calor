@@ -1,18 +1,10 @@
 §M{m001:Singleton}
-§F{f001:IsInitialized:pub}
-  §I{bool:hasInstance}
-  §O{bool}
-  §R hasInstance
-§/F{f001}
-§F{f002:GetValue:pub}
-  §I{i32:value}
-  §O{i32}
-  §R value
-§/F{f002}
-§F{f003:SetValue:pub}
-  §I{i32:oldValue}
-  §I{i32:newValue}
-  §O{i32}
-  §R newValue
-§/F{f003}
-§/M{m001}
+  §F{f001:IsInitialized:pub} (bool:hasInstance) -> bool
+    §R hasInstance
+
+  §F{f002:GetValue:pub} (i32:value) -> i32
+    §R value
+
+  §F{f003:SetValue:pub} (i32:oldValue, i32:newValue) -> i32
+    §R newValue
+

@@ -1,0 +1,9 @@
+§M{m002:Remote}
+  §F{f002:FetchRemote:pub} (str:url) -> str
+    §E{net}
+    §R "payload"
+
+  §F{f003:WriteRecord:pub} (str:data) -> i32
+    §E{db}
+    §R 0
+

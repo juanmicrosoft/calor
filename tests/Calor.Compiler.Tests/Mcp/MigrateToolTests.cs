@@ -287,12 +287,10 @@ public class MigrateToolTests
             Path.Combine(tempDir, "Test.calr"),
             """
             §M{m1:TestModule}
-            §C{c1:Foo:public}
-              §F{f1:Bar:public} §O{Int32}
-                → §R 42
-              §/F{f1}
-            §/C{c1}
-            §/M{m1}
+              §C{c1:Foo:public}
+                §F{f1:Bar:public} §O{Int32}
+                    → §R 42
+              §/C{c1}
             """);
         return tempDir;
     }

@@ -2,8 +2,6 @@
   §U{System.Collections.Generic}
 
   §CL{c001:Container:pub}
-    §PROP{p002:Items:List<str>:pub:get,set} = §C{Array.Empty<str>} §/C
+    §PROP{p002:Items:List<str>:pub:get,set} = §C{Array.Empty<str>}
 
-  §/CL{c001}
 
-§/M{m001}

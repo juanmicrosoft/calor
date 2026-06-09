@@ -26,6 +26,9 @@ public static class DiagnosticCode
     public const string UnknownSectionMarker = "Calor0006";
     public const string InvalidSectionOperator = "Calor0007";
 
+    // Phase 3 lexer errors (RFC §4.1)
+    public const string MixedIndentation = "Calor0099";
+
     // Parser errors (Calor0100-0199)
     public const string UnexpectedToken = "Calor0100";
     public const string MismatchedId = "Calor0101";
@@ -44,6 +47,19 @@ public static class DiagnosticCode
     public const string InvalidLispExpression = "Calor0114";
     public const string TypeParameterNotFound = "Calor0115";
 
+    // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
+
+    /// <summary>
+    /// Error: A closer-less <c>§C{target}</c> call expression consumed one
+    /// inline primary expression as its argument and then encountered a
+    /// second expression-start token on the same call. The form
+    /// <c>§C{f} a b</c> is ambiguous: <c>b</c> might be a second positional
+    /// argument (needs <c>§A</c>) or an unrelated token. Use the explicit
+    /// form <c>§C{f} §A a §A b §/C</c>. Per RFC v0.6 call-closer-elision §3.2
+    /// case B.
+    /// </summary>
+    public const string AmbiguousCallContinuation = "Calor0150";
+
     // Semantic errors (Calor0200-0299)
     public const string UndefinedReference = "Calor0200";
     public const string DuplicateDefinition = "Calor0201";
@@ -54,6 +70,46 @@ public static class DiagnosticCode
     /// Error: Extension method must have a parameter of the extended type.
     /// </summary>
     public const string MissingExtensionSelf = "Calor0204";
+
+    // Bind inference diagnostics (Calor0250-0259) — RFC v0.6 bind-inference-formalization
+
+    /// <summary>
+    /// Error: <c>§B{name}</c> requires either a <c>:type</c> annotation or
+    /// an initializer expression. Previously the binder silently defaulted
+    /// to <c>INT</c> in this case; that was a latent bug because misuse
+    /// produced wrong-typed code with no diagnostic.
+    /// </summary>
+    public const string BindRequiresTypeOrInitializer = "Calor0250";
+
+    /// <summary>
+    /// Error: <c>§B{name} none</c> / <c>§B{name} null</c> cannot infer a
+    /// type — the right-hand side carries no concrete element type. The
+    /// fix is to give the binding an explicit option type, e.g.
+    /// <c>§B{name:Option&lt;T&gt;} none</c>.
+    /// Fires only under <c>--strict-bind-inference</c> in v0.6; default-on
+    /// in v0.7. See RFC v0.6 bind-inference-formalization §3.2.
+    /// </summary>
+    public const string BindCannotInferNullLiteral = "Calor0251";
+
+    /// <summary>
+    /// Error: <c>§B{name} §C{Foo.bar}</c> cannot infer a type when
+    /// <c>Foo.bar</c> returns a generic with an unresolved type
+    /// parameter (e.g. <c>Vec&lt;T&gt;.empty</c>). The fix is to give
+    /// the binding an explicit type argument.
+    /// Fires only under <c>--strict-bind-inference</c> in v0.6; default-on
+    /// in v0.7. See RFC v0.6 bind-inference-formalization §3.2.
+    /// </summary>
+    public const string BindCannotInferGenericReturn = "Calor0252";
+
+    /// <summary>
+    /// Error: <c>§B{name} (+ INT:0 FLOAT:0.0)</c> — the initializer mixes
+    /// numeric types and widening could pick more than one bound type.
+    /// The fix is to give the binding an explicit numeric annotation
+    /// (<c>:i32</c>, <c>:f64</c>, …).
+    /// Fires only under <c>--strict-bind-inference</c> in v0.6; default-on
+    /// in v0.7. See RFC v0.6 bind-inference-formalization §3.2.
+    /// </summary>
+    public const string BindAmbiguousNumeric = "Calor0253";
 
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
@@ -208,6 +264,49 @@ public static class DiagnosticCode
     /// Info: Z3 SMT solver is unavailable, using heuristic checking only.
     /// </summary>
     public const string Z3UnavailableForInheritance = "Calor0817";
+
+    // Legacy structural-ID lint (Calor0820-0822) — Phase 1/2 v6 plan
+    // (drop structural IDs, then introduce compact 12-char IDs).
+
+    /// <summary>
+    /// Info (opt-in lint): a structural opener still carries a legacy
+    /// <c>{id:…}</c> block that the Phase 1 migrator (<c>calor fix
+    /// --drop-structural-ids</c>) can safely remove.
+    ///
+    /// Per RFC §5.7 the diagnostic is informational and must include a
+    /// machine-applicable suggested fix (the byte range to delete).
+    /// </summary>
+    public const string LegacyStructuralId = "Calor0820";
+
+    /// <summary>
+    /// Info (opt-in lint, Phase 2): a Calor declaration uses a 26-char
+    /// ULID payload that the compact migrator (<c>calor fix
+    /// --compact-ids</c>) can rewrite to a 12-char Crockford-lowercase
+    /// compact ID.
+    /// </summary>
+    public const string LegacyUlidPayload = "Calor0821";
+
+    /// <summary>
+    /// Warning (Phase 2): two declarations in the compile unit produced
+    /// the same compact ID. Indicates a generator collision and is
+    /// surfaced as a hard error in the registry path.
+    /// </summary>
+    public const string CompactIdCollision = "Calor0822";
+
+    /// <summary>
+    /// Info (opt-in lint, Phase 4b): a structural closing tag (e.g.
+    /// <c>§/F</c>, <c>§/CL</c>, <c>§/L</c>) is present in source that
+    /// has otherwise adopted indent form. Indent form alone now
+    /// terminates every structural block; legacy closers are kept only
+    /// for closers that still carry payload (<c>§/DO</c> condition,
+    /// <c>§/PP</c> condition, <c>§/K</c> case delimiter) and inline
+    /// expression closers (<c>§/C</c>, <c>§/T</c>, <c>§/NEW</c>, etc.).
+    ///
+    /// The fix is to delete the entire closer line (and any trailing
+    /// blank line introduced by the legacy formatter). <c>calor format</c>
+    /// already produces indent form and will strip these automatically.
+    /// </summary>
+    public const string LegacyCloserForm = "Calor0830";
 
     // Contract simplification (Calor0330-0339)
 

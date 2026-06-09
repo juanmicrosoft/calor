@@ -18,7 +18,7 @@ public class BugDetectionImprovementTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -37,13 +37,11 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -64,14 +62,12 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (/ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -92,19 +88,16 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§F{f002:Mul:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f002}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
+  §F{f002:Mul:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (* a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -125,13 +118,11 @@ public class BugDetectionImprovementTests
         // Division by parameter should produce a warning but not an error
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -155,15 +146,13 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §S (== result (/ a b))
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §S (== result (/ a b))
+      §R (/ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -185,14 +174,12 @@ public class BugDetectionImprovementTests
         // Source with §Q marker (the correct Calor syntax)
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (/ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -220,24 +207,20 @@ public class BugDetectionImprovementTests
     {
         var buggySource = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var fixedSource = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (/ a b)
 ";
         var calc = new ErrorDetectionCalculator();
         var bug = new BugDescription
@@ -264,13 +247,11 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -300,14 +281,12 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (/ a b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -341,12 +320,10 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Half:pub}
-  §I{i32:a}
-  §O{i32}
-  §R (/ a 2)
-§/F{f001}
-§/M{m001}
+  §F{f001:Half:pub}
+      §I{i32:a}
+      §O{i32}
+      §R (/ a 2)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -376,13 +353,11 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -418,16 +393,13 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Sum:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{~total:i32} INT:0
-  §L{l001:i:0:n:1}
-    §B{~total:i32} (+ total i)
-  §/L{l001}
-  §R total
-§/F{f001}
-§/M{m001}
+  §F{f001:Sum:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{~total:i32} INT:0
+      §L{l001:i:0:n:1}
+          §B{~total:i32} (+ total i)
+      §R total
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -458,16 +430,13 @@ public class BugDetectionImprovementTests
         // When the bound is subtracted by 1, no warning
         var source = @"
 §M{m001:Test}
-§F{f001:Sum:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{~total:i32} INT:0
-  §L{l001:i:0:(- n 1):1}
-    §B{~total:i32} (+ total i)
-  §/L{l001}
-  §R total
-§/F{f001}
-§/M{m001}
+  §F{f001:Sum:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{~total:i32} INT:0
+      §L{l001:i:0:(- n 1):1}
+          §B{~total:i32} (+ total i)
+      §R total
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -497,16 +466,13 @@ public class BugDetectionImprovementTests
         // Loop to a literal bound, body doesn't use loop var
         var source = @"
 §M{m001:Test}
-§F{f001:Count:pub}
-  §I{i32:n}
-  §O{i32}
-  §B{~total:i32} INT:0
-  §L{l001:i:0:10:1}
-    §B{~total:i32} (+ total 1)
-  §/L{l001}
-  §R total
-§/F{f001}
-§/M{m001}
+  §F{f001:Count:pub}
+      §I{i32:n}
+      §O{i32}
+      §B{~total:i32} INT:0
+      §L{l001:i:0:10:1}
+          §B{~total:i32} (+ total 1)
+      §R total
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -540,13 +506,11 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -566,14 +530,12 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (/ a b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -592,13 +554,11 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -622,13 +582,11 @@ public class BugDetectionImprovementTests
     {
         var buggySource = @"
 §M{m001:UnsafeMath}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -653,12 +611,10 @@ public class BugDetectionImprovementTests
         // Uses §C{} call syntax to produce BoundCallExpression with target "maybeVal.unwrap"
         var buggySource = @"
 §M{m001:UnsafeOption}
-§F{f001:GetValue:pub}
-  §I{Option<i32>:maybeVal}
-  §O{i32}
-  §R §C{maybeVal.unwrap} §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:GetValue:pub}
+      §I{Option<i32>:maybeVal}
+      §O{i32}
+      §R §C{maybeVal.unwrap} §/C
 ";
         var module = Parse(buggySource, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -684,13 +640,11 @@ public class BugDetectionImprovementTests
     {
         var buggySource = @"
 §M{m001:UnsafeAdd}
-§F{f001:AddLarge:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:AddLarge:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -711,13 +665,11 @@ public class BugDetectionImprovementTests
     {
         var buggySource = @"
 §M{m001:UnsafeDivide}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -744,14 +696,12 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §R (/ a b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -774,13 +724,11 @@ public class BugDetectionImprovementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -808,12 +756,10 @@ public class BugDetectionImprovementTests
         // Function that just returns a parameter should infer §S (== result param)
         var source = @"
 §M{m001:Test}
-§F{f001:Identity:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}
+  §F{f001:Identity:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -835,12 +781,10 @@ public class BugDetectionImprovementTests
         // Function that returns x * x should infer §S (>= result 0)
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (* x x)
-§/F{f001}
-§/M{m001}
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (* x x)
 ";
         var module = Parse(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
@@ -868,13 +812,11 @@ public class BugDetectionImprovementTests
         // findings are informational, not compilation failures.
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -903,13 +845,11 @@ public class BugDetectionImprovementTests
         // and parameters should achieve a structure score of 1.0
         var source = @"
 §M{m001:MathOps}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
         var ctx = new EvaluationContext
         {
@@ -932,13 +872,11 @@ public class BugDetectionImprovementTests
         // a GenerationAccuracy ratio >= 1.0 compared to C#
         var source = @"
 §M{m001:MathOps}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
         var csharpSource = @"
 using System;
@@ -969,25 +907,17 @@ namespace MathOps {
         // It should succeed after the fix.
         var source = @"
 §M{m001:PrimeCheck}
-§F{f001:IsPrime:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (> n 0)
-  §IF{if1} (<= n 1) → §R false
-  §/I{if1}
-  §IF{if2} (<= n 3) → §R true
-  §/I{if2}
-  §IF{if3} (== (% n 2) 0) → §R false
-  §/I{if3}
-  §L{while1:i:3:1000:2}
-    §IF{if4} (> (* i i) n) → §R true
-    §/I{if4}
-    §IF{if5} (== (% n i) 0) → §R false
-    §/I{if5}
-  §/L{while1}
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:IsPrime:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (> n 0)
+      §IF{if1} (<= n 1) → §R false
+      §IF{if2} (<= n 3) → §R true
+      §IF{if3} (== (% n 2) 0) → §R false
+      §L{while1:i:3:1000:2}
+          §IF{if4} (> (* i i) n) → §R true
+          §IF{if5} (== (% n i) 0) → §R false
+      §R true
 ";
         var ctx = new EvaluationContext
         {
@@ -1079,18 +1009,13 @@ namespace MathOps {
     {
         var source = @"
 §M{m001:Test}
-§F{f001:IsPrime:pub}
-  §I{i32:n}
-  §O{bool}
-  §IF{if1} (<= n 1) → §R false
-  §/I{if1}
-  §IF{if2} (<= n 3) → §R true
-  §/I{if2}
-  §IF{if3} (== (% n 2) 0) → §R false
-  §/I{if3}
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:IsPrime:pub}
+      §I{i32:n}
+      §O{bool}
+      §IF{if1} (<= n 1) → §R false
+      §IF{if2} (<= n 3) → §R true
+      §IF{if3} (== (% n 2) 0) → §R false
+      §R true
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1107,16 +1032,12 @@ namespace MathOps {
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Clamp:pub}
-  §I{i32:n}
-  §O{i32}
-  §IF{if1} (< n 0) → §R INT:0
-  §/I{if1}
-  §IF{if2} (== n 1) → §R INT:1
-  §/I{if2}
-  §R n
-§/F{f001}
-§/M{m001}
+  §F{f001:Clamp:pub}
+      §I{i32:n}
+      §O{i32}
+      §IF{if1} (< n 0) → §R INT:0
+      §IF{if2} (== n 1) → §R INT:1
+      §R n
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1132,16 +1053,13 @@ namespace MathOps {
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Abs:pub}
-  §I{i32:n}
-  §O{i32}
-  §IF{if1} (< n 0)
-    §R (- 0 n)
-  §EL
-    §R n
-  §/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Abs:pub}
+      §I{i32:n}
+      §O{i32}
+      §IF{if1} (< n 0)
+          §R (- 0 n)
+      §EL
+          §R n
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1157,21 +1075,18 @@ namespace MathOps {
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §S (>= result 0)
-  §R (/ a b)
-§/F{f001}
-§F{f002:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f002}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §S (>= result 0)
+      §R (/ a b)
+  §F{f002:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1187,13 +1102,11 @@ namespace MathOps {
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1213,16 +1126,13 @@ namespace MathOps {
         // Match expression (inside return) with wildcard pattern
         var source = @"
 §M{m001:Test}
-§F{f001:Describe:pub}
-  §I{i32:x}
-  §O{str}
-  §R §W{sw1} x
-    §K 1 → ""one""
-    §K 2 → ""two""
-    §K _ → ""other""
-  §/W{sw1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Describe:pub}
+      §I{i32:x}
+      §O{str}
+      §R §W{sw1} x
+          §K 1 → ""one""
+          §K 2 → ""two""
+          §K _ → ""other""
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1239,17 +1149,14 @@ namespace MathOps {
         // Match statement (not inside return) with wildcard pattern
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-    §W{m1} x
-      §K 1
-        §R INT:10
-      §K _
-        §R INT:0
-    §/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+        §W{m1} x
+            §K 1
+              §R INT:10
+            §K _
+              §R INT:0
 ";
         var module = Parse(source, out var diag);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -1266,15 +1173,12 @@ namespace MathOps {
         // A Calor program with → §R conditional returns should score higher than base
         var source = @"
 §M{m001:Test}
-§F{f001:Factorial:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (>= n 0)
-  §IF{if1} (<= n 1) → §R INT:1
-  §/I{if1}
-  §R (* n §C{Factorial} §A (- n 1) §/C)
-§/F{f001}
-§/M{m001}
+  §F{f001:Factorial:pub}
+      §I{i32:n}
+      §O{i32}
+      §Q (>= n 0)
+      §IF{if1} (<= n 1) → §R INT:1
+      §R (* n §C{Factorial} §A (- n 1) §/C)
 ";
         var ctx = new EvaluationContext
         {
@@ -1298,26 +1202,21 @@ namespace MathOps {
         // but a minimal program without them should not
         var defensiveSource = @"
 §M{m001:Test}
-§F{f001:SafeDiv:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §IF{if1} (<= b 1) → §R INT:0
-  §/I{if1}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:SafeDiv:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §IF{if1} (<= b 1) → §R INT:0
+      §R (/ a b)
 ";
         var minimalSource = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
         var defensiveCtx = new EvaluationContext
         {
@@ -1360,21 +1259,17 @@ class C {
         // Calor with all patterns
         var calorSource = @"
 §M{m001:Test}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §S (>= result 0)
-  §IF{if1} (<= b 1) → §R INT:0
-  §/I{if1}
-  §IF{if2} (> a 0)
-    §R (/ a b)
-  §EL
-    §R INT:0
-  §/I{if2}
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b 0)
+      §S (>= result 0)
+      §IF{if1} (<= b 1) → §R INT:0
+      §IF{if2} (> a 0)
+          §R (/ a b)
+      §EL
+          §R INT:0
 ";
         var ctx = new EvaluationContext
         {

@@ -13,7 +13,7 @@ public class CharOperationTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -22,12 +22,10 @@ public class CharOperationTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{{{inputType}}:s}
-              §O{{{outputType}}}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{{{inputType}}:s}
+                  §O{{{outputType}}}
+                  {{body}}
             """;
     }
 
@@ -35,12 +33,10 @@ public class CharOperationTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{char:c}
-              §O{object}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{char:c}
+                  §O{object}
+                  {{body}}
             """;
     }
 
@@ -195,13 +191,11 @@ public class CharOperationTests
     {
         var source = $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{string:s}
-              §I{char:c}
-              §O{object}
-              §R {{calor}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{string:s}
+                  §I{char:c}
+                  §O{object}
+                  §R {{calor}}
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -232,13 +226,11 @@ public class CharOperationTests
     {
         var source = $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{string:s}
-              §I{char:c}
-              §O{object}
-              §R {{op}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{string:s}
+                  §I{char:c}
+                  §O{object}
+                  §R {{op}}
             """;
         var module = Parse(source, out var diagnostics);
 

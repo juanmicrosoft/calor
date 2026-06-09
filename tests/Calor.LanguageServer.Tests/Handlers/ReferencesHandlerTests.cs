@@ -11,13 +11,11 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{x} 10
-            §B{y} x
-            §R (+ x y)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{x} 10
+                §B{y} x
+                §R (+ x y)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -35,17 +33,14 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Add:pub}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R (+ a b)
-            §/F{f001}
-            §F{f002:Test:pub}
-            §O{i32}
-            §R §C{Add} §A 1 §A 2 §/C
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Add:pub}
+                §I{i32:a}
+                §I{i32:b}
+                §O{i32}
+                §R (+ a b)
+              §F{f002:Test:pub}
+                §O{i32}
+                §R §C{Add} §A 1 §A 2 §/C
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -63,12 +58,10 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Double:pub}
-            §I{i32:value}
-            §O{i32}
-            §R (* value 2)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Double:pub}
+                §I{i32:value}
+                §O{i32}
+                §R (* value 2)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -86,12 +79,10 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{x} 10
-            §R x
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{x} 10
+                §R x
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -112,14 +103,11 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §/CL{c001}
-            §F{f001:Test:pub}
-            §O{Person}
-            §R §NEW{Person} §/NEW
-            §/F{f001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+              §F{f001:Test:pub}
+                §O{Person}
+                §R §NEW{Person} §/NEW
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -137,14 +125,11 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §CL{c001:Counter}
-            §FLD{i32:count:priv}
-            §MT{m001:Increment:pub}
-            §O{void}
-            §ASSIGN count (+ count 1)
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Counter}
+                §FLD{i32:count:priv}
+                §MT{m001:Increment:pub}
+                  §O{void}
+                  §ASSIGN count (+ count 1)
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -162,12 +147,11 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §EN{e001:Color}
-            Red
-            Green
-            Blue
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Color}
+              Red
+              Green
+              Blue
+              §/EN{e001}
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -185,15 +169,12 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Sum:pub}
-            §O{i32}
-            §B{total} 0
-            §L{for1:i:0:10:1}
-            §ASSIGN total (+ total i)
-            §/L{for1}
-            §R total
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Sum:pub}
+                §O{i32}
+                §B{total} 0
+                §L{for1:i:0:10:1}
+                  §ASSIGN total (+ total i)
+                §R total
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -211,15 +192,13 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §B{fn} §LAM
-            §I{i32:x}
-            §R (* x 2)
-            §/LAM
-            §R 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §B{fn} §LAM
+                §I{i32:x}
+                §R (* x 2)
+                §/LAM
+                §R 0
             """;
 
         var ast = LspTestHarness.GetAst(source);
@@ -237,11 +216,9 @@ public class ReferencesHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §R 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test:pub}
+                §O{i32}
+                §R 42
             """;
 
         var ast = LspTestHarness.GetAst(source);

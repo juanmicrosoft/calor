@@ -5,13 +5,11 @@ import { cn } from '@/lib/utils';
 import { trackCodeComparisonTab } from '@/lib/analytics';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 
-const calorCode = `§F{f_01J5X7K9M2:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x 0)
-  §S (>= result 0)
-  §R (* x x)
-§/F{f_01J5X7K9M2}`;
+const calorCode = `§M{m1:Math}
+  §F{f_01J5X7K9M2:Square:pub} (i32:x) -> i32
+    §Q (>= x 0)
+    §S (>= result 0)
+    §R (* x x)`;
 
 const csharpCode = `public static int Square(int x)
 {
@@ -24,10 +22,10 @@ const csharpCode = `public static int Square(int x)
 }`;
 
 const calorAnnotations = [
-  { line: 0, text: 'Permanent ID means AI can find this function even after you rename it' },
-  { line: 3, text: 'Rule: input must be >= 0. Compiler enforces this automatically.' },
-  { line: 4, text: 'Rule: output must be >= 0. No way to return invalid results.' },
-  { line: 5, text: 'No database or network calls—guaranteed by the compiler.' },
+  { line: 1, text: 'Permanent ID means AI can find this function even after you rename it' },
+  { line: 2, text: 'Rule: input must be >= 0. Compiler enforces this automatically.' },
+  { line: 3, text: 'Rule: output must be >= 0. No way to return invalid results.' },
+  { line: 4, text: 'No database or network calls—guaranteed by the compiler.' },
 ];
 
 const csharpAnnotations = [

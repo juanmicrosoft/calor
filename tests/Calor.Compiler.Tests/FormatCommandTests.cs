@@ -42,7 +42,7 @@ public class FormatCommandTests : IDisposable
         diagnostics.SetFilePath(filePath);
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         if (diagnostics.HasErrors)
         {
@@ -88,10 +88,8 @@ public class FormatCommandTests : IDisposable
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Main:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+      §O{void}
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -108,13 +106,11 @@ public class FormatCommandTests : IDisposable
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-    §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+        §R (+ a b)
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -136,10 +132,8 @@ public class FormatCommandTests : IDisposable
         // Format the same source twice
         var source = @"
 §M{m001:Test}
-§F{f001:Main:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+      §O{void}
 ";
         var filePath1 = CreateTestFile("test1.calr", source);
         var filePath2 = CreateTestFile("test2.calr", source);
@@ -159,10 +153,8 @@ public class FormatCommandTests : IDisposable
     {
         // Source with inconsistent formatting (extra whitespace, etc.)
         var source = @"§M{m001:Test}
-§F{f001:Main:pub}
-§O{void}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Main:pub}
+    §O{void}";
         var filePath = CreateTestFile("test.calr", source);
 
         var result = FormatFile(filePath);
@@ -182,10 +174,8 @@ public class FormatCommandTests : IDisposable
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Main:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+      §O{void}
 ";
         var filePath = CreateTestFile("test.calr", source);
         var originalContent = File.ReadAllText(filePath);
@@ -205,13 +195,11 @@ public class FormatCommandTests : IDisposable
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-    §R (+ x y)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+        §R (+ x y)
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -248,11 +236,9 @@ public class FormatCommandTests : IDisposable
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Main:pub}
-  §O{void}
-    §INVALID_TOKEN
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub}
+      §O{void}
+        §INVALID_TOKEN
 ";
         var filePath = CreateTestFile("invalid.calr", source);
 
@@ -283,7 +269,6 @@ public class FormatCommandTests : IDisposable
     {
         var source = @"
 §M{m001:Test}
-§/M{m001}
 ";
         var filePath = CreateTestFile("test.calr", source);
 
@@ -309,7 +294,6 @@ public class FormatCommandTests : IDisposable
     {
         var source = @"
 §M{m001:Test}
-§/M{m001}
 ";
         // Test with uppercase extension
         var filePath = CreateTestFile("test.CALR", source);
@@ -331,15 +315,12 @@ public class FormatCommandTests : IDisposable
     {
         var source1 = @"
 §M{m001:Test1}
-§/M{m001}
 ";
         var source2 = @"
 §M{m002:Test2}
-§/M{m002}
 ";
         var source3 = @"
 §M{m003:Test3}
-§/M{m003}
 ";
         var file1 = CreateTestFile("test1.calr", source1);
         var file2 = CreateTestFile("test2.calr", source2);

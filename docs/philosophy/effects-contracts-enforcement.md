@@ -133,7 +133,6 @@ This isn't incremental improvement. It's a phase transition that makes previousl
 
   §C{SaveOrder} order       // OK: SaveOrder has db:rw effect
   §C{SendEmail} order       // ERROR: SendEmail has net:w effect
-§/F{f001}                   //        not declared in §E{db:rw}
 ```
 
 **The compiler catches this.** Not a linter warning. Not a code review comment. A hard error that blocks compilation.
@@ -188,7 +187,6 @@ This means effect verification extends beyond Calor code to the entire .NET ecos
   §Q (>= account.balance amount)           // Precondition
   §S (== account.balance (- old_balance amount))  // Postcondition
   // ...
-§/F{f001}
 ```
 
 Every contract becomes executable verification:
@@ -237,10 +235,8 @@ Runtime checks catch violations when they happen. But with Z3, the compiler can 
   §S (>= result 0)
   §IF{if001} (< x 0)
     §R 0
-  §ELSE{if001}
+    §ELSE{if001}
     §R x
-  §/IF{if001}
-§/F{f004}
 ```
 
 ```

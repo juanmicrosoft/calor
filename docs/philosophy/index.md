@@ -22,7 +22,7 @@ When an AI agent reads code, it needs answers to specific questions:
 | What are the **side effects**? | Guess from I/O patterns | Declared with `§E{cw, fs:r, net:rw}` |
 | What **constraints** must hold? | Parse exception patterns | First-class preconditions/postconditions |
 | How do I **precisely reference** this? | Hope line numbers don't change | Unique IDs (`§F{f001:Main}`) |
-| Where does this **scope end**? | Count braces, handle nesting | Matched closing tags (`§/F{f001}`) |
+| Where does this **scope end**? | Count braces, handle nesting | Indentation (Python-style) |
 
 Traditional languages make agents *infer* these answers through complex analysis. Calor makes them *explicit* in the syntax.
 
@@ -34,13 +34,11 @@ Calor deliberately optimizes for machine readability over human aesthetics:
 
 ```
 §M{m001:Calculator}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
 ```
 
 This might look unusual to human programmers, but for an AI agent:

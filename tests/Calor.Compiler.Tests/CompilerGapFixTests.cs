@@ -19,7 +19,7 @@ public class CompilerGapFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -36,7 +36,7 @@ public class CompilerGapFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         parser.Parse();
@@ -53,11 +53,9 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§CL{c1:MyPoint:pub:struct}
-  §FLD{i32:X:pub}
-  §FLD{i32:Y:pub}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyPoint:pub:struct}
+      §FLD{i32:X:pub}
+      §FLD{i32:Y:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -72,10 +70,8 @@ public class CompilerGapFixTests
         // §CL{c1:Name:pub:struct} — modifiers span _pos2 and _pos3
         var source = @"
 §M{m1:TestMod}
-§CL{c1:MyPoint:pub:struct}
-  §FLD{i32:X:pub}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyPoint:pub:struct}
+      §FLD{i32:X:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -88,9 +84,7 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§CL{c1:MyClass:pub}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyClass:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -105,9 +99,7 @@ public class CompilerGapFixTests
         // C# structs are implicitly sealed, so "sealed" is correctly omitted from output
         var source = @"
 §M{m1:TestMod}
-§CL{c1:MyVal:pub:struct seal}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyVal:pub:struct seal}
 ";
 
         var result = ParseAndEmit(source);
@@ -122,9 +114,7 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§CL{c1:Bad:struct abs}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Bad:struct abs}
 ";
 
         var diagnostics = ParseWithDiagnostics(source);
@@ -142,10 +132,8 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§CL{c1:Counter:pub}
-  §FLD{i32:Count:pub:stat}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Counter:pub}
+      §FLD{i32:Count:pub:stat}
 ";
 
         var result = ParseAndEmit(source);
@@ -158,10 +146,8 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§CL{c1:MyClass:pub}
-  §FLD{str:_name:pri}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyClass:pub}
+      §FLD{str:_name:pri}
 ";
 
         var result = ParseAndEmit(source);
@@ -179,9 +165,7 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:_global}
-§CL{c1:MyClass:pub}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyClass:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -195,9 +179,7 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:MyApp}
-§CL{c1:MyClass:pub}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyClass:pub}
 ";
 
         var result = ParseAndEmit(source);
@@ -214,12 +196,10 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f001:Main:pub}
-  §O{void}
-  §B{~x:i32} 0
-  (inc x)
-§/F{f001}
-§/M{m1}
+  §F{f001:Main:pub}
+      §O{void}
+      §B{~x:i32} 0
+      (inc x)
 ";
 
         var result = ParseAndEmit(source);
@@ -232,12 +212,10 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f001:Main:pub}
-  §O{void}
-  §B{~x:i32} 0
-  (post-inc x)
-§/F{f001}
-§/M{m1}
+  §F{f001:Main:pub}
+      §O{void}
+      §B{~x:i32} 0
+      (post-inc x)
 ";
 
         var result = ParseAndEmit(source);
@@ -250,12 +228,10 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f001:Main:pub}
-  §O{void}
-  §B{~x:i32} 0
-  (dec x)
-§/F{f001}
-§/M{m1}
+  §F{f001:Main:pub}
+      §O{void}
+      §B{~x:i32} 0
+      (dec x)
 ";
 
         var result = ParseAndEmit(source);
@@ -268,12 +244,10 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:TestMod}
-§F{f001:Main:pub}
-  §O{void}
-  §B{~x:i32} 0
-  (post-dec x)
-§/F{f001}
-§/M{m1}
+  §F{f001:Main:pub}
+      §O{void}
+      §B{~x:i32} 0
+      (post-dec x)
 ";
 
         var result = ParseAndEmit(source);
@@ -290,17 +264,14 @@ public class CompilerGapFixTests
     {
         var source = @"
 §M{m1:_global}
-§CL{c1:Vector2:pub:struct}
-  §FLD{i32:X:pub}
-  §FLD{i32:Y:pub}
-  §FLD{i32:InstanceCount:pub:stat}
-  §MT{m001:Advance:pub}
-    §O{void}
-    (inc X)
-    (post-inc InstanceCount)
-  §/MT{m001}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Vector2:pub:struct}
+      §FLD{i32:X:pub}
+      §FLD{i32:Y:pub}
+      §FLD{i32:InstanceCount:pub:stat}
+      §MT{m001:Advance:pub}
+          §O{void}
+          (inc X)
+          (post-inc InstanceCount)
 ";
 
         var result = ParseAndEmit(source);

@@ -13,7 +13,7 @@ public class TypeOperationTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -22,12 +22,10 @@ public class TypeOperationTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{{{inputType}}:x}
-              §O{{{outputType}}}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{{{inputType}}:x}
+                  §O{{{outputType}}}
+                  {{body}}
             """;
     }
 

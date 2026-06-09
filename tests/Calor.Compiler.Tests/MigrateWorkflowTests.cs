@@ -488,15 +488,13 @@ public class MigrateWorkflowTests : IDisposable
         var calrSource = """
             §M{m001:VerifyTest}
 
-            §F{f001:Square:pub}
-              §I{i32:x}
-              §O{i32}
-              §Q (>= x 0)
-              §S (>= result 0)
-              §R (* x x)
-            §/F{f001}
+              §F{f001:Square:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §Q (>= x 0)
+                  §S (>= result 0)
+                  §R (* x x)
 
-            §/M{m001}
             """;
 
         // Write it as if it were a converted output

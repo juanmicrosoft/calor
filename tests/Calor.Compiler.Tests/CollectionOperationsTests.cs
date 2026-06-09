@@ -14,7 +14,7 @@ public class CollectionOperationsTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -23,7 +23,7 @@ public class CollectionOperationsTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     #region Lexer Tests
@@ -104,12 +104,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{list1:i32}
-              §/LIST{list1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{list1:i32}
+                  §/LIST{list1}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -133,15 +131,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{list1:i32}
-                1
-                2
-                3
-              §/LIST{list1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{list1:i32}
+                    1
+                    2
+                    3
+                  §/LIST{list1}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -166,12 +162,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{dict1:str:i32}
-              §/DICT{dict1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{dict1:str:i32}
+                  §/DICT{dict1}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -195,14 +189,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{dict1:str:i32}
-                §KV "one" 1
-                §KV "two" 2
-              §/DICT{dict1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{dict1:str:i32}
+                    §KV "one" 1
+                    §KV "two" 2
+                  §/DICT{dict1}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -227,12 +219,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §HSET{set1:str}
-              §/HSET{set1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §HSET{set1:str}
+                  §/HSET{set1}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -255,14 +245,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §HSET{set1:str}
-                "apple"
-                "banana"
-              §/HSET{set1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §HSET{set1:str}
+                    "apple"
+                    "banana"
+                  §/HSET{set1}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -287,11 +275,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §PUSH{list1} 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §PUSH{list1} 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -309,11 +295,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §PUT{dict1} "key" 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §PUT{dict1} "key" 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -331,11 +315,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §REM{coll1} "item"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §REM{coll1} "item"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -353,11 +335,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §CLR{coll1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §CLR{coll1}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -375,11 +355,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §INS{list1} 0 "first"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §INS{list1} 0 "first"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -397,11 +375,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §SETIDX{list1} 0 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §SETIDX{list1} 0 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -423,11 +399,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{bool}
-              §R §HAS{list1} 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{bool}
+                  §R §HAS{list1} 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -449,11 +423,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{bool}
-              §R §HAS{dict1} §KEY "mykey"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{bool}
+                  §R §HAS{dict1} §KEY "mykey"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -475,11 +447,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{bool}
-              §R §HAS{dict1} §VAL 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{bool}
+                  §R §HAS{dict1} §VAL 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -505,11 +475,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{i32}
-              §R §CNT myList
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{i32}
+                  §R §CNT myList
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -533,13 +501,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §EACHKV{e1:k:v} dict1
-                §P k
-              §/EACHKV{e1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §EACHKV{e1:k:v} dict1
+                      §P k
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -564,15 +529,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{nums:i32}
-                1
-                2
-                3
-              §/LIST{nums}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{nums:i32}
+                    1
+                    2
+                    3
+                  §/LIST{nums}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -591,14 +554,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{ages:str:i32}
-                §KV "alice" 30
-                §KV "bob" 25
-              §/DICT{ages}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{ages:str:i32}
+                    §KV "alice" 30
+                    §KV "bob" 25
+                  §/DICT{ages}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -615,14 +576,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §HSET{items:str}
-                "apple"
-                "banana"
-              §/HSET{items}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §HSET{items:str}
+                    "apple"
+                    "banana"
+                  §/HSET{items}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -640,11 +599,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §PUSH{myList} 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §PUSH{myList} 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -661,11 +618,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §PUT{myDict} "key" 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §PUT{myDict} "key" 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -682,11 +637,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §REM{myColl} "item"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §REM{myColl} "item"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -703,11 +656,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §CLR{myColl}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §CLR{myColl}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -724,11 +675,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §INS{myList} 0 "first"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §INS{myList} 0 "first"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -745,11 +694,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:HasKey:pub}
-              §O{bool}
-              §R §HAS{myDict} §KEY "testKey"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:HasKey:pub}
+                  §O{bool}
+                  §R §HAS{myDict} §KEY "testKey"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -766,11 +713,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:HasValue:pub}
-              §O{bool}
-              §R §HAS{myDict} §VAL 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:HasValue:pub}
+                  §O{bool}
+                  §R §HAS{myDict} §VAL 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -787,13 +732,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §EACHKV{e1:key:value} myDict
-                §P key
-              §/EACHKV{e1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §EACHKV{e1:key:value} myDict
+                      §P key
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -810,11 +752,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetLength:pub}
-              §O{i32}
-              §R §CNT myList
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetLength:pub}
+                  §O{i32}
+                  §R §CNT myList
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -835,12 +775,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{list1:i32}
-              §/LIST{list2}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{list1:i32}
+                  §/LIST{list2}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -854,12 +792,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{dict1:str:i32}
-              §/DICT{dict2}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{dict1:str:i32}
+                  §/DICT{dict2}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -897,12 +833,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{empty:str}
-              §/LIST{empty}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{empty:str}
+                  §/LIST{empty}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -920,12 +854,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{empty:str:i32}
-              §/DICT{empty}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{empty:str:i32}
+                  §/DICT{empty}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -943,12 +875,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §HSET{empty:i32}
-              §/HSET{empty}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §HSET{empty:i32}
+                  §/HSET{empty}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -966,16 +896,14 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{emptyList:i32}
-              §/LIST{emptyList}
-              §DICT{emptyDict:str:str}
-              §/DICT{emptyDict}
-              §HSET{emptySet:bool}
-              §/HSET{emptySet}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{emptyList:i32}
+                  §/LIST{emptyList}
+                  §DICT{emptyDict:str:str}
+                  §/DICT{emptyDict}
+                  §HSET{emptySet:bool}
+                  §/HSET{emptySet}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -994,13 +922,11 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{single:i32}
-                42
-              §/LIST{single}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{single:i32}
+                    42
+                  §/LIST{single}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1018,13 +944,11 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{single:str:i32}
-                §KV "key" 1
-              §/DICT{single}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{single:str:i32}
+                    §KV "key" 1
+                  §/DICT{single}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1042,17 +966,15 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{nums:i32}
-              §/LIST{nums}
-              §PUSH{nums} 1
-              §PUSH{nums} 2
-              §INS{nums} 0 0
-              §REM{nums} 1
-              §CLR{nums}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{nums:i32}
+                  §/LIST{nums}
+                  §PUSH{nums} 1
+                  §PUSH{nums} 2
+                  §INS{nums} 0 0
+                  §REM{nums} 1
+                  §CLR{nums}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1068,14 +990,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{nums:i32}
-                (+ 1 2)
-                (* 3 4)
-              §/LIST{nums}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{nums:i32}
+                    (+ 1 2)
+                    (* 3 4)
+                  §/LIST{nums}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1097,11 +1017,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §PUSH{list1} 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §PUSH{list1} 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1119,11 +1037,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §PUT{dict1} "key" 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §PUT{dict1} "key" 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1141,11 +1057,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §REM{coll1} "item"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §REM{coll1} "item"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1163,11 +1077,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §CLR{coll1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §CLR{coll1}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1185,11 +1097,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §INS{list1} 0 "first"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §INS{list1} 0 "first"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1207,11 +1117,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §SETIDX{list1} 0 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §SETIDX{list1} 0 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1229,11 +1137,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{bool}
-              §R §HAS{list1} 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{bool}
+                  §R §HAS{list1} 42
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1251,14 +1157,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{nums:i32}
-                1
-                2
-              §/LIST{nums}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{nums:i32}
+                    1
+                    2
+                  §/LIST{nums}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1280,15 +1184,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{nums:i32}
-                1
-                2
-                3
-              §/LIST{nums}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{nums:i32}
+                    1
+                    2
+                    3
+                  §/LIST{nums}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1315,14 +1217,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{ages:str:i32}
-                §KV "alice" 30
-                §KV "bob" 25
-              §/DICT{ages}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{ages:str:i32}
+                    §KV "alice" 30
+                    §KV "bob" 25
+                  §/DICT{ages}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1349,14 +1249,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §HSET{tags:str}
-                "important"
-                "urgent"
-              §/HSET{tags}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §HSET{tags:str}
+                    "important"
+                    "urgent"
+                  §/HSET{tags}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1383,16 +1281,14 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §PUSH{nums} 42
-              §PUT{dict} "key" 99
-              §INS{nums} 0 1
-              §REM{nums} 42
-              §CLR{dict}
-              §SETIDX{nums} 0 10
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §PUSH{nums} 42
+                  §PUT{dict} "key" 99
+                  §INS{nums} 0 1
+                  §REM{nums} 42
+                  §CLR{dict}
+                  §SETIDX{nums} 0 10
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1415,14 +1311,11 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §EACHKV{e1:k:v} myDict
-                §P k
-              §/EACHKV{e1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §EACHKV{e1:k:v} myDict
+                      §P k
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1453,12 +1346,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{outer:List<i32>}
-              §/LIST{outer}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{outer:List<i32>}
+                  §/LIST{outer}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1476,12 +1367,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{matrix:List<i32>}
-              §/LIST{matrix}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{matrix:List<i32>}
+                  §/LIST{matrix}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1498,12 +1387,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{grouped:str:List<i32>}
-              §/DICT{grouped}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{grouped:str:List<i32>}
+                  §/DICT{grouped}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1522,12 +1409,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{grouped:str:List<i32>}
-              §/DICT{grouped}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{grouped:str:List<i32>}
+                  §/DICT{grouped}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1544,12 +1429,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §HSET{nestedSet:HashSet<str>}
-              §/HSET{nestedSet}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §HSET{nestedSet:HashSet<str>}
+                  §/HSET{nestedSet}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1567,12 +1450,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §HSET{nestedSet:HashSet<str>}
-              §/HSET{nestedSet}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §HSET{nestedSet:HashSet<str>}
+                  §/HSET{nestedSet}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1593,11 +1474,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetFirst:pub}
-              §O{i32}
-              §R §IDX myList 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetFirst:pub}
+                  §O{i32}
+                  §R §IDX myList 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1617,11 +1496,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetFirst:pub}
-              §O{i32}
-              §R §IDX myList 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetFirst:pub}
+                  §O{i32}
+                  §R §IDX myList 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1638,11 +1515,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetFirst:pub}
-              §O{i32}
-              §R §IDX myList 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetFirst:pub}
+                  §O{i32}
+                  §R §IDX myList 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1669,15 +1544,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-                3
-              §/LIST{numbers}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                    3
+                  §/LIST{numbers}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1694,15 +1567,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                "invalid"
-                3
-              §/LIST{numbers}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    "invalid"
+                    3
+                  §/LIST{numbers}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1720,14 +1591,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{ages:str:i32}
-                §KV "alice" 30
-                §KV "bob" 25
-              §/DICT{ages}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{ages:str:i32}
+                    §KV "alice" 30
+                    §KV "bob" 25
+                  §/DICT{ages}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1744,14 +1613,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{ages:str:i32}
-                §KV 123 30
-                §KV "bob" 25
-              §/DICT{ages}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{ages:str:i32}
+                    §KV 123 30
+                    §KV "bob" 25
+                  §/DICT{ages}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1769,13 +1636,11 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{ages:str:i32}
-                §KV "alice" "thirty"
-              §/DICT{ages}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{ages:str:i32}
+                    §KV "alice" "thirty"
+                  §/DICT{ages}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1793,14 +1658,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §HSET{fruits:str}
-                "apple"
-                "banana"
-              §/HSET{fruits}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §HSET{fruits:str}
+                    "apple"
+                    "banana"
+                  §/HSET{fruits}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1817,14 +1680,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §HSET{fruits:str}
-                "apple"
-                42
-              §/HSET{fruits}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §HSET{fruits:str}
+                    "apple"
+                    42
+                  §/HSET{fruits}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1842,15 +1703,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-              §/LIST{numbers}
-              §PUSH{numbers} 3
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                  §/LIST{numbers}
+                  §PUSH{numbers} 3
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1867,15 +1726,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-              §/LIST{numbers}
-              §PUSH{numbers} "invalid"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                  §/LIST{numbers}
+                  §PUSH{numbers} "invalid"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1893,14 +1750,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{ages:str:i32}
-                §KV "alice" 30
-              §/DICT{ages}
-              §PUT{ages} "bob" 25
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{ages:str:i32}
+                    §KV "alice" 30
+                  §/DICT{ages}
+                  §PUT{ages} "bob" 25
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1917,14 +1772,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{ages:str:i32}
-                §KV "alice" 30
-              §/DICT{ages}
-              §PUT{ages} 123 25
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{ages:str:i32}
+                    §KV "alice" 30
+                  §/DICT{ages}
+                  §PUT{ages} 123 25
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1942,15 +1795,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-              §/LIST{numbers}
-              §SETIDX{numbers} 0 99
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                  §/LIST{numbers}
+                  §SETIDX{numbers} 0 99
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1967,15 +1818,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-              §/LIST{numbers}
-              §SETIDX{numbers} 0 "invalid"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                  §/LIST{numbers}
+                  §SETIDX{numbers} 0 "invalid"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -1993,11 +1842,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §PUSH{undefined} 1
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §PUSH{undefined} 1
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2015,15 +1862,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-              §/LIST{numbers}
-              §INS{numbers} 0 99
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                  §/LIST{numbers}
+                  §INS{numbers} 0 99
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2040,15 +1885,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-              §/LIST{numbers}
-              §CLR{numbers}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                  §/LIST{numbers}
+                  §CLR{numbers}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2065,15 +1908,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-              §/LIST{numbers}
-              §REM{numbers} 1
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                  §/LIST{numbers}
+                  §REM{numbers} 1
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2090,15 +1931,13 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-              §/LIST{numbers}
-              §REM{numbers} "invalid"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                  §/LIST{numbers}
+                  §REM{numbers} "invalid"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2120,18 +1959,15 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-                3
-              §/LIST{numbers}
-              §EACH{e001:n} numbers
-                §P n
-              §/EACH{e001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                    3
+                  §/LIST{numbers}
+                  §EACH{e001:n} numbers
+                      §P n
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2147,18 +1983,15 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{numbers:i32}
-                1
-                2
-                3
-              §/LIST{numbers}
-              §EACH{e001:n} numbers
-                §P n
-              §/EACH{e001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{numbers:i32}
+                    1
+                    2
+                    3
+                  §/LIST{numbers}
+                  §EACH{e001:n} numbers
+                      §P n
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2176,18 +2009,15 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{scores:str:i32}
-                §KV "alice" 100
-                §KV "bob" 85
-              §/DICT{scores}
-              §EACHKV{e001:name:score} scores
-                §P name
-                §P score
-              §/EACHKV{e001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{scores:str:i32}
+                    §KV "alice" 100
+                    §KV "bob" 85
+                  §/DICT{scores}
+                  §EACHKV{e001:name:score} scores
+                      §P name
+                      §P score
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2208,17 +2038,14 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §DICT{scores:str:i32}
-                §KV "alice" 100
-                §KV "bob" 85
-              §/DICT{scores}
-              §EACHKV{e001:name:score} scores
-                §P name
-              §/EACHKV{e001}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §DICT{scores:str:i32}
+                    §KV "alice" 100
+                    §KV "bob" 85
+                  §/DICT{scores}
+                  §EACHKV{e001:name:score} scores
+                      §P name
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2236,20 +2063,18 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §LIST{data:i32}
-                1
-                2
-                3
-              §/LIST{data}
-              §PUSH{data} 4
-              §INS{data} 0 0
-              §SETIDX{data} 2 99
-              §REM{data} 1
-              §CLR{data}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §LIST{data:i32}
+                    1
+                    2
+                    3
+                  §/LIST{data}
+                  §PUSH{data} 4
+                  §INS{data} 0 0
+                  §SETIDX{data} 2 99
+                  §REM{data} 1
+                  §CLR{data}
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2271,16 +2096,14 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{bool}
-              §LIST{items:i32}
-                1
-                2
-                3
-              §/LIST{items}
-              §R §HAS{items} 2
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{bool}
+                  §LIST{items:i32}
+                    1
+                    2
+                    3
+                  §/LIST{items}
+                  §R §HAS{items} 2
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2298,16 +2121,14 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{bool}
-              §LIST{items:i32}
-                1
-                2
-                3
-              §/LIST{items}
-              §R §HAS{items} 2
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{bool}
+                  §LIST{items:i32}
+                    1
+                    2
+                    3
+                  §/LIST{items}
+                  §R §HAS{items} 2
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2324,14 +2145,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{bool}
-              §DICT{cache:str:i32}
-                §KV "test" 42
-              §/DICT{cache}
-              §R §HAS{cache} §KEY "test"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{bool}
+                  §DICT{cache:str:i32}
+                    §KV "test" 42
+                  §/DICT{cache}
+                  §R §HAS{cache} §KEY "test"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2350,14 +2169,12 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{bool}
-              §DICT{cache:str:i32}
-                §KV "test" 42
-              §/DICT{cache}
-              §R §HAS{cache} §KEY "test"
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{bool}
+                  §DICT{cache:str:i32}
+                    §KV "test" 42
+                  §/DICT{cache}
+                  §R §HAS{cache} §KEY "test"
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2374,16 +2191,14 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{i32}
-              §LIST{items:i32}
-                1
-                2
-                3
-              §/LIST{items}
-              §R §CNT items
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{i32}
+                  §LIST{items:i32}
+                    1
+                    2
+                    3
+                  §/LIST{items}
+                  §R §CNT items
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2400,16 +2215,14 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{i32}
-              §LIST{items:i32}
-                1
-                2
-                3
-              §/LIST{items}
-              §R §CNT items
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{i32}
+                  §LIST{items:i32}
+                    1
+                    2
+                    3
+                  §/LIST{items}
+                  §R §CNT items
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2426,13 +2239,11 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:TestFunc:pub}
-              §O{void}
-              §LIST{a:i32}
-              §/LIST{a}
-              §PUSH{a} 1
-            §/F{f001}
-            §/M{m001}
+              §F{f001:TestFunc:pub}
+                  §O{void}
+                  §LIST{a:i32}
+                  §/LIST{a}
+                  §PUSH{a} 1
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2456,11 +2267,9 @@ public class CollectionOperationsTests
         // §IDX arr 0 (correct format) should parse to ArrayAccessNode
         var source = """
             §M{m001:Test}
-            §F{f001:Get:pub}
-              §O{i32}
-              §R §IDX args 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Get:pub}
+                  §O{i32}
+                  §R §IDX args 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2494,11 +2303,9 @@ public class CollectionOperationsTests
         // §IDX{arr} 0 (brace format) is valid — the attribute provides the array reference
         var source = """
             §M{m001:Test}
-            §F{f001:Get:pub}
-              §O{i32}
-              §R §IDX{arr} 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Get:pub}
+                  §O{i32}
+                  §R §IDX{arr} 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2517,11 +2324,9 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:GetFirst:pub}
-              §O{i32}
-              §R §IDX myList 0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetFirst:pub}
+                  §O{i32}
+                  §R §IDX myList 0
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2549,13 +2354,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §EACH{e1:item:i32:idx} items
-                §P item
-              §/EACH{e1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §EACH{e1:item:i32:idx} items
+                      §P item
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2573,13 +2375,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §EACH{e1:item:i32} items
-                §P item
-              §/EACH{e1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §EACH{e1:item:i32} items
+                      §P item
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2597,13 +2396,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §EACH{e1:item:i32:idx} items
-                §P item
-              §/EACH{e1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §EACH{e1:item:i32:idx} items
+                      §P item
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2625,13 +2421,10 @@ public class CollectionOperationsTests
         // Select((item, index) => ...) semantics.
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §EACH{e1:item:i32:idx} items
-                §P item
-              §/EACH{e1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §EACH{e1:item:i32:idx} items
+                      §P item
             """;
 
         var module = Parse(source, out var diagnostics);
@@ -2653,13 +2446,10 @@ public class CollectionOperationsTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §EACH{e1:item:i32:idx} items
-                §P item
-              §/EACH{e1}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §EACH{e1:item:i32:idx} items
+                      §P item
             """;
 
         var module = Parse(source, out var diagnostics);

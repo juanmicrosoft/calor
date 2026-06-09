@@ -13,7 +13,7 @@ public class GotoCaseTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -132,22 +132,19 @@ public class Foo
         // Minimal Calor source with a goto case inside a switch
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-  §W{sw1} x
-    §K 1
-      §GOTO{CASE:2}
-    §/K
-    §K 2
-      §R x
-    §/K
-    §K _
-      §R 0
-    §/K
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+      §W{sw1} x
+          §K 1
+            §GOTO{CASE:2}
+          §/K
+          §K 2
+            §R x
+          §/K
+          §K _
+            §R 0
+          §/K";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -159,19 +156,16 @@ public class Foo
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-  §W{sw1} x
-    §K 1
-      §GOTO{DEFAULT}
-    §/K
-    §K _
-      §R 0
-    §/K
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+      §W{sw1} x
+          §K 1
+            §GOTO{DEFAULT}
+          §/K
+          §K _
+            §R 0
+          §/K";
 
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -183,22 +177,19 @@ public class Foo
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-  §W{sw1} x
-    §K 1
-      §GOTO{CASE:2}
-    §/K
-    §K 2
-      §R x
-    §/K
-    §K _
-      §R 0
-    §/K
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+      §W{sw1} x
+          §K 1
+            §GOTO{CASE:2}
+          §/K
+          §K 2
+            §R x
+          §/K
+          §K _
+            §R 0
+          §/K";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,
@@ -211,19 +202,16 @@ public class Foo
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-  §W{sw1} x
-    §K 1
-      §GOTO{DEFAULT}
-    §/K
-    §K _
-      §R 0
-    §/K
-  §/W{sw1}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+      §W{sw1} x
+          §K 1
+            §GOTO{DEFAULT}
+          §/K
+          §K _
+            §R 0
+          §/K";
 
         var csharp = Compile(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors,

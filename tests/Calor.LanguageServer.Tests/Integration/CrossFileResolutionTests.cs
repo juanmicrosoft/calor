@@ -21,25 +21,21 @@ public class CrossFileResolutionTests
         // First document defines a function
         var source1 = """
             §M{m001:Utils}
-            §F{f001:Add:pub}
-            §I{i32:a}
-            §I{i32:b}
-            §O{i32}
-            §R a + b
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                §I{i32:a}
+                §I{i32:b}
+                §O{i32}
+                §R a + b
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///utils.calr"), source1);
 
         // Second document uses the function
         var source2 = """
             §M{m002:Main}
-            §F{f002:Test}
-            §O{i32}
-            §B{result} §C{Add} 1 2 §/C
-            §R result
-            §/F{f002}
-            §/M{m002}
+              §F{f002:Test}
+                §O{i32}
+                §B{result} §C{Add} 1 2 §/C
+                §R result
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source2);
 
@@ -59,22 +55,18 @@ public class CrossFileResolutionTests
         // First document defines a class
         var source1 = """
             §M{m001:Models}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §FLD{i32:age}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+                §FLD{i32:age}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source1);
 
         // Second document uses the class
         var source2 = """
             §M{m002:Main}
-            §F{f001:CreatePerson}
-            §O{Person}
-            §R §NEW Person
-            §/F{f001}
-            §/M{m002}
+              §F{f001:CreatePerson}
+                §O{Person}
+                §R §NEW Person
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source2);
 
@@ -93,12 +85,9 @@ public class CrossFileResolutionTests
         // First document defines an interface
         var source1 = """
             §M{m001:Interfaces}
-            §IFACE{i001:IShape}
-            §MT{m001:GetArea}
-            §O{f64}
-            §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IShape}
+                §MT{m001:GetArea}
+                  §O{f64}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///interfaces.calr"), source1);
 
@@ -117,12 +106,11 @@ public class CrossFileResolutionTests
         // First document defines an enum
         var source1 = """
             §M{m001:Types}
-            §EN{e001:Color}
-            §EM{Red}
-            §EM{Green}
-            §EM{Blue}
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Color}
+              §EM{Red}
+              §EM{Green}
+              §EM{Blue}
+              §/EN{e001}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///types.calr"), source1);
 
@@ -140,10 +128,8 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Test}
-            §F{f001:Test}
-            §R 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Test}
+                §R 42
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
 
@@ -160,14 +146,11 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Test}
-            §F{f001:Helper}
-            §R 42
-            §/F{f001}
-            §F{f002:Main}
-            §B{x} §C{Helper} §/C
-            §R x
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Helper}
+                §R 42
+              §F{f002:Main}
+                §B{x} §C{Helper} §/C
+                §R x
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
 
@@ -189,13 +172,10 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Test}
-            §F{f001:PublicFunc:pub}
-            §R 42
-            §/F{f001}
-            §F{f002:PrivateFunc:priv}
-            §R 0
-            §/F{f002}
-            §/M{m001}
+              §F{f001:PublicFunc:pub}
+                §R 42
+              §F{f002:PrivateFunc:priv}
+                §R 0
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
 
@@ -212,10 +192,8 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Test}
-            §CL{c001:MyClass}
-            §FLD{i32:value}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:MyClass}
+                §FLD{i32:value}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
 
@@ -231,12 +209,9 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Test}
-            §IFACE{i001:IMyInterface}
-            §MT{m001:DoSomething}
-            §O{void}
-            §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IMyInterface}
+                §MT{m001:DoSomething}
+                  §O{void}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
 
@@ -252,11 +227,10 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Test}
-            §EN{e001:Status}
-            §EM{Active}
-            §EM{Inactive}
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Status}
+              §EM{Active}
+              §EM{Inactive}
+              §/EN{e001}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
 
@@ -272,11 +246,10 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Test}
-            §DEL{d001:Callback}
-            §I{i32:value}
-            §O{void}
-            §/DEL{d001}
-            §/M{m001}
+              §DEL{d001:Callback}
+              §I{i32:value}
+              §O{void}
+              §/DEL{d001}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///test.calr"), source);
 
@@ -292,27 +265,21 @@ public class CrossFileResolutionTests
 
         var source1 = """
             §M{m001:File1}
-            §F{f001:FuncA:pub}
-            §R 1
-            §/F{f001}
-            §/M{m001}
+              §F{f001:FuncA:pub}
+                §R 1
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file1.calr"), source1);
 
         var source2 = """
             §M{m002:File2}
-            §F{f001:FuncB:pub}
-            §R 2
-            §/F{f001}
-            §/M{m002}
+              §F{f001:FuncB:pub}
+                §R 2
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file2.calr"), source2);
 
         var source3 = """
             §M{m003:File3}
-            §CL{c001:ClassC}
-            §/CL{c001}
-            §/M{m003}
+              §CL{c001:ClassC}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file3.calr"), source3);
 
@@ -335,21 +302,17 @@ public class CrossFileResolutionTests
         // First document defines a class
         var source1 = """
             §M{m001:Models}
-            §CL{c001:Customer}
-            §FLD{str:name}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Customer}
+                §FLD{str:name}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source1);
 
         // Second document should have access to Customer type in completions
         var source2 = """
             §M{m002:Service}
-            §F{f001:GetCustomer}
-            §O{i32}
-            §R 0
-            §/F{f001}
-            §/M{m002}
+              §F{f001:GetCustomer}
+                §O{i32}
+                §R 0
             """;
         var doc2 = workspace.GetOrCreate(DocumentUri.From("file:///service.calr"), source2);
 
@@ -369,23 +332,19 @@ public class CrossFileResolutionTests
         // First document defines a utility function
         var source1 = """
             §M{m001:Utils}
-            §F{f001:Calculate:pub}
-            §I{i32:x}
-            §O{i32}
-            §R x * 2
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Calculate:pub}
+                §I{i32:x}
+                §O{i32}
+                §R x * 2
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///utils.calr"), source1);
 
         // Second document should see Calculate in completions
         var source2 = """
             §M{m002:Main}
-            §F{f001:Test}
-            §O{i32}
-            §R 0
-            §/F{f001}
-            §/M{m002}
+              §F{f001:Test}
+                §O{i32}
+                §R 0
             """;
         var doc2 = workspace.GetOrCreate(DocumentUri.From("file:///main.calr"), source2);
 
@@ -408,11 +367,9 @@ public class CrossFileResolutionTests
         // First document defines a class
         var source1 = """
             §M{m001:Models}
-            §CL{c001:Address}
-            §FLD{str:street}
-            §FLD{str:city}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Address}
+                §FLD{str:street}
+                §FLD{str:city}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source1);
 
@@ -438,25 +395,20 @@ public class CrossFileResolutionTests
         // First document defines a base class
         var source1 = """
             §M{m001:Base}
-            §CL{c001:Animal}
-            §FLD{str:name}
-            §MT{m001:Speak}
-            §O{str}
-            §R "..."
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Animal}
+                §FLD{str:name}
+                §MT{m001:Speak}
+                  §O{str}
+                  §R "..."
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///base.calr"), source1);
 
         // Second document defines a derived class
         var source2 = """
             §M{m002:Derived}
-            §CL{c001:Dog}
-            §EXT{Animal}
-            §FLD{str:breed}
-            §/CL{c001}
-            §/M{m002}
+              §CL{c001:Dog}
+                §EXT{Animal}
+                §FLD{str:breed}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///derived.calr"), source2);
 
@@ -488,10 +440,8 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Test}
-            §F{f001:ToRemove:pub}
-            §R 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:ToRemove:pub}
+                §R 42
             """;
         var uri = DocumentUri.From("file:///toremove.calr");
         workspace.GetOrCreate(uri, source);
@@ -518,10 +468,8 @@ public class CrossFileResolutionTests
         // Initial source
         var source1 = """
             §M{m001:Test}
-            §F{f001:OldName:pub}
-            §R 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:OldName:pub}
+                §R 42
             """;
         workspace.GetOrCreate(uri, source1);
 
@@ -532,10 +480,8 @@ public class CrossFileResolutionTests
         // Update the document
         var source2 = """
             §M{m001:Test}
-            §F{f001:NewName:pub}
-            §R 42
-            §/F{f001}
-            §/M{m001}
+              §F{f001:NewName:pub}
+                §R 42
             """;
         workspace.Update(uri, source2, 2);
 
@@ -559,11 +505,9 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Models}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §FLD{i32:age}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+                §FLD{i32:age}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
 
@@ -581,14 +525,11 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Models}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §MT{m001:GetName}
-            §O{str}
-            §R name
-            §/MT{m001}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
+                §MT{m001:GetName}
+                  §O{str}
+                  §R name
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
 
@@ -605,14 +546,12 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Models}
-            §CL{c001:Person}
-            §PROP{str:FullName}
-            §GET
-            §R "test"
-            §/GET
-            §/PROP
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §PROP{str:FullName}
+                §GET
+                §R "test"
+                §/GET
+                §/PROP
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
 
@@ -629,12 +568,11 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Types}
-            §EN{e001:Color}
-            §EM{Red}
-            §EM{Green}
-            §EM{Blue}
-            §/EN{e001}
-            §/M{m001}
+              §EN{e001:Color}
+              §EM{Red}
+              §EM{Green}
+              §EM{Blue}
+              §/EN{e001}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///types.calr"), source);
 
@@ -651,12 +589,9 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Interfaces}
-            §IFACE{i001:IShape}
-            §MT{m001:GetArea}
-            §O{f64}
-            §/MT{m001}
-            §/IFACE{i001}
-            §/M{m001}
+              §IFACE{i001:IShape}
+                §MT{m001:GetArea}
+                  §O{f64}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///interfaces.calr"), source);
 
@@ -674,21 +609,17 @@ public class CrossFileResolutionTests
         // Base class in one file
         var source1 = """
             §M{m001:Base}
-            §CL{c001:Animal}
-            §FLD{str:name}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Animal}
+                §FLD{str:name}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///base.calr"), source1);
 
         // Derived class in another file
         var source2 = """
             §M{m002:Derived}
-            §CL{c001:Dog}
-            §EXT{Animal}
-            §FLD{str:breed}
-            §/CL{c001}
-            §/M{m002}
+              §CL{c001:Dog}
+                §EXT{Animal}
+                §FLD{str:breed}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///derived.calr"), source2);
 
@@ -707,10 +638,8 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Models}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
 
@@ -727,10 +656,8 @@ public class CrossFileResolutionTests
 
         var source = """
             §M{m001:Models}
-            §CL{c001:Person}
-            §FLD{str:name}
-            §/CL{c001}
-            §/M{m001}
+              §CL{c001:Person}
+                §FLD{str:name}
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///models.calr"), source);
 
@@ -779,10 +706,8 @@ public class CrossFileResolutionTests
         // Valid document
         var source2 = """
             §M{m002:Valid}
-            §F{f001:ValidFunc:pub}
-            §R 0
-            §/F{f001}
-            §/M{m002}
+              §F{f001:ValidFunc:pub}
+                §R 0
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///valid.calr"), source2);
 
@@ -800,20 +725,16 @@ public class CrossFileResolutionTests
         // First document defines Helper
         var source1 = """
             §M{m001:File1}
-            §F{f001:Helper:pub}
-            §R 1
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Helper:pub}
+                §R 1
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file1.calr"), source1);
 
         // Second document also defines Helper
         var source2 = """
             §M{m002:File2}
-            §F{f001:Helper:pub}
-            §R 2
-            §/F{f001}
-            §/M{m002}
+              §F{f001:Helper:pub}
+                §R 2
             """;
         workspace.GetOrCreate(DocumentUri.From("file:///file2.calr"), source2);
 

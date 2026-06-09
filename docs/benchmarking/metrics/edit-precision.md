@@ -39,7 +39,7 @@ Unique identifiers enable precise targeting that survives refactoring.
 | Has unique module IDs | 0.15 | Modules can be targeted by ID |
 | Has unique function IDs | 0.20 | Functions can be targeted by ID |
 | Has unique variable IDs | 0.10 | Variables can be targeted by ID |
-| Has closing tags | 0.05 | Scope boundaries are explicit |
+| Has indented body | 0.10 | Indent-form scope boundary (every opener is followed by an indented body, terminated by dedent) |
 | Module ID count | Variable | More IDs = better targeting |
 | Function ID count | Variable | More IDs = better targeting |
 
@@ -66,14 +66,10 @@ Base score: 0.50, cap at 0.85
 §L{for1:i:1:100:1}
   §IF{if1} (> i 50)
     §P i
-  §/I{if1}
-§/L{for1}
 
 §L{for2:j:1:50:1}
   §IF{if2} (< j 25)
     §P j
-  §/I{if2}
-§/L{for2}
 ```
 
 **Agent instruction:** "Change `for1` to start at 0"
@@ -150,9 +146,9 @@ Similar for simple edits, but Calor's ID provides certainty about which loop.
 ### Calor: ID-Based
 
 ```
-"Delete function f002"     → Find §F{f002...§/F{f002}, remove
+"Delete function f002"     → Find §F{f002:…}; the function's body is the indented region after this opener up to the next sibling (dedent). Remove the opener + indented body.
 "Rename function f001"     → Update §F{f001:NewName:vis}
-"Move loop for1"           → Cut §L{for1}...§/L{for1}, paste
+"Move loop for1"           → Cut §L{for1:…} and its indented body, paste at new indent depth
 "Add contract to f003"     → Insert §Q after §O in §F{f003}
 ```
 
@@ -234,19 +230,16 @@ Lower `modified / total` ratio = higher precision.
 
 ```
 §M{m001:Calculator}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§F{f002:Multiply:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f002}
-§/M{m001}
+  §F{f001:Add:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (+ a b)
+  §F{f002:Multiply:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (* a b)
 ```
 
 **Score:**

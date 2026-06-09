@@ -3,87 +3,75 @@
 
 §M{m001:DivByZeroBenchmark}
 
-§F{f001:VulnerableDivision:pub}
-  §DOC{BUG: Division by unchecked parameter}
-  §DOC{EXPECTED: Calor0920 Division by Zero}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (/ x y)
-§/F{f001}
-
-§F{f002:SafeDivisionWithGuard:pub}
-  §DOC{SAFE: Division with zero check}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §IF (!= y INT:0)
+  §F{f001:VulnerableDivision:pub}
+    §DOC{BUG: Division by unchecked parameter}
+    §DOC{EXPECTED: Calor0920 Division by Zero}
+    §I{i32:x}
+    §I{i32:y}
+    §O{i32}
     §R (/ x y)
-  §EL
-    §R INT:0
-  §/IF
-§/F{f002}
 
-§F{f003:VulnerableModulo:pub}
-  §DOC{BUG: Modulo by unchecked parameter}
-  §DOC{EXPECTED: Calor0920 Division by Zero}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (% a b)
-§/F{f003}
+  §F{f002:SafeDivisionWithGuard:pub}
+    §DOC{SAFE: Division with zero check}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:x}
+    §I{i32:y}
+    §O{i32}
+    §IF (!= y INT:0)
+      §R (/ x y)
+    §EL
+      §R INT:0
 
-§F{f004:SafeDivisionByLiteral:pub}
-  §DOC{SAFE: Division by non-zero literal}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:x}
-  §O{i32}
-  §R (/ x INT:2)
-§/F{f004}
+  §F{f003:VulnerableModulo:pub}
+    §DOC{BUG: Modulo by unchecked parameter}
+    §DOC{EXPECTED: Calor0920 Division by Zero}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §R (% a b)
 
-§F{f005:VulnerableDivisionInLoop:pub}
-  §DOC{BUG: Division in loop where counter can be zero}
-  §DOC{EXPECTED: Calor0920 Division by Zero}
-  §I{i32:n}
-  §O{i32}
-  §B{result:i32} INT:0
-  §L{l1:i:0:n:1}
-    §B{result:i32} (+ result (/ INT:100 i))
-  §/L{l1}
-  §R result
-§/F{f005}
+  §F{f004:SafeDivisionByLiteral:pub}
+    §DOC{SAFE: Division by non-zero literal}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:x}
+    §O{i32}
+    §R (/ x INT:2)
 
-§F{f006:SafeDivisionInLoopFromOne:pub}
-  §DOC{SAFE: Loop starts from 1}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:n}
-  §O{i32}
-  §B{result:i32} INT:0
-  §L{l1:i:1:n:1}
-    §B{result:i32} (+ result (/ INT:100 i))
-  §/L{l1}
-  §R result
-§/F{f006}
+  §F{f005:VulnerableDivisionInLoop:pub}
+    §DOC{BUG: Division in loop where counter can be zero}
+    §DOC{EXPECTED: Calor0920 Division by Zero}
+    §I{i32:n}
+    §O{i32}
+    §B{result:i32} INT:0
+    §L{l1:i:0:n:1}
+      §B{result:i32} (+ result (/ INT:100 i))
+    §R result
 
-§F{f007:VulnerableDivisionAfterDecrement:pub}
-  §DOC{BUG: Division after value can become zero}
-  §DOC{EXPECTED: Calor0920 Division by Zero}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §B{divisor:i32} (- y INT:1)
-  §R (/ x divisor)
-§/F{f007}
+  §F{f006:SafeDivisionInLoopFromOne:pub}
+    §DOC{SAFE: Loop starts from 1}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:n}
+    §O{i32}
+    §B{result:i32} INT:0
+    §L{l1:i:1:n:1}
+      §B{result:i32} (+ result (/ INT:100 i))
+    §R result
 
-§F{f008:SafeDivisionWithContract:pub}
-  §DOC{SAFE: Precondition guarantees non-zero}
-  §DOC{EXPECTED: No warnings}
-  §I{i32:x}
-  §I{i32:y}
-  §PRE (> y INT:0)
-  §O{i32}
-  §R (/ x y)
-§/F{f008}
+  §F{f007:VulnerableDivisionAfterDecrement:pub}
+    §DOC{BUG: Division after value can become zero}
+    §DOC{EXPECTED: Calor0920 Division by Zero}
+    §I{i32:x}
+    §I{i32:y}
+    §O{i32}
+    §B{divisor:i32} (- y INT:1)
+    §R (/ x divisor)
 
-§/M{m001}
+  §F{f008:SafeDivisionWithContract:pub}
+    §DOC{SAFE: Precondition guarantees non-zero}
+    §DOC{EXPECTED: No warnings}
+    §I{i32:x}
+    §I{i32:y}
+    §PRE (> y INT:0)
+    §O{i32}
+    §R (/ x y)
+

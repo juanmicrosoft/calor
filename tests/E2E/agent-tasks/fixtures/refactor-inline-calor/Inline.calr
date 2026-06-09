@@ -1,64 +1,30 @@
 §M{m001:InlineExamples}
+  §F{f001:Double:pub} (i32:x) -> i32
+    §R (* x 2)
 
-§F{f001:Double:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (* x 2)
-§/F{f001}
+  §F{f002:Calculate:pub} (i32:a, i32:b) -> i32
+    §B{~_hoist000} §C{Double} §A a §/C
+    §B{~_hoist001} §C{Double} §A b §/C
+    §R (+ _hoist000 _hoist001)
 
-§F{f002:Calculate:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ §C{Double}
-        §A a
-      §/C
-      §C{Double}
-        §A b
-      §/C)
-§/F{f002}
+  §F{f003:Clamp:pub} (i32:value, i32:min, i32:max) -> i32
+    §Q (<= min max)
+    §S (>= result min)
+    §S (<= result max)
+    §R (? (< value min) min (? (> value max) max value))
 
-§F{f003:Clamp:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{i32}
-  §Q (<= min max)
-  §S (>= result min)
-  §S (<= result max)
-  §R (? (< value min) min (? (> value max) max value))
-§/F{f003}
+  §F{f004:NormalizeScore:pub} (i32:score) -> i32
+    §S (>= result 0)
+    §S (<= result 100)
+    §R §C{Clamp} §A score §A 0 §A 100 §/C
 
-§F{f004:NormalizeScore:pub}
-  §I{i32:score}
-  §O{i32}
-  §S (>= result 0)
-  §S (<= result 100)
-  §R §C{Clamp}
-      §A score
-      §A 0
-      §A 100
-    §/C
-§/F{f004}
+  §F{f005:Square:pub} (i32:n) -> i32
+    §S (>= result 0)
+    §R (* n n)
 
-§F{f005:Square:pub}
-  §I{i32:n}
-  §O{i32}
-  §S (>= result 0)
-  §R (* n n)
-§/F{f005}
+  §F{f006:SumOfSquares:pub} (i32:x, i32:y) -> i32
+    §S (>= result 0)
+    §B{~_hoist002} §C{Square} §A x §/C
+    §B{~_hoist003} §C{Square} §A y §/C
+    §R (+ _hoist002 _hoist003)
 
-§F{f006:SumOfSquares:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §S (>= result 0)
-  §R (+ §C{Square}
-        §A x
-      §/C
-      §C{Square}
-        §A y
-      §/C)
-§/F{f006}
-
-§/M{m001}

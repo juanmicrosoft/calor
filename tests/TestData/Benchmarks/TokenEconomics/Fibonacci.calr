@@ -1,19 +1,15 @@
 §M{m001:Fibonacci}
-§F{f001:Calculate:pub}
-  §I{i32:n}
-  §O{i32}
-  §IF{if1} (<= n 1) → §R n
-  §EL
-    §B{~a} 0
-    §B{~b} 1
-    §B{~i} 2
-    §WH{w1} (<= i n)
-      §B{temp} (+ a b)
-      §B{~a} b
-      §B{~b} temp
-      §B{~i} (+ i 1)
-    §/WH{w1}
-    §R b
-  §/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Calculate:pub} (i32:n) -> i32
+    §IF{if1} (<= n 1)
+      §R n
+    §EL
+      §B{~a} 0
+      §B{~b} 1
+      §B{~i} 2
+      §WH{w1} (<= i n)
+        §B{temp} (+ a b)
+        §B{~a} b
+        §B{~b} temp
+        §B{~i} (+ i 1)
+      §R b
+

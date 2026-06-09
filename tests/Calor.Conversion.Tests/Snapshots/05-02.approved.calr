@@ -6,9 +6,6 @@
     §MT{m002:GetPositive:pub} (List<i32>:items) -> List<i32>
       §B{_lamWhere004} §LAM{lam003:x:i32} (> x 0) §/LAM{lam003}
       §B{_chainWhere005} §C{items.Where} §A _lamWhere004 §/C
-      §R §C{_chainWhere005.ToList} §/C
-    §/MT{m002}
+      §R §C{_chainWhere005.ToList}
 
-  §/CL{c001}
 
-§/M{m001}

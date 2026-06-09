@@ -16,16 +16,16 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 
 | Element | Syntax | Example |
 |:--------|:-------|:--------|
-| Module | `§M{id:name}` | `§M{m001:Calculator}` |
-| Function | `§F{id:name:visibility}` | `§F{f001:Add:pub}` |
-| Async Function | `§AF{id:name:visibility}` | `§AF{f001:FetchAsync:pub}` |
-| Method | `§MT{id:name:visibility}` | `§MT{mt001:Process:pub}` |
-| Async Method | `§AMT{id:name:visibility}` | `§AMT{mt001:ProcessAsync:pub}` |
+| Module | `§M{name}` | `§M{Calculator}` |
+| Function | `§F{name:visibility}` | `§F{Add:pub}` |
+| Async Function | `§AF{name:visibility}` | `§AF{FetchAsync:pub}` |
+| Method | `§MT{name:visibility}` | `§MT{Process:pub}` |
+| Async Method | `§AMT{name:visibility}` | `§AMT{ProcessAsync:pub}` |
 | Await | `§AWAIT expr` | `§AWAIT §C{GetAsync} §/C` |
 | Lambda (inline) | `(params) → expr` | `(x) → (* x 2)` |
-| Lambda (block) | `§LAM{id:params}...§/LAM{id}` | `§LAM{l1:x:i32}...§/LAM{l1}` |
-| Delegate | `§DEL{id:name}...§/DEL{id}` | `§DEL{d1:Handler}...§/DEL{d1}` |
-| Event | `§EVT{id:name:vis:type}` | `§EVT{e1:Click:pub:EventHandler}` |
+| Lambda (block) | `§LAM{params}` (indented body) | `§LAM{x:i32}` |
+| Delegate | `§DEL{name}` (indented signature) | `§DEL{Handler}` |
+| Event | `§EVT{name:vis:type}` | `§EVT{Click:pub:EventHandler}` |
 | Subscribe | `§SUB event handler` | `§SUB btn.Click OnClick` |
 | Unsubscribe | `§UNSUB event handler` | `§UNSUB btn.Click OnClick` |
 | Input | `§I{type:name}` | `§I{i32:x}` |
@@ -33,17 +33,17 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Effects | `§E{codes}` | `§E{cw,fs:r,net:rw}` |
 | Requires | `§Q expr` | `§Q (>= x 0)` |
 | Ensures | `§S expr` | `§S (>= result 0)` |
-| For Loop | `§L{id:var:from:to:step}` | `§L{l1:i:1:100:1}` |
-| While Loop | `§WH{id} condition` | `§WH{w1} (> i 0)` |
-| Do-While Loop | `§DO{id}...§/DO{id} cond` | `§DO{d1}...§/DO{d1} (< i 10)` |
-| If/ElseIf/Else | `§IF...§EI...§EL` | `§IF (> x 0) → §R x §EL → §R 0` |
+| For Loop | `§L{var:from:to:step}` | `§L{i:1:100:1}` |
+| While Loop | `§WH condition` | `§WH (> i 0)` |
+| Do-While Loop | `§DO` (body indented) | `§DO` then `§WHILE cond` |
+| If/ElseIf/Else | `§IF cond` then `§EI` / `§EL` at same column | `§IF (> x 0)` |
 | Call | `§C{target}...§/C` | `§C{Math.Max} §A 1 §A 2 §/C` |
 | C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |
 | Print | `§P expr` | `§P "Hello"` |
 | Return | `§R expr` | `§R (+ a b)` |
 | Binding | `§B{name} expr` | `§B{x} (+ 1 2)` |
 | Operations | `(op args...)` | `(+ a b)`, `(== x 0)` |
-| Close tag | `§/X{id}` | `§/F{f001}` |
+| Block end | _dedent_ (Python-style) | _(no `§/X` needed)_ |
 | List | `§LIST{id:type}` | `§LIST{nums:i32}` |
 | Dictionary | `§DICT{id:kType:vType}` | `§DICT{ages:str:i32}` |
 | HashSet | `§HSET{id:type}` | `§HSET{tags:str}` |
@@ -111,39 +111,46 @@ All operators use Lisp-style prefix notation: `(+ a b)`, `(&& x y)`
 
 ## ID Conventions
 
-| Element | Convention | Example |
-|:--------|:-----------|:--------|
-| Modules | `m001`, `m002` | `§M{m001:Calculator}` |
-| Functions | `f001`, `f002` | `§F{f001:Add:pub}` |
-| Loops | `for1`, `while1`, `do1` | `§L{for1:i:1:10:1}` |
-| Conditionals | `if1`, `if2` | `§IF{if1} condition` |
+Stable IDs are **optional** on structural openers and are auto-assigned
+by the parser when omitted. Provide an explicit ID only when you want
+to reference the element from external tooling (e.g. `calor navigate`).
+
+| Element | Auto-assigned form | Explicit form |
+|:--------|:-------------------|:--------------|
+| Modules | `§M{Calculator}` | `§M{m001:Calculator}` |
+| Functions | `§F{Add:pub}` | `§F{f001:Add:pub}` |
+| Loops | `§L{i:1:10:1}` | `§L{for1:i:1:10:1}` |
+| Conditionals | `§IF cond` | `§IF{if1} cond` |
 
 ---
 
 ## Complete Example
 
 ```
-§M{m001:FizzBuzz}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §L{for1:i:1:100:1}
-    §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
-    §EI (== (% i 3) 0) → §P "Fizz"
-    §EI (== (% i 5) 0) → §P "Buzz"
-    §EL → §P i
-    §/I{if1}
-  §/L{for1}
-§/F{f001}
-§/M{m001}
+§M{FizzBuzz}
+  §F{Main:pub}
+    §O{void}
+    §E{cw}
+    §L{i:1:100:1}
+      §IF (== (% i 15) 0) → §P "FizzBuzz"
+      §EI (== (% i 3) 0) → §P "Fizz"
+      §EI (== (% i 5) 0) → §P "Buzz"
+      §EL → §P i
 ```
+
+Blocks are delimited by **indentation** (default 2 spaces per nesting
+level). Legacy `§/X` closers are still accepted for transition
+compatibility but should not be used in new code — see
+[Structure Tags](/syntax-reference/structure-tags/) for details.
 
 ---
 
 ## Detailed Reference
 
-- [Structure Tags](/syntax-reference/structure-tags/) - Modules, functions, closing tags
+- [Structure Tags](/syntax-reference/structure-tags/) - Modules, functions, block structure
 - [Types](/syntax-reference/types/) - Type system, Option, Result
+- [Bindings](/syntax-reference/binding/) - `§B` local bindings and inference
+- [Calls](/syntax-reference/calls/) - `§C` calls and implicit close
 - [Expressions](/syntax-reference/expressions/) - Lisp-style operators
 - [Control Flow](/syntax-reference/control-flow/) - Loops, conditionals
 - [Contracts](/syntax-reference/contracts/) - Requires, ensures

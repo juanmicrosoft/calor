@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace TernaryChain
 {
@@ -16,19 +13,19 @@ namespace TernaryChain
     {
         public static int Classify(int score)
         {
-            if ((score >= 90))
+            if (score >= 90)
             {
                 return 4;
             }
-            else if ((score >= 80))
+            else if (score >= 80)
             {
                 return 3;
             }
-            else if ((score >= 70))
+            else if (score >= 70)
             {
                 return 2;
             }
-            else if ((score >= 60))
+            else if (score >= 60)
             {
                 return 1;
             }
@@ -41,13 +38,13 @@ namespace TernaryChain
 
         public static int Signum(int x)
         {
-            if ((x > 0))
+            if (x > 0)
             {
                 return 1;
             }
-            else if ((x < 0))
+            else if (x < 0)
             {
-                return (0 - 1);
+                return 0 - 1;
             }
             else
             {
@@ -58,11 +55,11 @@ namespace TernaryChain
 
         public static int Clamp100(int x)
         {
-            if ((x < 0))
+            if (x < 0)
             {
                 return 0;
             }
-            else if ((x > 100))
+            else if (x > 100)
             {
                 return 100;
             }

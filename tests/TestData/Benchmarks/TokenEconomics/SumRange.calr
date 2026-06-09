@@ -1,12 +1,8 @@
 §M{m001:SumRange}
-§F{f001:SumRange:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (> n 0)
-  §B{sum} 0
-  §L{for1:i:1:n:1}
-    §ASSIGN sum (+ sum i)
-  §/L{for1}
-  §R sum
-§/F{f001}
-§/M{m001}
+  §F{f001:SumRange:pub} (i32:n) -> i32
+    §Q (> n 0)
+    §B{sum} 0
+    §L{for1:i:1:n:1}
+      §ASSIGN sum (+ sum i)
+    §R sum
+

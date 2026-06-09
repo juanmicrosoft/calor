@@ -12,7 +12,7 @@ public class NullableCastTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -21,12 +21,10 @@ public class NullableCastTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{object:value}
-              §O{object}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{object:value}
+                  §O{object}
+                  {{body}}
             """;
     }
 

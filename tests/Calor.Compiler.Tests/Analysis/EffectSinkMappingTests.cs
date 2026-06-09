@@ -372,19 +372,17 @@ public class EffectSinkMappingTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:VulnerableQuery:pub}
-  §I{string:user_input}
-  §O{string}
-  §E{db:w}
-  §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
-  §C db.execute query
-  §R query
-§/F{f001}
-§/M{m001}";
+  §F{f001:VulnerableQuery:pub}
+      §I{string:user_input}
+      §O{string}
+      §E{db:w}
+      §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
+      §C db.execute query
+      §R query";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -417,19 +415,17 @@ public class EffectSinkMappingTests
         // Parse actual Calor code with effect declaration
         var source = @"
 §M{m001:Test}
-§F{f001:QueryUser:pub}
-  §I{string:user_input}
-  §O{string}
-  §E{db:w}
-  §B{query:string} STR:""SELECT * FROM users""
-  §C db.execute query
-  §R query
-§/F{f001}
-§/M{m001}";
+  §F{f001:QueryUser:pub}
+      §I{string:user_input}
+      §O{string}
+      §E{db:w}
+      §B{query:string} STR:""SELECT * FROM users""
+      §C db.execute query
+      §R query";
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 

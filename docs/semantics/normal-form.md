@@ -388,7 +388,6 @@ end_block:
   §COND condition
   §THEN then_body
   §ELSE else_body
-§/IF{if1}
 ```
 
 **CNF:**
@@ -408,8 +407,8 @@ end_label:
 **Source:**
 ```calor
 §WHILE{w1}
-  §COND condition
-  body
+§COND condition
+body
 §/WHILE{w1}
 ```
 
@@ -428,7 +427,7 @@ loop_exit:
 **Source:**
 ```calor
 §FOR{for1}{var=i}{from=0}{to=10}{step=1}
-  body
+body
 §/FOR{for1}
 ```
 
@@ -450,9 +449,9 @@ loop_exit:
 **Source:**
 ```calor
 §MATCH{m1} target
-  §CASE pattern1 => body1
-  §CASE pattern2 => body2
-  §CASE _ => default
+§CASE pattern1 => body1
+§CASE pattern2 => body2
+§CASE _ => default
 §/MATCH{m1}
 ```
 
@@ -487,7 +486,6 @@ match_end:
 §F{f1:myFunc}
   §REQUIRES{message="x must be positive"} §OP{kind=GT} x 0
   body
-§/F{f1}
 ```
 
 **CNF:**
@@ -507,7 +505,6 @@ precond_ok:
 §F{f1:myFunc}
   §ENSURES{message="result positive"} §OP{kind=GT} result 0
   §R expr
-§/F{f1}
 ```
 
 **CNF:**
@@ -636,7 +633,6 @@ public interface ICnfVisitor<T>
   §O{i32}
   §REQUIRES §OP{kind=AND} §OP{kind=GT} a 0 §OP{kind=GT} b 0
   §R §OP{kind=ADD} a b
-§/F{f1}
 ```
 
 ### CNF

@@ -335,22 +335,18 @@ public class TelemetryUpgradeTests
 
     private const string ValidCalorSource = @"
 §M{m001:Calculator}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
 
     private const string InvalidCalorSource = @"
 §M{m001:Test}
-§F{f001:Hello:pub}
-  §O{void}
-    §INVALID_SYNTAX
-§/F{f001}
-§/M{m001}
+  §F{f001:Hello:pub}
+      §O{void}
+        §INVALID_SYNTAX
 ";
 
     [Fact]

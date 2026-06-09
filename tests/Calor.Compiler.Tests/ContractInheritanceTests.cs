@@ -16,7 +16,7 @@ public class ContractInheritanceTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -28,14 +28,11 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IValidator}
-  §MT{m001:Validate}
-    §I{str:input}
-    §O{bool}
-    §Q (!= input null)
-  §/MT{m001}
-§/IFACE{i001}
-§/M{m001}
+  §IFACE{i001:IValidator}
+      §MT{m001:Validate}
+          §I{str:input}
+          §O{bool}
+          §Q (!= input null)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -57,14 +54,11 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §S (!= result null)
-  §/MT{m001}
-§/IFACE{i001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §S (!= result null)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -82,17 +76,14 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:ICalculator}
-  §MT{m001:Divide}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §Q (> a INT:0)
-    §Q (!= b INT:0)
-    §S (>= result INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§/M{m001}
+  §IFACE{i001:ICalculator}
+      §MT{m001:Divide}
+          §I{i32:a}
+          §I{i32:b}
+          §O{i32}
+          §Q (> a INT:0)
+          §Q (!= b INT:0)
+          §S (>= result INT:0)
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -113,23 +104,18 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-    §S (!= result null)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetById:pub}
-    §I{i32:id}
-    §O{str}
-    §R ""found""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+          §S (!= result null)
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetById:pub}
+          §I{i32:id}
+          §O{str}
+          §R ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -155,23 +141,18 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetById:pub}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-    §R ""found""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetById:pub}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+          §R ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -191,23 +172,18 @@ public class ContractInheritanceTests
         // Weaker precondition (>= instead of >) is OK
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetById:pub}
-    §I{i32:id}
-    §O{str}
-    §Q (>= id INT:0)
-    §R ""found""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetById:pub}
+          §I{i32:id}
+          §O{str}
+          §Q (>= id INT:0)
+          §R ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -227,23 +203,18 @@ public class ContractInheritanceTests
         // Stronger precondition (> instead of >=) is an LSP violation
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §Q (>= id INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetById:pub}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-    §R ""found""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §Q (>= id INT:0)
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetById:pub}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+          §R ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -264,21 +235,16 @@ public class ContractInheritanceTests
         // Weaker postcondition (>= instead of >) is an LSP violation
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetCount}
-    §O{i32}
-    §S (> result INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetCount:pub}
-    §O{i32}
-    §S (>= result INT:0)
-    §R INT:1
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetCount}
+          §O{i32}
+          §S (> result INT:0)
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetCount:pub}
+          §O{i32}
+          §S (>= result INT:0)
+          §R INT:1
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -298,21 +264,16 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetById:pub}
-    §I{i32:id}
-    §O{str}
-    §R ""found""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetById:pub}
+          §I{i32:id}
+          §O{str}
+          §R ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -336,22 +297,17 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetById:pub}
-    §I{i32:id}
-    §O{str}
-    §R ""found""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetById:pub}
+          §I{i32:id}
+          §O{str}
+          §R ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -376,22 +332,17 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §S (!= result null)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetById:pub}
-    §I{i32:id}
-    §O{str}
-    §R ""found""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §S (!= result null)
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetById:pub}
+          §I{i32:id}
+          §O{str}
+          §R ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -415,15 +366,12 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-    §S (!= result null)
-  §/MT{m001}
-§/IFACE{i001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+          §S (!= result null)
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -442,23 +390,18 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetById:pub}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-    §R ""found""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetById:pub}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+          §R ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -486,30 +429,22 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IReader}
-  §MT{m001:Read}
-    §O{str}
-    §S (!= result null)
-  §/MT{m001}
-§/IFACE{i001}
-§IFACE{i002:IWriter}
-  §MT{m002:Write}
-    §I{str:data}
-    §Q (!= data null)
-  §/MT{m002}
-§/IFACE{i002}
-§CL{c001:FileHandler:pub}
-  §IMPL{IReader}
-  §IMPL{IWriter}
-  §MT{mt001:Read:pub}
-    §O{str}
-    §R ""data""
-  §/MT{mt001}
-  §MT{mt002:Write:pub}
-    §I{str:data}
-  §/MT{mt002}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IReader}
+      §MT{m001:Read}
+          §O{str}
+          §S (!= result null)
+  §IFACE{i002:IWriter}
+      §MT{m002:Write}
+          §I{str:data}
+          §Q (!= data null)
+  §CL{c001:FileHandler:pub}
+      §IMPL{IReader}
+      §IMPL{IWriter}
+      §MT{mt001:Read:pub}
+          §O{str}
+          §R ""data""
+      §MT{mt002:Write:pub}
+          §I{str:data}
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -535,13 +470,10 @@ public class ContractInheritanceTests
         // When interface is not in the module (external), no checking occurs
         var source = @"
 §M{m001:Test}
-§CL{c001:MyClass:pub}
-  §IMPL{IExternalInterface}
-  §MT{mt001:DoSomething:pub}
-    §R ""done""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:MyClass:pub}
+      §IMPL{IExternalInterface}
+      §MT{mt001:DoSomething:pub}
+          §R ""done""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -561,22 +493,17 @@ public class ContractInheritanceTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IRepository}
-  §MT{m001:GetById}
-    §I{i32:id}
-    §O{str}
-    §Q (> id INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:SqlRepository:pub}
-  §IMPL{IRepository}
-  §MT{mt001:GetById:pub}
-    §I{i32:id}
-    §O{str}
-    §R ""found""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IRepository}
+      §MT{m001:GetById}
+          §I{i32:id}
+          §O{str}
+          §Q (> id INT:0)
+  §CL{c001:SqlRepository:pub}
+      §IMPL{IRepository}
+      §MT{mt001:GetById:pub}
+          §I{i32:id}
+          §O{str}
+          §R ""found""
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -610,24 +537,19 @@ public class ContractInheritanceTests
         // With incorrect "all pairs" semantics, this would report a false positive violation.
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:x}
-    §O{i32}
-    §Q (>= x INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:Service:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:x}
-    §O{i32}
-    §Q (>= x INT:-10)
-    §Q (< x INT:1000)
-    §R x
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:x}
+          §O{i32}
+          §Q (>= x INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:x}
+          §O{i32}
+          §Q (>= x INT:-10)
+          §Q (< x INT:1000)
+          §R x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -658,24 +580,19 @@ public class ContractInheritanceTests
         // With correct "at least one matching" semantics, this should be VALID.
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:x}
-    §O{i32}
-    §S (> result INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:Service:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:x}
-    §O{i32}
-    §S (>= result INT:10)
-    §S (!= result INT:999)
-    §R (+ x INT:10)
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:x}
+          §O{i32}
+          §S (> result INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:x}
+          §O{i32}
+          §S (>= result INT:10)
+          §S (!= result INT:999)
+          §R (+ x INT:10)
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -707,24 +624,19 @@ public class ContractInheritanceTests
         // This should report a violation because no implementer precondition is weaker-or-equal.
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:x}
-    §O{i32}
-    §Q (>= x INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:Service:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:x}
-    §O{i32}
-    §Q (>= x INT:10)
-    §Q (< x INT:1000)
-    §R x
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:x}
+          §O{i32}
+          §Q (>= x INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:x}
+          §O{i32}
+          §Q (>= x INT:10)
+          §Q (< x INT:1000)
+          §R x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -753,24 +665,19 @@ public class ContractInheritanceTests
         // This should report a violation because no implementer postcondition implies the interface.
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:x}
-    §O{i32}
-    §S (>= result INT:100)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:Service:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:x}
-    §O{i32}
-    §S (> result INT:0)
-    §S (!= result INT:0)
-    §R x
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:x}
+          §O{i32}
+          §S (>= result INT:100)
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:x}
+          §O{i32}
+          §S (> result INT:0)
+          §S (!= result INT:0)
+          §R x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -796,23 +703,18 @@ public class ContractInheritanceTests
         // Implementer: §Q (>= id 0)  // weaker - accepts more values - VALID
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:id}
-    §O{i32}
-    §Q (>= id INT:1)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:ValidService:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:id}
-    §O{i32}
-    §Q (>= id INT:0)
-    §R id
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:id}
+          §O{i32}
+          §Q (>= id INT:1)
+  §CL{c001:ValidService:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:id}
+          §O{i32}
+          §Q (>= id INT:0)
+          §R id
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -837,23 +739,18 @@ public class ContractInheritanceTests
         // Implementer: §Q (>= id 10)  // stronger - rejects valid inputs - VIOLATION
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:id}
-    §O{i32}
-    §Q (>= id INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:InvalidService:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:id}
-    §O{i32}
-    §Q (>= id INT:10)
-    §R id
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:id}
+          §O{i32}
+          §Q (>= id INT:0)
+  §CL{c001:InvalidService:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:id}
+          §O{i32}
+          §Q (>= id INT:10)
+          §R id
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -877,23 +774,18 @@ public class ContractInheritanceTests
         // Implementer: §Q (&& (> x 0) (< x 100))  // stronger - adds restriction - VIOLATION
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:x}
-    §O{i32}
-    §Q (> x INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:InvalidService:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:x}
-    §O{i32}
-    §Q (&& (> x INT:0) (< x INT:100))
-    §R x
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:x}
+          §O{i32}
+          §Q (> x INT:0)
+  §CL{c001:InvalidService:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:x}
+          §O{i32}
+          §Q (&& (> x INT:0) (< x INT:100))
+          §R x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -917,23 +809,18 @@ public class ContractInheritanceTests
         // Implementer: §S (>= result 10)  // stronger - guarantees more - VALID
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:value}
-    §O{i32}
-    §S (> result INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:ValidService:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:value}
-    §O{i32}
-    §S (>= result INT:10)
-    §R (+ value INT:10)
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:value}
+          §O{i32}
+          §S (> result INT:0)
+  §CL{c001:ValidService:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:value}
+          §O{i32}
+          §S (>= result INT:10)
+          §R (+ value INT:10)
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -957,23 +844,18 @@ public class ContractInheritanceTests
         // Implementer: §S (> result 0)  // weaker - guarantees less - VIOLATION
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:value}
-    §O{i32}
-    §S (>= result INT:10)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:InvalidService:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:value}
-    §O{i32}
-    §S (> result INT:0)
-    §R (+ value INT:1)
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:value}
+          §O{i32}
+          §S (>= result INT:10)
+  §CL{c001:InvalidService:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:value}
+          §O{i32}
+          §S (> result INT:0)
+          §R (+ value INT:1)
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -998,23 +880,18 @@ public class ContractInheritanceTests
         // Z3 should prove that x >= 1 implies x > 0 for integers
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:x}
-    §O{i32}
-    §Q (> x INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:ValidService:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:x}
-    §O{i32}
-    §Q (>= x INT:1)
-    §R x
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:x}
+          §O{i32}
+          §Q (> x INT:0)
+  §CL{c001:ValidService:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:x}
+          §O{i32}
+          §Q (>= x INT:1)
+          §R x
 ";
 
         var module = Parse(source, out var parseDiags);
@@ -1035,23 +912,18 @@ public class ContractInheritanceTests
         // When Z3 is explicitly disabled, should fall back to heuristics
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IService}
-  §MT{m001:Process}
-    §I{i32:id}
-    §O{i32}
-    §Q (> id INT:0)
-  §/MT{m001}
-§/IFACE{i001}
-§CL{c001:Service:pub}
-  §IMPL{IService}
-  §MT{mt001:Process:pub}
-    §I{i32:id}
-    §O{i32}
-    §Q (> id INT:0)
-    §R id
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:id}
+          §O{i32}
+          §Q (> id INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:id}
+          §O{i32}
+          §Q (> id INT:0)
+          §R id
 ";
 
         var module = Parse(source, out var parseDiags);

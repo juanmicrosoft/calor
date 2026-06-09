@@ -43,8 +43,8 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 | Effect declaration | 0.15 | Contains `§E{` |
 | Requires contract | 0.15 | Contains `§Q` |
 | Ensures contract | 0.10 | Contains `§S` |
-| Function closing tag | 0.05 | Contains `§/F{` |
-| Module closing tag | 0.05 | Contains `§/M{` |
+| Indented body line (proportional) | up to 0.10 | Matches `^[ \t]+\S` |
+| Indent-form completeness | 0.05 | At least one indented body line per `§F{` opener |
 
 ### C# Clarity Factors
 
@@ -68,15 +68,13 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 
 ```
 §M{m001:Calculator}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)
-  §S (>= result 0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+    §I{i32:a}
+    §I{i32:b}
+    §O{i32}
+    §Q (!= b 0)
+    §S (>= result 0)
+    §R (/ a b)
 ```
 
 **Score calculation:**
@@ -87,10 +85,10 @@ Traditional languages require parsing and inference. Calor makes these explicit.
 - `§R`: +0.10
 - `§Q`: +0.15
 - `§S`: +0.10
-- `§/F{`: +0.05
-- `§/M{`: +0.05
+- Indented body lines: +0.10 (proportional)
+- Indent-form completeness (every `§F{` has an indented body): +0.05
 
-**Total: 0.95**
+**Total: 1.00**
 
 ### C# (Lower Clarity)
 
@@ -137,7 +135,7 @@ namespace Calculator
 | Side effects | Parse `§E{codes}` |
 | Preconditions | Find all `§Q condition` |
 | Postconditions | Find all `§S condition` |
-| Scope boundaries | Match `§F{id}` with `§/F{id}` |
+| Scope boundaries | `§F{id}` opener followed by indented body lines (terminated by dedent in indent form) |
 
 ### From C# (Requires Inference)
 

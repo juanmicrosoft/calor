@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace DigitCount
 {
@@ -16,16 +14,16 @@ namespace DigitCount
     {
         public static bool IsZero(int n)
         {
-            return (n == 0);
+            return n == 0;
         }
 
         public static int Abs(int n)
         {
             int __result__ = default;
 
-            if ((n < 0))
+            if (n < 0)
             {
-                return (0 - n);
+                return 0 - n;
             }
             else
             {
@@ -33,24 +31,24 @@ namespace DigitCount
             }
 
 
-            if (!((__result__ >= 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0)", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 128, length: 16, sourceFile: null, line: 10, column: 3, condition: "(__result__ >= 0)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f002", Calor.Runtime.ContractKind.Ensures, startOffset: 118, length: 16, sourceFile: null, line: 6, column: 5, condition: "__result__ >= 0");
             return __result__;
         }
 
         public static int DigitCountPositive(int n)
         {
-            if (!((n >= 0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (n >= 0)", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 267, length: 11, sourceFile: null, line: 18, column: 3, condition: "(n >= 0)");
+            if (!(n >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: n >= 0", "f003", Calor.Runtime.ContractKind.Requires, startOffset: 253, length: 11, sourceFile: null, line: 13, column: 5, condition: "n >= 0");
             int __result__ = default;
 
-            if ((n < 10))
+            if (n < 10)
             {
                 return 1;
             }
 
-            var rest = DigitCountPositive((n / 10));
-            __result__ = (1 + rest);
+            var rest = DigitCountPositive(n / 10);
+            __result__ = 1 + rest;
 
-            if (!((__result__ > 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ > 0)", "f003", Calor.Runtime.ContractKind.Ensures, startOffset: 281, length: 15, sourceFile: null, line: 19, column: 3, condition: "(__result__ > 0)");
+            if (!(__result__ > 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ > 0", "f003", Calor.Runtime.ContractKind.Ensures, startOffset: 270, length: 15, sourceFile: null, line: 14, column: 5, condition: "__result__ > 0");
             return __result__;
         }
 
@@ -58,7 +56,7 @@ namespace DigitCount
         {
             int __result__ = default;
 
-            if ((n == 0))
+            if (n == 0)
             {
                 return 1;
             }
@@ -66,7 +64,7 @@ namespace DigitCount
             var absN = Abs(n);
             __result__ = DigitCountPositive(absN);
 
-            if (!((__result__ > 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ > 0)", "f004", Calor.Runtime.ContractKind.Ensures, startOffset: 459, length: 15, sourceFile: null, line: 28, column: 3, condition: "(__result__ > 0)");
+            if (!(__result__ > 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ > 0", "f004", Calor.Runtime.ContractKind.Ensures, startOffset: 442, length: 15, sourceFile: null, line: 21, column: 5, condition: "__result__ > 0");
             return __result__;
         }
 

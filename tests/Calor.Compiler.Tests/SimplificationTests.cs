@@ -705,13 +705,11 @@ public class SimplificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:x}
-  §O{bool}
-  §Q (&& true (>= x INT:0))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:x}
+      §O{bool}
+      §Q (&& true (>= x INT:0))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -735,13 +733,11 @@ public class SimplificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:x}
-  §O{bool}
-  §Q (-> (>= x INT:0) (>= x INT:0))
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:x}
+      §O{bool}
+      §Q (-> (>= x INT:0) (>= x INT:0))
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -764,13 +760,11 @@ public class SimplificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:x}
-  §O{bool}
-  §Q (>= x INT:0)
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:x}
+      §O{bool}
+      §Q (>= x INT:0)
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -788,13 +782,11 @@ public class SimplificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestFunc:pub}
-  §I{i32:n}
-  §O{bool}
-  §Q (forall ((i i32)) true)
-  §R true
-§/F{f001}
-§/M{m001}
+  §F{f001:TestFunc:pub}
+      §I{i32:n}
+      §O{bool}
+      §Q (forall ((i i32)) true)
+      §R true
 ";
 
         var module = Parse(source, out var diagnostics);
@@ -2266,7 +2258,7 @@ public class SimplificationTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }

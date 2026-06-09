@@ -27,7 +27,7 @@ public class BenchmarkVerificationTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -67,14 +67,12 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:VulnerableQuery:pub}
-  §I{string:user_input}
-  §O{string}
-  §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
-  §C db.execute query
-  §R query
-§/F{f001}
-§/M{m001}";
+  §F{f001:VulnerableQuery:pub}
+      §I{string:user_input}
+      §O{string}
+      §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
+      §C db.execute query
+      §R query";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return; // Skip if parsing not supported
@@ -91,14 +89,12 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeQuery:pub}
-  §I{string:user_input}
-  §O{string}
-  §B{query:string} STR:""SELECT * FROM users WHERE name = ?""
-  §C db.execute_param query user_input
-  §R query
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeQuery:pub}
+      §I{string:user_input}
+      §O{string}
+      §B{query:string} STR:""SELECT * FROM users WHERE name = ?""
+      §C db.execute_param query user_input
+      §R query";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -115,15 +111,13 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeEscaped:pub}
-  §I{string:user_input}
-  §O{string}
-  §B{escaped:string} (CALL sql_escape user_input)
-  §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" escaped)
-  §C db.execute query
-  §R query
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeEscaped:pub}
+      §I{string:user_input}
+      §O{string}
+      §B{escaped:string} (CALL sql_escape user_input)
+      §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" escaped)
+      §C db.execute query
+      §R query";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -141,14 +135,12 @@ public class BenchmarkVerificationTests
         // db.execute_with_param_logging should NOT be excluded — it's a real sink
         var source = @"
 §M{m001:Test}
-§F{f001:ParamLogging:pub}
-  §I{string:user_input}
-  §O{string}
-  §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
-  §C db.execute_with_param_logging query
-  §R query
-§/F{f001}
-§/M{m001}";
+  §F{f001:ParamLogging:pub}
+      §I{string:user_input}
+      §O{string}
+      §B{query:string} (+ STR:""SELECT * FROM users WHERE name = '"" user_input)
+      §C db.execute_with_param_logging query
+      §R query";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -165,14 +157,12 @@ public class BenchmarkVerificationTests
         // db.execute_param should still be excluded — it's a parameterized query
         var source = @"
 §M{m001:Test}
-§F{f001:ExecuteParam:pub}
-  §I{string:user_input}
-  §O{string}
-  §B{query:string} STR:""SELECT * FROM users WHERE name = ?""
-  §C db.execute_param query user_input
-  §R query
-§/F{f001}
-§/M{m001}";
+  §F{f001:ExecuteParam:pub}
+      §I{string:user_input}
+      §O{string}
+      §B{query:string} STR:""SELECT * FROM users WHERE name = ?""
+      §C db.execute_param query user_input
+      §R query";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -192,14 +182,12 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:VulnerableShell:pub}
-  §I{string:user_input}
-  §O{i32}
-  §B{cmd:string} (+ STR:""ls -la "" user_input)
-  §C shell cmd
-  §R INT:0
-§/F{f001}
-§/M{m001}";
+  §F{f001:VulnerableShell:pub}
+      §I{string:user_input}
+      §O{i32}
+      §B{cmd:string} (+ STR:""ls -la "" user_input)
+      §C shell cmd
+      §R INT:0";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -215,17 +203,15 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeWhitelist:pub}
-  §I{i32:option}
-  §O{i32}
-  §IF (== option INT:1)
-    §C exec STR:""ls""
-  §EL
-    §C exec STR:""pwd""
-  §/IF
-  §R INT:0
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeWhitelist:pub}
+      §I{i32:option}
+      §O{i32}
+      §IF (== option INT:1)
+        §C exec STR:""ls""
+      §EL
+        §C exec STR:""pwd""
+      §/IF
+      §R INT:0";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -245,13 +231,11 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:VulnerableRead:pub}
-  §I{string:user_path}
-  §O{string}
-  §B{content:string} (CALL file.read user_path)
-  §R content
-§/F{f001}
-§/M{m001}";
+  §F{f001:VulnerableRead:pub}
+      §I{string:user_path}
+      §O{string}
+      §B{content:string} (CALL file.read user_path)
+      §R content";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -267,13 +251,11 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeConstant:pub}
-  §O{string}
-  §B{path:string} STR:""/etc/config.json""
-  §B{content:string} (CALL file.read path)
-  §R content
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeConstant:pub}
+      §O{string}
+      §B{path:string} STR:""/etc/config.json""
+      §B{content:string} (CALL file.read path)
+      §R content";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -293,13 +275,11 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:VulnerableDiv:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (/ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:VulnerableDiv:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (/ x y)";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -315,17 +295,15 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeDiv:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §IF (!= y INT:0)
-    §R (/ x y)
-  §EL
-    §R INT:0
-  §/IF
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeDiv:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §IF (!= y INT:0)
+        §R (/ x y)
+      §EL
+        §R INT:0
+      §/IF";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return; // Skip if IF syntax not yet supported
@@ -341,12 +319,10 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeLiteralDiv:pub}
-  §I{i32:x}
-  §O{i32}
-  §R (/ x INT:2)
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeLiteralDiv:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (/ x INT:2)";
 
         var module = ParseAndBind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -366,12 +342,10 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:VulnerableNull:pub}
-  §I{string:maybeNull}
-  §O{i32}
-  §R (CALL string.length maybeNull)
-§/F{f001}
-§/M{m001}";
+  §F{f001:VulnerableNull:pub}
+      §I{string:maybeNull}
+      §O{i32}
+      §R (CALL string.length maybeNull)";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -388,16 +362,14 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeNull:pub}
-  §I{string:maybeNull}
-  §O{i32}
-  §IF (!= maybeNull NONE)
-    §R (CALL string.length maybeNull)
-  §EL
-    §R INT:0
-  §/IF
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeNull:pub}
+      §I{string:maybeNull}
+      §O{i32}
+      §IF (!= maybeNull NONE)
+        §R (CALL string.length maybeNull)
+      §EL
+        §R INT:0
+      §/IF";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -417,12 +389,10 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:VulnerableBounds:pub}
-  §I{i32:index}
-  §O{i32}
-  §R (CALL array.get index)
-§/F{f001}
-§/M{m001}";
+  §F{f001:VulnerableBounds:pub}
+      §I{i32:index}
+      §O{i32}
+      §R (CALL array.get index)";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -438,17 +408,15 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:SafeBounds:pub}
-  §I{i32:index}
-  §I{i32:len}
-  §O{i32}
-  §IF (&& (>= index INT:0) (< index len))
-    §R (CALL array.get index)
-  §EL
-    §R INT:-1
-  §/IF
-§/F{f001}
-§/M{m001}";
+  §F{f001:SafeBounds:pub}
+      §I{i32:index}
+      §I{i32:len}
+      §O{i32}
+      §IF (&& (>= index INT:0) (< index len))
+        §R (CALL array.get index)
+      §EL
+        §R INT:-1
+      §/IF";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -468,16 +436,14 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:CompletelySecure:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §IF (== y INT:0)
-    §R INT:0
-  §/IF
-  §R (/ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:CompletelySecure:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §IF (== y INT:0)
+        §R INT:0
+      §/IF
+      §R (/ x y)";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return; // Skip if IF syntax not yet supported
@@ -500,16 +466,14 @@ public class BenchmarkVerificationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:InsecureFunction:pub}
-  §I{string:user_input}
-  §I{i32:divisor}
-  §O{i32}
-  §B{query:string} (+ STR:""SELECT * FROM t WHERE x = '"" user_input)
-  §C db.execute query
-  §B{result:i32} (/ INT:100 divisor)
-  §R result
-§/F{f001}
-§/M{m001}";
+  §F{f001:InsecureFunction:pub}
+      §I{string:user_input}
+      §I{i32:divisor}
+      §O{i32}
+      §B{query:string} (+ STR:""SELECT * FROM t WHERE x = '"" user_input)
+      §C db.execute query
+      §B{result:i32} (/ INT:100 divisor)
+      §R result";
 
         var module = ParseAndBind(source, out var parseDiag);
         if (parseDiag.HasErrors) return;

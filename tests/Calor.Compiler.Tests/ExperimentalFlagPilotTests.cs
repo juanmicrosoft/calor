@@ -13,10 +13,8 @@ namespace Calor.Compiler.Tests;
 public class ExperimentalFlagPilotTests
 {
     private const string MinimalSource = @"§M{m001:Test}
-§F{f001:Noop:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}
+  §F{f001:Noop:pub}
+      §O{void}
 ";
 
     [Fact]

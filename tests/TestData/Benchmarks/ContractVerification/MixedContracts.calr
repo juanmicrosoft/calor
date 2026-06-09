@@ -1,34 +1,20 @@
 §M{m001:MixedMath}
-§F{f001:GoodSquare:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (>= result 0)
-  §R (* x x)
-§/F{f001}
+  §F{f001:GoodSquare:pub} (i32:x) -> i32
+    §S (>= result 0)
+    §R (* x x)
 
-§F{f002:BadNegate:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (< result 0)
-  §R (- 0 x)
-§/F{f002}
+  §F{f002:BadNegate:pub} (i32:x) -> i32
+    §S (< result 0)
+    §R (- 0 x)
 
-§F{f003:SafeDivide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q{"divisor must not be zero"} (!= b 0)
-  §S (== result (/ a b))
-  §R (/ a b)
-§/F{f003}
+  §F{f003:SafeDivide:pub} (i32:a, i32:b) -> i32
+    §Q{"divisor must not be zero"} (!= b 0)
+    §S (== result (/ a b))
+    §R (/ a b)
 
-§F{f004:ComplexCondition:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §Q{"x must be positive"} (> x 0)
-  §Q{"y must be positive"} (> y 0)
-  §S (> result 0)
-  §R (+ x y)
-§/F{f004}
-§/M{m001}
+  §F{f004:ComplexCondition:pub} (i32:x, i32:y) -> i32
+    §Q{"x must be positive"} (> x 0)
+    §Q{"y must be positive"} (> y 0)
+    §S (> result 0)
+    §R (+ x y)
+

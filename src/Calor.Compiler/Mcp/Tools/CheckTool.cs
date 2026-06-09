@@ -365,10 +365,8 @@ public sealed class CheckTool : McpToolBase
             var line = lines[i];
             var lineNum = i + 1;
 
-            if (line.Length > 0 && char.IsWhiteSpace(line[0]) && line.TrimStart().Length > 0)
-            {
-                issues.Add(new LintIssue(lineNum, "Line has leading whitespace (indentation not allowed)"));
-            }
+            // Indentation is now semantically meaningful (Phase 1+ indent form);
+            // do not flag leading whitespace.
 
             if (line.Length > 0 && line.TrimEnd('\r') != line.TrimEnd('\r').TrimEnd())
             {
@@ -409,17 +407,14 @@ public sealed class CheckTool : McpToolBase
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(line.TrimEnd('\r')))
-            {
-                issues.Add(new LintIssue(lineNum, "Blank lines not allowed in agent-optimized format"));
-            }
+            // Blank lines are now allowed as readability separators (Phase 4 indent form).
         }
 
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath("mcp-input.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         if (diagnostics.HasErrors)
         {
@@ -561,7 +556,7 @@ public sealed class CheckTool : McpToolBase
             var diagnostics = new DiagnosticBag();
 
             var lexer = new Lexer(wrapper.WrappedSource, diagnostics);
-            var tokens = lexer.TokenizeAll();
+            var tokens = lexer.TokenizeAllForParser();
 
             List<TokenOutput>? tokenOutput = null;
             if (showTokens)
@@ -1060,8 +1055,6 @@ internal sealed class SnippetWrapper
                 currentLine++;
             }
 
-            sb.AppendLine("§/M{_}");
-
             return new SnippetWrapper(sb.ToString(), snippetStart, snippetEnd, 0, warnings);
         }
 
@@ -1127,10 +1120,6 @@ internal sealed class SnippetWrapper
             sb.AppendLine();
             currentLine++;
         }
-
-        // Close function and module
-        sb.AppendLine("§/F{_}");
-        sb.AppendLine("§/M{_}");
 
         return new SnippetWrapper(sb.ToString(), snippetStartLine, snippetEndLine, firstLineColumnOffset, warnings);
     }

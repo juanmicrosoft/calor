@@ -20,7 +20,6 @@ Calor enforces that every function declares its effects:
   §E{db:w,cw}
   §C{DbContext.SaveChanges} §/C
   §C{ILogger.LogInformation} §A STR:"User saved" §/C
-§/F{f001}
 ```
 
 But how does the compiler know that `DbContext.SaveChanges` has effect `db:w` and `ILogger.LogInformation` has effect `cw`? Without this knowledge, every external call would be flagged as `Unknown`.

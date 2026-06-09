@@ -108,13 +108,11 @@ public class EffectEnforcementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:PrintAndRead:pub}
-  §O{str}
-  §P ""Enter your name: ""
-  §B{str:name} STR:""placeholder""
-  §R name
-§/F{f001}
-§/M{m001}
+  §F{f001:PrintAndRead:pub}
+      §O{str}
+      §P ""Enter your name: ""
+      §B{str:name} STR:""placeholder""
+      §R name
 ";
         var result = TestHarness.Compile(source);
 
@@ -127,13 +125,11 @@ public class EffectEnforcementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
         var result = TestHarness.Compile(source);
 
@@ -145,11 +141,9 @@ public class EffectEnforcementTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:TestPrint:pub}
-  §O{void}
-  §P ""test""
-§/F{f001}
-§/M{m001}
+  §F{f001:TestPrint:pub}
+      §O{void}
+      §P ""test""
 ";
         var result = TestHarness.Compile(source);
 
@@ -163,28 +157,26 @@ public class EffectEnforcementTests
         // LINQ extension method calls in §F should be recognized as pure
         var source = @"
 §M{m001:Test}
-§F{f001:SortItems:pub}
-  §O{void}
-  §C{items.OrderByDescending}
-  §/C
-  §C{items.ToArray}
-  §/C
-  §C{items.Where}
-  §/C
-  §C{items.Select}
-  §/C
-  §C{items.First}
-  §/C
-  §C{items.Any}
-  §/C
-  §C{items.Count}
-  §/C
-  §C{items.Distinct}
-  §/C
-  §C{items.ToList}
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:SortItems:pub}
+      §O{void}
+      §C{items.OrderByDescending}
+      §/C
+      §C{items.ToArray}
+      §/C
+      §C{items.Where}
+      §/C
+      §C{items.Select}
+      §/C
+      §C{items.First}
+      §/C
+      §C{items.Any}
+      §/C
+      §C{items.Count}
+      §/C
+      §C{items.Distinct}
+      §/C
+      §C{items.ToList}
+      §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -198,20 +190,18 @@ public class EffectEnforcementTests
         // Static LINQ calls like Enumerable.Range should resolve via type mapping
         var source = @"
 §M{m001:Test}
-§F{f001:MakeRange:pub}
-  §O{void}
-  §C{Enumerable.Range}
-    §A INT:1
-    §A INT:10
-  §/C
-  §C{Enumerable.Empty}
-  §/C
-  §C{Enumerable.Repeat}
-    §A INT:0
-    §A INT:5
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:MakeRange:pub}
+      §O{void}
+      §C{Enumerable.Range}
+        §A INT:1
+        §A INT:10
+      §/C
+      §C{Enumerable.Empty}
+      §/C
+      §C{Enumerable.Repeat}
+        §A INT:0
+        §A INT:5
+      §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -225,14 +215,12 @@ public class EffectEnforcementTests
         // OfType<T> calls should be recognized as pure
         var source = @"
 §M{m001:Test}
-§F{f001:FilterTypes:pub}
-  §O{void}
-  §C{items.OfType}
-  §/C
-  §C{items.Cast}
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:FilterTypes:pub}
+      §O{void}
+      §C{items.OfType}
+      §/C
+      §C{items.Cast}
+      §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -246,13 +234,10 @@ public class EffectEnforcementTests
         // §MT method inside §CL using §P without declaring cw should fail
         var source = @"
 §M{m001:Test}
-§CL{c001:MyService:pub}
-  §MT{mt001:PrintHello:pub}
-    §O{void}
-    §P ""Hello from method""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:MyService:pub}
+      §MT{mt001:PrintHello:pub}
+          §O{void}
+          §P ""Hello from method""
 ";
         var result = TestHarness.Compile(source);
 
@@ -268,14 +253,11 @@ public class EffectEnforcementTests
         // §MT method inside §CL using §P with cw declared should pass
         var source = @"
 §M{m001:Test}
-§CL{c001:MyService:pub}
-  §MT{mt001:PrintHello:pub}
-    §O{void}
-    §E{cw}
-    §P ""Hello from method""
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:MyService:pub}
+      §MT{mt001:PrintHello:pub}
+          §O{void}
+          §E{cw}
+          §P ""Hello from method""
 ";
         var result = TestHarness.Compile(source);
 
@@ -289,18 +271,15 @@ public class EffectEnforcementTests
         // §MT method with LINQ calls should compile (both class enforcement and LINQ purity)
         var source = @"
 §M{m001:Test}
-§CL{c001:DataProcessor:pub}
-  §MT{mt001:ProcessItems:pub}
-    §O{void}
-    §C{items.OrderByDescending}
-    §/C
-    §C{items.ToArray}
-    §/C
-    §C{items.Where}
-    §/C
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:DataProcessor:pub}
+      §MT{mt001:ProcessItems:pub}
+          §O{void}
+          §C{items.OrderByDescending}
+          §/C
+          §C{items.ToArray}
+          §/C
+          §C{items.Where}
+          §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -314,15 +293,12 @@ public class EffectEnforcementTests
         // §MT method calling Console.WriteLine without §E{cw} should fail
         var source = @"
 §M{m001:Test}
-§CL{c001:Logger:pub}
-  §MT{mt001:Log:pub}
-    §O{void}
-    §C{Console.WriteLine}
-      §A STR:""log message""
-    §/C
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Logger:pub}
+      §MT{mt001:Log:pub}
+          §O{void}
+          §C{Console.WriteLine}
+            §A STR:""log message""
+          §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -338,15 +314,12 @@ public class EffectEnforcementTests
         // §MT method with only pure operations should compile
         var source = @"
 §M{m001:Test}
-§CL{c001:Calculator:pub}
-  §MT{mt001:Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Calculator:pub}
+      §MT{mt001:Add:pub}
+          §I{i32:a}
+          §I{i32:b}
+          §O{i32}
+          §R (+ a b)
 ";
         var result = TestHarness.Compile(source);
 
@@ -361,14 +334,12 @@ public class EffectEnforcementTests
         // since constructors can't declare effects and field assignment is their purpose
         var source = @"
 §M{m001:Test}
-§CL{c001:Person:pub}
-  §FLD{str:_name:pri}
-  §CTOR{ctor1:pub}
-    §I{str:name}
-    §ASSIGN §THIS._name name
-  §/CTOR{ctor1}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Person:pub}
+      §FLD{str:_name:pri}
+      §CTOR{ctor1:pub}
+        §I{str:name}
+        §ASSIGN §THIS._name name
+      §/CTOR{ctor1}
 ";
         var result = TestHarness.Compile(source);
 
@@ -383,14 +354,11 @@ public class EffectEnforcementTests
         // an "unknown external call" error since it's not an external call
         var source = @"
 §M{m001:Test}
-§CL{c001:Mapper:pub}
-  §MT{mt001:Apply:pub}
-    §I{i32:value}
-    §O{i32}
-    §R §C{transform} §A value §/C
-  §/MT{mt001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Mapper:pub}
+      §MT{mt001:Apply:pub}
+          §I{i32:value}
+          §O{i32}
+          §R §C{transform} §A value §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -404,12 +372,10 @@ public class EffectEnforcementTests
         // In strict effects mode, delegate invocations should get a warning
         var source = @"
 §M{m001:Test}
-§F{f001:UseDelegate:pub}
-  §O{void}
-  §C{callback}
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:UseDelegate:pub}
+      §O{void}
+      §C{callback}
+      §/C
 ";
         var options = new CompilationOptions
         {
@@ -435,19 +401,15 @@ public class EffectEnforcementTests
         // Should resolve as an internal call, NOT produce Calor0411.
         var source = @"
 §M{m001:Test}
-§CL{c001:Calculator:pub}
-  §MT{mt001:Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
-  §/MT{mt001}
-§/CL{c001}
-§F{f001:UseCalculator:pub}
-  §O{i32}
-  §R §C{_calc.Add} §A INT:1 §A INT:2 §/C
-§/F{f001}
-§/M{m001}
+  §CL{c001:Calculator:pub}
+      §MT{mt001:Add:pub}
+          §I{i32:a}
+          §I{i32:b}
+          §O{i32}
+          §R (+ a b)
+  §F{f001:UseCalculator:pub}
+      §O{i32}
+      §R §C{_calc.Add} §A INT:1 §A INT:2 §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -462,21 +424,17 @@ public class EffectEnforcementTests
         // The caller must declare cw or the effect should propagate as an error.
         var source = @"
 §M{m001:Test}
-§CL{c001:Logger:pub}
-  §MT{mt001:Log:pub}
-    §I{str:message}
-    §O{void}
-    §E{cw}
-    §P message
-  §/MT{mt001}
-§/CL{c001}
-§F{f001:DoWork:pub}
-  §O{void}
-  §C{_logger.Log}
-    §A STR:""hello""
-  §/C
-§/F{f001}
-§/M{m001}
+  §CL{c001:Logger:pub}
+      §MT{mt001:Log:pub}
+          §I{str:message}
+          §O{void}
+          §E{cw}
+          §P message
+  §F{f001:DoWork:pub}
+      §O{void}
+      §C{_logger.Log}
+        §A STR:""hello""
+      §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -493,22 +451,18 @@ public class EffectEnforcementTests
         // Function calls a method with cw effect and properly declares cw.
         var source = @"
 §M{m001:Test}
-§CL{c001:Logger:pub}
-  §MT{mt001:Log:pub}
-    §I{str:message}
-    §O{void}
-    §E{cw}
-    §P message
-  §/MT{mt001}
-§/CL{c001}
-§F{f001:DoWork:pub}
-  §O{void}
-  §E{cw}
-  §C{_logger.Log}
-    §A STR:""hello""
-  §/C
-§/F{f001}
-§/M{m001}
+  §CL{c001:Logger:pub}
+      §MT{mt001:Log:pub}
+          §I{str:message}
+          §O{void}
+          §E{cw}
+          §P message
+  §F{f001:DoWork:pub}
+      §O{void}
+      §E{cw}
+      §C{_logger.Log}
+        §A STR:""hello""
+      §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -522,24 +476,19 @@ public class EffectEnforcementTests
         // Method in one class calls a method in another class (both §MT).
         var source = @"
 §M{m001:Test}
-§CL{c001:Printer:pub}
-  §MT{mt001:PrintMessage:pub}
-    §I{str:msg}
-    §O{void}
-    §E{cw}
-    §P msg
-  §/MT{mt001}
-§/CL{c001}
-§CL{c002:App:pub}
-  §MT{mt002:Run:pub}
-    §O{void}
-    §E{cw}
-    §C{_printer.PrintMessage}
-      §A STR:""hello""
-    §/C
-  §/MT{mt002}
-§/CL{c002}
-§/M{m001}
+  §CL{c001:Printer:pub}
+      §MT{mt001:PrintMessage:pub}
+          §I{str:msg}
+          §O{void}
+          §E{cw}
+          §P msg
+  §CL{c002:App:pub}
+      §MT{mt002:Run:pub}
+          §O{void}
+          §E{cw}
+          §C{_printer.PrintMessage}
+            §A STR:""hello""
+          §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -553,23 +502,18 @@ public class EffectEnforcementTests
         // Method in one class calls effectful method in another without declaring the effect.
         var source = @"
 §M{m001:Test}
-§CL{c001:Printer:pub}
-  §MT{mt001:PrintMessage:pub}
-    §I{str:msg}
-    §O{void}
-    §E{cw}
-    §P msg
-  §/MT{mt001}
-§/CL{c001}
-§CL{c002:App:pub}
-  §MT{mt002:Run:pub}
-    §O{void}
-    §C{_printer.PrintMessage}
-      §A STR:""hello""
-    §/C
-  §/MT{mt002}
-§/CL{c002}
-§/M{m001}
+  §CL{c001:Printer:pub}
+      §MT{mt001:PrintMessage:pub}
+          §I{str:msg}
+          §O{void}
+          §E{cw}
+          §P msg
+  §CL{c002:App:pub}
+      §MT{mt002:Run:pub}
+          §O{void}
+          §C{_printer.PrintMessage}
+            §A STR:""hello""
+          §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -585,30 +529,23 @@ public class EffectEnforcementTests
         // A → B → C chain across three classes. Effect should propagate from C to A.
         var source = @"
 §M{m001:Test}
-§CL{c001:ServiceC:pub}
-  §MT{mt001:WriteOutput:pub}
-    §O{void}
-    §E{cw}
-    §P ""output""
-  §/MT{mt001}
-§/CL{c001}
-§CL{c002:ServiceB:pub}
-  §MT{mt002:Process:pub}
-    §O{void}
-    §E{cw}
-    §C{_c.WriteOutput}
-    §/C
-  §/MT{mt002}
-§/CL{c002}
-§CL{c003:ServiceA:pub}
-  §MT{mt003:Execute:pub}
-    §O{void}
-    §E{cw}
-    §C{_b.Process}
-    §/C
-  §/MT{mt003}
-§/CL{c003}
-§/M{m001}
+  §CL{c001:ServiceC:pub}
+      §MT{mt001:WriteOutput:pub}
+          §O{void}
+          §E{cw}
+          §P ""output""
+  §CL{c002:ServiceB:pub}
+      §MT{mt002:Process:pub}
+          §O{void}
+          §E{cw}
+          §C{_c.WriteOutput}
+          §/C
+  §CL{c003:ServiceA:pub}
+      §MT{mt003:Execute:pub}
+          §O{void}
+          §E{cw}
+          §C{_b.Process}
+          §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -626,30 +563,24 @@ public class EffectEnforcementTests
         // (which produces Calor0411 in strict mode). The caller declares cw to be safe.
         var source = @"
 §M{m001:Test}
-§CL{c001:PureService:pub}
-  §MT{mt001:Process:pub}
-    §I{str:data}
-    §O{str}
-    §R data
-  §/MT{mt001}
-§/CL{c001}
-§CL{c002:EffectfulService:pub}
-  §MT{mt002:Process:pub}
-    §I{str:data}
-    §O{void}
-    §E{cw}
-    §P data
-  §/MT{mt002}
-§/CL{c002}
-§F{f001:DoWork:pub}
-  §I{str:input}
-  §O{void}
-  §E{cw}
-  §C{_a.Process}
-    §A STR:""hello""
-  §/C
-§/F{f001}
-§/M{m001}
+  §CL{c001:PureService:pub}
+      §MT{mt001:Process:pub}
+          §I{str:data}
+          §O{str}
+          §R data
+  §CL{c002:EffectfulService:pub}
+      §MT{mt002:Process:pub}
+          §I{str:data}
+          §O{void}
+          §E{cw}
+          §P data
+  §F{f001:DoWork:pub}
+      §I{str:input}
+      §O{void}
+      §E{cw}
+      §C{_a.Process}
+        §A STR:""hello""
+      §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -670,25 +601,19 @@ public class EffectEnforcementTests
         // even with the multi-map (the method name is unambiguous).
         var source = @"
 §M{m001:Test}
-§CL{c001:Calculator:pub}
-  §MT{mt001:Compute:pub}
-    §I{i32:x}
-    §O{i32}
-    §R (+ x 1)
-  §/MT{mt001}
-§/CL{c001}
-§CL{c002:OtherService:pub}
-  §MT{mt002:Format:pub}
-    §I{str:s}
-    §O{str}
-    §R s
-  §/MT{mt002}
-§/CL{c002}
-§F{f001:UseCalc:pub}
-  §O{i32}
-  §R §C{_calc.Compute} §A INT:5 §/C
-§/F{f001}
-§/M{m001}
+  §CL{c001:Calculator:pub}
+      §MT{mt001:Compute:pub}
+          §I{i32:x}
+          §O{i32}
+          §R (+ x 1)
+  §CL{c002:OtherService:pub}
+      §MT{mt002:Format:pub}
+          §I{str:s}
+          §O{str}
+          §R s
+  §F{f001:UseCalc:pub}
+      §O{i32}
+      §R §C{_calc.Compute} §A INT:5 §/C
 ";
         var result = TestHarness.Compile(source);
 
@@ -708,14 +633,12 @@ public class EffectEnforcementTests
         // Should compile without Calor0411 (unknown external call).
         var source = @"
 §M{m001:Test}
-§F{f001:LogSomething:pub}
-  §O{void}
-  §E{cw}
-  §C{ILogger.LogInformation}
-    §A STR:""Processing request""
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:LogSomething:pub}
+      §O{void}
+      §E{cw}
+      §C{ILogger.LogInformation}
+        §A STR:""Processing request""
+      §/C
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -730,13 +653,11 @@ public class EffectEnforcementTests
         // A Calor function calls DbContext.SaveChanges and declares db:w effect.
         var source = @"
 §M{m001:Test}
-§F{f001:SaveData:pub}
-  §O{void}
-  §E{db:w}
-  §C{DbContext.SaveChanges}
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:SaveData:pub}
+      §O{void}
+      §E{db:w}
+      §C{DbContext.SaveChanges}
+      §/C
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -751,14 +672,12 @@ public class EffectEnforcementTests
         // A Calor function calls IConfiguration.GetSection and declares env:r effect.
         var source = @"
 §M{m001:Test}
-§F{f001:ReadConfig:pub}
-  §O{void}
-  §E{env:r}
-  §C{IConfiguration.GetSection}
-    §A STR:""ConnectionStrings""
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:ReadConfig:pub}
+      §O{void}
+      §E{env:r}
+      §C{IConfiguration.GetSection}
+        §A STR:""ConnectionStrings""
+      §/C
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -773,12 +692,10 @@ public class EffectEnforcementTests
         // A Calor function calls ControllerBase.Ok — should be pure.
         var source = @"
 §M{m001:Test}
-§F{f001:GetResult:pub}
-  §O{void}
-  §C{ControllerBase.Ok}
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:GetResult:pub}
+      §O{void}
+      §C{ControllerBase.Ok}
+      §/C
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -794,12 +711,10 @@ public class EffectEnforcementTests
         // Should produce Calor0410 (forbidden effect), NOT Calor0411 (unknown).
         var source = @"
 §M{m001:Test}
-§F{f001:SaveData:pub}
-  §O{void}
-  §C{DbContext.SaveChanges}
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:SaveData:pub}
+      §O{void}
+      §C{DbContext.SaveChanges}
+      §/C
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
@@ -817,22 +732,20 @@ public class EffectEnforcementTests
         // This verifies the full pipeline: declared effects match computed effects.
         var source = @"
 §M{m001:Test}
-§F{f001:HandleRequest:pub}
-  §O{void}
-  §E{cw,db:w,env:r}
-  §C{ILogger.LogInformation}
-    §A STR:""Starting request""
-  §/C
-  §C{IConfiguration.GetSection}
-    §A STR:""AppSettings""
-  §/C
-  §C{DbContext.SaveChanges}
-  §/C
-  §C{ILogger.LogInformation}
-    §A STR:""Request complete""
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:HandleRequest:pub}
+      §O{void}
+      §E{cw,db:w,env:r}
+      §C{ILogger.LogInformation}
+        §A STR:""Starting request""
+      §/C
+      §C{IConfiguration.GetSection}
+        §A STR:""AppSettings""
+      §/C
+      §C{DbContext.SaveChanges}
+      §/C
+      §C{ILogger.LogInformation}
+        §A STR:""Request complete""
+      §/C
 ";
         var result = TestHarness.CompileWithEffects(source, enforceEffects: true,
             policy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);

@@ -1,12 +1,11 @@
 §M{m001:GuardMatch}
-§F{f001:Classify:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §IF{if1} (&& (== x 0) (== y 0)) → §R 0
-  §EI (== x y) → §R 1
-  §EI (== x (- 0 y)) → §R 2
-  §EL → §R 3
-  §/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Classify:pub} (i32:x, i32:y) -> i32
+    §IF{if1} (&& (== x 0) (== y 0))
+      §R 0
+    §EI (== x y)
+      §R 1
+    §EI (== x (- 0 y))
+      §R 2
+    §EL
+      §R 3
+

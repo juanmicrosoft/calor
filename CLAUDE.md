@@ -71,13 +71,13 @@ All paths relative to `src/Calor.Compiler/`.
 ## Calor Syntax Quick Reference
 
 ```
-§M{id:Name}              Module (close: §/M{id})
-§F{id:name:retType:vis}   Function (close: §/F{id})
+§M{id:Name}              Module (close: §/M)
+§F{id:name:retType:vis}   Function (close: §/F)
 §B{name:type}             Immutable binding
 §B{~name:type}            Mutable binding
-§L{id:var:from:to:step}   For loop (close: §/L{id})
+§L{id:var:from:to:step}   For loop (close: §/L)
 §IF{id} (cond) → §R expr  Inline if-return
-§IF{id} (cond) ... §/I{id} Block if (close: §/I NOT §/IF)
+§IF{id} (cond) ... §/I    Block if (close: §/I NOT §/IF)
 §EI (cond)                 ElseIf
 §EL                        Else
 §C{object.method} §A arg §/C  Method call with argument
@@ -88,7 +88,11 @@ All paths relative to `src/Calor.Compiler/`.
 
 **Typed literals:** `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14`
 
-**Critical:** Closing tags use abbreviated forms — `§/I` (not `§/IF`), `§/M`, `§/F`, `§/L`.
+**Closing tags:**
+- Abbreviated form: `§/I` (not `§/IF`), `§/M`, `§/F`, `§/L`.
+- IDs on closing tags are **optional**. `§/M` and `§/M{m001}` both parse; the parser
+  pairs closers by structural nesting. Drop legacy IDs in bulk with
+  `calor fix --drop-structural-ids <root>`. Legacy closers lint as `Calor0820`.
 
 ## Adding New AST Nodes — Checklist
 

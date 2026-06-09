@@ -7,21 +7,19 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace AreaOfCircle
 {
     public static class AreaOfCircleModule
     {
-        public static double Area(double radius)
+        public static float Area(float radius)
         {
-            if (!((radius > 0.0))) throw new Calor.Runtime.ContractViolationException("Precondition failed: (radius > 0.0)", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 69, length: 17, sourceFile: null, line: 5, column: 3, condition: "(radius > 0.0)");
-            double __result__ = default;
+            if (!(radius > 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: radius > 0", "f001", Calor.Runtime.ContractKind.Requires, startOffset: 68, length: 15, sourceFile: null, line: 3, column: 5, condition: "radius > 0");
+            float __result__ = default;
 
-            __result__ = (3.14159265 * (radius * radius));
+            __result__ = 3.14159265 * (radius * radius);
 
-            if (!((__result__ > 0.0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ > 0.0)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 89, length: 17, sourceFile: null, line: 6, column: 3, condition: "(__result__ > 0.0)");
+            if (!(__result__ > 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ > 0", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 89, length: 15, sourceFile: null, line: 4, column: 5, condition: "__result__ > 0");
             return __result__;
         }
 

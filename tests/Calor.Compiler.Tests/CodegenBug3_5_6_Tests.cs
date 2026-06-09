@@ -21,9 +21,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:static}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Helper:static}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -37,9 +35,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:pub:static}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Helper:pub:static}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
@@ -71,9 +67,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:DataService:pub:partial}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:DataService:pub:partial}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public partial class DataService", result);
@@ -105,9 +99,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:pub:static,partial}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Helper:pub:static,partial}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static partial class Helper", result);
@@ -118,9 +110,7 @@ public class CodegenBug3_5_6_Tests
     {
         var source = @"
 §M{m1:Test}
-§CL{c1:MyClass:partial}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:MyClass:partial}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -133,9 +123,7 @@ public class CodegenBug3_5_6_Tests
         // R1: "st" short form should be recognized as "static"
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:st}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Helper:st}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -148,9 +136,7 @@ public class CodegenBug3_5_6_Tests
         // R1: "st" short form should emit as "static" in C#
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:pub:st}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Helper:pub:st}
 ";
         var result = ParseAndEmit(source);
         Assert.Contains("public static class Helper", result);
@@ -162,9 +148,7 @@ public class CodegenBug3_5_6_Tests
         // R1: "st" combined with other modifiers
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:st,partial}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Helper:st,partial}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -178,9 +162,7 @@ public class CodegenBug3_5_6_Tests
         // An unrecognized modifier like "foo" should not set any known flags
         var source = @"
 §M{m1:Test}
-§CL{c1:Helper:foo}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Helper:foo}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -200,9 +182,7 @@ public class CodegenBug3_5_6_Tests
         // §CL{id:name:BaseClass:modifiers}
         var source = @"
 §M{m1:Test}
-§CL{c1:Child:Parent:sealed}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Child:Parent:sealed}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -216,9 +196,7 @@ public class CodegenBug3_5_6_Tests
         // §CL{id:name:abs} — original 3-positional format
         var source = @"
 §M{m1:Test}
-§CL{c1:Shape:abs}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Shape:abs}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -232,10 +210,8 @@ public class CodegenBug3_5_6_Tests
         // §EXT{Parent} as child tag
         var source = @"
 §M{m1:Test}
-§CL{c1:Child}
-§EXT{Parent}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Child}
+    §EXT{Parent}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -306,9 +282,7 @@ public class CodegenBug3_5_6_Tests
         // §CL{c0:Foo:pub:abs} — pos2 is visibility keyword, should be ignored; pos3 is modifiers
         var source = @"
 §M{m1:Test}
-§CL{c0:Foo:pub:abs}
-§/CL{c0}
-§/M{m1}
+  §CL{c0:Foo:pub:abs}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -322,9 +296,7 @@ public class CodegenBug3_5_6_Tests
         // §CL{c0:Foo:MyBase:sealed} — pos2 is base class, pos3 is modifiers
         var source = @"
 §M{m1:Test}
-§CL{c0:Foo:MyBase:sealed}
-§/CL{c0}
-§/M{m1}
+  §CL{c0:Foo:MyBase:sealed}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -338,9 +310,7 @@ public class CodegenBug3_5_6_Tests
         // §CL{c1:Base:abs seal} — space-separated modifiers in 3-positional format
         var source = @"
 §M{m1:Test}
-§CL{c1:Base:abs seal}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Base:abs seal}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -358,9 +328,7 @@ public class CodegenBug3_5_6_Tests
         // and old files with base classes always used 4 positionals.
         var source = @"
 §M{m1:Test}
-§CL{c1:Foo:partial}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Foo:partial}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -375,9 +343,7 @@ public class CodegenBug3_5_6_Tests
         // §CL{c1:Child:ParentWidget} — "ParentWidget" is not a known modifier → treated as base class
         var source = @"
 §M{m1:Test}
-§CL{c1:Child:ParentWidget}
-§/CL{c1}
-§/M{m1}
+  §CL{c1:Child:ParentWidget}
 ";
         var module = ParseModule(source);
         var cls = Assert.Single(module.Classes);
@@ -395,11 +361,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Greet:pub}
-              §O{str}
-              §B{~result:str} STR:"Hello ${p.Name}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Greet:pub}
+                  §O{str}
+                  §B{~result:str} STR:"Hello ${p.Name}"
             """;
 
         var result = ParseAndEmit(source);
@@ -411,11 +375,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${a.B.C}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${a.B.C}"
             """;
 
         var result = ParseAndEmit(source);
@@ -427,11 +389,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${x?.Y}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${x?.Y}"
             """;
 
         var result = ParseAndEmit(source);
@@ -443,11 +403,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"Hello ${name}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"Hello ${name}"
             """;
 
         var result = ParseAndEmit(source);
@@ -459,11 +417,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${arr[0]}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${arr[0]}"
             """;
 
         var result = ParseAndEmit(source);
@@ -475,11 +431,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${obj.Method()}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${obj.Method()}"
             """;
 
         var result = ParseAndEmit(source);
@@ -491,11 +445,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${list[i].Name}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${list[i].Name}"
             """;
 
         var result = ParseAndEmit(source);
@@ -507,11 +459,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${obj.GetValue(x)}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${obj.GetValue(x)}"
             """;
 
         var result = ParseAndEmit(source);
@@ -523,11 +473,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${a + b}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${a + b}"
             """;
 
         var result = ParseAndEmit(source);
@@ -539,11 +487,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${0}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${0}"
             """;
 
         var result = ParseAndEmit(source);
@@ -557,11 +503,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${a} and ${b[0]}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${a} and ${b[0]}"
             """;
 
         var result = ParseAndEmit(source);
@@ -573,11 +517,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${dict.GetOrAdd(key, () => new V { P = 1 })}"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${dict.GetOrAdd(key, () => new V { P = 1 })}"
             """;
 
         var result = ParseAndEmit(source);
@@ -589,11 +531,9 @@ public class CodegenBug3_5_6_Tests
     {
         var source = """
             §M{m1:Test}
-            §F{f001:Get:pub}
-              §O{str}
-              §B{~result:str} STR:"${incomplete"
-            §/F{f001}
-            §/M{m1}
+              §F{f001:Get:pub}
+                  §O{str}
+                  §B{~result:str} STR:"${incomplete"
             """;
 
         var result = ParseAndEmit(source);
@@ -747,7 +687,7 @@ public class CodegenBug3_5_6_Tests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -762,7 +702,7 @@ public class CodegenBug3_5_6_Tests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();

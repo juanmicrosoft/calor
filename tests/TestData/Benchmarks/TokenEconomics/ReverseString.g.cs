@@ -6,9 +6,6 @@
 #nullable enable
 
 using System;
-using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace StringOps
 {
@@ -16,7 +13,7 @@ namespace StringOps
     {
         public static string Swap(string a, string b)
         {
-            return (b + a);
+            return b + a;
         }
 
         public static string Identity(string s)

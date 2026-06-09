@@ -6,9 +6,5 @@
         §K string { Length: §PREL{gt} 100 } → "long string"
         §K §VAR{n} §WHEN (> n 0) → "positive"
         §K _ → "other"
-      §/W{match003}
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

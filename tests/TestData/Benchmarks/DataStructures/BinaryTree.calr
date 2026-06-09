@@ -1,29 +1,18 @@
 §M{m001:BinaryTree}
-§F{f001:CompareValues:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §IF{if1} (< a b) → §R -1
-  §EI (> a b) → §R 1
-  §EL → §R 0
-  §/I{if1}
-§/F{f001}
-§F{f002:ShouldGoLeft:pub}
-  §I{i32:value}
-  §I{i32:nodeValue}
-  §O{bool}
-  §R (< value nodeValue)
-§/F{f002}
-§F{f003:ShouldGoRight:pub}
-  §I{i32:value}
-  §I{i32:nodeValue}
-  §O{bool}
-  §R (> value nodeValue)
-§/F{f003}
-§F{f004:IsMatch:pub}
-  §I{i32:value}
-  §I{i32:nodeValue}
-  §O{bool}
-  §R (== value nodeValue)
-§/F{f004}
-§/M{m001}
+  §F{f001:CompareValues:pub} (i32:a, i32:b) -> i32
+    §IF{if1} (< a b)
+      §R -1
+    §EI (> a b)
+      §R 1
+    §EL
+      §R 0
+
+  §F{f002:ShouldGoLeft:pub} (i32:value, i32:nodeValue) -> bool
+    §R (< value nodeValue)
+
+  §F{f003:ShouldGoRight:pub} (i32:value, i32:nodeValue) -> bool
+    §R (> value nodeValue)
+
+  §F{f004:IsMatch:pub} (i32:value, i32:nodeValue) -> bool
+    §R (== value nodeValue)
+

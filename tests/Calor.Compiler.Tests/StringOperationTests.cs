@@ -13,7 +13,7 @@ public class StringOperationTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -22,12 +22,10 @@ public class StringOperationTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{string:s}
-              §O{string}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{string:s}
+                  §O{string}
+                  {{body}}
             """;
     }
 
@@ -35,12 +33,10 @@ public class StringOperationTests
     {
         return $$"""
             §M{m001:Test}
-            §F{f001:Main:pub}
-              {{paramStr}}
-              §O{string}
-              {{body}}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  {{paramStr}}
+                  §O{string}
+                  {{body}}
             """;
     }
 
@@ -538,15 +534,12 @@ public class StringOperationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{string:s}
-              §O{string}
-              §IF{if1} (isempty s)
-                §R ""
-              §/I{if1}
-              §R s
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{string:s}
+                  §O{string}
+                  §IF{if1} (isempty s)
+                      §R ""
+                  §R s
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -584,13 +577,11 @@ public class StringOperationTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §I{string:s}
-              §O{string}
-              §B{x} (upper (trim s))
-              §R x
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §I{string:s}
+                  §O{string}
+                  §B{x} (upper (trim s))
+                  §R x
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -648,13 +639,11 @@ public class StringOperationTests
         // Extract domain from email: get part after @
         var source = """
             §M{m001:Test}
-            §F{f001:GetDomain:pub}
-              §I{string:email}
-              §O{string}
-              §B{atIdx} (indexof email "@")
-              §R (substr email (+ atIdx 1))
-            §/F{f001}
-            §/M{m001}
+              §F{f001:GetDomain:pub}
+                  §I{string:email}
+                  §O{string}
+                  §B{atIdx} (indexof email "@")
+                  §R (substr email (+ atIdx 1))
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -673,13 +662,11 @@ public class StringOperationTests
         // Generate slug: lowercase, replace spaces with dashes
         var source = """
             §M{m001:Test}
-            §F{f001:ToSlug:pub}
-              §I{string:title}
-              §O{string}
-              §B{cleaned} (lower (trim title))
-              §R (replace cleaned " " "-")
-            §/F{f001}
-            §/M{m001}
+              §F{f001:ToSlug:pub}
+                  §I{string:title}
+                  §O{string}
+                  §B{cleaned} (lower (trim title))
+                  §R (replace cleaned " " "-")
             """;
         var module = Parse(source, out var diagnostics);
 
@@ -698,13 +685,11 @@ public class StringOperationTests
         // Validate non-empty and starts with prefix
         var source = """
             §M{m001:Test}
-            §F{f001:IsValid:pub}
-              §I{string:value}
-              §I{string:prefix}
-              §O{bool}
-              §R (&& (! (isempty value)) (starts value prefix))
-            §/F{f001}
-            §/M{m001}
+              §F{f001:IsValid:pub}
+                  §I{string:value}
+                  §I{string:prefix}
+                  §O{bool}
+                  §R (&& (! (isempty value)) (starts value prefix))
             """;
         var module = Parse(source, out var diagnostics);
 

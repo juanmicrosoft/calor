@@ -1,0 +1,15 @@
+§M{m001:GridOps}
+  §F{f001:SumGrid:pub} (i32:size) -> i32
+    §B{~total} 0
+    §L{l1:x:0:size:1}
+      §B{plane} §C{SumPlane} §A x §A size §/C
+      §B{~total} (+ total plane)
+    §R total
+
+  §F{f002:SumPlane:pub} (i32:x, i32:size) -> i32
+    §B{~sum} 0
+    §L{l2:y:0:size:1}
+      §L{l3:z:0:size:1}
+        §B{~sum} (+ sum (+ x (+ y z)))
+    §R sum
+

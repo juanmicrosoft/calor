@@ -1,0 +1,5 @@
+§M{m002:Services}
+  §F{f002:PrepareDashboard:pub} (i32:userId) -> str
+    §B{settings} §C{LoadUserSettings} §A userId §/C
+    §R settings
+

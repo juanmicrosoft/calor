@@ -142,17 +142,15 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:AsyncTests}
-              §AF{f001:FetchDataAsync:pub}
-                §I{str:url}
-                §O{str}
-                §R "data"
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:FetchDataAsync:pub}
+                    §I{str:url}
+                    §O{str}
+                    §R "data"
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -166,17 +164,15 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:SyncTests}
-              §F{f001:GetData:pub}
-                §I{str:url}
-                §O{str}
-                §R "data"
-              §/F{f001}
-            §/M{m001}
+                §F{f001:GetData:pub}
+                    §I{str:url}
+                    §O{str}
+                    §R "data"
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -193,19 +189,17 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:AsyncMethodTests}
-              §CL{c001:Service:pub}
-                §AMT{mt001:ProcessAsync:pub}
-                  §I{i32:id}
-                  §O{str}
-                  §R "done"
-                §/AMT{mt001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Service:pub}
+                    §AMT{mt001:ProcessAsync:pub}
+                      §I{i32:id}
+                      §O{str}
+                      §R "done"
+                    §/AMT{mt001}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -220,19 +214,16 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:SyncMethodTests}
-              §CL{c001:Service:pub}
-                §MT{mt001:Process:pub}
-                  §I{i32:id}
-                  §O{str}
-                  §R "done"
-                §/MT{mt001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Service:pub}
+                    §MT{mt001:Process:pub}
+                        §I{i32:id}
+                        §O{str}
+                        §R "done"
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -250,16 +241,14 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:AsyncEmitTests}
-              §AF{f001:GetDataAsync:pub}
-                §O{str}
-                §R "data"
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:GetDataAsync:pub}
+                    §O{str}
+                    §R "data"
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -275,18 +264,16 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:AsyncMethodEmitTests}
-              §CL{c001:Service:pub}
-                §AMT{mt001:ProcessAsync:pub}
-                  §O{i32}
-                  §R 42
-                §/AMT{mt001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Service:pub}
+                    §AMT{mt001:ProcessAsync:pub}
+                      §O{i32}
+                      §R 42
+                    §/AMT{mt001}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -300,15 +287,13 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:AsyncVoidTests}
-              §AF{f001:DoWorkAsync:pub}
-                §R
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:DoWorkAsync:pub}
+                    §R
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -324,16 +309,14 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:SyncEmitTests}
-              §F{f001:GetData:pub}
-                §O{str}
-                §R "data"
-              §/F{f001}
-            §/M{m001}
+                §F{f001:GetData:pub}
+                    §O{str}
+                    §R "data"
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -367,7 +350,7 @@ public class AsyncAwaitTests
         var calor = emitter.Emit(result.Ast!);
 
         Assert.Contains("§AMT{", calor);
-        Assert.Contains("§/AMT{", calor);
+        Assert.DoesNotContain("§/AMT{", calor);
     }
 
     [Fact]
@@ -390,7 +373,7 @@ public class AsyncAwaitTests
         var calor = emitter.Emit(result.Ast!);
 
         Assert.Contains("§MT{", calor);
-        Assert.Contains("§/MT{", calor);
+        Assert.DoesNotContain("§/MT{", calor);
         Assert.DoesNotContain("§AMT{", calor);
     }
 
@@ -404,18 +387,16 @@ public class AsyncAwaitTests
         // If someone explicitly declares Task<T> as output, we shouldn't wrap it again
         var calorSource = """
             §M{m001:NoDoubleWrap}
-              §CL{c001:Service:pub}
-                §AMT{mt001:GetTaskAsync:pub}
-                  §O{Task<i32>}
-                  §R 42
-                §/AMT{mt001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Service:pub}
+                    §AMT{mt001:GetTaskAsync:pub}
+                      §O{Task<i32>}
+                      §R 42
+                    §/AMT{mt001}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -431,22 +412,19 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:MixedMethods}
-              §CL{c001:Service:pub}
-                §MT{mt001:GetSync:pub}
-                  §O{str}
-                  §R "sync"
-                §/MT{mt001}
-                §AMT{mt002:GetAsync:pub}
-                  §O{str}
-                  §R "async"
-                §/AMT{mt002}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Service:pub}
+                    §MT{mt001:GetSync:pub}
+                        §O{str}
+                        §R "sync"
+                    §AMT{mt002:GetAsync:pub}
+                      §O{str}
+                      §R "async"
+                    §/AMT{mt002}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var classNode = Assert.Single(ast.Classes);
@@ -470,18 +448,16 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:ModifierTests}
-              §CL{c001:Service:pub}
-                §AMT{mt001:ProcessAsync:pub:virt}
-                  §O{str}
-                  §R "done"
-                §/AMT{mt001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Service:pub}
+                    §AMT{mt001:ProcessAsync:pub:virt}
+                      §O{str}
+                      §R "done"
+                    §/AMT{mt001}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -537,7 +513,7 @@ public class AsyncAwaitTests
         var source = "§AF{f001:Test:pub}";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Contains(tokens, t => t.Kind == TokenKind.AsyncFunc);
     }
@@ -548,7 +524,7 @@ public class AsyncAwaitTests
         var source = "§/AF{f001}";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Contains(tokens, t => t.Kind == TokenKind.EndAsyncFunc);
     }
@@ -559,7 +535,7 @@ public class AsyncAwaitTests
         var source = "§AMT{m001:Test:pub}";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Contains(tokens, t => t.Kind == TokenKind.AsyncMethod);
     }
@@ -570,7 +546,7 @@ public class AsyncAwaitTests
         var source = "§/AMT{m001}";
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         Assert.Contains(tokens, t => t.Kind == TokenKind.EndAsyncMethod);
     }
@@ -585,17 +561,15 @@ public class AsyncAwaitTests
         // Test using §B (Bind) statement with await expression
         var calorSource = """
             §M{m001:ConfigureAwaitTests}
-              §AF{f001:FetchAsync:pub}
-                §O{str}
-                §B{str:result} §AWAIT{false} §C{client.GetStringAsync} §A "url" §/C
-                §R result
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:FetchAsync:pub}
+                    §O{str}
+                    §B{str:result} §AWAIT{false} §C{client.GetStringAsync} §A "url" §/C
+                    §R result
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -615,17 +589,15 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:ConfigureAwaitTests}
-              §AF{f001:FetchAsync:pub}
-                §O{str}
-                §B{str:result} §AWAIT{true} §C{client.GetStringAsync} §A "url" §/C
-                §R result
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:FetchAsync:pub}
+                    §O{str}
+                    §B{str:result} §AWAIT{true} §C{client.GetStringAsync} §A "url" §/C
+                    §R result
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -643,17 +615,15 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:ConfigureAwaitEmit}
-              §AF{f001:FetchAsync:pub}
-                §O{str}
-                §B{str:result} §AWAIT{false} §C{client.GetStringAsync} §A "url" §/C
-                §R result
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:FetchAsync:pub}
+                    §O{str}
+                    §B{str:result} §AWAIT{false} §C{client.GetStringAsync} §A "url" §/C
+                    §R result
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -667,17 +637,15 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:NoConfigureAwait}
-              §AF{f001:FetchAsync:pub}
-                §O{str}
-                §B{str:result} §AWAIT §C{client.GetStringAsync} §A "url" §/C
-                §R result
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:FetchAsync:pub}
+                    §O{str}
+                    §B{str:result} §AWAIT §C{client.GetStringAsync} §A "url" §/C
+                    §R result
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -841,18 +809,16 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:NestedGenericTests}
-              §CL{c001:Service:pub}
-                §AMT{mt001:GetListAsync:pub}
-                  §O{List<i32>}
-                  §R §C{new List<int>}§/C
-                §/AMT{mt001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Service:pub}
+                    §AMT{mt001:GetListAsync:pub}
+                      §O{List<i32>}
+                      §R §C{new List<int>}§/C
+                    §/AMT{mt001}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -900,18 +866,16 @@ public class AsyncAwaitTests
         // Correct syntax: §Q{"message"} (s-expression)
         var calorSource = """
             §M{m001:ContractTests}
-              §AF{f001:GetUserAsync:pub}
-                §I{i32:userId}
-                §O{str}
-                §Q{"userId must be positive"} (> userId 0)
-                §R "user"
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:GetUserAsync:pub}
+                    §I{i32:userId}
+                    §O{str}
+                    §Q{"userId must be positive"} (> userId 0)
+                    §R "user"
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -925,18 +889,16 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:ContractTests}
-              §AF{f001:ComputeAsync:pub}
-                §I{i32:x}
-                §O{i32}
-                §S{"result is non-negative"} (>= result 0)
-                §R 42
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:ComputeAsync:pub}
+                    §I{i32:x}
+                    §O{i32}
+                    §S{"result is non-negative"} (>= result 0)
+                    §R 42
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -950,18 +912,16 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:ContractEmitTests}
-              §AF{f001:ValidateAsync:pub}
-                §I{i32:value}
-                §O{bool}
-                §Q{"value must be non-negative"} (>= value 0)
-                §R true
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:ValidateAsync:pub}
+                    §I{i32:value}
+                    §O{bool}
+                    §Q{"value must be non-negative"} (>= value 0)
+                    §R true
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -978,20 +938,18 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:MethodContractTests}
-              §CL{c001:Service:pub}
-                §AMT{mt001:ProcessAsync:pub}
-                  §I{str:input}
-                  §O{str}
-                  §Q{"input must not be null"} (!= input null)
-                  §R "processed"
-                §/AMT{mt001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Service:pub}
+                    §AMT{mt001:ProcessAsync:pub}
+                      §I{str:input}
+                      §O{str}
+                      §Q{"input must not be null"} (!= input null)
+                      §R "processed"
+                    §/AMT{mt001}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -1011,17 +969,15 @@ public class AsyncAwaitTests
         // Correct syntax: type params come after the brace
         var calorSource = """
             §M{m001:GenericAsyncTests}
-              §AF{f001:GetAsync:pub}<T>
-                §I{T:item}
-                §O{T}
-                §R item
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:GetAsync:pub}<T>
+                    §I{T:item}
+                    §O{T}
+                    §R item
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -1036,17 +992,15 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:GenericAsyncEmitTests}
-              §AF{f001:GetAsync:pub}<T>
-                §I{T:item}
-                §O{T}
-                §R item
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:GetAsync:pub}<T>
+                    §I{T:item}
+                    §O{T}
+                    §R item
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -1090,19 +1044,17 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:StaticAsyncTests}
-              §CL{c001:Helper:pub}
-                §AMT{mt001:ComputeAsync:pub:stat}
-                  §I{i32:x}
-                  §O{i32}
-                  §R 42
-                §/AMT{mt001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Helper:pub}
+                    §AMT{mt001:ComputeAsync:pub:stat}
+                      §I{i32:x}
+                      §O{i32}
+                      §R 42
+                    §/AMT{mt001}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -1117,19 +1069,17 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:StaticAsyncEmitTests}
-              §CL{c001:Helper:pub}
-                §AMT{mt001:ComputeAsync:pub:stat}
-                  §I{i32:x}
-                  §O{i32}
-                  §R 42
-                §/AMT{mt001}
-              §/CL{c001}
-            §/M{m001}
+                §CL{c001:Helper:pub}
+                    §AMT{mt001:ComputeAsync:pub:stat}
+                      §I{i32:x}
+                      §O{i32}
+                      §R 42
+                    §/AMT{mt001}
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();
@@ -1171,18 +1121,16 @@ public class AsyncAwaitTests
         // Use §B (Bind) for variable declarations
         var calorSource = """
             §M{m001:MultipleAwaitsTests}
-              §AF{f001:ChainAsync:pub}
-                §O{str}
-                §B{str:first} §AWAIT §C{GetFirstAsync}§/C
-                §B{str:second} §AWAIT §C{GetSecondAsync}§/C
-                §R second
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:ChainAsync:pub}
+                    §O{str}
+                    §B{str:first} §AWAIT §C{GetFirstAsync}§/C
+                    §B{str:second} §AWAIT §C{GetSecondAsync}§/C
+                    §R second
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         Assert.Empty(diagnostics.Errors);
@@ -1196,18 +1144,16 @@ public class AsyncAwaitTests
     {
         var calorSource = """
             §M{m001:MultipleAwaitsEmit}
-              §AF{f001:ChainAsync:pub}
-                §O{str}
-                §B{str:first} §AWAIT §C{GetFirstAsync}§/C
-                §B{str:second} §AWAIT{false} §C{GetSecondAsync}§/C
-                §R second
-              §/AF{f001}
-            §/M{m001}
+                §AF{f001:ChainAsync:pub}
+                    §O{str}
+                    §B{str:first} §AWAIT §C{GetFirstAsync}§/C
+                    §B{str:second} §AWAIT{false} §C{GetSecondAsync}§/C
+                    §R second
             """;
 
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagnostics);
-        var parser = new Parser(lexer.TokenizeAll(), diagnostics);
+        var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
         var ast = parser.Parse();
 
         var emitter = new CSharpEmitter();

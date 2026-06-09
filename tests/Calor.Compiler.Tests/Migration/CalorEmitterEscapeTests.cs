@@ -164,12 +164,9 @@ public class Test
     {
         var validCalor = @"
 §M{m1:Test}
-  §CL{c1:Test}
-    §MT{mt1:M:pub}
-      §O{void}
-    §/MT{mt1}
-  §/CL{c1}
-§/M{m1}
+    §CL{c1:Test}
+        §MT{mt1:M:pub}
+            §O{void}
 ";
         var errors = ConvertCommand.ValidateCalorSource(validCalor);
         Assert.Empty(errors);
@@ -178,8 +175,8 @@ public class Test
     [Fact]
     public void ValidateCalorSource_InvalidSource_ReturnsErrors()
     {
-        // Malformed Calor with unmatched tags
-        var invalidCalor = "§M{m1:Test}\n§CL{c1:Test}\n§/M{m1}";
+        // Malformed Calor: unexpected token
+        var invalidCalor = "§M{m1:Test}\n§INVALID_TOKEN{c1:Test}\n";
         var errors = ConvertCommand.ValidateCalorSource(invalidCalor);
         Assert.NotEmpty(errors);
     }

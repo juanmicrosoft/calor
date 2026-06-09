@@ -1,14 +1,7 @@
 §M{m1:Test}
-§F{f001:Add:pub}
-§I{i32:a}
-§I{i32:b}
-§O{i32}
-§R (+ a b)
-§/F{f001}
-§F{f002:Multiply:pub}
-§I{i32:x}
-§I{i32:y}
-§O{i32}
-§R (* x y)
-§/F{f002}
-§/M{m1}
+  §F{f001:Add:pub} (i32:a, i32:b) -> i32
+    §R (+ a b)
+
+  §F{f002:Multiply:pub} (i32:x, i32:y) -> i32
+    §R (* x y)
+

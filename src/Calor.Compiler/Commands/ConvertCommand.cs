@@ -48,6 +48,10 @@ public static class ConvertCommand
             description: "Timeout in seconds for the conversion (0 = no timeout)",
             getDefaultValue: () => 0);
 
+        var explicitCallClosersOption = new Option<bool>(
+            aliases: new[] { "--explicit-call-closers" },
+            description: "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision");
+
         var command = new Command("convert", "Convert a single file between C# and Calor")
         {
             inputArgument,
@@ -57,15 +61,28 @@ public static class ConvertCommand
             explainOption,
             noFallbackOption,
             validateOption,
-            timeoutOption
+            timeoutOption,
+            explicitCallClosersOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, outputOption, benchmarkOption, verboseOption, explainOption, noFallbackOption, validateOption, timeoutOption);
+        command.SetHandler(async ctx =>
+        {
+            var input = ctx.ParseResult.GetValueForArgument(inputArgument);
+            var output = ctx.ParseResult.GetValueForOption(outputOption);
+            var benchmark = ctx.ParseResult.GetValueForOption(benchmarkOption);
+            var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
+            var explain = ctx.ParseResult.GetValueForOption(explainOption);
+            var noFallback = ctx.ParseResult.GetValueForOption(noFallbackOption);
+            var validate = ctx.ParseResult.GetValueForOption(validateOption);
+            var timeoutSeconds = ctx.ParseResult.GetValueForOption(timeoutOption);
+            var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
+            await ExecuteAsync(input, output, benchmark, verbose, explain, noFallback, validate, timeoutSeconds, explicitCallClosers);
+        });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, int timeoutSeconds)
+    private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, int timeoutSeconds, bool explicitCallClosers)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -104,7 +121,7 @@ public static class ConvertCommand
             ConversionResult? conversionResult = null;
             if (direction == ConversionDirection.CSharpToCalor)
             {
-                conversionResult = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, timeoutSeconds);
+                conversionResult = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, timeoutSeconds, explicitCallClosers);
             }
             else
             {
@@ -166,14 +183,15 @@ public static class ConvertCommand
         }
     }
 
-    private static async Task<ConversionResult?> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, int timeoutSeconds)
+    private static async Task<ConversionResult?> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, int timeoutSeconds, bool explicitCallClosers)
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
             Verbose = verbose,
             IncludeBenchmark = benchmark,
             Explain = explain,
-            GracefulFallback = !noFallback
+            GracefulFallback = !noFallback,
+            UseImplicitCallCloser = !explicitCallClosers
         });
 
         ConversionResult result;
@@ -307,7 +325,7 @@ public static class ConvertCommand
     {
         var diagBag = new DiagnosticBag();
         var lexer = new Lexer(calorSource, diagBag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagBag);
         parser.Parse();
         return diagBag.Where(d => d.IsError).ToList();

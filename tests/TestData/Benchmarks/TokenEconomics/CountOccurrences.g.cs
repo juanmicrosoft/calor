@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace CountOccurrences
 {
@@ -20,8 +18,8 @@ namespace CountOccurrences
 
             __result__ = matchCount;
 
-            if (!((__result__ >= 0))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ >= 0)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 106, length: 16, sourceFile: null, line: 6, column: 3, condition: "(__result__ >= 0)");
-            if (!((__result__ <= length))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ <= length)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 125, length: 21, sourceFile: null, line: 7, column: 3, condition: "(__result__ <= length)");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 100, length: 16, sourceFile: null, line: 3, column: 5, condition: "__result__ >= 0");
+            if (!(__result__ <= length)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ <= length", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 122, length: 21, sourceFile: null, line: 4, column: 5, condition: "__result__ <= length");
             return __result__;
         }
 
@@ -29,7 +27,7 @@ namespace CountOccurrences
         {
             if (matches)
             {
-                return (count + 1);
+                return count + 1;
             }
             else
             {

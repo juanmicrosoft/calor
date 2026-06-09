@@ -6,9 +6,5 @@
         §K §PREL{gte} 80 → "B"
         §K §PREL{gte} 70 → "C"
         §K _ → "F"
-      §/W{match003}
-    §/MT{m002}
 
-  §/CL{c001}
 
-§/M{m001}

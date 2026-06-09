@@ -1,39 +1,27 @@
 §M{m001:ShoppingCart}
-§F{f001:ItemTotal:pub}
-  §I{f64:price}
-  §I{i32:quantity}
-  §O{f64}
-  §Q (> price 0.0)
-  §Q (> quantity 0)
-  §S (>= result 0.0)
-  §R (* price quantity)
-§/F{f001}
-§F{f002:CartSubtotal:pub}
-  §I{f64:itemTotal1}
-  §I{f64:itemTotal2}
-  §O{f64}
-  §Q (>= itemTotal1 0.0)
-  §Q (>= itemTotal2 0.0)
-  §S (>= result 0.0)
-  §R (+ itemTotal1 itemTotal2)
-§/F{f002}
-§F{f003:TotalWithTax:pub}
-  §I{f64:subtotal}
-  §I{f64:taxRate}
-  §O{f64}
-  §Q (>= subtotal 0.0)
-  §Q (>= taxRate 0.0)
-  §Q (<= taxRate 1.0)
-  §S (>= result subtotal)
-  §R (+ subtotal (* subtotal taxRate))
-§/F{f003}
-§F{f004:NewQuantity:pub}
-  §I{i32:oldQuantity}
-  §I{i32:change}
-  §O{i32}
-  §B{result} (+ oldQuantity change)
-  §IF{if1} (< result 0) → §R 0
-  §EL → §R result
-  §/I{if1}
-§/F{f004}
-§/M{m001}
+  §F{f001:ItemTotal:pub} (f32:price, i32:quantity) -> f32
+    §Q (> price 0)
+    §Q (> quantity 0)
+    §S (>= result 0)
+    §R (* price quantity)
+
+  §F{f002:CartSubtotal:pub} (f32:itemTotal1, f32:itemTotal2) -> f32
+    §Q (>= itemTotal1 0)
+    §Q (>= itemTotal2 0)
+    §S (>= result 0)
+    §R (+ itemTotal1 itemTotal2)
+
+  §F{f003:TotalWithTax:pub} (f32:subtotal, f32:taxRate) -> f32
+    §Q (>= subtotal 0)
+    §Q (>= taxRate 0)
+    §Q (<= taxRate 1)
+    §S (>= result subtotal)
+    §R (+ subtotal (* subtotal taxRate))
+
+  §F{f004:NewQuantity:pub} (i32:oldQuantity, i32:change) -> i32
+    §B{result} (+ oldQuantity change)
+    §IF{if1} (< result 0)
+      §R 0
+    §EL
+      §R result
+

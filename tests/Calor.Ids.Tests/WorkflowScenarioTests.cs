@@ -32,19 +32,15 @@ public class WorkflowScenarioTests : IDisposable
         // Original file
         var originalSource = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:Module}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:OldName:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:OldName:pub}
+                  §O{void}
             """;
 
         // After rename
         var renamedSource = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:Module}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:NewName:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:NewName:pub}
+                  §O{void}
             """;
 
         var originalEntries = ScanSource(originalSource, "test.calr");
@@ -64,31 +60,24 @@ public class WorkflowScenarioTests : IDisposable
         // Original file with inline code
         var originalSource = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:Module}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Calculate:pub}
-              §I{i32:x}
-              §O{i32}
-              §R (* x x)
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Calculate:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §R (* x x)
             """;
 
         // After extracting helper (agent omits ID, calor ids assign fills it)
         var extractedSource = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:Module}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Calculate:pub}
-              §I{i32:x}
-              §O{i32}
-              §B{result} §C{Square}
-                §A x
-              §/C
-              §R result
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ9912:Square:pri}
-              §I{i32:n}
-              §O{i32}
-              §R (* n n)
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ9912}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Calculate:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §B{result} §C{Square} §A x §/C
+                  §R result
+              §F{f_01J5X7K9M2NPQRSTABWXYZ9912:Square:pri}
+                  §I{i32:n}
+                  §O{i32}
+                  §R (* n n)
             """;
 
         var originalEntries = ScanSource(originalSource, "test.calr");
@@ -109,13 +98,10 @@ public class WorkflowScenarioTests : IDisposable
     {
         var source = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:Module}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func1:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func2:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func1:pub}
+                  §O{void}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func2:pub}
+                  §O{void}
             """;
 
         var entries = ScanSource(source, "/src/test.calr");
@@ -138,13 +124,10 @@ public class WorkflowScenarioTests : IDisposable
     {
         var content = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:Module}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func1:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func2:pub}
-              §O{void}
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func1:pub}
+                  §O{void}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func2:pub}
+                  §O{void}
             """;
 
         // Start with empty existingIds - duplicates are detected within the file
@@ -167,15 +150,14 @@ public class WorkflowScenarioTests : IDisposable
         // Each branch has its own base module but creates new functions independently
         _ = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:Module}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
             """;
 
         // Each branch assigns a new function ID
         var existingIds1 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var existingIds2 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var (_, assignments1) = IdAssigner.AssignIds("§F{:Func1:pub}\n§O{void}\n§/F{}", "test.calr", false, existingIds1);
-        var (_, assignments2) = IdAssigner.AssignIds("§F{:Func2:pub}\n§O{void}\n§/F{}", "test.calr", false, existingIds2);
+        var (_, assignments1) = IdAssigner.AssignIds("§F{:Func1:pub}\n§O{void}\n", "test.calr", false, existingIds1);
+        var (_, assignments2) = IdAssigner.AssignIds("§F{:Func2:pub}\n§O{void}\n", "test.calr", false, existingIds2);
 
         // Both should get unique IDs (ULID collision probability is ~10^-24)
         Assert.NotEqual(assignments1[0].NewId, assignments2[0].NewId);
@@ -187,12 +169,10 @@ public class WorkflowScenarioTests : IDisposable
         // Original source with IDs
         var originalSource = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:Module}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Calculate:pub}
-              §I{i32:x}
-              §O{i32}
-              §R (* x 2)
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Calculate:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §R (* x 2)
             """;
 
         var entries1 = ScanSource(originalSource, "test.calr");
@@ -214,12 +194,10 @@ public class WorkflowScenarioTests : IDisposable
         // Source with unusual formatting
         var messySource = """
             §M{m_01J5X7K9M2NPQRSTABWXYZ1234:Module}
-            §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func:pub}
-            §I{i32:x}
-            §O{i32}
-            §R x
-            §/F{f_01J5X7K9M2NPQRSTABWXYZ1234}
-            §/M{m_01J5X7K9M2NPQRSTABWXYZ1234}
+              §F{f_01J5X7K9M2NPQRSTABWXYZ1234:Func:pub}
+                §I{i32:x}
+                §O{i32}
+                §R x
             """;
 
         // Scan both versions
@@ -234,7 +212,7 @@ public class WorkflowScenarioTests : IDisposable
     {
         var diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 

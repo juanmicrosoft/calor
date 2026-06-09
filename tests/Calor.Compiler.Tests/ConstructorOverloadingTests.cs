@@ -24,24 +24,22 @@ public class ConstructorOverloadingTests
     {
         var source = """
             §M{m001:MultiCtor}
-            §CL{c001:Person:pub}
-              §FLD{fld1:name:str:priv}
-              §FLD{fld2:age:i32:priv}
+              §CL{c001:Person:pub}
+                  §FLD{fld1:name:str:priv}
+                  §FLD{fld2:age:i32:priv}
 
-              §CTOR{ctor001:pub}
-                §I{str:name}
-                §I{i32:age}
-                §ASSIGN name name
-                §ASSIGN age age
-              §/CTOR{ctor001}
+                  §CTOR{ctor001:pub}
+                    §I{str:name}
+                    §I{i32:age}
+                    §ASSIGN name name
+                    §ASSIGN age age
+                  §/CTOR{ctor001}
 
-              §CTOR{ctor002:pub}
-                §I{str:name}
-                §ASSIGN name name
-                §ASSIGN age 0
-              §/CTOR{ctor002}
-            §/CL{c001}
-            §/M{m001}
+                  §CTOR{ctor002:pub}
+                    §I{str:name}
+                    §ASSIGN name name
+                    §ASSIGN age 0
+                  §/CTOR{ctor002}
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -62,29 +60,27 @@ public class ConstructorOverloadingTests
     {
         var source = """
             §M{m001:TripleCtor}
-            §CL{c001:Config:pub}
-              §FLD{fld1:host:str:priv}
-              §FLD{fld2:port:i32:priv}
+              §CL{c001:Config:pub}
+                  §FLD{fld1:host:str:priv}
+                  §FLD{fld2:port:i32:priv}
 
-              §CTOR{ctor001:pub}
-                §I{str:host}
-                §I{i32:port}
-                §ASSIGN host host
-                §ASSIGN port port
-              §/CTOR{ctor001}
+                  §CTOR{ctor001:pub}
+                    §I{str:host}
+                    §I{i32:port}
+                    §ASSIGN host host
+                    §ASSIGN port port
+                  §/CTOR{ctor001}
 
-              §CTOR{ctor002:pub}
-                §I{str:host}
-                §ASSIGN host host
-                §ASSIGN port 8080
-              §/CTOR{ctor002}
+                  §CTOR{ctor002:pub}
+                    §I{str:host}
+                    §ASSIGN host host
+                    §ASSIGN port 8080
+                  §/CTOR{ctor002}
 
-              §CTOR{ctor003:pub}
-                §ASSIGN host "localhost"
-                §ASSIGN port 8080
-              §/CTOR{ctor003}
-            §/CL{c001}
-            §/M{m001}
+                  §CTOR{ctor003:pub}
+                    §ASSIGN host "localhost"
+                    §ASSIGN port 8080
+                  §/CTOR{ctor003}
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -105,25 +101,23 @@ public class ConstructorOverloadingTests
     {
         var source = """
             §M{m001:BaseCall}
-            §CL{c001:AppException:pub}
-              §EXT{Exception}
+              §CL{c001:AppException:pub}
+                  §EXT{Exception}
 
-              §CTOR{ctor001:pub}
-                §I{str:message}
-                §I{i32:code}
-                §BASE
-                  §A message
-                §/BASE
-              §/CTOR{ctor001}
+                  §CTOR{ctor001:pub}
+                    §I{str:message}
+                    §I{i32:code}
+                    §BASE
+                      §A message
+                    §/BASE
+                  §/CTOR{ctor001}
 
-              §CTOR{ctor002:pub}
-                §I{str:message}
-                §BASE
-                  §A message
-                §/BASE
-              §/CTOR{ctor002}
-            §/CL{c001}
-            §/M{m001}
+                  §CTOR{ctor002:pub}
+                    §I{str:message}
+                    §BASE
+                      §A message
+                    §/BASE
+                  §/CTOR{ctor002}
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -144,26 +138,24 @@ public class ConstructorOverloadingTests
     {
         var source = """
             §M{m001:ThisChain}
-            §CL{c001:Point:pub}
-              §FLD{fld1:x:i32:priv}
-              §FLD{fld2:y:i32:priv}
+              §CL{c001:Point:pub}
+                  §FLD{fld1:x:i32:priv}
+                  §FLD{fld2:y:i32:priv}
 
-              §CTOR{ctor001:pub}
-                §I{i32:x}
-                §I{i32:y}
-                §ASSIGN x x
-                §ASSIGN y y
-              §/CTOR{ctor001}
+                  §CTOR{ctor001:pub}
+                    §I{i32:x}
+                    §I{i32:y}
+                    §ASSIGN x x
+                    §ASSIGN y y
+                  §/CTOR{ctor001}
 
-              §CTOR{ctor002:pub}
-                §I{i32:val}
-                §THIS
-                  §A val
-                  §A val
-                §/THIS
-              §/CTOR{ctor002}
-            §/CL{c001}
-            §/M{m001}
+                  §CTOR{ctor002:pub}
+                    §I{i32:val}
+                    §THIS
+                      §A val
+                      §A val
+                    §/THIS
+                  §/CTOR{ctor002}
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -183,20 +175,18 @@ public class ConstructorOverloadingTests
     {
         var source = """
             §M{m001:PrecondCtor}
-            §CL{c001:PositiveValue:pub}
-              §FLD{fld1:value:i32:priv}
+              §CL{c001:PositiveValue:pub}
+                  §FLD{fld1:value:i32:priv}
 
-              §CTOR{ctor001:pub}
-                §I{i32:value}
-                §Q (> value 0)
-                §ASSIGN value value
-              §/CTOR{ctor001}
+                  §CTOR{ctor001:pub}
+                    §I{i32:value}
+                    §Q (> value 0)
+                    §ASSIGN value value
+                  §/CTOR{ctor001}
 
-              §CTOR{ctor002:pub}
-                §ASSIGN value 1
-              §/CTOR{ctor002}
-            §/CL{c001}
-            §/M{m001}
+                  §CTOR{ctor002:pub}
+                    §ASSIGN value 1
+                  §/CTOR{ctor002}
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -219,15 +209,13 @@ public class ConstructorOverloadingTests
     {
         var source = """
             §M{m001:MixedVis}
-            §CL{c001:Singleton:pub}
-              §CTOR{ctor001:priv}
-              §/CTOR{ctor001}
+              §CL{c001:Singleton:pub}
+                  §CTOR{ctor001:priv}
+                  §/CTOR{ctor001}
 
-              §CTOR{ctor002:int}
-                §I{i32:seed}
-              §/CTOR{ctor002}
-            §/CL{c001}
-            §/M{m001}
+                  §CTOR{ctor002:int}
+                    §I{i32:seed}
+                  §/CTOR{ctor002}
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
@@ -532,7 +520,7 @@ public class ConstructorOverloadingTests
 
         // Should have two §/CTOR blocks
         var endCtorCount = calrText.Split("§/CTOR{").Length - 1;
-        Assert.Equal(2, endCtorCount);
+        Assert.Equal(0, endCtorCount);
     }
 
     #endregion
@@ -544,20 +532,18 @@ public class ConstructorOverloadingTests
     {
         var source = """
             §M{m001:IdTest}
-            §CL{c001:Widget:pub}
-              §CTOR{ctor001:pub}
-                §I{str:name}
-              §/CTOR{ctor001}
+              §CL{c001:Widget:pub}
+                  §CTOR{ctor001:pub}
+                    §I{str:name}
+                  §/CTOR{ctor001}
 
-              §CTOR{ctor002:pub}
-                §I{str:name}
-                §I{i32:size}
-              §/CTOR{ctor002}
+                  §CTOR{ctor002:pub}
+                    §I{str:name}
+                    §I{i32:size}
+                  §/CTOR{ctor002}
 
-              §CTOR{ctor003:priv}
-              §/CTOR{ctor003}
-            §/CL{c001}
-            §/M{m001}
+                  §CTOR{ctor003:priv}
+                  §/CTOR{ctor003}
             """;
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions

@@ -264,7 +264,8 @@ public sealed class ProjectMigrator
         var conversionOptions = new ConversionOptions
         {
             IncludeBenchmark = _options.IncludeBenchmark,
-            PassthroughOnError = _options.PassthroughOnError
+            PassthroughOnError = _options.PassthroughOnError,
+            UseImplicitCallCloser = _options.UseImplicitCallCloser
         };
 
         if (!string.IsNullOrEmpty(_options.ModuleNameOverride))

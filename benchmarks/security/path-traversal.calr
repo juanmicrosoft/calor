@@ -3,73 +3,66 @@
 
 §M{m001:PathTraversalBenchmark}
 
-§F{f001:VulnerableFileRead:pub}
-  §DOC{BUG: Direct file read with user-provided path}
-  §DOC{EXPECTED: Calor0983 Path Traversal}
-  §I{string:user_path}
-  §O{string}
-  §E{fs:r}
-  §B{content:string} (CALL file.read user_path)
-  §R content
-§/F{f001}
+  §F{f001:VulnerableFileRead:pub}
+    §DOC{BUG: Direct file read with user-provided path}
+    §DOC{EXPECTED: Calor0983 Path Traversal}
+    §I{string:user_path}
+    §O{string}
+    §E{fs:r}
+    §B{content:string} (CALL file.read user_path)
+    §R content
 
-§F{f002:SafeWhitelistedPath:pub}
-  §DOC{SAFE: Only whitelisted paths allowed}
-  §DOC{EXPECTED: No warnings}
-  §I{string:filename}
-  §O{string}
-  §E{fs:r}
-  §B{basePath:string} STR:"/app/public/"
-  §B{safeName:string} (CALL path.basename filename)
-  §B{fullPath:string} (+ basePath safeName)
-  §B{content:string} (CALL file.read fullPath)
-  §R content
-§/F{f002}
+  §F{f002:SafeWhitelistedPath:pub}
+    §DOC{SAFE: Only whitelisted paths allowed}
+    §DOC{EXPECTED: No warnings}
+    §I{string:filename}
+    §O{string}
+    §E{fs:r}
+    §B{basePath:string} STR:"/app/public/"
+    §B{safeName:string} (CALL path.basename filename)
+    §B{fullPath:string} (+ basePath safeName)
+    §B{content:string} (CALL file.read fullPath)
+    §R content
 
-§F{f003:VulnerablePathJoin:pub}
-  §DOC{BUG: User input used in path.join}
-  §DOC{EXPECTED: Calor0983 Path Traversal}
-  §I{string:request_path}
-  §O{string}
-  §E{fs:r}
-  §B{base:string} STR:"/var/data"
-  §B{fullPath:string} (CALL path.join base request_path)
-  §B{content:string} (CALL fs.read fullPath)
-  §R content
-§/F{f003}
+  §F{f003:VulnerablePathJoin:pub}
+    §DOC{BUG: User input used in path.join}
+    §DOC{EXPECTED: Calor0983 Path Traversal}
+    §I{string:request_path}
+    §O{string}
+    §E{fs:r}
+    §B{base:string} STR:"/var/data"
+    §B{fullPath:string} (CALL path.join base request_path)
+    §B{content:string} (CALL fs.read fullPath)
+    §R content
 
-§F{f004:SafeSanitizedPath:pub}
-  §DOC{SAFE: Path properly sanitized}
-  §DOC{EXPECTED: No warnings}
-  §I{string:user_input}
-  §O{string}
-  §E{fs:r}
-  §B{sanitized:string} (CALL path_sanitize user_input)
-  §B{base:string} STR:"/safe/directory/"
-  §B{fullPath:string} (+ base sanitized)
-  §B{content:string} (CALL file.read fullPath)
-  §R content
-§/F{f004}
+  §F{f004:SafeSanitizedPath:pub}
+    §DOC{SAFE: Path properly sanitized}
+    §DOC{EXPECTED: No warnings}
+    §I{string:user_input}
+    §O{string}
+    §E{fs:r}
+    §B{sanitized:string} (CALL path_sanitize user_input)
+    §B{base:string} STR:"/safe/directory/"
+    §B{fullPath:string} (+ base sanitized)
+    §B{content:string} (CALL file.read fullPath)
+    §R content
 
-§F{f005:VulnerableFileWrite:pub}
-  §DOC{BUG: Writing to user-controlled path}
-  §DOC{EXPECTED: Calor0983 Path Traversal}
-  §I{string:form_input}
-  §I{string:content}
-  §O{void}
-  §E{fs:w}
-  §B{path:string} (+ STR:"/uploads/" form_input)
-  §C file.write path content
-§/F{f005}
+  §F{f005:VulnerableFileWrite:pub}
+    §DOC{BUG: Writing to user-controlled path}
+    §DOC{EXPECTED: Calor0983 Path Traversal}
+    §I{string:form_input}
+    §I{string:content}
+    §O{void}
+    §E{fs:w}
+    §B{path:string} (+ STR:"/uploads/" form_input)
+    §C file.write path content
 
-§F{f006:SafeConstantPath:pub}
-  §DOC{SAFE: Path is a constant}
-  §DOC{EXPECTED: No warnings}
-  §O{string}
-  §E{fs:r}
-  §B{path:string} STR:"/etc/app/config.json"
-  §B{content:string} (CALL file.read path)
-  §R content
-§/F{f006}
+  §F{f006:SafeConstantPath:pub}
+    §DOC{SAFE: Path is a constant}
+    §DOC{EXPECTED: No warnings}
+    §O{string}
+    §E{fs:r}
+    §B{path:string} STR:"/etc/app/config.json"
+    §B{content:string} (CALL file.read path)
+    §R content
 
-§/M{m001}

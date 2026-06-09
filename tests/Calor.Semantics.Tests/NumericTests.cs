@@ -17,12 +17,10 @@ public class NumericTests
         // Adding 1 to int.MaxValue should overflow
         var source = @"
 §M{m001:Test}
-§F{f001:overflow:pub}
-  §O{i32}
-  §B{max} INT:2147483647
-  §R (+ max INT:1)
-§/F{f001}
-§/M{m001}
+  §F{f001:overflow:pub}
+      §O{i32}
+      §B{max} INT:2147483647
+      §R (+ max INT:1)
 ";
 
         var result = SemanticsTestHarness.ExecuteChecked(source, "overflow");
@@ -46,12 +44,10 @@ public class NumericTests
         // Using simple approach without typed bindings
         var source = @"
 §M{m001:Test}
-§F{f001:convert:pub}
-  §I{i32:i}
-  §O{f64}
-  §R i
-§/F{f001}
-§/M{m001}
+  §F{f001:convert:pub}
+      §I{i32:i}
+      §O{f64}
+      §R i
 ";
 
         var result = SemanticsTestHarness.Execute(source, "convert", new object[] { 42 });
@@ -69,13 +65,11 @@ public class NumericTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:divZero:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:divZero:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (/ a b)
 ";
 
         var result = SemanticsTestHarness.Execute(source, "divZero", new object[] { 42, 0 });
@@ -95,19 +89,16 @@ public class NumericTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§F{f002:mul:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (* a b)
-§/F{f002}
-§/M{m001}
+  §F{f001:add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
+  §F{f002:mul:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (* a b)
 ";
 
         var addResult = SemanticsTestHarness.Execute(source, "add", new object[] { 3, 4 });
@@ -127,19 +118,16 @@ public class NumericTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:lessThan:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §R (< a b)
-§/F{f001}
-§F{f002:equals:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{bool}
-  §R (== a b)
-§/F{f002}
-§/M{m001}
+  §F{f001:lessThan:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §R (< a b)
+  §F{f002:equals:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{bool}
+      §R (== a b)
 ";
 
         var ltResult = SemanticsTestHarness.Execute(source, "lessThan", new object[] { 3, 5 });
@@ -159,13 +147,11 @@ public class NumericTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:mod:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (% a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:mod:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (% a b)
 ";
 
         var result = SemanticsTestHarness.Execute(source, "mod", new object[] { 10, 3 });

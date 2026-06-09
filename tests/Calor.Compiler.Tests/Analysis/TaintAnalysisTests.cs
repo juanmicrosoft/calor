@@ -18,7 +18,7 @@ public class TaintAnalysisTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
 
@@ -313,13 +313,11 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Add:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -335,12 +333,10 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Simple:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Simple:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -358,10 +354,8 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Empty:pub}
-  §O{void}
-§/F{f001}
-§/M{m001}";
+  §F{f001:Empty:pub}
+      §O{void}";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -376,12 +370,10 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Process:pub}
-  §I{string:data}
-  §O{string}
-  §R (CALL process data)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Process:pub}
+      §I{string:data}
+      §O{string}
+      §R (CALL process data)";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -397,12 +389,10 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Process:pub}
-  §I{string:user_input}
-  §O{string}
-  §R user_input
-§/F{f001}
-§/M{m001}";
+  §F{f001:Process:pub}
+      §I{string:user_input}
+      §O{string}
+      §R user_input";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -419,12 +409,10 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Process:pub}
-  §I{string:user_input}
-  §O{string}
-  §R user_input
-§/F{f001}
-§/M{m001}";
+  §F{f001:Process:pub}
+      §I{string:user_input}
+      §O{string}
+      §R user_input";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -459,15 +447,12 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Foo:pub}
-  §O{i32}
-  §R INT:1
-§/F{f001}
-§F{f002:Bar:pub}
-  §O{i32}
-  §R INT:2
-§/F{f002}
-§/M{m001}";
+  §F{f001:Foo:pub}
+      §O{i32}
+      §R INT:1
+  §F{f002:Bar:pub}
+      §O{i32}
+      §R INT:2";
 
         var bound = Bind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -485,12 +470,10 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Test:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Test:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -511,12 +494,10 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Process:pub}
-  §I{string:user_input}
-  §O{string}
-  §R user_input
-§/F{f001}
-§/M{m001}";
+  §F{f001:Process:pub}
+      §I{string:user_input}
+      §O{string}
+      §R user_input";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return; // Skip if string type not supported
@@ -533,12 +514,10 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Handle:pub}
-  §I{string:request_data}
-  §O{string}
-  §R request_data
-§/F{f001}
-§/M{m001}";
+  §F{f001:Handle:pub}
+      §I{string:request_data}
+      §O{string}
+      §R request_data";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -552,12 +531,10 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Calculate:pub}
-  §I{i32:value}
-  §O{i32}
-  §R value
-§/F{f001}
-§/M{m001}";
+  §F{f001:Calculate:pub}
+      §I{i32:value}
+      §O{i32}
+      §R value";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -577,13 +554,11 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Propagate:pub}
-  §I{string:user_data}
-  §O{string}
-  §B{processed:string} user_data
-  §R processed
-§/F{f001}
-§/M{m001}";
+  §F{f001:Propagate:pub}
+      §I{string:user_data}
+      §O{string}
+      §B{processed:string} user_data
+      §R processed";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -599,14 +574,12 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Concat:pub}
-  §I{string:user_input}
-  §I{string:prefix}
-  §O{string}
-  §B{result:string} (+ prefix user_input)
-  §R result
-§/F{f001}
-§/M{m001}";
+  §F{f001:Concat:pub}
+      §I{string:user_input}
+      §I{string:prefix}
+      §O{string}
+      §B{result:string} (+ prefix user_input)
+      §R result";
 
         var func = GetFunction(source, out var parseDiag);
         if (parseDiag.HasErrors) return;
@@ -626,13 +599,11 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Safe:pub}
-  §I{i32:x}
-  §I{i32:y}
-  §O{i32}
-  §R (+ x y)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Safe:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (+ x y)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -648,13 +619,11 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Constants:pub}
-  §O{i32}
-  §B{a:i32} INT:1
-  §B{b:i32} INT:2
-  §R (+ a b)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Constants:pub}
+      §O{i32}
+      §B{a:i32} INT:1
+      §B{b:i32} INT:2
+      §R (+ a b)";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -773,12 +742,10 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Safe:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Safe:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x";
 
         var func = GetFunction(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);
@@ -801,17 +768,14 @@ public class TaintAnalysisTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Func1:pub}
-  §I{i32:x}
-  §O{i32}
-  §R x
-§/F{f001}
-§F{f002:Func2:pub}
-  §I{i32:y}
-  §O{i32}
-  §R y
-§/F{f002}
-§/M{m001}";
+  §F{f001:Func1:pub}
+      §I{i32:x}
+      §O{i32}
+      §R x
+  §F{f002:Func2:pub}
+      §I{i32:y}
+      §O{i32}
+      §R y";
 
         var bound = Bind(source, out var parseDiag);
         Assert.False(parseDiag.HasErrors);

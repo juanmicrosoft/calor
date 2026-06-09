@@ -7,8 +7,6 @@
 
 using System;
 using Calor.Runtime;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace MinTwo
 {
@@ -18,7 +16,7 @@ namespace MinTwo
         {
             int __result__ = default;
 
-            if ((a < b))
+            if (a < b)
             {
                 return a;
             }
@@ -28,8 +26,8 @@ namespace MinTwo
             }
 
 
-            if (!((__result__ <= a))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ <= a)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 69, length: 16, sourceFile: null, line: 6, column: 3, condition: "(__result__ <= a)");
-            if (!((__result__ <= b))) throw new Calor.Runtime.ContractViolationException("Postcondition failed: (__result__ <= b)", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 88, length: 16, sourceFile: null, line: 7, column: 3, condition: "(__result__ <= b)");
+            if (!(__result__ <= a)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ <= a", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 63, length: 16, sourceFile: null, line: 3, column: 5, condition: "__result__ <= a");
+            if (!(__result__ <= b)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ <= b", "f001", Calor.Runtime.ContractKind.Ensures, startOffset: 85, length: 16, sourceFile: null, line: 4, column: 5, condition: "__result__ <= b");
             return __result__;
         }
 

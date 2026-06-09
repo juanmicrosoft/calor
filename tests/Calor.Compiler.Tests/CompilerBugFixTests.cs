@@ -24,14 +24,14 @@ public class CompilerBugFixTests
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        return lexer.TokenizeAll();
+        return lexer.TokenizeAllForParser();
     }
 
     private static ModuleNode Parse(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         return parser.Parse();
     }
@@ -71,13 +71,10 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:TestMod}
-            §F{f001:Helper:pub}
-              §O{void}
-            §/F{f001}
-            §F{f002:Main:pub}
-              §O{void}
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Helper:pub}
+                  §O{void}
+              §F{f002:Main:pub}
+                  §O{void}
             """;
 
         var result = Program.Compile(source);
@@ -96,12 +93,10 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Greet:pub}
-              §I{string:name}
-              §O{string}
-              §R name
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Greet:pub}
+                  §I{string:name}
+                  §O{string}
+                  §R name
             """;
 
         var module = Parse(source, out var diag);
@@ -121,12 +116,10 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Check:pub}
-              §I{bool:flag}
-              §O{bool}
-              §R flag
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Check:pub}
+                  §I{bool:flag}
+                  §O{bool}
+                  §R flag
             """;
 
         var module = Parse(source, out var diag);
@@ -144,14 +137,12 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Foo:pub}
-              §O{void}
-              §B{msg:string} STR:"hello"
-              §C{Console.WriteLine}
-                §A msg
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{msg:string} STR:"hello"
+                  §C{Console.WriteLine}
+                    §A msg
+                  §/C
             """;
 
         var module = Parse(source, out var diag);
@@ -179,16 +170,14 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Classify:pub}
-              §I{i32:x}
-              §O{i32}
-              §X{ma001:x}
-                §WC _
-                  §R INT:1
-              §/X{ma001}
-              §R INT:0
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Classify:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §X{ma001:x}
+                    §WC _
+                      §R INT:1
+                  §/X{ma001}
+                  §R INT:0
             """;
 
         var module = Parse(source, out var diag);
@@ -226,13 +215,11 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
             """;
 
         var module = Parse(source, out var diag);
@@ -247,13 +234,11 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Add:pub}
-              §I{f64:a}
-              §I{f64:b}
-              §O{f64}
-              §R (+ a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{f64:a}
+                  §I{f64:b}
+                  §O{f64}
+                  §R (+ a b)
             """;
 
         var module = Parse(source, out var diag);
@@ -272,14 +257,12 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §E{cw}
-              §C{Console.WriteLine}
-                §A STR:"hello"
-              §/C
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §C{Console.WriteLine}
+                    §A STR:"hello"
+                  §/C
             """;
 
         var module = Parse(source, out var diag);
@@ -546,10 +529,8 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Simple:pub}
-              §O{void}
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Simple:pub}
+                  §O{void}
             """;
 
         var result = Program.Compile(source);
@@ -565,20 +546,17 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Calculator}
-            §F{f001:Add:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §R (+ a b)
-            §/F{f001}
-            §F{f002:Main:pub}
-              §O{void}
-              §E{cw}
-              §C{Console.WriteLine}
-                §A INT:42
-              §/C
-            §/F{f002}
-            §/M{m001}
+              §F{f001:Add:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §R (+ a b)
+              §F{f002:Main:pub}
+                  §O{void}
+                  §E{cw}
+                  §C{Console.WriteLine}
+                    §A INT:42
+                  §/C
             """;
 
         var result = Program.Compile(source);
@@ -593,14 +571,12 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Safe}
-            §F{f001:Divide:pub}
-              §I{i32:a}
-              §I{i32:b}
-              §O{i32}
-              §Q (!= b INT:0)
-              §R (/ a b)
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Divide:pub}
+                  §I{i32:a}
+                  §I{i32:b}
+                  §O{i32}
+                  §Q (!= b INT:0)
+                  §R (/ a b)
             """;
 
         var result = Program.Compile(source);
@@ -612,11 +588,9 @@ public class CompilerBugFixTests
     {
         var source = """
             §M{m001:Test}
-            §F{f001:Main:pub}
-              §O{void}
-              §ARR{a001:nums:i32} INT:1 INT:2 INT:3
-            §/F{f001}
-            §/M{m001}
+              §F{f001:Main:pub}
+                  §O{void}
+                  §ARR{a001:nums:i32} INT:1 INT:2 INT:3
             """;
 
         var result = Program.Compile(source);
@@ -624,6 +598,251 @@ public class CompilerBugFixTests
         {
             Assert.NotEmpty(result.GeneratedCode);
         }
+    }
+
+    #endregion
+
+    #region BindValidationPass: Calor0250 fires through the full CLI pipeline
+
+    [Fact]
+    public void BindValidation_BareBinding_ReportsCalor0250_ThroughCli()
+    {
+        // §B{x} with no type and no initializer must fail compilation
+        // through the production CLI path. PR #642 implemented the diagnostic
+        // in the Binder, but the Binder is not invoked from Program.Compile;
+        // BindValidationPass wires this check into the main pipeline.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.True(result.HasErrors,
+            "Calor0250 must fire for §B{x} with no type and no initializer.");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
+    }
+
+    [Fact]
+    public void BindValidation_TypedBinding_NoInitializer_Compiles()
+    {
+        // §B{x:i32} (typed, no initializer) is valid — default-initializes.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x:i32}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors,
+            "Typed binding with no initializer must compile cleanly: " +
+            string.Join("; ", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
+    }
+
+    [Fact]
+    public void BindValidation_UntypedBinding_WithInitializer_Compiles()
+    {
+        // §B{x} INT:42 (untyped, with initializer) is valid — type is inferred.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} INT:42
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors,
+            "Untyped binding with initializer must compile cleanly: " +
+            string.Join("; ", result.Diagnostics.Errors.Select(e => $"{e.Code}: {e.Message}")));
+    }
+
+    [Fact]
+    public void BindValidation_BareBinding_InsideIfBody_ReportsCalor0250()
+    {
+        // The validator must recurse into nested statement bodies.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §I{i32:n}
+                  §O{void}
+                  §IF{if1} (> n INT:0)
+                      §B{tmp}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.True(result.HasErrors,
+            "Calor0250 must fire for bare §B inside a nested if body.");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
+    }
+
+    [Fact]
+    public void BindValidation_BareBinding_InsideForBody_ReportsCalor0250()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §L{l1:i:INT:0:INT:10:INT:1}
+                      §B{tmp}
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.True(result.HasErrors,
+            "Calor0250 must fire for bare §B inside a nested for loop body.");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindRequiresTypeOrInitializer);
+    }
+
+    [Fact]
+    public void StrictBindInference_NoneInitializer_ReportsCalor0251()
+    {
+        // §B{x} §NN with --strict-bind-inference must fail with Calor0251.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} §NN
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindCannotInferNullLiteral);
+    }
+
+    [Fact]
+    public void StrictBindInference_NoneInitializer_NoStrict_Compiles()
+    {
+        // Without --strict-bind-inference, §B{x} §NN must compile cleanly.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} §NN
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors,
+            "Without --strict-bind-inference, §B{x} §NN must not fire Calor0251.");
+    }
+
+    [Fact]
+    public void StrictBindInference_TypedNone_DoesNotReportCalor0251()
+    {
+        // §B{x:Option<i32>} §NN bypasses the inference path entirely.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x:Option<i32>} §NN
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.DoesNotContain(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindCannotInferNullLiteral);
+    }
+
+    [Fact]
+    public void StrictBindInference_GenericFactoryCall_ReportsCalor0252()
+    {
+        // §B{x} §C{Vec.empty} §/C is a known generic factory; strict mode flags it.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} §C{Vec.empty} §/C
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindCannotInferGenericReturn);
+    }
+
+    [Fact]
+    public void StrictBindInference_GenericFactoryCall_NoStrict_Compiles()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} §C{Vec.empty} §/C
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { EnforceEffects = false });
+
+        Assert.DoesNotContain(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindCannotInferGenericReturn);
+    }
+
+    [Fact]
+    public void StrictBindInference_AmbiguousNumeric_ReportsCalor0253()
+    {
+        // (+ INT:0 FLOAT:0.0) mixes integer and float literals: ambiguous widening.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} (+ INT:0 FLOAT:0.0)
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindAmbiguousNumeric);
+    }
+
+    [Fact]
+    public void StrictBindInference_AmbiguousNumeric_NoStrict_Compiles()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} (+ INT:0 FLOAT:0.0)
+            """;
+
+        var result = Program.Compile(source);
+
+        Assert.False(result.HasErrors,
+            "Without --strict-bind-inference, mixed INT+FLOAT must not fire Calor0253.");
+    }
+
+    [Fact]
+    public void StrictBindInference_HomogeneousNumeric_DoesNotReportCalor0253()
+    {
+        // Same-type operands: no ambiguity, no diagnostic.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Foo:pub}
+                  §O{void}
+                  §B{x} (+ INT:1 INT:2)
+            """;
+
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = true });
+
+        Assert.DoesNotContain(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.BindAmbiguousNumeric);
     }
 
     #endregion

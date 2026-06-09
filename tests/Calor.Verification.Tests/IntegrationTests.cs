@@ -16,14 +16,12 @@ public class IntegrationTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x 0)
-  §S (>= result 0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x 0)
+      §S (>= result 0)
+      §R (* x x)";
 
         var options = new CompilationOptions
         {
@@ -45,13 +43,11 @@ public class IntegrationTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:Bad:pub}
-  §I{i32:x}
-  §O{i32}
-  §S (> result x)
-  §R x
-§/F{f001}
-§/M{m001}";
+  §F{f001:Bad:pub}
+      §I{i32:x}
+      §O{i32}
+      §S (> result x)
+      §R x";
 
         var options = new CompilationOptions
         {
@@ -73,14 +69,12 @@ public class IntegrationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x 0)
-  §S (>= result 0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x 0)
+      §S (>= result 0)
+      §R (* x x)";
 
         var withoutVerify = Program.Compile(source, "test.calr", new CompilationOptions
         {
@@ -102,14 +96,12 @@ public class IntegrationTests
 
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x 0)
-  §S (>= result 0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x 0)
+      §S (>= result 0)
+      §R (* x x)";
 
         var options = new CompilationOptions
         {
@@ -135,13 +127,11 @@ public class IntegrationTests
         // Basic contract compilation without --verify should work as before
         var source = @"
 §M{m001:Test}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)";
 
         var result = Program.Compile(source, "test.calr");
 
@@ -154,14 +144,12 @@ public class IntegrationTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
-  §Q (>= x 0)
-  §S (>= result 0)
-  §R (* x x)
-§/F{f001}
-§/M{m001}";
+  §F{f001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x 0)
+      §S (>= result 0)
+      §R (* x x)";
 
         var options = new CompilationOptions
         {

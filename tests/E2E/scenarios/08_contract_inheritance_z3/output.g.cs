@@ -12,11 +12,6 @@ namespace ContractZ3Test
 {
     public interface IService
     {
-        /// <summary>
-        /// Interface method with contracts.
-        /// </summary>
-        /// <remarks>Requires: value >= 0</remarks>
-        /// <remarks>Ensures: result > 0</remarks>
         int Process(int value);
     }
 
@@ -24,12 +19,12 @@ namespace ContractZ3Test
     {
         public int Process(int value)
         {
-            if (!(value >= -10)) throw new Calor.Runtime.ContractViolationException("Precondition failed: value >= -10", "unknown", Calor.Runtime.ContractKind.Requires, startOffset: 277, length: 21, sourceFile: null, line: 17, column: 5, condition: "value >= -10");
+            if (!(value >= -10)) throw new Calor.Runtime.ContractViolationException("Precondition failed: value >= -10", "unknown", Calor.Runtime.ContractKind.Requires, startOffset: 192, length: 17, sourceFile: null, line: 9, column: 7, condition: "value >= -10");
             int __result__ = default;
 
             __result__ = value + 1;
 
-            if (!(__result__ >= 1)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 1", "unknown", Calor.Runtime.ContractKind.Ensures, startOffset: 303, length: 20, sourceFile: null, line: 18, column: 5, condition: "__result__ >= 1");
+            if (!(__result__ >= 1)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 1", "unknown", Calor.Runtime.ContractKind.Ensures, startOffset: 216, length: 16, sourceFile: null, line: 10, column: 7, condition: "__result__ >= 1");
             return __result__;
         }
 
@@ -39,12 +34,12 @@ namespace ContractZ3Test
     {
         public int Process(int value)
         {
-            if (!(value >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: value >= 0", "unknown", Calor.Runtime.ContractKind.Requires, startOffset: 484, length: 19, sourceFile: null, line: 28, column: 5, condition: "value >= 0");
+            if (!(value >= 0)) throw new Calor.Runtime.ContractViolationException("Precondition failed: value >= 0", "unknown", Calor.Runtime.ContractKind.Requires, startOffset: 365, length: 15, sourceFile: null, line: 18, column: 7, condition: "value >= 0");
             int __result__ = default;
 
             __result__ = value + 10;
 
-            if (!(__result__ >= 10)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 10", "unknown", Calor.Runtime.ContractKind.Ensures, startOffset: 508, length: 21, sourceFile: null, line: 29, column: 5, condition: "__result__ >= 10");
+            if (!(__result__ >= 10)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 10", "unknown", Calor.Runtime.ContractKind.Ensures, startOffset: 387, length: 17, sourceFile: null, line: 19, column: 7, condition: "__result__ >= 10");
             return __result__;
         }
 

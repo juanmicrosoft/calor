@@ -1,26 +1,15 @@
 §M{m001:OrderService}
-§F{f001:SaveOrder:pub}
-  §I{str:orderId}
-  §O{void}
-  §E{cw}
-  §P orderId
-§/F{f001}
+  §F{f001:SaveOrder:pub} (str:orderId) -> void
+    §E{cw}
+    §P orderId
 
-§F{f002:NotifyCustomer:pub}
-  §I{str:email}
-  §I{str:message}
-  §O{void}
-  §E{cw}
-  §P email
-  §P message
-§/F{f002}
+  §F{f002:NotifyCustomer:pub} (str:email, str:message) -> void
+    §E{cw}
+    §P email
+    §P message
 
-§F{f003:ProcessOrder:pub}
-  §I{str:orderId}
-  §I{str:email}
-  §O{void}
-  §E{cw}
-  §C{SaveOrder} §A orderId §/C
-  §C{NotifyCustomer} §A email §A "Order shipped" §/C
-§/F{f003}
-§/M{m001}
+  §F{f003:ProcessOrder:pub} (str:orderId, str:email) -> void
+    §E{cw}
+    §C{SaveOrder} §A orderId §/C
+    §C{NotifyCustomer} §A email §A "Order shipped" §/C
+

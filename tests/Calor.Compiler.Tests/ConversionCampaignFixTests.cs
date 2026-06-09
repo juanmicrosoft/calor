@@ -22,7 +22,7 @@ public class ConversionCampaignFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         var module = parser.Parse();
@@ -39,7 +39,7 @@ public class ConversionCampaignFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
 
         var parser = new Parser(tokens, diagnostics);
         parser.Parse();
@@ -51,7 +51,7 @@ public class ConversionCampaignFixTests
     {
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         Assert.Empty(diag.Errors);
         var parser = new Parser(tokens, diag);
         var ast = parser.Parse();
@@ -71,7 +71,7 @@ public class ConversionCampaignFixTests
         diagnostics.SetFilePath("test.calr");
 
         var lexer = new Lexer(calorSource, diagnostics);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         if (diagnostics.HasErrors) return null;
 
         var parser = new Parser(tokens, diagnostics);
@@ -91,17 +91,14 @@ public class ConversionCampaignFixTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:MatchTest:pub}
-§I{i32:x}
-§O{str}
-§W{m1} x
-§K 1
-§R ""one""
-§K _
-§R ""other""
-§/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:MatchTest:pub}
+    §I{i32:x}
+    §O{str}
+    §W{m1} x
+    §K 1
+      §R ""one""
+    §K _
+      §R ""other""
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("default:", csharp);
@@ -113,19 +110,16 @@ public class ConversionCampaignFixTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:MatchTest:pub}
-§I{i32:x}
-§O{str}
-§W{m1} x
-§K 1
-§R ""one""
-§K 2
-§R ""two""
-§K _
-§R ""other""
-§/W{m1}
-§/F{f001}
-§/M{m001}
+  §F{f001:MatchTest:pub}
+    §I{i32:x}
+    §O{str}
+    §W{m1} x
+    §K 1
+      §R ""one""
+    §K 2
+      §R ""two""
+    §K _
+      §R ""other""
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("case 1:", csharp);
@@ -143,12 +137,10 @@ public class ConversionCampaignFixTests
     {
         var source = @"
 §M{m001:Test}
-§CL{c001:Foo:pub}
-§PROP{p001:Name:str:pub}
-§GET §/GET
-§/PROP{p001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Foo:pub}
+    §PROP{p001:Name:str:pub}
+    §GET §/GET
+    §/PROP{p001}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("{ get; }", csharp);
@@ -160,13 +152,11 @@ public class ConversionCampaignFixTests
     {
         var source = @"
 §M{m001:Test}
-§CL{c001:Foo:pub}
-§PROP{p001:Name:str:pub}
-§GET §/GET
-§SET §/SET
-§/PROP{p001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Foo:pub}
+    §PROP{p001:Name:str:pub}
+    §GET §/GET
+    §SET §/SET
+    §/PROP{p001}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("get; set;", csharp);
@@ -181,14 +171,11 @@ public class ConversionCampaignFixTests
     {
         var source = @"
 §M{m001:Test}
-§CL{c001:Account:pub}
-§FLD{str:_name:priv}
-§MT{m001:SetName:pub}
-§I{str:name}
-§ASSIGN this._name name
-§/MT{m001}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Account:pub}
+    §FLD{str:_name:priv}
+    §MT{m001:SetName:pub}
+      §I{str:name}
+      §ASSIGN this._name name
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("this._name", csharp);
@@ -200,14 +187,12 @@ public class ConversionCampaignFixTests
     {
         var source = @"
 §M{m001:Test}
-§CL{c001:Account:pub}
-§FLD{str:_id:priv}
-§CTOR{ctor1:pub}
-§I{str:id}
-§ASSIGN this._id id
-§/CTOR{ctor1}
-§/CL{c001}
-§/M{m001}
+  §CL{c001:Account:pub}
+    §FLD{str:_id:priv}
+    §CTOR{ctor1:pub}
+    §I{str:id}
+    §ASSIGN this._id id
+    §/CTOR{ctor1}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("this._id", csharp);
@@ -223,13 +208,11 @@ public class ConversionCampaignFixTests
     {
         var source = @"
 §M{m001:Test}
-§F{f001:BuildReport:pub}
-§O{str}
-§E{cw}
-§B{sb} §NEW{System.Text.StringBuilder} §/NEW
-§R (str sb)
-§/F{f001}
-§/M{m001}
+  §F{f001:BuildReport:pub}
+    §O{str}
+    §E{cw}
+    §B{sb} §NEW{System.Text.StringBuilder} §/NEW
+    §R (str sb)
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("new System.Text.StringBuilder()", csharp);
@@ -245,12 +228,10 @@ public class ConversionCampaignFixTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IOrder}
-§PROP{p001:Purchased:datetime:pub}
-§GET §/GET
-§/PROP{p001}
-§/IFACE{i001}
-§/M{m001}
+  §IFACE{i001:IOrder}
+    §PROP{p001:Purchased:datetime:pub}
+    §GET §/GET
+    §/PROP{p001}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("interface IOrder", csharp);
@@ -264,15 +245,12 @@ public class ConversionCampaignFixTests
     {
         var source = @"
 §M{m001:Test}
-§IFACE{i001:IOrder}
-§PROP{p001:Cost:f64:pub}
-§GET §/GET
-§/PROP{p001}
-§MT{m001:GetDescription}
-§O{str}
-§/MT{m001}
-§/IFACE{i001}
-§/M{m001}
+  §IFACE{i001:IOrder}
+    §PROP{p001:Cost:f64:pub}
+    §GET §/GET
+    §/PROP{p001}
+    §MT{m001:GetDescription}
+      §O{str}
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("interface IOrder", csharp);
@@ -382,7 +360,7 @@ public interface IAnimal
 }");
         Assert.True(result.Success, string.Join("\n", result.Issues));
         Assert.Contains("§MT{", result.CalorSource);
-        Assert.Contains("§/MT{", result.CalorSource);
+        Assert.DoesNotContain("§/MT{", result.CalorSource);
         Assert.DoesNotContain("§SIG", result.CalorSource);
     }
 
@@ -619,30 +597,30 @@ public class Example
     [Fact]
     public void Lexer_LineComment_SkipsContent()
     {
-        var source = "§M{m001:Test}\n// This is a comment with apostrophe: it's fine\n§/M{m001}";
+        var source = "§M{m001:Test}\n// This is a comment with apostrophe: it's fine\n";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         Assert.Empty(diag.Errors);
     }
 
     [Fact]
     public void Lexer_LineCommentAtEndOfFile_SkipsContent()
     {
-        var source = "§M{m001:Test}\n§/M{m001}\n// trailing comment";
+        var source = "§M{m001:Test}\n\n// trailing comment";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         Assert.Empty(diag.Errors);
     }
 
     [Fact]
     public void Lexer_CharLiteral_DoesNotCrash()
     {
-        var source = "§M{m001:Test}\n§F{f001:hello}\n§O{str}\n§R 'x'\n§/F{f001}\n§/M{m001}";
+        var source = "§M{m001:Test}\n§F{f001:hello}\n§O{str}\n§R 'x'\n\n";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         Assert.NotNull(tokens);
         Assert.True(tokens.Count > 0);
     }
@@ -650,10 +628,10 @@ public class Example
     [Fact]
     public void Lexer_SlashNotFollowedBySlash_IsSlashToken()
     {
-        var source = "§M{m001:Test}\n§F{f001:div}\n§O{i32}\n§R (/ 10 2)\n§/F{f001}\n§/M{m001}";
+        var source = "§M{m001:Test}\n§F{f001:div}\n§O{i32}\n§R (/ 10 2)\n\n";
         var diag = new DiagnosticBag();
         var lexer = new Lexer(source, diag);
-        var tokens = lexer.TokenizeAll();
+        var tokens = lexer.TokenizeAllForParser();
         Assert.Contains(tokens, t => t.Kind == TokenKind.Slash);
     }
 
@@ -666,16 +644,14 @@ public class Example
     {
         var source = @"
 §M{m001:TestModule}
-§F{f001:process}
-  §E{cw}
-  §I{List<i32>:items}
-  §O{i32}
-  §B{filtered} §C{items.Where} §A §LAM{lam001:x:i32} (> x 5) §/LAM{lam001} §/C
-  §B{count} §C{filtered.Count} §/C
-  §P count
-  §R count
-§/F{f001}
-§/M{m001}";
+  §F{f001:process}
+      §E{cw}
+      §I{List<i32>:items}
+      §O{i32}
+      §B{filtered} §C{items.Where} §A §LAM{lam001:x:i32} (> x 5) §/LAM{lam001} §/C
+      §B{count} §C{filtered.Count} §/C
+      §P count
+      §R count";
 
         var ast = ParseCalor(source);
 
@@ -693,13 +669,11 @@ public class Example
     {
         var source = @"
 §M{m001:TestModule}
-§F{f001:sortItems}
-  §I{List<i32>:items}
-  §O{List<i32>}
-  §B{sorted} §C{items.OrderBy} §A §LAM{lam001:x:i32} x §/LAM{lam001} §/C
-  §R §C{sorted.ToList} §/C
-§/F{f001}
-§/M{m001}";
+  §F{f001:sortItems}
+      §I{List<i32>:items}
+      §O{List<i32>}
+      §B{sorted} §C{items.OrderBy} §A §LAM{lam001:x:i32} x §/LAM{lam001} §/C
+      §R §C{sorted.ToList} §/C";
 
         var ast = ParseCalor(source);
 
@@ -2242,13 +2216,11 @@ public class Demo
     {
         var calor = @"
 §M{m001:HasTest}
-  §F{f001:Check:pub}
-    §I{Dict<str,i32>:cache}
-    §I{str:key}
-    §O{bool}
-    §R (! §HAS{cache} §KEY key)
-  §/F{f001}
-§/M{m001}
+    §F{f001:Check:pub}
+        §I{Dict<str,i32>:cache}
+        §I{str:key}
+        §O{bool}
+        §R (! §HAS{cache} §KEY key)
 ";
         var compiled = ParseAndEmit(calor);
         Assert.Contains("ContainsKey", compiled);
@@ -2260,13 +2232,11 @@ public class Demo
     {
         var calor = @"
 §M{m001:IdxTest}
-  §F{f001:AddFirst:pub}
-    §I{i32:val}
-    §O{i32}
-    §B{items} §LIST{l001:i32} 10 20 30 §/LIST{l001}
-    §R (+ val §IDX items 0)
-  §/F{f001}
-§/M{m001}
+    §F{f001:AddFirst:pub}
+        §I{i32:val}
+        §O{i32}
+        §B{items} §LIST{l001:i32} 10 20 30 §/LIST{l001}
+        §R (+ val §IDX items 0)
 ";
         var compiled = ParseAndEmit(calor);
         Assert.Contains("[0]", compiled);
@@ -2278,12 +2248,10 @@ public class Demo
     {
         var calor = @"
 §M{m001:CntTest}
-  §F{f001:IsEmpty:pub}
-    §I{List<i32>:items}
-    §O{bool}
-    §R (== §CNT items 0)
-  §/F{f001}
-§/M{m001}
+    §F{f001:IsEmpty:pub}
+        §I{List<i32>:items}
+        §O{bool}
+        §R (== §CNT items 0)
 ";
         var compiled = ParseAndEmit(calor);
         Assert.Contains(".Count", compiled);
@@ -2295,12 +2263,10 @@ public class Demo
     {
         var calor = @"
 §M{m001:LenTest}
-  §F{f001:IsLong:pub}
-    §I{List<str>:arr}
-    §O{bool}
-    §R (> §LEN arr 10)
-  §/F{f001}
-§/M{m001}
+    §F{f001:IsLong:pub}
+        §I{List<str>:arr}
+        §O{bool}
+        §R (> §LEN arr 10)
 ";
         var compiled = ParseAndEmit(calor);
         Assert.Contains(".Length", compiled);
@@ -2406,21 +2372,18 @@ public class Demo
         // Test that (not null), (or 1 2), (and (gt 0) (lt 100)) patterns round-trip
         var calor = @"
 §M{m001:PatternTest}
-  §F{f001:Classify:pub}
-    §I{i32:x}
-    §O{str}
-    §W{w001} x
-      §K (not null)
-        §R ""found""
-      §K (or 1 2)
-        §R ""one or two""
-      §K (and gt 0 lt 100)
-        §R ""in range""
-      §K _
-        §R ""other""
-    §/W{w001}
-  §/F{f001}
-§/M{m001}
+    §F{f001:Classify:pub}
+        §I{i32:x}
+        §O{str}
+        §W{w001} x
+            §K (not null)
+              §R ""found""
+            §K (or 1 2)
+              §R ""one or two""
+            §K (and gt 0 lt 100)
+              §R ""in range""
+            §K _
+              §R ""other""
 ";
         var compiled = ParseAndEmit(calor);
         // Should emit proper C# switch with pattern combinators
@@ -2439,11 +2402,9 @@ public class Demo
         // In permissive mode, unknown external calls should not produce Calor0411
         var source = @"
 §M{m001:TestModule}
-§F{f001:doStuff}
-  §O{void}
-  §C{SomeUnknown.ExternalMethod} §/C
-§/F{f001}
-§/M{m001}";
+  §F{f001:doStuff}
+      §O{void}
+      §C{SomeUnknown.ExternalMethod} §/C";
 
         var ast = ParseCalor(source);
         var diag = new DiagnosticBag();
@@ -2464,11 +2425,9 @@ public class Demo
         // In permissive mode, Calor0410 (forbidden effect) should be a warning, not an error
         var source = @"
 §M{m001:TestModule}
-§F{f001:greet}
-  §O{void}
-  §P ""hello""
-§/F{f001}
-§/M{m001}";
+  §F{f001:greet}
+      §O{void}
+      §P ""hello""";
 
         var ast = ParseCalor(source);
         var diag = new DiagnosticBag();
@@ -2493,12 +2452,10 @@ public class Demo
         // Permissive mode should allow compilation to succeed even with undeclared effects
         var source = @"
 §M{m001:TestModule}
-§F{f001:doIO}
-  §O{void}
-  §P ""writing to console""
-  §C{SomeExternal.DoNetworkCall} §/C
-§/F{f001}
-§/M{m001}";
+  §F{f001:doIO}
+      §O{void}
+      §P ""writing to console""
+      §C{SomeExternal.DoNetworkCall} §/C";
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
@@ -2517,11 +2474,9 @@ public class Demo
         // Verify that strict mode still produces errors (baseline comparison)
         var source = @"
 §M{m001:TestModule}
-§F{f001:doStuff}
-  §O{void}
-  §C{SomeUnknown.ExternalMethod} §/C
-§/F{f001}
-§/M{m001}";
+  §F{f001:doStuff}
+      §O{void}
+      §C{SomeUnknown.ExternalMethod} §/C";
 
         var ast = ParseCalor(source);
         var diag = new DiagnosticBag();
@@ -2693,12 +2648,10 @@ public class Config { public string Name { get; set; } public int Value { get; s
         // Fix 9.1: §A[@default] should parse — @ is skipped in named arg brackets
         var source = @"
 §M{m001:Test}
-§F{f001:Foo:pub}
-§I{str:name}
-§O{str}
-§R §C{Bar} §A[name] name §A[@default] null §/C
-§/F{f001}
-§/M{m001}";
+  §F{f001:Foo:pub}
+    §I{str:name}
+    §O{str}
+    §R §C{Bar} §A[name] name §A[@default] null §/C";
         var compiled = Compile(source);
         Assert.NotNull(compiled);
     }
@@ -2726,12 +2679,9 @@ public class Foo {
         // Fix 9.4: bool:trueTestPermits should NOT be parsed as BOOL:true literal
         var source = @"
 §M{m001:Test}
-§CL{c001:Foo:pub}
-§MT{m002:Bar:pub} (bool:trueTest, bool:falseAlarm) -> bool
-  §R trueTest
-§/MT{m002}
-§/CL{c001}
-§/M{m001}";
+  §CL{c001:Foo:pub}
+    §MT{m002:Bar:pub} (bool:trueTest, bool:falseAlarm) -> bool
+        §R trueTest";
         var compiled = Compile(source);
         Assert.NotNull(compiled);
     }
@@ -2767,17 +2717,14 @@ public class Foo {
 
         var source = $@"
 §M{{m001:Test}}
-§F{{f001:Big:pub}}
-§I{{i32:x}}
-§O{{i32}}
-§W{{m1}} x
-§K {pattern}
-§R INT:1
-§K _
-§R INT:0
-§/W{{m1}}
-§/F{{f001}}
-§/M{{m001}}
+  §F{{f001:Big:pub}}
+    §I{{i32:x}}
+    §O{{i32}}
+    §W{{m1}} x
+    §K {pattern}
+      §R INT:1
+    §K _
+      §R INT:0
 ";
         var csharp = ParseAndEmit(source);
         Assert.Contains("switch", csharp);
@@ -2845,19 +2792,15 @@ public class Foo {
         // must not greedily consume the property pattern as REST attributes.
         var source = @"
 §M{m001:Test}
-§F{f001:Check:pub}
-§I{i32:x}
-§O{bool}
-§B{result} §W{lp001} x
-  §K §PLIST §REST{_} { Flag: true }
-    §R true
-  §/K
-  §K _
-    §R false
-§/W{lp001}
-§R result
-§/F{f001}
-§/M{m001}
+  §F{f001:Check:pub}
+    §I{i32:x}
+    §O{bool}
+    §B{result} §W{lp001} x
+      §K §PLIST §REST{_} { Flag: true }
+        §R true
+      §K _
+        §R false
+    §R result
 ";
         var diag = ParseWithDiagnostics(source);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));
@@ -2873,13 +2816,11 @@ public class Foo {
         // §SALLOC inside (?? ...) Lisp expression must be recognized as expression start
         var source = @"
 §M{m001:Test}
-§F{f001:Alloc:pub}
-§O{i32}
-§B{arr} §SALLOC{char:256}
-§B{buf} (?? arr §SALLOC{char:128})
-§R INT:0
-§/F{f001}
-§/M{m001}
+  §F{f001:Alloc:pub}
+    §O{i32}
+    §B{arr} §SALLOC{char:256}
+    §B{buf} (?? arr §SALLOC{char:128})
+    §R INT:0
 ";
         var diag = ParseWithDiagnostics(source);
         Assert.False(diag.HasErrors, string.Join("\n", diag.Select(d => d.Message)));

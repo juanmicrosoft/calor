@@ -1,0 +1,9 @@
+§M{m001:GridOps}
+  §F{f001:SumGrid:pub} (i32:size) -> i32
+    §B{~total} 0
+    §L{l1:x:0:size:1}
+      §L{l2:y:0:size:1}
+        §L{l3:z:0:size:1}
+          §B{~total} (+ total (+ x (+ y z)))
+    §R total
+

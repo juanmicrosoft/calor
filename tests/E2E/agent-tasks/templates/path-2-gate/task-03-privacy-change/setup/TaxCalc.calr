@@ -1,0 +1,8 @@
+§M{m001:TaxCalc}
+  §F{f001:ComputeTax:priv} (i32:amount) -> i32
+    §R (/ amount 10)
+
+  §F{f002:ComputeTaxWrapper:pub} (i32:amount) -> i32
+    §B{t} §C{ComputeTax} §A amount §/C
+    §R t
+

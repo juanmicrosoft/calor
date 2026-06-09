@@ -688,16 +688,13 @@ Logic: (&& a b), (|| a b), (! a)
 
 Example:
 §M{m001:Math}
-§F{f001:Factorial:pub}
-  §I{i32:n}
-  §O{i32}
-  §Q (>= n 0)
-  §S (>= result 1)
-  §IF{if1} (<= n 1) → §R 1
-  §EL → §R (* n (Factorial (- n 1)))
-  §/I{if1}
-§/F{f001}
-§/M{m001}
+  §F{f001:Factorial:pub}
+      §I{i32:n}
+      §O{i32}
+      §Q (>= n 0)
+      §S (>= result 1)
+      §IF{if1} (<= n 1) → §R 1
+      §EL → §R (* n (Factorial (- n 1)))
 
 Output only the code, no markdown or explanation.";
     }

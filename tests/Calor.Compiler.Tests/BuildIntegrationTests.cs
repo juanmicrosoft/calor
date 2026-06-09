@@ -16,14 +16,12 @@ public class BuildIntegrationTests
             var sourceFile = Path.Combine(tempDir, "test.calr");
             var source = @"
 §M{m001:Test}
-§F{f001:Hello:pub}
-  §O{void}
-  §E{cw}
-  §C{Console.WriteLine}
-    §A ""Hello from test!""
-  §/C
-§/F{f001}
-§/M{m001}
+  §F{f001:Hello:pub}
+      §O{void}
+      §E{cw}
+      §C{Console.WriteLine}
+        §A ""Hello from test!""
+      §/C
 ";
             File.WriteAllText(sourceFile, source);
 
@@ -48,11 +46,9 @@ public class BuildIntegrationTests
         // Arrange - Invalid Calor source
         var source = @"
 §M{m001:Test}
-§F{f001:Hello:pub}
-  §O{void}
-    §INVALID_SYNTAX
-§/F{f001}
-§/M{m001}
+  §F{f001:Hello:pub}
+      §O{void}
+        §INVALID_SYNTAX
 ";
 
         // Act
@@ -68,13 +64,11 @@ public class BuildIntegrationTests
         // Arrange
         var source = @"
 §M{m001:Calculator}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 ";
 
         // Act
@@ -93,20 +87,17 @@ public class BuildIntegrationTests
         // Arrange
         var source = @"
 §M{m001:Math}
-§F{f001:Add:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (+ a b)
-§/F{f001}
+  §F{f001:Add:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (+ a b)
 
-§F{f002:Subtract:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §R (- a b)
-§/F{f002}
-§/M{m001}
+  §F{f002:Subtract:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §R (- a b)
 ";
 
         // Act
@@ -124,14 +115,12 @@ public class BuildIntegrationTests
         // Arrange
         var source = @"
 §M{m001:Safe}
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b INT:0)
-  §R (/ a b)
-§/F{f001}
-§/M{m001}
+  §F{f001:Divide:pub}
+      §I{i32:a}
+      §I{i32:b}
+      §O{i32}
+      §Q (!= b INT:0)
+      §R (/ a b)
 ";
 
         // Act

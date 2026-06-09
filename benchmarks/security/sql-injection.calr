@@ -3,81 +3,74 @@
 
 §M{m001:SqlInjectionBenchmark}
 
-§F{f001:VulnerableQuery:pub}
-  §DOC{BUG: Direct SQL concatenation with user input}
-  §DOC{EXPECTED: Calor0981 SQL Injection}
-  §I{string:user_input}
-  §O{string}
-  §E{db:w}
-  §B{query:string} (+ STR:"SELECT * FROM users WHERE name = '" user_input)
-  §B{query:string} (+ query STR:"'")
-  §C db.execute query
-  §R query
-§/F{f001}
+  §F{f001:VulnerableQuery:pub}
+    §DOC{BUG: Direct SQL concatenation with user input}
+    §DOC{EXPECTED: Calor0981 SQL Injection}
+    §I{string:user_input}
+    §O{string}
+    §E{db:w}
+    §B{query:string} (+ STR:"SELECT * FROM users WHERE name = '" user_input)
+    §B{query:string} (+ query STR:"'")
+    §C db.execute query
+    §R query
 
-§F{f002:SafeParameterizedQuery:pub}
-  §DOC{SAFE: Parameterized query with placeholders}
-  §DOC{EXPECTED: No warnings}
-  §I{string:user_input}
-  §O{string}
-  §E{db:w}
-  §B{query:string} STR:"SELECT * FROM users WHERE name = ?"
-  §C db.execute_param query user_input
-  §R query
-§/F{f002}
+  §F{f002:SafeParameterizedQuery:pub}
+    §DOC{SAFE: Parameterized query with placeholders}
+    §DOC{EXPECTED: No warnings}
+    §I{string:user_input}
+    §O{string}
+    §E{db:w}
+    §B{query:string} STR:"SELECT * FROM users WHERE name = ?"
+    §C db.execute_param query user_input
+    §R query
 
-§F{f003:VulnerableMultipleConcatenation:pub}
-  §DOC{BUG: Multiple concatenations with user input}
-  §DOC{EXPECTED: Calor0981 SQL Injection}
-  §I{string:name}
-  §I{string:email}
-  §O{string}
-  §E{db:w}
-  §B{query:string} STR:"INSERT INTO users (name, email) VALUES ('"
-  §B{query:string} (+ query name)
-  §B{query:string} (+ query STR:"', '")
-  §B{query:string} (+ query email)
-  §B{query:string} (+ query STR:"')")
-  §C db.execute query
-  §R query
-§/F{f003}
+  §F{f003:VulnerableMultipleConcatenation:pub}
+    §DOC{BUG: Multiple concatenations with user input}
+    §DOC{EXPECTED: Calor0981 SQL Injection}
+    §I{string:name}
+    §I{string:email}
+    §O{string}
+    §E{db:w}
+    §B{query:string} STR:"INSERT INTO users (name, email) VALUES ('"
+    §B{query:string} (+ query name)
+    §B{query:string} (+ query STR:"', '")
+    §B{query:string} (+ query email)
+    §B{query:string} (+ query STR:"')")
+    §C db.execute query
+    §R query
 
-§F{f004:SafeEscapedInput:pub}
-  §DOC{SAFE: Input properly escaped before concatenation}
-  §DOC{EXPECTED: No warnings}
-  §I{string:user_input}
-  §O{string}
-  §E{db:w}
-  §B{escaped:string} (CALL sql_escape user_input)
-  §B{query:string} (+ STR:"SELECT * FROM users WHERE name = '" escaped)
-  §B{query:string} (+ query STR:"'")
-  §C db.execute query
-  §R query
-§/F{f004}
+  §F{f004:SafeEscapedInput:pub}
+    §DOC{SAFE: Input properly escaped before concatenation}
+    §DOC{EXPECTED: No warnings}
+    §I{string:user_input}
+    §O{string}
+    §E{db:w}
+    §B{escaped:string} (CALL sql_escape user_input)
+    §B{query:string} (+ STR:"SELECT * FROM users WHERE name = '" escaped)
+    §B{query:string} (+ query STR:"'")
+    §C db.execute query
+    §R query
 
-§F{f005:VulnerableIndirectTaint:pub}
-  §DOC{BUG: Taint propagates through intermediate variable}
-  §DOC{EXPECTED: Calor0981 SQL Injection}
-  §I{string:request_param}
-  §O{string}
-  §E{db:w}
-  §B{name:string} request_param
-  §B{search:string} name
-  §B{query:string} (+ STR:"SELECT * FROM users WHERE name LIKE '%" search)
-  §B{query:string} (+ query STR:"%'")
-  §C db.query query
-  §R query
-§/F{f005}
+  §F{f005:VulnerableIndirectTaint:pub}
+    §DOC{BUG: Taint propagates through intermediate variable}
+    §DOC{EXPECTED: Calor0981 SQL Injection}
+    §I{string:request_param}
+    §O{string}
+    §E{db:w}
+    §B{name:string} request_param
+    §B{search:string} name
+    §B{query:string} (+ STR:"SELECT * FROM users WHERE name LIKE '%" search)
+    §B{query:string} (+ query STR:"%'")
+    §C db.query query
+    §R query
 
-§F{f006:SafeConstantQuery:pub}
-  §DOC{SAFE: Query uses only constants}
-  §DOC{EXPECTED: No warnings}
-  §O{string}
-  §E{db:w}
-  §B{tableName:string} STR:"users"
-  §B{query:string} (+ STR:"SELECT COUNT(*) FROM " tableName)
-  §C db.execute query
-  §R query
-§/F{f006}
+  §F{f006:SafeConstantQuery:pub}
+    §DOC{SAFE: Query uses only constants}
+    §DOC{EXPECTED: No warnings}
+    §O{string}
+    §E{db:w}
+    §B{tableName:string} STR:"users"
+    §B{query:string} (+ STR:"SELECT COUNT(*) FROM " tableName)
+    §C db.execute query
+    §R query
 
-§/M{m001}

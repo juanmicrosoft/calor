@@ -2,12 +2,8 @@
   §CL{c001:MathUtils:pub:stat}
     §MT{m002:Square:pub:stat} (f64:x) -> f64
       §R (* x x)
-    §/MT{m002}
 
     §MT{m003:Cube:pub:stat} (f64:x) -> f64
       §R (* (* x x) x)
-    §/MT{m003}
 
-  §/CL{c001}
 
-§/M{m001}
