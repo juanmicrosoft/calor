@@ -113,13 +113,268 @@ public class CallStatementImplicitCloseTests
         // This passes today because §/C is present:
         var source = """
 §M{m001:Test}
-  §F{f001:Foo:i32}
-      §O{i32}
-      §B{x} §C{Identity} §A INT:1 §/C
-      §R x
+  §F{f001:Foo:pub}
+      §B{x:str} §C{Greeting} §/C
 """;
         var module = Parse(source, out var diags);
         Assert.False(diags.HasErrors,
             $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+
+        var bind = module.Functions.First().Body.OfType<BindStatementNode>().First();
+        var call = Assert.IsType<CallExpressionNode>(bind.Initializer);
+        Assert.Equal("Greeting", call.Target);
+    }
+
+    // -------------------------------------------------------------------
+    // v0.6.2 RFC §3.2 / §4 — STATEMENT-CONTEXT EMITTER ELISION
+    // -------------------------------------------------------------------
+    // The parser already accepts both `§C{Foo}` (zero-arg implicit close)
+    // and `§C{Foo} primary_expr` (one-arg inline) since pre-v0.6.
+    // v0.6.2 makes the EMITTER produce these shorter forms when
+    // `ConversionContext.UseImplicitCallCloser` is true (the default).
+
+    private static string EmitModule(string source, bool useImplicitCallCloser = true)
+    {
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Original errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+        var emitter = new Migration.CalorEmitter(
+            new Migration.ConversionContext { UseImplicitCallCloser = useImplicitCallCloser });
+        return module.Accept<string>(emitter);
+    }
+
+    [Fact]
+    public void V062_ZeroArgStmt_FlagOn_ElidesCloser()
+    {
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §C{DoWork} §/C
+""";
+        var emitted = EmitModule(source);
+        Assert.Contains("§C{DoWork}", emitted);
+        Assert.DoesNotContain("§C{DoWork} §/C", emitted);
+    }
+
+    [Fact]
+    public void V062_ZeroArgStmt_FlagOff_KeepsCloser()
+    {
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §C{DoWork} §/C
+""";
+        var emitted = EmitModule(source, useImplicitCallCloser: false);
+        Assert.Contains("§C{DoWork} §/C", emitted);
+    }
+
+    [Fact]
+    public void V062_OneArgStmt_LiteralArg_FlagOn_ElidesAAndCloser()
+    {
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §C{Console.WriteLine} §A STR:"hello" §/C
+""";
+        var emitted = EmitModule(source);
+        // CalorEmitter strips typed-literal prefixes for strings: STR:"x" -> "x"
+        Assert.Contains("§C{Console.WriteLine} \"hello\"", emitted);
+        Assert.DoesNotContain("§A", emitted);
+        Assert.DoesNotContain("§/C", emitted);
+    }
+
+    [Fact]
+    public void V062_OneArgStmt_IdentifierArg_FlagOn_ElidesAAndCloser()
+    {
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub} (str:msg)
+      §C{Console.WriteLine} §A msg §/C
+""";
+        var emitted = EmitModule(source);
+        Assert.Contains("§C{Console.WriteLine} msg", emitted);
+        Assert.DoesNotContain("§A msg", emitted);
+    }
+
+    [Fact]
+    public void V062_OneArgStmt_NestedZeroArgCallArg_ElidesOuterButKeepsInner()
+    {
+        // Inner zero-arg call is visited in inline-sibling context, so it
+        // must keep §/C; outer stmt call elides because it's at top level.
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §C{Outer} §A §C{Inner} §/C §/C
+""";
+        var emitted = EmitModule(source);
+        // Outer elided, inner kept its §/C
+        Assert.Contains("§C{Outer} §C{Inner} §/C", emitted);
+        // No standalone §A on this line
+        var line = emitted.Split('\n').First(l => l.Contains("Outer"));
+        Assert.DoesNotContain("§A", line);
+    }
+
+    [Fact]
+    public void V062_OneArgStmt_NewExpressionArg_ElidesAAndCloser()
+    {
+        // §NEW{T} on the same line — IsExpressionStart accepts §NEW.
+        var source = """
+§M{m001:Test}
+  §U{System.Text}
+  §F{f001:Foo:pub}
+      §C{Process} §A §NEW{StringBuilder} §/NEW §/C
+""";
+        var emitted = EmitModule(source);
+        Assert.Contains("§C{Process} §NEW{StringBuilder} §/NEW", emitted);
+    }
+
+    [Fact]
+    public void V062_NamedArg_StaysStandardForm()
+    {
+        // Named one-arg cannot use the inline form (§A[name] is required).
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §C{Greet} §A[who] STR:"world" §/C
+""";
+        var emitted = EmitModule(source);
+        Assert.Contains("§A[who] \"world\"", emitted);
+        Assert.Contains("§/C", emitted);
+    }
+
+    [Fact]
+    public void V062_MultiArgStmt_StaysStandardForm()
+    {
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §C{Math.Max} §A INT:1 §A INT:2 §/C
+""";
+        var emitted = EmitModule(source);
+        // Emitter strips INT: prefix on int literals.
+        Assert.Contains("§C{Math.Max} §A 1 §A 2 §/C", emitted);
+    }
+
+    [Fact]
+    public void V062_RoundTrip_OneArgElision_PreservesAst()
+    {
+        // Source has standard form; emit-then-reparse must produce the
+        // same logical AST as the original.
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §C{Console.WriteLine} §A STR:"hello" §/C
+      §C{Process} §A INT:42 §/C
+""";
+        var module1 = Parse(source, out var diags1);
+        Assert.False(diags1.HasErrors);
+
+        var emitted = EmitModule(source);
+        var module2 = Parse(emitted, out var diags2);
+        Assert.False(diags2.HasErrors,
+            $"Re-parse errors: {string.Join("; ", diags2.Errors.Select(e => e.Message))}");
+
+        var calls1 = module1.Functions.First().Body.OfType<CallStatementNode>().ToList();
+        var calls2 = module2.Functions.First().Body.OfType<CallStatementNode>().ToList();
+        Assert.Equal(calls1.Count, calls2.Count);
+        for (int i = 0; i < calls1.Count; i++)
+        {
+            Assert.Equal(calls1[i].Target, calls2[i].Target);
+            Assert.Equal(calls1[i].Arguments.Count, calls2[i].Arguments.Count);
+        }
+    }
+
+    [Fact]
+    public void V062_RoundTrip_Idempotent_AfterFirstElidedEmit()
+    {
+        // emit(parse(emit(parse(src)))) == emit(parse(src))
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub} (str:msg)
+      §C{Console.WriteLine} §A msg §/C
+      §C{DoWork} §/C
+""";
+        var emitted1 = EmitModule(source);
+        var emitted2 = EmitModule(emitted1);
+        Assert.Equal(emitted1, emitted2);
+    }
+
+    [Fact]
+    public void V062_InlineSiblingContext_StmtCalls_KeepCloser()
+    {
+        // Lambda short-statement-body emits multiple statements space-joined
+        // on a single line, inside _inInlineSiblingContext. Stmt-context
+        // elision must be suppressed there to avoid sibling absorption.
+        var lam = new LambdaExpressionNode(
+            default,
+            id: "l001",
+            parameters: new List<LambdaParameterNode>(),
+            effects: null,
+            isAsync: false,
+            expressionBody: null,
+            statementBody: new List<StatementNode>
+            {
+                new CallStatementNode(
+                    default, target: "A", fallible: false,
+                    arguments: new List<ExpressionNode>(),
+                    attributes: new AttributeCollection()),
+                new CallStatementNode(
+                    default, target: "B", fallible: false,
+                    arguments: new List<ExpressionNode>(),
+                    attributes: new AttributeCollection()),
+            },
+            attributes: new AttributeCollection());
+
+        var emitter = new Migration.CalorEmitter(
+            new Migration.ConversionContext { UseImplicitCallCloser = true });
+        var emitted = lam.Accept<string>(emitter);
+
+        // Both inner calls must keep §/C inside lambda short-body.
+        Assert.Contains("§C{A} §/C", emitted);
+        Assert.Contains("§C{B} §/C", emitted);
+    }
+
+    [Fact]
+    public void V062_OneArgStmt_MultiLineHoistedArg_ElidesAfterHoist()
+    {
+        // §NEW with object initializer emits multi-line; emitter hoists
+        // it to a temp var. After hoist the arg is a single identifier,
+        // which IS in IsExpressionStart, so the outer one-arg call elides.
+        var source = """
+§M{m001:Test}
+  §CL{c001:Person:pub}
+    §PROP{p002:Name:str:pub:get,set}
+  §F{f002:Foo:pub}
+      §C{Process} §A §NEW{Person}
+        Name = STR:"x"
+      §/NEW §/C
+""";
+        var emitted = EmitModule(source);
+        // The hoisted form should look like: §B{~_hoistNNN:Person} §NEW{Person} ... §/NEW followed by §C{Process} _hoistNNN
+        Assert.Matches(@"§C\{Process\}\s+_hoist\d+", emitted);
+    }
+
+    [Fact]
+    public void V062_ZeroArgStmt_AtEndOfBlock_RoundTrips()
+    {
+        // Last statement in a function body — followed by Dedent, not a sibling.
+        var source = """
+§M{m001:Test}
+  §F{f001:Foo:pub}
+      §C{Setup} §/C
+      §C{Run} §/C
+""";
+        var emitted = EmitModule(source);
+        Assert.DoesNotContain("§C{Run} §/C", emitted);
+
+        // Re-parse must yield the same two-call structure.
+        var module2 = Parse(emitted, out var diags);
+        Assert.False(diags.HasErrors);
+        var calls = module2.Functions.First().Body.OfType<CallStatementNode>().ToList();
+        Assert.Equal(2, calls.Count);
+        Assert.Equal("Setup", calls[0].Target);
+        Assert.Equal("Run", calls[1].Target);
+        Assert.Empty(calls[0].Arguments);
+        Assert.Empty(calls[1].Arguments);
     }
 }

@@ -1079,19 +1079,83 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // via HasEndNewBeforeEndCall, and nested §C/§/C balance the same
         // way. Hoisting those would needlessly introduce §B{~_hoist000}
         // temps that re-shape the source.
-        var args = node.Arguments.Select((a, i) =>
+        var rendered = node.Arguments.Select((a, i) =>
         {
             var argValue = AcceptInInlineSibling(a);
             if (argValue.Contains('\n'))
                 argValue = HoistToTempVar(argValue);
-            if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
-                return $"§A[{node.ArgumentNames[i]!.TrimStart('@')}] {argValue}";
-            return $"§A {argValue}";
-        });
-        var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
+            bool named = node.ArgumentNames != null
+                      && i < node.ArgumentNames.Count
+                      && node.ArgumentNames[i] != null;
+            var standardWrapped = named
+                ? $"§A[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
+                : $"§A {argValue}";
+            return (named, standardWrapped, argValue);
+        }).ToList();
+
         var target = ConvertVerbatimStringsInTarget(node.Target.Replace("->", "."));
+
+        // RFC v0.6 call-closer-elision §3.2 / §4 — statement-context elision.
+        // Stmt-context calls normally end at a newline (AppendLine adds \n),
+        // so §/C is safe to elide. Two elision shapes:
+        //   • Zero-arg: §C{target}<EOL>  (Parser.cs:1409-1413 path)
+        //   • One-arg positional: §C{target} <expr><EOL>  (Parser.cs:1398-1403 path)
+        // Named args, multi-arg, or args whose first token is not in
+        // IsExpressionStart() keep the standard §A ... §/C form.
+        // Also held back inside _inInlineSiblingContext (e.g. when a lambda
+        // short-body emits two statements space-joined on one line): there
+        // the next-sibling-statement opener IS on the same line, so eliding
+        // would risk absorption — mirrors the expression-context discipline
+        // at Visit(CallExpressionNode) line ~2380.
+        // Flag defaults to true as of v0.6.1 (was false in v0.6.0); set
+        // ConversionContext.UseImplicitCallCloser = false to opt out.
+        bool canElide = _context?.UseImplicitCallCloser != false
+                     && _inInlineSiblingContext == 0;
+
+        if (canElide && rendered.Count == 0)
+        {
+            AppendLine($"§C{{{target}}}");
+            return "";
+        }
+
+        if (canElide && rendered.Count == 1 && !rendered[0].named
+            && StartsWithExpressionStarter(rendered[0].argValue))
+        {
+            AppendLine($"§C{{{target}}} {rendered[0].argValue}");
+            return "";
+        }
+
+        var argsStr = rendered.Count > 0
+            ? $" {string.Join(" ", rendered.Select(r => r.standardWrapped))}"
+            : "";
         AppendLine($"§C{{{target}}}{argsStr} §/C");
         return "";
+    }
+
+    /// <summary>
+    /// Conservative whitelist for the leading character of a rendered
+    /// expression that ParseExpression() AND IsExpressionStart() both accept.
+    /// Used to gate stmt-context one-arg §/C elision: if the rendered arg
+    /// starts with a token that IsExpressionStart() rejects (e.g. <c>{</c>
+    /// for a collection initializer — Parser.cs:1584 vs 1506), the parser's
+    /// inline-arg path at Parser.cs:1398 will not fire and the call would
+    /// silently parse as zero-arg. RFC v0.6 call-closer-elision §3.2.
+    /// </summary>
+    private static bool StartsWithExpressionStarter(string rendered)
+    {
+        if (string.IsNullOrEmpty(rendered)) return false;
+        char c = rendered[0];
+        // §  → section markers (§C, §NEW, §ARR, §SOME, §IF, …)
+        // letter/_ → identifier or typed-literal prefix (INT:, STR:, BOOL:, …)
+        // digit → bare numeric literal
+        // (  → Lisp-style expression or inline lambda
+        // "  → string literal
+        // @  → verbatim identifier (@keyword)
+        // #  → self-reference (refinement predicates)
+        return c == '§'
+            || char.IsLetter(c) || c == '_'
+            || char.IsDigit(c)
+            || c == '(' || c == '"' || c == '@' || c == '#';
     }
 
     public string Visit(PrintStatementNode node)
