@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "description": "Calor vs C# evaluation benchmarks for AI coding agent effectiveness. 207 programs across 14 categories. Calor programs use functional pure-function style (not §CL/§IFACE class syntax) for cross-language comparability. Programs with expectedAdvantage < 1.0 are adversarial — C# is naturally more compact there.",
+  "description": "Calor vs C# evaluation benchmarks for AI coding agent effectiveness. 210 programs across 14 categories. Calor programs use functional pure-function style (not §CL/§IFACE class syntax) for cross-language comparability. Programs with expectedAdvantage < 1.0 are adversarial — C# is naturally more compact there.",
   "benchmarks": [
     {
       "id": "001",
@@ -1644,6 +1644,56 @@
       ],
       "notes": "ADVERSARIAL: C# ternary chains vs Calor \u00a7IF/\u00a7EI/\u00a7EL blocks. C# wins.",
       "expectedAdvantage": 0.7
+    },
+    {
+      "id": "050",
+      "name": "VoidSequence",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/VoidSequence.calr",
+      "csharpFile": "TokenEconomics/VoidSequence.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "void_return",
+        "call_statement",
+        "zero_arg_call",
+        "v0_6_2_elision"
+      ],
+      "notes": "Sequence of zero-arg void method calls (setup/process/shutdown). Exercises v0.6.2 stmt-context zero-arg \u00a7/C elision."
+    },
+    {
+      "id": "051",
+      "name": "LogPipeline",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/LogPipeline.calr",
+      "csharpFile": "TokenEconomics/LogPipeline.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "void_return",
+        "call_statement",
+        "one_arg_call",
+        "v0_6_2_elision"
+      ],
+      "notes": "Sequence of one-arg void method calls (logger pattern). Exercises v0.6.2 stmt-context one-arg \u00a7A+\u00a7/C elision."
+    },
+    {
+      "id": "052",
+      "name": "PairLogger",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/PairLogger.calr",
+      "csharpFile": "TokenEconomics/PairLogger.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "void_return",
+        "call_statement",
+        "multi_arg_call"
+      ],
+      "notes": "Sequence of multi-arg void method calls. NEUTRAL re v0.6.2: multi-arg calls retain standard \u00a7A\u2026\u00a7/C form."
     },
     {
       "id": "async001",
