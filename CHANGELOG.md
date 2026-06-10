@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+- **`calor diagnose` CLI command removed.** The command was deprecated in v0.5.x (PR #609) with a removal target of v0.6.0; this release completes that deprecation. For machine-readable diagnostics use the `calor_check` MCP tool with `action: "diagnose"` (or `calor_compile` with automatic fix application). Documentation pages and cross-links have been removed.
+
 ## [0.6.1] - 2026-06-09
 
 ### Benchmark Results (Statistical: 30 runs)

@@ -141,13 +141,10 @@ Class fields are in scope for all member bodies, preventing false uninitialized-
 
 ## Integration with CI/CD
 
-Use `calor diagnose --format sarif` for SARIF output compatible with GitHub Code Scanning and other tools:
+For machine-readable diagnostics in CI/CD pipelines, use the `calor_check` MCP tool (`action: "diagnose"`) via the [`calor mcp`](/cli/mcp/) server. The MCP tool returns JSON-formatted diagnostics with structured location and severity information suitable for downstream tooling.
 
 ```bash
-# Generate SARIF report
-calor diagnose MyModule.calr --format sarif --output results.sarif
-
-# Combine with static analysis
+# Combine compile with static analysis output
 calor -i MyModule.calr --analyze --permissive-effects 2> analysis-output.txt
 ```
 

@@ -213,7 +213,6 @@ public class Program
         rootCommand.AddCommand(InitCommand.Create());
         rootCommand.AddCommand(FormatCommand.Create());
         rootCommand.AddCommand(LintCommand.Create());
-        rootCommand.AddCommand(DiagnoseCommand.Create());
         rootCommand.AddCommand(AssessCommand.Create());
         rootCommand.AddCommand(AnalyzeConvertibilityCommand.Create());
         rootCommand.AddCommand(HookCommand.Create());

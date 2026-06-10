@@ -77,7 +77,7 @@ Error in Calculator.calr:12:5
 Compilation failed with 1 error
 ```
 
-For machine-readable error output, use [`calor diagnose`](/cli/diagnose/).
+For machine-readable diagnostics, use the `calor_check` MCP tool (`action: "diagnose"`).
 
 ---
 
@@ -142,6 +142,5 @@ calor -i MyModule.calr -o MyModule.g.cs --verify --clear-cache
 ## See Also
 
 - [calor init](/cli/init/) - Set up automatic compilation with MSBuild
-- [calor diagnose](/cli/diagnose/) - Machine-readable diagnostics
 - [calor format](/cli/format/) - Format Calor source files
 - [Static Contract Verification](/philosophy/static-verification/) - Z3 verification details
