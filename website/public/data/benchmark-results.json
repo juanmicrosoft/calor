@@ -1,11 +1,11 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-09T15:24:11.3402872Z",
-  "commit": "b2bbec53",
+  "timestamp": "2026-06-10T15:49:25.8303576Z",
+  "commit": "3a2f9549",
   "frameworkVersion": "1.0.0",
   "summary": {
     "overallAdvantage": 1.29,
-    "programCount": 207,
+    "programCount": 210,
     "metricCount": 8,
     "calorWins": 7,
     "cSharpWins": 1,
@@ -16,12 +16,12 @@
       "ratio": 1.12,
       "winner": "calor",
       "ci95": [
-        1.122,
-        1.122
+        1.116,
+        1.116
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": -0.125,
+      "effectSize": -0.12,
       "effectInterpretation": "negligible"
     },
     "GenerationAccuracy": {
@@ -33,19 +33,19 @@
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": 0.344,
+      "effectSize": 0.341,
       "effectInterpretation": "small"
     },
     "Comprehension": {
-      "ratio": 1.85,
+      "ratio": 1.86,
       "winner": "calor",
       "ci95": [
-        1.855,
-        1.855
+        1.857,
+        1.857
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": 1.841,
+      "effectSize": 1.837,
       "effectInterpretation": "large"
     },
     "EditPrecision": {
@@ -57,55 +57,55 @@
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": 4.829,
+      "effectSize": 4.854,
       "effectInterpretation": "large"
     },
     "ErrorDetection": {
-      "ratio": 1.52,
+      "ratio": 1.51,
       "winner": "calor",
       "ci95": [
-        1.515,
-        1.515
+        1.508,
+        1.508
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": 1.263,
+      "effectSize": 1.245,
       "effectInterpretation": "large"
     },
     "InformationDensity": {
       "ratio": 0.99,
       "winner": "csharp",
       "ci95": [
-        0.994,
-        0.994
+        0.988,
+        0.988
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": -0.436,
+      "effectSize": -0.466,
       "effectInterpretation": "small"
     },
     "RefactoringStability": {
       "ratio": 1.38,
       "winner": "calor",
       "ci95": [
-        1.376,
-        1.376
+        1.377,
+        1.377
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": 7.097,
+      "effectSize": 7.098,
       "effectInterpretation": "large"
     },
     "Correctness": {
-      "ratio": 1.31,
+      "ratio": 1.3,
       "winner": "calor",
       "ci95": [
-        1.308,
-        1.308
+        1.303,
+        1.303
       ],
       "significant": true,
       "pValue": 0.0001,
-      "effectSize": 1.397,
+      "effectSize": 1.371,
       "effectInterpretation": "large"
     }
   },
@@ -2714,6 +2714,83 @@
       }
     },
     {
+      "id": "050",
+      "name": "VoidSequence",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "void_return",
+        "call_statement",
+        "zero_arg_call",
+        "v0_6_2_elision"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.266,
+      "metrics": {
+        "TokenEconomics": 0.679,
+        "GenerationAccuracy": 1,
+        "Comprehension": 3.028,
+        "EditPrecision": 1.351,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.601,
+        "RefactoringStability": 1.471,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "051",
+      "name": "LogPipeline",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "void_return",
+        "call_statement",
+        "one_arg_call",
+        "v0_6_2_elision"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.077,
+      "metrics": {
+        "TokenEconomics": 0.783,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.578,
+        "EditPrecision": 1.314,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.53,
+        "RefactoringStability": 1.415,
+        "Correctness": 1
+      }
+    },
+    {
+      "id": "052",
+      "name": "PairLogger",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "void_return",
+        "call_statement",
+        "multi_arg_call"
+      ],
+      "calorSuccess": true,
+      "cSharpSuccess": true,
+      "advantage": 1.038,
+      "metrics": {
+        "TokenEconomics": 0.678,
+        "GenerationAccuracy": 1,
+        "Comprehension": 1.421,
+        "EditPrecision": 1.314,
+        "ErrorDetection": 1,
+        "InformationDensity": 0.473,
+        "RefactoringStability": 1.415,
+        "Correctness": 1
+      }
+    },
+    {
       "id": "async001",
       "name": "SimpleAsync",
       "level": 3,
@@ -5076,11 +5153,11 @@
     ],
     "categoryDetails": {
       "TokenEconomics": {
-        "mean": 1.122,
-        "stdDev": 16.542,
-        "ci95Lower": 1.11,
-        "ci95Upper": 1.134,
-        "cohensD": -0.125,
+        "mean": 1.116,
+        "stdDev": 16.589,
+        "ci95Lower": 1.104,
+        "ci95Upper": 1.128,
+        "cohensD": -0.12,
         "pValue": 0.0001,
         "significant": true
       },
@@ -5088,62 +5165,62 @@
         "mean": 1.017,
         "stdDev": 0.039,
         "ci95Lower": 1.016,
-        "ci95Upper": 1.019,
-        "cohensD": 0.344,
+        "ci95Upper": 1.018,
+        "cohensD": 0.341,
         "pValue": 0.0001,
         "significant": true
       },
       "Comprehension": {
-        "mean": 1.855,
+        "mean": 1.857,
         "stdDev": 0.032,
-        "ci95Lower": 1.841,
-        "ci95Upper": 1.868,
-        "cohensD": 1.841,
+        "ci95Lower": 1.843,
+        "ci95Upper": 1.871,
+        "cohensD": 1.837,
         "pValue": 0.0001,
         "significant": true
       },
       "EditPrecision": {
         "mean": 1.36,
         "stdDev": 0.008,
-        "ci95Lower": 1.358,
-        "ci95Upper": 1.363,
-        "cohensD": 4.829,
+        "ci95Lower": 1.357,
+        "ci95Upper": 1.362,
+        "cohensD": 4.854,
         "pValue": 0.0001,
         "significant": true
       },
       "ErrorDetection": {
-        "mean": 1.515,
+        "mean": 1.508,
         "stdDev": 0.105,
-        "ci95Lower": 1.502,
-        "ci95Upper": 1.529,
-        "cohensD": 1.263,
+        "ci95Lower": 1.494,
+        "ci95Upper": 1.522,
+        "cohensD": 1.245,
         "pValue": 0.0001,
         "significant": true
       },
       "InformationDensity": {
-        "mean": 0.994,
+        "mean": 0.988,
         "stdDev": 0.024,
-        "ci95Lower": 0.984,
-        "ci95Upper": 1.004,
-        "cohensD": -0.436,
+        "ci95Lower": 0.978,
+        "ci95Upper": 0.998,
+        "cohensD": -0.466,
         "pValue": 0.0001,
         "significant": true
       },
       "RefactoringStability": {
-        "mean": 1.376,
+        "mean": 1.377,
         "stdDev": 0.01,
         "ci95Lower": 1.374,
-        "ci95Upper": 1.379,
-        "cohensD": 7.097,
+        "ci95Upper": 1.38,
+        "cohensD": 7.098,
         "pValue": 0.0001,
         "significant": true
       },
       "Correctness": {
-        "mean": 1.308,
-        "stdDev": 0.054,
-        "ci95Lower": 1.3,
-        "ci95Upper": 1.315,
-        "cohensD": 1.397,
+        "mean": 1.303,
+        "stdDev": 0.055,
+        "ci95Lower": 1.296,
+        "ci95Upper": 1.311,
+        "cohensD": 1.371,
         "pValue": 0.0001,
         "significant": true
       }
