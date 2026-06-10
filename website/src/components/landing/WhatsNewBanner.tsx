@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.6.1</span>
+            <span className="font-semibold text-calor-cerulean">v0.6.2</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">Implicit `§/C` for zero-arg `§C` calls is now the default — more idiomatic Calor by default; opt-out via `--explicit-call-closers`.</span>
+            <span className="text-foreground">Statement-context `§C` calls now elide `§/C` by default, the deprecated `calor diagnose` command was removed, and the benchmark corpus grew to 210 programs.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"

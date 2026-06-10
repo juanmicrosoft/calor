@@ -10,6 +10,20 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-06-10
+
+### Added
+- **Elision-aware TokenEconomics benchmark fixtures** (`VoidSequence`, `LogPipeline`, `PairLogger`) exercise the new statement-context `§/C` elision path. Corpus is now 210 programs.
+
+### Changed
+- **Statement-context `§C` calls now elide `§/C` by default (when safe).** `CalorEmitter.Visit(CallStatementNode)` rewrites zero-argument calls as `§C{target}` and one-argument unnamed calls (with safe-prefix arguments) as `§C{target} arg`. Mirrors the v0.6.1 behavior for expression-context calls. Elision is gated by `UseImplicitCallCloser` and suppressed in inline-sibling contexts.
+
+### Removed
+- **`calor diagnose` CLI command removed.** Deprecated in v0.5.x with a stated removal target of v0.6.0; v0.6.2 completes that deprecation. For machine-readable diagnostics use the `calor_check` MCP tool with `action: "diagnose"` (or `calor_compile` with automatic fix application).
+
+### Fixed
+- **Contract verifier: class methods, user-defined types, and visibility preservation.** `ContractSimplificationPass` now preserves `Visibility` so the verifier reaches `§MT` members. `ContractVerificationPass` walks class-method bodies. Z3 translator gained support for user-defined types and dot-path field access (`a.b.c`).
+
 ## [0.6.1] - 2026-06-09
 
 ### Changed

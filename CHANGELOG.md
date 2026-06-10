@@ -4,8 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-06-10
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.29x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.86x ± 0.00 (Calor wins, large effect d=1.84)
+  - ErrorDetection: 1.51x ± 0.00 (Calor wins, large effect d=1.25)
+  - RefactoringStability: 1.38x ± 0.00 (Calor wins, large effect d=7.10)
+  - EditPrecision: 1.36x ± 0.00 (Calor wins, large effect d=4.85)
+  - Correctness: 1.30x ± 0.00 (Calor wins, large effect d=1.37)
+  - TokenEconomics: 1.12x ± 0.00 (Calor wins)
+  - GenerationAccuracy: 1.02x ± 0.00 (Calor wins, marginal)
+  - InformationDensity: 0.99x ± 0.00 (C# wins, small effect d=-0.47)
+- **Programs Tested**: 210 (was 207 in v0.6.1 — three new TokenEconomics fixtures exercising statement-context call elision: `VoidSequence`, `LogPipeline`, `PairLogger`)
+
+### Added
+- **Elision-aware TokenEconomics benchmark fixtures.** Three new programs (`VoidSequence`, `LogPipeline`, `PairLogger`) added to `tests/TestData/Benchmarks/TokenEconomics/` to exercise the new statement-context `§/C` elision path. Two are favorable to Calor (zero-arg and one-arg call sequences); `PairLogger` is a neutral control using multi-arg calls where elision does not apply. See PR #653 for the bias analysis.
+
+### Changed
+- **Statement-context `§C` calls now elide `§/C` by default (when safe).** `CalorEmitter.Visit(CallStatementNode)` rewrites zero-argument calls as `§C{target}` and one-argument unnamed calls (with safe-prefix arguments) as `§C{target} arg`, matching the v0.6.1 behavior for expression-context calls. Elision is gated by `UseImplicitCallCloser` and is suppressed inside inline-sibling contexts (e.g. short lambda bodies) to avoid AST corruption. RFC: `docs/plans/v0.6-call-closer-elision.md` §3.2/§4. See PR #652.
+
 ### Removed
 - **`calor diagnose` CLI command removed.** The command was deprecated in v0.5.x (PR #609) with a removal target of v0.6.0; this release completes that deprecation. For machine-readable diagnostics use the `calor_check` MCP tool with `action: "diagnose"` (or `calor_compile` with automatic fix application). Documentation pages and cross-links have been removed.
+
+### Fixed
+- **Contract verifier: class methods, user-defined types, and visibility preservation.** `ContractSimplificationPass` now preserves the `Visibility` of class methods so the contract verifier can be reached for `§MT` members. `ContractVerificationPass` extended to walk class-method bodies. The Z3 contract translator gained support for user-defined types and dot-path field access (`a.b.c`). PR #618.
 
 ## [0.6.1] - 2026-06-09
 
