@@ -794,36 +794,14 @@ public class CallExpressionImplicitCloseTests
     }
 
     [Fact]
-    public void RoundTrip_ZeroArgCallStatement_FollowedBySiblingStatement_PreservesShape()
+    public void RoundTrip_ZeroArgCallStatement_FollowedBySiblingStatement_ElidesInV062()
     {
         // Two adjacent zero-arg call statements at function-body level.
-        // Statement-form §C{Foo} §/C is the existing emitter behavior;
-        // even with the flag flipped, statement-form keeps §/C explicit
-        // because absorbing the next sibling statement would be ambiguous.
-        var foo = new CallStatementNode(
-            default, target: "Bar", fallible: false,
-            arguments: new List<ExpressionNode>(),
-            attributes: new AttributeCollection());
-        var emitter = new Migration.CalorEmitter(
-            new Migration.ConversionContext { UseImplicitCallCloser = true });
-        foo.Accept<string>(emitter);
-        // The statement emitter appends to its internal buffer via AppendLine.
-        // We can't easily get the buffer; instead, build a function whose body
-        // is two such statements and emit the whole module.
-        var bar = new CallStatementNode(
-            default, target: "Bar", fallible: false,
-            arguments: new List<ExpressionNode>(),
-            attributes: new AttributeCollection());
-        var baz = new CallStatementNode(
-            default, target: "Baz", fallible: false,
-            arguments: new List<ExpressionNode>(),
-            attributes: new AttributeCollection());
-        var fnEmitter = new Migration.CalorEmitter(
-            new Migration.ConversionContext { UseImplicitCallCloser = true });
-        var barOutput = bar.Accept<string>(fnEmitter);
-        var bazOutput = baz.Accept<string>(fnEmitter);
-        // Statement-form always returns "" — the buffer holds the actual text.
-        // We're verifying via a different angle: round-trip through full source.
+        // v0.6.1 kept §/C on every stmt-context call; v0.6.2 (RFC §3.2/§4)
+        // elides §/C in stmt context when not inside an inline-sibling
+        // context. Function-body siblings are on their own lines, so the
+        // parser's zero-arg implicit-close path at Parser.cs:1409-1413
+        // handles the next-line sibling unambiguously.
         var source = """
 §M{m001:Test}
   §F{f001:Foo:pub}
@@ -837,9 +815,31 @@ public class CallExpressionImplicitCloseTests
         var ctx2 = new Migration.ConversionContext { UseImplicitCallCloser = true };
         var fullEmitter = new Migration.CalorEmitter(ctx2);
         var fullEmitted = module.Accept<string>(fullEmitter);
-        // Both statement-form calls must keep their §/C even with flag on.
-        Assert.Contains("§C{Bar} §/C", fullEmitted);
-        Assert.Contains("§C{Baz} §/C", fullEmitted);
+
+        // v0.6.2: both stmt-context zero-arg calls drop their §/C.
+        Assert.Contains("§C{Bar}", fullEmitted);
+        Assert.Contains("§C{Baz}", fullEmitted);
+        Assert.DoesNotContain("§C{Bar} §/C", fullEmitted);
+        Assert.DoesNotContain("§C{Baz} §/C", fullEmitted);
+
+        // Round-trip must remain structurally stable.
+        var module2 = Parse(fullEmitted, out var diags2);
+        Assert.False(diags2.HasErrors,
+            $"Re-parse errors: {string.Join("; ", diags2.Errors.Select(e => e.Message))}");
+        var fn = module2.Functions.First();
+        var calls = fn.Body.OfType<CallStatementNode>().ToList();
+        Assert.Equal(2, calls.Count);
+        Assert.Equal("Bar", calls[0].Target);
+        Assert.Empty(calls[0].Arguments);
+        Assert.Equal("Baz", calls[1].Target);
+        Assert.Empty(calls[1].Arguments);
+
+        // Opt-out: with the flag off, both keep §/C.
+        var legacyEmitter = new Migration.CalorEmitter(
+            new Migration.ConversionContext { UseImplicitCallCloser = false });
+        var legacyEmitted = module.Accept<string>(legacyEmitter);
+        Assert.Contains("§C{Bar} §/C", legacyEmitted);
+        Assert.Contains("§C{Baz} §/C", legacyEmitted);
     }
 
     [Fact]
@@ -938,14 +938,14 @@ public class CallExpressionImplicitCloseTests
             // The token after `{body}` is `§/LAM` (LambdaEnd) which is NOT
             // in Parser.IsExpressionStart(), so an elided zero-arg §C body
             // cannot absorb it as an inline arg. Loop-5 verified.
-            2610,
+            2674,
 
             // With-expression emits `§WITH {target} {assignments} §/WITH`.
             // The token after `{target}` is `{assignments}` which begins
             // with `§SET` (not in IsExpressionStart), and the closer is
             // `§/WITH`. An elided zero-arg §C target cannot absorb §SET
             // as an inline arg. Loop-5 verified.
-            3157,
+            3221,
         };
 
         var violations = new List<string>();
