@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Phase 2 — bulk round-trip validation.
+"""Phase 2 — bulk round-trip validation (historical, kept for reference).
 
 For each real .calr fixture (samples/, src/, tests/, benchmarks/):
   1. Read the closer-form source.
   2. Run `to_indent` to produce indent-form source.
-  3. Invoke `calor diagnose` on BOTH versions.
-  4. Compare diagnostic counts (closer vs indent should match).
+  3. Invoke the calor compiler on BOTH versions.
+  4. Compare compile success (closer vs indent should match).
 
-Reports any fixture where indent diagnostics differ from closer diagnostics.
+Note: closer-form syntax was removed in Phase 4d. This script is preserved for
+historical reference but is effectively a no-op against the current corpus.
+The previous implementation invoked the deprecated `calor diagnose` CLI command,
+which was removed in v0.6.2 — it now invokes the root compile command and
+compares exit codes.
 """
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 import tempfile
@@ -40,28 +43,22 @@ def discover_fixtures() -> list[Path]:
 
 
 def diagnose(path: Path) -> tuple[int, str]:
-    """Return (error_count, stdout_or_stderr)."""
+    """Return (error_count, stdout_or_stderr).
+
+    Uses the root compile command (exit code 0 = success, non-zero = errors).
+    Replaces the previously-used `calor diagnose` CLI command, which was
+    removed in v0.6.2 — see CHANGELOG.md.
+    """
     try:
         r = subprocess.run(
-            ['dotnet', str(CALOR_DLL), 'diagnose', str(path)],
+            ['dotnet', str(CALOR_DLL), '-i', str(path)],
             capture_output=True, text=True, timeout=30,
             encoding='utf-8', errors='replace',
         )
     except subprocess.TimeoutExpired:
         return (-1, 'TIMEOUT')
-    out = r.stdout
-    err_count = 0
-    for line in out.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            j = json.loads(line)
-            if j.get('severity') == 'error':
-                err_count += 1
-        except json.JSONDecodeError:
-            pass
-    return (err_count, out)
+    err_count = 1 if r.returncode != 0 else 0
+    return (err_count, (r.stdout or '') + (r.stderr or ''))
 
 
 def main() -> int:

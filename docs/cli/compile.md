@@ -119,7 +119,7 @@ Error in Calculator.calr:12:5
 Compilation failed with 1 error
 ```
 
-For machine-readable error output, use [`calor diagnose`](/calor/cli/diagnose/).
+For machine-readable diagnostics, use the `calor_check` MCP tool (`action: "diagnose"`).
 
 ---
 
@@ -256,6 +256,5 @@ First compilation runs Z3 for each contract (can take seconds per complex contra
 ## See Also
 
 - [calor init](/calor/cli/init/) - Set up automatic compilation with MSBuild
-- [calor diagnose](/calor/cli/diagnose/) - Machine-readable diagnostics
 - [calor format](/calor/cli/format/) - Format Calor source files
 - [Getting Started](/calor/getting-started/) - Installation and first program

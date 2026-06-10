@@ -289,6 +289,5 @@ Most editors can be configured to run formatters on save:
 
 ## See Also
 
-- [calor diagnose](/calor/cli/diagnose/) - Check for errors and warnings
 - [calor compile](/calor/cli/compile/) - Compile Calor to C#
 - [Syntax Reference](/calor/syntax-reference/) - Calor language reference
