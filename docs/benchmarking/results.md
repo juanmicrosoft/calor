@@ -1,6 +1,6 @@
 <!-- THIS FILE IS AUTO-GENERATED. DO NOT EDIT MANUALLY. -->
 <!-- Generated from website/public/data/benchmark-results.json by CI/CD -->
-<!-- Last generated: 2026-02-24T14:37:29.066Z -->
+<!-- Last generated: 2026-06-10T16:07:00.716Z -->
 
 ---
 layout: default
@@ -11,9 +11,9 @@ nav_order: 2
 
 # Benchmark Results
 
-Evaluated across 207 paired Calor/C# programs.
+Evaluated across 210 paired Calor/C# programs.
 
-**Last updated:** February 24, 2026 (commit: c7665e6)
+**Last updated:** June 10, 2026 (commit: 74109e5)
 
 ---
 
@@ -21,13 +21,14 @@ Evaluated across 207 paired Calor/C# programs.
 
 | Category | Calor vs C# | Winner | Interpretation |
 |:---------|:-----------|:-------|:---------------|
-| Comprehension | **2.12x** | Calor | Explicit structure aids understanding |
-| Error Detection | **1.75x** | Calor | Contracts surface invariant violations |
-| Edit Precision | **1.38x** | Calor | Unique IDs enable targeted changes |
-| Refactoring Stability | **1.30x** | Calor | Structural IDs preserve refactoring intent |
+| Comprehension | **1.77x** | Calor | Explicit structure aids understanding |
+| Error Detection | **1.41x** | Calor | Contracts surface invariant violations |
+| Edit Precision | **1.36x** | Calor | Unique IDs enable targeted changes |
+| Refactoring Stability | **1.37x** | Calor | Structural IDs preserve refactoring intent |
 | Generation Accuracy | **1.02x** | Calor | Better code generation from prompts |
-| Token Economics | 0.73x | C# | Calor's explicit syntax uses more tokens |
-| Information Density | **1.08x** | Calor | More semantic content per token |
+| Task Completion | **1.00x** | Calor | Better task completion rate |
+| Token Economics | **1.02x** | Calor | More compact representation |
+| Information Density | 0.93x | C# | Calor trades density for explicitness |
 
 ---
 
@@ -35,18 +36,18 @@ Evaluated across 207 paired Calor/C# programs.
 
 ### Where Calor Wins
 
-#### Comprehension (2.12x)
+#### Comprehension (1.77x)
 
 Calor's explicit structure provides clear signals for understanding:
 
 | Factor | Calor | C# |
 |:-------|:-----|:---|
-| Module boundaries | `§M{id:name}` opener + indented body (indent form) | `namespace Name { }` |
+| Module boundaries | `§M{id:name}...§/M{id}` | `namespace Name { }` |
 | Function signatures | `§F{id:name:vis}` with `§I`, `§O` | Method declarations |
 | Side effects | Explicit `§E{cw,db:rw}` | Must infer from code |
 | Contracts | First-class `§Q`, `§S` | Comments or assertions |
 
-#### Error Detection (1.75x)
+#### Error Detection (1.41x)
 
 Contracts make invariants explicit:
 
@@ -60,7 +61,7 @@ if (x < 0) throw new ArgumentException();
 Debug.Assert(result >= 0);
 ```
 
-#### Edit Precision (1.38x)
+#### Edit Precision (1.36x)
 
 Unique IDs enable precise targeting:
 
@@ -72,7 +73,7 @@ Unique IDs enable precise targeting:
 for (int i = 0; i < 100; i++)
 ```
 
-#### Refactoring Stability (1.30x)
+#### Refactoring Stability (1.37x)
 
 Structural IDs maintain references across refactoring operations, enabling reliable multi-step transformations.
 
@@ -80,25 +81,21 @@ Structural IDs maintain references across refactoring operations, enabling relia
 
 Calor benefits from explicit structure that reduces generation ambiguity.
 
-#### Information Density (1.08x)
+#### Task Completion (1.00x)
 
-Calor achieves higher density through semantic annotations.
+Calor benefits when tasks require understanding code behavior through contracts.
+
+#### Token Economics (1.02x)
+
+Calor achieves compact representation through Lisp-style expressions.
 
 ---
 
 ### Where C# Wins
 
-#### Token Economics (0.73x)
+#### Information Density (0.93x)
 
-C# is more compact:
-
-| Operation | Calor | C# |
-|:----------|:-----|:---|
-| Return sum | `§R (+ a b)` | `return a + b;` |
-| Print value | `§P x` | `Console.WriteLine(x);` |
-| Function def | 5-7 lines | 3-5 lines |
-
-Average: Calor uses ~1.5x more tokens than C#.
+C# packs more semantic content per token by using implicit information and familiar shorthand.
 
 ---
 
@@ -107,14 +104,16 @@ Average: Calor uses ~1.5x more tokens than C#.
 ```
                     Calor better <-  -> C# better
                          |
-Comprehension     ████████████████  2.12x
-Error Detection   ██████████████░░  1.75x
-Edit Precision    ███████████░░░░░  1.38x
-Refactoring Stability██████████░░░░░░  1.30x
+Comprehension     ██████████████░░  1.77x
+Error Detection   ███████████░░░░░  1.41x
+Edit Precision    ███████████░░░░░  1.36x
+Refactoring Stability███████████░░░░░  1.37x
                          |
 Generation Accuracy████████░░░░░░░░  1.02x
-Token Economics   ░░░░░░░░░░██████  0.73x
-Information Density█████████░░░░░░░  1.08x
+Task Completion   ████████░░░░░░░░  1.00x
+                         |
+Token Economics   ████████░░░░░░░░  1.02x
+Information Density░░░░░░░░░███████  0.93x
 ```
 
 ---
