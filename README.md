@@ -166,7 +166,7 @@ The server exposes 19 tools across five categories:
 
 | Category | Tools |
 |:---------|:------|
-| Compilation & Verification | `calor_compile`, `calor_typecheck`, `calor_verify`, `calor_verify_contracts`, `calor_diagnose` |
+| Compilation & Verification | `calor_compile`, `calor_typecheck`, `calor_verify`, `calor_verify_contracts`, `calor_check` |
 | Code Navigation (LSP-style) | `calor_goto_definition`, `calor_find_references`, `calor_symbol_info`, `calor_document_outline`, `calor_find_symbol` |
 | Analysis & Migration | `calor_analyze`, `calor_assess`, `calor_convert`, `calor_compile_check_compat` |
 | Code Quality | `calor_lint`, `calor_format`, `calor_validate_snippet` |
