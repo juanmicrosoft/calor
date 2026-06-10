@@ -1,0 +1,14 @@
+§M{m001:VoidSequence}
+  §F{f001:Initialize:pub} () -> void
+    §R
+
+  §F{f002:Process:pub} () -> void
+    §R
+
+  §F{f003:Shutdown:pub} () -> void
+    §R
+
+  §F{f004:Execute:pub} () -> void
+    §C{Initialize}
+    §C{Process}
+    §C{Shutdown}

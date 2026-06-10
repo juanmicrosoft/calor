@@ -1,0 +1,7 @@
+§M{m001:PairLogger}
+  §F{f001:LogPair:pub} (str:key, i32:value) -> void
+    §R
+
+  §F{f002:RunReport:pub} (str:k1, i32:v1, str:k2, i32:v2) -> void
+    §C{LogPair} §A k1 §A v1 §/C
+    §C{LogPair} §A k2 §A v2 §/C

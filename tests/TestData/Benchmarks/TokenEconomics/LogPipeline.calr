@@ -1,0 +1,8 @@
+§M{m001:LogPipeline}
+  §F{f001:Log:pub} (str:msg) -> void
+    §R
+
+  §F{f002:RunBatch:pub} (str:a, str:b, str:c) -> void
+    §C{Log} a
+    §C{Log} b
+    §C{Log} c
