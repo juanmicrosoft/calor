@@ -4,7 +4,7 @@
       §ASSIGN result 0
       §IF{if003} (isempty input)
         §R false
-      §ASSIGN result §C{int.Parse} §A input §/C
+      §ASSIGN result §C{int.Parse} input
       §R true
 
     §MT{m004:Increment:pub} (i32:value:ref)

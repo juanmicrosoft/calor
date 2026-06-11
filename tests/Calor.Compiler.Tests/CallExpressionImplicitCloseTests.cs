@@ -335,6 +335,29 @@ public class CallExpressionImplicitCloseTests
     }
 
     [Fact]
+    public void ExpressionContext_OneArgFollowedBySiblingStatement_NoCalor0150()
+    {
+        // v0.6.3 — sibling-statement-on-next-line must NOT trigger Calor0150.
+        // Without the same-line guard at Parser.cs ~7992, the §IF on the
+        // next line would be misclassified as a second positional arg of
+        // §C{pred}. Mirrors the conversion-scorecard test 093 (Delegates):
+        // `§B{_pre} §C{pred} §IDX{numbers} i / §IF _pre ...`.
+        var source = """
+§M{m001:Test}
+  §F{f001:Filter:pub} (i32[]:numbers, F:pred) -> i32
+      §B{~count:i32} 0
+      §L{for010:i:0:(- (len numbers) 1):1}
+          §B{_pre} §C{pred} §IDX{numbers} i
+          §IF{if011} _pre
+              §ASSIGN count (+ count 1)
+      §R count
+""";
+        Parse(source, out var diags);
+        Assert.DoesNotContain(diags.Errors,
+            e => e.Code == DiagnosticCode.AmbiguousCallContinuation);
+    }
+
+    [Fact]
     public void ExpressionContext_GenericTargetAndZeroArg_Parses()
     {
         // §B{xs} §C{Array.Empty<i32>}   ← generic target, zero-arg, no §/C
@@ -608,14 +631,13 @@ public class CallExpressionImplicitCloseTests
     }
 
     [Fact]
-    public void Emitter_OneArgCall_ImplicitCloserFlagTrue_StillEmitsCloser()
+    public void Emitter_OneArgCall_ImplicitCloserFlagTrue_ElidesCloser()
     {
-        // v0.6.1 ships zero-arg-only emitter elision (RFC §6). The one-arg
-        // path needs context-aware safety (a §C inside a Lisp `(+ a b)`
-        // arg-list would consume its sibling) — that work tracks separately
-        // in CHANGELOG.md under "Out of scope for v0.6.1". This test pins
-        // the intentional zero-arg-only limitation so it can't silently
-        // expand without a deliberate decision.
+        // v0.6.3 (RFC v0.6 call-closer-elision §2.1/§2.2): one-arg expression-context
+        // calls now elide §/C by default — mirroring the stmt-context behavior
+        // shipped in v0.6.2 (PR #652). Trailing-postfix safety (RFC §3.2 case A)
+        // is handled by FieldAccessNode hoisting on section-marker detection;
+        // sibling-absorption safety is handled by _inInlineSiblingContext.
         var args = new List<ExpressionNode>
         {
             new IntLiteralNode(default, 42),
@@ -624,7 +646,88 @@ public class CallExpressionImplicitCloseTests
         var ctx = new Migration.ConversionContext { UseImplicitCallCloser = true };
         var emitter = new Migration.CalorEmitter(ctx);
         var output = call.Accept<string>(emitter);
+        Assert.Equal("§C{Identity} 42", output);
+    }
+
+    [Fact]
+    public void Emitter_OneArgCall_ImplicitCloserFlagFalse_PinsExplicitCloser()
+    {
+        // Opt-out path mirror for one-arg: UseImplicitCallCloser=false restores
+        // the explicit §A ... §/C form. Pins the opt-out so it can't silently
+        // regress alongside the v0.6.3 default flip.
+        var args = new List<ExpressionNode>
+        {
+            new IntLiteralNode(default, 42),
+        };
+        var call = new CallExpressionNode(default, "Identity", args);
+        var ctx = new Migration.ConversionContext { UseImplicitCallCloser = false };
+        var emitter = new Migration.CalorEmitter(ctx);
+        var output = call.Accept<string>(emitter);
+        Assert.Equal("§C{Identity} §A 42 §/C", output);
+    }
+
+    [Fact]
+    public void Emitter_OneArgCall_NamedArg_KeepsExplicitCloser()
+    {
+        // Named arguments cannot use the inline-arg form (the parser's one-arg
+        // implicit-close path at Parser.cs:1398 only accepts a primary_expr,
+        // not §A[name] value). Must keep §A[name] ... §/C even at leaf positions.
+        var args = new List<ExpressionNode> { new IntLiteralNode(default, 42) };
+        var argNames = new List<string?> { "value" };
+        var call = new CallExpressionNode(default, "Configure", args, argNames);
+        var emitter = new Migration.CalorEmitter();
+        var output = call.Accept<string>(emitter);
+        Assert.Equal("§C{Configure} §A[value] 42 §/C", output);
+    }
+
+    [Fact]
+    public void Emitter_OneArgCallInsideOuterCallArgs_KeepsExplicitCloser()
+    {
+        // BLOCKER mirror for one-arg: a one-arg call as one of several §A
+        // arguments to an outer call MUST keep its explicit §/C. Otherwise
+        // `§C{M} §A §C{A} x §A 2 §/C` would re-parse as `M(A(x, 2))` instead
+        // of `M(A(x), 2)`. _inInlineSiblingContext suppresses the elision.
+        var args = new List<ExpressionNode>
+        {
+            new CallExpressionNode(default, "A", new List<ExpressionNode>
+            {
+                new ReferenceNode(default, "x"),
+            }),
+            new IntLiteralNode(default, 2),
+        };
+        var outer = new CallExpressionNode(default, "M", args);
+        var emitter = new Migration.CalorEmitter();
+        var output = outer.Accept<string>(emitter);
+        // Inner one-arg A(x) must keep its §/C inside the outer §A chain.
+        Assert.Contains("§C{A} §A x §/C", output);
         Assert.EndsWith("§/C", output);
+    }
+
+    [Fact]
+    public void Emitter_OneArgCall_FlagTrue_RoundTripsThroughParser()
+    {
+        // End-to-end: the parser accepts the emitter's flag-true one-arg output.
+        var call = new CallExpressionNode(default, "Identity", new List<ExpressionNode>
+        {
+            new IntLiteralNode(default, 1),
+        });
+        var emitted = EmitWithImplicitCloser(call);
+        Assert.Equal("§C{Identity} 1", emitted);
+
+        var source = $$"""
+§M{m001:Test}
+  §F{f001:Bar:pub}
+      §B{x} {{emitted}}
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+
+        var bind = module.Functions.First().Body.OfType<BindStatementNode>().First();
+        var rt = Assert.IsType<CallExpressionNode>(bind.Initializer);
+        Assert.Equal("Identity", rt.Target);
+        Assert.Single(rt.Arguments);
+        Assert.IsType<IntLiteralNode>(rt.Arguments[0]);
     }
 
     [Fact]

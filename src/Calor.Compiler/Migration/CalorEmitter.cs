@@ -1299,12 +1299,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (ContainsSectionMarker(variableName))
             variableName = $"_hoist{_hoistCounter++:D3}";
 
-        // Pre-evaluate all elements to collect hoisted bindings before the list block
+        // Pre-evaluate all elements to collect hoisted bindings before the list block.
+        // AcceptInInlineSibling: each element line is parsed as a sibling expression
+        // and a one-arg closer-less §C inside an element would absorb the next
+        // sibling (or §/LIST) as its inline argument (v0.6.3 RFC §3.2 case B).
+        // Mirrors §DICT entries, §HSET elements, and §ARR inline elements.
         var evaluatedElements = new List<string>();
         var allHoisted = new List<string>();
         foreach (var element in node.Elements)
         {
-            var val = element.Accept(this);
+            var val = AcceptInInlineSibling(element);
             if (_pendingHoistedLines.Count > 0)
             {
                 allHoisted.AddRange(_pendingHoistedLines);
@@ -1373,12 +1377,35 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
 
+        // AcceptInInlineSibling: each §HSET element is emitted on its own line,
+        // but the parser treats elements as sibling expressions and a one-arg
+        // closer-less §C inside an element would absorb the next §C / §/HSET
+        // as its inline argument (v0.6.3 RFC §3.2 case B). Mirrors §DICT entries
+        // (line ~1346) and §ROW elements (line ~1474). Pre-evaluate to flush
+        // any hoisted bindings BEFORE the §HSET opener so they sit at the parent
+        // scope, not inside the set body.
+        var evalElements = new List<string>();
+        var allHoisted = new List<string>();
+        foreach (var element in node.Elements)
+        {
+            var val = AcceptInInlineSibling(element);
+            if (_pendingHoistedLines.Count > 0)
+            {
+                allHoisted.AddRange(_pendingHoistedLines);
+                _pendingHoistedLines.Clear();
+            }
+            evalElements.Add(val);
+        }
+
+        foreach (var hoisted in allHoisted)
+            AppendLine(hoisted);
+
         AppendLine($"§HSET{{{variableName}:{elementType}}}");
         Indent();
 
-        foreach (var element in node.Elements)
+        foreach (var val in evalElements)
         {
-            AppendLine(element.Accept(this));
+            AppendLine(val);
         }
 
         Dedent();
@@ -1714,12 +1741,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
 
-        // Evaluate all elements first, collecting any hoisted bindings before the list
+        // Evaluate all elements first, collecting any hoisted bindings before the list.
+        // AcceptInInlineSibling: each element line is parsed as a sibling expression
+        // and a one-arg closer-less §C would absorb the next sibling (v0.6.3 RFC §3.2 B).
         var evaluatedElements = new List<string>();
         var allHoisted = new List<string>();
         foreach (var element in node.Elements)
         {
-            var val = element.Accept(this);
+            var val = AcceptInInlineSibling(element);
             // Collect any hoisted lines generated during element evaluation
             if (_pendingHoistedLines.Count > 0)
             {
@@ -1802,12 +1831,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
 
-        // Pre-evaluate elements to flush hoisted bindings before the §HSET block
+        // Pre-evaluate elements to flush hoisted bindings before the §HSET block.
+        // AcceptInInlineSibling: each element line is parsed as a sibling expression
+        // and a one-arg closer-less §C would absorb the next sibling (v0.6.3 RFC §3.2 B).
         var evaluatedElements = new List<string>();
         var allHoisted = new List<string>();
         foreach (var element in node.Elements)
         {
-            var val = element.Accept(this);
+            var val = AcceptInInlineSibling(element);
             if (_pendingHoistedLines.Count > 0)
             {
                 allHoisted.AddRange(_pendingHoistedLines);
@@ -2398,11 +2429,38 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var args = node.Arguments.Select((a, i) =>
         {
             var argValue = AcceptInInlineSibling(a);
-            if (node.ArgumentNames != null && i < node.ArgumentNames.Count && node.ArgumentNames[i] != null)
-                return $"§A[{node.ArgumentNames[i]!.TrimStart('@')}] {argValue}";
-            return $"§A {argValue}";
-        });
-        return $"§C{{{fullTarget}}} {string.Join(" ", args)} §/C";
+            bool named = node.ArgumentNames != null
+                      && i < node.ArgumentNames.Count
+                      && node.ArgumentNames[i] != null;
+            var wrapped = named
+                ? $"§A[{node.ArgumentNames![i]!.TrimStart('@')}] {argValue}"
+                : $"§A {argValue}";
+            return (named, wrapped, argValue);
+        }).ToList();
+
+        // RFC v0.6 call-closer-elision §2.1 / §2.2 — expression-context
+        // one-arg elision. Mirrors the stmt-context path at Visit(CallStatementNode).
+        // Parser side: Parser.cs `ParseCallExpression` accepts `§C{target} primary_expr`
+        // (no §A, no §/C) when followed by a syntactic terminator (RFC §2).
+        // Held back inside _inInlineSiblingContext (§A chain / §ARR / §ROW / §SALLOC
+        // initializer / §NEW arg) — there a same-line sibling would be absorbed as
+        // this call's inline argument and silently corrupt the AST (e.g.
+        // `§ARR{...} §C{f} x §C{g} y §/ARR` would re-parse as one element `f(x, g(y))`
+        // instead of two elements `f(x), g(y)`). Trailing-postfix safety (RFC §3.2
+        // case A: `§C{Box.unwrap} y.Length`) is handled by FieldAccessNode and
+        // peers detecting section markers in the inner emission and hoisting via
+        // HoistToTempVar — the same mechanism that protects zero-arg elision.
+        // Named args, multi-arg, or args whose first token is not in
+        // IsExpressionStart() keep the standard §A ... §/C form.
+        if (args.Count == 1 && !args[0].named)
+        {
+            bool canElide = _context?.UseImplicitCallCloser != false
+                         && _inInlineSiblingContext == 0
+                         && StartsWithExpressionStarter(args[0].argValue);
+            if (canElide)
+                return $"§C{{{fullTarget}}} {args[0].argValue}";
+        }
+        return $"§C{{{fullTarget}}} {string.Join(" ", args.Select(a => a.wrapped))} §/C";
     }
 
     /// <summary>
@@ -2670,7 +2728,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.IsExpressionLambda && node.ExpressionBody != null)
         {
-            var body = node.ExpressionBody.Accept(this);
+            // Inline-sibling context: the body is space-joined between §LAM{...}
+            // and §/LAM{...} on a single emitted line, so any one-arg §C{...} arg
+            // inside the body (v0.6.3 RFC §2.1) would absorb the §/LAM as its
+            // inline argument and corrupt the AST. Mirrors the v0.6.1 zero-arg
+            // discipline at all other sibling-context sites.
+            var body = AcceptInInlineSibling(node.ExpressionBody);
             return $"§LAM{{{header}}} {body} §/LAM{{{node.Id}}}";
         }
         else if (node.StatementBody != null && node.StatementBody.Count > 0)
@@ -3215,7 +3278,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(WithExpressionNode node)
     {
-        var target = node.Target.Accept(this);
+        // Inline-sibling context for the target: §WITH target ... §/WITH is
+        // emitted on a single line, so an elided one-arg §C{f} target form
+        // (v0.6.3 RFC §2.1) would absorb the following §SET / §/WITH as its
+        // inline argument.
+        var target = AcceptInInlineSibling(node.Target);
         var assignments = string.Join(" ", node.Assignments.Select(a => AcceptInInlineSibling(a)));
         if (assignments.Length > 0)
             return $"§WITH {target} {assignments} §/WITH";
