@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Expression-context `§C` calls now elide `§/C` by default for one-argument forms.** `CalorEmitter.Visit(CallExpressionNode)` extends the v0.6.1 zero-arg elision and the v0.6.2 stmt-context one-arg elision to expression context: `§C{target} arg` (no `§A`, no `§/C`) when the argument is unnamed, the rendered first token is in the `StartsWithExpressionStarter` whitelist, and we are not inside an inline-sibling context. Conversion scorecard: 96/100 → 99/100 round-trip pass (+3 net, 0 regressions). RFC: `docs/plans/v0.6-call-closer-elision.md` §2.1/§2.2/§8.1.
+
+### Fixed
+- **Parser: `Calor0150` no longer fires across sibling-statement boundaries.** When the next expression-start token after a one-arg elided call is on a different line, it is a sibling statement, not an ambiguous second positional arg. Previously the parser misclassified patterns like `§B{p} §C{f} §IDX{a} i` followed on the next line by `§IF p ...` as a second arg, raising a spurious Calor0150. Now gated by a same-line check at `Parser.cs ~7992`. Regression test: `ExpressionContext_OneArgFollowedBySiblingStatement_NoCalor0150`.
+- **Emitter: `§LAM` body, `§WITH` target, and `§LIST`/`§HSET` element emit sites now use `AcceptInInlineSibling`.** These same-line sibling positions previously used raw `node.X.Accept(this)`, which could silently corrupt the AST after the one-arg expression-context elision landed. Guarded by the existing `CalorEmitter_HasNoRawAcceptInSpaceSeparatedSiblingPosition` static test.
+
+### Internal
+- Closed stale PRs #559, #619, #625 (superseded by later work).
+- Updated four conversion snapshots (`tests/Calor.Conversion.Tests/Snapshots/{05-01,05-02,05-03,12-02}.approved.calr`) for the mechanical `§A arg §/C` → `arg` shape change.
+
 ## [0.6.2] - 2026-06-10
 
 ### Benchmark Results (Statistical: 30 runs)

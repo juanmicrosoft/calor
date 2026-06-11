@@ -7,9 +7,9 @@
       §B{_lamOrderBy004} §LAM{lam003:s:str} s §/LAM{lam003}
       §B{_lamSelect006} §LAM{lam005:s:str} (upper s) §/LAM{lam005}
       §B{_lamWhere008} §LAM{lam007:s:str} (> (len s) 0) §/LAM{lam007}
-      §B{_chainWhere009} §C{items.Where} §A _lamWhere008 §/C
-      §B{_chainSelect010} §C{_chainWhere009.Select} §A _lamSelect006 §/C
-      §B{_chainOrderBy011} §C{_chainSelect010.OrderBy} §A _lamOrderBy004 §/C
+      §B{_chainWhere009} §C{items.Where} _lamWhere008
+      §B{_chainSelect010} §C{_chainWhere009.Select} _lamSelect006
+      §B{_chainOrderBy011} §C{_chainSelect010.OrderBy} _lamOrderBy004
       §R §C{_chainOrderBy011.ToList}
 
 

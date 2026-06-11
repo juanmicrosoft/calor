@@ -7989,12 +7989,21 @@ public sealed class Parser
                     finalSpan = startToken.Span.Union(argExpr.Span);
                 }
             }
-            else if (IsExpressionStart())
+            else if (IsExpressionStart() && Current.Span.Line == _tokens[_position - 1].Span.Line)
             {
-                // Two consecutive expression-start tokens in inline-arg form:
-                // Calor0150 (RFC v0.6 call-closer-elision §3.2 case B).
-                // Recovery: stop here without consuming the second expression
-                // — let the caller see and recover from it.
+                // Two consecutive expression-start tokens on the SAME line in
+                // inline-arg form: Calor0150 (RFC v0.6 call-closer-elision §3.2
+                // case B). Recovery: stop here without consuming the second
+                // expression — let the caller see and recover from it.
+                //
+                // If the next expression-start is on a NEW line it is the start
+                // of a sibling statement (e.g. `§B{p} §C{f} §IDX{a} i\n§IF ...`),
+                // not a continuation — take the implicit-close path silently.
+                // The expr-context one-arg elision (v0.6.3) relies on this:
+                // emitted args like `§IDX{a} i` parse correctly because §IDX's
+                // own ParseExpression() consumes the trailing index, but the
+                // outer call must not then mistake the next-line statement
+                // opener for a second positional arg.
                 _diagnostics.ReportAmbiguousCallContinuation(Current.Span, target);
                 finalSpan = startToken.Span.Union(argExpr.Span);
             }

@@ -3,7 +3,7 @@
 
   §CL{c001:DataService:pub}
     §AMT{m002:FetchDataAsync:pub} () -> str
-      §B{_} §AWAIT §C{Task.Delay} §A 100 §/C
+      §B{_} §AWAIT §C{Task.Delay} 100
       §R "data"
 
 
