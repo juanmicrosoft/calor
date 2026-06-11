@@ -14,7 +14,8 @@ namespace Calor.Compiler.Analysis;
 ///   an initializer expression.</item>
 /// </list>
 ///
-/// <para>Strict-mode checks (enabled by <c>--strict-bind-inference</c>):</para>
+/// <para>Strict-mode checks (default-on since v0.6.3; disable with
+/// <c>--no-strict-bind-inference</c>):</para>
 /// <list type="bullet">
 ///   <item><c>Calor0251 BindCannotInferNullLiteral</c> —
 ///   <c>§B{x} none</c> / <c>§B{x} null</c> with no <c>:type</c> annotation.</item>
@@ -58,7 +59,7 @@ public sealed class BindValidationPass
         "Stack.empty",
     ];
 
-    public BindValidationPass(DiagnosticBag diagnostics, bool strictInference = false)
+    public BindValidationPass(DiagnosticBag diagnostics, bool strictInference = true)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _strictInference = strictInference;

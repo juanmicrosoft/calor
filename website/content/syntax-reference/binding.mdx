@@ -168,12 +168,12 @@ case, producing wrong-typed code with no diagnostic. The diagnostic
 was added in v0.6 and is enforced through the main `calor compile`
 pipeline by `BindValidationPass`.
 
-### Strict-mode diagnostics (`--strict-bind-inference`)
+### Strict-mode diagnostics (default-on since v0.6.3)
 
 The following diagnostics are reserved in the `Calor0250-0259` range
-and are enforced **only** when the `--strict-bind-inference` flag is
-passed to `calor compile`. They are scheduled to become default-on in
-v0.7 (see RFC §6).
+and are enforced **by default** as of v0.6.3 (RFC §6). To opt out
+during migration, pass `--no-strict-bind-inference` to `calor compile`
+or set `CompilationOptions.StrictBindInference = false`.
 
 | Code | Title | Fires on |
 |:-----|:------|:---------|

@@ -86,8 +86,8 @@ public static class DiagnosticCode
     /// type — the right-hand side carries no concrete element type. The
     /// fix is to give the binding an explicit option type, e.g.
     /// <c>§B{name:Option&lt;T&gt;} none</c>.
-    /// Fires only under <c>--strict-bind-inference</c> in v0.6; default-on
-    /// in v0.7. See RFC v0.6 bind-inference-formalization §3.2.
+    /// Default-on since v0.6.3; disable with <c>--no-strict-bind-inference</c>.
+    /// See RFC v0.6 bind-inference-formalization §3.2 / §6.
     /// </summary>
     public const string BindCannotInferNullLiteral = "Calor0251";
 
@@ -96,8 +96,8 @@ public static class DiagnosticCode
     /// <c>Foo.bar</c> returns a generic with an unresolved type
     /// parameter (e.g. <c>Vec&lt;T&gt;.empty</c>). The fix is to give
     /// the binding an explicit type argument.
-    /// Fires only under <c>--strict-bind-inference</c> in v0.6; default-on
-    /// in v0.7. See RFC v0.6 bind-inference-formalization §3.2.
+    /// Default-on since v0.6.3; disable with <c>--no-strict-bind-inference</c>.
+    /// See RFC v0.6 bind-inference-formalization §3.2 / §6.
     /// </summary>
     public const string BindCannotInferGenericReturn = "Calor0252";
 
@@ -106,8 +106,8 @@ public static class DiagnosticCode
     /// numeric types and widening could pick more than one bound type.
     /// The fix is to give the binding an explicit numeric annotation
     /// (<c>:i32</c>, <c>:f64</c>, …).
-    /// Fires only under <c>--strict-bind-inference</c> in v0.6; default-on
-    /// in v0.7. See RFC v0.6 bind-inference-formalization §3.2.
+    /// Default-on since v0.6.3; disable with <c>--no-strict-bind-inference</c>.
+    /// See RFC v0.6 bind-inference-formalization §3.2 / §6.
     /// </summary>
     public const string BindAmbiguousNumeric = "Calor0253";
 

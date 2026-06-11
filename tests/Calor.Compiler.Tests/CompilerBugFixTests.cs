@@ -724,7 +724,7 @@ public class CompilerBugFixTests
     [Fact]
     public void StrictBindInference_NoneInitializer_NoStrict_Compiles()
     {
-        // Without --strict-bind-inference, §B{x} §NN must compile cleanly.
+        // With --no-strict-bind-inference (StrictBindInference = false), §B{x} §NN must compile.
         var source = """
             §M{m001:Test}
               §F{f001:Foo:pub}
@@ -732,10 +732,11 @@ public class CompilerBugFixTests
                   §B{x} §NN
             """;
 
-        var result = Program.Compile(source);
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = false });
 
         Assert.False(result.HasErrors,
-            "Without --strict-bind-inference, §B{x} §NN must not fire Calor0251.");
+            "With StrictBindInference = false, §B{x} §NN must not fire Calor0251.");
     }
 
     [Fact]
@@ -786,7 +787,7 @@ public class CompilerBugFixTests
             """;
 
         var result = Program.Compile(source, "test.calr",
-            new CompilationOptions { EnforceEffects = false });
+            new CompilationOptions { EnforceEffects = false, StrictBindInference = false });
 
         Assert.DoesNotContain(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.BindCannotInferGenericReturn);
@@ -821,10 +822,11 @@ public class CompilerBugFixTests
                   §B{x} (+ INT:0 FLOAT:0.0)
             """;
 
-        var result = Program.Compile(source);
+        var result = Program.Compile(source, "test.calr",
+            new CompilationOptions { StrictBindInference = false });
 
         Assert.False(result.HasErrors,
-            "Without --strict-bind-inference, mixed INT+FLOAT must not fire Calor0253.");
+            "With StrictBindInference = false, mixed INT+FLOAT must not fire Calor0253.");
     }
 
     [Fact]
