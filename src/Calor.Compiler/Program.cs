@@ -103,7 +103,12 @@ public class Program
 
         var strictBindInferenceOption = new Option<bool>(
             aliases: ["--strict-bind-inference"],
-            description: "Enable strict bind-inference diagnostics Calor0251-0253 (null/none, generic factory, ambiguous-numeric). Default-on in v0.7.",
+            description: "Enable strict bind-inference diagnostics Calor0251-0253 (null/none, generic factory, ambiguous-numeric). Default-on as of v0.6.3.",
+            getDefaultValue: () => true);
+
+        var noStrictBindInferenceOption = new Option<bool>(
+            aliases: ["--no-strict-bind-inference"],
+            description: "Disable the strict bind-inference diagnostics Calor0251-0253 (opt-out of the v0.6.3 default).",
             getDefaultValue: () => false);
 
         var experimentalOption = new Option<string[]>(
@@ -130,6 +135,7 @@ public class Program
             analyzeOption,
             allFindingsOption,
             strictBindInferenceOption,
+            noStrictBindInferenceOption,
             experimentalOption
         };
 
@@ -163,6 +169,9 @@ public class Program
             var analyze = ctx.ParseResult.GetValueForOption(analyzeOption);
             var allFindings = ctx.ParseResult.GetValueForOption(allFindingsOption);
             var strictBindInference = ctx.ParseResult.GetValueForOption(strictBindInferenceOption);
+            var noStrictBindInference = ctx.ParseResult.GetValueForOption(noStrictBindInferenceOption);
+            // --no-strict-bind-inference always wins over the default
+            if (noStrictBindInference) strictBindInference = false;
             var experimental = ctx.ParseResult.GetValueForOption(experimentalOption) ?? Array.Empty<string>();
 
             telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
@@ -250,7 +259,7 @@ public class Program
         return result;
     }
 
-    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = false)
+    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true)
     {
         try
         {
@@ -964,12 +973,12 @@ public sealed class CompilationOptions
     public bool EnableTypeChecking { get; init; }
 
     /// <summary>
-    /// Enable strict bind-inference diagnostics (Calor0251-0253). When false,
-    /// only Calor0250 (BindRequiresTypeOrInitializer) is enforced. Designed
-    /// to ship behind a flag for one release per RFC v0.6 bind-inference-formalization §6.
-    /// Default-on in v0.7.
+    /// Enable strict bind-inference diagnostics (Calor0251-0253). Default-on
+    /// since v0.6.3 (RFC v0.6 bind-inference-formalization §6). When false,
+    /// only Calor0250 (BindRequiresTypeOrInitializer) is enforced. Opt-out
+    /// via the CLI flag <c>--no-strict-bind-inference</c>.
     /// </summary>
-    public bool StrictBindInference { get; init; }
+    public bool StrictBindInference { get; init; } = true;
 
     /// <summary>
     /// Cancellation token for aborting long-running operations (e.g., Z3 verification).
