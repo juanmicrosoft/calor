@@ -1,11 +1,11 @@
 §M{m001:DesignPatterns}
   §CL{c001:DataProcessor:int:abs}
     §MT{mt001:Process:pub} () -> str
-      §B{str:data} §C{this.ReadData} §/C
+      §B{str:data} §C{this.ReadData}
       §IF{if1} (== data "")
         §R "Validation failed"
-      §B{str:processed} §C{this.ProcessData} §A data §/C
-      §R §C{this.SaveResults} §A processed §/C
+      §B{str:processed} §C{this.ProcessData} data
+      §R §C{this.SaveResults} processed
 
     §MT{mt002:ReadData:priv:abs} () -> str
 
@@ -37,8 +37,8 @@
       §R "Saved CSV"
 
     §MT{mt004:ValidateData:priv:over} (str:data) -> bool
-      §B{~_hoist000} §C{base.ValidateData} §A data §/C
-      §B{~_hoist001} §C{data.Contains} §A "CSV" §/C
+      §B{~_hoist000} §C{base.ValidateData} data
+      §B{~_hoist001} §C{data.Contains} "CSV"
       §R (&& _hoist000 _hoist001)
 
 
@@ -65,10 +65,10 @@
   §CL{c004:TemplateMethodDemo:int:stat}
     §MT{mt001:ProcessCsv:pub:stat} (str:input, str:output) -> str
       §B{CsvProcessor:processor} §NEW{CsvProcessor} §A input §A output §/NEW
-      §R §C{processor.Process} §/C
+      §R §C{processor.Process}
 
     §MT{mt002:ProcessJson:pub:stat} (str:endpoint, str:output) -> str
       §B{JsonProcessor:processor} §NEW{JsonProcessor} §A endpoint §A output §/NEW
-      §R §C{processor.Process} §/C
+      §R §C{processor.Process}
 
 

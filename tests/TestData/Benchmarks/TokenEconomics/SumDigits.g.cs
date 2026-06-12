@@ -66,7 +66,7 @@ namespace SumDigits
 
             __result__ = SumDigitsPositive(n);
 
-            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f004", Calor.Runtime.ContractKind.Ensures, startOffset: 525, length: 16, sourceFile: null, line: 23, column: 5, condition: "__result__ >= 0");
+            if (!(__result__ >= 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ >= 0", "f004", Calor.Runtime.ContractKind.Ensures, startOffset: 511, length: 16, sourceFile: null, line: 23, column: 5, condition: "__result__ >= 0");
             return __result__;
         }
 

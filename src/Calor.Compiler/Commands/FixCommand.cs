@@ -40,6 +40,10 @@ public static class FixCommand
             aliases: ["--compact-ids"],
             description: "Rewrite legacy ULID payloads to v6 12-char compact form");
 
+        var elideCallClosersOption = new Option<bool>(
+            aliases: ["--elide-call-closers"],
+            description: "Elide §/C on zero-arg + one-arg same-line calls (v0.6.x)");
+
         var revertOption = new Option<bool>(
             aliases: ["--revert"],
             description: "Reverse the operation using --log");
@@ -57,6 +61,7 @@ public static class FixCommand
             rootArgument,
             dropStructuralIdsOption,
             compactIdsOption,
+            elideCallClosersOption,
             revertOption,
             logOption,
             dryRunOption,
@@ -65,7 +70,7 @@ public static class FixCommand
         command.SetHandler(
             ExecuteAsync,
             rootArgument, dropStructuralIdsOption, compactIdsOption,
-            revertOption, logOption, dryRunOption);
+            elideCallClosersOption, revertOption, logOption, dryRunOption);
 
         return command;
     }
@@ -74,6 +79,7 @@ public static class FixCommand
         DirectoryInfo root,
         bool dropStructuralIds,
         bool compactIds,
+        bool elideCallClosers,
         bool revert,
         FileInfo? log,
         bool dryRun)
@@ -83,14 +89,17 @@ public static class FixCommand
             Console.Error.WriteLine($"root directory not found: {root.FullName}");
             return 2;
         }
-        if (!dropStructuralIds && !compactIds)
+        var selectedCount = (dropStructuralIds ? 1 : 0)
+                          + (compactIds ? 1 : 0)
+                          + (elideCallClosers ? 1 : 0);
+        if (selectedCount == 0)
         {
-            Console.Error.WriteLine("specify --drop-structural-ids or --compact-ids");
+            Console.Error.WriteLine("specify --drop-structural-ids, --compact-ids, or --elide-call-closers");
             return 2;
         }
-        if (dropStructuralIds && compactIds)
+        if (selectedCount > 1)
         {
-            Console.Error.WriteLine("--drop-structural-ids and --compact-ids are mutually exclusive; run them separately");
+            Console.Error.WriteLine("--drop-structural-ids, --compact-ids, and --elide-call-closers are mutually exclusive; run them separately");
             return 2;
         }
 
@@ -99,6 +108,12 @@ public static class FixCommand
             return revert
                 ? await RevertStructuralIdsAsync(root, log, dryRun)
                 : await DropStructuralIdsAsync(root, log, dryRun);
+        }
+        if (elideCallClosers)
+        {
+            return revert
+                ? await RevertElideCallClosersAsync(root, log, dryRun)
+                : await ElideCallClosersAsync(root, log, dryRun);
         }
         // compactIds
         return revert
@@ -258,6 +273,86 @@ public static class FixCommand
             if (!dryRun)
             {
                 await File.WriteAllTextAsync(pathByRel[rel], restoredText, new UTF8Encoding(false));
+            }
+            filesRestored++;
+        }
+        Console.WriteLine(
+            $"revert: {(dryRun ? "[dry-run] " : "")}files_restored={filesRestored}");
+        return 0;
+    }
+
+    private static async Task<int> ElideCallClosersAsync(
+        DirectoryInfo root, FileInfo? logFile, bool dryRun)
+    {
+        var elider = new CallCloserElider();
+        var migrationLog = new StructuralIdDropper.MigrationLog();
+        int filesChanged = 0;
+        int totalRemovals = 0;
+        int filesSkipped = 0;
+
+        foreach (var path in EnumerateCalrFiles(root))
+        {
+            var rel = MakeRelativePosix(root, path);
+            var original = await File.ReadAllTextAsync(path, Encoding.UTF8);
+            var result = elider.Process(original, rel);
+            if (result.Skipped)
+            {
+                filesSkipped++;
+                Console.Error.WriteLine($"skip {rel}: {result.SkipReason}");
+                continue;
+            }
+            if (result.Removals.Count == 0)
+            {
+                continue;
+            }
+            migrationLog.Entries.AddRange(result.Removals);
+            totalRemovals += result.CallsElided;
+            filesChanged++;
+
+            if (!dryRun)
+            {
+                await File.WriteAllTextAsync(path, result.MigratedSource, new UTF8Encoding(false));
+            }
+        }
+
+        Console.WriteLine(
+            $"elide-call-closers: {(dryRun ? "[dry-run] " : "")}files_changed={filesChanged} elisions={totalRemovals} files_skipped={filesSkipped}");
+
+        if (logFile != null)
+        {
+            var json = CallCloserElider.SerializeLog(migrationLog);
+            await File.WriteAllTextAsync(logFile.FullName, json, new UTF8Encoding(false));
+            Console.WriteLine($"wrote {logFile.FullName}");
+        }
+
+        return 0;
+    }
+
+    private static async Task<int> RevertElideCallClosersAsync(
+        DirectoryInfo root, FileInfo? logFile, bool dryRun)
+    {
+        if (logFile == null || !logFile.Exists)
+        {
+            Console.Error.WriteLine("--revert requires --log <existing migration.log.json>");
+            return 2;
+        }
+        var json = await File.ReadAllTextAsync(logFile.FullName, Encoding.UTF8);
+        var migrationLog = CallCloserElider.DeserializeLog(json);
+
+        int filesRestored = 0;
+        foreach (var group in migrationLog.Entries.GroupBy(e => e.File))
+        {
+            var migPath = Path.Combine(root.FullName, group.Key.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(migPath))
+            {
+                Console.Error.WriteLine($"skip missing file: {migPath}");
+                continue;
+            }
+            var migrated = await File.ReadAllBytesAsync(migPath);
+            var restored = ReinsertRemovals(migrated, group);
+            if (!dryRun)
+            {
+                await File.WriteAllBytesAsync(migPath, restored);
             }
             filesRestored++;
         }
