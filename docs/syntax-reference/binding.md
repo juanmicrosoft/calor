@@ -193,8 +193,22 @@ adding the annotation always silences the diagnostic.
 §B{x:f64} (+ INT:0 FLOAT:0.0)      // silences Calor0253
 ```
 
-LSP quick-fixes that insert the recommended annotation are tracked in
-[#644](https://github.com/juanmicrosoft/calor/issues/644).
+LSP quick-fixes that insert the recommended annotation are available
+in v0.6.3 and surface in any IDE talking to the Calor language server.
+Each diagnostic carries a `SuggestedFix` that inserts the default
+annotation right before the closing `}` of the bind's attribute block:
+
+| Code | Inserted annotation | Notes |
+|:-----|:--------------------|:------|
+| `Calor0251` (`§NN`)    | `:Option<object>` | replace `object` with the concrete element type |
+| `Calor0251` (`null`)   | `:object?`        | replace `object` with the concrete type |
+| `Calor0252` (`Vec.empty`, `Set.empty`, `List.empty`, `Queue.empty`, `Stack.empty`, `Array.empty`) | `:Vec<object>` etc. | one type parameter; replace `object` |
+| `Calor0252` (`Map.empty`, `Dict.empty`, `Dictionary.empty`)  | `:Map<object, object>` etc. | two type parameters |
+| `Calor0253`            | `:f64`            | widening default; replace with `:i32` to narrow |
+
+Quick-fixes only fire on canonical bind forms (`§B{name}` or `§B{~name}`)
+to keep edit placement provably correct; non-canonical attribute blocks
+emit the diagnostic without a fix.
 
 ---
 
