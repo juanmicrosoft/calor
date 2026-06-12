@@ -547,7 +547,7 @@ public class Program
 
         // Bind validation (Calor0250: §B requires type or initializer)
         phaseSw.Restart();
-        var bindValidator = new BindValidationPass(diagnostics, options.StrictBindInference);
+        var bindValidator = new BindValidationPass(diagnostics, source, options.StrictBindInference);
         bindValidator.Check(ast);
         phaseSw.Stop();
         telemetry?.TrackPhase("BindValidation", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);

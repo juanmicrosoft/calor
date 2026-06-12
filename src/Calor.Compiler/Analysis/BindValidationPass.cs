@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Analysis;
 
@@ -37,32 +38,50 @@ public sealed class BindValidationPass
 {
     private readonly DiagnosticBag _diagnostics;
     private readonly bool _strictInference;
+    private readonly string? _source;
 
     /// <summary>
     /// Well-known generic factory calls whose return type cannot be inferred
-    /// without an explicit type argument. Matched on the call's target
-    /// string ending — so <c>Vec.empty</c>, <c>Vec&lt;T&gt;.empty</c>, and
-    /// <c>some.module.Vec.empty</c> all match <c>Vec.empty</c>.
+    /// without an explicit type argument. The value is a placeholder type
+    /// template used in LSP quick-fixes (e.g. <c>Vec.empty</c> → <c>Vec&lt;object&gt;</c>).
+    /// Matched on the call's target string ending — so <c>Vec.empty</c>,
+    /// <c>Vec&lt;T&gt;.empty</c>, and <c>some.module.Vec.empty</c> all match
+    /// <c>Vec.empty</c>. The placeholder uses <c>object</c> so the inserted
+    /// annotation compiles; users typically replace it with a concrete type.
     /// </summary>
-    private static readonly string[] GenericFactoryTargets =
+    private static readonly (string Target, string Template)[] GenericFactoryTargets =
     [
-        "Vec.empty",
-        "Vec.create",
-        "List.empty",
-        "List.create",
-        "Array.empty",
-        "Set.empty",
-        "Map.empty",
-        "Dictionary.empty",
-        "Dict.empty",
-        "Queue.empty",
-        "Stack.empty",
+        ("Vec.empty",        "Vec<object>"),
+        ("Vec.create",       "Vec<object>"),
+        ("List.empty",       "List<object>"),
+        ("List.create",      "List<object>"),
+        ("Array.empty",      "Array<object>"),
+        ("Set.empty",        "Set<object>"),
+        ("Map.empty",        "Map<object, object>"),
+        ("Dictionary.empty", "Dictionary<object, object>"),
+        ("Dict.empty",       "Dict<object, object>"),
+        ("Queue.empty",      "Queue<object>"),
+        ("Stack.empty",      "Stack<object>"),
     ];
 
     public BindValidationPass(DiagnosticBag diagnostics, bool strictInference = true)
+        : this(diagnostics, source: null, strictInference)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new bind-validation pass. When <paramref name="source"/> is
+    /// non-null, strict-mode diagnostics (Calor0251-0253) are emitted with
+    /// an attached <see cref="SuggestedFix"/> that inserts the recommended
+    /// <c>:type</c> annotation at the matching <c>}</c> of the bind's
+    /// attribute block. Without source, the same diagnostics fire without
+    /// fixes (used by call sites that don't carry source text).
+    /// </summary>
+    public BindValidationPass(DiagnosticBag diagnostics, string? source, bool strictInference = true)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _strictInference = strictInference;
+        _source = source;
     }
 
     public void Check(ModuleNode module)
@@ -223,62 +242,187 @@ public sealed class BindValidationPass
         // Calor0251 — bare none/null cannot infer a type.
         if (init is NoneExpressionNode none && none.TypeName == null)
         {
-            _diagnostics.ReportError(bind.Span, DiagnosticCode.BindCannotInferNullLiteral,
-                $"Binding '{bind.Name}' uses 'none' without a type. " +
+            var msg = $"Binding '{bind.Name}' uses 'none' without a type. " +
                 "Inference cannot pick a concrete element type. " +
                 "Add ':Option<T>' (e.g. '§B{" + bind.Name + ":Option<i32>} none') " +
-                "or use a typed §NN{type=...} form.");
+                "or use a typed §NN{type=...} form.";
+            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferNullLiteral, msg,
+                "Annotate binding with ':Option<object>'", ":Option<object>");
             return;
         }
 
         if (init is ReferenceNode refNode && refNode.Name == "null")
         {
-            _diagnostics.ReportError(bind.Span, DiagnosticCode.BindCannotInferNullLiteral,
-                $"Binding '{bind.Name}' is initialised to 'null' with no declared type. " +
+            var msg = $"Binding '{bind.Name}' is initialised to 'null' with no declared type. " +
                 "Inference cannot pick a concrete type. " +
-                "Add ':T?' or use an Option type (e.g. '§B{" + bind.Name + ":Option<T>} none').");
+                "Add ':T?' or use an Option type (e.g. '§B{" + bind.Name + ":Option<T>} none').";
+            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferNullLiteral, msg,
+                "Annotate binding with ':object?'", ":object?");
             return;
         }
 
         // Calor0252 — well-known generic factory call without explicit type.
-        if (init is CallExpressionNode call && IsGenericFactoryTarget(call.Target))
+        if (init is CallExpressionNode call && TryGetGenericFactoryTemplate(call.Target, out var template))
         {
-            _diagnostics.ReportError(bind.Span, DiagnosticCode.BindCannotInferGenericReturn,
-                $"Binding '{bind.Name}' is initialised from '{call.Target}' whose return type " +
+            var msg = $"Binding '{bind.Name}' is initialised from '{call.Target}' whose return type " +
                 "is generic and has no resolved type argument. " +
-                "Add an explicit type annotation, e.g. '§B{" + bind.Name + ":Vec<i32>} §C{Vec<i32>.empty} §/C'.");
+                "Add an explicit type annotation, e.g. '§B{" + bind.Name + ":Vec<i32>} §C{Vec<i32>.empty} §/C'.";
+            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindCannotInferGenericReturn, msg,
+                $"Annotate binding with ':{template}'", $":{template}");
             return;
         }
 
         // Calor0253 — binary op mixing integer and float literal operands.
         if (init is BinaryOperationNode bin && IsAmbiguousNumeric(bin))
         {
-            _diagnostics.ReportError(bind.Span, DiagnosticCode.BindAmbiguousNumeric,
-                $"Binding '{bind.Name}' is initialised from a numeric expression that mixes " +
+            var msg = $"Binding '{bind.Name}' is initialised from a numeric expression that mixes " +
                 "integer and floating-point literals; widening could pick more than one type. " +
                 "Add an explicit numeric annotation, e.g. '§B{" + bind.Name + ":f64} ...' " +
-                "or '§B{" + bind.Name + ":i32} ...'.");
+                "or '§B{" + bind.Name + ":i32} ...'.";
+            ReportStrictWithMaybeFix(bind, DiagnosticCode.BindAmbiguousNumeric, msg,
+                "Annotate binding with ':f64' (widening default)", ":f64");
             return;
         }
     }
 
-    private static bool IsGenericFactoryTarget(string target)
+    /// <summary>
+    /// Emits a strict-bind-inference diagnostic. If <see cref="_source"/> is
+    /// available and the bind's attribute block is in canonical
+    /// <c>§B{name}</c> / <c>§B{~name}</c> form, attaches a SuggestedFix that
+    /// inserts <paramref name="typeAnnotation"/> immediately before the
+    /// closing <c>}</c>. Otherwise emits the diagnostic without a fix.
+    /// </summary>
+    private void ReportStrictWithMaybeFix(
+        BindStatementNode bind, string code, string message,
+        string fixDescription, string typeAnnotation)
     {
+        var fix = TryBuildBindTypeAnnotationFix(bind, fixDescription, typeAnnotation);
+        if (fix != null)
+        {
+            _diagnostics.ReportErrorWithFix(bind.Span, code, message, fix);
+        }
+        else
+        {
+            _diagnostics.ReportError(bind.Span, code, message);
+        }
+    }
+
+    /// <summary>
+    /// Builds a SuggestedFix that inserts a <c>:type</c> annotation right
+    /// before the closing <c>}</c> of a canonical bind attribute block.
+    /// Returns null when source is unavailable, the bind isn't in the
+    /// expected form, or the close brace can't be located safely.
+    /// </summary>
+    private SuggestedFix? TryBuildBindTypeAnnotationFix(
+        BindStatementNode bind, string description, string typeAnnotation)
+    {
+        if (_source == null)
+        {
+            return null;
+        }
+
+        var start = bind.Span.Start;
+        if (start < 0 || start >= _source.Length)
+        {
+            return null;
+        }
+
+        // Locate the '{' that opens the bind attribute block. Must come right
+        // after '§B' and on the same line as bind.Span.
+        var openBrace = _source.IndexOf('{', start);
+        if (openBrace < 0)
+        {
+            return null;
+        }
+
+        // Attribute blocks must not span lines per the lexer grammar.
+        var newlineBefore = _source.IndexOf('\n', start, openBrace - start);
+        if (newlineBefore >= 0)
+        {
+            return null;
+        }
+
+        // Find the matching '}' (attribute blocks don't nest).
+        var closeBrace = _source.IndexOf('}', openBrace + 1);
+        if (closeBrace < 0)
+        {
+            return null;
+        }
+
+        // Reject if the attribute block spans a newline.
+        var newlineInside = _source.IndexOf('\n', openBrace + 1, closeBrace - openBrace - 1);
+        if (newlineInside >= 0)
+        {
+            return null;
+        }
+
+        // Only fire on canonical shapes: optional '~' followed by identifier
+        // characters and no embedded ':' (no existing annotation) — protects
+        // against unusual attribute forms that strict-mode might still reach.
+        var inside = _source.Substring(openBrace + 1, closeBrace - openBrace - 1);
+        if (!IsCanonicalBindAttribute(inside))
+        {
+            return null;
+        }
+
+        // Column math: bind.Span.Column is 1-indexed for the '§' character;
+        // closeBrace is char-offset of the '}' (UTF-16). Distance from start
+        // to closeBrace is the column delta on the same line.
+        var closeBraceColumn = bind.Span.Column + (closeBrace - start);
+
+        var filePath = _diagnostics.CurrentFilePath ?? "";
+        var edit = TextEdit.Insert(filePath, bind.Span.Line, closeBraceColumn, typeAnnotation);
+        return new SuggestedFix(description, edit);
+    }
+
+    private static bool IsCanonicalBindAttribute(string inside)
+    {
+        if (string.IsNullOrEmpty(inside))
+        {
+            return false;
+        }
+        var i = 0;
+        if (inside[0] == '~')
+        {
+            i = 1;
+        }
+        if (i >= inside.Length)
+        {
+            return false;
+        }
+        for (; i < inside.Length; i++)
+        {
+            var c = inside[i];
+            if (!(char.IsLetterOrDigit(c) || c == '_'))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool TryGetGenericFactoryTemplate(string target, out string template)
+    {
+        template = "";
         if (string.IsNullOrEmpty(target))
         {
             return false;
         }
         // Match either an exact target, or any target whose tail is a known
         // factory (so e.g. "my.module.Vec.empty" still matches "Vec.empty").
-        foreach (var known in GenericFactoryTargets)
+        foreach (var (known, tmpl) in GenericFactoryTargets)
         {
             if (target == known || target.EndsWith("." + known, StringComparison.Ordinal))
             {
+                template = tmpl;
                 return true;
             }
         }
         return false;
     }
+
+    private static bool IsGenericFactoryTarget(string target)
+        => TryGetGenericFactoryTemplate(target, out _);
 
     private static bool IsAmbiguousNumeric(BinaryOperationNode bin)
     {

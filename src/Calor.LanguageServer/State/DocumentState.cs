@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
@@ -107,6 +108,23 @@ public sealed class DocumentState
                 catch (Exception)
                 {
                     // Binding can fail on malformed AST, continue without bound module
+                }
+            }
+
+            // Phase 4: Bind validation (Calor0250-0253). Always runs when an
+            // AST is available so quick-fixes for strict bind-inference
+            // diagnostics surface in the IDE. Strict checks default-on per
+            // v0.6.3 (RFC v0.6 bind-inference-formalization §6 Phase 4).
+            if (Ast != null)
+            {
+                try
+                {
+                    var bindValidator = new BindValidationPass(Diagnostics, Source, strictInference: true);
+                    bindValidator.Check(Ast);
+                }
+                catch (Exception)
+                {
+                    // Validation should never throw on a parsed AST, but be defensive.
                 }
             }
 
