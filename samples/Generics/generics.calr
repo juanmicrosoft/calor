@@ -22,7 +22,7 @@
       §ASSIGN _items §NEW{List<T>} §/NEW
 
     §MT{m001:Add:pub} (T:item) -> void
-      §C{_items.Add} §A item §/C
+      §C{_items.Add} item
 
     §MT{m002:GetAll:pub} () -> ReadList<T>
       §R _items

@@ -64,7 +64,7 @@ namespace DigitCount
             var absN = Abs(n);
             __result__ = DigitCountPositive(absN);
 
-            if (!(__result__ > 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ > 0", "f004", Calor.Runtime.ContractKind.Ensures, startOffset: 442, length: 15, sourceFile: null, line: 21, column: 5, condition: "__result__ > 0");
+            if (!(__result__ > 0)) throw new Calor.Runtime.ContractViolationException("Postcondition failed: __result__ > 0", "f004", Calor.Runtime.ContractKind.Ensures, startOffset: 435, length: 15, sourceFile: null, line: 21, column: 5, condition: "__result__ > 0");
             return __result__;
         }
 

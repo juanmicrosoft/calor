@@ -5,19 +5,19 @@
     §S (> result 0)
     §IF{if1} (== pos 0)
       §R 1
-    §B{sub} §C{PowerOfTwo} §A (- pos 1) §/C
+    §B{sub} §C{PowerOfTwo} (- pos 1)
     §R (* 2 sub)
 
   §F{f002:SetBit:pub} (i32:bits, i32:pos) -> i32
     §Q (>= pos 0)
     §Q (< pos 32)
-    §B{mask} §C{PowerOfTwo} §A pos §/C
+    §B{mask} §C{PowerOfTwo} pos
     §R (+ bits mask)
 
   §F{f003:TestBit:pub} (i32:bits, i32:pos) -> bool
     §Q (>= pos 0)
     §Q (< pos 32)
-    §B{mask} §C{PowerOfTwo} §A pos §/C
+    §B{mask} §C{PowerOfTwo} pos
     §B{div} (/ bits mask)
     §R (!= (% div 2) 0)
 
@@ -25,6 +25,6 @@
     §S (>= result 0)
     §IF{if1} (== bits 0)
       §R 0
-    §B{rest} §C{PopCount} §A (/ bits 2) §/C
+    §B{rest} §C{PopCount} (/ bits 2)
     §R (+ (% bits 2) rest)
 

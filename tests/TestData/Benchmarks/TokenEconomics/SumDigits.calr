@@ -15,14 +15,14 @@
     §S (>= result 0)
     §IF{if1} (== n 0)
       §R 0
-    §B{digit} §C{LastDigit} §A n §/C
-    §B{remaining} §C{SumDigitsPositive} §A (/ n 10) §/C
+    §B{digit} §C{LastDigit} n
+    §B{remaining} §C{SumDigitsPositive} (/ n 10)
     §R (+ digit remaining)
 
   §F{f004:SumDigits:pub} (i32:n) -> i32
     §S (>= result 0)
     §IF{if1} (< n 0)
       §B{posN} (- 0 n)
-      §R §C{SumDigitsPositive} §A posN §/C
-    §R §C{SumDigitsPositive} §A n §/C
+      §R §C{SumDigitsPositive} posN
+    §R §C{SumDigitsPositive} n
 

@@ -10,6 +10,6 @@
 
   §F{f003:ProcessOrder:pub} (str:orderId, str:email) -> void
     §E{cw}
-    §C{SaveOrder} §A orderId §/C
+    §C{SaveOrder} orderId
     §C{NotifyCustomer} §A email §A "Order shipped" §/C
 
