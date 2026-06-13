@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-06-13
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.29x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.86x ± 0.00 (Calor wins, large effect d=1.84)
+  - ErrorDetection: 1.51x ± 0.00 (Calor wins, large effect d=1.25)
+  - RefactoringStability: 1.38x ± 0.00 (Calor wins, large effect d=7.10)
+  - EditPrecision: 1.36x ± 0.00 (Calor wins, large effect d=4.85)
+  - Correctness: 1.30x ± 0.00 (Calor wins, large effect d=1.37)
+  - TokenEconomics: 1.12x ± 0.00 (Calor wins)
+  - GenerationAccuracy: 1.02x ± 0.00 (Calor wins, marginal)
+  - InformationDensity: 0.99x ± 0.00 (C# wins, small effect d=-0.47)
+- **Programs Tested**: 210
+
 ### Added
 - **`calor fix --elide-call-closers` bulk migrator (CLI + SDK).** New `calor fix` subcommand that rewrites existing `.calr` source trees to the v0.6.x call-closer-elided form: zero-arg `§C{X} §/C` → `§C{X}` and same-line one-arg `§C{X} §A arg §/C` → `§C{X} arg`. Multi-line forms, named-arg (`§A[name] x`), multi-arg, and `ref`/`out`/`in` arg modifiers are left untouched. Computes token-precise byte spans on the original source and records them as `{file, byte_offset, byte_length, removed_bytes_base64}` entries (shape shared with `StructuralIdDropper.LogEntry`) so `--revert --log <file>` restores byte-for-byte. Includes a canonical-emit safety net (re-parse the migrated source, re-emit both ASTs through `CalorEmitter`, drop the file's edits on any divergence) that catches semantics-changing edits (e.g. a trailing `§+ y` sibling that would be absorbed into the call's arg expression). Mutually exclusive with `--drop-structural-ids` and `--compact-ids`; supports `--dry-run` and `--log`. Implementation: `src/Calor.Compiler/Migration/CallCloserElider.cs`. Tests: 12 cases in `tests/Calor.Compiler.Tests/Migration/CallCloserEliderTests.cs` (zero-/one-/multi-arg, named args, nested, multi-line skip, round-trip byte equality, idempotence, lex-error skip). Closes the v0.6.3 item from `docs/plans/v0.6-call-closer-elision.md` §2.3 ("No new migrator (yet)").
 - **LSP quick-fixes for strict bind-inference diagnostics `Calor0251`/`Calor0252`/`Calor0253`.** Each diagnostic now ships a `SuggestedFix` that inserts the recommended `:type` annotation right before the closing `}` of the bind's attribute block. Concrete templates: `:Option<object>` (for `§NN`), `:object?` (for `null`), `:Vec<object>` / `:Map<object, object>` / etc. arity-aware per the matched generic factory, and `:f64` (for ambiguous numeric). Surfaces in any IDE talking to `calor-lsp` via the existing `CodeActionHandler` and in the CLI's existing fix-application paths. Closes #644. Only fires on canonical bind shapes (`§B{name}` / `§B{~name}`) so the edit placement is provably correct.

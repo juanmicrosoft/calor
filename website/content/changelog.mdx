@@ -10,6 +10,21 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-06-13
+
+### Added
+- **`calor fix --elide-call-closers` bulk migrator.** New `calor fix` subcommand that rewrites existing `.calr` source trees to the v0.6.x call-closer-elided form: zero-arg `§C{X} §/C` → `§C{X}` and same-line one-arg `§C{X} §A arg §/C` → `§C{X} arg`. Multi-line forms, named-arg (`§A[name] x`), multi-arg, and `ref`/`out`/`in` arg modifiers are left untouched. Includes a canonical-emit safety net (re-parse the migrated source, re-emit both ASTs, drop the file's edits on any divergence) and `--revert --log <file>` for byte-for-byte round-trip. Mutually exclusive with `--drop-structural-ids` and `--compact-ids`; supports `--dry-run`.
+- **LSP quick-fixes for strict bind-inference diagnostics `Calor0251`/`Calor0252`/`Calor0253`.** Each diagnostic now ships a `SuggestedFix` that inserts the recommended `:type` annotation right before the closing `}` of the bind's attribute block. Templates: `:Option<object>` (for `§NN`), `:object?` (for `null`), `:Vec<object>` / `:Map<object, object>` / etc. arity-aware per the matched generic factory, and `:f64` (for ambiguous numeric).
+- **`Calor.LanguageServer.DocumentState.Reanalyze` now runs `BindValidationPass`** so strict-bind diagnostics (and their quick-fixes) surface in editors; previously the LSP only ran the lexer/parser/binder and these diagnostics were CLI-only.
+
+### Changed
+- **Expression-context `§C` calls now elide `§/C` by default for one-argument forms.** `CalorEmitter.Visit(CallExpressionNode)` extends the v0.6.1 zero-arg elision and the v0.6.2 stmt-context one-arg elision to expression context: `§C{target} arg` (no `§A`, no `§/C`) when the argument is unnamed, the rendered first token is in the `StartsWithExpressionStarter` whitelist, and we are not inside an inline-sibling context.
+- **Strict bind-inference diagnostics `Calor0251`/`Calor0252`/`Calor0253` are now default-on.** These flag bindings that cannot infer a concrete type without an explicit `:type` annotation: untyped `§NN`/`null`, well-known generic factory calls (`Vec.empty`, `List.empty`, etc.), and binary ops mixing integer and floating-point literals. Opt out for one release with `--no-strict-bind-inference` (CLI) or `CompilationOptions.StrictBindInference = false` (SDK).
+
+### Fixed
+- **Parser: `Calor0150` no longer fires across sibling-statement boundaries.** When the next expression-start token after a one-arg elided call is on a different line, it is a sibling statement, not an ambiguous second positional arg.
+- **Emitter: `§LAM` body, `§WITH` target, and `§LIST`/`§HSET` element emit sites now use `AcceptInInlineSibling`.** These same-line sibling positions previously used raw `node.X.Accept(this)`, which could silently corrupt the AST after the one-arg expression-context elision landed.
+
 ## [0.6.2] - 2026-06-10
 
 ### Added
