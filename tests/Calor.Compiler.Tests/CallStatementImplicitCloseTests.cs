@@ -377,4 +377,99 @@ public class CallStatementImplicitCloseTests
         Assert.Empty(calls[0].Arguments);
         Assert.Empty(calls[1].Arguments);
     }
+
+    // -------------------------------------------------------------------
+    // v0.6.4 regression coverage — last-body-stmt-before-sibling-decl bug.
+    // Prior behavior: ParseCallStatement called ExpectBlockEnd(EndCall) on
+    // the post-§A path which consumed the parent block's terminating Dedent.
+    // When the next sibling at the parent scope was another §F (function),
+    // the enclosing function body's parser could not detect its own end and
+    // tried to parse §F as a statement → Calor0100. See the discussion in
+    // docs/plans/v0.6.4-roadmap.md item C (resolved via parser fix, not the
+    // originally-planned sample rewrite).
+    // -------------------------------------------------------------------
+
+    [Fact]
+    public void V064_ZeroArgStmt_LastInBody_BeforeSiblingFunc_Parses()
+    {
+        var source = """
+§M{m001:T}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §C{Helper}
+  §F{f002:Helper:priv} () -> void
+    §E{cw}
+    §C{Console.WriteLine} "hi"
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+        Assert.Equal(2, module.Functions.Count);
+        Assert.Equal("Main", module.Functions[0].Name);
+        Assert.Equal("Helper", module.Functions[1].Name);
+    }
+
+    [Fact]
+    public void V064_OneArgStmtViaA_LastInBody_BeforeSiblingFunc_Parses()
+    {
+        var source = """
+§M{m001:T}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §C{Helper} §A 1
+  §F{f002:Helper:priv} (a:i32) -> void
+    §E{cw}
+    §C{Console.WriteLine} "hi"
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+        Assert.Equal(2, module.Functions.Count);
+        var mainCall = (CallStatementNode)module.Functions[0].Body[0];
+        Assert.Equal("Helper", mainCall.Target);
+        Assert.Single(mainCall.Arguments);
+    }
+
+    [Fact]
+    public void V064_OneArgStmtInline_LastInBody_BeforeSiblingFunc_Parses()
+    {
+        // Inline single-arg form (no §A): exercises the early-return branch
+        // in ParseCallStatement, not the post-§A end-handling branch.
+        var source = """
+§M{m001:T}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §C{Helper} 42
+  §F{f002:Helper:priv} (a:i32) -> void
+    §E{cw}
+    §C{Console.WriteLine} "hi"
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+        Assert.Equal(2, module.Functions.Count);
+    }
+
+    [Fact]
+    public void V064_LegacyMultiLineCall_StillParses()
+    {
+        // §C{target} on one line, §A on a deeper-indented line, §/C below.
+        // The lexer emits Dedent then §/C; the parser must still consume
+        // the Dedent + §/C run (legacy form), not bail out early.
+        var source = """
+§M{m001:Test}
+  §F{f001:Print:pub}
+      §O{void}
+      §E{cw}
+      §C{Console.WriteLine}
+        §A "Hello v2!"
+      §/C
+""";
+        var module = Parse(source, out var diags);
+        Assert.False(diags.HasErrors,
+            $"Errors: {string.Join("; ", diags.Errors.Select(e => e.Message))}");
+        var call = FirstCall(module);
+        Assert.Equal("Console.WriteLine", call.Target);
+        Assert.Single(call.Arguments);
+    }
 }

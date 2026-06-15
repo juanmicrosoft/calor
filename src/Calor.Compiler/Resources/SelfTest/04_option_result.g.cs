@@ -35,13 +35,13 @@ namespace TypeSystem
 
         private static void TestOk()
         {
-            var result = Calor.Runtime.Result.Ok<object, string>(new object[] { new object[] { new object[] { 100 } } });
+            var result = Calor.Runtime.Result.Ok<int, string>(100);
             Console.WriteLine("  Created Ok(100)");
         }
 
         private static void TestErr()
         {
-            var result = Calor.Runtime.Result.Err<object, object>(new object[] { new object[] { new object[] { "Something went wrong" } } });
+            var result = Calor.Runtime.Result.Err<object, string>("Something went wrong");
             Console.WriteLine("  Created Err");
         }
 
