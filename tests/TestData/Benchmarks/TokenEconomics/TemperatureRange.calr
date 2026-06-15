@@ -1,0 +1,5 @@
+§M{m001:TemperatureRange}
+  §F{f001:RangeKelvin:pub} (f32:cMin, f32:cMax) -> f32
+    §B{kMin} (+ cMin 273.15)
+    §B{kMax} (+ cMax 273.15)
+    §R (- kMax kMin)

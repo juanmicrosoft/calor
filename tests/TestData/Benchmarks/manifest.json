@@ -1696,6 +1696,125 @@
       "notes": "Sequence of multi-arg void method calls. NEUTRAL re v0.6.2: multi-arg calls retain standard \u00a7A\u2026\u00a7/C form."
     },
     {
+      "id": "053",
+      "name": "ParseAndDouble",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/ParseAndDouble.calr",
+      "csharpFile": "TokenEconomics/ParseAndDouble.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "bind",
+        "bind_inference",
+        "one_arg_call",
+        "expression_context_call",
+        "v0_6_3_elision"
+      ],
+      "notes": "Binding initializer from a one-arg expression-context call (parse-and-transform pattern). Exercises v0.6.3 expr-context \u00a7A+\u00a7/C elision in the \u00a7B initializer position."
+    },
+    {
+      "id": "054",
+      "name": "FormatHeader",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/FormatHeader.calr",
+      "csharpFile": "TokenEconomics/FormatHeader.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "string_return",
+        "bind",
+        "bind_inference",
+        "one_arg_call",
+        "expression_context_call",
+        "v0_6_3_elision"
+      ],
+      "notes": "String-typed binding from a one-arg expression-context call (formatter/renderer pattern). Exercises v0.6.3 expr-context elision plus string-return inference."
+    },
+    {
+      "id": "055",
+      "name": "ReturnMapped",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/ReturnMapped.calr",
+      "csharpFile": "TokenEconomics/ReturnMapped.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "one_arg_call",
+        "expression_context_call",
+        "return_expression",
+        "v0_6_3_elision"
+      ],
+      "notes": "Direct return from a one-arg expression-context call (delegation pattern). Exercises v0.6.3 expr-context \u00a7A+\u00a7/C elision in the \u00a7R return position."
+    },
+    {
+      "id": "056",
+      "name": "AggregateStats",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/AggregateStats.calr",
+      "csharpFile": "TokenEconomics/AggregateStats.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "bind",
+        "bind_inference",
+        "arithmetic",
+        "v0_6_bind_inference"
+      ],
+      "notes": "Bind-inference from a typed arithmetic expression (mean-of-three pattern). \u00a7B{sum} has no \u00a7:i32 annotation; binder infers from operand types per v0.6 bind-inference RFC."
+    },
+    {
+      "id": "057",
+      "name": "TemperatureRange",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/TemperatureRange.calr",
+      "csharpFile": "TokenEconomics/TemperatureRange.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "bind",
+        "bind_inference",
+        "arithmetic",
+        "float_arithmetic",
+        "v0_6_bind_inference"
+      ],
+      "notes": "Bind-inference for chained float intermediates (unit-conversion pattern). Two \u00a7B with no annotation, each inferring f32/f64 from the typed operand."
+    },
+    {
+      "id": "058",
+      "name": "ThreeWayMerge",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/ThreeWayMerge.calr",
+      "csharpFile": "TokenEconomics/ThreeWayMerge.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "multi_arg_call",
+        "expression_context_call"
+      ],
+      "notes": "Three-arg expression-context call. NEUTRAL re v0.6.3: multi-arg calls retain standard \u00a7A\u2026\u00a7/C form. Acts as a control to keep the new-fixture batch honest."
+    },
+    {
+      "id": "059",
+      "name": "NamedConfig",
+      "category": "TokenEconomics",
+      "calorFile": "TokenEconomics/NamedConfig.calr",
+      "csharpFile": "TokenEconomics/NamedConfig.cs",
+      "level": 2,
+      "features": [
+        "module",
+        "function",
+        "named_arg_call",
+        "expression_context_call"
+      ],
+      "notes": "Named-arg expression-context call (config-builder pattern). NEUTRAL re v0.6.3: \u00a7A[name] form is excluded from elision. Acts as a second control."
+    },
+    {
       "id": "async001",
       "name": "SimpleAsync",
       "category": "AsyncConcurrency",
