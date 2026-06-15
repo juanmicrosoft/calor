@@ -10,6 +10,12 @@ All notable changes to this project will be documented in this file.
 ### Internal
 - **`samples/TypeSystem/typesystem.calr` and matching E2E scenario `tests/E2E/scenarios/04_option_result/input.calr` modernized to v0.6.3 canonical syntax.** Replaced the legacy `§OK{§ARR{arr_init:any} §ARR{arr_init:any} value §/ARR{arr_init} §/ARR{arr_init}}` triply-nested-array form (an artifact of mass C# → Calor conversion that produced incorrect type-erased generated C# like `Result.Ok<object, string>(new object[] { new object[] { new object[] { 100 } } })`) with the canonical short form `§OK value` / `§ERR "msg"`, which now generates the intended `Result.Ok<int, string>(100)` / `Result.Err<object, string>("msg")`. Also elided `§A` and `§/C` on all `§C{...}` calls per v0.6.3 emitter rules. The matching `output.g.cs` golden was regenerated. Closes v0.6.4 roadmap item C; the underlying skip the v0.6.3 bulk migrator (`calor fix --elide-call-closers`) hit on this file was the parser bug above. Latent emitter asymmetry remains: `CalorEmitter` still writes `§OK{value}` (with braces) for non-array `Result.Ok` values, which round-trips through the parser as `Ok<object, string>(new object[] { value })`. Tracked separately for v0.7.
 
+### Documentation
+- **v0.6 bind-inference RFC §7 — `Calor0250` open question resolved.** The RFC asked "Should `Calor0250` be promoted from warning to error in v0.7?" but the diagnostic was always shipped as a hard error (see `Binder.cs:279` and `BindValidationPass.cs:223`, both `ReportError`); §5's severity table already listed it as **error**. The open-question bullet was a stale carry-over from the RFC v1 draft. Updated §7 to record the resolution and cite the v0.6.4 corpus-clean audit (zero firings across 230 `.calr` files in `samples/` + `tests/TestData/Benchmarks/`).
+
+### Tests
+- **`BindCorpusCleanTests.Corpus_HasZeroBindInferenceFirings`** — permanent CI-enforced pin that runs `BindValidationPass` (strict inference on) against every `.calr` file under `samples/` and `tests/TestData/Benchmarks/` and asserts zero firings of `Calor0250`/`Calor0251`/`Calor0252`/`Calor0253`. Lex/parse failures are skipped (some corpus files use experimental shapes outside this audit's scope); only the well-parsed subset is audited. Any future regression in the corpus or a tightening of the bind-inference checks will now block merge with the offending file + diagnostic in the failure message.
+
 ## [0.6.3] - 2026-06-13
 
 ### Benchmark Results (Statistical: 30 runs)
