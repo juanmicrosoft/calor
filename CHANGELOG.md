@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Parser: elided-call statement no longer steals the parent block's terminating Dedent.** `ParseCallStatement` previously called `ExpectBlockEnd(EndCall)` unconditionally after a `§A`-argument list (and excluded `Dedent`/`Eof` from the zero-arg implicit-close branch), which consumed the enclosing function/if/loop body's terminator when no `§/C` was actually present. The bug manifested whenever an elided call (`§C{X}` or `§C{X} §A arg`) was the last statement of a function body that was followed by a sibling top-level declaration (e.g. another `§F`) — the parser then tried to parse `§F` as a statement and reported `Calor0100: Expected statement but found Func`. Discovered while modernizing `samples/TypeSystem/typesystem.calr` for v0.6.4 item C. Fix at `src/Calor.Compiler/Parsing/Parser.cs ParseCallStatement` + new `DedentRunEndsAtEndCall` helper. Regression coverage: 4 new tests in `CallStatementImplicitCloseTests` (`V064_ZeroArgStmt_LastInBody_BeforeSiblingFunc_Parses`, `V064_OneArgStmtViaA_LastInBody_BeforeSiblingFunc_Parses`, `V064_OneArgStmtInline_LastInBody_BeforeSiblingFunc_Parses`, `V064_LegacyMultiLineCall_StillParses`).
+
+### Internal
+- **`samples/TypeSystem/typesystem.calr` and matching E2E scenario `tests/E2E/scenarios/04_option_result/input.calr` modernized to v0.6.3 canonical syntax.** Replaced the legacy `§OK{§ARR{arr_init:any} §ARR{arr_init:any} value §/ARR{arr_init} §/ARR{arr_init}}` triply-nested-array form (an artifact of mass C# → Calor conversion that produced incorrect type-erased generated C# like `Result.Ok<object, string>(new object[] { new object[] { new object[] { 100 } } })`) with the canonical short form `§OK value` / `§ERR "msg"`, which now generates the intended `Result.Ok<int, string>(100)` / `Result.Err<object, string>("msg")`. Also elided `§A` and `§/C` on all `§C{...}` calls per v0.6.3 emitter rules. The matching `output.g.cs` golden was regenerated. Closes v0.6.4 roadmap item C; the underlying skip the v0.6.3 bulk migrator (`calor fix --elide-call-closers`) hit on this file was the parser bug above. Latent emitter asymmetry remains: `CalorEmitter` still writes `§OK{value}` (with braces) for non-array `Result.Ok` values, which round-trips through the parser as `Ok<object, string>(new object[] { value })`. Tracked separately for v0.7.
+
 ## [0.6.3] - 2026-06-13
 
 ### Benchmark Results (Statistical: 30 runs)

@@ -142,6 +142,22 @@ public sealed class Parser
         => Check(explicitCloser) || Check(TokenKind.Dedent) || Check(TokenKind.Eof);
 
     /// <summary>
+    /// v0.6.4 — returns true when the current token is a Dedent and the
+    /// following run of contiguous Dedents is terminated by an explicit
+    /// <c>§/C</c> (EndCall). Used by <see cref="ParseCallStatement"/> to
+    /// distinguish "Dedent that terminates a legacy multi-line §C body"
+    /// (must consume) from "Dedent that terminates the parent block"
+    /// (must leave for the parent).
+    /// </summary>
+    private bool DedentRunEndsAtEndCall()
+    {
+        if (!Check(TokenKind.Dedent)) return false;
+        int lookahead = 1;
+        while (Peek(lookahead).Kind == TokenKind.Dedent) lookahead++;
+        return Peek(lookahead).Kind == TokenKind.EndCall;
+    }
+
+    /// <summary>
     /// Phase 3 (indent-aware) — overload accepting two alternative closers
     /// (used for sites like §F/§AF that share a body parser).
     /// </summary>
@@ -1403,16 +1419,26 @@ public sealed class Parser
         }
 
         // Zero-arg implicit close: §C{target} followed by anything other than
-        // §A or §/C (e.g. a sibling statement opener on the next line). The
-        // standard-form branch below would error with Calor0100 since it
-        // requires §/C/Dedent/Eof; emit an empty-args call here instead.
+        // §A, §/C, or a Dedent-run terminated by §/C — including:
+        //   - a sibling statement opener on the next line (same-indent body)
+        //   - a Dedent ending the parent block (this call is the last body stmt)
+        //   - Eof at end of input
+        // Emit empty-args call WITHOUT consuming the terminator: Dedent and Eof
+        // belong to the parent block and must be left intact (mirrors
+        // ParseCallExpression's implicit-close path; v0.6 RFC §3.2 case A).
+        // Bug fix v0.6.4: previously excluded Dedent/Eof unconditionally and
+        // fell through to the standard-form branch, where ExpectBlockEnd(EndCall)
+        // consumed the parent block's terminating Dedent, leaving the enclosing
+        // function body unable to detect its own end. We must still fall through
+        // when a Dedent-run leads to §/C (legacy zero-arg multi-line form
+        // §C{Foo}\n  §/C, where the lexer emits Dedent before §/C).
         if (!Check(TokenKind.Arg) && !Check(TokenKind.EndCall)
-            && !Check(TokenKind.Dedent) && !Check(TokenKind.Eof))
+            && !DedentRunEndsAtEndCall())
         {
             return new CallStatementNode(startToken.Span, target, fallible, arguments, attrs);
         }
 
-        // Standard format with explicit §A and §/C
+        // Standard format with explicit §A and (optionally) §/C
         var argumentNames = new List<string?>();
         while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
         {
@@ -1435,8 +1461,32 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndCall);
-        var span2 = startToken.Span.Union(endToken.Span);
+        // Consume §/C if explicitly present (with optional leading Dedent-run
+        // from the legacy multi-line form); otherwise the call ends implicitly
+        // and Dedent/Eof are left for the parent block to consume.
+        // Bug fix v0.6.4: previously called ExpectBlockEnd(EndCall) which
+        // consumed any Dedent unconditionally, stealing the parent block's
+        // terminator when no §/C followed.
+        TextSpan endSpan;
+        if (Check(TokenKind.EndCall))
+        {
+            var endToken = ExpectBlockEnd(TokenKind.EndCall);
+            endSpan = endToken.Span;
+        }
+        else if (DedentRunEndsAtEndCall())
+        {
+            while (Check(TokenKind.Dedent)) Advance();
+            var endToken = ExpectBlockEnd(TokenKind.EndCall);
+            endSpan = endToken.Span;
+        }
+        else
+        {
+            // Implicit close at EOF, before a Dedent that terminates the
+            // parent block, or before a sibling statement opener.
+            var lastConsumed = _position > 0 ? _tokens[_position - 1] : startToken;
+            endSpan = lastConsumed.Span;
+        }
+        var span2 = startToken.Span.Union(endSpan);
 
         // Only pass argument names if any are non-null
         var hasNames = argumentNames.Any(n => n != null);
