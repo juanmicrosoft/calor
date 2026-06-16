@@ -1,0 +1,6 @@
+§M{m001:ReturnMapped}
+  §F{f001:Double:pub} (i32:x) -> i32
+    §R (* x 2)
+
+  §F{f002:Process:pub} (i32:n) -> i32
+    §R §C{Double} n

@@ -1,0 +1,7 @@
+§M{m001:FormatHeader}
+  §F{f001:Format:pub} (str:title) -> str
+    §R title
+
+  §F{f002:Render:pub} (str:title) -> str
+    §B{header} §C{Format} title
+    §R header

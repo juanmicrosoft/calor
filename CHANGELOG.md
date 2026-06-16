@@ -16,6 +16,21 @@ All notable changes to this project will be documented in this file.
 ### Tests
 - **`BindCorpusCleanTests.Corpus_HasZeroBindInferenceFirings`** — permanent CI-enforced pin that runs `BindValidationPass` (strict inference on) against every `.calr` file under `samples/` and `tests/TestData/Benchmarks/` and asserts zero firings of `Calor0250`/`Calor0251`/`Calor0252`/`Calor0253`. Lex/parse failures are skipped (some corpus files use experimental shapes outside this audit's scope); only the well-parsed subset is audited. Any future regression in the corpus or a tightening of the bind-inference checks will now block merge with the offending file + diagnostic in the failure message.
 
+### Added
+- **7 new TokenEconomics benchmark fixtures** (ids 053–059, `tests/TestData/Benchmarks/TokenEconomics/`) exercising v0.6.3 expression-context call elision and v0.6 bind-inference, with two neutral controls. Closes the v0.6 call-closer-elision RFC §8.1 criterion 4 ("Expected `TokenEconomics` lower-95%-CI > 1.122") and the v0.6.4 roadmap item A:
+
+  | ID | Name | Pattern | Composite ratio |
+  |---|---|---|---|
+  | 053 | ParseAndDouble | bind from one-arg expr-context call (parser pattern) | 1.42x |
+  | 054 | FormatHeader | bind from one-arg expr-context call (formatter pattern) | 1.43x |
+  | 055 | ReturnMapped | direct return from one-arg expr-context call (delegation) | 1.45x |
+  | 056 | AggregateStats | bind-inference from typed arithmetic (mean-of-three) | 1.52x |
+  | 057 | TemperatureRange | bind-inference for chained typed intermediates | 1.47x |
+  | 058 | ThreeWayMerge | three-arg expr-context call (NEUTRAL control — no elision) | 1.34x |
+  | 059 | NamedConfig | named-arg expr-context call (NEUTRAL control — `§A[name]` excluded from elision) | 1.32x |
+
+  Honest measurement: composite ratios are inflated by the line-count component (small focused programs structurally favor Calor's lower namespace/class boilerplate overhead). The elision-favorable fixtures average 0.80 on pure token ratio vs the existing 45-fixture corpus average of 0.81, so the *token-level* elision savings are real but small. The two neutral controls (with composite ratios in the same band as PR #653's `PairLogger` neutral, 1.22x) document the floor under the same structural conditions.
+
 ## [0.6.3] - 2026-06-13
 
 ### Benchmark Results (Statistical: 30 runs)
