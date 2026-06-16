@@ -10,6 +10,20 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-06-16
+
+### Fixed
+- **Parser: an elided `§C` call no longer steals the parent block's terminating `Dedent`.** An elided `§C{X}` / `§C{X} §A arg` call that was the last statement of a function body followed by a sibling declaration (e.g. another `§F`) previously failed with `Calor0100: Expected statement but found Func`. Discovered while modernizing the TypeSystem sample for this release.
+
+### Added
+- **7 new TokenEconomics benchmark fixtures** broadening corpus coverage of v0.6.3 expression-context call elision and v0.6 bind-inference (parser, formatter, delegation, and aggregation shapes), plus two neutral controls. Honest note: the `TokenEconomics` category scores raw token count only, and Calor's `§`-sigils cost more tokens than the equivalent C# on small programs, so these representative fixtures left the category at 1.11x — the v0.7 `TokenEconomics` gate remains open.
+
+### Internal
+- **The TypeSystem sample and the `04_option_result` E2E scenario were modernized to canonical v0.6.3 syntax** — a legacy triply-nested `§OK{§ARR…}` array form (an artifact of mass C# → Calor conversion) was replaced with the canonical `§OK value` / `§ERR "msg"` short form, fixing the generated C# from `Result.Ok<object, string>(new object[]{…})` to `Result.Ok<int, string>(100)`.
+
+### Documentation
+- **v0.6 bind-inference RFC §7 — the `Calor0250` open question is resolved.** The diagnostic has always shipped as a hard error; the "promote warning→error in v0.7?" bullet was a stale carry-over and is now marked resolved, backed by a permanent corpus-clean test pinning zero bind-inference firings across the sample and benchmark corpus.
+
 ## [0.6.3] - 2026-06-13
 
 ### Added
