@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-06-16
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.28x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x ± 0.00 (Calor wins, large effect d=1.80)
+  - ErrorDetection: 1.49x ± 0.00 (Calor wins, large effect d=1.21)
+  - RefactoringStability: 1.38x ± 0.00 (Calor wins, large effect d=7.09)
+  - EditPrecision: 1.36x ± 0.00 (Calor wins, large effect d=4.90)
+  - Correctness: 1.29x ± 0.00 (Calor wins, large effect d=1.31)
+  - TokenEconomics: 1.11x ± 0.00 (Calor wins, negligible effect d=-0.12)
+  - GenerationAccuracy: 1.02x ± 0.00 (Calor wins, small effect d=0.34)
+  - InformationDensity: 0.98x ± 0.00 (C# wins, medium effect d=-0.52)
+- **Programs Tested**: 217
+
 ### Fixed
 - **Parser: elided-call statement no longer steals the parent block's terminating Dedent.** `ParseCallStatement` previously called `ExpectBlockEnd(EndCall)` unconditionally after a `§A`-argument list (and excluded `Dedent`/`Eof` from the zero-arg implicit-close branch), which consumed the enclosing function/if/loop body's terminator when no `§/C` was actually present. The bug manifested whenever an elided call (`§C{X}` or `§C{X} §A arg`) was the last statement of a function body that was followed by a sibling top-level declaration (e.g. another `§F`) — the parser then tried to parse `§F` as a statement and reported `Calor0100: Expected statement but found Func`. Discovered while modernizing `samples/TypeSystem/typesystem.calr` for v0.6.4 item C. Fix at `src/Calor.Compiler/Parsing/Parser.cs ParseCallStatement` + new `DedentRunEndsAtEndCall` helper. Regression coverage: 4 new tests in `CallStatementImplicitCloseTests` (`V064_ZeroArgStmt_LastInBody_BeforeSiblingFunc_Parses`, `V064_OneArgStmtViaA_LastInBody_BeforeSiblingFunc_Parses`, `V064_OneArgStmtInline_LastInBody_BeforeSiblingFunc_Parses`, `V064_LegacyMultiLineCall_StillParses`).
 
@@ -17,7 +33,7 @@ All notable changes to this project will be documented in this file.
 - **`BindCorpusCleanTests.Corpus_HasZeroBindInferenceFirings`** — permanent CI-enforced pin that runs `BindValidationPass` (strict inference on) against every `.calr` file under `samples/` and `tests/TestData/Benchmarks/` and asserts zero firings of `Calor0250`/`Calor0251`/`Calor0252`/`Calor0253`. Lex/parse failures are skipped (some corpus files use experimental shapes outside this audit's scope); only the well-parsed subset is audited. Any future regression in the corpus or a tightening of the bind-inference checks will now block merge with the offending file + diagnostic in the failure message.
 
 ### Added
-- **7 new TokenEconomics benchmark fixtures** (ids 053–059, `tests/TestData/Benchmarks/TokenEconomics/`) exercising v0.6.3 expression-context call elision and v0.6 bind-inference, with two neutral controls. Closes the v0.6 call-closer-elision RFC §8.1 criterion 4 ("Expected `TokenEconomics` lower-95%-CI > 1.122") and the v0.6.4 roadmap item A:
+- **7 new TokenEconomics benchmark fixtures** (ids 053–059, `tests/TestData/Benchmarks/TokenEconomics/`) exercising v0.6.3 expression-context call elision and v0.6 bind-inference, with two neutral controls. These broaden corpus coverage of elision/bind-inference patterns (parser, formatter, delegation, aggregation shapes):
 
   | ID | Name | Pattern | Composite ratio |
   |---|---|---|---|
@@ -29,7 +45,7 @@ All notable changes to this project will be documented in this file.
   | 058 | ThreeWayMerge | three-arg expr-context call (NEUTRAL control — no elision) | 1.34x |
   | 059 | NamedConfig | named-arg expr-context call (NEUTRAL control — `§A[name]` excluded from elision) | 1.32x |
 
-  Honest measurement: composite ratios are inflated by the line-count component (small focused programs structurally favor Calor's lower namespace/class boilerplate overhead). The elision-favorable fixtures average 0.80 on pure token ratio vs the existing 45-fixture corpus average of 0.81, so the *token-level* elision savings are real but small. The two neutral controls (with composite ratios in the same band as PR #653's `PairLogger` neutral, 1.22x) document the floor under the same structural conditions.
+  **Correction / honest measurement:** these fixtures were originally added (v0.6.4 roadmap item A) to push the `TokenEconomics` 30-run lower-95%-CI past the v0.7 gate of 1.122. They do **not** achieve that. The `TokenEconomics` category measures **raw token count only** — `TokenEconomicsCalculator` computes a token×char×line composite (the ratios in the table above) but discards it and reports `calorTokenCount`/`csharpTokenCount`. On small focused programs Calor's `§`-sigil punctuation costs *more* tokens than the equivalent C#, so the new fixtures' token ratios average ~0.80 (C# leaner) and nudged the category from 1.12x (v0.6.3) down to **1.11x**. They are retained because they are representative, honest programs — the benchmark deliberately includes cases C# wins (e.g. InformationDensity 0.98x). The v0.7 `TokenEconomics` gate remains **open**, now correctly understood to require token-favorable (high-C#-ceremony) programs rather than composite-favorable ones; the discarded-composite in the calculator is flagged as a latent bug for v0.7 review.
 
 ## [0.6.3] - 2026-06-13
 
