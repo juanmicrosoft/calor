@@ -384,10 +384,10 @@ end_block:
 
 **Source:**
 ```calor
-§IF{if1}
-  §COND condition
-  §THEN then_body
-  §ELSE else_body
+§IF{if1} (condition)
+  then_body
+§EL
+  else_body
 ```
 
 **CNF:**
@@ -406,10 +406,8 @@ end_label:
 
 **Source:**
 ```calor
-§WHILE{w1}
-§COND condition
-body
-§/WHILE{w1}
+§WH{w1} (condition)
+  body
 ```
 
 **CNF:**
@@ -426,9 +424,8 @@ loop_exit:
 
 **Source:**
 ```calor
-§FOR{for1}{var=i}{from=0}{to=10}{step=1}
-body
-§/FOR{for1}
+§L{for1:i:0:10:1}
+  body
 ```
 
 **CNF:**
@@ -448,11 +445,10 @@ loop_exit:
 
 **Source:**
 ```calor
-§MATCH{m1} target
-§CASE pattern1 => body1
-§CASE pattern2 => body2
-§CASE _ => default
-§/MATCH{m1}
+§W{sw1:expr} target
+  §K pattern1 → body1
+  §K pattern2 → body2
+  §K _ → default
 ```
 
 **CNF:**

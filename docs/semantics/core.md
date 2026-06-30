@@ -362,11 +362,10 @@ Match expressions MUST be exhaustive. The compiler emits `Calor0500: NonExhausti
 ### 8.2 Evaluation
 
 ```calor
-§MATCH{m1} expr
-§CASE pattern1 guard1 => body1
-§CASE pattern2 => body2
-§CASE _ => default
-§/MATCH{m1}
+§W{sw1:expr} n
+  §K §VAR{x} §WHEN (> x 100) → "large"
+  §K 0 → "zero"
+  §K _ → "other"
 ```
 
 **Semantics:**
@@ -387,13 +386,12 @@ Patterns are tried in **declaration order**. First matching pattern wins.
 ### 9.1 Try/Catch/Finally
 
 ```calor
-§TRY{try1}
-body
-§CATCH{ExceptionType:var}
-handler
-§FINALLY
-cleanup
-§/TRY{try1}
+§TR{tr1}
+  body
+§CA{ExceptionType:var}
+  handler
+§FI
+  cleanup
 ```
 
 **Semantics:**

@@ -68,36 +68,29 @@ Defined in `ExpressionNodes.cs:141-146`:
 | ElseIf Clause | `ElseIfClauseNode` | `ControlFlowNodes.cs:140-157` |
 
 ```calor
-§IF{id001}
-  §COND §OP{kind=GT} §REF{name=x} 0
-  §THEN
-  §R INT:1
-  §ELSEIF
-  §COND §OP{kind=LT} §REF{name=x} 0
-  §THEN
-  §R INT:-1
-  §ELSE
-  §R INT:0
+§IF{if1} (> x 0)
+  §R 1
+§EI (< x 0)
+  §R -1
+§EL
+  §R 0
 ```
 
 ### 3.2 Loops
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| For Loop | `ForStatementNode` | `§FOR{id}{var}{from}{to}{step}` | `ControlFlowNodes.cs:9-41` |
-| While Loop | `WhileStatementNode` | `§WHILE{id}` | `ControlFlowNodes.cs:47-70` |
+| For Loop | `ForStatementNode` | `§L{id:var:from:to:step}` | `ControlFlowNodes.cs:9-41` |
+| While Loop | `WhileStatementNode` | `§WH{id} (cond)` | `ControlFlowNodes.cs:47-70` |
 | Do-While Loop | `DoWhileStatementNode` | `§DO{id}...§/DO` | `ControlFlowNodes.cs:76-99` |
 | Foreach Loop | `ForeachStatementNode` | `§EACH{id:var:type}` | `ArrayNodes.cs:115-164` |
 
 ```calor
-§FOR{for1}{var=i}{from=0}{to=10}{step=1}
-§PRINT §REF{name=i}
-§/FOR{for1}
+§L{l1:i:0:10:1}
+  §P i
 
-§WHILE{while1}
-§COND §OP{kind=LT} §REF{name=i} 100
-...
-§/WHILE{while1}
+§WH{w1} (< i 100)
+  §P i
 ```
 
 ### 3.3 Loop Control
@@ -120,14 +113,10 @@ Defined in `ExpressionNodes.cs:141-146`:
 | Match Case | `MatchCaseNode` | `PatternNodes.cs:59-75` |
 
 ```calor
-§MATCH{m001} §REF{name=shape}
-§CASE §PATTERN{Some} §VAR{s}
-§BODY §R §REF{name=s}
-§/CASE
-§CASE §PATTERN{None}
-§BODY §R STR:"none"
-§/CASE
-§/MATCH{m001}
+§W{sw1:expr} code
+  §K 200 → "OK"
+  §K 404 → "Not Found"
+  §K _ → "Unknown"
 ```
 
 ### 4.2 Pattern Types
@@ -249,21 +238,20 @@ Defined in `ExpressionNodes.cs:141-146`:
 
 | Construct | Node Type | Syntax | File Reference |
 |-----------|-----------|--------|----------------|
-| Try Statement | `TryStatementNode` | `§TRY{id}...§/TRY` | `ExceptionNodes.cs:17-43` |
-| Catch Clause | `CatchClauseNode` | `§CATCH{Type:var}` | `ExceptionNodes.cs:50-92` |
-| Throw | `ThrowStatementNode` | `§THROW expr` | `ExceptionNodes.cs:98-113` |
-| Rethrow | `RethrowStatementNode` | `§RETHROW` | `ExceptionNodes.cs:119-125` |
+| Try Statement | `TryStatementNode` | `§TR{id} ... §CA ... §FI` | `ExceptionNodes.cs:17-43` |
+| Catch Clause | `CatchClauseNode` | `§CA{Type:var}` | `ExceptionNodes.cs:50-92` |
+| Throw | `ThrowStatementNode` | `§TH expr` | `ExceptionNodes.cs:98-113` |
+| Rethrow | `RethrowStatementNode` | `§RT` | `ExceptionNodes.cs:119-125` |
 
 ```calor
-§TRY{try1}
-§C{RiskyOperation} §/C
+§TR{tr1}
+  §C{RiskyOperation} §/C
 §CA{IOException:ex}
-§PRINT §REF{name=ex}
-§CA
-§RETHROW
+  §P ex
+§CA{Exception:ex}
+  §RT
 §FI
-§C{Cleanup} §/C
-§/TRY{try1}
+  §C{Cleanup} §/C
 ```
 
 ---
