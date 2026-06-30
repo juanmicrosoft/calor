@@ -10,6 +10,14 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-06-30
+
+### Fixed
+- **The `TokenEconomics` benchmark metric now reports the composite it computes (the discarded-composite bug, [#668](https://github.com/juanmicrosoft/calor/issues/668)).** The calculator computed a composite advantage — the geometric mean of the token, character, and line ratios — and then *discarded it*, reporting the raw token-count ratio only despite the metric being named `CompositeTokenEconomics`. The category now reports the composite. The metric is deterministic, so its 95% CI equals its point estimate. This lifts the headline numbers — TokenEconomics from `1.11×` (token-only) to `1.42×` (composite) and overall from `1.28×` to `1.32×` — purely as a **measurement correction, not a Calor improvement**. The honest caveat stands: Calor still uses *more raw tokens* than C# on small programs (the `§`-sigil premium), but is more compact once character and line counts are included.
+
+### Changed
+- **The deferred v0.7 `TokenEconomics` gate was recalibrated against the corrected metric.** The old token-only target (`lower-95%-CI > 1.122`) is superseded by a composite gate of **≥ 1.40×**, anchored to the measured 1.42× baseline. The public [Token Economics metric page](/benchmarking/metrics/token-economics/) was corrected — it had previously and incorrectly reported the category as "C# wins".
+
 ## [0.6.4] - 2026-06-16
 
 ### Fixed

@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-06-30
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x ± 0.00 (Calor wins, large effect d=1.80)
+  - ErrorDetection: 1.49x ± 0.00 (Calor wins, large effect d=1.21)
+  - TokenEconomics: 1.42x ± 0.00 (Calor wins, composite metric — see Fixed)
+  - RefactoringStability: 1.38x ± 0.00 (Calor wins, large effect d=7.09)
+  - EditPrecision: 1.36x ± 0.00 (Calor wins, large effect d=4.90)
+  - Correctness: 1.29x ± 0.00 (Calor wins, large effect d=1.31)
+  - GenerationAccuracy: 1.02x ± 0.00 (Calor wins, small effect d=0.34)
+  - InformationDensity: 0.98x ± 0.00 (C# wins, medium effect d=-0.52)
+- **Programs Tested**: 217
+
+> **Note:** the overall and TokenEconomics figures rose vs v0.6.4 (1.28x → 1.32x; 1.11x → 1.42x) as a **measurement correction**, not a Calor improvement — the TokenEconomics metric now reports the composite it always computed (see Fixed). Calor still uses more *raw tokens* than C# on small programs.
+
 ### Fixed
 - **`TokenEconomics` benchmark metric now reports the composite it computes (the discarded-composite bug, #668).** `TokenEconomicsCalculator.CalculateAsync` computed a composite advantage — the geometric mean of the token, character, and line ratios — and then **discarded it**, reporting the raw token-count ratio only despite the metric being named `CompositeTokenEconomics`. The category now reports the composite. The metric is deterministic (pure token/char/line counting, no LLM sampling), so its 95% CI equals its point estimate. **This raises the headline numbers — TokenEconomics from `1.11×` (token-only) to `1.42×` (composite), and overall from `1.28×` to `1.32×` — purely as a measurement correction; it is not a Calor improvement.** The honest caveat is documented: Calor still uses *more raw tokens* than C# on small programs (the `§`-sigil premium), but is more compact once character and line counts are included. Fix applied to both calculator copies (`tests/Calor.Evaluation/Metrics/TokenEconomicsCalculator.cs`, `src/Calor.Compiler/Evaluation/Metrics/TokenEconomicsCalculator.cs`); the misleading "Token savings: … fewer tokens" report line was corrected to "Compactness: … more compact (composite)". Regression coverage: `MetricCalculatorTests.TokenEconomicsCalculator_ReportsCompositeAdvantage_NotRawTokenRatioOnly` pins that the reported advantage equals the geometric mean of the three ratios (not the token ratio alone).
 
