@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **`TokenEconomics` benchmark metric now reports the composite it computes (the discarded-composite bug, #668).** `TokenEconomicsCalculator.CalculateAsync` computed a composite advantage — the geometric mean of the token, character, and line ratios — and then **discarded it**, reporting the raw token-count ratio only despite the metric being named `CompositeTokenEconomics`. The category now reports the composite. The metric is deterministic (pure token/char/line counting, no LLM sampling), so its 95% CI equals its point estimate. **This raises the headline numbers — TokenEconomics from `1.11×` (token-only) to `1.42×` (composite), and overall from `1.28×` to `1.32×` — purely as a measurement correction; it is not a Calor improvement.** The honest caveat is documented: Calor still uses *more raw tokens* than C# on small programs (the `§`-sigil premium), but is more compact once character and line counts are included. Fix applied to both calculator copies (`tests/Calor.Evaluation/Metrics/TokenEconomicsCalculator.cs`, `src/Calor.Compiler/Evaluation/Metrics/TokenEconomicsCalculator.cs`); the misleading "Token savings: … fewer tokens" report line was corrected to "Compactness: … more compact (composite)". Regression coverage: `MetricCalculatorTests.TokenEconomicsCalculator_ReportsCompositeAdvantage_NotRawTokenRatioOnly` pins that the reported advantage equals the geometric mean of the three ratios (not the token ratio alone).
+
+### Changed
+- **v0.7 `TokenEconomics` gate recalibrated against the corrected metric (#668).** The deferred v0.7 acceptance criterion ("lower-95%-CI > 1.122") was a token-only target derived from the buggy metric. It is superseded by a composite gate of **≥ 1.40×** (regression guard anchored to the measured 1.42× v0.6.5 baseline). Documented transparently in `docs/plans/v0.6-call-closer-elision.md` §8 criterion 4, with correction notes in `docs/plans/v0.6-bind-inference-formalization.md`, `docs/plans/v0.6.4-roadmap.md`, and the public `token-economics` benchmark metric pages (which previously and incorrectly reported the category as "C# wins").
+
 ## [0.6.4] - 2026-06-16
 
 ### Benchmark Results (Statistical: 30 runs)
