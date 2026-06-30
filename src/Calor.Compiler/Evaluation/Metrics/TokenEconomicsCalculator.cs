@@ -11,7 +11,7 @@ public class TokenEconomicsCalculator : IMetricCalculator
 {
     public string Category => "TokenEconomics";
 
-    public string Description => "Measures token and character counts to compare code compactness";
+    public string Description => "Measures composite compactness (geometric mean of token, character, and line ratios) between Calor and C#";
 
     public Task<MetricResult> CalculateAsync(EvaluationContext context)
     {
@@ -30,16 +30,27 @@ public class TokenEconomicsCalculator : IMetricCalculator
         var calorLineCount = context.CalorSource.Split('\n').Length;
         var csharpLineCount = context.CSharpSource.Split('\n').Length;
 
-        // Calculate ratios (lower is better for Calor, so C#/Calor gives advantage ratio)
+        // Per-dimension advantage ratios (lower is better for Calor, so C#/Calor gives advantage ratio)
         var tokenRatio = calorTokenCount > 0 ? (double)csharpTokenCount / calorTokenCount : 1.0;
         var charRatio = calorCharCount > 0 ? (double)csharpCharCount / calorCharCount : 1.0;
         var lineRatio = calorLineCount > 0 ? (double)csharpLineCount / calorLineCount : 1.0;
 
-        // Composite advantage (geometric mean of ratios)
+        // Composite advantage: geometric mean of the three dimensions. This is the
+        // headline TokenEconomics number reported by this metric — it blends raw
+        // token count with character and line compactness so no single dimension
+        // dominates. (Previously this was computed and then discarded; the metric
+        // mistakenly reported the raw token ratio only.)
         var compositeAdvantage = Math.Pow(tokenRatio * charRatio * lineRatio, 1.0 / 3.0);
+
+        // Composite "size index" for each language (geometric mean of the three raw
+        // counts) so that CalorScore/CSharpScore remain meaningful and their ratio
+        // (CSharpScore / CalorScore) reproduces compositeAdvantage exactly.
+        var calorSize = Math.Pow((double)calorTokenCount * calorCharCount * calorLineCount, 1.0 / 3.0);
+        var csharpSize = Math.Pow((double)csharpTokenCount * csharpCharCount * csharpLineCount, 1.0 / 3.0);
 
         var details = new Dictionary<string, object>
         {
+            ["compositeAdvantage"] = compositeAdvantage,
             ["calorTokenCount"] = calorTokenCount,
             ["csharpTokenCount"] = csharpTokenCount,
             ["tokenRatio"] = tokenRatio,
@@ -53,11 +64,12 @@ public class TokenEconomicsCalculator : IMetricCalculator
             ["csharpTokens"] = csharpTokens.Take(50).ToList()
         };
 
-        return Task.FromResult(MetricResult.CreateLowerIsBetter(
+        return Task.FromResult(new MetricResult(
             Category,
             "CompositeTokenEconomics",
-            calorTokenCount,
-            csharpTokenCount,
+            calorSize,
+            csharpSize,
+            compositeAdvantage,
             details));
     }
 

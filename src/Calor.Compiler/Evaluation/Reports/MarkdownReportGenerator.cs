@@ -192,7 +192,7 @@ public class MarkdownReportGenerator
             var savings = (1 - 1.0 / tokenAdvantage) * 100;
             if (savings > 0)
             {
-                sb.AppendLine($"3. **Token savings:** Calor uses approximately {savings:F0}% fewer tokens than equivalent C# code");
+                sb.AppendLine($"3. **Compactness:** Calor is approximately {savings:F0}% more compact than equivalent C# code (composite of token, character, and line counts)");
             }
         }
 

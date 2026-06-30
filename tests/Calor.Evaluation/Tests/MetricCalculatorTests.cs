@@ -12,7 +12,7 @@ public class MetricCalculatorTests
     #region Token Economics Tests
 
     [Fact]
-    public async Task TokenEconomicsCalculator_CalculatesTokenRatio_WhenCalorIsMoreCompact()
+    public async Task TokenEconomicsCalculator_ReportsCompositeAdvantage_NotRawTokenRatioOnly()
     {
         // Arrange
         var calculator = new TokenEconomicsCalculator();
@@ -36,11 +36,24 @@ namespace Calculator
 
         // Assert
         Assert.Equal("TokenEconomics", result.Category);
-        // The tokenizer counts punctuation heavily, so we verify the metric calculation runs
-        // and produces comparable scores rather than assuming Calor is always smaller by token count
-        Assert.True(result.CalorScore > 0, "Should calculate Calor token count");
-        Assert.True(result.CSharpScore > 0, "Should calculate C# token count");
+        Assert.Equal("CompositeTokenEconomics", result.MetricName);
+        Assert.True(result.CalorScore > 0, "Should calculate a Calor composite size index");
+        Assert.True(result.CSharpScore > 0, "Should calculate a C# composite size index");
         Assert.True(result.AdvantageRatio > 0, "Should calculate advantage ratio");
+
+        // The reported advantage must be the composite (geometric mean of the
+        // token, character, and line ratios), not the raw token ratio that was
+        // previously reported while the composite was computed then discarded.
+        var tokenRatio = (double)result.Details["tokenRatio"];
+        var charRatio = (double)result.Details["charRatio"];
+        var lineRatio = (double)result.Details["lineRatio"];
+        var expectedComposite = Math.Pow(tokenRatio * charRatio * lineRatio, 1.0 / 3.0);
+
+        Assert.Equal(expectedComposite, result.AdvantageRatio, 6);
+        Assert.Equal(expectedComposite, (double)result.Details["compositeAdvantage"], 6);
+
+        // The size-index scores must reproduce the composite exactly via CSharp/Calor.
+        Assert.Equal(result.AdvantageRatio, result.CSharpScore / result.CalorScore, 6);
     }
 
     [Fact]

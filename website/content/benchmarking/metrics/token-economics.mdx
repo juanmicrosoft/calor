@@ -6,14 +6,27 @@ order: 8
 
 
 **Category:** Token Economics
-**Result:** C# wins (0.63x)
-**What it measures:** Tokens required to represent equivalent logic
+**Result:** Calor wins (composite)
+**What it measures:** Composite compactness — the geometric mean of the token, character, and line ratios between equivalent Calor and C# programs
 
 ---
 
 ## Overview
 
-The Token Economics metric measures how many tokens each language requires to express the same logic. Fewer tokens means less context window usage.
+The Token Economics metric measures how compact each language is at expressing
+the same logic. It is a **composite** of three dimensions — token count,
+non-whitespace character count, and line count — combined as a geometric mean so
+that no single dimension dominates. Greater compactness means less context-window
+usage and lower edit cost.
+
+> **Metric correction (v0.6.5, #668):** earlier releases reported this category as
+> "C# wins" using a **raw token count only**. The calculator computed the composite
+> (token × char × line) and then discarded it, reporting the token ratio alone. That
+> bug is fixed: the category now reports the composite it always computed. On the
+> representative benchmark corpus the composite **favors Calor** (currently **1.42×**),
+> because Calor's character- and line-level compactness outweighs its higher raw token
+> count. Raw token count *alone* — especially on tiny programs — still tends to favor
+> C# (see the per-program examples below, which illustrate that single dimension).
 
 ---
 
@@ -71,11 +84,20 @@ foreach (var ch in source)
 CompositeAdvantage = (TokenRatio × CharRatio × LineRatio)^(1/3)
 ```
 
-Geometric mean of all three ratios.
+Geometric mean of all three ratios. **This composite is the value the metric
+reports** (as of v0.6.5 / #668). Because the underlying counts are deterministic,
+the composite has no run-to-run variance — its 95% confidence interval equals its
+point estimate.
 
 ---
 
 ## Detailed Comparison
+
+> The per-program ratios below report the **raw token dimension only** — one of the
+> three inputs to the composite. They show that on small programs Calor often uses
+> *more* raw tokens than C#. The composite metric additionally credits Calor's
+> character- and line-level compactness, which is why the aggregate category favors
+> Calor on the representative corpus.
 
 ### Hello World
 
@@ -183,7 +205,11 @@ public static int Divide(int a, int b)
 
 ---
 
-## Why Calor Uses More Tokens
+## Why Calor Uses More Raw Tokens
+
+These factors raise Calor's **raw token count** (one of the three composite
+dimensions). They are outweighed in the composite by Calor's character- and
+line-level compactness on the representative corpus.
 
 ### 1. Explicit Tags
 
@@ -251,15 +277,18 @@ Token efficiency is less critical when:
 
 ## Interpretation
 
-The 0.63x ratio means Calor uses ~1.6x more tokens than C# on average.
+On the representative benchmark corpus the **composite** Token Economics ratio
+favors Calor (currently **1.42×**): Calor is more compact overall once character
+and line counts are included alongside tokens.
 
-This is the price of:
+Calor does pay a **raw token** premium for:
 - Explicit structure
 - First-class contracts
 - Effect declarations
-- Closing tags
+- `§`-sigil markers
 
-Lisp-style expressions help keep this ratio manageable.
+That premium is real but is outweighed by Calor's character/line compactness in
+the composite. Lisp-style expressions help keep the raw-token premium manageable.
 
 ---
 
