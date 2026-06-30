@@ -805,8 +805,9 @@ public class CollectionOperationsTests
     }
 
     [Fact]
-    public void Parse_MismatchedEachKVId_ReportsError()
+    public void Parse_LegacyEachKVCloser_ReportsError()
     {
+        // §/EACHKV is removed closer-form (Phase 4d): rejected with Calor0830, not MismatchedId.
         var source = """
             §M{m001:Test}
             §F{f001:Main:pub}
@@ -821,7 +822,8 @@ public class CollectionOperationsTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
     }
 
     #endregion

@@ -161,6 +161,37 @@ public class ParserLegacyCloserRejectionTests
         Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.LegacyCloserForm);
     }
 
+    [Fact]
+    public void ApplyingBareLegacyCloserFix_NoIdPayload_YieldsCleanIndentOnlySource()
+    {
+        // Bare closers (no {id}) are the common modern form — exercise the
+        // path where the removal range is computed from the closer keyword
+        // length alone (no brace tokens to peek).
+        const string src = """
+            §M{m1:Calc}
+              §F{f1:Add:pub}
+                §I{i32:a}
+                §I{i32:b}
+                §O{i32}
+                §R (+ a b)
+              §/F
+            §/M
+            """;
+        var bag = ParseBag(src);
+
+        var fixes = bag.DiagnosticsWithFixes
+            .Where(d => d.Code == DiagnosticCode.LegacyCloserForm)
+            .ToList();
+        Assert.Equal(2, fixes.Count);
+
+        var healed = ApplyFixes(src, bag);
+        Assert.DoesNotContain("§/", healed);
+
+        var (diags, hasErrors) = Parse(healed);
+        Assert.False(hasErrors, "Healed source must parse cleanly");
+        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.LegacyCloserForm);
+    }
+
     /// <summary>
     /// Mirrors the line/column edit application used by the LSP code-action
     /// handler and the calor_check MCP tool (apply path): edits are applied

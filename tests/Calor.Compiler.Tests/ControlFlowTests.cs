@@ -43,8 +43,9 @@ public class ControlFlowTests
     }
 
     [Fact]
-    public void Parse_ForLoop_MismatchedId_ReportsError()
+    public void Parse_ForLoop_LegacyCloser_ReportsError()
     {
+        // §/L is removed closer-form (Phase 4d): rejected with Calor0830, not MismatchedId.
         var source = """
             §M{m001:Test}
             §F{f001:Main:pub}
@@ -57,10 +58,8 @@ public class ControlFlowTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d =>
-            d.Code == DiagnosticCode.MismatchedId &&
-            d.Message.Contains("for1") &&
-            d.Message.Contains("for999"));
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
     }
 
     [Fact]

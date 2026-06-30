@@ -11328,6 +11328,16 @@ public sealed class Parser
         if (endToken.Kind == TokenKind.Dedent || endToken.Kind == TokenKind.Eof)
             return false;
 
+        // Phase 4d: structural legacy closers (§/F, §/M, §/CL, ...) are removed
+        // syntax and are already flagged + auto-healed by Calor0830, whose fix
+        // DELETES the entire closer line. Reporting a redundant Calor0101 id
+        // mismatch here would attach a second, conflicting fix (inserting the
+        // opener id into a closer that is being deleted) — applying both fixes
+        // scrambles the source. The closer is going away entirely, so any id
+        // mismatch on it is moot; let Calor0830 own these tokens.
+        if (StructuralLegacyClosers.Contains(endToken.Kind))
+            return false;
+
         // If both are the same, no mismatch
         if (endId == openId)
             return false;
