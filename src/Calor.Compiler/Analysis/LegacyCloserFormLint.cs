@@ -1,3 +1,6 @@
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
+
 namespace Calor.Compiler.Analysis;
 
 /// <summary>
@@ -125,5 +128,65 @@ public static class LegacyCloserFormLint
         }
 
         return findings;
+    }
+
+    /// <summary>
+    /// Like <see cref="Scan"/>, but returns ONLY the findings that are safe to
+    /// delete from a <c>.calr</c> source file (used by <c>calor fix
+    /// --heal-closers</c>). A raw <see cref="Scan"/> matches the literal text
+    /// <c>§/…</c> anywhere — including inside a string literal (e.g.
+    /// <c>§P "see §/F"</c>) or a <c>//</c> comment — so a bulk rewriter driven
+    /// by raw findings would corrupt such content. The parser/LSP/MCP auto-heal
+    /// never has this problem because it operates on the token/AST level.
+    ///
+    /// <para>This method restores that safety at the source level by tokenizing
+    /// with the real <see cref="Lexer"/> and keeping only findings whose offset
+    /// coincides with a genuine closer TOKEN. Closer text that lands inside a
+    /// string/char literal is part of a <c>StrLiteral</c> token, and text inside
+    /// a <c>//</c> comment is skipped entirely, so neither produces a closer
+    /// token — such findings are dropped and the content is left untouched. If
+    /// the source cannot be tokenized at all, no findings are returned (heal
+    /// nothing rather than risk corruption).</para>
+    /// </summary>
+    public static IReadOnlyList<Finding> ScanForHeal(string source, string filePath)
+    {
+        var raw = Scan(source, filePath);
+        if (raw.Count == 0)
+        {
+            return raw;
+        }
+
+        HashSet<int> closerTokenOffsets;
+        try
+        {
+            var lexer = new Lexer(source, new DiagnosticBag());
+            closerTokenOffsets = new HashSet<int>();
+            foreach (var token in lexer.TokenizeAll())
+            {
+                // A genuine closer token's text is the source slice starting at
+                // the '§' (e.g. "§/F"); its span start is that '§' offset, which
+                // is exactly Finding.RemovedOffset.
+                if (token.Text.StartsWith("\u00A7/", StringComparison.Ordinal))
+                {
+                    closerTokenOffsets.Add(token.Span.Start);
+                }
+            }
+        }
+        catch
+        {
+            // Untokenizable source — be conservative and heal nothing.
+            return Array.Empty<Finding>();
+        }
+
+        var safe = new List<Finding>();
+        foreach (var finding in raw)
+        {
+            if (closerTokenOffsets.Contains(finding.RemovedOffset))
+            {
+                safe.Add(finding);
+            }
+        }
+
+        return safe;
     }
 }
