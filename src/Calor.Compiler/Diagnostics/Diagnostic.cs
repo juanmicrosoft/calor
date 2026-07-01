@@ -84,6 +84,17 @@ public static class DiagnosticCode
     /// </summary>
     public const string MissingExtensionSelf = "Calor0204";
 
+    /// <summary>
+    /// Error: a value-returning <c>§R expr</c> appears in the body of an owner
+    /// that returns no value — a <c>void</c>/<c>Task</c> function or method, an
+    /// iterator (its body yields), a constructor, a property/indexer setter or
+    /// init accessor, or an event add/remove accessor. The generated C# would
+    /// fail to compile (CS0127 "since it returns void" / CS1622 for iterators).
+    /// The fix is either to declare a return type (<c>§O{type}</c> / a 3-field
+    /// header return type) or to drop the value and use a bare <c>§R</c>.
+    /// </summary>
+    public const string ReturnValueInVoidOwner = "Calor0205";
+
     // Bind inference diagnostics (Calor0250-0259) — RFC v0.6 bind-inference-formalization
 
     /// <summary>

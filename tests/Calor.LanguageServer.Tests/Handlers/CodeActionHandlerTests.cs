@@ -81,7 +81,7 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-              §F{f001:Test}
+              §F{f001:Test:pub} () -> i32
                 §R 0
             """;
 
@@ -95,7 +95,7 @@ public class CodeActionHandlerTests
     {
         var source = """
             §M{m001:TestModule}
-            §F{f001:Test}
+            §F{f001:Test:pub} () -> i32
             §R 0
             """;
 
