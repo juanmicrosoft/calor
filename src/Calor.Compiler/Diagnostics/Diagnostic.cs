@@ -47,6 +47,19 @@ public static class DiagnosticCode
     public const string InvalidLispExpression = "Calor0114";
     public const string TypeParameterNotFound = "Calor0115";
 
+    /// <summary>
+    /// Error: A <c>§F</c>/<c>§AF</c> function header carries four positional
+    /// fields (<c>{id:name:type:vis}</c>) where the third is a return type and
+    /// the fourth a visibility. Function headers take at most
+    /// <c>{id:name:visibility}</c>; the return type belongs in the signature
+    /// (<c>(...) -&gt; type</c>). Left unflagged, the extra field is silently
+    /// dropped — the parser reads the type as the visibility and discards the
+    /// real visibility — emitting a void method (e.g. <c>void Add() { return 0; }</c>,
+    /// CS0127). Only <c>§F</c>/<c>§AF</c> are affected; <c>§MT</c>/<c>§AMT</c>
+    /// legitimately take a fourth modifier field.
+    /// </summary>
+    public const string MalformedFunctionHeader = "Calor0116";
+
     // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
 
     /// <summary>

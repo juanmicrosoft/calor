@@ -978,7 +978,7 @@ public class SyntaxTests
         var diagnostics = new DiagnosticBag();
         var source = @"
 §M{m001:Test}
-  §F{f001:Calc:i32:pub}
+  §F{f001:Calc:pub} () -> i32
         §R (+ §THIS.Value INT:1)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
@@ -1005,7 +1005,7 @@ public class SyntaxTests
         var diagnostics = new DiagnosticBag();
         var source = @"
 §M{m001:Test}
-  §F{f001:Calc:i32:pub}
+  §F{f001:Calc:pub} () -> i32
         §R (+ §BASE.Value INT:1)";
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();

@@ -223,9 +223,7 @@ public class CompactIdMigratorTests
         // matching closer ID to exercise the closer-rewrite path.
         var src =
             $"§M{{m_{Ulid1}:Calc}}\n" +
-            $"  §F{{f_{Ulid2}:divide:i32:public}}\n" +
-            $"    §I{{i32:a}}\n" +
-            $"    §I{{i32:b}}\n" +
+            $"  §F{{f_{Ulid2}:divide:public}} (i32:a, i32:b) -> i32\n" +
             $"    §R (/ a b)\n";
 
         // Baseline: source pre-migration must parse cleanly so the test

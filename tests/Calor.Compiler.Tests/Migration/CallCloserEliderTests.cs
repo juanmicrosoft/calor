@@ -36,7 +36,7 @@ public class CallCloserEliderTests
     public void T_elide_a_ZeroArgStmt_ElidesEndC()
     {
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §C{Doit} §/C\n";
         var result = Sut.Process(src, "a.calr");
 
@@ -50,7 +50,7 @@ public class CallCloserEliderTests
     public void T_elide_b_OneArgStmt_SameLine_ElidesBoth()
     {
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §C{Doit} §A x §/C\n";
         var result = Sut.Process(src, "b.calr");
 
@@ -69,7 +69,7 @@ public class CallCloserEliderTests
         // (Calor bindings place the initializer expression directly after
         // §B{name:type} — there is no '§=' token.)
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §B{r:i32} §C{Add} §A 1 §/C\n";
         var result = Sut.Process(src, "c.calr");
 
@@ -83,7 +83,7 @@ public class CallCloserEliderTests
     {
         // §A is on a different line from §C — must NOT elide.
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §C{Doit}\n"
             + "    §A x\n"
             + "  §/C\n";
@@ -99,7 +99,7 @@ public class CallCloserEliderTests
     public void T_elide_e_NamedArg_NotElided()
     {
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §C{Doit} §A[name] x §/C\n";
         var result = Sut.Process(src, "e.calr");
 
@@ -112,7 +112,7 @@ public class CallCloserEliderTests
     public void T_elide_f_TwoArgs_NotElided()
     {
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §C{Add} §A 1 §A 2 §/C\n";
         var result = Sut.Process(src, "f.calr");
 
@@ -126,7 +126,7 @@ public class CallCloserEliderTests
     {
         // Nested call: outer arg is itself a call expression.
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §C{Outer} §A §C{Inner} §A x §/C §/C\n";
         var result = Sut.Process(src, "g.calr");
 
@@ -154,7 +154,7 @@ public class CallCloserEliderTests
     public void T_elide_i_RoundTrip_ByteEqual()
     {
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §C{Doit} §A x §/C\n"
             + "  §C{Another} §/C\n";
         var result = Sut.Process(src, "i.calr");
@@ -175,7 +175,7 @@ public class CallCloserEliderTests
     public void T_elide_j_Idempotent()
     {
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §C{Doit} §A x §/C\n";
         var first = Sut.Process(src, "j.calr");
         Assert.False(first.Skipped, first.SkipReason);
@@ -191,7 +191,7 @@ public class CallCloserEliderTests
     {
         // No §/C at all — nothing to elide.
         var src = Module
-            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:void:public}\n"
+            + "§F{f_01j5x7abcdef01j5x7abcdef01:run:public}\n"
             + "  §C{Doit} x\n";
         var result = Sut.Process(src, "k.calr");
 
