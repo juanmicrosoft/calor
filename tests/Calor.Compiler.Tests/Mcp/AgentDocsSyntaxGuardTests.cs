@@ -77,7 +77,7 @@ public class AgentDocsSyntaxGuardTests
             @"tests\Calor.Evaluation\Skills\calor-language-skills.md",
         })
         {
-            var path = Path.Combine(root, rel);
+            var path = Path.Combine(root, ToPlatformRelative(rel));
             list.Add(new Surface(rel, File.ReadAllText(path)));
         }
 
@@ -88,13 +88,20 @@ public class AgentDocsSyntaxGuardTests
             @"src\Calor.Compiler\Resources\error-suggestions.json",
         })
         {
-            var path = Path.Combine(root, rel);
+            var path = Path.Combine(root, ToPlatformRelative(rel));
             var correct = CollectCorrectCalorStrings(File.ReadAllText(path));
             list.Add(new Surface(rel, string.Join("\n\n", correct)));
         }
 
         return list;
     }
+
+    // The surface paths above are written with Windows-style '\' separators for
+    // readability; normalize them to the running platform's separator so the
+    // guard reads the files on Linux/macOS CI as well as on Windows.
+    private static string ToPlatformRelative(string rel) =>
+        rel.Replace('\\', Path.DirectorySeparatorChar)
+           .Replace('/', Path.DirectorySeparatorChar);
 
     private static List<string> CollectCorrectCalorStrings(string json)
     {
