@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-07-01
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x ± 0.00 (Calor wins, large effect d=1.80)
+  - ErrorDetection: 1.49x ± 0.00 (Calor wins, large effect d=1.21)
+  - TokenEconomics: 1.42x ± 0.00 (Calor wins, composite metric)
+  - RefactoringStability: 1.38x ± 0.00 (Calor wins, large effect d=7.09)
+  - EditPrecision: 1.36x ± 0.00 (Calor wins, large effect d=4.90)
+  - Correctness: 1.29x ± 0.00 (Calor wins, large effect d=1.31)
+  - GenerationAccuracy: 1.02x ± 0.00 (Calor wins, small effect d=0.34)
+  - InformationDensity: 0.98x ± 0.00 (C# wins, medium effect d=-0.52)
+- **Programs Tested**: 217
+
+> **Note:** this release is docs / tooling / test correctness only (primer + reference-doc fixes, `Calor0830` auto-heal, and two compile-time primer guards); it contains no benchmark-affecting code changes, so the profile is unchanged from v0.6.5.
+
+### Fixed
+- **`calor://primer` MCP resource now compiles (Track 1 / D1, #674).** The agent primer served at `calor://primer` (`McpMessageHandler.GetPrimerContent`) taught syntax the compiler rejects today — closer-form tags (`§/F`, `§/M`, `§/I`, `§/L`), ULID IDs, `§RESULT`, `§I`/`§O` markers, and empty `§R` — so an agent onboarded from the primer at session start wrote non-compiling Calor (`Calor0830`/`Calor0006`/…). The primer was rewritten to be fully indent-only and empirically compilable: 3-field `§F` headers with arrow signatures (`(i32:a, i32:b) -> i32`), lowercase `result` in postconditions, BCL-only effectful calls with declared `§E{cw}`, no structural closers, plus a "Common mistakes" section and a quick reference. Exposed to tests via `McpResourceValidator.GetPrimer()`.
+- **`Calor0830` (legacy closer form) is now auto-healable, and its remediation no longer points to a dead end (Track 1 / D1b, #676).** The diagnostic told users to run `calor format`, but `calor format` and `calor lint --fix` parse the file first and abort on `HasErrors` — and `Calor0830` *is* a parse error, so those commands could never read, let alone fix, the file. `Parser.ReportLegacyCloser` now reports through `ReportErrorWithFix`, attaching a `SuggestedFix` that deletes the entire closer line (keyword + any optional `{id}` payload). This flows to the LSP quick-fix and the `calor_check apply:true` MCP tool, and the healed source compiles. The message now explains the block ends at its body's dedent; stale doc comments in `Diagnostic.cs` and `LegacyCloserFormLint.cs` that also referenced `calor format` were corrected. (No CLI heal command yet — parse-first `calor format`/`lint --fix` remain; wiring `LegacyCloserFormLint.Scan` into a CLI remediation is a tracked follow-up.)
+
+### Documentation
+- **Purged removed closer-form from teaching/reference docs (Track 1 / D1, #675).** Phase 4d removed structural closer tags (`§/M`, `§/F`, `§/I`, `§/L`, …), which now hard-error `Calor0830`, but the Markdown docs still claimed closers were "still accepted" and showed closer-form / stale pseudo-syntax — so an agent following Calor's own docs wrote non-compiling Calor. Corrected the false "still accepted" claims in `syntax-reference/structure-tags.md`, `syntax-reference/index.md`, and `ids.md` §2.2; modernized stale if / loop / match / class / try-catch code blocks in `semantics/core.md`, `dotnet-backend.md`, `inventory.md`, and `normal-form.md` from removed closer-form + obsolete AST pseudo-notation to current indent-only syntax. Every concrete example rewritten was compiled with `calor` and succeeds. (Records, with-expressions, and property patterns remain a deferred semantics-doc modernization pass.)
+
+### Tests
+- **`PrimerCompilesTests` — the semantic guard that every correct module the primer teaches compiles (#674).** Extracts every complete `§M` module from `calor://primer` and compiles it via `Program.Compile` under the same options `calor_compile` uses by default, asserting zero errors, plus a guard that all taught modules are discovered. This is the guard that would have caught the closer-form/`§RESULT` lies that 5 review loops and every string-based test missed.
+- **`PrimerMistakesRejectedTests` — the dual guard: every "Common mistakes (these do NOT compile)" example genuinely fails to compile (Track 1 / D2a, #677).** Each curated fragment is rewritten into the smallest complete module where it would naturally appear and asserted to fail at **either** the Calor layer (`HasErrors`) or the generated-C# layer (Roslyn). The 4-field `§F{f1:Add:i32:pub}` header is caught only at the C# layer (**CS0127** — Calor accepts it but emits `void Add() { return 0; }`; a Calor-level "value returned from void function" check is the deferred "F-prerequisite invariant" follow-up). Drift guards (`Primer_ListsEachCuratedMistake`, `Primer_MistakeCount_MatchesCuratedSet`, `CorrectModule_CompilesAtBothLayers`) keep the curated set and the primer in sync.
+
 ## [0.6.5] - 2026-06-30
 
 ### Benchmark Results (Statistical: 30 runs)

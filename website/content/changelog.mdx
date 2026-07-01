@@ -10,6 +10,18 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-07-01
+
+### Fixed
+- **The `calor://primer` MCP resource now compiles.** The agent primer served at `calor://primer` taught syntax the compiler rejects today — closer-form tags (`§/F`, `§/M`, `§/I`, `§/L`), ULID IDs, `§RESULT`, and empty `§R` — so an agent onboarded from it at session start wrote non-compiling Calor. It was rewritten to be fully indent-only and empirically compilable, with 3-field `§F` headers, arrow signatures, BCL-only effectful calls, a "Common mistakes" section, and a quick reference.
+- **`Calor0830` (legacy closer form) is now auto-healable.** Its remediation previously told users to run `calor format`, which parses the file first and aborts on the very error it was meant to fix — a dead end. The diagnostic now attaches a quick-fix that deletes the closer line, surfaced through the LSP quick-fix and the `calor_check apply` MCP tool, and the message explains the block ends at its body's dedent.
+
+### Documentation
+- **Teaching and reference docs no longer show removed closer-form syntax.** The Markdown docs still claimed closers were "still accepted" and showed closer-form / stale pseudo-syntax, so an agent following Calor's own docs wrote non-compiling Calor. The false claims were corrected and the stale if / loop / match / class / try-catch examples were modernized to current indent-only syntax — each verified to compile.
+
+### Tests
+- **Compile-time guards keep the primer honest in both directions.** `PrimerCompilesTests` proves every correct module the primer teaches compiles under the same options `calor_compile` uses by default; `PrimerMistakesRejectedTests` proves every example in the primer's "these do NOT compile" section genuinely fails to compile — so Calor's own onboarding materials can't drift into teaching non-compiling code. Drift guards keep the curated mistake set in sync with the primer.
+
 ## [0.6.5] - 2026-06-30
 
 ### Fixed
