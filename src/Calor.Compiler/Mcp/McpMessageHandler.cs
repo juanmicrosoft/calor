@@ -98,7 +98,7 @@ public sealed class McpMessageHandler
         {
             Uri = "calor://primer",
             Name = "Calor Language Primer",
-            Description = "Canonical examples for agents: module, function, effects, contracts, class, closing tags, IDs. Read once at session start.",
+            Description = "Canonical examples for agents: module, function, effects, contracts, branching, loops, bindings, class. Indent-only; every example compiles. Read once at session start.",
             MimeType = "text/plain"
         });
         RegisterResource(new McpResource
@@ -481,133 +481,113 @@ public sealed class McpMessageHandler
         """;
 
     private static string GetPrimerContent() => """
-        CALOR LANGUAGE PRIMER — Read this once to understand the syntax.
+        CALOR LANGUAGE PRIMER -- read once. Calor is INDENT-ONLY and every example below compiles.
 
-        IDs are ULID-based: f_01JWDG3K..., m_01JWDG3K... (not sequential).
-        Closing tags use abbreviated forms: §/F (not §/IF), §/M, §/CL, etc.
+        Nesting uses indentation (2 spaces per level). There are NO closing tags such as
+        §/F, §/M, §/I, §/L -- a block ends when the indentation decreases. (The call
+        closer §/C still exists and is optional.) IDs like m1, f1, if1 are short labels
+        you choose; any token works.
 
-        ── Module ──────────────────────────────────────────
+        -- Module + functions ------------------------------
 
-        §M{m_01JWDG3KABCDEFGHJKMNPQRST:Calculator}
+        §M{m1:Basics}
+          §F{f1:Add:pub} (i32:a, i32:b) -> i32
+            §R (+ a b)
 
-        §F{f_01JWDG3LABCDEFGHJKMNPQRST:Add:pub}
-          §I{i32:a}
-          §I{i32:b}
-          §O{i32}
-          §R (+ a b)
-        §/F{f_01JWDG3LABCDEFGHJKMNPQRST}
+          §F{f2:IsPositive:pub} (i32:x) -> bool
+            §R (> x 0)
 
-        §/M{m_01JWDG3KABCDEFGHJKMNPQRST}
+        -- Effects + calls ---------------------------------
 
-        ── Function with effects ───────────────────────────
+        §M{m2:Effects}
+          §F{f1:Greet:pub} (str:name) -> void
+            §E{cw}
+            §C{Console.WriteLine} §A "Hello" §/C
+            §C{Console.WriteLine} §A name §/C
 
-        §F{f_01JWDG3MABCDEFGHJKMNPQRST:SaveUser:pub}
-          §I{User:user}
-          §O{void}
-          §E{db:w,cw}
-          §C{DbContext.SaveChanges} §/C
-          §C{ILogger.LogInformation} §A STR:"User saved" §/C
-        §/F{f_01JWDG3MABCDEFGHJKMNPQRST}
+        -- Contracts (pre/postconditions; result = return value) --
 
-        ── Function with contracts ─────────────────────────
+        §M{m3:Contracts}
+          §F{f1:Square:pub} (i32:x) -> i32
+            §Q (>= x 0)
+            §S (>= result 0)
+            §R (* x x)
 
-        §F{f_01JWDG3NABCDEFGHJKMNPQRST:Divide:pub}
-          §I{f64:a}
-          §I{f64:b}
-          §O{f64}
-          §Q (!= b FLOAT:0.0)
-          §S (>= §RESULT FLOAT:0.0)
-          §R (/ a b)
-        §/F{f_01JWDG3NABCDEFGHJKMNPQRST}
+          §F{f2:Divide:pub} (i32:a, i32:b) -> i32
+            §Q{"divisor must not be zero"} (!= b 0)
+            §R (/ a b)
 
-        ── Immutable and mutable bindings ──────────────────
+        -- If / else-if / else -----------------------------
 
-        §B{name:str} STR:"hello"
-        §B{~counter:i32} INT:0
+        §M{m4:Branching}
+          §F{f1:Sign:pub} (i32:x) -> i32
+            §IF{if1} (> x 0)
+              §R 1
+            §EI (< x 0)
+              §R (- 0 1)
+            §EL
+              §R 0
 
-        ── If/else ─────────────────────────────────────────
+        -- For loop ----------------------------------------
 
-        §IF{if01} (> x INT:0)
-          §R x
-        §EL
-          §R (- INT:0 x)
-        §/I{if01}
+        §M{m5:Loops}
+          §F{f1:PrintOneToFive:pub} () -> void
+            §E{cw}
+            §L{l1:i:1:5:1}
+              §C{Console.WriteLine} §A i §/C
 
-        ── For loop ────────────────────────────────────────
+        -- Bindings (immutable, and ~mutable) --------------
 
-        §L{l01:i:INT:0:INT:10:INT:1}
-          §C{Console.WriteLine} §A i §/C
-        §/L{l01}
+        §M{m6:Bindings}
+          §F{f1:Demo:pub} () -> void
+            §E{cw}
+            §B{greeting:str} "Ada"
+            §B{~count:i32} 0
+            §C{Console.WriteLine} §A greeting §/C
+            §C{Console.WriteLine} §A count §/C
 
-        ── Class with method ───────────────────────────────
+        -- Class with a method -----------------------------
 
-        §CL{c_01JWDG3PABCDEFGHJKMNPQRST:UserService:pub}
+        §M{m7:Classes}
+          §CL{c1:Greeter:pub}
+            §MT{mt1:Greet:pub} () -> str
+              §R "hello"
 
-          §MT{mt_01JWDG3QABCDEFGHJKMNPQRST:GetName:pub}
-            §I{i32:id}
-            §O{str}
-            §E{db:r}
-            §R STR:"user"
-          §/MT{mt_01JWDG3QABCDEFGHJKMNPQRST}
+        -- Common mistakes (these do NOT compile) ----------
 
-        §/CL{c_01JWDG3PABCDEFGHJKMNPQRST}
+          §/F §/M §/I §/L       removed; use indentation only (a block ends on dedent)
+          §S (>= §RESULT 0)     wrong; the return value is lowercase: §S (>= result 0)
+          §IF (> x 0)           wrong; §IF needs an id: §IF{if1} (> x 0)
+          §IF{i1}{x > 0}        wrong; the condition goes in (parens), not braces
+          §K   §ELSE            no such keywords; else is §EL, else-if is §EI (no id)
+          §F{f1:Add:i32:pub}    wrong; a 4-field header drops the return type. Use:
+                                §F{f1:Add:pub} (i32:a, i32:b) -> i32
 
-        ── CHAIN STATEMENTS — IF/ELSE-IF/ELSE (CRITICAL) ────
+        -- Quick reference ---------------------------------
 
-        §IF ALWAYS requires an {id} attribute. The condition follows in parentheses.
-        §EI (else-if) and §EL (else) are continuation keywords — they do NOT take {id}.
-        The "else" keyword in Calor is §EL — there is no §K or §ELSE.
+        FUNCTION   §F{id:Name:vis} (type:param, ...) -> retType      vis = pub | priv
+        CALL       §C{Target} §A arg §/C         §/C optional; one §A per argument
+        RETURN     §R (expr)                     e.g. §R (+ a b)   §R x   §R "text"
+        PRINT      §P expr                       Console.WriteLine shorthand (needs §E{cw})
+        BIND       §B{name:type} value           §B{~name:type} value   (~ = mutable)
+        LOOP       §L{id:var:from:to:step}       e.g. §L{l1:i:1:5:1}
+        IF/ELSE    §IF{id} (cond) / §EI (cond) / §EL
+        CONTRACTS  §Q (pre)   §S (post; uses result)   §INV (invariant)
+        CLASS      §CL{id:Name:vis} / method §MT{id:Name:vis} (...) -> ret / field §FLD{type:name:vis}
 
-        CORRECT:
-          §IF{i01} (< x INT:0)
-            §R (- INT:0 x)
-          §EL
-            §R x
-          §/I{i01}
+        EXPRESSIONS (Lisp prefix form)
+          arithmetic   (+ a b) (- a b) (* a b) (/ a b) (% a b)
+          comparison   (== x y) (!= x y) (< x y) (<= x y) (> x y) (>= x y)
+          logical      (&& a b) (|| a b) (! a)
 
-          §IF{i02} (< value min)
-            §R min
-          §EI (> value max)
-            §R max
-          §EL
-            §R value
-          §/I{i02}
+        LITERALS   integers 42   strings "hello"   booleans true / false   floats 3.14
 
-        WRONG:
-          §IF (< x INT:0)           ← missing {id}
-          §K                         ← no such keyword; use §EL
-          §ELSE                      ← no such keyword; use §EL
-          §IF{i01}{x < 0}            ← condition goes in (parens), not braces
-
-        ── CONTRACTS (CRITICAL) ─────────────────────────────
-
-        §Q is a precondition. It takes a Lisp-style expression in parentheses.
-        §S is a postcondition. Same form. §RESULT or `result` is the return value.
-
-        CORRECT:    §Q (>= x INT:0)   §S (== §RESULT a)   §S (&& (>= §RESULT a) (>= §RESULT b))
-        WRONG:      §Q{x >= 0}        §S{result >= 0}     §S (= result ...)
-
-        The condition is NEVER inside {...} braces — only function/binding NAMES go in braces.
-
-        ── EXPRESSIONS (Lisp prefix form) ───────────────────
-
-        arithmetic:  (+ a b)  (- a b)  (* a b)  (/ a b)  (% a b)
-        comparison:  (== x y)  (!= x y)  (< x y)  (<= x y)  (> x y)  (>= x y)
-        logical:     (&& a b)  (|| a b)  (! a)
-
-        ── Key rules ───────────────────────────────────────
-
-        CLOSING TAGS: §/F (function), §/M (module), §/CL (class),
-          §/I (if block — NOT §/IF), §/L (loop), §/C (call),
-          §/MT (method), §/CT (constructor)
-
-        TYPED LITERALS: INT:42, STR:"hello", BOOL:true, FLOAT:3.14
-
-        EFFECTS: §E{db:w,cw} — declares side effects. See calor://effects.
-
-        IDS: Every declaration needs a ULID ID with the right prefix.
-          Use calor_generate_ids to get fresh IDs. See calor://id-prefixes.
+        EFFECTS    §E{cw} declares side effects (cw = console write). See calor://effects.
+                   Declare effects on any function that performs IO. Calls outside the
+                   standard library are not yet effect-resolved.
         """;
+
+    internal static string GetPrimerContentPublic() => GetPrimerContent();
 
     internal static string GetEffectCatalogJsonPublic() => GetEffectCatalogJson();
     private static string GetEffectCatalogJson() => """

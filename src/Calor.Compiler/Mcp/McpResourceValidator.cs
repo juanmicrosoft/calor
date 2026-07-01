@@ -9,4 +9,5 @@ public static class McpResourceValidator
     public static string GetTagCatalog() => McpMessageHandler.GetTagCatalogJsonPublic();
     public static string GetIdPrefixCatalog() => McpMessageHandler.GetIdPrefixCatalogJsonPublic();
     public static string GetWorkflows() => McpMessageHandler.GetWorkflowsJsonPublic();
+    public static string GetPrimer() => McpMessageHandler.GetPrimerContentPublic();
 }
