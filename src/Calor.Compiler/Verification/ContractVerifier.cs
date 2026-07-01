@@ -1,3 +1,4 @@
+using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
@@ -110,8 +111,7 @@ public sealed class ContractVerifier
         var validNames = function.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
         validNames.Add("result"); // Special identifier for return value
 
-        var hasReturnValue = function.Output != null &&
-                             !function.Output.TypeName.Equals("VOID", StringComparison.OrdinalIgnoreCase);
+        var hasReturnValue = ReturnShape.DeclaresValueOutput(function.Output);
 
         foreach (var name in referencedNames)
         {
