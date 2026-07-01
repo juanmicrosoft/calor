@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.6.5</span>
+            <span className="font-semibold text-calor-cerulean">v0.6.6</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The TokenEconomics benchmark now reports the composite compactness score it always computed instead of raw token count alone &mdash; an honest measurement fix that lifts the category to 1.42&times; and the overall advantage to 1.32&times;, with the v0.7 gate recalibrated against the corrected metric.</span>
+            <span className="text-foreground">Calor&apos;s own onboarding materials now compile: the <code>calor://primer</code> MCP resource and the teaching docs no longer teach removed closer-form syntax, and compile-time guards keep the primer honest in both directions &mdash; every &ldquo;correct&rdquo; example compiles and every &ldquo;common mistake&rdquo; genuinely fails. Legacy <code>Calor0830</code> closers now auto-heal via the LSP and MCP quick-fix.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
