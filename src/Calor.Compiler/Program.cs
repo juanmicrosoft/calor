@@ -552,6 +552,15 @@ public class Program
         phaseSw.Stop();
         telemetry?.TrackPhase("BindValidation", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
 
+        // Return validation (Calor0205: value returned from a no-value owner).
+        // Always-on hard error — runs regardless of EnableTypeChecking so the
+        // generated C# never silently fails with CS0127/CS1622.
+        phaseSw.Restart();
+        var returnValidator = new ReturnValidationPass(diagnostics);
+        returnValidator.Check(ast);
+        phaseSw.Stop();
+        telemetry?.TrackPhase("ReturnValidation", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+
         if (diagnostics.HasErrors)
         {
             TrackDiagnostics(telemetry, diagnostics);

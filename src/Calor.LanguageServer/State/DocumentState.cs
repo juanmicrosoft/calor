@@ -128,6 +128,21 @@ public sealed class DocumentState
                 }
             }
 
+            // Phase 5: Return validation (Calor0205). Always runs when an AST is
+            // available so the IDE surfaces value-returned-from-void-owner errors.
+            if (Ast != null)
+            {
+                try
+                {
+                    var returnValidator = new ReturnValidationPass(Diagnostics);
+                    returnValidator.Check(Ast);
+                }
+                catch (Exception)
+                {
+                    // Validation should never throw on a parsed AST, but be defensive.
+                }
+            }
+
             // Populate DiagnosticsWithFixes from DiagnosticBag
             DiagnosticsWithFixes.AddRange(Diagnostics.DiagnosticsWithFixes);
         }
