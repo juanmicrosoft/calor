@@ -159,35 +159,51 @@ public class DiagnoseToolFixTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_DiagnosticOutput_HasCorrectSchema()
+    public async Task ExecuteAsync_WithLegacyClosers_Apply_HealsToCompilingSource()
     {
+        // Closer-form source hard-errors (Calor0830). With apply=true the
+        // diagnose path must strip the closers via their SuggestedFix and
+        // return source that compiles clean indent-only.
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")"
+                "apply": true,
+                "source": "§M{m1:Calc}\n  §F{f1:Add:pub}\n    §I{i32:a}\n    §I{i32:b}\n    §O{i32}\n    §R (+ a b)\n  §/F{f1}\n§/M{m1}"
             }
             """).RootElement;
 
         var result = await _tool.ExecuteAsync(args);
+        var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
 
-        var text = result.Content[0].Text!;
-        var json = JsonDocument.Parse(text).RootElement;
+        // A Calor0830 diagnostic must be present with a fix attached.
+        var hasCloserDiag = false;
+        foreach (var diag in json.GetProperty("diagnostics").EnumerateArray())
+        {
+            if (diag.GetProperty("code").GetString() == "Calor0830")
+            {
+                hasCloserDiag = true;
+                Assert.True(diag.TryGetProperty("fix", out var fix));
+                Assert.True(fix.TryGetProperty("edits", out var edits));
+                Assert.True(edits.GetArrayLength() > 0);
+            }
+        }
+        Assert.True(hasCloserDiag, "Expected a Calor0830 diagnostic");
 
-        // Verify top-level schema
-        Assert.True(json.TryGetProperty("success", out _));
-        Assert.True(json.TryGetProperty("errorCount", out _));
-        Assert.True(json.TryGetProperty("warningCount", out _));
-        Assert.True(json.TryGetProperty("diagnostics", out _));
+        Assert.True(json.TryGetProperty("fixedSource", out var fixedSourceEl));
+        var healed = fixedSourceEl.GetString()!;
+        Assert.DoesNotContain("§/", healed);
+        Assert.True(json.GetProperty("fixesApplied").GetInt32() >= 2);
 
-        // Verify diagnostic schema
-        var diagnostic = json.GetProperty("diagnostics")[0];
-        Assert.True(diagnostic.TryGetProperty("severity", out _));
-        Assert.True(diagnostic.TryGetProperty("code", out _));
-        Assert.True(diagnostic.TryGetProperty("message", out _));
-        Assert.True(diagnostic.TryGetProperty("line", out _));
-        Assert.True(diagnostic.TryGetProperty("column", out _));
-        // Optional fields
-        Assert.True(diagnostic.TryGetProperty("suggestion", out _));
-        Assert.True(diagnostic.TryGetProperty("fix", out _));
+        // Re-diagnose the healed source: it must now compile clean.
+        var reArgs = JsonSerializer.SerializeToElement(new { action = "diagnose", source = healed });
+        var reResult = await _tool.ExecuteAsync(reArgs);
+        var reJson = JsonDocument.Parse(reResult.Content[0].Text!).RootElement;
+
+        Assert.True(reJson.GetProperty("success").GetBoolean());
+        Assert.Equal(0, reJson.GetProperty("errorCount").GetInt32());
+        foreach (var diag in reJson.GetProperty("diagnostics").EnumerateArray())
+        {
+            Assert.NotEqual("Calor0830", diag.GetProperty("code").GetString());
+        }
     }
 }

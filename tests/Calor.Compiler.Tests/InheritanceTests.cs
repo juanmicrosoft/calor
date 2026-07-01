@@ -470,8 +470,10 @@ public class InheritanceTests
     }
 
     [Fact]
-    public void Parse_MismatchedClassId_ReportsError()
+    public void Parse_LegacyClassCloser_ReportsError()
     {
+        // §/CL is removed closer-form syntax (Phase 4d): rejected with
+        // Calor0830, not the obsolete id-mismatch diagnostic (Calor0101).
         var source = @"
 §M{m1:Test}
 §CL{c1:MyClass:pub}
@@ -482,8 +484,8 @@ public class InheritanceTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        var errorMessages = string.Join("\n", diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.Message));
-        Assert.Contains("does not match", errorMessages, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(diagnostics, d => d.Code == "Calor0830");
+        Assert.DoesNotContain(diagnostics, d => d.Code == "Calor0101");
     }
 
     [Fact]

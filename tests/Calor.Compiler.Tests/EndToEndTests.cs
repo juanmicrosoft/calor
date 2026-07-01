@@ -71,8 +71,11 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void Compile_MismatchedId_ReturnsErrors()
+    public void Compile_LegacyCloser_ReturnsErrors()
     {
+        // §/M is removed closer-form syntax (Phase 4d). It is rejected with
+        // Calor0830 regardless of any {id} payload — the id-mismatch path
+        // (Calor0101) no longer fires for structural closers.
         var source = """
             §M{m001:Test}
             §/M{m999}
@@ -81,7 +84,8 @@ public class EndToEndTests
         var result = Program.Compile(source);
 
         Assert.True(result.HasErrors);
-        Assert.Contains(result.Diagnostics, d => d.Code == "Calor0101");
+        Assert.Contains(result.Diagnostics, d => d.Code == "Calor0830");
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == "Calor0101");
     }
 
     [Fact]

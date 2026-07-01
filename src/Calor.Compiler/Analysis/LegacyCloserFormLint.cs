@@ -10,9 +10,13 @@ namespace Calor.Compiler.Analysis;
 /// flagged.
 ///
 /// This is a SOURCE-level scanner (not AST) so it can be applied to
-/// any <c>.calr</c> source without parsing. The recommended machine
-/// fix is to run <c>calor format</c>, which re-emits the entire file
-/// in canonical indent form.
+/// any <c>.calr</c> source without parsing — useful precisely because
+/// closer form hard-errors (<c>Calor0830</c>) during parsing, which
+/// prevents the AST-based <c>calor format</c> / <c>calor lint --fix</c>
+/// paths from healing such files. Each <see cref="Finding"/> carries the
+/// exact source range to delete (<see cref="Finding.RemovedOffset"/> /
+/// <see cref="Finding.RemovedLength"/>); removing those ranges rewrites
+/// the source into canonical indent form.
 ///
 /// Wiring into the standard <c>calor lint</c> pipeline is intentionally
 /// gated: callers must request the lint explicitly so repositories

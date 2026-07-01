@@ -121,8 +121,10 @@ public class ParserTests
     }
 
     [Fact]
-    public void Parse_MismatchedModuleId_ReportsError()
+    public void Parse_LegacyModuleCloser_ReportsError()
     {
+        // §/M is removed closer-form (Phase 4d): rejected with Calor0830.
+        // The obsolete id-mismatch diagnostic no longer fires for structural closers.
         var source = """
             §M{m001:Test}
             §/M{m002}
@@ -131,13 +133,14 @@ public class ParserTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
-        Assert.Contains(diagnostics, d => d.Message.Contains("m002") && d.Message.Contains("m001"));
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
     }
 
     [Fact]
-    public void Parse_MismatchedFuncId_ReportsError()
+    public void Parse_LegacyFuncCloser_ReportsError()
     {
+        // §/F is removed closer-form (Phase 4d): rejected with Calor0830, not MismatchedId.
         var source = """
             §M{m001:Test}
             §F{f001:Main:pub}
@@ -149,10 +152,8 @@ public class ParserTests
         var module = Parse(source, out var diagnostics);
 
         Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics, d =>
-            d.Code == DiagnosticCode.MismatchedId &&
-            d.Message.Contains("f999") &&
-            d.Message.Contains("f001"));
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.LegacyCloserForm);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.MismatchedId);
     }
 
     [Fact]

@@ -225,12 +225,65 @@ public sealed class Parser
     {
         if (!StructuralLegacyClosers.Contains(closerToken.Kind)) return;
 
-        _diagnostics.ReportError(
+        var fix = BuildLegacyCloserRemovalFix(closerToken);
+
+        _diagnostics.ReportErrorWithFix(
             closerToken.Span,
             DiagnosticCode.LegacyCloserForm,
-            $"Legacy structural closing tag '{closerToken.Text}' is no longer accepted. " +
-            "Indent form alone terminates this block — remove the closer line. " +
-            "Run `calor format` to rewrite this file in canonical indent form.");
+            $"Legacy structural closing tag '{closerToken.Text}' was removed in Phase 4d and is no longer accepted. " +
+            "A block now ends at the dedent of its body, so delete the closer line — " +
+            "the indentation already marks where the block ends.",
+            fix);
+    }
+
+    /// <summary>
+    /// Builds the <see cref="SuggestedFix"/> that auto-heals a legacy
+    /// structural closer by deleting its entire line. The edit spans from
+    /// column 1 of the closer line to just past the closer keyword and any
+    /// optional <c>{id}</c> payload (e.g. <c>§/F{f1}</c>), replacing it with
+    /// an empty string. Indent-only Calor tolerates the resulting blank line,
+    /// so the healed source compiles. Consumed by the LSP code-action handler
+    /// and the <c>calor_check</c> MCP tool's <c>apply</c> path.
+    /// </summary>
+    private SuggestedFix BuildLegacyCloserRemovalFix(Token closerToken)
+    {
+        var span = closerToken.Span;
+        int endLine = span.Line;
+        int endColumn = span.Column + span.Length;
+
+        // Extend the removal over an optional {id} payload so the whole
+        // closer construct is deleted, not just the keyword. Structural
+        // closers carry at most a single brace group (the echoed opener id).
+        if (Peek(1).Kind == TokenKind.OpenBrace)
+        {
+            int depth = 0;
+            int i = 1;
+            while (Peek(i).Kind != TokenKind.Eof)
+            {
+                var kind = Peek(i).Kind;
+                if (kind == TokenKind.OpenBrace)
+                {
+                    depth++;
+                }
+                else if (kind == TokenKind.CloseBrace)
+                {
+                    depth--;
+                    if (depth == 0)
+                    {
+                        var closeSpan = Peek(i).Span;
+                        endLine = closeSpan.Line;
+                        endColumn = closeSpan.Column + closeSpan.Length;
+                        break;
+                    }
+                }
+                i++;
+            }
+        }
+
+        var filePath = _diagnostics.CurrentFilePath ?? string.Empty;
+        return new SuggestedFix(
+            $"Remove the legacy closer '{closerToken.Text}' (indentation already ends the block)",
+            TextEdit.Replace(filePath, span.Line, 1, endLine, endColumn, string.Empty));
     }
 
     public ModuleNode Parse()
@@ -11273,6 +11326,16 @@ public sealed class Parser
         // or by reaching EOF (no explicit §/X closer), there is no ID to
         // mismatch against.
         if (endToken.Kind == TokenKind.Dedent || endToken.Kind == TokenKind.Eof)
+            return false;
+
+        // Phase 4d: structural legacy closers (§/F, §/M, §/CL, ...) are removed
+        // syntax and are already flagged + auto-healed by Calor0830, whose fix
+        // DELETES the entire closer line. Reporting a redundant Calor0101 id
+        // mismatch here would attach a second, conflicting fix (inserting the
+        // opener id into a closer that is being deleted) — applying both fixes
+        // scrambles the source. The closer is going away entirely, so any id
+        // mismatch on it is moot; let Calor0830 own these tokens.
+        if (StructuralLegacyClosers.Contains(endToken.Kind))
             return false;
 
         // If both are the same, no mismatch
