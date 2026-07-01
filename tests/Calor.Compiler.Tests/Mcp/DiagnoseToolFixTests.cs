@@ -136,6 +136,57 @@ public class DiagnoseToolFixTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithFourFieldHeader_Apply_HealsToReturningSource()
+    {
+        // A four-field §F header hard-errors (Calor0116). With apply=true the
+        // diagnose path must rewrite it to a three-field header plus a signature
+        // via its SuggestedFix and return source that compiles clean — and, in
+        // particular, keeps the return type instead of silently becoming void.
+        var args = JsonDocument.Parse("""
+            {
+                "action": "diagnose",
+                "apply": true,
+                "source": "§M{m1:Calc}\n  §F{f1:Add:i32:pub}\n    §R (+ 1 2)"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+        var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+
+        // A Calor0116 diagnostic must be present with a fix attached.
+        var hasHeaderDiag = false;
+        foreach (var diag in json.GetProperty("diagnostics").EnumerateArray())
+        {
+            if (diag.GetProperty("code").GetString() == "Calor0116")
+            {
+                hasHeaderDiag = true;
+                Assert.True(diag.TryGetProperty("fix", out var fix));
+                Assert.True(fix.TryGetProperty("edits", out var edits));
+                Assert.True(edits.GetArrayLength() > 0);
+            }
+        }
+        Assert.True(hasHeaderDiag, "Expected a Calor0116 diagnostic");
+
+        Assert.True(json.TryGetProperty("fixedSource", out var fixedSourceEl));
+        var healed = fixedSourceEl.GetString()!;
+        Assert.Contains("§F{f1:Add:pub} () -> i32", healed);
+        Assert.DoesNotContain("i32:pub", healed);
+        Assert.True(json.GetProperty("fixesApplied").GetInt32() >= 1);
+
+        // Re-diagnose the healed source: it must now compile clean.
+        var reArgs = JsonSerializer.SerializeToElement(new { action = "diagnose", source = healed });
+        var reResult = await _tool.ExecuteAsync(reArgs);
+        var reJson = JsonDocument.Parse(reResult.Content[0].Text!).RootElement;
+
+        Assert.True(reJson.GetProperty("success").GetBoolean());
+        Assert.Equal(0, reJson.GetProperty("errorCount").GetInt32());
+        foreach (var diag in reJson.GetProperty("diagnostics").EnumerateArray())
+        {
+            Assert.NotEqual("Calor0116", diag.GetProperty("code").GetString());
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithUnknownSectionMarker_IncludesHelpfulMessage()
     {
         var args = JsonDocument.Parse("""

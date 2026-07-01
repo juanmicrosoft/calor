@@ -286,6 +286,84 @@ public sealed class Parser
             TextEdit.Replace(filePath, span.Line, 1, endLine, endColumn, string.Empty));
     }
 
+    /// <summary>
+    /// Detects the malformed four-field function header
+    /// <c>§F{id:name:type:vis}</c> / <c>§AF{id:name:type:vis}</c> and reports
+    /// <see cref="DiagnosticCode.MalformedFunctionHeader"/> (Calor0116). Only
+    /// <c>§F</c>/<c>§AF</c> are checked — <c>§MT</c>/<c>§AMT</c> legitimately
+    /// take a fourth modifier field. The detection is deliberately narrow:
+    /// exactly four positional fields whose fourth is a visibility token, which
+    /// uniquely identifies the "return type placed in the header" mistake. Left
+    /// unflagged the parser reads the type as the visibility and silently drops
+    /// the real visibility, emitting a void method (CS0127).
+    ///
+    /// The attached <see cref="SuggestedFix"/> is safe to auto-apply: it drops
+    /// the type from the header (<c>{id:name:vis}</c>) and, when no inline
+    /// signature or type-parameter list follows on the header line, appends
+    /// <c>() -&gt; type</c> so the healed function keeps the intended return
+    /// type instead of becoming void.
+    /// </summary>
+    private void CheckMalformedFunctionHeader(Token startToken, AttributeCollection attrs, Token headerOpen, Token headerClose)
+    {
+        var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
+        if (posCount != 4)
+        {
+            return;
+        }
+
+        var visRaw = attrs["_pos3"] ?? string.Empty;
+        if (!AttributeHelper.IsVisibilityToken(visRaw))
+        {
+            return;
+        }
+
+        // The header block must be a well-formed {...} we can rewrite.
+        if (headerOpen.Kind != TokenKind.OpenBrace || headerClose.Kind != TokenKind.CloseBrace)
+        {
+            return;
+        }
+
+        var id = attrs["_pos0"] ?? string.Empty;
+        var name = attrs["_pos1"] ?? string.Empty;
+        var type = attrs["_pos2"] ?? string.Empty;
+
+        var filePath = _diagnostics.CurrentFilePath ?? string.Empty;
+        var headerEndLine = headerClose.Span.Line;
+        var headerEndColumn = headerClose.Span.Column + headerClose.Span.Length;
+
+        var edits = new List<TextEdit>
+        {
+            TextEdit.Replace(
+                filePath,
+                headerOpen.Span.Line,
+                headerOpen.Span.Column,
+                headerEndLine,
+                headerEndColumn,
+                $"{{{id}:{name}:{visRaw}}}"),
+        };
+
+        // Only inject a signature when nothing already follows the header on
+        // this line — an inline signature `(...)` or a type-parameter list
+        // `<...>` means we must not append a second one.
+        var followsSignatureOrTypeParams = Check(TokenKind.OpenParen) || Check(TokenKind.Less);
+        if (!followsSignatureOrTypeParams)
+        {
+            edits.Add(TextEdit.Insert(filePath, headerEndLine, headerEndColumn, $" () -> {type}"));
+        }
+
+        var fix = new SuggestedFix(
+            $"Move the return type '{type}' out of the header: use {{{id}:{name}:{visRaw}}} and declare the return type in the signature",
+            edits);
+
+        _diagnostics.ReportErrorWithFix(
+            startToken.Span.Union(headerClose.Span),
+            DiagnosticCode.MalformedFunctionHeader,
+            $"'{startToken.Text}' header has four fields ({{{id}:{name}:{type}:{visRaw}}}), but §F/§AF headers take at most {{id:name:visibility}}. " +
+            $"The third field '{type}' is a return type — declare it in the signature as '(...) -> {type}', not in the header. " +
+            "A four-field header silently drops the return type and emits a void method.",
+            fix);
+    }
+
     public ModuleNode Parse()
     {
         return ParseModule();
@@ -587,7 +665,9 @@ public sealed class Parser
     private FunctionNode ParseFunction()
     {
         var startToken = Expect(TokenKind.Func);
+        var headerOpen = Current;
         var attrs = ParseAttributes();
+        CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
 
         var (id, funcName, visibilityStr) = AttributeHelper.InterpretFuncAttributes(attrs);
 
@@ -779,7 +859,9 @@ public sealed class Parser
     private FunctionNode ParseAsyncFunction()
     {
         var startToken = Expect(TokenKind.AsyncFunc);
+        var headerOpen = Current;
         var attrs = ParseAttributes();
+        CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
 
         var (id, funcName, visibilityStr) = AttributeHelper.InterpretFuncAttributes(attrs);
 
