@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-07-01
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x ± 0.00 (Calor wins, large effect d=1.80)
+  - ErrorDetection: 1.49x ± 0.00 (Calor wins, large effect d=1.21)
+  - TokenEconomics: 1.42x ± 0.00 (Calor wins, composite metric)
+  - RefactoringStability: 1.38x ± 0.00 (Calor wins, large effect d=7.09)
+  - EditPrecision: 1.36x ± 0.00 (Calor wins, large effect d=4.90)
+  - Correctness: 1.29x ± 0.00 (Calor wins, large effect d=1.31)
+  - GenerationAccuracy: 1.02x ± 0.00 (Calor wins, small effect d=0.34)
+  - InformationDensity: 0.98x ± 0.00 (C# wins, medium effect d=-0.52)
+- **Programs Tested**: 217
+
+> **Note:** this release is compile-time-diagnostic, docs, and test-correctness only — two new hard-error diagnostics that reject non-compiling Calor *earlier* (closing the deferred "F-prerequisite invariant" gap from v0.6.6), plus an agent-docs sweep to indent-only syntax. It contains no benchmark-affecting code changes, so the profile is unchanged from v0.6.6.
+
+### Added
+- **`Calor0116` — malformed four-field `§F`/`§AF` function headers are now a parse error (#680).** A header like `§F{f1:Add:i32:pub}` looks reasonable but is silently wrong: function headers take at most `{id:name:visibility}`, and the return type belongs in the signature (`(...) -> type`). Left unflagged, the parser read the extra field's type as the visibility and *discarded the real visibility*, emitting a void method (e.g. `void Add() { return 0; }`, then **CS0127** in the generated C#). The parser now reports `Calor0116` with the correct 3-field-plus-arrow form. Only `§F`/`§AF` are affected; `§MT`/`§AMT` legitimately take a fourth *modifier* field, so they are untouched.
+- **`Calor0205` — a value returned from a no-value owner is now a hard error (#681).** An always-on `ReturnValidationPass` flags a value-returning `§R expr` in the body of an owner that returns no value: a `void`/async-`void` function or method, an iterator (its body uses `§YIELD`/`§YBRK`), a constructor, a property/indexer `set`/`init` accessor, or an event `add`/`remove` accessor. Previously this silently produced non-compiling C# (**CS0127** / **CS1622**) — the classic case being a correct `void` header followed by `§R INT:0`. Because the check is always-on and reports a hard error, the design is conservative to guarantee **zero false positives**: it flags only expressions that are *definitely* a non-void value and can never be a valid C# statement-expression (literals, arithmetic/logical ops, references, ternaries, tuples, interpolated strings, ranges, `typeof`/`nameof`/`sizeof`); calls, `new`, `await`, and `++`/`--` are left unflagged because they can be void-typed or valid void statement-expressions (which is what keeps the C#→Calor migration lowering of `void F() => VoidCall();` safe). Completeness is enforced by construction via a reflection-based structural walker plus a completeness meta-test, and a corpus-clean pin asserts zero firings across all samples and benchmarks. Together with `Calor0116`, this closes the deferred "value returned from void function" / F-prerequisite follow-up noted in v0.6.6. (Scoped as diagnostic-only; a shared emitter `ReturnShape` refactor remains a tracked follow-up.)
+
+### Documentation
+- **Swept every agent-readable surface to indent-only syntax (v0.6.7 Item 0, #679).** The MCP primer surfaces, the `copilot-instructions`/`AGENTS`/`CLAUDE`/`GEMINI` templates, `README.nuget.md`, the evaluation skills doc, and the correct-Calor fields of the JSON resources were audited and corrected so no agent-facing teaching material still shows removed closer-form tags, four-field headers, or other syntax the compiler rejects. A new `AgentDocsSyntaxGuardTests` compiles/scans every surface and fails if any teaches non-compiling forms (four-field headers, `§B =` bind-equals, structural closers), keeping the guarantee from drifting.
+
+### Fixed
+- **`AgentDocsSyntaxGuardTests` surface paths are now cross-platform (#679).** The guard's doc-surface relative paths were written with Windows `\` separators and passed straight to `Path.Combine`, so on the Linux CI runner they resolved to a single literal filename segment and threw `FileNotFoundException` — failing every case on CI while passing locally on Windows. Each relative path's separators are now normalized to `Path.DirectorySeparatorChar` before combining.
+
 ## [0.6.6] - 2026-07-01
 
 ### Benchmark Results (Statistical: 30 runs)
