@@ -15,7 +15,7 @@ Calor makes these things explicit:
 | Side effects | `§E{cw,fr,net}` | Know effects without reading implementation |
 | Contracts | `§Q` (requires), `§S` (ensures) | Generate tests, verify correctness |
 | Unique IDs | `§F{f001:Main}` | Precise references that survive refactoring |
-| Clear structure | `§F{...}...§/F{...}` | Unambiguous scope boundaries |
+| Clear structure | Indentation-based nesting (no closing tags) | Unambiguous scope boundaries |
 
 ## Quick Start
 
@@ -34,12 +34,9 @@ calor --input program.calr --output program.g.cs
 
 ```
 §M{m001:Hello}
-§F{f001:Main:pub}
-  §O{void}
-  §E{cw}
-  §P "Hello from Calor!"
-§/F{f001}
-§/M{m001}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §P "Hello from Calor!"
 ```
 
 ## Documentation

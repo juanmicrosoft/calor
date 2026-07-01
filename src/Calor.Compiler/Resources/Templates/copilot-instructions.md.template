@@ -39,13 +39,16 @@ Use `calor_help` with action=features to check specific features, or `calor_batc
 
 ### Quick Syntax Reference
 
+Calor is **indent-only**: a block's body is indented under its opener and ends at
+the next dedent. There are **no closing tags** — never write `§/`-prefixed closers.
+
 | Structure | Calor Syntax |
 |-----------|-------------|
-| Module | `§M{id:Name}` ... `§/M{id}` |
-| Function | `§F{id:name:returnType:vis}` ... `§/F{id}` |
-| Binding | `§B{name:type} expr` (immutable), `§B{~name:type}` (mutable) |
-| Loop | `§L{id:var:from:to:step}` ... `§/L{id}` |
-| Conditional | `§IF{id} (cond) → §R expr` |
+| Module | `§M{id:Name}` (body indented) |
+| Function | `§F{id:name:vis} (type:name, ...) -> retType` (body indented) |
+| Binding | `§B{name} expr` (immutable), `§B{~name} expr` (mutable) |
+| Loop | `§L{id:var:from:to:step}` (body indented) |
+| Conditional | `§IF{id} (cond)` + `§EI (cond)` / `§EL`; inline `§IF{id} (cond) → §R expr` |
 | Contracts | `§Q (precondition)`, `§S (postcondition)` |
 | Types | `i32`, `i64`, `str`, `bool`, `f64`, `void`, `?i32` (option), `i32!str` (result) |
 | Expressions | Prefix notation: `(+ a b)`, `(== x 0)`, `(% i 15)` |

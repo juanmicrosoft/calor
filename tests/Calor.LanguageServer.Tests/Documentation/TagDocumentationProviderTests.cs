@@ -410,7 +410,7 @@ public class TagDocumentationProviderTests
         var doc = provider.GetTagDocumentation("§VR");
 
         Assert.NotNull(doc);
-        Assert.Contains("vr", doc.Syntax.ToLower());
+        Assert.Contains("virt", doc.Syntax.ToLower());
     }
 
     [Fact]

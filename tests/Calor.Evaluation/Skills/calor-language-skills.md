@@ -30,14 +30,14 @@ Calor natively supports far more C# constructs than you might expect. Before usi
 |-------------|-------------|--------|
 | foreach loop | `§L{item:collection}` | Full |
 | for loop | `§L{var:start..end}` | Full |
-| while loop | `§WH{condition}` | Full |
+| while loop | `§WH{id} (cond)` with an indented body | Full |
 | do-while loop | `§DO{id} ... §/DO{id} condition` | Full |
-| switch/match | `§W{expr} §K{pattern} result §/W` | Full |
-| if/else | `§IF{condition} ... §EI ... §EL ... §/IF` | Full |
-| async/await | `§AF{id:name}` / `§AMT{id:name}` / `§AWAIT expr §/AWAIT` | Full |
+| switch/match | `§W{expr}` with indented `§K{pattern}` cases | Full |
+| if/else | `§IF{id} (cond)` / `§EI (cond)` / `§EL` with indented bodies | Full |
+| async/await | `§AF{id:name:vis} (params) -> ret` / `§AMT{id:name:vis} (params) -> ret` / `§AWAIT expr` | Full |
 | yield return | `§YIELD expr` / `§YBRK` | Full |
-| try/catch/finally | `§TR{} ... §CA{Type:var} ... §FI{} ... §/TR` | Full |
-| using statement | `§USE{var}=expr ... §/USE` | Full |
+| try/catch/finally | `§TR{id}` / `§CA{Type:var}` / `§FI` with indented bodies | Full |
+| using statement | `§USE{var} expr` with an indented body | Full |
 | struct types | `§CL{id:Name:vis:struct}` | Full |
 | generic constraints | `§G{T}` / `§WHERE{T:constraint}` | Full |
 | delegates | `§DEL{id:Name:vis}` | Full |
@@ -56,7 +56,7 @@ Calor natively supports far more C# constructs than you might expect. Before usi
 | attributes | `[@AttributeName]` or `[@Attr(args)]` | Full |
 | LINQ (method syntax) | `§C{coll.Where} §A §LAM{...} ... §/C` | Full |
 | indexers (this[]) | `§IXER{id:type:vis:get,set} (type:param)` | Full |
-| unsafe code | `§UNSAFE{id} ... §/UNSAFE{id}` | Full |
+| unsafe code | `§UNSAFE{id}` with an indented body | Full |
 | is pattern combinators | `(&& (> x 0) (< x 100))` / `(|| ...)` | Full |
 | range expression (0..5) | `§RANGE start end` | Full |
 | index from end (^1) | `§^ n` | Full |
@@ -90,14 +90,11 @@ The contracts become your specification. **If you can't satisfy a postcondition,
 
 ```calor
 // FIRST: Write the contracts
-§F{f001:MyFunction:pub}
-  §I{i32:n}
-  §O{i32}
+§F{f001:MyFunction:pub} (i32:n) -> i32
   §Q (> n 0)           // Input constraint from requirement
   §S (>= result 0)     // Output guarantee from requirement
   // THEN: Implement logic that satisfies the contracts
   §R ...
-§/F{f001}
 ```
 
 ## Why Contracts Give You an Advantage
@@ -174,9 +171,7 @@ The `(len arr)` operation will throw `NullReferenceException` if `arr` is null. 
 
 **Example - Array Max function:**
 ```calor
-§F{f001:Max:pub}
-  §I{[i32]:arr}
-  §O{i32}
+§F{f001:Max:pub} ([i32]:arr) -> i32
   §Q (!= arr null)              // First: array must not be null
   §Q (> (len arr) 0)            // Then: array must have elements
   §B{max} §IDX arr 0
@@ -185,11 +180,10 @@ The `(len arr)` operation will throw `NullReferenceException` if `arr` is null. 
     §B{current} §IDX arr i
     §IF{if1} (> current max)
       §ASSIGN max current
-    §/I{if1}
+
     §ASSIGN i (+ i 1)
-  §/WH{wh1}
+
   §R max
-§/F{f001}
 ```
 
 **Why this matters:** Without the null check, passing `null` causes a runtime crash (`NullReferenceException`) instead of a clean contract violation (`ContractViolationException`). The null check ensures invalid inputs are rejected with a proper error message.
@@ -202,12 +196,11 @@ The `(len arr)` operation will throw `NullReferenceException` if `arr` is null. 
 §M{id:Name}           Module (namespace) — dotted names supported for nested namespaces
                       e.g. §M{m001:Calor.Runtime} → namespace Calor.Runtime { ... }
                       e.g. §M{m001:MyApp.Services} → namespace MyApp.Services { ... }
-§F{id:Name:vis}       Function (pub|pri)
-§I{type:name}         Input parameter
-§O{type}              Output/return type
+§F{id:Name:vis} (type:name, ...) -> returnType
+                      Function (pub|pri) with parameters and return type
 §E{effects}           Side effects: cw,cr,fs:r,fs:w,net:rw,db:rw
 §U{namespace}         Using directive
-§/M{id} §/F{id}       Close tags (ID must match)
+Indentation delimits modules/functions; do not write structural close tags
 ```
 
 ### Types
@@ -285,13 +278,13 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 **Use IF expressions to implement these:**
 ```calor
 // Absolute value - NO (abs x) operator!
-§B{absVal} §IF{if1} (< x 0) → (- 0 x) §EL → x §/I{if1}
+§B{absVal} §IF{if1} (< x 0) → (- 0 x) §EL → x
 
 // Maximum - NO (max a b) operator!
-§B{maxVal} §IF{if1} (> a b) → a §EL → b §/I{if1}
+§B{maxVal} §IF{if1} (> a b) → a §EL → b
 
 // Minimum - NO (min a b) operator!
-§B{minVal} §IF{if1} (< a b) → a §EL → b §/I{if1}
+§B{minVal} §IF{if1} (< a b) → a §EL → b
 ```
 
 ### String Operations
@@ -405,16 +398,16 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 **Array Creation:**
 ```calor
 // Sized array with literal
-§B{[i32]:arr} §ARR{a001:i32:5}              // Create int[5]
+§B{arr} §ARR{a001:i32:5}                    // Create int[5]
 
 // Sized array with variable
-§B{[i32]:arr} §ARR{a001:i32:n}              // Create int[n]
+§B{arr} §ARR{a001:i32:n}                    // Create int[n]
 
 // Sized array with expression
-§B{[i32]:result} §ARR{a001:i32:(len data)}  // Create int[data.Length]
+§B{result} §ARR{a001:i32:(len data)}        // Create int[data.Length]
 
 // Initialized array
-§B{[i32]:arr} §ARR{a001:i32} 1 2 3 §/ARR{a001}  // Create [1, 2, 3]
+§B{arr} §ARR{a001:i32} 1 2 3 §/ARR{a001}       // Create [1, 2, 3]
 ```
 
 **Array Element Access:**
@@ -452,9 +445,7 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
 
 **Complete Array Example:**
 ```calor
-§F{f001:SumArray:pub}
-  §I{[i32]:nums}
-  §O{i32}
+§F{f001:SumArray:pub} ([i32]:nums) -> i32
   §B{sum} 0
   §B{i} 0
   §WH{wh1} (< i (len nums))
@@ -462,9 +453,8 @@ INT:2147483647     // int.MaxValue (2^31 - 1)
     §B{val} §IDX nums i
     §ASSIGN sum (+ sum val)
     §ASSIGN i (+ i 1)
-  §/WH{wh1}
+
   §R sum
-§/F{f001}
 ```
 
 **CRITICAL: Don't mix tag-style (§IDX) inside Lisp expressions or contracts:**
@@ -494,11 +484,10 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
 §IF{id} (condition) → §R value1
 §EI (condition2) → §R value2
 §EL → §R value3
-§/I{id}
 ```
 - Use ONLY when each branch has exactly ONE statement
 - The statement must immediately follow the arrow
-- Always end with `§/I{id}`
+- End the if by dedenting; do not write a structural close tag
 
 **Block syntax - MULTIPLE STATEMENTS:**
 ```calor
@@ -508,7 +497,6 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
   // multiple statements allowed here
   §B{x} 5
   §R x
-§/I{id}
 ```
 - Use when ANY branch needs more than one statement
 - No arrow after the condition
@@ -519,12 +507,12 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
 §IF can be used as an expression to return a value (like C#'s ternary `?:`):
 
 ```calor
-// Syntax: §IF{id} condition → thenValue §EL → elseValue §/I{id}
-§B{x} §IF{if1} (< n 0) → (- 0 n) §EL → n §/I{if1}
+// Syntax: §IF{id} (condition) → thenValue §EL → elseValue
+§B{x} §IF{if1} (< n 0) → (- 0 n) §EL → n
 // Compiles to: var x = (n < 0) ? (0 - n) : n;
 
 // Conditional assignment - minimum of two values
-§B{minLen} §IF{if1} (<= lenA lenB) → lenA §EL → lenB §/I{if1}
+§B{minLen} §IF{if1} (<= lenA lenB) → lenA §EL → lenB
 // Compiles to: var minLen = (lenA <= lenB) ? lenA : lenB;
 ```
 
@@ -534,15 +522,14 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
 ```calor
 // WRONG - arrow syntax cannot have statements after it on separate lines
 §IF{if1} (== x 0) → §R false
-§ASSIGN y (+ y 1)    // ERROR: parser expects §/I or §EI here
-§/I{if1}
+§ASSIGN y (+ y 1)    // ERROR: arrow syntax accepts only the branch statement here
 ```
 
 **CORRECT - use block syntax when you need multiple statements:**
 ```calor
 §IF{if1} (== x 0)
   §R false
-§/I{if1}
+
 §ASSIGN y (+ y 1)    // Now this is outside the if, which is correct
 ```
 
@@ -550,14 +537,12 @@ Calor has two styles for if statements. Choosing the wrong one causes compilatio
 ```calor
 §L{id:var:start:end:step}
   // body (var goes from start to end inclusive)
-§/L{id}
 ```
 
 **While Loop:**
 ```calor
 §WH{id} (condition)
   // body - use block-style ifs inside loops
-§/WH{id}
 ```
 
 **Do-While Loop:**
@@ -579,16 +564,15 @@ When you have a loop with conditional logic inside, use block-style for inner if
 §WH{wh1} (condition)
   §IF{if1} (check)
     §R result
-  §/I{if1}
+
   §ASSIGN i (+ i 1)
-§/WH{wh1}
 ```
 
 ### Bindings and Assignment
 
 ```calor
 §B{varName} expression    // Create binding: varName = expression
-§B{type:varName} expr     // Create binding with explicit type
+§B{~varName} expression   // Create mutable binding
 §ASSIGN varName expr      // Update existing binding
 ```
 
@@ -619,101 +603,73 @@ When you have a loop with conditional logic inside, use block-style for inner if
 
 ### Simple Function (no constraints)
 ```calor
-§F{f001:Square:pub}
-  §I{i32:n}
-  §O{i32}
+§F{f001:Square:pub} (i32:n) -> i32
   §R (* n n)
-§/F{f001}
 ```
 
 ### Function with Precondition
 ```calor
-§F{f001:SafeDivide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
+§F{f001:SafeDivide:pub} (i32:a, i32:b) -> i32
   §Q (!= b 0)
   §R (/ a b)
-§/F{f001}
 ```
 
 ### Function with Postcondition
 ```calor
-§F{f001:Abs:pub}
-  §I{i32:n}
-  §O{i32}
+§F{f001:Abs:pub} (i32:n) -> i32
   §S (>= result 0)
   §IF{if1} (< n 0) → §R (- 0 n)
   §EL → §R n
-  §/I{if1}
-§/F{f001}
 ```
 
 ### Function with Both Pre and Postconditions
 ```calor
-§F{f001:Clamp:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{i32}
+§F{f001:Clamp:pub} (i32:value, i32:min, i32:max) -> i32
   §Q (<= min max)
   §S (>= result min)
   §S (<= result max)
   §IF{if1} (< value min) → §R min
   §EI (> value max) → §R max
   §EL → §R value
-  §/I{if1}
-§/F{f001}
 ```
 
 ### Recursive Function
 ```calor
-§F{f001:Factorial:pub}
-  §I{i32:n}
-  §O{i32}
+§F{f001:Factorial:pub} (i32:n) -> i32
   §Q (>= n 0)
   §S (>= result 1)
   §IF{if1} (<= n 1) → §R 1
   §EL → §R (* n §C{Factorial} §A (- n 1) §/C)
-  §/I{if1}
-§/F{f001}
 ```
 
 ### Loop-based Function
 ```calor
-§F{f001:Power:pub}
-  §I{i32:base}
-  §I{i32:exp}
-  §O{i32}
+§F{f001:Power:pub} (i32:base, i32:exp) -> i32
   §Q (>= exp 0)
   §B{result} 1
   §L{for1:i:1:exp:1}
     §ASSIGN result (* result base)
-  §/L{for1}
+
   §R result
-§/F{f001}
 ```
 
 ### Loop with Conditional (Block-Style)
 When a loop contains an if statement, always use block-style for the inner if:
 ```calor
-§F{f001:IsPrime:pub}
-  §I{i32:n}
-  §O{bool}
+§F{f001:IsPrime:pub} (i32:n) -> bool
   §Q (> n 0)
   §IF{if1} (<= n 1) → §R false
   §EI (== n 2) → §R true
   §EI (== (% n 2) 0) → §R false
-  §/I{if1}
+
   §B{i} 3
   §WH{wh1} (<= (* i i) n)
     §IF{if2} (== (% n i) 0)
       §R false
-    §/I{if2}
+
     §ASSIGN i (+ i 2)
-  §/WH{wh1}
+
   §R true
-§/F{f001}
 ```
 
 ## Complex Composed Examples
@@ -724,42 +680,24 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
 // C# patterns: class, fields, constructor, ==, !=, Equals, operator overloads
 ```calor
 §M{m001:PointModule}
-§CL{cl01:Point:pub}
-  §FLD{i32:_x:pri}
-  §FLD{i32:_y:pri}
+  §CL{cl01:Point:pub}
+    §FLD{i32:_x:pri}
+    §FLD{i32:_y:pri}
 
-  §CTOR{ct01:pub}
-    §I{i32:x}
-    §I{i32:y}
-    §ASSIGN §THIS._x x
-    §ASSIGN §THIS._y y
-  §/CTOR{ct01}
+    §CTOR{ct01:pub} (i32:x, i32:y)
+      §ASSIGN §THIS._x x
+      §ASSIGN §THIS._y y
 
-  §MT{mt01:Equals:pub}
-    §I{Point:other}
-    §O{bool}
-    §IF{if1} (== other null) → §R false
-    §EL → §R true
-    §/I{if1}
-  §/MT{mt01}
+    §MT{mt01:Equals:pub} (Point:other) -> bool
+      §IF{if1} (== other null) → §R false
+      §EL → §R true
 
-  §OP{op01:==:pub}
-    §I{Point:left}
-    §I{Point:right}
-    §O{bool}
-    §IF{if1} (== left null) → §R (== right null)
-    §EL → §R §C{left.Equals} §A right §/C
-    §/I{if1}
-  §/OP{op01}
+    §OP{op01:==:pub} (Point:left, Point:right) -> bool
+      §IF{if1} (== left null) → §R (== right null)
+      §EL → §R §C{left.Equals} §A right §/C
 
-  §OP{op02:!=:pub}
-    §I{Point:left}
-    §I{Point:right}
-    §O{bool}
-    §R (not (== left right))
-  §/OP{op02}
-§/CL{cl01}
-§/M{m001}
+    §OP{op02:!=:pub} (Point:left, Point:right) -> bool
+      §R (not (== left right))
 ```
 
 ### Async Method with Try/Catch
@@ -777,12 +715,6 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
         §R (+ "data from " url)
       §CA{Exception:ex}
         §R (+ "error: " ex.Message)
-      §/TR{try003}
-    §/AMT{m002}
-
-  §/CL{c001}
-
-§/M{m001}
 ```
 
 ### Enum with Switch/Match
@@ -795,7 +727,6 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
     Active
     Suspended
     Closed
-  §/EN{e001}
 
   §CL{c002:StatusHelper:pub}
     §MT{m003:GetLabel:pub:stat} (Status:s) -> str
@@ -805,12 +736,6 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
         §K Status.Suspended → "Temporarily Suspended"
         §K Status.Closed → "Closed"
         §K _ → "Unknown"
-      §/W{match004}
-    §/MT{m003}
-
-  §/CL{c002}
-
-§/M{m001}
 ```
 
 ### Yield Iterator
@@ -824,47 +749,34 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
     §MT{m002:GetEvens:pub} (i32:max) -> Seq<i32>
       §L{for003:i:0:max:2}
         §YIELD i
-      §/L{for003}
-    §/MT{m002}
-
-  §/CL{c001}
-
-§/M{m001}
 ```
 
 ### Hybrid Native + §CSHARP Interop
 // C# patterns: native Calor class with one method using raw C# via §CSHARP block
 ```calor
 §M{m001:HybridModule}
-§CL{cl01:DataProcessor:pub}
-  §FLD{str:_connStr:pri}
+  §CL{cl01:DataProcessor:pub}
+    §FLD{str:_connStr:pri}
 
-  §CTOR{ct01:pub}
-    §I{str:connStr}
-    §ASSIGN §THIS._connStr connStr
-  §/CTOR{ct01}
+    §CTOR{ct01:pub} (str:connStr)
+      §ASSIGN §THIS._connStr connStr
 
-  §MT{mt01:GetCount:pub}
-    §I{str:table}
-    §O{i32}
-    §B{query} (concat "SELECT COUNT(*) FROM " table)
-    §R §C{Execute} §A _connStr §A query §/C
-  §/MT{mt01}
+    §MT{mt01:GetCount:pub} (str:table) -> i32
+      §B{query} (concat "SELECT COUNT(*) FROM " table)
+      §R §C{Execute} §A _connStr §A query §/C
 
-  §CSHARP{
-    public System.Data.DataTable RunQuery(string sql)
-    {
-        using var conn = new System.Data.SqlClient.SqlConnection(_connStr);
-        conn.Open();
-        using var cmd = new System.Data.SqlClient.SqlCommand(sql, conn);
-        var adapter = new System.Data.SqlClient.SqlDataAdapter(cmd);
-        var table = new System.Data.DataTable();
-        adapter.Fill(table);
-        return table;
-    }
-  }§/CSHARP
-§/CL{cl01}
-§/M{m001}
+    §CSHARP{
+      public System.Data.DataTable RunQuery(string sql)
+      {
+          using var conn = new System.Data.SqlClient.SqlConnection(_connStr);
+          conn.Open();
+          using var cmd = new System.Data.SqlClient.SqlCommand(sql, conn);
+          var adapter = new System.Data.SqlClient.SqlDataAdapter(cmd);
+          var table = new System.Data.DataTable();
+          adapter.Fill(table);
+          return table;
+      }
+    }§/CSHARP
 ```
 
 ## String Operation Examples
@@ -877,13 +789,8 @@ Task: Return `"{type}:{id}"`
 
 ```calor
 §M{m001:CacheModule}
-§F{f001:BuildCacheKey:pub}
-  §I{str:type}
-  §I{i32:id}
-  §O{str}
-  §R (concat type ":" (str id))
-§/F{f001}
-§/M{m001}
+  §F{f001:BuildCacheKey:pub} (str:type, i32:id) -> str
+    §R (concat type ":" (str id))
 ```
 
 ### Generating Formatted Tokens
@@ -892,13 +799,8 @@ Task: Return `"TOKEN-{userId}-{sequence}"`
 
 ```calor
 §M{m001:TokenModule}
-§F{f001:GenerateToken:pub}
-  §I{i32:userId}
-  §I{i32:sequence}
-  §O{str}
-  §R (fmt "TOKEN-{0}-{1}" userId sequence)
-§/F{f001}
-§/M{m001}
+  §F{f001:GenerateToken:pub} (i32:userId, i32:sequence) -> str
+    §R (fmt "TOKEN-{0}-{1}" userId sequence)
 ```
 
 ### Zero-Padded IDs
@@ -907,13 +809,8 @@ Task: Return `"{prefix}-{sequence:D6}"` (6-digit zero-padded)
 
 ```calor
 §M{m001:IdModule}
-§F{f001:GenerateId:pub}
-  §I{str:prefix}
-  §I{i32:sequence}
-  §O{str}
-  §R (fmt "{0}-{1:D6}" prefix sequence)
-§/F{f001}
-§/M{m001}
+  §F{f001:GenerateId:pub} (str:prefix, i32:sequence) -> str
+    §R (fmt "{0}-{1:D6}" prefix sequence)
 ```
 
 ## Collections
@@ -924,7 +821,6 @@ Task: Return `"{prefix}-{sequence:D6}"` (6-digit zero-padded)
 §LIST{name:elementType}   // Create and initialize a list
   value1
   value2
-§/LIST{name}
 
 §PUSH{listName} value     // Add to end of list
 §INS{listName} index val  // Insert at index
@@ -941,7 +837,6 @@ Task: Return `"{prefix}-{sequence:D6}"` (6-digit zero-padded)
 §DICT{name:keyType:valType}  // Create dictionary
   §KV key1 value1
   §KV key2 value2
-§/DICT{name}
 
 §PUT{dictName} key value     // Add or update entry
 §REM{dictName} key           // Remove by key
@@ -955,7 +850,6 @@ Task: Return `"{prefix}-{sequence:D6}"` (6-digit zero-padded)
 §HSET{name:elementType}   // Create hash set
   value1
   value2
-§/HSET{name}
 
 §PUSH{setName} value      // Add to set
 §REM{setName} value       // Remove from set
@@ -969,11 +863,9 @@ Task: Return `"{prefix}-{sequence:D6}"` (6-digit zero-padded)
 §EACH{id:var} collection      // Foreach (type inferred)
 §EACH{id:var:type} collection  // Foreach (explicit type)
   ...body...
-§/EACH{id}
 
 §EACHKV{id:k:v} dict      // Foreach over dictionary key-values
   ...body...
-§/EACHKV{id}
 ```
 
 ## Async/Await
@@ -981,10 +873,8 @@ Task: Return `"{prefix}-{sequence:D6}"` (6-digit zero-padded)
 Async functions and methods use `§AF` and `§AMT` tags:
 
 ```calor
-§AF{id:Name:vis}          // Async function (returns Task<T>)
-§/AF{id}                  // End async function
-§AMT{id:Name:vis}         // Async method (returns Task<T>)
-§/AMT{id}                 // End async method
+§AF{id:Name:vis} (params) -> ret   // Async function (returns Task<T>)
+§AMT{id:Name:vis} (params) -> ret  // Async method (returns Task<T>)
 §AWAIT expr               // Await an async operation
 §AWAIT{false} expr        // Await with ConfigureAwait(false)
 ```
@@ -993,13 +883,9 @@ Async functions and methods use `§AF` and `§AMT` tags:
 
 ```calor
 §M{m001:AsyncDemo}
-§AF{f001:FetchDataAsync:pub}
-  §I{str:url}
-  §O{str}
-  §B{str:result} §AWAIT §C{client.GetStringAsync} §A url §/C
-  §R result
-§/AF{f001}
-§/M{m001}
+  §AF{f001:FetchDataAsync:pub} (str:url) -> str
+    §B{result} §AWAIT §C{client.GetStringAsync} §A url §/C
+    §R result
 ```
 
 ## Exception Handling
@@ -1013,8 +899,6 @@ Async functions and methods use `§AF` and `§AMT` tags:
   ...catch body...
 §FI                       // Finally block
   ...finally body...
-§/TR{id}                  // End try block
-
 §TH "message"             // Throw new Exception
 §TH expr                  // Throw expression
 §RT                       // Rethrow (inside catch)
@@ -1026,20 +910,14 @@ Async functions and methods use `§AF` and `§AMT` tags:
 
 ```calor
 §M{m001:ErrorHandling}
-§F{f001:SafeDivide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §TR{t1}
-    §R (/ a b)
-  §CA{DivideByZeroException:ex}
-    §P "Division by zero!"
-    §R 0
-  §FI
-    §P "Cleanup complete"
-  §/TR{t1}
-§/F{f001}
-§/M{m001}
+  §F{f001:SafeDivide:pub} (i32:a, i32:b) -> i32
+    §TR{t1}
+      §R (/ a b)
+    §CA{DivideByZeroException:ex}
+      §P "Division by zero!"
+      §R 0
+    §FI
+      §P "Cleanup complete"
 ```
 
 ## Generics
@@ -1070,26 +948,18 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 ```calor
 §M{m001:GenericDemo}
-§CL{c001:Repository:pub}<T>
-  §WHERE T : class
-  §FLD{List<T>:_items:pri}
+  §CL{c001:Repository:pub}<T>
+    §WHERE T : class
+    §FLD{List<T>:_items:pri}
 
-  §CTOR{ct001:pub}
-    §ASSIGN _items §NEW{List<T>}
-  §/CTOR{ct001}
+    §CTOR{ct001:pub} ()
+      §ASSIGN _items §NEW{List<T>}
 
-  §MT{m001:Add:pub}
-    §I{T:item}
-    §O{void}
-    §C{_items.Add} §A item §/C
-  §/MT{m001}
+    §MT{m001:Add:pub} (T:item) -> void
+      §C{_items.Add} §A item §/C
 
-  §MT{m002:GetAll:pub}
-    §O{IReadOnlyList<T>}
-    §R _items
-  §/MT{m002}
-§/CL{c001}
-§/M{m001}
+    §MT{m002:GetAll:pub} () -> IReadOnlyList<T>
+      §R _items
 ```
 
 ## Classes and Interfaces
@@ -1107,11 +977,7 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 ```calor
 §IFACE{id:Name}           // Interface definition
-  §MT{id:MethodName}      // Method signature
-    §I{type:param}        // Parameters
-    §O{returnType}        // Return type
-  §/MT{id}
-§/IFACE{id}
+  §MT{id:MethodName} (type:param) -> returnType
 ```
 
 ### Method Modifiers
@@ -1127,57 +993,40 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 
 ```calor
 §M{m001:Shapes}
-§CL{c001:Shape:pub abs}
-  §MT{mt001:Area:pub:abs}
-    §O{f64}
-  §/MT{mt001}
-§/CL{c001}
+  §CL{c001:Shape:pub abs}
+    §MT{mt001:Area:pub:abs} () -> f64
 
-§CL{c002:Circle:pub}
-  §EXT{Shape}
-  §FLD{f64:radius:pri}
-  §MT{mt001:Area:pub:over}
-    §O{f64}
-    §R (* 3.14159 (* radius radius))
-  §/MT{mt001}
-§/CL{c002}
-§/M{m001}
+  §CL{c002:Circle:pub}
+    §EXT{Shape}
+    §FLD{f64:radius:pri}
+    §MT{mt001:Area:pub:over} () -> f64
+      §R (* 3.14159 (* radius radius))
 ```
 
 ## Constructors
 
 ```calor
-§CTOR{id:visibility}      // Constructor
-  §I{type:param}          // Parameters
+§CTOR{id:visibility} (type:param)
   §BASE §A arg §/BASE     // Call base constructor
   §THIS §A arg §/THIS     // Call this constructor
   §ASSIGN target value    // Field assignment
-§/CTOR{id}
 ```
 
 ### Template: Constructor with Base Call
 
 ```calor
 §M{m001:Animals}
-§CL{c001:Animal:pub}
-  §FLD{str:_name:pro}
-  §CTOR{ctor001:pub}
-    §I{str:name}
-    §ASSIGN §THIS._name name
-  §/CTOR{ctor001}
-§/CL{c001}
+  §CL{c001:Animal:pub}
+    §FLD{str:_name:pro}
+    §CTOR{ctor001:pub} (str:name)
+      §ASSIGN §THIS._name name
 
-§CL{c002:Dog:pub}
-  §EXT{Animal}
-  §FLD{str:_breed:pri}
-  §CTOR{ctor001:pub}
-    §I{str:name}
-    §I{str:breed}
-    §BASE §A name §/BASE
-    §ASSIGN §THIS._breed breed
-  §/CTOR{ctor001}
-§/CL{c002}
-§/M{m001}
+  §CL{c002:Dog:pub}
+    §EXT{Animal}
+    §FLD{str:_breed:pri}
+    §CTOR{ctor001:pub} (str:name, str:breed)
+      §BASE §A name §/BASE
+      §ASSIGN §THIS._breed breed
 ```
 
 ## Switch/Match Expressions
@@ -1187,26 +1036,21 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 §K pattern → expr         // Case with arrow syntax
 §K pattern                // Case with block body
   ...body...
-§/K                       // End case
-§/W{id}                   // End match
+§/K                       // End case (valid case delimiter)
+                          // Match ends at the next dedent
 ```
 
 ### Template: Switch Expression
 
 ```calor
 §M{m001:Grades}
-§F{f001:GetGrade:pub}
-  §I{i32:score}
-  §O{str}
-  §R §W{sw1} score
-    §K §PREL{gte} 90 → "A"
-    §K §PREL{gte} 80 → "B"
-    §K §PREL{gte} 70 → "C"
-    §K §PREL{gte} 60 → "D"
-    §K _ → "F"
-  §/W{sw1}
-§/F{f001}
-§/M{m001}
+  §F{f001:GetGrade:pub} (i32:score) -> str
+    §R §W{sw1} score
+      §K §PREL{gte} 90 → "A"
+      §K §PREL{gte} 80 → "B"
+      §K §PREL{gte} 70 → "C"
+      §K §PREL{gte} 60 → "D"
+      §K _ → "F"
 ```
 
 ### Guard Clauses with WHEN
@@ -1217,7 +1061,6 @@ Type parameters use `<T>` suffix syntax after tag attributes:
   §K §VAR{n} §WHEN (< n 0) → "negative"
   §K 0 → "zero"
   §K _ → "normal"
-§/W{sw1}
 ```
 
 ## Enums
@@ -1227,13 +1070,11 @@ Type parameters use `<T>` suffix syntax after tag attributes:
   Red
   Green
   Blue
-§/EN{id}
 
 §EN{id:Name:underlyingType}  // Enum with underlying type
   Ok = 200
   NotFound = 404
   Error = 500
-§/EN{id}
 ```
 
 ## Guidelines for Writing Calor
@@ -1259,7 +1100,7 @@ Type parameters use `<T>` suffix syntax after tag attributes:
    - Inside loops, prefer block-style for inner if statements
    - When in doubt, use block syntax - it always works
 
-7. **Close all structures**: Every `§IF{id}` needs `§/I{id}`, every `§WH{id}` needs `§/WH{id}`, etc. The closing ID must match the opening ID.
+7. **Use indentation to delimit structures**: Blocks end at the next dedent. Do not write structural close tags; they are compile-time errors.
 
 8. **Use contracts to verify your work**: If a postcondition fails at runtime, your implementation is incorrect. Contracts are your self-checking mechanism.
 
@@ -1272,24 +1113,18 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 **WRONG - Checking length without null check first:**
 ```calor
 // WRONG: If arr is null, this throws NullReferenceException, not ContractViolationException
-§F{f001:Max:pub}
-  §I{[i32]:arr}
-  §O{i32}
+§F{f001:Max:pub} ([i32]:arr) -> i32
   §Q (> (len arr) 0)            // ❌ Crashes if arr is null!
   // ...
-§/F{f001}
 ```
 
 **CORRECT - Always check null BEFORE length:**
 ```calor
 // CORRECT: Null check first, then length check
-§F{f001:Max:pub}
-  §I{[i32]:arr}
-  §O{i32}
+§F{f001:Max:pub} ([i32]:arr) -> i32
   §Q (!= arr null)              // ✓ First: reject null
   §Q (> (len arr) 0)            // ✓ Then: check length (safe now)
   // ...
-§/F{f001}
 ```
 
 **Why this matters:** Contracts are evaluated in order. If you call `(len arr)` when `arr` is null, you get a crash instead of a proper contract violation. Always guard reference types with `(!= x null)` before accessing their properties.
@@ -1346,7 +1181,6 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 §B{result} 0
 §IF{if1} (< n 0)
   §B{result} (- 0 n)            // ❌ ERROR - 'result' already exists
-§/I{if1}
 ```
 
 **CORRECT - Use §ASSIGN to update existing variables:**
@@ -1359,7 +1193,6 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 §B{result} 0
 §IF{if1} (< n 0)
   §ASSIGN result (- 0 n)        // ✓ Update existing result
-§/I{if1}
 ```
 
 ### Character Literal Mistakes
@@ -1398,7 +1231,7 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 **WRONG - C#-style array syntax:**
 ```calor
 // WRONG: Type with brackets after
-§I{i32[]:items}                 // ❌ ERROR - wrong type syntax
+§F{f001:UseItems:pub} (i32[]:items) -> i32  // ❌ ERROR - wrong type syntax
 
 // WRONG: C#-style element access
 §B{x} (get arr i)               // ❌ ERROR - 'get' doesn't exist
@@ -1415,7 +1248,7 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 **CORRECT - Calor array syntax:**
 ```calor
 // CORRECT: Type with brackets before
-§I{[i32]:items}                 // ✓ Array of i32
+§F{f001:UseItems:pub} ([i32]:items) -> i32  // ✓ Array of i32
 
 // CORRECT: Element access with §IDX (both forms valid)
 §B{x} §IDX arr i                // ✓ arr[i]
@@ -1453,11 +1286,11 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 **§IF as Expression - NOW SUPPORTED:**
 ```calor
 // IF expression for conditional values (compiles to C# ternary)
-§B{absX} §IF{if1} (< x 0) → (- 0 x) §EL → x §/I{if1}
+§B{absX} §IF{if1} (< x 0) → (- 0 x) §EL → x
 // Compiles to: var absX = (x < 0) ? (0 - x) : x;
 
 // IF expression in return
-§R §IF{if1} (< a b) → (- 0 1) §EL → 1 §/I{if1}
+§R §IF{if1} (< a b) → (- 0 1) §EL → 1
 // Compiles to: return (a < b) ? (0 - 1) : 1;
 ```
 
@@ -1473,7 +1306,6 @@ Type parameters use `<T>` suffix syntax after tag attributes:
 **CORRECT - Use string operations or character codes:**
 ```calor
 §IF{if1} (equals a b) → §R 0
-§/I{if1}
 ```
 
 For lexicographic comparison, compare character by character using `(char-at)` and `(char-code)`.
@@ -1505,12 +1337,9 @@ For lexicographic comparison, compare character by character using `(char-at)` a
 §PROP{id:Name:type:vis}   Property definition
   §GET{vis}               Getter
     §R expression
-  §/GET
   §SET                    Setter
     §ASSIGN _field value
-  §/SET
   §INIT                   Init-only setter (C# 9+)
-§/PROP{id}
 
 §FLD{type:name:vis}       Field definition
 §DEFAULT                  Default value expression
@@ -1522,15 +1351,11 @@ For lexicographic comparison, compare character by character using `(char-at)` a
 §IXER{id:type:vis:get,set} (type:param)     Compact auto-indexer (single line)
 §IXER{id:type:vis:get,set} (t1:p1, t2:p2)   Multi-parameter indexer
 
-§IXER{id:type:vis}        Full indexer definition
-  §I{type:param}           Parameter
+§IXER{id:type:vis} (type:param)  Full indexer definition
   §GET                     Getter body
     §R expression
-  §/GET
   §SET                     Setter body
     ...
-  §/SET
-§/IXER{id}
 ```
 
 C# `this[string key] { get; set; }` becomes `§IXER{ix1:str:pub:get,set} (str:key)`.
@@ -1543,7 +1368,7 @@ C# `this[string key] { get; set; }` becomes `§IXER{ix1:str:pub:get,set} (str:ke
 §DEL{id:Name:vis}         Delegate type declaration
   §I{type:param}
   §O{returnType}
-§/DEL{id}
+  // Delegate body ends at the next dedent
 ```
 
 ### Lambda Expressions
@@ -1605,7 +1430,7 @@ Alternative alias `§SW` is available for `§W`:
 
 ```
 §SW{id} target            Same as §W{id} target
-§/SW{id}                  Same as §/W{id}
+  Cases are indented under `§SW`; the match ends at the next dedent
 ```
 
 ## Pattern Matching Enhancements
@@ -1681,14 +1506,11 @@ No special tags needed — works in `§IF`, contracts (`§Q`/`§S`), bindings, a
 
 ```
 §ENUM{id:Name}            Enum (legacy alias for §EN)
-§/ENUM{id}                End enum (legacy)
+  Enum members are indented; the enum ends at the next dedent
 
 §EEXT{id:EnumName}        Extension methods for enum
-  §F{f001:MethodName:pub}
-    §I{EnumType:self}     First param becomes 'this'
-    §O{returnType}
-  §/F{f001}
-§/EEXT{id}
+  §F{f001:MethodName:pub} (EnumType:self) -> returnType
+    // First param becomes 'this'; extension block ends at the next dedent
 ```
 
 ## Extended Features: Metadata
@@ -2003,14 +1825,12 @@ Lock statements are converted to `§SYNC` blocks with full round-trip semantics.
 ```calor
 §SYNC{id} (lockExpression)
   ... body statements ...
-§/SYNC{id}
 ```
 
 ### Example
 ```calor
 §SYNC{s1} (_syncRoot)
-  §B{~count:i32} = (+ count INT:1)
-§/SYNC{s1}
+  §ASSIGN count (+ count INT:1)
 ```
 
 Compiles to:

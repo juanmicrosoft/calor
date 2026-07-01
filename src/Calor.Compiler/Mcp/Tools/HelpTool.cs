@@ -425,31 +425,37 @@ public sealed class HelpTool : McpToolBase
 
                 Calor is a DSL that compiles to C# on .NET 10. All constructs use section markers (§).
 
+                Calor is **indent-only**: a block's body is indented (2 spaces per level) under its
+                opener and ends at the next dedent. There are **NO structural closing tags** — never
+                write §/M, §/F, §/L, §/I, §/CL, §/MT, §/TR, etc. (The inline call closer §/C is still
+                valid and optional; §RAW…§/RAW, §CSHARP{…}§/CSHARP and §PP…§/PP keep their delimiters.)
+
                 ### Core Tags
                 ```
-                §M{id:Name}              Module (close: §/M{id})
-                §F{id:name:vis}           Function (close: §/F{id})
-                §B{name:type}             Immutable binding
-                §B{~name:type}            Mutable binding
-                §I{type:name}             Parameter
+                §M{id:Name}              Module (body indented)
+                §F{id:name:vis} (type:name, ...) -> retType   Function (body indented)
+                §B{name}                 Immutable binding (§B{name} expr)
+                §B{~name}                Mutable binding (§B{~name} expr)
+                §I{type:name}             Parameter (explicit form; alt. to the (…) signature)
                 §I{type:name:this}        Extension method parameter (C# 'this' modifier)
                 §I{type:name:ref}         Ref parameter
                 §I{type:name:out}         Out parameter
                 §I{type:name:in}          In (readonly ref) parameter
                 §I{type:name:params}      Params array parameter
                 §I{type:name}=expr        Parameter with default value
-                §O{type}                  Return type
+                §O{type}                  Return type (explicit form; alt. to -> retType)
                 §R expr                   Return statement
                 §C{obj.Method} §A arg §/C Method call with argument
                 ```
 
                 ### Control Flow
                 ```
-                §IF{id} (cond) ... §EI (cond2) ... §EL ... §/I{id}   If/ElseIf/Else
-                §L{id:var:from:to:step} ... §/L{id}                  For loop
-                §L{id:item:collection} ... §/L{id}                   Foreach loop
-                §WH{id} (cond) ... §/WH{id}                          While loop
-                §W{expr} §K{pattern} result §/W                      Match/Switch
+                §IF{id} (cond)  /  §EI (cond2)  /  §EL      If/ElseIf/Else (bodies indented)
+                §IF{id} (cond) → §R expr                    Inline if (single statement)
+                §L{id:var:from:to:step}                     For loop (body indented)
+                §EACH{var:collection}                       Foreach loop (body indented)
+                §WH{id} (cond)                              While loop (body indented)
+                §W{expr}  then  §K{pattern} → result        Match/Switch (arms indented)
                 §GOTO{label}                                          Goto label
                 §GOTO{CASE:expr}                                      Goto case expr
                 §GOTO{DEFAULT}                                        Goto default
@@ -457,22 +463,22 @@ public sealed class HelpTool : McpToolBase
 
                 ### Types and Classes
                 ```
-                §CL{id:Name:vis}          Class (close: §/CL{id})
+                §CL{id:Name:vis}          Class (body indented)
                 §CL{id:Name:vis:stat}     Static class
-                §IFACE{id:Name}           Interface (close: §/IFACE{id})
-                §ST{id:Name:vis}          Struct (close: §/ST{id})
-                §MT{id:name:vis}          Method (close: §/MT{id})
-                §CTOR{id:vis}             Constructor (close: §/CTOR{id})
+                §CL{id:Name:vis:struct}   Struct
+                §IFACE{id:Name}           Interface (body indented)
+                §MT{id:name:vis} (type:name, ...) -> retType   Method (body indented)
+                §CTOR{id:vis}             Constructor (body indented)
                 §BASE arg1 arg2           Constructor chaining to base class
                 §THIS arg1 arg2           Constructor chaining to another constructor
-                §PROP{id:Name:type:vis}   Property (close: §/PROP{id})
-                §IXER{id:type:vis}        Indexer (close: §/IXER{id})
+                §PROP{id:Name:type:vis}   Property (body indented)
+                §IXER{id:type:vis}        Indexer (body indented)
                 §FLD{type:name:vis}       Field
                 §FLD{type:name:vis:volatile} Volatile field
                 §EXT{BaseClass}           Extends
                 §IMPL{Interface}          Implements
-                §EN{id:Name}              Enum (close: §/EN{id})
-                §SYNC{id} expr ... §/SYNC{id}  Lock/synchronization block
+                §EN{id:Name}              Enum (body indented)
+                §SYNC{id}                 Lock/synchronization block (body indented)
                 ```
 
                 ### Properties and Indexers (compact forms)
@@ -492,12 +498,12 @@ public sealed class HelpTool : McpToolBase
 
                 ### Async, Exceptions, and Resources
                 ```
-                §AF{id:name:vis}          Async function
-                §AMT{id:name:vis}         Async method
-                §AWAIT expr §/AWAIT       Await expression
-                §TR{id} ... §CA{Type:var} ... §FI{} ... §/TR{id}   Try/Catch/Finally
+                §AF{id:name:vis} (type:name, ...) -> retType   Async function (body indented)
+                §AMT{id:name:vis} (type:name, ...) -> retType  Async method (body indented)
+                §AWAIT expr               Await expression
+                §TR{id}  /  §CA{Type:var}  /  §FI    Try/Catch/Finally (bodies indented; §CA{Type:var} WHEN (cond) for filters)
                 §TH expr                  Throw
-                §USE{var}=expr ... §/USE  Using statement
+                §USE{var} expr            Using statement (body indented)
                 §YIELD expr               Yield return
                 §YBRK                     Yield break
                 ```
@@ -537,7 +543,7 @@ public sealed class HelpTool : McpToolBase
                 §PP{CONDITION} ... §PPE ... §/PP{CONDITION}   #if/#else/#endif
                 §CSHARP{code}§/CSHARP                         Raw C# passthrough (member-level)
                 §RAW ... §/RAW                                Raw C# block
-                §UNSAFE{id} ... §/UNSAFE{id}                  Unsafe block
+                §UNSAFE{id}                                   Unsafe block (body indented)
                 ```
 
                 ### Typed Literals
