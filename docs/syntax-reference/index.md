@@ -143,8 +143,8 @@ to reference the element from external tooling (e.g. `calor navigate`).
 ```
 
 Blocks are delimited by **indentation** (default 2 spaces per nesting
-level). Legacy `§/X` closers are still accepted for transition
-compatibility but should not be used in new code — see
+level). There are no closer tags — an explicit `§/X` was removed in
+Phase 4d and now raises `Calor0830`. See
 [Structure Tags](/calor/syntax-reference/structure-tags/) for details.
 
 ---

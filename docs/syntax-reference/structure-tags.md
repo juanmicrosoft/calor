@@ -14,10 +14,11 @@ Structure tags define the organization of Calor code: modules, functions, and th
 > ends at the first line that **dedents** back to the parent column. No
 > closing tags are required. The compiler default is `2` spaces per
 > nesting level (mixing tabs and spaces is rejected). Legacy closer tags
-> (`§/M`, `§/F`, `§/L`, `§/I`, …) are still accepted during the
-> transition window, but all examples below use the indent-only form;
-> bulk-migrate older corpora with
-> [`calor format`](/calor/cli/format/).
+> (`§/M`, `§/F`, `§/L`, `§/I`, …) were **removed** in Phase 4d: an explicit
+> closer now raises `Calor0830`. A block is terminated by indentation
+> alone, so all examples below use the indent-only form. To migrate an
+> older corpus that still has closer lines, delete those lines — the
+> indentation already marks where each block ends.
 
 ---
 
@@ -44,8 +45,8 @@ Modules are like C# namespaces. They group related functions.
 - `name` becomes the C# namespace
 - The module block extends until the next line that dedents back to
   column 0 (or end of file)
-- Legacy `§/M` closers are still accepted but discouraged; migrate
-  with [`calor format`](/calor/cli/format/)
+- Legacy `§/M` closers were removed in Phase 4d; an explicit closer now
+  raises `Calor0830`. The module ends at the next dedent to column 0
 
 ---
 
@@ -669,25 +670,24 @@ dedents back to (or past) the parent column.
 3. Chain continuations (`§EI`, `§EL`, `§K`, `§WHEN`, `§CA`, `§FI`)
    sit at the **same** column as their parent (`§IF`, `§W`, `§TR`),
    not indented inside it
-4. Legacy `§/X` closers are still accepted and ignored
+4. Closer tags were removed in Phase 4d — an explicit `§/X` raises `Calor0830`
 
 ### Example
 
 ```
-§M{Example}
-  §F{Main:pub}
-    §O{void}
+§M{m1:Example}
+  §F{f1:Main:pub} () -> void
     §E{cw}
-    §L{i:1:10:1}
-      §IF (> i 5)
+    §L{l1:i:1:10:1}
+      §IF{if1} (> i 5)
         §P i
       §EL
         §P "small"
 ```
 
-The `§/I`, `§/L`, `§/F`, `§/M` closers are inferred from the dedents.
-If you write them explicitly, the lexer drops them silently — but
-calorfmt will strip them in a future release.
+Each block above (`§IF`, `§L`, `§F`, `§M`) ends purely at its dedent —
+there are no closer tags. Writing an explicit `§/I`, `§/L`, `§/F`, or
+`§/M` now raises `Calor0830`.
 
 ### Tag Reference
 

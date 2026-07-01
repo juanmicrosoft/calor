@@ -66,12 +66,12 @@ As of v6, structural openers (`§M`, `§F`, `§AF`, `§L`,
 accept a **compact form** that omits the leading `{id:…}` block. The
 compiler auto-assigns an ID of the shape `<prefix>_auto<N>`.
 
-When the opener uses the compact form, the matching closing tag
-(`§/M`, `§/F`, `§/AF`, `§/L`, `§/I`, `§/TR`, `§/CL`, `§/IFACE`,
-`§/MT`, `§/CTOR`, `§/EN`) may also omit `{id}`. **The two sides are
-linked**: if the opener carries an explicit `{id:…}`, the closer must
-still carry the matching `{id}` (diagnostic `Calor0101` if they
-diverge). Both forms parse and are valid side-by-side:
+Indent-only Calor has no closing tags at all — a block ends at its
+dedent — so an opener's `{id:…}` is the only place a structural ID
+appears. (Pre-Phase-4d Calor paired each opener with a `§/…` closer that
+repeated the ID; closer tags were removed in Phase 4d and an explicit
+closer now raises `Calor0830`.) Both opener forms parse and are valid
+side-by-side:
 
 ```calor
 # Compact (recommended for new code)

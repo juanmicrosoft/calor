@@ -319,18 +319,19 @@ namespace Calor.Runtime
 
 **Calor:**
 ```calor
-§MATCH{m1} §REF{name=opt}
-§CASE §SOME{x} => §R §REF{name=x}
-§CASE §NONE => §R INT:0
-§/MATCH{m1}
+§W{sw1:expr} code
+  §K 200 → "OK"
+  §K 404 → "Not Found"
+  §K _ → "Unknown"
 ```
 
 **C#:**
 ```csharp
-opt switch
+code switch
 {
-    Option<int>.Some(var x) => x,
-    Option<int>.None => 0,
+    200 => "OK",
+    404 => "Not Found",
+    _ => "Unknown",
 }
 ```
 
@@ -436,14 +437,12 @@ await expr.ConfigureAwait(false)
 
 **Calor:**
 ```calor
-§CLASS{c1:Circle:seal}
-§EXT{Shape}
-§IMPL{IDrawable}
-§FLD{f64:Radius:pri}
-§METHOD{m1:Area:pub:over} §O{f64} §E{}
-§R §OP{kind=MUL} 3.14159 §OP{kind=MUL} §REF{name=Radius} §REF{name=Radius}
-§/METHOD{m1}
-§/CLASS{c1}
+§CL{c1:Circle:pub:seal}
+  §EXT{Shape}
+  §IMPL{IDrawable}
+  §FLD{f64:Radius:priv}
+  §MT{mt1:Area:pub:over} () -> f64
+    §R (* 3.14159 (* this.Radius this.Radius))
 ```
 
 **C#:**
