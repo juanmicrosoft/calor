@@ -38,8 +38,8 @@ internal static class InteropHintAnalyzer
             "yield return/break is supported via §YIELD and §YBRK — consider converting iterator methods"),
 
         (new Regex(@"\busing\s*\(", RegexOptions.Compiled),
-            "using-statement", "§USE{var}=expr",
-            "using statements are supported via §USE{var}=expr ... §/USE — consider converting resource management blocks"),
+            "using-statement", "§USE{var} expr",
+            "using statements are supported via §USE{var} expr with an indented body — consider converting resource management blocks"),
 
         (new Regex(@"\bdelegate\s+", RegexOptions.Compiled),
             "delegate", "§DEL{id:name:vis}",

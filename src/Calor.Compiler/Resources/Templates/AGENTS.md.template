@@ -86,17 +86,18 @@ calor convert file.calr              # Convert Calor to C#
 
 #### Calor v2+ Syntax Reference
 
+Calor is **indent-only**: a block's body is indented under its opener and ends at
+the next dedent. There are **no closing tags** — never write `§/`-prefixed closers.
+
 | Structure | Syntax |
 |-----------|--------|
-| Module | `§M{id:Name}` ... `§/M{id}` |
-| Function | `§F{id:Name:vis}` ... `§/F{id}` |
-| Async Func | `§AF{id:Name:vis}` ... `§/AF{id}` |
-| Input | `§I{type:name}` |
-| Output | `§O{type}` |
+| Module | `§M{id:Name}` (body indented) |
+| Function | `§F{id:name:vis} (type:name, ...) -> retType` |
+| Async Func | `§AF{id:name:vis} (type:name, ...) -> retType` |
 | Effects | `§E{cw,db,net}` |
-| Loop | `§L{id:var:from:to:step}` ... `§/L{id}` |
-| Conditional | `§IF{id} condition → action` |
-| Try/Catch | `§TR{id}` ... `§CA{Type:var}` ... `§FI` ... `§/TR{id}` |
+| Loop | `§L{id:var:from:to:step}` (body indented) |
+| Conditional | `§IF{id} (cond)` + `§EI (cond)` / `§EL`; inline `→ §R expr` |
+| Try/Catch | `§TR{id}` ... `§CA{Type:var}` ... `§FI` (indent-only) |
 | Preprocessor | `§PP{CONDITION}` ... `§PPE` ... `§/PP{CONDITION}` |
 
 **Expressions (Lisp-style):** `(+ a b)`, `(== x 0)`, `(% i 15)`
@@ -109,10 +110,10 @@ calor convert file.calr              # Convert Calor to C#
 
 **Contracts:** `§Q (> x 0)` (precondition), `§S (>= result 0)` (postcondition)
 
-**Collections:**
-- List: `§LIST{name:type}` ... `§/LIST{name}`, `§PUSH{name} value`
-- Dict: `§DICT{name:key:val}` ... `§KV key val` ... `§/DICT{name}`
-- HashSet: `§HSET{name:type}` ... `§/HSET{name}`
+**Collections (indent-only; items indented under the opener):**
+- List: `§LIST{name:type}` then indented values; append with `§PUSH{name} value`
+- Dict: `§DICT{name:key:val}` then indented `§KV key value`; set with `§PUT{name} key value`
+- HashSet: `§HSET{name:type}` then indented values
 
 #### Type Mappings
 | C# | Calor |

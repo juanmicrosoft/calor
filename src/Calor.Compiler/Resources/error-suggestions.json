@@ -37,10 +37,10 @@
       "title": "Variable Redeclaration",
       "matchPatterns": ["already defined", "already declared", "redeclar", "already exists"],
       "matchCodes": ["Calor0201"],
-      "description": "Use §B to declare a new variable and §ASSIGN to update an existing one.",
+      "description": "Declare a variable once with §B. Use §B{~name} for a mutable binding, then reassign it later with §ASSIGN name value — do not declare the same name twice.",
       "wrongExample": "§B{k} (% rng n)    // First use: declares k\n§B{k} (+ k 1)      // ERROR - 'k' already defined",
-      "correctExample": "§B{k} (% rng n)    // Declare k\n§ASSIGN k (+ k 1)   // Update k",
-      "explanation": "§B declares a new binding. Once declared, use §ASSIGN to update the variable's value. This applies inside conditionals too."
+      "correctExample": "§B{~k} (% rng n)   // Declare k once (mutable)\n§ASSIGN k (+ k 1)  // Reassign k — no re-declaration",
+      "explanation": "§B declares a NEW binding, so using it twice for the same name is a redeclaration. Declare once with §B{~name} for a value that changes, then update it with §ASSIGN name value (a second §B{~name} would re-declare, not update)."
     },
     {
       "id": "char-literals",
@@ -58,8 +58,8 @@
       "matchPatterns": ["i32[]", "string[]", "wrong type syntax", "array type"],
       "matchCodes": ["Calor0113"],
       "description": "Array type brackets go BEFORE the type name in Calor, not after.",
-      "wrongExample": "§I{i32[]:items}     // ERROR - wrong type syntax",
-      "correctExample": "§I{[i32]:items}     // Array of i32",
+      "wrongExample": "§F{f1:UseItems:pub} (i32[]:items) -> i32     // ERROR - wrong array type syntax",
+      "correctExample": "§F{f1:UseItems:pub} ([i32]:items) -> i32\n  §R (len items)",
       "explanation": "In Calor, array types use [T] syntax with brackets before the type name: [i32], [str], [f64]."
     },
     {
@@ -68,8 +68,8 @@
       "matchPatterns": ["get arr", "at arr", "arr[", "element access", "§IDX inside", "tag inside Lisp"],
       "matchCodes": ["Calor0106", "Calor0104"],
       "description": "Use §IDX for array element access. Cannot nest §IDX inside Lisp expressions.",
-      "wrongExample": "§B{x} (get arr i)      // ERROR - 'get' doesn't exist\n§B{x} arr[i]           // ERROR - no C# indexer\n§ASSIGN sum (+ sum §IDX data i)  // ERROR - tag inside Lisp expr",
-      "correctExample": "§B{x} §IDX arr i       // arr[i]\n§SETIDX{arr} i value   // arr[i] = value\n\n// For use in expressions, extract to binding first:\n§B{val} §IDX data i\n§ASSIGN sum (+ sum val)",
+      "wrongExample": "§B{x} (get arr i)      // ERROR - 'get' doesn't exist\n§B{x} arr[i]           // ERROR - no C# indexer\n§B{~sum} (+ sum §IDX data i)  // ERROR - tag inside Lisp expr",
+      "correctExample": "§B{x} §IDX arr i       // arr[i]\n§SETIDX{arr} i value   // arr[i] = value\n\n// For use in expressions, extract to binding first:\n§B{val} §IDX data i\n§B{~sum} (+ sum val)",
       "explanation": "Use §IDX for reading (no braces), §SETIDX{arr} for writing. §IDX cannot be nested inside Lisp expressions — extract to a binding first."
     },
     {
@@ -87,10 +87,10 @@
       "title": "Missing Built-in Operators",
       "matchPatterns": ["(abs ", "(max ", "(min ", "(sqrt ", "(pow ", "undefined function"],
       "matchCodes": ["Calor0200"],
-      "description": "abs, max, min, sqrt, pow are not built-in. Use IF expressions instead.",
+      "description": "abs, max, min, sqrt, pow are not built-in. Use IF branches instead.",
       "wrongExample": "§R (abs x)     // ERROR - abs doesn't exist\n§R (max a b)   // ERROR - max doesn't exist",
-      "correctExample": "§B{absX} §IF{if1} (< x 0) → (- 0 x) §EL → x §/I{if1}\n§B{maxVal} §IF{if1} (> a b) → a §EL → b §/I{if1}",
-      "explanation": "Calor doesn't have abs, max, min, sqrt, pow as built-in functions. Use IF expressions (ternary) to implement them inline."
+      "correctExample": "§IF{if1} (< x 0) → §R (- 0 x)\n§R x\n\n§IF{if2} (> a b) → §R a\n§R b",
+      "explanation": "Calor doesn't have abs, max, min, sqrt, pow as built-in functions. Use §IF with a single return or an indented block to implement branch logic."
     },
     {
       "id": "control-flow-arrow",
@@ -99,8 +99,8 @@
       "matchCodes": ["Calor0100", "Calor0104"],
       "description": "Arrow syntax (→) is for single statements only. Use block syntax for multiple statements.",
       "wrongExample": "§IF{if1} (condition) → §B{x} 1 → §R x   // ERROR",
-      "correctExample": "§IF{if1} (condition)\n  §B{x} 1\n  §R x\n§/I{if1}",
-      "explanation": "The arrow (→) can only be followed by a single statement. For multiple statements, use the block form with §/I{id} closing tag."
+      "correctExample": "§IF{if1} (condition)\n  §B{x} 1\n  §R x",
+      "explanation": "The arrow (→) can only be followed by a single statement. For multiple statements, put an indented block under the §IF opener; the block ends at dedent."
     },
     {
       "id": "new-object-placeholder",
@@ -109,7 +109,7 @@
       "matchCodes": ["Calor0106", "Calor0200"],
       "description": "The converter generates §NEW{object} when it can't resolve the target type of a C# target-typed 'new()'. Replace 'object' with the actual type.",
       "wrongExample": "§TH §NEW{object} §A \"Invalid input\" §/NEW   // 'object' is a placeholder",
-      "correctExample": "§TH §NEW{ArgumentException} §A \"Invalid input\" §/NEW",
+      "correctExample": "§TH §NEW{ArgumentException}(\"Invalid input\")",
       "explanation": "Look at the context — throw statements usually need an Exception type, assignments need the variable's declared type, method returns need the return type. Replace §NEW{object} with the correct concrete type."
     },
     {
@@ -119,7 +119,7 @@
       "matchCodes": ["Calor0112", "Calor0113"],
       "description": "Large integer literals may overflow i32 range. Calor now supports i64 natively — values outside int range are handled automatically.",
       "wrongExample": "§C{Method} §A -1486618624   // This was 1000000000000 truncated to i32!",
-      "correctExample": "§C{Method} §A 1000000000000   // Now correctly stored as i64",
+      "correctExample": "§C{Method} §A 1000000000000 §/C   // Now correctly stored as i64",
       "explanation": "If you see suspiciously negative numbers where large positive values are expected, the original C# likely used long/Int64 literals. Re-convert the file to pick up the i64 fix."
     },
     {
@@ -129,58 +129,58 @@
       "matchCodes": ["Calor0106", "Calor0104"],
       "description": "Generic type arguments like <T> in call expressions are not yet fully supported in expression contexts.",
       "wrongExample": "§C{EnumCache<T>.GetInfo} §/C   // Parser rejects <T> in expressions",
-      "correctExample": "§B{~info} §C{EnumCache}.GetInfo §/C   // Use without type param, let C# infer",
+      "correctExample": "§B{~info} §C{EnumCache.GetInfo} §/C   // Use without type param, let C# infer",
       "explanation": "When converting generic method calls, remove the type arguments from the call expression if C# type inference can resolve them. For explicit type args, use a §CSHARP interop block."
     },
     {
       "id": "if-id-mismatch",
-      "title": "IF Block ID Mismatch",
+      "title": "Legacy IF Closing Tag",
       "matchPatterns": ["does not match IF id", "END_IF id", "mismatch"],
       "matchCodes": ["Calor0100", "Calor0102"],
-      "description": "Nested IF blocks have mismatched opening/closing IDs, usually caused by converter bug with continue/break inside nested conditionals.",
-      "wrongExample": "§IF{if016} (condition)\n  §/I{if017}   // ID mismatch!",
-      "correctExample": "§IF{if016} (condition)\n  §/I{if016}   // IDs must match",
-      "explanation": "Manually fix the closing ID to match the opening ID. Count the nesting levels to identify which §/I belongs to which §IF."
+      "description": "Current Calor IF blocks are indentation-delimited. Do not add legacy IF closing tags or try to match IF IDs.",
+      "wrongExample": "§IF{if016} (condition)\n  §R 1\n§/I{if017}   // ERROR: legacy structural closing tag",
+      "correctExample": "§IF{if016} (condition)\n  §R 1",
+      "explanation": "Indent the IF body under §IF. The block ends at dedent, so there is no IF closing tag or closing ID to match."
     },
     {
       "id": "invalid-lisp-expression",
       "title": "Invalid Lisp Expression",
       "matchPatterns": ["Unexpected token in expression", "invalid expression argument", "invalid lisp"],
       "matchCodes": ["Calor0114"],
-      "description": "The parser encountered an unexpected token inside a Lisp-style expression (parenthesized prefix notation). Common causes: nullable type in cast position (?T), unsupported operator, or malformed nested expression.",
-      "wrongExample": "(cast ?T value)          // ?T not recognized as type\n(+ a §IDX arr i)         // Can't nest § tags in Lisp expressions",
-      "correctExample": "(cast T? value)          // Use postfix nullable\n§B{_tmp} §IDX arr i      // Extract to binding first\n(+ a _tmp)",
-      "explanation": "Lisp expressions use prefix notation: (operator arg1 arg2). Types must be valid identifiers — use T? postfix notation for nullable types. Section markers (§) cannot appear inside parenthesized expressions."
+      "description": "The parser encountered an unexpected token inside a Lisp-style expression (parenthesized prefix notation). Common causes: postfix nullable type syntax (T?), unsupported operator, or malformed nested expression.",
+      "wrongExample": "(cast T? value)          // Use prefix ?T for option/nullable types\n(+ a §IDX arr i)         // Can't nest § tags in Lisp expressions",
+      "correctExample": "(cast ?T value)          // Prefix option/nullable type\n§B{_tmp} §IDX arr i      // Extract to binding first\n(+ a _tmp)",
+      "explanation": "Lisp expressions use prefix notation: (operator arg1 arg2). Types must use Calor type forms such as ?T for option/nullable values. Section markers (§) cannot appear inside parenthesized expressions."
     },
     {
       "id": "mismatched-id",
-      "title": "Mismatched Block ID",
+      "title": "Legacy Block Closing ID",
       "matchPatterns": ["mismatched id", "does not match", "closing tag id", "opening id"],
       "matchCodes": ["Calor0101"],
-      "description": "A closing tag's ID does not match the corresponding opening tag. This commonly happens with nested IF, LOOP, TRY, or MATCH blocks where copy-paste or converter output has incorrect IDs.",
-      "wrongExample": "§LOOP{loop1} (range 0 n)\n  §IF{if1} (condition)\n  §/I{if1}\n§/L{loop2}   // ERROR: loop2 != loop1",
-      "correctExample": "§LOOP{loop1} (range 0 n)\n  §IF{if1} (condition)\n  §/I{if1}\n§/L{loop1}   // IDs must match",
-      "explanation": "Every opening tag (§IF{id}, §LOOP{id}, §TRY{id}, §MATCH{id}) must have a closing tag with the same ID. Check nesting carefully — mismatched IDs usually indicate a copy-paste error or incorrect nesting."
+      "description": "Current Calor blocks are indentation-delimited; legacy closing-tag IDs for IF, LOOP, TRY, or MATCH are obsolete. Similar parser errors usually mean an unwanted closing tag or bad indentation.",
+      "wrongExample": "§L{loop1:i:0:n:1}\n  §IF{if1} (condition)\n    §R i\n§/L{loop2}   // ERROR: legacy structural closing tag",
+      "correctExample": "§L{loop1:i:0:n:1}\n  §IF{if1} (condition)\n    §R i",
+      "explanation": "Remove legacy closing tags and indent nested bodies. Blocks end at the next dedent; there are no structural IDs to match."
     },
     {
       "id": "expected-keyword",
       "title": "Expected Keyword",
       "matchPatterns": ["expected keyword", "expected 'module'", "expected 'fn'", "expected 'type'"],
       "matchCodes": ["Calor0103"],
-      "description": "The parser expected a specific keyword (module, fn, type, etc.) but found something else. This usually means a structural syntax error.",
-      "wrongExample": "mymodule MyApp         // Missing 'module' keyword\n  function Add(a b)    // 'function' is not a Calor keyword",
-      "correctExample": "module MyApp\n  fn Add(a:i32 b:i32) -> i32",
-      "explanation": "Calor requires specific keywords: 'module' for module declarations, 'fn' for functions, 'type' for type definitions. Check spelling and ensure you're using Calor keywords, not C# keywords."
+      "description": "The parser expected a Calor section marker such as §M or §F but found something else. This usually means obsolete keyword syntax or a malformed declaration.",
+      "wrongExample": "module MyApp         // Obsolete keyword syntax\n  function Add(a b)    // 'function' is not a Calor marker",
+      "correctExample": "§M{m1:MyApp}\n  §F{f1:Add:pub} (i32:a, i32:b) -> i32\n    §R (+ a b)",
+      "explanation": "Use current Calor section markers: §M{id:Name} for modules and §F{id:name:vis} (type:name, ...) -> retType for functions. Do not use C# or legacy keyword forms."
     },
     {
       "id": "expected-closing-tag",
-      "title": "Expected Closing Tag",
+      "title": "Expected Indented Block",
       "matchPatterns": ["expected closing tag", "unterminated block", "missing §/", "unclosed"],
       "matchCodes": ["Calor0105"],
-      "description": "A block was opened with a section marker but never properly closed. Every §IF, §LOOP, §TRY, §MATCH, §NEW, §FOREACH must have a matching closing tag.",
-      "wrongExample": "§IF{if1} (> x 0)\n  §R x\n// Missing §/I{if1}",
-      "correctExample": "§IF{if1} (> x 0)\n  §R x\n§/I{if1}",
-      "explanation": "Block tags must be closed: §IF→§/I, §LOOP→§/L, §TRY→§/T, §MATCH→§/M, §NEW→§/NEW, §FOREACH→§/FE. The closing tag must include the same ID as the opening tag."
+      "description": "A legacy diagnostic may mention closing tags, but current Calor blocks are indentation-delimited. This usually means a block body is missing or incorrectly indented.",
+      "wrongExample": "§IF{if1} (> x 0)\n§R x   // ERROR: body must be indented under §IF",
+      "correctExample": "§IF{if1} (> x 0)\n  §R x",
+      "explanation": "Do not add structural closing tags. Indent the block body under the opener; the block ends when indentation returns to the parent level."
     },
     {
       "id": "invalid-modifier",
@@ -188,9 +188,9 @@
       "matchPatterns": ["invalid modifier", "unexpected modifier", "modifier not allowed"],
       "matchCodes": ["Calor0107"],
       "description": "A modifier keyword was used in an invalid position or an unrecognized modifier was applied to a declaration.",
-      "wrongExample": "static fn Helper() -> i32   // 'static' may not be valid here\npublic private fn Bad()     // Conflicting modifiers",
-      "correctExample": "fn Helper() -> i32\npub fn Good() -> i32",
-      "explanation": "Calor uses its own modifier keywords (pub, mut, etc.). C# modifiers like static, private, protected are not directly supported. Check the Calor language reference for valid modifiers."
+      "wrongExample": "static §F{f1:Helper:pub} () -> i32   // C# modifier before Calor marker\n§F{f2:Bad:public} () -> i32           // Use pub/priv, not public/private",
+      "correctExample": "§F{f1:Helper:pub} () -> i32\n  §R 0\n§F{f2:Good:priv} () -> i32\n  §R 1",
+      "explanation": "Calor stores visibility and modifiers inside declaration markers (for example pub or priv). C# modifier keywords like public, private, protected, and static are not written before §F."
     },
     {
       "id": "type-parameter-not-found",
@@ -198,9 +198,9 @@
       "matchPatterns": ["type parameter not found", "unknown type parameter", "undefined type param"],
       "matchCodes": ["Calor0115"],
       "description": "A reference to a generic type parameter (like T, K, V) was used but the parameter is not declared in the current scope.",
-      "wrongExample": "fn Identity(x:T) -> T      // T not declared as type param",
-      "correctExample": "fn Identity<T>(x:T) -> T   // T declared in angle brackets",
-      "explanation": "Generic type parameters must be declared in the function or type signature using angle brackets. Ensure the type parameter name matches exactly (case-sensitive)."
+      "wrongExample": "§F{f1:Identity:pub} (T:x) -> T      // T not declared as type param",
+      "correctExample": "§F{f1:Identity<T>:pub} (T:x) -> T\n  §R x",
+      "explanation": "Generic type parameters must be declared in the function or type name field using angle brackets. Ensure the type parameter name matches exactly (case-sensitive)."
     },
     {
       "id": "invalid-reference",
@@ -218,8 +218,8 @@
       "matchPatterns": ["missing extension self", "extension method", "first parameter must be self"],
       "matchCodes": ["Calor0204"],
       "description": "An extension function is missing the required 'self' first parameter. Extension functions in Calor must declare the receiver type as the first parameter.",
-      "wrongExample": "ext fn ToUpper() -> str     // Missing self parameter",
-      "correctExample": "ext fn ToUpper(self:str) -> str",
+      "wrongExample": "§F{f1:ToUpper:pub} () -> str     // Missing self parameter",
+      "correctExample": "§F{f1:ToUpper:pub} (str:self) -> str\n  §R (upper self)",
       "explanation": "Extension functions require a 'self' parameter as the first argument to specify the type being extended. This is equivalent to the 'this' parameter in C# extension methods."
     },
     {
@@ -228,9 +228,9 @@
       "matchPatterns": ["§NEW{object}", "NEW{object}"],
       "matchCodes": ["Calor0106", "Calor0200"],
       "description": "The converter generated §NEW{object} where a concrete type is needed. Use calor_fix with error code 'new_object' to auto-replace from context (binding type, field type, throw → Exception, return type).",
-      "wrongExample": "§B{b1:result:List<int>} §NEW{object}§/NEW",
-      "correctExample": "§B{b1:result:List<int>} §NEW{List<int>}§/NEW",
-      "explanation": "The calor_fix tool infers the correct type from surrounding context: §B binding types, §FLD field types, §TH throw (→ Exception), or §O return types."
+      "wrongExample": "§F{f1:Make:pub} () -> List<i32>\n  §R §NEW{object}()",
+      "correctExample": "§F{f1:Make:pub} () -> List<i32>\n  §R §NEW{List<i32>}()",
+      "explanation": "The calor_fix tool infers the correct type from surrounding context: binding values, field/property types, throw statements (→ Exception), or function/method return types."
     },
     {
       "id": "arrow-multi-statement-autofix",
@@ -239,8 +239,8 @@
       "matchCodes": ["Calor0106"],
       "description": "Arrow syntax (→) only supports a single statement. Use calor_fix with error code 'arrow_multi_statement' to convert to block form automatically.",
       "wrongExample": "§IF{if1} (condition) → §B{x} 1 §R x",
-      "correctExample": "§IF{if1} (condition)\n  §B{x} 1\n  §R x\n§/I{if1}",
-      "explanation": "The calor_fix tool detects arrow bodies with multiple §-tagged statements and rewrites them as block bodies with proper closing tags."
+      "correctExample": "§IF{if1} (condition)\n  §B{x} 1\n  §R x",
+      "explanation": "The calor_fix tool detects arrow bodies with multiple §-tagged statements and rewrites them as indented block bodies."
     },
     {
       "id": "id-conflicts-autofix",
@@ -248,9 +248,9 @@
       "matchPatterns": ["duplicate id", "id conflict", "already defined"],
       "matchCodes": ["Calor0301", "Calor0302"],
       "description": "Duplicate declaration IDs (e.g., two §F{f1:...}) cause compilation errors. Use calor_fix with error code 'id_conflicts' to renumber duplicates automatically.",
-      "wrongExample": "§F{f1:Foo:pub} ... §/F{f1}\n§F{f1:Bar:pub} ... §/F{f1}",
-      "correctExample": "§F{f1:Foo:pub} ... §/F{f1}\n§F{f2:Bar:pub} ... §/F{f2}",
-      "explanation": "The calor_fix tool scans for duplicate IDs and renumbers the second (and subsequent) occurrences while updating both opening and closing tags."
+      "wrongExample": "§F{f1:Foo:pub} () -> void\n  §R\n§F{f1:Bar:pub} () -> void\n  §R",
+      "correctExample": "§F{f1:Foo:pub} () -> void\n  §R\n§F{f2:Bar:pub} () -> void\n  §R",
+      "explanation": "The calor_fix tool scans for duplicate IDs and renumbers the second and subsequent occurrences. Blocks are indentation-delimited, so only declaration IDs need updating."
     }
   ]
 }

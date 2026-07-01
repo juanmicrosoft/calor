@@ -623,32 +623,32 @@ public sealed class McpMessageHandler
     internal static string GetTagCatalogJsonPublic() => GetTagCatalogJson();
     private static string GetTagCatalogJson() => """
         {"tags":[
-          {"open":"§M{id:Name}","close":"§/M{id}","description":"Module","idPrefix":"m_"},
-          {"open":"§F{id:Name:vis}","close":"§/F{id}","description":"Function","idPrefix":"f_"},
-          {"open":"§AF{id:Name:vis}","close":"§/AF{id}","description":"Async function","idPrefix":"f_"},
-          {"open":"§CL{id:Name:vis}","close":"§/CL{id}","description":"Class","idPrefix":"c_"},
-          {"open":"§IF{id}","close":"§/I{id}","description":"If block (NOTE: close is §/I not §/IF)"},
-          {"open":"§EI","close":"(none)","description":"Else-if branch"},
+          {"open":"§M{id:Name}","close":"(none — indent-only)","description":"Module (body indented)","idPrefix":"m_"},
+          {"open":"§F{id:name:vis} (type:name, ...) -> retType","close":"(none — indent-only)","description":"Function (body indented)","idPrefix":"f_"},
+          {"open":"§AF{id:name:vis} (type:name, ...) -> retType","close":"(none — indent-only)","description":"Async function (body indented)","idPrefix":"f_"},
+          {"open":"§CL{id:Name:vis}","close":"(none — indent-only)","description":"Class (body indented)","idPrefix":"c_"},
+          {"open":"§IF{id} (cond)","close":"(none — indent-only)","description":"If block (bodies indented; §EI/§EL for elseif/else)"},
+          {"open":"§EI (cond)","close":"(none)","description":"Else-if branch"},
           {"open":"§EL","close":"(none)","description":"Else branch"},
-          {"open":"§L{id:var:from:to:step}","close":"§/L{id}","description":"For loop"},
-          {"open":"§C{target}","close":"§/C","description":"Method call"},
+          {"open":"§L{id:var:from:to:step}","close":"(none — indent-only)","description":"For loop (body indented)"},
+          {"open":"§C{target}","close":"§/C","description":"Method call (§/C optional, closes inline)"},
           {"open":"§A","close":"(inline)","description":"Argument to call"},
           {"open":"§R","close":"(inline)","description":"Return expression"},
-          {"open":"§B{name:type}","close":"(inline)","description":"Immutable binding"},
-          {"open":"§B{~name:type}","close":"(inline)","description":"Mutable binding (~ prefix)"},
-          {"open":"§I{type:name}","close":"(inline)","description":"Function input parameter"},
-          {"open":"§O{type}","close":"(inline)","description":"Function output type"},
+          {"open":"§B{name}","close":"(inline)","description":"Immutable binding (§B{name} expr)"},
+          {"open":"§B{~name}","close":"(inline)","description":"Mutable binding (~ prefix)"},
+          {"open":"§I{type:name}","close":"(inline)","description":"Function input parameter (explicit form)"},
+          {"open":"§O{type}","close":"(inline)","description":"Function output type (explicit form)"},
           {"open":"§E{effects}","close":"(inline)","description":"Effect declaration (comma-separated codes)"},
           {"open":"§Q (expr)","close":"(inline)","description":"Precondition contract"},
           {"open":"§S (expr)","close":"(inline)","description":"Postcondition contract"},
-          {"open":"§MT{id:Name:vis}","close":"§/MT{id}","description":"Method (inside class)","idPrefix":"mt_"},
-          {"open":"§AMT{id:Name:vis}","close":"§/AMT{id}","description":"Async method","idPrefix":"mt_"},
-          {"open":"§CT{id:vis}","close":"§/CT{id}","description":"Constructor","idPrefix":"ctor_"},
-          {"open":"§P{id:Name:type:vis}","close":"§/P{id}","description":"Property","idPrefix":"p_"},
-          {"open":"§IN{id:Name}","close":"§/IN{id}","description":"Interface","idPrefix":"i_"},
-          {"open":"§EN{id:Name:vis}","close":"§/EN{id}","description":"Enum","idPrefix":"e_"},
-          {"open":"§OP{id:operator:vis}","close":"§/OP{id}","description":"Operator overload","idPrefix":"op_"}
-        ],"closingTagRules":"Closing tags use ABBREVIATED forms: §/F (not §/IF), §/M, §/CL, §/I (for if blocks), §/L, §/MT, §/CT, §/P, §/IN, §/EN, §/OP. The most common error is using §/IF instead of §/I for if-blocks."}
+          {"open":"§MT{id:name:vis} (type:name, ...) -> retType","close":"(none — indent-only)","description":"Method (inside class, body indented)","idPrefix":"mt_"},
+          {"open":"§AMT{id:name:vis} (type:name, ...) -> retType","close":"(none — indent-only)","description":"Async method (body indented)","idPrefix":"mt_"},
+          {"open":"§CTOR{id:vis}","close":"(none — indent-only)","description":"Constructor (body indented)","idPrefix":"ctor_"},
+          {"open":"§PROP{id:Name:type:vis}","close":"(none — indent-only)","description":"Property (body indented)","idPrefix":"p_"},
+          {"open":"§IFACE{id:Name}","close":"(none — indent-only)","description":"Interface (body indented)","idPrefix":"i_"},
+          {"open":"§EN{id:Name:vis}","close":"(none — indent-only)","description":"Enum (body indented)","idPrefix":"e_"},
+          {"open":"§OP{id:operator:vis}","close":"(none — indent-only)","description":"Operator overload (body indented)","idPrefix":"op_"}
+        ],"closingTagRules":"Calor is INDENT-ONLY: a block's body is indented (2 spaces per level) under its opener and ends at the next dedent. There are NO structural closing tags — never write §/M, §/F, §/CL, §/I, §/L, §/MT, §/CTOR, §/PROP, §/IFACE, §/EN, §/OP. The only closers that remain are inline/optional: §/C closes a call, and §RAW…§/RAW, §CSHARP{…}§/CSHARP, §PP…§/PP keep their delimiters."}
         """;
 
     internal static string GetIdPrefixCatalogJsonPublic() => GetIdPrefixCatalogJson();
@@ -834,12 +834,13 @@ public sealed class McpMessageHandler
         3. After writing any .calr code, compile with calor_compile (autoFix is on by default).
         4. Never edit .g.cs files — they are auto-generated from .calr sources.
 
-        SYNTAX ESSENTIALS:
-        - Module: §M{id:Name} ... §/M{id}
-        - Function: §F{id:Name:vis} ... §/F{id}
-        - Binding: §B{name:type} expr (immutable), §B{~name:type} expr (mutable)
-        - Loop: §L{id:var:from:to:step} ... §/L{id}
-        - Conditional: §IF{id} (cond) ... §/I{id} (NOTE: close with §/I, not §/IF)
+        SYNTAX ESSENTIALS (Calor is INDENT-ONLY: bodies are indented, no closing tags):
+        - Module: §M{id:Name} (body indented)
+        - Function: §F{id:name:vis} (type:name, ...) -> retType (body indented)
+        - Binding: §B{name} expr (immutable), §B{~name} expr (mutable)
+        - Loop: §L{id:var:from:to:step} (body indented)
+        - Conditional: §IF{id} (cond) with §EI (cond) / §EL; inline §IF{id} (cond) → §R expr
+        - NO structural closing tags — never write §/M, §/F, §/L, §/I; a block ends at the next dedent
         - Typed literals: INT:42, STR:"hello", BOOL:true, FLOAT:3.14
         - Expressions use prefix notation: (+ a b), (== x 0), (% i 15)
         - Types: i32, i64, str, bool, f64, void, ?i32 (option), i32!str (result)
