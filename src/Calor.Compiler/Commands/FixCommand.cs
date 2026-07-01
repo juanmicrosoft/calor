@@ -19,6 +19,13 @@ namespace Calor.Compiler.Commands;
 ///   Crockford-lowercase compact form (saves ~9.7 tokens per ID).
 ///   The mapping is collision-detected across all files in
 ///   <c>root</c>.</description></item>
+///   <item><description><c>--elide-call-closers</c>: elides <c>§/C</c> on
+///   zero-arg and one-arg same-line calls.</description></item>
+///   <item><description><c>--heal-closers</c>: deletes legacy structural
+///   closing tags (<c>§/F</c>, <c>§/M</c>, <c>§/L</c>, …) to rewrite a file
+///   into canonical indent-only form. Safe against closer text embedded in
+///   string literals or comments (see
+///   <see cref="Analysis.LegacyCloserFormLint.ScanForHeal"/>).</description></item>
 /// </list>
 /// </summary>
 public static class FixCommand
@@ -44,6 +51,10 @@ public static class FixCommand
             aliases: ["--elide-call-closers"],
             description: "Elide §/C on zero-arg + one-arg same-line calls (v0.6.x)");
 
+        var healClosersOption = new Option<bool>(
+            aliases: ["--heal-closers"],
+            description: "Delete legacy structural closers (§/F, §/M, …) -> indent-only form");
+
         var revertOption = new Option<bool>(
             aliases: ["--revert"],
             description: "Reverse the operation using --log");
@@ -62,6 +73,7 @@ public static class FixCommand
             dropStructuralIdsOption,
             compactIdsOption,
             elideCallClosersOption,
+            healClosersOption,
             revertOption,
             logOption,
             dryRunOption,
@@ -70,7 +82,7 @@ public static class FixCommand
         command.SetHandler(
             ExecuteAsync,
             rootArgument, dropStructuralIdsOption, compactIdsOption,
-            elideCallClosersOption, revertOption, logOption, dryRunOption);
+            elideCallClosersOption, healClosersOption, revertOption, logOption, dryRunOption);
 
         return command;
     }
@@ -80,6 +92,7 @@ public static class FixCommand
         bool dropStructuralIds,
         bool compactIds,
         bool elideCallClosers,
+        bool healClosers,
         bool revert,
         FileInfo? log,
         bool dryRun)
@@ -91,15 +104,16 @@ public static class FixCommand
         }
         var selectedCount = (dropStructuralIds ? 1 : 0)
                           + (compactIds ? 1 : 0)
-                          + (elideCallClosers ? 1 : 0);
+                          + (elideCallClosers ? 1 : 0)
+                          + (healClosers ? 1 : 0);
         if (selectedCount == 0)
         {
-            Console.Error.WriteLine("specify --drop-structural-ids, --compact-ids, or --elide-call-closers");
+            Console.Error.WriteLine("specify --drop-structural-ids, --compact-ids, --elide-call-closers, or --heal-closers");
             return 2;
         }
         if (selectedCount > 1)
         {
-            Console.Error.WriteLine("--drop-structural-ids, --compact-ids, and --elide-call-closers are mutually exclusive; run them separately");
+            Console.Error.WriteLine("--drop-structural-ids, --compact-ids, --elide-call-closers, and --heal-closers are mutually exclusive; run them separately");
             return 2;
         }
 
@@ -114,6 +128,12 @@ public static class FixCommand
             return revert
                 ? await RevertElideCallClosersAsync(root, log, dryRun)
                 : await ElideCallClosersAsync(root, log, dryRun);
+        }
+        if (healClosers)
+        {
+            return revert
+                ? await RevertHealClosersAsync(root, log, dryRun)
+                : await HealClosersAsync(root, log, dryRun);
         }
         // compactIds
         return revert
@@ -338,6 +358,79 @@ public static class FixCommand
         }
         var json = await File.ReadAllTextAsync(logFile.FullName, Encoding.UTF8);
         var migrationLog = CallCloserElider.DeserializeLog(json);
+
+        int filesRestored = 0;
+        foreach (var group in migrationLog.Entries.GroupBy(e => e.File))
+        {
+            var migPath = Path.Combine(root.FullName, group.Key.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(migPath))
+            {
+                Console.Error.WriteLine($"skip missing file: {migPath}");
+                continue;
+            }
+            var migrated = await File.ReadAllBytesAsync(migPath);
+            var restored = ReinsertRemovals(migrated, group);
+            if (!dryRun)
+            {
+                await File.WriteAllBytesAsync(migPath, restored);
+            }
+            filesRestored++;
+        }
+        Console.WriteLine(
+            $"revert: {(dryRun ? "[dry-run] " : "")}files_restored={filesRestored}");
+        return 0;
+    }
+
+    private static async Task<int> HealClosersAsync(
+        DirectoryInfo root, FileInfo? logFile, bool dryRun)
+    {
+        var migrator = new CloserHealMigrator();
+        var migrationLog = new StructuralIdDropper.MigrationLog();
+        int filesChanged = 0;
+        int totalRemovals = 0;
+
+        foreach (var path in EnumerateCalrFiles(root))
+        {
+            var rel = MakeRelativePosix(root, path);
+            var original = await File.ReadAllTextAsync(path, Encoding.UTF8);
+            var (migrated, removals) = migrator.Process(original, rel);
+            if (removals.Count == 0)
+            {
+                continue;
+            }
+            migrationLog.Entries.AddRange(removals);
+            totalRemovals += removals.Count;
+            filesChanged++;
+
+            if (!dryRun)
+            {
+                await File.WriteAllTextAsync(path, migrated, new UTF8Encoding(false));
+            }
+        }
+
+        Console.WriteLine(
+            $"heal-closers: {(dryRun ? "[dry-run] " : "")}files_changed={filesChanged} removals={totalRemovals}");
+
+        if (logFile != null)
+        {
+            var json = CloserHealMigrator.SerializeLog(migrationLog);
+            await File.WriteAllTextAsync(logFile.FullName, json, new UTF8Encoding(false));
+            Console.WriteLine($"wrote {logFile.FullName}");
+        }
+
+        return 0;
+    }
+
+    private static async Task<int> RevertHealClosersAsync(
+        DirectoryInfo root, FileInfo? logFile, bool dryRun)
+    {
+        if (logFile == null || !logFile.Exists)
+        {
+            Console.Error.WriteLine("--revert requires --log <existing migration.log.json>");
+            return 2;
+        }
+        var json = await File.ReadAllTextAsync(logFile.FullName, Encoding.UTF8);
+        var migrationLog = CloserHealMigrator.DeserializeLog(json);
 
         int filesRestored = 0;
         foreach (var group in migrationLog.Entries.GroupBy(e => e.File))
