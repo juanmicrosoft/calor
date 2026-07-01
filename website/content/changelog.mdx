@@ -10,6 +10,15 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-07-01
+
+### Added
+- **`Calor0116` — malformed four-field `§F`/`§AF` function headers are now a parse error.** A header like `§F{f1:Add:i32:pub}` looks reasonable but is silently wrong: function headers take at most `{id:name:visibility}`, and the return type belongs in the signature (`(...) -> type`). Left unflagged, the parser read the extra field's type as the visibility and *discarded the real visibility*, emitting a void method (e.g. `void Add() { return 0; }`, then a CS0127 in the generated C#). The parser now reports it up front. Only `§F`/`§AF` are affected — `§MT`/`§AMT` legitimately take a fourth *modifier* field.
+- **`Calor0205` — a value returned from a no-value owner is now a hard error.** An always-on pass flags a value-returning `§R expr` in a `void`/async-`void` function or method, an iterator, a constructor, a property/indexer `set`/`init` accessor, or an event `add`/`remove` accessor — cases that previously produced non-compiling C# (CS0127 / CS1622), the classic one being a correct `void` header followed by `§R INT:0`. Being always-on, it is deliberately conservative for **zero false positives**: it flags only expressions that are definitely a value and never a valid void statement-expression, leaving calls, `new`, `await`, and `++`/`--` untouched. Together with `Calor0116`, this closes the deferred "value returned from void function" gap from v0.6.6.
+
+### Documentation
+- **Every agent-readable surface was swept to indent-only syntax.** The MCP primer, the editor/agent instruction templates, `README.nuget`, the evaluation skills doc, and the correct-Calor fields of the JSON resources were corrected so no agent-facing material still shows removed closer-form tags, four-field headers, or other syntax the compiler rejects — with a new compile-time guard that fails if any surface drifts back to teaching non-compiling forms.
+
 ## [0.6.6] - 2026-07-01
 
 ### Fixed

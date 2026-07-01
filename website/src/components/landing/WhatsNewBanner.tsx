@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.6.6</span>
+            <span className="font-semibold text-calor-cerulean">v0.6.7</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">Calor&apos;s own onboarding materials now compile: the <code>calor://primer</code> MCP resource and the teaching docs no longer teach removed closer-form syntax, and compile-time guards keep the primer honest in both directions &mdash; every &ldquo;correct&rdquo; example compiles and every &ldquo;common mistake&rdquo; genuinely fails. Legacy <code>Calor0830</code> closers now auto-heal via the LSP and MCP quick-fix.</span>
+            <span className="text-foreground">Two new compile-time diagnostics catch non-compiling Calor earlier: <code>Calor0116</code> rejects malformed four-field function headers, and <code>Calor0205</code> flags a value returned from a <code>void</code>, iterator, constructor, setter, or event accessor &mdash; together closing the &ldquo;value returned from void&rdquo; gap. Every agent-readable doc surface was also swept to indent-only syntax, guarded by a compile-time test.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
