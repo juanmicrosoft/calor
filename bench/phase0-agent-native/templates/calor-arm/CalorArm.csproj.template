@@ -1,0 +1,33 @@
+<!--
+  Calor-arm execution template (gates doc §1 pin).
+  Instantiated by the runner per pair: __REPO_ROOT__ is substituted with the
+  repo root. Effects enforcement ON, permissive OFF, contract mode debug —
+  runs violating this pin are invalid by automated check.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <CalorTasksAssembly>__REPO_ROOT__/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll</CalorTasksAssembly>
+    <CalorOutputDirectory>$(MSBuildThisFileDirectory)obj/calor/</CalorOutputDirectory>
+    <CalorEnforceEffects>true</CalorEnforceEffects>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="__REPO_ROOT__/src/Calor.Runtime/Calor.Runtime.csproj" />
+    <ProjectReference Include="__REPO_ROOT__/src/Calor.Tasks/Calor.Tasks.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <CalorCompile Include="**/*.calr" />
+  </ItemGroup>
+
+  <Import Project="__REPO_ROOT__/src/Calor.Sdk/Sdk/Sdk.targets" />
+
+</Project>

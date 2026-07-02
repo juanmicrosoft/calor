@@ -1,0 +1,92 @@
+{
+  "version": "1.0-draft",
+  "frozen": false,
+  "description": "Pre-registered category registry for the agent-native Phase 0 suite. Freezes with the suite; no categories may be added, merged, or excluded after freeze (gates doc §0.3, §5).",
+  "gateRule": "Phase 2a gate uses the pooled result of all gate-bearing wedge categories (W1+W2+W3). Per-category results are reported but not individually gated.",
+  "categories": [
+    {
+      "id": "W1",
+      "name": "contract-preserving-refactors",
+      "kind": "wedge",
+      "gateBearing": true,
+      "minPairs": 4,
+      "expectedWinner": "calor",
+      "description": "Refactor existing code without violating declared §Q/§S contracts; held-out tests probe contract-relevant behavior."
+    },
+    {
+      "id": "W2",
+      "name": "contract-dense-algorithmic",
+      "kind": "wedge",
+      "gateBearing": true,
+      "minPairs": 4,
+      "expectedWinner": "calor",
+      "description": "Implement or modify pure/contract-dense algorithmic code (Option/Result style) with contracts inside the modeled-forms whitelist."
+    },
+    {
+      "id": "W3",
+      "name": "first-order-effects",
+      "kind": "wedge",
+      "gateBearing": true,
+      "minPairs": 4,
+      "expectedWinner": "calor",
+      "description": "Changes crossing manifest-checked BCL effect boundaries (fs/net/db/console), first-order code only, no delegates. Calor's compile-error effect enforcement is sound here today."
+    },
+    {
+      "id": "W4",
+      "name": "effect-safe-db-writes",
+      "kind": "wedge-deferred",
+      "gateBearing": false,
+      "gateEligibleAfter": "strategy 2a item 4 (delegate/override/interop closure) + 2b item 1 (frames)",
+      "minPairs": 0,
+      "expectedWinner": "calor",
+      "description": "Deferred-eligibility wedge; pre-registered now so it cannot be invented post-hoc."
+    },
+    {
+      "id": "W5",
+      "name": "security-boundary-edits",
+      "kind": "wedge-deferred",
+      "gateBearing": false,
+      "gateEligibleAfter": "strategy 2a item 4 + 2b item 1",
+      "minPairs": 0,
+      "expectedWinner": "calor",
+      "description": "Taint/effect-derived sink boundaries. Deferred-eligibility wedge."
+    },
+    {
+      "id": "C1",
+      "name": "heavy-bcl-ecosystem",
+      "kind": "context",
+      "gateBearing": false,
+      "minPairs": 2,
+      "expectedWinner": "csharp",
+      "description": "Tasks C# should dominate: dense ecosystem/library integration."
+    },
+    {
+      "id": "C2",
+      "name": "performance-work",
+      "kind": "context",
+      "gateBearing": false,
+      "minPairs": 2,
+      "expectedWinner": "csharp",
+      "description": "Perf-sensitive changes; profiling-adjacent work."
+    },
+    {
+      "id": "C3",
+      "name": "debugger-dependent",
+      "kind": "context",
+      "gateBearing": false,
+      "minPairs": 2,
+      "expectedWinner": "csharp",
+      "description": "Diagnosis tasks that benefit from stepping through execution."
+    },
+    {
+      "id": "N1",
+      "name": "neutral-bread-and-butter",
+      "kind": "neutral",
+      "gateBearing": true,
+      "gateRole": "regression-tolerance only (gates doc §4), never a Calor-advantage claim",
+      "minPairs": 8,
+      "expectedWinner": "none",
+      "description": "Ordinary bug fixes, small features, test writing. Guards against the wedge being purchased with general usability."
+    }
+  ]
+}

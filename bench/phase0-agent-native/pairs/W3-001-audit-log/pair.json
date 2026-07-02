@@ -1,0 +1,35 @@
+{
+  "id": "W3-001-audit-log",
+  "category": "W3",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 2,
+    "calorDeclCount": 2,
+    "csharpComplexity": 2,
+    "calorComplexity": 2,
+    "notes": "Seed pair; parity trivially satisfied at this size. NOT yet difficulty-validated (gates doc §3.1) — do not use as gate evidence before the equivalence pass."
+  },
+  "wedgeWhitelistCheck": "No contracts in the starting fixtures; the task's effect boundaries (File.AppendAllText, File.ReadAllLines, File.Exists) are covered by bcl-io manifest entries. First-order code, no delegates.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

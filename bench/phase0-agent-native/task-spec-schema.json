@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent-native Phase 0 pair manifest (pair.json)",
+  "type": "object",
+  "required": ["id", "category", "spec", "tests", "arms", "parity"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(W[1-5]|C[1-3]|N1)-[0-9]{3}-[a-z0-9-]+$",
+      "description": "Category-prefixed pair id, e.g. W3-001-file-logger"
+    },
+    "category": { "type": "string", "enum": ["W1", "W2", "W3", "W4", "W5", "C1", "C2", "C3", "N1"] },
+    "spec": { "type": "string", "description": "Path to the arm-neutral behavioral spec (spec.md). The ONLY task statement either arm sees." },
+    "tests": {
+      "type": "object",
+      "required": ["path", "runner"],
+      "properties": {
+        "path": { "type": "string", "description": "Arm-shared held-out test directory. One suite, two runners; per-arm test authorship is prohibited." },
+        "runner": { "type": "string", "enum": ["dotnet-test"] },
+        "heldOut": { "type": "boolean", "default": true, "description": "Held-out tests are never shown to the agent under test." }
+      }
+    },
+    "arms": {
+      "type": "object",
+      "required": ["csharp", "calor"],
+      "properties": {
+        "csharp": {
+          "type": "object",
+          "required": ["fixture"],
+          "properties": {
+            "fixture": { "type": "string" },
+            "toolkit": { "type": "string", "default": "full", "description": "C# arm always gets Roslyn analyzers + NRT + freedom to generate its own evidence (gates doc §1)." }
+          }
+        },
+        "calor": {
+          "type": "object",
+          "required": ["fixture"],
+          "properties": {
+            "fixture": { "type": "string" },
+            "config": {
+              "type": "object",
+              "description": "Must match the gates-doc §1 pin; runs violating it are invalid.",
+              "properties": {
+                "enforceEffects": { "const": true },
+                "permissiveEffects": { "const": false },
+                "contractMode": { "const": "debug" },
+                "z3Required": { "const": true }
+              }
+            }
+          }
+        }
+      }
+    },
+    "parity": {
+      "type": "object",
+      "required": ["csharpDeclCount", "calorDeclCount", "csharpComplexity", "calorComplexity"],
+      "description": "Structural parity record (gates doc §3.3): decl count and cyclomatic-complexity sum within ±30% across arms.",
+      "properties": {
+        "csharpDeclCount": { "type": "integer", "minimum": 1 },
+        "calorDeclCount": { "type": "integer", "minimum": 1 },
+        "csharpComplexity": { "type": "integer", "minimum": 1 },
+        "calorComplexity": { "type": "integer", "minimum": 1 },
+        "notes": { "type": "string" }
+      }
+    },
+    "wedgeWhitelistCheck": {
+      "type": "string",
+      "description": "REQUIRED for W1-W5: statement that intended contracts fall inside docs/verification-modeled-forms.md, and (W3+) that effect boundaries are manifest-covered. Checked at authoring."
+    },
+    "iterationBudget": { "type": "integer", "default": 10 },
+    "timeoutSeconds": { "type": "integer", "default": 600 }
+  }
+}

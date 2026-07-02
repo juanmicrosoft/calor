@@ -1,0 +1,4 @@
+§M{m001:AuditLog}
+  §F{f001:Append:pub} (str:path, str:entry) -> void
+    §E{fs:w}
+    §C{File.AppendAllText} §A path §A (+ entry "\n") §/C
