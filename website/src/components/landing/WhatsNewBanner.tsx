@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.6.7</span>
+            <span className="font-semibold text-calor-cerulean">v0.6.8</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">Two new compile-time diagnostics catch non-compiling Calor earlier: <code>Calor0116</code> rejects malformed four-field function headers, and <code>Calor0205</code> flags a value returned from a <code>void</code>, iterator, constructor, setter, or event accessor &mdash; together closing the &ldquo;value returned from void&rdquo; gap. Every agent-readable doc surface was also swept to indent-only syntax, guarded by a compile-time test.</span>
+            <span className="text-foreground">New <code>calor fix --heal-closers</code> CLI rewrites legacy closer-form source (<code>§/F</code>, <code>§/M</code>, …) into canonical indent-only form &mdash; reversibly and byte-exactly &mdash; finishing the <code>Calor0830</code> auto-heal story. Internally, return-value classification is now single-sourced in a shared <code>ReturnShape</code> helper. A tooling-and-refactor release with no benchmark-affecting changes.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"

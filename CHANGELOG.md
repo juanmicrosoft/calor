@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-07-01
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x ± 0.00 (Calor wins, large effect d=1.80)
+  - ErrorDetection: 1.49x ± 0.00 (Calor wins, large effect d=1.21)
+  - TokenEconomics: 1.42x ± 0.00 (Calor wins, composite metric)
+  - RefactoringStability: 1.38x ± 0.00 (Calor wins, large effect d=7.09)
+  - EditPrecision: 1.36x ± 0.00 (Calor wins, large effect d=4.90)
+  - Correctness: 1.29x ± 0.00 (Calor wins, large effect d=1.31)
+  - GenerationAccuracy: 1.02x ± 0.00 (Calor wins, small effect d=0.34)
+  - InformationDensity: 0.98x ± 0.00 (C# wins, medium effect d=-0.52)
+- **Programs Tested**: 217
+
+> **Note:** this release is CLI tooling and an internal refactor only — a source-level `calor fix --heal-closers` migrator and a shared return-classification helper. It contains no benchmark-affecting code changes, so the profile is unchanged from v0.6.7.
+
+### Added
+- **`calor fix --heal-closers` — a source-level CLI that finishes the `Calor0830` auto-heal story (#683).** Closer-form syntax (`§/F`, `§/M`, `§/L`, …) hard-errors at parse time, so the AST-based `calor format` / `calor lint --fix` paths cannot heal such a file — the error *is* a parse error, so those commands abort before they can read it. The new `calor fix --heal-closers <root> [--log <file>] [--revert] [--dry-run]` deletes legacy structural closers at the source level, rewriting a file into canonical indent-only form, and `--revert --log` restores it byte-exactly. A lexer-backed `LegacyCloserFormLint.ScanForHeal` keeps only closers that are genuine tokens, so a `§/F` embedded in a string literal or a `//` comment is left untouched (a raw text scan would corrupt it); removals are recorded as UTF-8 **byte** ranges (the `§` code point is two bytes) via the shared reversible migration-log schema, so revert is byte-exact even across non-ASCII content and CRLF line endings. This delivers the CLI heal command deferred in v0.6.6.
+
+### Changed
+- **Single-sourced return-value classification in a shared `Analysis/ReturnShape` (#684).** The void / async-void / iterator / accessor "does this owner return a value" classification was duplicated between `ReturnValidationPass` (which drives `Calor0205`) and `ContractVerifier` (which decides whether `result` is referenceable in a postcondition), risking drift between the two. Both now defer to a single `Analysis/ReturnShape` classifier, which deliberately distinguishes the *runtime* shape (`Classify`, folding in async/iterator lowering) from the narrow *header* predicate (`DeclaresValueOutput`, which does not — an iterator still *declares* `IEnumerable<T>`, so `result` stays referenceable in its postcondition). The refactor is behavior-preserving and the emitter's own signature / `WrapInTask` codegen is intentionally left untouched; a 31-case unit table pins every owner shape including the iterator divergence. This retires the "shared emitter `ReturnShape` refactor" follow-up noted in v0.6.7.
+
 ## [0.6.7] - 2026-07-01
 
 ### Benchmark Results (Statistical: 30 runs)
