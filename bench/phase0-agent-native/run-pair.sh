@@ -266,6 +266,14 @@ extract_metrics() {
 check_pins
 for (( run=1; run<=RUNS; run++ )); do
     WS="$(mktemp -d "${TMPDIR:-/tmp}/p0-${PAIR_ID}-${ARM}-XXXXXX")"
+    # Canonicalize (macOS: $TMPDIR lives behind the /var -> /private/var
+    # symlink). Agent builds run from the *physical* cwd while shim/metrics
+    # builds pass the *logical* $WS path; MSBuild treats the two spellings as
+    # different project identities, and the identity flip makes incremental
+    # clean delete ProjectReference outputs (Calor.Runtime.dll) from src/bin —
+    # every contract-bearing calor-arm pair then fails held-out runs with
+    # FileNotFoundException. One physical path removes the ambiguity.
+    WS="$(cd "$WS" && pwd -P)"
     WS_OUT="$OUT_DIR/$PAIR_ID/$ARM/run-$run"
     mkdir -p "$WS_OUT"
     SHIM_DIR="$WS_OUT/.shim"

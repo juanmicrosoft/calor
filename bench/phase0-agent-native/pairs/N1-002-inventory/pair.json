@@ -1,0 +1,35 @@
+{
+  "id": "N1-002-inventory",
+  "category": "N1",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 3,
+    "calorDeclCount": 3,
+    "csharpComplexity": 8,
+    "calorComplexity": 8,
+    "notes": "Dictionary<string,int> domain kept (no simplification needed): Calor supports it natively via §HAS/§PUT/§IDX/§EACHKV and instance Remove; the compiler requires declaring the 'mut' effect on the mutating functions (per the bcl-system Dictionary manifest), which the fixture demonstrates on AddItem. Reference solutions are structurally identical: AddItem (if/else, 2), RemoveItem (guard + if/else, 3), TotalCount (loop, 2), +1 base each. NOT yet difficulty-validated (gates doc §3.1)."
+  },
+  "wedgeWhitelistCheck": "n/a (neutral category)",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

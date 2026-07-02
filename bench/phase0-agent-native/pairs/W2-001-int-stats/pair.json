@@ -1,0 +1,35 @@
+{
+  "id": "W2-001-int-stats",
+  "category": "W2",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 3,
+    "calorDeclCount": 3,
+    "csharpComplexity": 6,
+    "calorComplexity": 6,
+    "notes": "Fixture per arm: 1 static class/module + Min + Max; each function is base 1 + loop + comparison branch = 3. Structurally identical across arms. NOT yet difficulty-validated (gates doc §3.1) — do not use as gate evidence before the equivalence pass."
+  },
+  "wedgeWhitelistCheck": "Calor-arm contracts: (> §LEN values 0) on Min/Max/Mean — array length of a simple variable base, modeled per modeled-forms §2 ('array length (simple variable base only)', ArrayLengthNode -> u32 $length variable); (<= lo hi), (>= result lo), (<= result hi) on Clamp — binary comparisons over i32 parameters, result, and integer literals per §1/§2. No function calls, no floats, no strings, no computed array bases, no generic-typed values appear in any contract. All functions are pure (§E{}), so no effect-manifest coverage is required.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}
