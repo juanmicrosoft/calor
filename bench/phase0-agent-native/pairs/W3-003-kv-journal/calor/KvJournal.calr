@@ -1,0 +1,4 @@
+§M{m001:KvJournal}
+  §F{f001:Set:pub} (str:path, str:key, str:value) -> void
+    §E{fs:w}
+    §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C

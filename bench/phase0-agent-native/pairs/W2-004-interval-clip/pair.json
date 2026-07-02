@@ -1,0 +1,35 @@
+{
+  "id": "W2-004-interval-clip",
+  "category": "W2",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 5,
+    "calorDeclCount": 5,
+    "csharpComplexity": 11,
+    "calorComplexity": 13,
+    "notes": "Counted on the reference solutions: 1 static class/module + TotalCovered (loop, 2) + ContainsPoint (loop + branch, 3) + GapCount (loop + branch, 3) both arms. ClipCovered: C# uses Math.Max/Math.Min (loop + 1 branch, 3); Calor expresses the same max/min as two clamp branches (loop + 3 branches, 5). 13/11 = 1.18, within the ±30% band (gates doc §3.3). Complexity = 1 per function + 1 per branch/loop. Second-wave hardness pair (half-open boundary semantics, negative-overlap flooring, touching-vs-gapped intervals, empty set); NOT yet difficulty-validated (gates doc §3.1)."
+  },
+  "wedgeWhitelistCheck": "Calor-arm contracts: (== §LEN starts §LEN ends) — equality over the lengths of two simple-variable array bases (modeled-forms §2, ArrayLengthNode -> u32 $length variable, one per array); (<= lo hi) — comparison over i32 parameters; (>= result 0) on TotalCovered/ClipCovered/GapCount. No function calls, no floats, no strings, no computed array bases, no generic-typed values appear in any contract. All functions are pure (§E{}), so no effect-manifest coverage is required.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

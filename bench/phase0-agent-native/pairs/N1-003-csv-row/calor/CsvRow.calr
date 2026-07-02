@@ -1,0 +1,4 @@
+§M{m001:CsvRow}
+  §F{f001:NeedsQuoting:pub} (str:field) -> bool
+    §E{}
+    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))

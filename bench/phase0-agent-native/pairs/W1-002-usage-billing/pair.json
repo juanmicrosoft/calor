@@ -1,0 +1,35 @@
+{
+  "id": "W1-002-usage-billing",
+  "category": "W1",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 6,
+    "calorDeclCount": 6,
+    "csharpComplexity": 10,
+    "calorComplexity": 10,
+    "notes": "Counted on the reference solutions (both arms structurally parallel): 1 static class/module + NormalizeUsage (2 branches, 3) + BillBasic (1) + BillPro (tier branch, 2) + BillCapped (cap branch, 2) + CheaperPlan (tie branch, 2). Complexity = 1 per function + 1 per branch/loop. Second-wave hardness pair (truncation ties, overflow-if-unnormalized, tier boundary); NOT yet difficulty-validated (gates doc §3.1)."
+  },
+  "wedgeWhitelistCheck": "Calor-arm contracts are all binary comparisons over i32 parameters, `result`, and signed 32-bit integer literals: (>= cap 0); result bounds (>= result 0/300/500), (<= result 1/cap/70500/80400/100000). Modeled per modeled-forms §1 (i32 -> BitVec32) and §2 (binary comparison operators, integer literals, simple variable references). No function calls, no floats, no strings, no arrays, no generic-typed values appear in any contract. All functions are pure (§E{}), so no effect-manifest coverage is required.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

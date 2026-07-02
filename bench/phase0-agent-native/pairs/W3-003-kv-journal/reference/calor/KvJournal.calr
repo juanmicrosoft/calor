@@ -1,0 +1,63 @@
+§M{m001:KvJournal}
+  §F{f001:Set:pub} (str:path, str:key, str:value) -> void
+    §E{fs:w}
+    §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
+
+  §F{f002:KeyOf:pri} (str:line) -> str
+    §E{}
+    §B{eq:i32} (indexof line "=")
+    §IF{if1} (< eq 0)
+      §R line
+    §R (substr line 0 eq)
+
+  §F{f003:ValueOf:pri} (str:line) -> str
+    §E{}
+    §B{eq:i32} (indexof line "=")
+    §IF{if2} (< eq 0)
+      §R ""
+    §R (substr line (+ eq 1) (- (len line) (+ eq 1)))
+
+  §F{f004:Get:pub} (str:path, str:key) -> str
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if3} (! exists)
+      §R ""
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §B{~found:str} ""
+    §EACH{e1:ln} lines
+      §B{k:str} §C{KeyOf} §A ln §/C
+      §IF{if4} (== k key)
+        §ASSIGN found §C{ValueOf} §A ln §/C
+    §R found
+
+  §F{f005:CountKeys:pub} (str:path) -> i32
+    §E{fs:r,mut}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if5} (! exists)
+      §R 0
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §LIST{seen:str}
+    §/LIST{seen}
+    §EACH{e2:ln} lines
+      §B{k:str} §C{KeyOf} §A ln §/C
+      §IF{if6} (! §HAS{seen} k)
+        §PUSH{seen} k
+    §R §CNT{seen}
+
+  §F{f006:Compact:pub} (str:path) -> void
+    §E{fs:rw,mut}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if7} (! exists)
+      §R
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §LIST{order:str}
+    §/LIST{order}
+    §EACH{e3:ln} lines
+      §B{k:str} §C{KeyOf} §A ln §/C
+      §IF{if8} (! §HAS{order} k)
+        §PUSH{order} k
+    §B{~text:str} ""
+    §EACH{e4:k2} order
+      §B{v:str} §C{Get} §A path §A k2 §/C
+      §ASSIGN text (+ text (+ k2 (+ "=" (+ v "\n"))))
+    §C{File.WriteAllText} §A path §A text §/C
