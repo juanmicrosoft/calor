@@ -203,10 +203,19 @@ run_agent() {
         return 0
     fi
 
-    local timeout_cmd="timeout"; command -v timeout >/dev/null || timeout_cmd="gtimeout"
-    ( cd "$ws/src" && PATH="$shim_dir:$PATH" $timeout_cmd "$TIMEOUT_SECS" \
+    # Portable timeout: coreutils timeout/gtimeout when present, else a bash
+    # watchdog (macOS ships neither by default — 42 runs learned this once)
+    ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
         claude --print --output-format json --dangerously-skip-permissions \
-        "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) || echo "agent exit: $?" >> "$ws_out/agent.err"
+        "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
+    local agent_pid=$!
+    ( sleep "$TIMEOUT_SECS" && kill -9 "$agent_pid" 2>/dev/null ) &
+    local watchdog_pid=$!
+    local rc=0
+    wait "$agent_pid" 2>/dev/null || rc=$?
+    kill "$watchdog_pid" 2>/dev/null || true
+    wait "$watchdog_pid" 2>/dev/null || true
+    if [[ $rc -ne 0 ]]; then echo "agent exit: $rc" >> "$ws_out/agent.err"; fi
 }
 
 # ---------------------------------------------------------------------------
