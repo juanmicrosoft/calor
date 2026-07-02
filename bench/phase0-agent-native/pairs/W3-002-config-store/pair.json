@@ -1,0 +1,35 @@
+{
+  "id": "W3-002-config-store",
+  "category": "W3",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 3,
+    "calorDeclCount": 3,
+    "csharpComplexity": 14,
+    "calorComplexity": 14,
+    "notes": "Reference solutions are structurally identical (exists-guard + scan loop per operation; Set uses first-match-only replace with a found flag in both arms). Complexity counted as 1 per function + 1 per branch/loop/&&. NOT yet difficulty-validated (gates doc §3.1)."
+  },
+  "wedgeWhitelistCheck": "No contracts in the starting fixtures; the task's effect boundaries (File.Exists, File.ReadAllLines -> fs:r; File.WriteAllText -> fs:w) are covered by bcl-io manifest entries, and all string operations (StartsWith, Substring, concatenation) are effect-free under the bcl-system System.String mapping. First-order code, no delegates, no LINQ.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

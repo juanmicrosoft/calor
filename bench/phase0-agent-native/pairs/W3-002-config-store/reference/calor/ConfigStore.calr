@@ -1,0 +1,45 @@
+§M{m001:ConfigStore}
+  §F{f001:Get:pub} (str:path, str:key) -> str
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if1} (! exists)
+      §R ""
+    §B{prefix:str} (+ key "=")
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §EACH{e1:line} lines
+      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §IF{if2} matches
+        §R §C{line.Substring} §A §LEN prefix §/C
+    §R ""
+
+  §F{f002:Set:pub} (str:path, str:key, str:value) -> void
+    §E{fs:rw}
+    §B{prefix:str} (+ key "=")
+    §B{~content:str} ""
+    §B{~found:bool} false
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if3} exists
+      §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+      §EACH{e2:line} lines
+        §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+        §IF{if4} (&& (! found) matches)
+          §ASSIGN content (+ content (+ prefix (+ value "\n")))
+          §ASSIGN found true
+        §EL
+          §ASSIGN content (+ content (+ line "\n"))
+    §IF{if5} (! found)
+      §ASSIGN content (+ content (+ prefix (+ value "\n")))
+    §C{File.WriteAllText} §A path §A content §/C
+
+  §F{f003:Has:pub} (str:path, str:key) -> bool
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if6} (! exists)
+      §R false
+    §B{prefix:str} (+ key "=")
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §EACH{e3:line} lines
+      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §IF{if7} matches
+        §R true
+    §R false

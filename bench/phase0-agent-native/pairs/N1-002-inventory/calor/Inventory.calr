@@ -1,0 +1,7 @@
+§M{m001:Inventory}
+  §F{f001:AddItem:pub} (Dictionary<str, i32>:items, str:name, i32:qty) -> void
+    §E{mut}
+    §IF{if1} §HAS{items} §KEY name
+      §PUT{items} name (+ §IDX items name qty)
+    §EL
+      §PUT{items} name qty

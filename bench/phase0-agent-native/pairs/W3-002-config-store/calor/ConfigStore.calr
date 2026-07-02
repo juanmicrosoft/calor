@@ -1,0 +1,13 @@
+§M{m001:ConfigStore}
+  §F{f001:Get:pub} (str:path, str:key) -> str
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if1} (! exists)
+      §R ""
+    §B{prefix:str} (+ key "=")
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §EACH{e1:line} lines
+      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §IF{if2} matches
+        §R §C{line.Substring} §A §LEN prefix §/C
+    §R ""

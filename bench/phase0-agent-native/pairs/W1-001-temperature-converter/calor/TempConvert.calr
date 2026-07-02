@@ -1,0 +1,30 @@
+§M{m001:TempConvert}
+  §F{f001:CelsiusToFahrenheit:pub} (i32:celsius) -> i32
+    §E{}
+    §Q (>= celsius -273)
+    §S (>= result -459)
+    §S (<= result 9032)
+    §B{~c:i32} celsius
+    §IF{if1} (> c 5000)
+      §ASSIGN c 5000
+    §R (+ (/ (* c 9) 5) 32)
+
+  §F{f002:CelsiusToKelvin:pub} (i32:celsius) -> i32
+    §E{}
+    §Q (>= celsius -273)
+    §S (>= result 0)
+    §S (<= result 5273)
+    §B{~c:i32} celsius
+    §IF{if2} (> c 5000)
+      §ASSIGN c 5000
+    §R (+ c 273)
+
+  §F{f003:FahrenheitToCelsius:pub} (i32:fahrenheit) -> i32
+    §E{}
+    §Q (>= fahrenheit -459)
+    §S (>= result -273)
+    §S (<= result 5000)
+    §B{~f:i32} fahrenheit
+    §IF{if3} (> f 9032)
+      §ASSIGN f 9032
+    §R (/ (* (- f 32) 5) 9)

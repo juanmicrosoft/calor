@@ -1,0 +1,52 @@
+§M{m001:Stats}
+  §F{f001:Min:pub} ([i32]:values) -> i32
+    §E{}
+    §Q (> §LEN values 0)
+    §B{~smallest:i32} §IDX values 0
+    §B{~i:i32} 1
+    §WH{wh1} (< i (len values))
+      §B{v:i32} §IDX values i
+      §IF{if1} (< v smallest)
+        §ASSIGN smallest v
+      §ASSIGN i (+ i 1)
+    §R smallest
+
+  §F{f002:Max:pub} ([i32]:values) -> i32
+    §E{}
+    §Q (> §LEN values 0)
+    §B{~largest:i32} §IDX values 0
+    §B{~i:i32} 1
+    §WH{wh2} (< i (len values))
+      §B{v:i32} §IDX values i
+      §IF{if2} (> v largest)
+        §ASSIGN largest v
+      §ASSIGN i (+ i 1)
+    §R largest
+
+  §F{f003:Sum:pub} ([i32]:values) -> i32
+    §E{}
+    §B{~total:i32} 0
+    §B{~i:i32} 0
+    §WH{wh3} (< i (len values))
+      §B{v:i32} §IDX values i
+      §ASSIGN total (+ total v)
+      §ASSIGN i (+ i 1)
+    §R total
+
+  §F{f004:Mean:pub} ([i32]:values) -> i32
+    §E{}
+    §Q (> §LEN values 0)
+    §B{total:i32} §C{Sum} §A values §/C
+    §B{n:i32} §LEN values
+    §R (/ total n)
+
+  §F{f005:Clamp:pub} (i32:value, i32:lo, i32:hi) -> i32
+    §E{}
+    §Q (<= lo hi)
+    §S (>= result lo)
+    §S (<= result hi)
+    §IF{if3} (< value lo)
+      §R lo
+    §IF{if4} (> value hi)
+      §R hi
+    §R value

@@ -1,0 +1,12 @@
+§M{m001:ParityEncoder}
+  §F{f001:Encode:pub} ([i32]:values) -> i32
+    §E{}
+    §B{~odd:i32} 0
+    §B{~i:i32} 0
+    §WH{wh1} (< i (len values))
+      §B{v:i32} §IDX values i
+      §IF{if1} (!= (% v 2) 0)
+        §ASSIGN odd (+ odd 1)
+      §ASSIGN i (+ i 1)
+    §B{n:i32} §LEN values
+    §R (+ (* odd 65536) n)

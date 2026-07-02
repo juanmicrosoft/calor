@@ -1,0 +1,35 @@
+{
+  "id": "W2-002-parity-encoder",
+  "category": "W2",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 2,
+    "calorDeclCount": 2,
+    "csharpComplexity": 3,
+    "calorComplexity": 3,
+    "notes": "Fixture per arm: 1 static class/module + Encode; Encode is base 1 + loop + parity branch = 3. Structurally identical across arms. NOT yet difficulty-validated (gates doc §3.1) — do not use as gate evidence before the equivalence pass."
+  },
+  "wedgeWhitelistCheck": "Calor-arm contracts: (>= expectedLength 0) on IsValidLength — binary comparison over an i32 parameter and an integer literal (modeled-forms §1/§2); (>= result 0) and (<= result §LEN values) on CountEven, (>= result -1) and (< result §LEN values) on IndexOfFirstOdd — comparisons over result, integer literals, and array length of a simple variable base (modeled-forms §2, 'array length (simple variable base only)'). No function calls, no floats, no strings, no computed array bases, no generic-typed values appear in any contract. All functions are pure (§E{}), so no effect-manifest coverage is required.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

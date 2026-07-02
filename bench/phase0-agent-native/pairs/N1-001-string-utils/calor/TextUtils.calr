@@ -1,0 +1,5 @@
+§M{m001:TextUtils}
+  §F{f001:Slugify:pub} (str:s) -> str
+    §E{}
+    §B{lower:str} §C{s.ToLowerInvariant} §/C
+    §R §C{lower.Replace} §A " " §A "-" §/C

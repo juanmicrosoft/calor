@@ -1,0 +1,35 @@
+{
+  "id": "W1-001-temperature-converter",
+  "category": "W1",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 4,
+    "calorDeclCount": 4,
+    "csharpComplexity": 6,
+    "calorComplexity": 6,
+    "notes": "Fixture per arm: 1 static class/module + 3 conversion functions, each base 1 + one clamp branch = 2. Structurally identical across arms. NOT yet difficulty-validated (gates doc §3.1) — do not use as gate evidence before the equivalence pass."
+  },
+  "wedgeWhitelistCheck": "All Calor-arm contracts are scalar i32 comparisons over a single parameter, `result`, and integer literals: (>= celsius -273), (>= fahrenheit -459), (>= kelvin 0), (<= result ceiling), and result-range bounds like (>= result -459)/(<= result 9032). These are binary comparison operators over BitVec32 variables and signed 32-bit literals — modeled-forms §1 (i32 variables) and §2 (binary comparison operators, integer literals). No function calls, no floats, no strings, no arrays, no generic-typed values appear in any contract. All functions are pure (§E{}), so no effect-manifest coverage is required.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

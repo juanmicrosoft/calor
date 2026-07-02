@@ -1,0 +1,35 @@
+{
+  "id": "N1-001-string-utils",
+  "category": "N1",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 3,
+    "calorDeclCount": 3,
+    "csharpComplexity": 7,
+    "calorComplexity": 7,
+    "notes": "Reference solutions are structurally parallel: Slugify (1), Truncate (two guards, 3), WordCount (split + filter loop, 3). Calor normalizes tab/CR/LF to spaces before splitting (its Split call takes one separator); C# passes multiple separator chars to Split — same complexity count, both first-order. Complexity counted as 1 per function + 1 per branch/loop. NOT yet difficulty-validated (gates doc §3.1)."
+  },
+  "wedgeWhitelistCheck": "n/a (neutral category)",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

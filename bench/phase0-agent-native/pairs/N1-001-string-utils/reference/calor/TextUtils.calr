@@ -1,0 +1,25 @@
+§M{m001:TextUtils}
+  §F{f001:Slugify:pub} (str:s) -> str
+    §E{}
+    §B{lower:str} §C{s.ToLowerInvariant} §/C
+    §R §C{lower.Replace} §A " " §A "-" §/C
+
+  §F{f002:Truncate:pub} (str:s, i32:maxLen) -> str
+    §E{}
+    §IF{if1} (<= §LEN s maxLen)
+      §R s
+    §IF{if2} (<= maxLen INT:3)
+      §R §C{s.Substring} §A INT:0 §A maxLen §/C
+    §R (+ §C{s.Substring} §A INT:0 §A (- maxLen INT:3) §/C "...")
+
+  §F{f003:WordCount:pub} (str:s) -> i32
+    §E{}
+    §B{tabs:str} §C{s.Replace} §A "\t" §A " " §/C
+    §B{returns:str} §C{tabs.Replace} §A "\r" §A " " §/C
+    §B{norm:str} §C{returns.Replace} §A "\n" §A " " §/C
+    §B{parts:[str]} §C{norm.Split} §A ' ' §/C
+    §B{~count:i32} INT:0
+    §EACH{e1:part} parts
+      §IF{if3} (> §LEN part INT:0)
+        §ASSIGN count (+ count INT:1)
+    §R count
