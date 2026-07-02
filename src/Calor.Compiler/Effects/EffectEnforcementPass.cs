@@ -294,8 +294,27 @@ public sealed class EffectEnforcementPass
     /// Maps common short type names to fully-qualified names for manifest resolution.
     /// Used by both ParseCallTarget (in EffectInferrer) and ParseCallTargetForChain.
     /// </summary>
-    internal static string MapShortTypeNameToFullName(string shortName) => shortName switch
+    internal static string MapShortTypeNameToFullName(string shortName)
     {
+        // Calor surface syntax for the runtime's Option/Result types:
+        // ?T is Option<T>; T!E is Result<T,E>. Their combinators are
+        // manifest-entered as pure-modulo-arguments (delegate arguments are
+        // charged at the lambda definition site by the effect pass).
+        if (shortName.StartsWith('?') || shortName.StartsWith("Option<"))
+            return "Calor.Runtime.Option`1";
+        if (shortName.StartsWith("Result<"))
+            return "Calor.Runtime.Result`2";
+        if (shortName.Contains('!') && !shortName.Contains('.') && !shortName.Contains('('))
+            return "Calor.Runtime.Result`2";
+
+        return MapKnownShortTypeName(shortName);
+    }
+
+    private static string MapKnownShortTypeName(string shortName) => shortName switch
+    {
+        // Calor runtime static helper classes
+        "Option" => "Calor.Runtime.Option",
+        "Result" => "Calor.Runtime.Result",
         // BCL types
         "Console" => "System.Console",
         "File" => "System.IO.File",

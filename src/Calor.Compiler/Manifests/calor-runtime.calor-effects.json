@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "description": "Effect declarations for Calor.Runtime (Option, Result, Unit). Convention: pure modulo arguments — combinators that take delegates (Map, AndThen, Match, Filter, UnwrapOrElse, OrElse, MapErr, Try, ...) contribute no effects themselves; their delegate arguments are charged at the lambda definition site by the effect pass. Unwrap/UnwrapErr may throw on contract violation; per BCL manifest precedent (Int32.Parse), contract-violation throws are not modeled as effects.",
+  "library": "Calor.Runtime",
+  "mappings": [
+    {
+      "type": "Calor.Runtime.Option`1",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      },
+      "getters": {
+        "IsSome": [],
+        "IsNone": []
+      }
+    },
+    {
+      "type": "Calor.Runtime.Option",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "Calor.Runtime.Result`2",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      },
+      "getters": {
+        "IsOk": [],
+        "IsErr": []
+      }
+    },
+    {
+      "type": "Calor.Runtime.Result",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    },
+    {
+      "type": "Calor.Runtime.Unit",
+      "defaultEffects": [],
+      "methods": {
+        "*": []
+      }
+    }
+  ]
+}

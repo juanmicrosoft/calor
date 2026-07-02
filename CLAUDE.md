@@ -1,6 +1,6 @@
 # CLAUDE.md — Calor Compiler
 
-Calor is a DSL designed for AI agents that compiles to C# on .NET 10. The compiler lives in `src/Calor.Compiler/` and is packaged as the `calor` global tool. Version is tracked in `Directory.Build.props` (currently 0.3.5).
+Calor is a DSL designed for AI agents that compiles to C# on .NET 10. The compiler lives in `src/Calor.Compiler/` and is packaged as the `calor` global tool. Version is tracked in `Directory.Build.props` (check there for the current version; do not trust a number written in docs).
 
 ## Build & Test
 
@@ -70,29 +70,45 @@ All paths relative to `src/Calor.Compiler/`.
 
 ## Calor Syntax Quick Reference
 
+Block structure is **indentation-only** (2 spaces per level, Python-style). **Never
+write structural closer tags** — the main block closers (`§/M`, `§/F`, `§/L`, `§/I`,
+`§/W`, `§/WH`, `§/CL`, `§/MT`, `§/IFACE`, and others) raise a hard error (`Calor0830`);
+a few remaining closer forms are still tolerated by the parser but always optional.
+The only closers you should ever write are `§/C` (call argument lists) and `§/LAM`
+(block lambdas).
+
 ```
-§M{id:Name}              Module (close: §/M)
-§F{id:name:retType:vis}   Function (close: §/F)
-§B{name:type}             Immutable binding
-§B{~name:type}            Mutable binding
-§L{id:var:from:to:step}   For loop (close: §/L)
-§IF{id} (cond) → §R expr  Inline if-return
-§IF{id} (cond) ... §/I    Block if (close: §/I NOT §/IF)
-§EI (cond)                 ElseIf
-§EL                        Else
+§M{id:Name}                Module
+§F{id:name:vis} (T:x) -> R  Function with inline signature
+§B{name:type}              Immutable binding
+§B{~name:type}             Mutable binding
+§L{id:var:from:to:step}    For loop
+§IF{id} (cond)             If (body indented)
+§EI (cond)                  ElseIf (at parent column)
+§EL                         Else (at parent column)
 §C{object.method} §A arg §/C  Method call with argument
+§E{codes}                  Effects (§E{} = pure)
 §Q (expr)                  Precondition
 §S (expr)                  Postcondition
 §INV                       Invariant
 ```
 
-**Typed literals:** `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14`
+Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`):
 
-**Closing tags:**
-- Abbreviated form: `§/I` (not `§/IF`), `§/M`, `§/F`, `§/L`.
-- IDs on closing tags are **optional**. `§/M` and `§/M{m001}` both parse; the parser
-  pairs closers by structural nesting. Drop legacy IDs in bulk with
-  `calor fix --drop-structural-ids <root>`. Legacy closers lint as `Calor0820`.
+```
+§M{m001:FizzBuzz}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §L{for1:i:1:100:1}
+      §IF{if1} (== (% i 15) 0)
+        §P "FizzBuzz"
+      §EI (== (% i 3) 0)
+        §P "Fizz"
+      §EL
+        §P i
+```
+
+**Typed literals:** `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14`
 
 ## Adding New AST Nodes — Checklist
 

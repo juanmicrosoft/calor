@@ -4,16 +4,49 @@ using Calor.Compiler.Parsing;
 namespace Calor.Compiler.Verification.Obligations;
 
 /// <summary>
+/// A fact together with the source range it governs. Guard facts (if/while
+/// conditions, loop bounds) only hold inside the body they guard, so the
+/// solver must not assert them for obligations outside that range.
+/// </summary>
+public sealed record ScopedFact(ExpressionNode Fact, int ScopeStart, int ScopeEnd)
+{
+    public static ScopedFact FunctionWide(ExpressionNode fact)
+        => new(fact, 0, int.MaxValue);
+
+    public bool AppliesTo(TextSpan span)
+        => span.Start >= ScopeStart && span.End <= ScopeEnd;
+}
+
+/// <summary>
 /// Collects flow-sensitive facts from the AST that can be used as Z3 assumptions
 /// when verifying obligations. Extracts loop bounds, if-guard conditions, and
 /// inline refinement predicates.
+///
+/// Facts are scoped to the statement range they dominate: an if-condition holds
+/// only inside the then-body, an elseif-condition only inside its own body, a
+/// while-condition only inside the loop body. Facts whose variables are rebound
+/// inside the governed range are dropped entirely (conservative assignment kill)
+/// because the guard may no longer hold at the obligation site.
 /// </summary>
 public sealed class FactCollector
 {
     /// <summary>
-    /// Collected facts as expression nodes suitable for Z3 translation.
+    /// Collected facts with the source ranges they govern.
     /// </summary>
-    public List<ExpressionNode> Facts { get; } = new();
+    public List<ScopedFact> ScopedFacts { get; } = new();
+
+    /// <summary>
+    /// Convenience view of the collected fact expressions (scope-erased).
+    /// </summary>
+    public IReadOnlyList<ExpressionNode> Facts
+        => ScopedFacts.Select(f => f.Fact).ToList();
+
+    /// <summary>
+    /// Adds a fact that holds for the whole function (e.g., an indexed-type
+    /// constraint), subject to no assignment kill.
+    /// </summary>
+    public void AddFunctionWideFact(ExpressionNode fact)
+        => ScopedFacts.Add(ScopedFact.FunctionWide(fact));
 
     /// <summary>
     /// Collects facts from a function's body and parameter refinements that are relevant
@@ -23,13 +56,16 @@ public sealed class FactCollector
     /// </summary>
     public void CollectFromFunction(FunctionNode func)
     {
-        // Collect parameter inline refinements as facts
-        // These serve as assumptions for IndexBounds and other obligations
+        // Parameter inline refinements hold on entry for the whole function —
+        // unless the body rebinds the parameter name, in which case the
+        // refinement may no longer describe the current value.
+        var bodyAssigned = CollectAssignedNames(func.Body);
         foreach (var param in func.Parameters)
         {
-            if (param.InlineRefinement != null)
+            if (param.InlineRefinement != null && !bodyAssigned.Contains(param.Name))
             {
-                Facts.Add(SubstituteSelfRef(param.InlineRefinement.Predicate, param.Name));
+                ScopedFacts.Add(ScopedFact.FunctionWide(
+                    SubstituteSelfRef(param.InlineRefinement.Predicate, param.Name)));
             }
         }
 
@@ -56,21 +92,19 @@ public sealed class FactCollector
                 break;
 
             case WhileStatementNode whileStmt:
-                // The while condition holds inside the loop body
-                Facts.Add(whileStmt.Condition);
+                // The while condition holds on entry to each iteration, but a
+                // body that reassigns its variables invalidates it mid-body.
+                AddGuardFact(whileStmt.Condition, whileStmt.Body);
                 CollectFromStatements(whileStmt.Body);
                 break;
 
             case IfStatementNode ifStmt:
-                // The if-condition is a fact within the then-body.
-                // We add it as a general assumption since obligations inside
-                // the then-body are only reachable when the condition holds.
-                Facts.Add(ifStmt.Condition);
+                // Each condition is a fact only within the body it guards.
+                AddGuardFact(ifStmt.Condition, ifStmt.ThenBody);
                 CollectFromStatements(ifStmt.ThenBody);
-                // ElseIf clauses have their own conditions
                 foreach (var elseIf in ifStmt.ElseIfClauses)
                 {
-                    Facts.Add(elseIf.Condition);
+                    AddGuardFact(elseIf.Condition, elseIf.Body);
                     CollectFromStatements(elseIf.Body);
                 }
                 if (ifStmt.ElseBody != null)
@@ -93,23 +127,102 @@ public sealed class FactCollector
 
     /// <summary>
     /// Extracts loop bounds from a for-loop.
-    /// §L{id:i:from:to:step} yields facts: i >= from AND i < to
+    /// §L{id:i:from:to:step} yields facts: i >= from AND i < to, scoped to the body.
     /// </summary>
     private void CollectFromForLoop(ForStatementNode forStmt)
     {
         var dummySpan = new TextSpan(0, 0, 1, 1);
         var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName);
 
-        // Fact: loopVar >= from
         var geFrom = new BinaryOperationNode(dummySpan, BinaryOperator.GreaterOrEqual, loopVar, forStmt.From);
-        Facts.Add(geFrom);
+        AddGuardFact(geFrom, forStmt.Body);
 
-        // Fact: loopVar < to
         var ltTo = new BinaryOperationNode(dummySpan, BinaryOperator.LessThan, loopVar, forStmt.To);
-        Facts.Add(ltTo);
+        AddGuardFact(ltTo, forStmt.Body);
 
-        // Recurse into loop body
         CollectFromStatements(forStmt.Body);
+    }
+
+    /// <summary>
+    /// Records a guard fact scoped to the body it governs, unless the body
+    /// rebinds a variable the fact mentions (conservative assignment kill).
+    /// </summary>
+    private void AddGuardFact(ExpressionNode fact, IReadOnlyList<StatementNode> body)
+    {
+        if (body.Count == 0)
+            return;
+
+        var referenced = new HashSet<string>(StringComparer.Ordinal);
+        CollectReferencedNames(fact, referenced);
+
+        var assigned = CollectAssignedNames(body);
+        if (referenced.Overlaps(assigned))
+            return;
+
+        var scopeStart = body.Min(s => s.Span.Start);
+        var scopeEnd = body.Max(s => s.Span.End);
+        ScopedFacts.Add(new ScopedFact(fact, scopeStart, scopeEnd));
+    }
+
+    private static void CollectReferencedNames(ExpressionNode expr, HashSet<string> names)
+    {
+        switch (expr)
+        {
+            case ReferenceNode reference:
+                names.Add(reference.Name);
+                break;
+            case BinaryOperationNode binOp:
+                CollectReferencedNames(binOp.Left, names);
+                CollectReferencedNames(binOp.Right, names);
+                break;
+            case UnaryOperationNode unOp:
+                CollectReferencedNames(unOp.Operand, names);
+                break;
+        }
+    }
+
+    private static HashSet<string> CollectAssignedNames(IReadOnlyList<StatementNode> statements)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        CollectAssignedNames(statements, names);
+        return names;
+    }
+
+    private static void CollectAssignedNames(IReadOnlyList<StatementNode> statements, HashSet<string> names)
+    {
+        foreach (var stmt in statements)
+        {
+            switch (stmt)
+            {
+                case BindStatementNode bind:
+                    names.Add(bind.Name);
+                    break;
+                case ForStatementNode forStmt:
+                    names.Add(forStmt.VariableName);
+                    CollectAssignedNames(forStmt.Body, names);
+                    break;
+                case WhileStatementNode whileStmt:
+                    CollectAssignedNames(whileStmt.Body, names);
+                    break;
+                case DoWhileStatementNode doWhile:
+                    CollectAssignedNames(doWhile.Body, names);
+                    break;
+                case IfStatementNode ifStmt:
+                    CollectAssignedNames(ifStmt.ThenBody, names);
+                    foreach (var elseIf in ifStmt.ElseIfClauses)
+                        CollectAssignedNames(elseIf.Body, names);
+                    if (ifStmt.ElseBody != null)
+                        CollectAssignedNames(ifStmt.ElseBody, names);
+                    break;
+                case ForeachStatementNode foreach_:
+                    names.Add(foreach_.VariableName);
+                    CollectAssignedNames(foreach_.Body, names);
+                    break;
+                case TryStatementNode tryStmt:
+                    CollectAssignedNames(tryStmt.TryBody, names);
+                    break;
+            }
+        }
     }
 
     /// <summary>

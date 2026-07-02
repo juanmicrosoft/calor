@@ -112,27 +112,58 @@ public sealed class ObligationSolver : IDisposable
             solver.Set("timeout", _timeoutMs);
 
             // ASSUME: Assert all translatable preconditions
+            var preconditionExprs = new List<BoolExpr>();
             foreach (var pre in info.Preconditions)
             {
                 var preExpr = translator.TranslateBoolExpr(pre.Condition);
                 if (preExpr != null)
                 {
+                    preconditionExprs.Add(preExpr);
                     solver.Assert(preExpr);
                 }
             }
 
-            // ASSUME: Assert collected flow-sensitive facts (loop bounds, parameter refinements, etc.)
-            // For RefinementEntry obligations, skip collected facts to avoid circular reasoning
-            // (the obligation IS the refinement, not an assumption for it).
+            // ASSUME: Assert collected flow-sensitive facts (loop bounds, parameter
+            // refinements, etc.) whose governed source range contains the obligation —
+            // a guard fact must not leak into sibling branches or past its body.
+            // For RefinementEntry obligations, skip collected facts to avoid circular
+            // reasoning (the obligation IS the refinement, not an assumption for it).
             if (obligation.Kind != ObligationKind.RefinementEntry)
             {
                 foreach (var fact in info.CollectedFacts)
                 {
-                    var factExpr = translator.TranslateBoolExpr(fact);
+                    if (!fact.AppliesTo(obligation.Span))
+                        continue;
+
+                    var factExpr = translator.TranslateBoolExpr(fact.Fact);
                     if (factExpr != null)
                     {
                         solver.Assert(factExpr);
                     }
+                }
+            }
+
+            // CONSISTENCY PRE-CHECK: an UNSAT assumption set would vacuously
+            // discharge every obligation ("assume False, prove anything"). If the
+            // assumptions are inconsistent, retry with preconditions only; if the
+            // preconditions themselves are inconsistent, refuse to discharge.
+            if (solver.Check() == Status.UNSATISFIABLE)
+            {
+                solver = _ctx.MkSolver();
+                solver.Set("timeout", _timeoutMs);
+                foreach (var preExpr in preconditionExprs)
+                {
+                    solver.Assert(preExpr);
+                }
+
+                if (solver.Check() == Status.UNSATISFIABLE)
+                {
+                    obligation.Status = ObligationStatus.Unsupported;
+                    obligation.CounterexampleDescription =
+                        "Assumption set is inconsistent (unsatisfiable preconditions); " +
+                        "vacuous discharge prevented";
+                    obligation.SolverDuration = sw.Elapsed;
+                    return;
                 }
             }
 
@@ -245,7 +276,7 @@ public sealed class ObligationSolver : IDisposable
                     // If the indexed type has a constraint, add it as a fact
                     if (itype.Constraint != null)
                     {
-                        factCollector.Facts.Add(
+                        factCollector.AddFunctionWideFact(
                             FactCollector.SubstituteSelfRefStatic(itype.Constraint, itype.SizeParam));
                     }
                 }
@@ -255,7 +286,7 @@ public sealed class ObligationSolver : IDisposable
                 parameters,
                 func.Preconditions,
                 func.Output?.TypeName,
-                factCollector.Facts,
+                factCollector.ScopedFacts,
                 extraVars);
         }
 
@@ -271,7 +302,7 @@ public sealed class ObligationSolver : IDisposable
                     parameters,
                     method.Preconditions,
                     method.Output?.TypeName,
-                    new List<ExpressionNode>(),
+                    new List<ScopedFact>(),
                     new List<(string, string)>());
             }
         }
@@ -283,7 +314,7 @@ public sealed class ObligationSolver : IDisposable
         List<(string Name, string TypeName)> Parameters,
         IReadOnlyList<RequiresNode> Preconditions,
         string? OutputType,
-        List<ExpressionNode> CollectedFacts,
+        List<ScopedFact> CollectedFacts,
         List<(string Name, string TypeName)> ExtraVariables);
 
     public void Dispose()

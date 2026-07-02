@@ -258,12 +258,14 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
 
     private static bool IsUnsafeUnwrapCall(string target)
     {
-        // Detect unsafe unwrap patterns
+        // Detect unsafe unwrap patterns; the catch-all must exclude every
+        // safe fallback form so the predicate stays consistent with
+        // IsSafeUnwrapCall regardless of call order
         return target.EndsWith(".unwrap") ||
                target.EndsWith(".unwrap_unchecked") ||
                target.EndsWith(".expect") ||
-               target.EndsWith(".unwrap_or_else") == false && target.Contains("unwrap") ||
-               target.EndsWith(".get_unchecked");
+               target.EndsWith(".get_unchecked") ||
+               (!IsSafeUnwrapCall(target) && target.Contains("unwrap"));
     }
 
     private static bool IsSafeUnwrapCall(string target)

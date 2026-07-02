@@ -702,4 +702,45 @@ public class EffectResolverTests
         Assert.Equal(EffectResolutionStatus.Resolved, result.Status);
         Assert.Contains(result.Effects.Effects, e => e.Value == "intentional");
     }
+
+    // ───── Calor.Runtime combinators: pure modulo arguments ─────
+
+    [Theory]
+    [InlineData("Calor.Runtime.Option`1", "Map")]
+    [InlineData("Calor.Runtime.Option`1", "AndThen")]
+    [InlineData("Calor.Runtime.Option`1", "Match")]
+    [InlineData("Calor.Runtime.Option`1", "Filter")]
+    [InlineData("Calor.Runtime.Option`1", "Unwrap")]
+    [InlineData("Calor.Runtime.Option`1", "UnwrapOrElse")]
+    [InlineData("Calor.Runtime.Result`2", "Map")]
+    [InlineData("Calor.Runtime.Result`2", "MapErr")]
+    [InlineData("Calor.Runtime.Result`2", "AndThen")]
+    [InlineData("Calor.Runtime.Result`2", "OrElse")]
+    [InlineData("Calor.Runtime.Result`2", "Match")]
+    [InlineData("Calor.Runtime.Result", "Try")]
+    [InlineData("Calor.Runtime.Option", "Some")]
+    [InlineData("Calor.Runtime.Option", "FromNullable")]
+    public void CalorRuntime_Combinators_ArePure(string type, string method)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var result = resolver.Resolve(type, method);
+        Assert.True(result.Effects.IsEmpty,
+            $"{type}.{method} should be effect-free (pure modulo arguments), got: {result.Effects}");
+        Assert.NotEqual(EffectResolutionStatus.Unknown, result.Status);
+    }
+
+    [Theory]
+    [InlineData("?i32", "Calor.Runtime.Option`1")]
+    [InlineData("?str", "Calor.Runtime.Option`1")]
+    [InlineData("Option<i32>", "Calor.Runtime.Option`1")]
+    [InlineData("i32!str", "Calor.Runtime.Result`2")]
+    [InlineData("Result<i32,str>", "Calor.Runtime.Result`2")]
+    [InlineData("Option", "Calor.Runtime.Option")]
+    [InlineData("Result", "Calor.Runtime.Result")]
+    [InlineData("Console", "System.Console")]
+    public void MapShortTypeName_ResolvesCalorOptionResultSurfaceTypes(string surface, string expected)
+    {
+        Assert.Equal(expected, EffectEnforcementPass.MapShortTypeNameToFullName(surface));
+    }
 }
