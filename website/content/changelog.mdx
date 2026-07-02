@@ -10,6 +10,14 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-07-01
+
+### Added
+- **`calor fix --heal-closers` — a source-level CLI that finishes the `Calor0830` auto-heal story.** Closer-form syntax (`§/F`, `§/M`, `§/L`, …) hard-errors at parse time, so `calor format` / `calor lint --fix` — which parse the file first — can never read, let alone heal, it. The new `calor fix --heal-closers <root> [--log <file>] [--revert] [--dry-run]` deletes legacy structural closers at the source level, rewriting a file into canonical indent-only form, and `--revert --log` restores it byte-exactly. It is lexer-backed, so a `§/F` embedded in a string literal or a `//` comment is left untouched, and removals are recorded as UTF-8 byte ranges so revert is exact even across non-ASCII text and CRLF endings. This delivers the CLI heal command deferred in v0.6.6.
+
+### Changed
+- **Single-sourced return-value classification in a shared `Analysis/ReturnShape`.** The "does this owner return a value" classification — for `void`/async-`void` functions and methods, iterators, constructors, setters, and event accessors — was duplicated between the `Calor0205` pass and the contract verifier's `result` check. Both now defer to one classifier, which distinguishes the *runtime* shape (folding in async/iterator lowering) from the narrow *header* predicate (which keeps `result` referenceable in an iterator's postcondition, since an iterator still declares `IEnumerable<T>`). The refactor is behavior-preserving and leaves codegen untouched, retiring the shared-`ReturnShape` follow-up noted in v0.6.7.
+
 ## [0.6.7] - 2026-07-01
 
 ### Added
