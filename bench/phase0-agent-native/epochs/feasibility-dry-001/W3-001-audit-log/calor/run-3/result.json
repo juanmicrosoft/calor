@@ -1,0 +1,16 @@
+{
+  "pair": "W3-001-audit-log",
+  "arm": "calor",
+  "run": 3,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 6,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "tokens": {
+    "input": 10111,
+    "output": 7776
+  },
+  "nullAgent": false
+}

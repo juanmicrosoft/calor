@@ -1,0 +1,16 @@
+{
+  "pair": "N1-002-inventory",
+  "arm": "calor",
+  "run": 1,
+  "taskSuccess": false,
+  "escapedBugs": 999,
+  "heldoutPassed": 0,
+  "iterations": 0,
+  "iterationsToGreen": 11,
+  "censored": true,
+  "tokens": {
+    "input": 4163,
+    "output": 4332
+  },
+  "nullAgent": false
+}
