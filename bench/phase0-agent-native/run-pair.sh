@@ -27,6 +27,60 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# ---------------------------------------------------------------------------
+# Invalid-run detection (gates doc §0.2): invalid, crashed, or API-errored
+# runs (e.g. "You've hit your session limit" — epoch feasibility-dry-001) are
+# auto-detected, re-run on a fresh workspace up to MAX_INVALID_RETRIES times,
+# and after the cap counted as task failure with "invalid": true.
+#
+# Prints the detection reason and returns 0 if the run is INVALID; returns 1
+# if the run looks valid. Args: <ws_out> [agent_exit_code].
+# ---------------------------------------------------------------------------
+MAX_INVALID_RETRIES=2
+INVALID_MARKERS=("hit your session limit" "rate limit" "overloaded" "api error")
+
+detect_invalid_run() {
+    local ws_out="$1" agent_rc="${2:-0}"
+    local aj="$ws_out/agent.json"
+
+    if [[ ! -s "$aj" ]]; then
+        echo "agent.json missing or empty"
+        return 0
+    fi
+    if ! jq -e . "$aj" >/dev/null 2>&1; then
+        echo "agent.json is not valid JSON"
+        return 0
+    fi
+    # Rate-limit / API-error markers, case-insensitive, checked in both the
+    # parsed .result field and the raw file content
+    local content marker
+    content="$( { jq -r '.result // empty' "$aj" 2>/dev/null; cat "$aj"; } | tr '[:upper:]' '[:lower:]')"
+    for marker in "${INVALID_MARKERS[@]}"; do
+        if [[ "$content" == *"$marker"* ]]; then
+            echo "agent output matches error marker: \"$marker\""
+            return 0
+        fi
+    done
+    # Crashed agent that produced no observed work
+    if [[ "$agent_rc" -ne 0 && ! -s "$ws_out/journal.jsonl" ]]; then
+        echo "agent exit code $agent_rc with empty journal.jsonl"
+        return 0
+    fi
+    return 1
+}
+
+# Test entrypoint: ./run-pair.sh --detect-invalid <ws_out> [agent_exit_code]
+# Exits 0 (and prints the reason) if the run directory is invalid, 1 if valid.
+if [[ "${1:-}" == "--detect-invalid" ]]; then
+    [[ -n "${2:-}" ]] || { echo "Usage: --detect-invalid <ws_out> [agent_exit_code]" >&2; exit 2; }
+    if reason="$(detect_invalid_run "$2" "${3:-0}")"; then
+        echo "INVALID: $reason"
+        exit 0
+    fi
+    echo "VALID"
+    exit 1
+fi
+
 PAIR_DIR=""
 ARM=""
 RUNS=1
@@ -191,6 +245,7 @@ EOF
 # ---------------------------------------------------------------------------
 run_agent() {
     local ws="$1" ws_out="$2" shim_dir="$3"
+    AGENT_RC=0
     local prompt
     prompt="You are working in $ws/src. Read $ws/spec.md and implement the missing operations it describes, in the existing source files, following the conventions already present. The iteration budget is $ITERATION_BUDGET build/test cycles. Build with 'dotnet build' from $ws/src to check your work. Do not create test files; do not modify the project file. Stop when the spec is fully implemented and the project builds cleanly."
 
@@ -215,6 +270,7 @@ run_agent() {
     wait "$agent_pid" 2>/dev/null || rc=$?
     kill "$watchdog_pid" 2>/dev/null || true
     wait "$watchdog_pid" 2>/dev/null || true
+    AGENT_RC=$rc
     if [[ $rc -ne 0 ]]; then echo "agent exit: $rc" >> "$ws_out/agent.err"; fi
 }
 
@@ -266,31 +322,80 @@ extract_metrics() {
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:$success,
           escapedBugs:$escaped, heldoutPassed:$passed,
           iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
+          invalid:false,
           tokens:{input:$tin, output:$tout}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
 }
 
 # ---------------------------------------------------------------------------
+# Invalid-slot result (gates doc §0.2): a slot still invalid after the retry
+# cap counts as task failure for the arm, marked "invalid": true.
+# ---------------------------------------------------------------------------
+write_invalid_result() {
+    local ws_out="$1" run_idx="$2"
+    jq -n \
+        --arg pair "$PAIR_ID" --arg arm "$ARM" --argjson run "$run_idx" \
+        --argjson itg "$((ITERATION_BUDGET + 1))" \
+        --argjson null_agent "$NULL_AGENT" \
+        '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
+          escapedBugs:999, heldoutPassed:0,
+          iterations:0, iterationsToGreen:$itg, censored:true,
+          invalid:true,
+          tokens:{input:0, output:0}, nullAgent:($null_agent==1)}' \
+        > "$ws_out/result.json"
+    cat "$ws_out/result.json"
+}
+
+# Wipe a run's ws_out for a fresh re-attempt, preserving the invalid.txt log
+wipe_ws_out() {
+    local ws_out="$1"
+    find "$ws_out" -mindepth 1 -maxdepth 1 ! -name invalid.txt -exec rm -rf {} +
+}
+
+# ---------------------------------------------------------------------------
 check_pins
 for (( run=1; run<=RUNS; run++ )); do
-    WS="$(mktemp -d "${TMPDIR:-/tmp}/p0-${PAIR_ID}-${ARM}-XXXXXX")"
-    # Canonicalize (macOS: $TMPDIR lives behind the /var -> /private/var
-    # symlink). Agent builds run from the *physical* cwd while shim/metrics
-    # builds pass the *logical* $WS path; MSBuild treats the two spellings as
-    # different project identities, and the identity flip makes incremental
-    # clean delete ProjectReference outputs (Calor.Runtime.dll) from src/bin —
-    # every contract-bearing calor-arm pair then fails held-out runs with
-    # FileNotFoundException. One physical path removes the ambiguity.
-    WS="$(cd "$WS" && pwd -P)"
     WS_OUT="$OUT_DIR/$PAIR_ID/$ARM/run-$run"
     mkdir -p "$WS_OUT"
-    SHIM_DIR="$WS_OUT/.shim"
 
-    materialize "$WS" "$WS_OUT"
-    write_shim "$WS" "$WS_OUT" "$SHIM_DIR"
-    run_agent "$WS" "$WS_OUT" "$SHIM_DIR"
-    extract_metrics "$WS" "$WS_OUT" "$run"
+    # Invalid-run re-attempt loop (gates doc §0.2): a detected-invalid run is
+    # logged, its ws_out wiped, and the slot re-run on a fresh workspace, up
+    # to MAX_INVALID_RETRIES re-attempts; after the cap the slot counts as
+    # task failure with "invalid": true.
+    for (( attempt=0; attempt<=MAX_INVALID_RETRIES; attempt++ )); do
+        WS="$(mktemp -d "${TMPDIR:-/tmp}/p0-${PAIR_ID}-${ARM}-XXXXXX")"
+        # Canonicalize (macOS: $TMPDIR lives behind the /var -> /private/var
+        # symlink). Agent builds run from the *physical* cwd while shim/metrics
+        # builds pass the *logical* $WS path; MSBuild treats the two spellings as
+        # different project identities, and the identity flip makes incremental
+        # clean delete ProjectReference outputs (Calor.Runtime.dll) from src/bin —
+        # every contract-bearing calor-arm pair then fails held-out runs with
+        # FileNotFoundException. One physical path removes the ambiguity.
+        WS="$(cd "$WS" && pwd -P)"
+        SHIM_DIR="$WS_OUT/.shim"
 
-    rm -rf "$WS"
+        materialize "$WS" "$WS_OUT"
+        write_shim "$WS" "$WS_OUT" "$SHIM_DIR"
+        run_agent "$WS" "$WS_OUT" "$SHIM_DIR"
+
+        if reason="$(detect_invalid_run "$WS_OUT" "$AGENT_RC")"; then
+            printf '%s attempt=%d agent_rc=%d: %s\n' \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$attempt" "$AGENT_RC" "$reason" \
+                >> "$WS_OUT/invalid.txt"
+            echo "INVALID run detected (pair=$PAIR_ID arm=$ARM run=$run attempt=$attempt): $reason" >&2
+            rm -rf "$WS"
+            if (( attempt < MAX_INVALID_RETRIES )); then
+                wipe_ws_out "$WS_OUT"   # fresh re-attempt, keep invalid.txt
+                continue
+            fi
+            echo "Retry cap reached; counting run $run as task failure (invalid)" >&2
+            write_invalid_result "$WS_OUT" "$run"
+            break
+        fi
+
+        extract_metrics "$WS" "$WS_OUT" "$run"
+        rm -rf "$WS"
+        break
+    done
 done
