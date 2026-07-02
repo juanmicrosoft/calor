@@ -2,7 +2,7 @@
   "version": "1.0-draft",
   "frozen": false,
   "description": "Pre-registered category registry for the agent-native Phase 0 suite. Freezes with the suite; no categories may be added, merged, or excluded after freeze (gates doc §0.3, §5).",
-  "gateRule": "Phase 2a gate uses the pooled result of all gate-bearing wedge categories (W1+W2+W3). Per-category results are reported but not individually gated.",
+  "gateRule": "Phase 2a gate uses the pooled result of all gate-bearing wedge categories (W1+W2+W3), with no single category contributing more than 40% of pooled pairs (gates doc §4). Exact per-category pair counts freeze here at suite freeze. Per-category results are reported but not individually gated.",
   "categories": [
     {
       "id": "W1",

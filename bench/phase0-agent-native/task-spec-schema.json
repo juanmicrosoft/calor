@@ -68,7 +68,14 @@
       "type": "string",
       "description": "REQUIRED for W1-W5: statement that intended contracts fall inside docs/verification-modeled-forms.md, and (W3+) that effect boundaries are manifest-covered. Checked at authoring."
     },
-    "iterationBudget": { "type": "integer", "default": 10 },
-    "timeoutSeconds": { "type": "integer", "default": 600 }
+    "iterationBudget": {
+      "const": 10,
+      "description": "Pinned by the gates doc §2 — per-pair budget choice would move censoring points (a quiet knob). Any deviation must be pre-registered with rationale before the suite freeze, which requires changing this schema."
+    },
+    "timeoutSeconds": {
+      "type": "integer",
+      "default": 600,
+      "description": "Task-level timeout. A timeout mid-iteration fails that iteration (gates doc §2). Per-pair values must be set before freeze; not adjustable afterward."
+    }
   }
 }
