@@ -1,0 +1,16 @@
+{
+  "pair": "N1-002-inventory",
+  "arm": "csharp",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 10,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "tokens": {
+    "input": 3885,
+    "output": 1096
+  },
+  "nullAgent": false
+}

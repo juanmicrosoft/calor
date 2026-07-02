@@ -1,0 +1,16 @@
+{
+  "pair": "W2-002-parity-encoder",
+  "arm": "calor",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 21,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "tokens": {
+    "input": 137,
+    "output": 3553
+  },
+  "nullAgent": false
+}

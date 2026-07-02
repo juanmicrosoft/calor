@@ -1,0 +1,4 @@
+Test run for /Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/feasibility-dry-001/W1-001-temperature-converter/csharp/run-1/heldout/bin/Debug/net10.0/HeldOut.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:    24, Skipped:     0, Total:    24, Duration: 17 ms - HeldOut.dll (net10.0)

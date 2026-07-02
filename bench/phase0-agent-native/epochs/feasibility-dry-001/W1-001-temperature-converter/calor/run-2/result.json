@@ -1,0 +1,16 @@
+{
+  "pair": "W1-001-temperature-converter",
+  "arm": "calor",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 24,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "tokens": {
+    "input": 4028,
+    "output": 4274
+  },
+  "nullAgent": false
+}
