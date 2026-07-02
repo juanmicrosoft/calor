@@ -1,0 +1,22 @@
+§M{m001:AuditLog}
+  §F{f001:Append:pub} (str:path, str:entry) -> void
+    §E{fs:w}
+    §C{File.AppendAllText} §A path §A (+ entry "\n") §/C
+
+  §F{f002:CountEntries:pub} (str:path) -> i32
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if1} (! exists)
+      §R INT:0
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §R §LEN lines
+
+  §F{f003:LastEntry:pub} (str:path) -> str
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if2} (! exists)
+      §R ""
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §IF{if3} (== §LEN lines INT:0)
+      §R ""
+    §R §IDX lines (- §LEN lines INT:1)
