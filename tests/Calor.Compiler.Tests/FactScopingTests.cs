@@ -115,9 +115,11 @@ public sealed class FactScopingTests
             f.Fact is BinaryOperationNode { Operator: BinaryOperator.LessThan });
     }
 
-    [Fact]
+    [SkippableFact]
     public void ContradictorySiblingGuards_DoNotVacuouslyDischargeObligations()
     {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+
         // Before fact scoping, both sibling guards (x==1, x==2) were asserted
         // together for every obligation in the function, making the assumption
         // set UNSAT and vacuously discharging the unguarded index access.
@@ -153,9 +155,11 @@ public sealed class FactScopingTests
         Assert.NotEqual(ObligationStatus.Discharged, indexObl.Status);
     }
 
-    [Fact]
+    [SkippableFact]
     public void GuardedIndexAccess_InsideBranch_StillUsesGuardFact()
     {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+
         // The scoping change must not break the legitimate case: an index
         // obligation inside the guarded body still sees the dominating guard.
         var source = """
