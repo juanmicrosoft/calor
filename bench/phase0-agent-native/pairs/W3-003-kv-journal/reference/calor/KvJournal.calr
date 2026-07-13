@@ -5,14 +5,14 @@
 
   §F{f002:KeyOf:pri} (str:line) -> str
     §E{}
-    §B{eq:i32} (indexof line "=")
+    §B{eq:i32} (indexof line "=" :ordinal)
     §IF{if1} (< eq 0)
       §R line
     §R (substr line 0 eq)
 
   §F{f003:ValueOf:pri} (str:line) -> str
     §E{}
-    §B{eq:i32} (indexof line "=")
+    §B{eq:i32} (indexof line "=" :ordinal)
     §IF{if2} (< eq 0)
       §R ""
     §R (substr line (+ eq 1) (- (len line) (+ eq 1)))

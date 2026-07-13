@@ -130,9 +130,10 @@ public sealed class CsvRowHeldOutTests
     }
 
     [Fact]
-    public void SplitRow_QuotedEmptyField()
+    public void SplitRow_LeadingEmptyField()
     {
-        Assert.Equal(new List<string> { "", "x" }, TestShim.SplitRow("\"\",x"));
+        // ",x" is JoinRow(["", "x"]) - in-contract (empty fields are never quoted)
+        Assert.Equal(new List<string> { "", "x" }, TestShim.SplitRow(",x"));
     }
 
     [Fact]

@@ -38,8 +38,9 @@ above.
      content, not separators.
    - A trailing comma means the row ends with an empty field.
 
-`SplitRow(JoinRow(fields))` must reproduce `fields` exactly for every list of
-fields.
+`SplitRow(JoinRow(fields))` must reproduce `fields` exactly for every
+**non-empty** list of fields. (The empty list is the one exception:
+`JoinRow([])` is the empty string, which parses as a single empty field.)
 
 ## Constraints
 
