@@ -1,0 +1,35 @@
+{
+  "id": "N1-003-csv-row",
+  "category": "N1",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 5,
+    "calorDeclCount": 5,
+    "csharpComplexity": 13,
+    "calorComplexity": 13,
+    "notes": "Counted on the reference solutions (both arms structurally parallel): 1 static class/module + NeedsQuoting (1) + EscapeField (branch, 2) + JoinRow (loop + separator branch, 3) + SplitRow (loop + in-quotes branch + quote branch + lookahead branch + comma branch + quote-start branch, 7). Complexity = 1 per function + 1 per branch/loop. Calor iterates characters via one-char substrings where C# indexes chars (char literals emit as strings in Calor) — same branch structure. Second-wave hardness pair (doubled-quote unescaping, quoted separators, empty/trailing fields, round-trip property); NOT yet difficulty-validated (gates doc §3.1)."
+  },
+  "wedgeWhitelistCheck": "n/a (neutral category). No contracts anywhere in the fixtures or references; SplitRow declares the enforced 'mut' effect for list building in the Calor arm.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

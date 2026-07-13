@@ -1,0 +1,35 @@
+{
+  "id": "W2-003-window-stats",
+  "category": "W2",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 5,
+    "calorDeclCount": 5,
+    "csharpComplexity": 12,
+    "calorComplexity": 12,
+    "notes": "Counted on the reference solutions (both arms structurally parallel): 1 static class/module + WindowSum (loop, 2) + WindowMin (loop + branch, 3) + MaxWindowSum (loop + branch, 3) + CountAbove (degenerate guard + loop + branch, 4). Complexity = 1 per function + 1 per branch/loop. Second-wave hardness pair (accumulator initialization on all-negative/all-positive input, last-window off-by-one, strict-vs-inclusive threshold, count > length degenerate); NOT yet difficulty-validated (gates doc §3.1)."
+  },
+  "wedgeWhitelistCheck": "Calor-arm contracts: (>= start 0), (> count 0) — comparisons over i32 parameters and integer literals; (<= (+ start count) §LEN values), (<= count §LEN values) — arithmetic and comparison against array length of a simple variable base (modeled-forms §2, ArrayLengthNode -> u32 $length variable); (>= result 0) on CountAbove. No function calls, no floats, no strings, no computed array bases, no generic-typed values appear in any contract. All functions are pure (§E{}), so no effect-manifest coverage is required.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

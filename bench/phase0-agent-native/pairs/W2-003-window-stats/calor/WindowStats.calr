@@ -1,0 +1,12 @@
+§M{m001:WindowStats}
+  §F{f001:WindowSum:pub} ([i32]:values, i32:start, i32:count) -> i32
+    §E{}
+    §Q (>= start 0)
+    §Q (> count 0)
+    §Q (<= (+ start count) §LEN values)
+    §B{~total:i32} 0
+    §B{~i:i32} start
+    §WH{wh1} (< i (+ start count))
+      §ASSIGN total (+ total §IDX values i)
+      §ASSIGN i (+ i 1)
+    §R total

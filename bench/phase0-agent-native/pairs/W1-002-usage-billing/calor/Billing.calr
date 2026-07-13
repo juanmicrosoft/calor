@@ -1,0 +1,11 @@
+§M{m001:Billing}
+  §F{f001:BillBasic:pub} (i32:units) -> i32
+    §E{}
+    §S (>= result 500)
+    §S (<= result 70500)
+    §B{~u:i32} units
+    §IF{if1} (< u 0)
+      §ASSIGN u 0
+    §IF{if2} (> u 100000)
+      §ASSIGN u 100000
+    §R (+ (/ (* u 7) 10) 500)

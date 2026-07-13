@@ -1,0 +1,48 @@
+§M{m001:Billing}
+  §F{f001:NormalizeUsage:pri} (i32:units) -> i32
+    §E{}
+    §S (>= result 0)
+    §S (<= result 100000)
+    §IF{if1} (< units 0)
+      §R 0
+    §IF{if2} (> units 100000)
+      §R 100000
+    §R units
+
+  §F{f002:BillBasic:pub} (i32:units) -> i32
+    §E{}
+    §S (>= result 500)
+    §S (<= result 70500)
+    §B{u:i32} §C{NormalizeUsage} §A units §/C
+    §R (+ (/ (* u 7) 10) 500)
+
+  §F{f003:BillPro:pub} (i32:units) -> i32
+    §E{}
+    §S (>= result 300)
+    §S (<= result 80400)
+    §B{u:i32} §C{NormalizeUsage} §A units §/C
+    §IF{if3} (<= u 1000)
+      §R (+ (/ (* u 9) 10) 300)
+    §B{tier1:i32} (/ (* 1000 9) 10)
+    §B{tier2:i32} (/ (* (- u 1000) 8) 10)
+    §R (+ (+ tier1 tier2) 300)
+
+  §F{f004:BillCapped:pub} (i32:units, i32:cap) -> i32
+    §E{}
+    §Q (>= cap 0)
+    §S (>= result 0)
+    §S (<= result cap)
+    §B{price:i32} §C{BillPro} §A units §/C
+    §IF{if4} (> price cap)
+      §R cap
+    §R price
+
+  §F{f005:CheaperPlan:pub} (i32:units) -> i32
+    §E{}
+    §S (>= result 0)
+    §S (<= result 1)
+    §B{basic:i32} §C{BillBasic} §A units §/C
+    §B{pro:i32} §C{BillPro} §A units §/C
+    §IF{if5} (<= basic pro)
+      §R 0
+    §R 1

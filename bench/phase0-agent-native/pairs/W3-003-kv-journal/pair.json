@@ -1,0 +1,35 @@
+{
+  "id": "W3-003-kv-journal",
+  "category": "W3",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 7,
+    "calorDeclCount": 7,
+    "csharpComplexity": 18,
+    "calorComplexity": 18,
+    "notes": "Counted on the reference solutions (both arms structurally parallel): 1 static class/module + Set (1) + KeyOf (branch, 2) + ValueOf (branch, 2) + Get (exists guard + loop + branch, 4) + CountKeys (exists guard + loop + branch, 4) + Compact (exists guard + first-appearance loop with branch + rebuild loop, 5) = 18 per arm, ratio 1.0. Complexity = 1 per function + 1 per branch/loop. Second-wave hardness pair (last-write-wins, first-'=' split, prefix keys, first-appearance compaction order, must-not-create-file); NOT yet difficulty-validated (gates doc §3.1)."
+  },
+  "wedgeWhitelistCheck": "No contracts in the fixtures or reference solutions (W3 exercises effect boundaries, not the prover). Effect boundaries are manifest-covered: File.AppendAllText (fs:w), File.Exists / File.ReadAllLines (fs:r), File.WriteAllText (fs:w) — all present in the bcl-io manifest; list mutation declares the enforced 'mut' effect. All code is first-order: no delegates, no lambdas, no function values.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

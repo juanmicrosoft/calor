@@ -1,0 +1,52 @@
+§M{m001:Spans}
+  §F{f001:TotalCovered:pub} ([i32]:starts, [i32]:ends) -> i32
+    §E{}
+    §Q (== §LEN starts §LEN ends)
+    §S (>= result 0)
+    §B{~total:i32} 0
+    §B{~i:i32} 0
+    §WH{wh1} (< i §LEN starts)
+      §ASSIGN total (+ total (- §IDX ends i §IDX starts i))
+      §ASSIGN i (+ i 1)
+    §R total
+
+  §F{f002:ContainsPoint:pub} ([i32]:starts, [i32]:ends, i32:x) -> bool
+    §E{}
+    §Q (== §LEN starts §LEN ends)
+    §B{~i:i32} 0
+    §WH{wh2} (< i §LEN starts)
+      §IF{if1} (&& (>= x §IDX starts i) (< x §IDX ends i))
+        §R true
+      §ASSIGN i (+ i 1)
+    §R false
+
+  §F{f003:ClipCovered:pub} ([i32]:starts, [i32]:ends, i32:lo, i32:hi) -> i32
+    §E{}
+    §Q (== §LEN starts §LEN ends)
+    §Q (<= lo hi)
+    §S (>= result 0)
+    §B{~total:i32} 0
+    §B{~i:i32} 0
+    §WH{wh3} (< i §LEN starts)
+      §B{~s:i32} §IDX starts i
+      §B{~e:i32} §IDX ends i
+      §IF{if2} (< s lo)
+        §ASSIGN s lo
+      §IF{if3} (> e hi)
+        §ASSIGN e hi
+      §IF{if4} (> e s)
+        §ASSIGN total (+ total (- e s))
+      §ASSIGN i (+ i 1)
+    §R total
+
+  §F{f004:GapCount:pub} ([i32]:starts, [i32]:ends) -> i32
+    §E{}
+    §Q (== §LEN starts §LEN ends)
+    §S (>= result 0)
+    §B{~n:i32} 0
+    §B{~i:i32} 1
+    §WH{wh4} (< i §LEN starts)
+      §IF{if5} (> §IDX starts i §IDX ends (- i 1))
+        §ASSIGN n (+ n 1)
+      §ASSIGN i (+ i 1)
+    §R n
