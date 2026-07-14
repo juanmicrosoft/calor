@@ -1,0 +1,92 @@
+§M{m001:OrderPipeline}
+  §F{f001:IsValidOrder:pub} (i32:qty, i32:unitPrice) -> bool
+    §E{}
+    §R (&& (>= qty 1) (&& (<= qty 1000) (>= unitPrice 0)))
+
+  §F{f002:TierDiscountBps:pub} (i32:tier) -> i32
+    §E{}
+    §IF{if1} (== tier 1)
+      §R 500
+    §EI (== tier 2)
+      §R 1000
+    §EI (== tier 3)
+      §R 1500
+    §R 0
+
+  §F{f003:Subtotal:pub} (i32:qty, i32:unitPrice) -> i32
+    §E{}
+    §R (* qty unitPrice)
+
+  §F{f004:DiscountAmount:pub} (i32:subtotal, i32:tier) -> i32
+    §E{}
+    §B{bps:i32} §C{TierDiscountBps} §A tier §/C
+    §R (/ (* subtotal bps) 10000)
+
+  §F{f005:TaxAmount:pub} (i32:amount, i32:taxRateBps) -> i32
+    §E{}
+    §R (/ (* amount taxRateBps) 10000)
+
+  §F{f006:OrderTotal:pub} (i32:qty, i32:unitPrice, i32:tier, i32:taxRateBps) -> i32
+    §E{}
+    §B{valid:bool} §C{IsValidOrder} §A qty §A unitPrice §/C
+    §IF{if2} (! valid)
+      §R 0
+    §B{sub:i32} §C{Subtotal} §A qty §A unitPrice §/C
+    §B{disc:i32} §C{DiscountAmount} §A sub §A tier §/C
+    §B{net:i32} (- sub disc)
+    §B{tax:i32} §C{TaxAmount} §A net §A taxRateBps §/C
+    §R (+ net tax)
+
+  §F{f007:CanTransition:pub} (i32:fromState, i32:toState) -> bool
+    §E{}
+    §IF{if3} (== fromState 0)
+      §R (|| (== toState 1) (== toState 4))
+    §IF{if4} (== fromState 1)
+      §R (|| (== toState 2) (== toState 4))
+    §IF{if5} (== fromState 2)
+      §R (== toState 3)
+    §R false
+
+  §F{f008:ApplyTransition:pub} (i32:state, i32:toState) -> i32
+    §E{}
+    §B{allowed:bool} §C{CanTransition} §A state §A toState §/C
+    §IF{if8} allowed
+      §R toState
+    §R state
+
+  §F{f009:RecordOrder:pub} (Dictionary<str, i32>:totals, str:customer, i32:amount) -> void
+    §E{mut}
+    §IF{if9} §HAS{totals} §KEY customer
+      §PUT{totals} customer (+ §IDX totals customer amount)
+    §EL
+      §PUT{totals} customer amount
+
+  §F{f010:CustomerTotal:pub} (Dictionary<str, i32>:totals, str:customer) -> i32
+    §E{}
+    §IF{if10} (! §HAS{totals} §KEY customer)
+      §R 0
+    §R §IDX totals customer
+
+  §F{f011:GrandTotal:pub} (Dictionary<str, i32>:totals) -> i32
+    §E{}
+    §B{~total:i32} 0
+    §EACHKV{e1:customer:amount} totals
+      §ASSIGN total (+ total amount)
+    §R total
+
+  §F{f012:ActiveCustomers:pub} (Dictionary<str, i32>:totals) -> i32
+    §E{}
+    §B{~count:i32} 0
+    §EACHKV{e2:customer2:amount2} totals
+      §ASSIGN count (+ count 1)
+    §R count
+
+  §F{f013:ProcessOrder:pub} (Dictionary<str, i32>:totals, str:customer, i32:qty, i32:unitPrice, i32:tier, i32:taxRateBps) -> i32
+    §E{mut}
+    §B{valid:bool} §C{IsValidOrder} §A qty §A unitPrice §/C
+    §IF{if11} (! valid)
+      §R 0
+    §B{total:i32} §C{OrderTotal} §A qty §A unitPrice §A tier §A taxRateBps §/C
+    §IF{if12} (> total 0)
+      §C{RecordOrder} §A totals §A customer §A total §/C
+    §R total

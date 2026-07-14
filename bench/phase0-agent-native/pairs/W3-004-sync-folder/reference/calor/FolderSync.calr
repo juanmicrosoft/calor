@@ -1,0 +1,202 @@
+§M{m001:FolderSync}
+  §F{f001:EntryName:pri} (str:line) -> str
+    §E{}
+    §B{sep:i32} (indexof line "|" :ordinal)
+    §IF{if1} (< sep 0)
+      §R line
+    §R (substr line 0 sep)
+
+  §F{f002:EntryStamp:pri} (str:line) -> i32
+    §E{}
+    §B{sep:i32} (indexof line "|" :ordinal)
+    §IF{if2} (< sep 0)
+      §R -1
+    §B{digits:str} (substr line (+ sep 1) (- (len line) (+ sep 1)))
+    §R §C{Int32.Parse} §A digits §/C
+
+  §F{f003:FormatEntry:pri} (str:name, i32:stamp) -> str
+    §E{}
+    §R (+ name (+ "|" §C{stamp.ToString} §/C))
+
+  §F{f004:IndexHas:pub} (str:path, str:name) -> bool
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if3} (! exists)
+      §R false
+    §B{prefix:str} (+ name "|")
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §EACH{e1:line} lines
+      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §IF{if4} matches
+        §R true
+    §R false
+
+  §F{f005:IndexStamp:pub} (str:path, str:name) -> i32
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if5} (! exists)
+      §R -1
+    §B{prefix:str} (+ name "|")
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §EACH{e2:line} lines
+      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §IF{if6} matches
+        §R §C{EntryStamp} §A line §/C
+    §R -1
+
+  §F{f006:WriteIndexEntry:pub} (str:path, str:name, i32:stamp) -> void
+    §E{fs:rw}
+    §B{entry:str} §C{FormatEntry} §A name §A stamp §/C
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if7} (! exists)
+      §C{File.AppendAllText} §A path §A (+ entry "\n") §/C
+      §R
+    §B{prefix:str} (+ name "|")
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §B{~content:str} ""
+    §B{~found:bool} false
+    §EACH{e3:line} lines
+      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §IF{if8} (&& (! found) matches)
+        §ASSIGN content (+ content (+ entry "\n"))
+        §ASSIGN found true
+      §EL
+        §ASSIGN content (+ content (+ line "\n"))
+    §IF{if9} (! found)
+      §ASSIGN content (+ content (+ entry "\n"))
+    §C{File.WriteAllText} §A path §A content §/C
+
+  §F{f007:RemoveIndexEntry:pub} (str:path, str:name) -> void
+    §E{fs:rw}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if10} (! exists)
+      §R
+    §B{prefix:str} (+ name "|")
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §B{~content:str} ""
+    §EACH{e4:line} lines
+      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §IF{if11} (! matches)
+        §ASSIGN content (+ content (+ line "\n"))
+    §C{File.WriteAllText} §A path §A content §/C
+
+  §F{f008:CopyNewer:pub} (str:sourcePath, str:targetPath) -> i32
+    §E{fs:rw}
+    §B{exists:bool} §C{File.Exists} §A sourcePath §/C
+    §IF{if12} (! exists)
+      §R 0
+    §B{lines:[str]} §C{File.ReadAllLines} §A sourcePath §/C
+    §B{~count:i32} 0
+    §EACH{e5:line} lines
+      §B{name:str} §C{EntryName} §A line §/C
+      §B{s:i32} §C{EntryStamp} §A line §/C
+      §B{t:i32} §C{IndexStamp} §A targetPath §A name §/C
+      §IF{if13} (> s t)
+        §C{WriteIndexEntry} §A targetPath §A name §A s §/C
+        §ASSIGN count (+ count 1)
+    §R count
+
+  §F{f009:PruneOrphans:pub} (str:sourcePath, str:targetPath) -> i32
+    §E{fs:rw}
+    §B{exists:bool} §C{File.Exists} §A targetPath §/C
+    §IF{if14} (! exists)
+      §R 0
+    §B{lines:[str]} §C{File.ReadAllLines} §A targetPath §/C
+    §B{~count:i32} 0
+    §EACH{e6:line} lines
+      §B{name:str} §C{EntryName} §A line §/C
+      §B{present:bool} §C{IndexHas} §A sourcePath §A name §/C
+      §IF{if15} (! present)
+        §C{RemoveIndexEntry} §A targetPath §A name §/C
+        §ASSIGN count (+ count 1)
+    §R count
+
+  §F{f010:DryRunReport:pub} (str:sourcePath, str:targetPath) -> str
+    §E{fs:r}
+    §B{~report:str} ""
+    §B{srcExists:bool} §C{File.Exists} §A sourcePath §/C
+    §IF{if16} srcExists
+      §B{srcLines:[str]} §C{File.ReadAllLines} §A sourcePath §/C
+      §EACH{e7:line} srcLines
+        §B{name:str} §C{EntryName} §A line §/C
+        §B{s:i32} §C{EntryStamp} §A line §/C
+        §B{t:i32} §C{IndexStamp} §A targetPath §A name §/C
+        §IF{if17} (> s t)
+          §ASSIGN report (+ report (+ "copy " (+ name "\n")))
+    §B{tgtExists:bool} §C{File.Exists} §A targetPath §/C
+    §IF{if18} tgtExists
+      §B{tgtLines:[str]} §C{File.ReadAllLines} §A targetPath §/C
+      §EACH{e8:line2} tgtLines
+        §B{name2:str} §C{EntryName} §A line2 §/C
+        §B{present:bool} §C{IndexHas} §A sourcePath §A name2 §/C
+        §IF{if19} (! present)
+          §ASSIGN report (+ report (+ "prune " (+ name2 "\n")))
+    §R report
+
+  §F{f011:Sync:pub} (str:sourcePath, str:targetPath) -> i32
+    §E{fs:rw}
+    §B{copied:i32} §C{CopyNewer} §A sourcePath §A targetPath §/C
+    §B{pruned:i32} §C{PruneOrphans} §A sourcePath §A targetPath §/C
+    §R (+ copied pruned)
+
+  §F{f012:RecordDelete:pub} (str:tombstonePath, str:name, i32:stamp) -> void
+    §E{fs:rw}
+    §B{existing:i32} §C{IndexStamp} §A tombstonePath §A name §/C
+    §IF{if20} (>= existing stamp)
+      §R
+    §C{WriteIndexEntry} §A tombstonePath §A name §A stamp §/C
+
+  §F{f013:SyncTwoWay:pub} (str:sourcePath, str:targetPath, str:tombstonePath) -> i32
+    §E{fs:rw,mut}
+    §B{~actions:i32} 0
+    §LIST{srcNames:str}
+    §/LIST{srcNames}
+    §LIST{tgtSnapshot:str}
+    §/LIST{tgtSnapshot}
+    §B{tgtExists:bool} §C{File.Exists} §A targetPath §/C
+    §IF{if21} tgtExists
+      §B{tgtLines:[str]} §C{File.ReadAllLines} §A targetPath §/C
+      §EACH{e9:tline} tgtLines
+        §PUSH{tgtSnapshot} tline
+    §B{srcExists:bool} §C{File.Exists} §A sourcePath §/C
+    §IF{if22} srcExists
+      §B{srcLines:[str]} §C{File.ReadAllLines} §A sourcePath §/C
+      §EACH{e10:line} srcLines
+        §B{name:str} §C{EntryName} §A line §/C
+        §PUSH{srcNames} name
+        §B{s:i32} §C{EntryStamp} §A line §/C
+        §B{t:i32} §C{IndexStamp} §A targetPath §A name §/C
+        §B{d:i32} §C{IndexStamp} §A tombstonePath §A name §/C
+        §B{~m:i32} s
+        §IF{if23} (> t m)
+          §ASSIGN m t
+        §IF{if24} (>= d m)
+          §C{RemoveIndexEntry} §A sourcePath §A name §/C
+          §ASSIGN actions (+ actions 1)
+          §IF{if25} (>= t 0)
+            §C{RemoveIndexEntry} §A targetPath §A name §/C
+            §ASSIGN actions (+ actions 1)
+        §EI (> s t)
+          §C{WriteIndexEntry} §A targetPath §A name §A s §/C
+          §ASSIGN actions (+ actions 1)
+        §EI (> t s)
+          §C{WriteIndexEntry} §A sourcePath §A name §A t §/C
+          §ASSIGN actions (+ actions 1)
+    §EACH{e11:tline2} tgtSnapshot
+      §B{name2:str} §C{EntryName} §A tline2 §/C
+      §IF{if26} (! §HAS{srcNames} name2)
+        §B{t2:i32} §C{EntryStamp} §A tline2 §/C
+        §B{d2:i32} §C{IndexStamp} §A tombstonePath §A name2 §/C
+        §IF{if27} (>= d2 t2)
+          §C{RemoveIndexEntry} §A targetPath §A name2 §/C
+          §ASSIGN actions (+ actions 1)
+        §EL
+          §C{WriteIndexEntry} §A sourcePath §A name2 §A t2 §/C
+          §ASSIGN actions (+ actions 1)
+    §R actions
+
+  §F{f014:SyncWithPolicy:pub} (str:sourcePath, str:targetPath, str:tombstonePath, bool:twoWay) -> i32
+    §E{fs:rw,mut}
+    §IF{if28} twoWay
+      §R §C{SyncTwoWay} §A sourcePath §A targetPath §A tombstonePath §/C
+    §R §C{Sync} §A sourcePath §A targetPath §/C

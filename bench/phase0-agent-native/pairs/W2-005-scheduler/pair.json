@@ -1,0 +1,35 @@
+{
+  "id": "W2-005-scheduler",
+  "category": "W2",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 14,
+    "calorDeclCount": 14,
+    "csharpComplexity": 44,
+    "calorComplexity": 44,
+    "notes": "Counted on the reference solutions (both arms structurally parallel): 1 static class/module + 13 functions. Complexity = 1 per function + 1 per branch/loop: IsValidInterval 1, Overlaps 1, ConflictIndex 4, HasConflict 1, AddBooking 3, Cancel 2, NextFreeStart 3, ActiveCount 3, OverlapLength 4, BusyTime 3, UtilizationPercent 1, PriorityAt 4, AddWithPreemption 13 = 43, +1 = 44. Third-wave hardness model (scale + interaction, per epochs/hardness-check-001/VERDICT.md): contract-dense modification on a complete working 12-function interval scheduler. The task (priority preemption with displacement) must maintain the cross-function no-overlap invariant that ConflictIndex, BusyTime, UtilizationPercent, and PriorityAt all silently depend on; naive displacement (drop the displaced booking at the new booking's end without re-checking conflicts, or relocate against the pre-displacement state) corrupts the timetable in ways only the invariant-probing held-out tests catch. Starting fixture compiles and passes the preserved-behavior subset conceptually; held-out suite is red until AddWithPreemption lands (absent from the pinned surface). NOT yet difficulty-validated (gates doc 3.1/3.6)."
+  },
+  "wedgeWhitelistCheck": "Calor-arm contracts: all preconditions are binary comparisons over i32 parameters, signed 32-bit integer literals, and array length of simple variable bases via LEN (modeled-forms 1: i32 -> BitVec32, T[] -> Array with u32 $length companion; 2: binary comparison operators, integer literals, simple variable references). Postconditions: (>= result -1) on ConflictIndex/AddBooking/NextFreeStart/AddWithPreemption, (>= result 0) on ActiveCount/OverlapLength. No function calls, no floats, no strings, no computed array bases, no generic-typed values appear in any contract. Mutating functions (AddBooking, Cancel, AddWithPreemption) declare E{mut} (heap mutation); all others are pure E{}. No manifest-checked BCL effect boundaries are crossed (W2 category), so no effect-manifest coverage is required beyond mut enforcement, which is compiler-checked.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 900
+}

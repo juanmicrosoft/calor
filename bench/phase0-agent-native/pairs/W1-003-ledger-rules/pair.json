@@ -1,0 +1,35 @@
+{
+  "id": "W1-003-ledger-rules",
+  "category": "W1",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 16,
+    "calorDeclCount": 16,
+    "csharpComplexity": 34,
+    "calorComplexity": 34,
+    "notes": "Counted on the reference solutions (both arms structurally parallel): 1 static class/module + 15 functions. Complexity = 1 per function + 1 per branch/loop: EntryFee 3, IsValidAccount 1, IsValidAmount 1, PostEntry 1, AccountBalance 4, TotalDebited 3, TotalCredited 3, TotalVolume 2, FeesCollected 1, TransferCost 3, CanAfford 1, Transfer 2, BatchPost 2, BatchTransfer 5, ReverseEntry 1 = 33, +1 = 34. Third-wave hardness model (scale + interaction, per epochs/hardness-check-001/VERDICT.md): modification-under-constraint on a complete working 14-function double-entry ledger. The fee schedule is computed at three sites (EntryFee helper; inlined on the costing path in TransferCost/CanAfford; inlined on the batch path in BatchTransfer) - a naive fee change updates only the helper and silently breaks batch totals, transfer-cost symmetry, and affordability boundaries, all probed by held-out tests on distant functions. Starting fixture compiles and passes the preserved-behavior subset conceptually; held-out suite is red until the modification lands (ReverseEntry absent from the pinned surface). NOT yet difficulty-validated (gates doc 3.1/3.6)."
+  },
+  "wedgeWhitelistCheck": "Calor-arm contracts: all preconditions are binary comparisons over i32 parameters, signed 32-bit integer literals, arithmetic (+ count 1), (+ count 2), (+ count n), (* 2 n), and array length of simple variable bases via LEN (modeled-forms 1: i32 -> BitVec32, T[] -> Array with u32 $length companion; 2: binary operators, integer literals, simple references). Postconditions: (>= result 0), (>= result amount), (>= result (+ count 1)), (== result (+ count 1)). No function calls, no floats, no strings, no computed array bases, no generic-typed values appear in any contract. Mutating functions (PostEntry, Transfer, BatchPost, BatchTransfer, ReverseEntry) declare E{mut} (heap mutation); pure functions declare E{}. No manifest-checked BCL effect boundaries are crossed (W1 category), so no effect-manifest coverage is required beyond mut enforcement, which is compiler-checked.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 900
+}

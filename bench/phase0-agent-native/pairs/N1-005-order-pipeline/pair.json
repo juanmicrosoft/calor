@@ -1,0 +1,41 @@
+{
+  "id": "N1-005-order-pipeline",
+  "category": "N1",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 17,
+    "calorDeclCount": 17,
+    "csharpComplexity": 40,
+    "calorComplexity": 40,
+    "notes": "Wave-3 neutral modification pair (hardness-check-001 verdict: hardness from scale and interaction). Counted on the reference solutions, which are structurally identical. Decls: 1 static class/module + 16 functions. Complexity = 1 per function + 1 per branch/loop/&&/||: IsValidOrder 3, TierDiscountBps 4, Subtotal 1, DiscountAmount 1, TaxAmount 1, OrderTotal 2, CanTransition 8, ApplyTransition 2, RecordOrder 2, CustomerTotal 2, GrandTotal 2, ActiveCustomers 2, ProcessOrder 3, RefundAmount 1, RecordRefund 3, ProcessReturn 3 = 40 per arm, ratio 1.0. Starting fixtures are the identical complete 13-function pipeline in both arms (decls 14, complexity 31: CanTransition starts at 6 without the two return transitions). Dictionary<string,int> aggregation is native in both arms; the Calor mutating functions declare the enforced 'mut' effect, which the fixture demonstrates on RecordOrder/ProcessOrder. NOT yet difficulty-validated (gates doc §3.1).",
+    "startingFixture": {
+      "csharpDeclCount": 14,
+      "calorDeclCount": 14,
+      "csharpComplexity": 31,
+      "calorComplexity": 31
+    }
+  },
+  "wedgeWhitelistCheck": "n/a (neutral category). No contracts; no I/O effects; pure integer arithmetic plus in-place Dictionary mutation ('mut' under the bcl-system Dictionary mapping). First-order code: no delegates, no lambdas, no LINQ.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}
