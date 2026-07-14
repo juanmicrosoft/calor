@@ -31,5 +31,7 @@
   },
   "wedgeWhitelistCheck": "Calor-arm contracts: (== §LEN starts §LEN ends) — equality over the lengths of two simple-variable array bases (modeled-forms §2, ArrayLengthNode -> u32 $length variable, one per array); (<= lo hi) — comparison over i32 parameters; (>= result 0) on TotalCovered/ClipCovered/GapCount. No function calls, no floats, no strings, no computed array bases, no generic-typed values appear in any contract. All functions are pure (§E{}), so no effect-manifest coverage is required.",
   "iterationBudget": 10,
-  "timeoutSeconds": 600
+  "timeoutSeconds": 600,
+  "gateEligible": false,
+  "retiredReason": "hardness-check-001: at ceiling; cannot power the 2a gate"
 }

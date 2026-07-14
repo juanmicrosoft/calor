@@ -1,0 +1,197 @@
+// Double-entry mini-ledger over parallel arrays.
+// Entry i = (debits[i], credits[i], amounts[i]): moves amounts[i] from the
+// debit account to the credit account. Account 0 is the house fee account.
+// Callers keep every amount in 1 .. 999999 so 32-bit arithmetic never wraps.
+§M{m001:Ledger}
+  §F{f001:EntryFee:pub} (i32:amount) -> i32
+    §E{}
+    §Q (> amount 0)
+    §Q (< amount 1000000)
+    §S (>= result 0)
+    §IF{if101} (>= amount 2000)
+      §R 0
+    §IF{if102} (< amount 100)
+      §R 1
+    §R (/ amount 100)
+
+  §F{f002:IsValidAccount:pub} (i32:account, i32:accountCount) -> bool
+    §E{}
+    §R (&& (>= account 0) (< account accountCount))
+
+  §F{f003:IsValidAmount:pub} (i32:amount) -> bool
+    §E{}
+    §R (&& (> amount 0) (< amount 1000000))
+
+  §F{f004:PostEntry:pub} ([i32]:debits, [i32]:credits, [i32]:amounts, i32:count, i32:debitAcct, i32:creditAcct, i32:amount) -> i32
+    §E{mut}
+    §Q (>= count 0)
+    §Q (< count §LEN debits)
+    §Q (< count §LEN credits)
+    §Q (< count §LEN amounts)
+    §S (== result (+ count 1))
+    §SETIDX{debits} count debitAcct
+    §SETIDX{credits} count creditAcct
+    §SETIDX{amounts} count amount
+    §R (+ count 1)
+
+  §F{f005:AccountBalance:pub} ([i32]:debits, [i32]:credits, [i32]:amounts, i32:count, i32:account) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN debits)
+    §Q (<= count §LEN credits)
+    §Q (<= count §LEN amounts)
+    §B{~total:i32} 0
+    §B{~i:i32} 0
+    §WH{wh501} (< i count)
+      §B{amt:i32} §IDX amounts i
+      §IF{if501} (== §IDX credits i account)
+        §ASSIGN total (+ total amt)
+      §IF{if502} (== §IDX debits i account)
+        §ASSIGN total (- total amt)
+      §ASSIGN i (+ i 1)
+    §R total
+
+  §F{f006:TotalDebited:pub} ([i32]:debits, [i32]:amounts, i32:count, i32:account) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN debits)
+    §Q (<= count §LEN amounts)
+    §B{~total:i32} 0
+    §B{~i:i32} 0
+    §WH{wh601} (< i count)
+      §IF{if601} (== §IDX debits i account)
+        §B{amt:i32} §IDX amounts i
+        §ASSIGN total (+ total amt)
+      §ASSIGN i (+ i 1)
+    §R total
+
+  §F{f007:TotalCredited:pub} ([i32]:credits, [i32]:amounts, i32:count, i32:account) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN credits)
+    §Q (<= count §LEN amounts)
+    §B{~total:i32} 0
+    §B{~i:i32} 0
+    §WH{wh701} (< i count)
+      §IF{if701} (== §IDX credits i account)
+        §B{amt:i32} §IDX amounts i
+        §ASSIGN total (+ total amt)
+      §ASSIGN i (+ i 1)
+    §R total
+
+  §F{f008:TotalVolume:pub} ([i32]:amounts, i32:count) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN amounts)
+    §B{~total:i32} 0
+    §B{~i:i32} 0
+    §WH{wh801} (< i count)
+      §ASSIGN total (+ total §IDX amounts i)
+      §ASSIGN i (+ i 1)
+    §R total
+
+  §F{f009:FeesCollected:pub} ([i32]:credits, [i32]:amounts, i32:count) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN credits)
+    §Q (<= count §LEN amounts)
+    §B{fees:i32} §C{TotalCredited} §A credits §A amounts §A count §A 0 §/C
+    §R fees
+
+  §F{f010:TransferCost:pub} (i32:amount) -> i32
+    §E{}
+    §Q (> amount 0)
+    §Q (< amount 1000000)
+    §S (>= result amount)
+    // Fee schedule applied inline on the costing path.
+    §IF{if1001} (>= amount 2000)
+      §R amount
+    §IF{if1002} (< amount 100)
+      §R (+ amount 1)
+    §R (+ amount (/ amount 100))
+
+  §F{f011:CanAfford:pub} (i32:balance, i32:amount) -> bool
+    §E{}
+    §Q (> amount 0)
+    §Q (< amount 1000000)
+    §B{cost:i32} §C{TransferCost} §A amount §/C
+    §R (>= balance cost)
+
+  §F{f012:Transfer:pub} ([i32]:debits, [i32]:credits, [i32]:amounts, i32:count, i32:fromAcct, i32:toAcct, i32:amount) -> i32
+    §E{mut}
+    §Q (>= count 0)
+    §Q (<= (+ count 2) §LEN debits)
+    §Q (<= (+ count 2) §LEN credits)
+    §Q (<= (+ count 2) §LEN amounts)
+    §S (>= result (+ count 1))
+    §B{next:i32} §C{PostEntry} §A debits §A credits §A amounts §A count §A fromAcct §A toAcct §A amount §/C
+    §B{fee:i32} §C{EntryFee} §A amount §/C
+    §IF{if1201} (> fee 0)
+      §B{next2:i32} §C{PostEntry} §A debits §A credits §A amounts §A next §A fromAcct §A 0 §A fee §/C
+      §R next2
+    §R next
+
+  §F{f013:BatchPost:pub} ([i32]:debits, [i32]:credits, [i32]:amounts, i32:count, [i32]:fromAccts, [i32]:toAccts, [i32]:batchAmounts, i32:n) -> i32
+    §E{mut}
+    §Q (>= count 0)
+    §Q (>= n 0)
+    §Q (<= n §LEN fromAccts)
+    §Q (<= n §LEN toAccts)
+    §Q (<= n §LEN batchAmounts)
+    §Q (<= (+ count n) §LEN debits)
+    §Q (<= (+ count n) §LEN credits)
+    §Q (<= (+ count n) §LEN amounts)
+    §B{~cur:i32} count
+    §B{~i:i32} 0
+    §WH{wh1301} (< i n)
+      §B{fromAcct:i32} §IDX fromAccts i
+      §B{toAcct:i32} §IDX toAccts i
+      §B{amt:i32} §IDX batchAmounts i
+      §ASSIGN cur §C{PostEntry} §A debits §A credits §A amounts §A cur §A fromAcct §A toAcct §A amt §/C
+      §ASSIGN i (+ i 1)
+    §R cur
+
+  §F{f014:BatchTransfer:pub} ([i32]:debits, [i32]:credits, [i32]:amounts, i32:count, [i32]:fromAccts, [i32]:toAccts, [i32]:batchAmounts, i32:n) -> i32
+    §E{mut}
+    §Q (>= count 0)
+    §Q (>= n 0)
+    §Q (<= n §LEN fromAccts)
+    §Q (<= n §LEN toAccts)
+    §Q (<= n §LEN batchAmounts)
+    §Q (<= (+ count (* 2 n)) §LEN debits)
+    §Q (<= (+ count (* 2 n)) §LEN credits)
+    §Q (<= (+ count (* 2 n)) §LEN amounts)
+    §B{~cur:i32} count
+    §B{~i:i32} 0
+    §WH{wh1401} (< i n)
+      §B{fromAcct:i32} §IDX fromAccts i
+      §B{toAcct:i32} §IDX toAccts i
+      §B{amt:i32} §IDX batchAmounts i
+      §ASSIGN cur §C{PostEntry} §A debits §A credits §A amounts §A cur §A fromAcct §A toAcct §A amt §/C
+      // Fee schedule applied inline on the batch path.
+      §B{~fee:i32} 0
+      §IF{if1401} (>= amt 2000)
+        §ASSIGN fee 0
+      §EI (< amt 100)
+        §ASSIGN fee 1
+      §EL
+        §ASSIGN fee (/ amt 100)
+      §IF{if1402} (> fee 0)
+        §ASSIGN cur §C{PostEntry} §A debits §A credits §A amounts §A cur §A fromAcct §A 0 §A fee §/C
+      §ASSIGN i (+ i 1)
+    §R cur
+
+  §F{f015:ReverseEntry:pub} ([i32]:debits, [i32]:credits, [i32]:amounts, i32:count, i32:index) -> i32
+    §E{mut}
+    §Q (>= count 0)
+    §Q (>= index 0)
+    §Q (< index count)
+    §Q (< count §LEN debits)
+    §Q (< count §LEN credits)
+    §Q (< count §LEN amounts)
+    §S (== result (+ count 1))
+    §B{d:i32} §IDX debits index
+    §B{c:i32} §IDX credits index
+    §B{a:i32} §IDX amounts index
+    §B{next:i32} §C{PostEntry} §A debits §A credits §A amounts §A count §A c §A d §A a §/C
+    §R next

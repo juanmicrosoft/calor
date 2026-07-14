@@ -1,0 +1,41 @@
+{
+  "id": "W3-004-sync-folder",
+  "category": "W3",
+  "spec": "spec.md",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 15,
+    "calorDeclCount": 15,
+    "csharpComplexity": 56,
+    "calorComplexity": 56,
+    "notes": "Wave-3 modification-under-constraint pair (hardness-check-001 verdict: hardness from scale and interaction, not edge-case density). Counted on the reference solutions, which are structurally identical (same helpers, same guards, same two-pass SyncTwoWay). Decls: 1 static class/module + 14 functions. Complexity = 1 per function + 1 per branch/loop/&&: EntryName 2, EntryStamp 2, FormatEntry 1, IndexHas 4, IndexStamp 4, WriteIndexEntry 6, RemoveIndexEntry 4, CopyNewer 4, PruneOrphans 4, DryRunReport 7, Sync 1, RecordDelete 2, SyncTwoWay 13, SyncWithPolicy 2 = 56 per arm, ratio 1.0. Starting fixtures are the identical 11-function complete one-way module in both arms. NOT yet difficulty-validated (gates doc §3.1).",
+    "startingFixture": {
+      "csharpDeclCount": 12,
+      "calorDeclCount": 12,
+      "csharpComplexity": 39,
+      "calorComplexity": 39
+    }
+  },
+  "wedgeWhitelistCheck": "No contracts in the fixtures or reference solutions (W3 exercises effect boundaries, not the prover). Every effect boundary is bcl-io manifest-covered: File.Exists / File.ReadAllLines -> fs:r; File.WriteAllText / File.AppendAllText -> fs:w. String operations (StartsWith, Substring, IndexOf, concatenation) are effect-free under bcl-system System.String; Int32.Parse is effect-free under bcl-system System.Int32. List mutation in SyncTwoWay declares the enforced 'mut' effect. All code is first-order: no delegates, no lambdas, no LINQ, no function values. The effects trap is real: the two new write paths (RecordDelete, SyncTwoWay writing BOTH indexes) require fs:rw (and mut for the name lists) or the Calor build fails under --enforce-effects.",
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

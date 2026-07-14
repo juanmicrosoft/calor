@@ -31,5 +31,7 @@
   },
   "wedgeWhitelistCheck": "No contracts in the starting fixtures; the task's effect boundaries (File.AppendAllText, File.ReadAllLines, File.Exists) are covered by bcl-io manifest entries. First-order code, no delegates.",
   "iterationBudget": 10,
-  "timeoutSeconds": 600
+  "timeoutSeconds": 600,
+  "gateEligible": false,
+  "retiredReason": "hardness-check-001: at ceiling; cannot power the 2a gate"
 }

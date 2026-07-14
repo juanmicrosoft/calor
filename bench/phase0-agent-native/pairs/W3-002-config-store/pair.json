@@ -31,5 +31,7 @@
   },
   "wedgeWhitelistCheck": "No contracts in the starting fixtures; the task's effect boundaries (File.Exists, File.ReadAllLines -> fs:r; File.WriteAllText -> fs:w) are covered by bcl-io manifest entries, and all string operations (StartsWith, Substring, concatenation) are effect-free under the bcl-system System.String mapping. First-order code, no delegates, no LINQ.",
   "iterationBudget": 10,
-  "timeoutSeconds": 600
+  "timeoutSeconds": 600,
+  "gateEligible": false,
+  "retiredReason": "hardness-check-001: at ceiling; cannot power the 2a gate"
 }

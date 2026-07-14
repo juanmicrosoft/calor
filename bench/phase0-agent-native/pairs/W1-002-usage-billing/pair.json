@@ -31,5 +31,7 @@
   },
   "wedgeWhitelistCheck": "Calor-arm contracts are all binary comparisons over i32 parameters, `result`, and signed 32-bit integer literals: (>= cap 0); result bounds (>= result 0/300/500), (<= result 1/cap/70500/80400/100000). Modeled per modeled-forms §1 (i32 -> BitVec32) and §2 (binary comparison operators, integer literals, simple variable references). No function calls, no floats, no strings, no arrays, no generic-typed values appear in any contract. All functions are pure (§E{}), so no effect-manifest coverage is required.",
   "iterationBudget": 10,
-  "timeoutSeconds": 600
+  "timeoutSeconds": 600,
+  "gateEligible": false,
+  "retiredReason": "hardness-check-001: at ceiling; cannot power the 2a gate"
 }

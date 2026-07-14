@@ -1,0 +1,217 @@
+// Interval booking scheduler over parallel arrays.
+// Booking i = [starts[i], ends[i]) with priority prios[i]; active[i] is 1
+// while the booking holds its slot and 0 once cancelled. count is the number
+// of booking records (including cancelled ones); capacity beyond count is
+// scratch space. Invariant: no two active bookings overlap.
+// Callers keep every time value in 0 .. 999999 so 32-bit arithmetic never wraps.
+§M{m001:Scheduler}
+  §F{f001:IsValidInterval:pub} (i32:s, i32:e) -> bool
+    §E{}
+    §R (&& (>= s 0) (< s e))
+
+  §F{f002:Overlaps:pub} (i32:s1, i32:e1, i32:s2, i32:e2) -> bool
+    §E{}
+    §R (&& (< s1 e2) (< s2 e1))
+
+  §F{f003:ConflictIndex:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:s, i32:e) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN starts)
+    §Q (<= count §LEN ends)
+    §Q (<= count §LEN active)
+    §S (>= result -1)
+    §B{~i:i32} 0
+    §WH{wh301} (< i count)
+      §IF{if301} (== §IDX active i 1)
+        §B{bs:i32} §IDX starts i
+        §B{be:i32} §IDX ends i
+        §B{ov:bool} §C{Overlaps} §A bs §A be §A s §A e §/C
+        §IF{if302} ov
+          §R i
+      §ASSIGN i (+ i 1)
+    §R -1
+
+  §F{f004:HasConflict:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:s, i32:e) -> bool
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN starts)
+    §Q (<= count §LEN ends)
+    §Q (<= count §LEN active)
+    §B{idx:i32} §C{ConflictIndex} §A starts §A ends §A active §A count §A s §A e §/C
+    §R (>= idx 0)
+
+  §F{f005:AddBooking:pub} ([i32]:starts, [i32]:ends, [i32]:prios, [i32]:active, i32:count, i32:s, i32:e, i32:prio) -> i32
+    §E{mut}
+    §Q (>= count 0)
+    §Q (< count §LEN starts)
+    §Q (< count §LEN ends)
+    §Q (< count §LEN prios)
+    §Q (< count §LEN active)
+    §S (>= result -1)
+    §B{valid:bool} §C{IsValidInterval} §A s §A e §/C
+    §IF{if501} (! valid)
+      §R -1
+    §B{conflict:bool} §C{HasConflict} §A starts §A ends §A active §A count §A s §A e §/C
+    §IF{if502} conflict
+      §R -1
+    §SETIDX{starts} count s
+    §SETIDX{ends} count e
+    §SETIDX{prios} count prio
+    §SETIDX{active} count 1
+    §R (+ count 1)
+
+  §F{f006:Cancel:pub} ([i32]:active, i32:count, i32:index) -> bool
+    §E{mut}
+    §Q (>= count 0)
+    §Q (>= index 0)
+    §Q (< index count)
+    §Q (<= count §LEN active)
+    §IF{if601} (== §IDX active index 1)
+      §SETIDX{active} index 0
+      §R BOOL:true
+    §R BOOL:false
+
+  §F{f007:NextFreeStart:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:duration, i32:earliest, i32:horizon) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (>= earliest 0)
+    §Q (<= count §LEN starts)
+    §Q (<= count §LEN ends)
+    §Q (<= count §LEN active)
+    §S (>= result -1)
+    §B{~t:i32} earliest
+    §WH{wh701} (<= (+ t duration) horizon)
+      §B{te:i32} (+ t duration)
+      §B{idx:i32} §C{ConflictIndex} §A starts §A ends §A active §A count §A t §A te §/C
+      §IF{if701} (< idx 0)
+        §R t
+      §ASSIGN t §IDX ends idx
+    §R -1
+
+  §F{f008:ActiveCount:pub} ([i32]:active, i32:count) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN active)
+    §S (>= result 0)
+    §B{~n:i32} 0
+    §B{~i:i32} 0
+    §WH{wh801} (< i count)
+      §IF{if801} (== §IDX active i 1)
+        §ASSIGN n (+ n 1)
+      §ASSIGN i (+ i 1)
+    §R n
+
+  §F{f009:OverlapLength:pub} (i32:s, i32:e, i32:winFrom, i32:winTo) -> i32
+    §E{}
+    §S (>= result 0)
+    §B{~lo:i32} s
+    §IF{if901} (> winFrom lo)
+      §ASSIGN lo winFrom
+    §B{~hi:i32} e
+    §IF{if902} (< winTo hi)
+      §ASSIGN hi winTo
+    §IF{if903} (<= hi lo)
+      §R 0
+    §R (- hi lo)
+
+  §F{f010:BusyTime:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:winFrom, i32:winTo) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN starts)
+    §Q (<= count §LEN ends)
+    §Q (<= count §LEN active)
+    §B{~total:i32} 0
+    §B{~i:i32} 0
+    §WH{wh1001} (< i count)
+      §IF{if1001} (== §IDX active i 1)
+        §B{bs:i32} §IDX starts i
+        §B{be:i32} §IDX ends i
+        §B{part:i32} §C{OverlapLength} §A bs §A be §A winFrom §A winTo §/C
+        §ASSIGN total (+ total part)
+      §ASSIGN i (+ i 1)
+    §R total
+
+  §F{f011:UtilizationPercent:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:winFrom, i32:winTo) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (>= winFrom 0)
+    §Q (< winFrom winTo)
+    §Q (<= count §LEN starts)
+    §Q (<= count §LEN ends)
+    §Q (<= count §LEN active)
+    §B{busy:i32} §C{BusyTime} §A starts §A ends §A active §A count §A winFrom §A winTo §/C
+    §R (/ (* busy 100) (- winTo winFrom))
+
+  §F{f012:PriorityAt:pub} ([i32]:starts, [i32]:ends, [i32]:prios, [i32]:active, i32:count, i32:t) -> i32
+    §E{}
+    §Q (>= count 0)
+    §Q (<= count §LEN starts)
+    §Q (<= count §LEN ends)
+    §Q (<= count §LEN prios)
+    §Q (<= count §LEN active)
+    §B{~i:i32} 0
+    §WH{wh1201} (< i count)
+      §IF{if1201} (== §IDX active i 1)
+        §B{bs:i32} §IDX starts i
+        §B{be:i32} §IDX ends i
+        §IF{if1202} (&& (<= bs t) (< t be))
+          §R §IDX prios i
+      §ASSIGN i (+ i 1)
+    §R -1
+
+  §F{f013:AddWithPreemption:pub} ([i32]:starts, [i32]:ends, [i32]:prios, [i32]:active, i32:count, i32:s, i32:e, i32:prio, i32:horizon) -> i32
+    §E{mut}
+    §Q (>= count 0)
+    §Q (< count §LEN starts)
+    §Q (< count §LEN ends)
+    §Q (< count §LEN prios)
+    §Q (< count §LEN active)
+    §S (>= result -1)
+    §B{valid:bool} §C{IsValidInterval} §A s §A e §/C
+    §IF{if1301} (! valid)
+      §R -1
+    // Reject when any conflicting active booking has priority >= prio.
+    §B{~blocked:bool} BOOL:false
+    §B{~i:i32} 0
+    §WH{wh1301} (< i count)
+      §IF{if1302} (== §IDX active i 1)
+        §B{bs:i32} §IDX starts i
+        §B{be:i32} §IDX ends i
+        §B{ov:bool} §C{Overlaps} §A bs §A be §A s §A e §/C
+        §IF{if1303} ov
+          §IF{if1304} (>= §IDX prios i prio)
+            §ASSIGN blocked BOOL:true
+      §ASSIGN i (+ i 1)
+    §IF{if1305} blocked
+      §R -1
+    // Remove every conflicting booking from the timetable (mark pending = 2).
+    §ASSIGN i 0
+    §WH{wh1302} (< i count)
+      §IF{if1306} (== §IDX active i 1)
+        §B{cs:i32} §IDX starts i
+        §B{ce:i32} §IDX ends i
+        §B{ov2:bool} §C{Overlaps} §A cs §A ce §A s §A e §/C
+        §IF{if1307} ov2
+          §SETIDX{active} i 2
+      §ASSIGN i (+ i 1)
+    // Place the new booking.
+    §SETIDX{starts} count s
+    §SETIDX{ends} count e
+    §SETIDX{prios} count prio
+    §SETIDX{active} count 1
+    §B{newCount:i32} (+ count 1)
+    // Re-place displaced bookings in increasing index order.
+    §ASSIGN i 0
+    §WH{wh1303} (< i count)
+      §IF{if1308} (== §IDX active i 2)
+        §B{ds:i32} §IDX starts i
+        §B{de:i32} §IDX ends i
+        §B{dur:i32} (- de ds)
+        §SETIDX{active} i 0
+        §B{slot:i32} §C{NextFreeStart} §A starts §A ends §A active §A newCount §A dur §A e §A horizon §/C
+        §IF{if1309} (>= slot 0)
+          §SETIDX{starts} i slot
+          §SETIDX{ends} i (+ slot dur)
+          §SETIDX{active} i 1
+      §ASSIGN i (+ i 1)
+    §R newCount

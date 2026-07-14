@@ -61,7 +61,18 @@
         "calorDeclCount": { "type": "integer", "minimum": 1 },
         "csharpComplexity": { "type": "integer", "minimum": 1 },
         "calorComplexity": { "type": "integer", "minimum": 1 },
-        "notes": { "type": "string" }
+        "notes": { "type": "string" },
+        "startingFixture": {
+          "type": "object",
+          "description": "Parity counts for the starting fixture (the code the agent begins from), when it differs from the reference solution the top-level counts are taken on.",
+          "required": ["csharpDeclCount", "calorDeclCount", "csharpComplexity", "calorComplexity"],
+          "properties": {
+            "csharpDeclCount": { "type": "integer", "minimum": 1 },
+            "calorDeclCount": { "type": "integer", "minimum": 1 },
+            "csharpComplexity": { "type": "integer", "minimum": 1 },
+            "calorComplexity": { "type": "integer", "minimum": 1 }
+          }
+        }
       }
     },
     "wedgeWhitelistCheck": {
@@ -76,6 +87,15 @@
       "type": "integer",
       "default": 600,
       "description": "Task-level timeout. A timeout mid-iteration fails that iteration (gates doc §2). Per-pair values must be set before freeze; not adjustable afterward."
+    },
+    "gateEligible": {
+      "type": "boolean",
+      "default": true,
+      "description": "When false, the pair is excluded from hardness/§3.6 pooling and can never contribute to the 2a gate. Set only with a retiredReason."
+    },
+    "retiredReason": {
+      "type": "string",
+      "description": "Why the pair was retired from gate eligibility (e.g. a hardness-check epoch found it at ceiling). Required whenever gateEligible is false."
     }
   }
 }
