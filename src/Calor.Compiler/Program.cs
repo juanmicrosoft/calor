@@ -786,6 +786,10 @@ public class Program
         // Code generation
         phaseSw.Restart();
         var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult, options.ObligationResults);
+        if (options.EmitLineDirectives && !string.IsNullOrEmpty(filePath))
+        {
+            emitter.LineDirectiveFilePath = filePath;
+        }
         var generatedCode = emitter.Emit(ast);
         phaseSw.Stop();
         telemetry?.TrackPhase("CodeGen", phaseSw.ElapsedMilliseconds, true);
@@ -1010,6 +1014,16 @@ public sealed class CompilationOptions
     /// Default: failed=Error, boundary=AlwaysGuard, timeout=WarnAndGuard.
     /// </summary>
     public Verification.Obligations.ObligationPolicy ObligationPolicy { get; init; } = Verification.Obligations.ObligationPolicy.Default;
+
+    /// <summary>
+    /// Emit <c>#line</c> directives in generated C# mapping each statement back
+    /// to its <c>.calr</c> source location, so Roslyn diagnostics and runtime
+    /// stack traces point at the Calor source instead of the generated file.
+    /// Default: true. Requires a source file path to be passed to
+    /// <see cref="Program.Compile(string, string?, CompilationOptions)"/>;
+    /// with a null path no directives are emitted.
+    /// </summary>
+    public bool EmitLineDirectives { get; init; } = true;
 
     /// <summary>
     /// Experimental feature flags. Used by Phase 0+ of the Calor-native type-system

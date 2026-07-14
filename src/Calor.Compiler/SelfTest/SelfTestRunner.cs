@@ -68,7 +68,11 @@ public sealed class SelfTestRunner
             {
                 EnforceEffects = true,
                 ContractMode = ContractMode.Debug,
-                VerifyContracts = false
+                VerifyContracts = false,
+                // Golden files validate codegen shape, not source mapping.
+                // #line directives are covered by dedicated emitter tests;
+                // keeping them out of the goldens avoids noise on every edit.
+                EmitLineDirectives = false
             };
 
             // Normalize input line endings so span offsets are consistent across platforms
