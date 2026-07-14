@@ -347,3 +347,35 @@ Delegate escape hatch removed (unconditional error + migration policy); adopter 
 | Justified content-addressing ill-defined for synthesized assumptions; `§SEMVER` salt is the principled option | PL-MINOR | §5.1 pinned: declaration-sourced content only; `§SEMVER`-salt recorded as the designated design option |
 
 **Loop termination.** Four rounds: DA 35→55→62→78; PL 55→72→78→81. Round 4 was a verification round: all checked dispositions substantive, both executed fixes verified against source, the central closing claim ("remaining gap is empirical, not architectural") upheld by both panelists with one earned asterisk — a four-round streak of audit-drift findings, whose systemic fix (single-sourcing, whitelist and gates artifacts) this plan already schedules. Both panelists ruled a fifth revision round value-destroying. **The document stands at v4.1. The remaining confidence gap is closable only by data: build `agent-native-gates.md` (one adversarial review before freezing), fix the FactCollector defect, land the combinator manifests and whitelist, author the Phase 0 fixtures, and publish the baseline — including the losses.**
+
+---
+
+## 9. Postscript (2026-07-14): Phase 0 kill row invoked — gate parked at authorable scale
+
+Executed per §6's pre-registered framework after epochs feasibility-dry-001,
+hardness-check-001, and hardness-check-002 (~165 valid live runs):
+
+**Finding:** zero escaped bugs from either arm across three escalating
+hardness models (edge-case density, interaction traps, modification-under-
+constraint) at fixture scales up to 16 functions. The 2a gate's win
+condition is zero-vs-zero — **unfalsifiable at authorable-fixture scale at
+current model capability**. This is the Phase 0 kill row's own clause: a
+fair suite that cannot separate the arms is itself a result, published here.
+
+**Scope of conclusion (per §6):** nothing broader than stated. The bet is
+not falsified — it is unmeasurable in this regime. Frontier agents at
+current capability do not ship hidden bugs on well-specified tasks of this
+size, in any language.
+
+**Banked positive findings:** (1) the syntax-tax map — 2.7x iterations on
+green-field Calor authoring, 1.0x (full parity) on modification of existing
+Calor, meaning the zero-training-prior penalty vanishes exactly in the
+per-module-adoption workflow the strategy assumes; (2) a working, cheap,
+adversarially hardened two-arm measurement harness; (3) four rounds of
+verified soundness fixes to the compiler surfaced by benchmark authoring.
+
+**Disposition:** 2a gate parked; suite and gates doc remain frozen-ready
+for re-run at the next model generation. Real-codebase-scale redesign
+sketched in [real-scale-benchmark-design.md](real-scale-benchmark-design.md)
+(design only, not built). Effort redirects to Phase 1 dev-loop items, with
+write-path robustness (item 5) elevated by the epochs' evidence.
