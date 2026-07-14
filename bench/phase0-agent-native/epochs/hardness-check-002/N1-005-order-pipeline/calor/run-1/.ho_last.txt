@@ -1,0 +1,4 @@
+Test run for /Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/hardness-check-002/N1-005-order-pipeline/calor/run-1/heldout/bin/Debug/net10.0/HeldOut.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:    25, Skipped:     0, Total:    25, Duration: 18 ms - HeldOut.dll (net10.0)
