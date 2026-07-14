@@ -1,0 +1,1 @@
+2026-07-13T22:27:32Z attempt=0 agent_rc=1: agent output matches error marker: "api error"

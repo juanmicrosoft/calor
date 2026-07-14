@@ -1,0 +1,17 @@
+{
+  "pair": "W1-002-usage-billing",
+  "arm": "calor",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 19,
+  "iterations": 2,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4918,
+    "output": 8956
+  },
+  "nullAgent": false
+}

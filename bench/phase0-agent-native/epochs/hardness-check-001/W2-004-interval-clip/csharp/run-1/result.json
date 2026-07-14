@@ -1,0 +1,17 @@
+{
+  "pair": "W2-004-interval-clip",
+  "arm": "csharp",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 21,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4068,
+    "output": 1464
+  },
+  "nullAgent": false
+}
