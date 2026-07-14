@@ -235,6 +235,8 @@ public class Program
         rootCommand.AddCommand(CoverageCommand.Create());
         rootCommand.AddCommand(SelfTestCommand.Create());
         rootCommand.AddCommand(EvaluationCommand.Create());
+        rootCommand.AddCommand(RunCommand.Create());
+        rootCommand.AddCommand(TestCommand.Create());
 
         // Initialize telemetry for subcommands
         // Parse --no-telemetry early from args
