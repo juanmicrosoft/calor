@@ -1,0 +1,17 @@
+{
+  "pair": "W1-003-ledger-rules",
+  "arm": "csharp",
+  "run": 3,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 25,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4070,
+    "output": 2195
+  },
+  "nullAgent": false
+}

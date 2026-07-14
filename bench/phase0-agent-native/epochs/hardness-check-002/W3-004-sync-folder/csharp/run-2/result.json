@@ -1,0 +1,17 @@
+{
+  "pair": "W3-004-sync-folder",
+  "arm": "csharp",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 24,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4072,
+    "output": 4664
+  },
+  "nullAgent": false
+}
