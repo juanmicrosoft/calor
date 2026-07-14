@@ -105,6 +105,13 @@ done
 PAIR_DIR="$(cd "$PAIR_DIR" && pwd)"
 PAIR_ID="$(jq -r .id "$PAIR_DIR/pair.json")"
 TIMEOUT_SECS="$(jq -r '.timeoutSeconds // 600' "$PAIR_DIR/pair.json")"
+
+# Escaped-bugs sentinel for non-compiling / never-tested states: the pair's
+# actual held-out test count ([Fact] + [InlineData] cases), not a magic 999
+# that would distort escaped-bug aggregates across pairs of different sizes.
+HELDOUT_TEST_COUNT=$(( $( { grep -ho '\[Fact\]' "$PAIR_DIR"/tests/*.cs 2>/dev/null || true; } | wc -l) \
+                     + $( { grep -ho '\[InlineData' "$PAIR_DIR"/tests/*.cs 2>/dev/null || true; } | wc -l) ))
+[[ $HELDOUT_TEST_COUNT -gt 0 ]] || { echo "No held-out tests found in $PAIR_DIR/tests" >&2; exit 3; }
 mkdir -p "$OUT_DIR"
 OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 
@@ -197,6 +204,13 @@ EOF
 }
 EOF
     fi
+
+    # Baseline src-tree hash (mirrors the shim's computation): without it the
+    # first observed build always compares against "none" and journals a
+    # phantom edited:true iteration even when the agent has changed nothing.
+    local base_hash
+    base_hash=$(find "$ws/src" -type f \( -name '*.cs' -o -name '*.calr' \) -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
+    echo "$base_hash" > "$ws_out/.lasthash"
 }
 
 # ---------------------------------------------------------------------------
@@ -215,11 +229,14 @@ if [[ "\${CALOR_P0_SHIM_OFF:-0}" == "1" ]]; then exec "$real_dotnet" "\$@"; fi
 "$real_dotnet" "\$@"; rc=\$?
 case "\${1:-}" in
   build|test|run)
-    hash=\$(find "$ws/src" -type f \\( -name '*.cs' -o -name '*.calr' \\) -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
+    # bin/obj are excluded: generated outputs (e.g. the calor arm's obj/calor/
+    # *.g.cs) would otherwise flip the hash on the first build and journal a
+    # phantom edited:true iteration with zero agent edits
+    hash=\$(find "$ws/src" -type f \\( -name '*.cs' -o -name '*.calr' \\) -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
     prev=\$(cat "$ws_out/.lasthash" 2>/dev/null || echo none)
     edited=\$([[ "\$hash" != "\$prev" ]] && echo true || echo false)
     echo "\$hash" > "$ws_out/.lasthash"
-    ho_pass=0; ho_fail=999
+    ho_pass=0; ho_fail=$HELDOUT_TEST_COUNT
     # Fresh, decoupled src build; only if it succeeds is the dll current and
     # the held-out result meaningful (non-compiling state = all failing)
     if CALOR_P0_SHIM_OFF=1 "$real_dotnet" build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_build.txt" 2>&1; then
@@ -227,7 +244,7 @@ case "\${1:-}" in
         ho_fail=0
         ho_pass=\$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
       else
-        ho_fail=\$(grep -oE 'Failed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 999)
+        ho_fail=\$(grep -oE 'Failed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo $HELDOUT_TEST_COUNT)
         ho_pass=\$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
       fi
     fi
@@ -247,10 +264,15 @@ run_agent() {
     local ws="$1" ws_out="$2" shim_dir="$3"
     AGENT_RC=0
     local prompt
-    prompt="You are working in $ws/src. Read $ws/spec.md and implement the missing operations it describes, in the existing source files, following the conventions already present. The iteration budget is $ITERATION_BUDGET build/test cycles. Build with 'dotnet build' from $ws/src to check your work. Do not create test files; do not modify the project file. Stop when the spec is fully implemented and the project builds cleanly."
+    prompt="You are working in $ws/src. Read $ws/spec.md and complete the task it describes — implementing missing operations and/or modifying existing behavior as specified — in the existing source files, following the conventions already present. The iteration budget is $ITERATION_BUDGET build/test cycles. Build with 'dotnet build' from $ws/src to check your work. Do not create test files; do not modify the project file. Stop when the spec is fully satisfied and the project builds cleanly (the starter already builds, so a clean build alone does not mean you are done)."
 
     if [[ $NULL_AGENT -eq 1 ]]; then
-        # Apply the reference solution, then do one observed build (validates
+        # First build the starter as shipped (observed, through the shim) so
+        # every null-agent run also proves the starting fixture compiles.
+        ( cd "$ws/src" && PATH="$shim_dir:$PATH" dotnet build --nologo -v q >/dev/null 2>&1 ) || {
+            echo "null-agent: starter fixture failed to build (pair=$PAIR_ID arm=$ARM)" >&2
+        }
+        # Then apply the reference solution and do one observed build (validates
         # shim + held-out wiring end to end with zero API spend)
         cp -R "$PAIR_DIR/reference/$ARM/." "$ws/src/"
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" dotnet build --nologo -v q >/dev/null 2>&1 ) || true
@@ -283,13 +305,13 @@ extract_metrics() {
     touch "$journal"
 
     # Final silent held-out run = declared-done state (non-compiling = all fail)
-    local final_pass=0 final_fail=999
+    local final_pass=0 final_fail=$HELDOUT_TEST_COUNT
     if CALOR_P0_SHIM_OFF=1 dotnet build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_final.txt" 2>&1; then
         if CALOR_P0_SHIM_OFF=1 dotnet test "$ws_out/heldout/HeldOut.csproj" --nologo -v q > "$ws_out/.ho_final.txt" 2>&1; then
             final_fail=0
             final_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_final.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
         else
-            final_fail=$(grep -oE 'Failed:[[:space:]]+[0-9]+' "$ws_out/.ho_final.txt" | grep -oE '[0-9]+' | head -1 || echo 999)
+            final_fail=$(grep -oE 'Failed:[[:space:]]+[0-9]+' "$ws_out/.ho_final.txt" | grep -oE '[0-9]+' | head -1 || echo "$HELDOUT_TEST_COUNT")
             final_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_final.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
         fi
     fi
@@ -297,8 +319,10 @@ extract_metrics() {
     # Iterations = journaled build/test invocations with edited=true
     local iterations iters_to_green censored
     iterations=$(jq -s '[.[] | select(.edited==true)] | length' "$journal")
-    iters_to_green=$(jq -s '[to_entries[] | select(.value.edited==true)] as $its
-        | ([$its[] | select(.value.heldout_fail==0)] | first // null)
+    # Ordinal among edited iterations (journal entries with edited=false —
+    # e.g. the observed null-agent starter build — must not inflate this)
+    iters_to_green=$(jq -s '[.[] | select(.edited==true)] | to_entries
+        | ([.[] | select(.value.heldout_fail==0)] | first // null)
         | if . == null then -1 else (.key + 1) end' "$journal" 2>/dev/null || echo -1)
     censored=false
     if [[ "$iters_to_green" == "-1" ]]; then
@@ -337,9 +361,10 @@ write_invalid_result() {
     jq -n \
         --arg pair "$PAIR_ID" --arg arm "$ARM" --argjson run "$run_idx" \
         --argjson itg "$((ITERATION_BUDGET + 1))" \
+        --argjson escaped "$HELDOUT_TEST_COUNT" \
         --argjson null_agent "$NULL_AGENT" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
-          escapedBugs:999, heldoutPassed:0,
+          escapedBugs:$escaped, heldoutPassed:0,
           iterations:0, iterationsToGreen:$itg, censored:true,
           invalid:true,
           tokens:{input:0, output:0}, nullAgent:($null_agent==1)}' \

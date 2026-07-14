@@ -26,7 +26,7 @@
     §B{prefix:str} (+ name "|")
     §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
     §EACH{e1:line} lines
-      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §B{matches:bool} (starts line prefix :ordinal)
       §IF{if4} matches
         §R true
     §R false
@@ -39,7 +39,7 @@
     §B{prefix:str} (+ name "|")
     §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
     §EACH{e2:line} lines
-      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §B{matches:bool} (starts line prefix :ordinal)
       §IF{if6} matches
         §R §C{EntryStamp} §A line §/C
     §R -1
@@ -56,7 +56,7 @@
     §B{~content:str} ""
     §B{~found:bool} false
     §EACH{e3:line} lines
-      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §B{matches:bool} (starts line prefix :ordinal)
       §IF{if8} (&& (! found) matches)
         §ASSIGN content (+ content (+ entry "\n"))
         §ASSIGN found true
@@ -75,7 +75,7 @@
     §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
     §B{~content:str} ""
     §EACH{e4:line} lines
-      §B{matches:bool} §C{line.StartsWith} §A prefix §/C
+      §B{matches:bool} (starts line prefix :ordinal)
       §IF{if11} (! matches)
         §ASSIGN content (+ content (+ line "\n"))
     §C{File.WriteAllText} §A path §A content §/C

@@ -31,5 +31,7 @@
   },
   "wedgeWhitelistCheck": "No contracts in the fixtures or reference solutions (W3 exercises effect boundaries, not the prover). Effect boundaries are manifest-covered: File.AppendAllText (fs:w), File.Exists / File.ReadAllLines (fs:r), File.WriteAllText (fs:w) — all present in the bcl-io manifest; list mutation declares the enforced 'mut' effect. All code is first-order: no delegates, no lambdas, no function values.",
   "iterationBudget": 10,
-  "timeoutSeconds": 600
+  "timeoutSeconds": 600,
+  "gateEligible": false,
+  "retiredReason": "hardness-check-001: at ceiling; cannot power the 2a gate"
 }

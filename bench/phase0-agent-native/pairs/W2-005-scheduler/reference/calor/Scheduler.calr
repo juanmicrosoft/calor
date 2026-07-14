@@ -74,7 +74,6 @@
   §F{f007:NextFreeStart:pub} ([i32]:starts, [i32]:ends, [i32]:active, i32:count, i32:duration, i32:earliest, i32:horizon) -> i32
     §E{}
     §Q (>= count 0)
-    §Q (> duration 0)
     §Q (>= earliest 0)
     §Q (<= count §LEN starts)
     §Q (<= count §LEN ends)

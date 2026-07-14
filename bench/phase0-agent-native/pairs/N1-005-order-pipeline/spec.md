@@ -15,6 +15,10 @@ behavior and a public surface, never implementation language idioms.
   1500 bps, any other tier → 0 bps.
 - **Order states** (integer codes): 0 Pending, 1 Confirmed, 2 Shipped,
   3 Delivered, 4 Cancelled.
+- **Rate and amount domains:** callers guarantee `taxRateBps` and
+  `restockFeeBps` are always in `0..10000` (inclusive), and all amounts
+  (`qty`, `unitPrice`, subtotals, totals) are non-negative — so every
+  computed discount, tax, fee, and refund is non-negative.
 - **Per-customer aggregate:** a mutable customer → running-total map
   (`Dictionary<string, int>`) owned by the caller and passed to every
   operation. **Invariant: the map never stores a zero or negative total** —
@@ -74,7 +78,10 @@ minus the sum of all values returned by `ProcessReturn`, and
 `CustomerTotal` satisfies the same per customer. `ActiveCustomers` counts
 exactly the customers whose net total is positive. Callers guarantee a
 return always corresponds to a previously recorded order for that customer,
-so a refund never exceeds the customer's running total.
+so a refund never exceeds the customer's running total; combined with the
+domain guarantees above (`taxRateBps` and `restockFeeBps` in `0..10000`,
+amounts positive), refunds are always non-negative and never exceed the
+order's total.
 
 ## Constraints
 

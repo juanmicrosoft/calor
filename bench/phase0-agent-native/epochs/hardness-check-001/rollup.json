@@ -1,0 +1,123 @@
+{
+  "epoch": "hardness-check-001",
+  "regenerated": "2026-07-13, from per-run result.json files (original rollup was written as a 0-byte file)",
+  "runs": 30,
+  "validRuns": 30,
+  "pairs": [
+    {
+      "pair": "N1-003-csv-row",
+      "arms": [
+        {
+          "arm": "calor",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 2.6666666666666665,
+          "meanIterationsToGreen": 2.6666666666666665,
+          "tokensOutTotal": 58272
+        },
+        {
+          "arm": "csharp",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 1,
+          "meanIterationsToGreen": 1,
+          "tokensOutTotal": 5857
+        }
+      ]
+    },
+    {
+      "pair": "W1-002-usage-billing",
+      "arms": [
+        {
+          "arm": "calor",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 1.3333333333333333,
+          "meanIterationsToGreen": 1,
+          "tokensOutTotal": 24986
+        },
+        {
+          "arm": "csharp",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 1,
+          "meanIterationsToGreen": 1,
+          "tokensOutTotal": 8244
+        }
+      ]
+    },
+    {
+      "pair": "W2-003-window-stats",
+      "arms": [
+        {
+          "arm": "calor",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 1,
+          "meanIterationsToGreen": 1,
+          "tokensOutTotal": 14142
+        },
+        {
+          "arm": "csharp",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 1.3333333333333333,
+          "meanIterationsToGreen": 1,
+          "tokensOutTotal": 5793
+        }
+      ]
+    },
+    {
+      "pair": "W2-004-interval-clip",
+      "arms": [
+        {
+          "arm": "calor",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 1,
+          "meanIterationsToGreen": 1,
+          "tokensOutTotal": 20734
+        },
+        {
+          "arm": "csharp",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 1,
+          "meanIterationsToGreen": 1,
+          "tokensOutTotal": 4479
+        }
+      ]
+    },
+    {
+      "pair": "W3-003-kv-journal",
+      "arms": [
+        {
+          "arm": "calor",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 3.6666666666666665,
+          "meanIterationsToGreen": 2.6666666666666665,
+          "tokensOutTotal": 59964
+        },
+        {
+          "arm": "csharp",
+          "runs": 3,
+          "successes": 3,
+          "escapedBugsTotal": 0,
+          "meanIterations": 1,
+          "meanIterationsToGreen": 1,
+          "tokensOutTotal": 5117
+        }
+      ]
+    }
+  ]
+}
