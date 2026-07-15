@@ -38,7 +38,7 @@ public sealed class CheckTool : McpToolBase
                 },
                 "apply": {
                     "type": "boolean",
-                    "description": "When true, automatically apply all available fix edits and return the fixed source alongside diagnostics (diagnose action, default: false)"
+                    "description": "When true, automatically apply all available fix edits and return the fixed source alongside diagnostics; if errors remain, a source-level heal (indentation + structural-closer repair) is attempted (diagnose action, default: false)"
                 },
                 "strictApi": {
                     "type": "boolean",
@@ -192,9 +192,29 @@ public sealed class CheckTool : McpToolBase
 
             string? fixedSource = null;
             var fixesApplied = 0;
+            bool healed = false;
             if (applyFixes)
             {
                 fixedSource = ApplyFixes(source, result.Diagnostics.DiagnosticsWithFixes, out fixesApplied);
+
+                // Auto-heal: if errors remain after applying the targeted fix
+                // edits, run the source-level healer (same transform as
+                // `calor format --heal`) and keep the result when it strictly
+                // reduces the error count. This lets agent check→fix loops
+                // self-heal indentation/closer thrash without a round-trip.
+                if (result.HasErrors)
+                {
+                    var candidate = new SourceHealer().Heal(fixedSource);
+                    if (candidate != fixedSource)
+                    {
+                        var recheck = Program.Compile(candidate, "mcp-input.calr", compileOptions);
+                        if (recheck.Diagnostics.Errors.Count < result.Diagnostics.Errors.Count)
+                        {
+                            fixedSource = candidate;
+                            healed = true;
+                        }
+                    }
+                }
             }
 
             var output = new DiagnoseOutput
@@ -204,7 +224,8 @@ public sealed class CheckTool : McpToolBase
                 WarningCount = diagnostics.Count(d => d.Severity == "warning"),
                 Diagnostics = diagnostics,
                 FixedSource = fixedSource,
-                FixesApplied = applyFixes ? fixesApplied : null
+                FixesApplied = applyFixes ? fixesApplied : null,
+                Healed = healed ? true : null
             };
 
             return Task.FromResult(McpToolResult.Json(output, isError: result.HasErrors));
@@ -724,6 +745,14 @@ public sealed class CheckTool : McpToolBase
         [JsonPropertyName("fixesApplied")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? FixesApplied { get; init; }
+
+        /// <summary>
+        /// True when the source-level healer (calor format --heal) was applied
+        /// on top of the targeted fix edits because errors remained.
+        /// </summary>
+        [JsonPropertyName("healed")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? Healed { get; init; }
     }
 
     private sealed class DiagnoseDiagnosticOutput

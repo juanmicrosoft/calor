@@ -39,21 +39,28 @@ public static class FormatCommand
             aliases: ["--verbose", "-v"],
             description: "Enable verbose output");
 
+        var healOption = new Option<bool>(
+            aliases: ["--heal"],
+            description: "Best-effort source-level repair: strip forbidden structural closers, " +
+                         "normalize indentation to 2-space levels from structural nesting, and fix " +
+                         "common whitespace issues. Works on files too broken for the AST formatter. Idempotent.");
+
         var command = new Command("format", "Format Calor source files to canonical style")
         {
             inputArgument,
             checkOption,
             writeOption,
             diffOption,
-            verboseOption
+            verboseOption,
+            healOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, checkOption, writeOption, diffOption, verboseOption);
+        command.SetHandler(ExecuteAsync, inputArgument, checkOption, writeOption, diffOption, verboseOption, healOption);
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo[] files, bool check, bool write, bool diff, bool verbose)
+    private static async Task ExecuteAsync(FileInfo[] files, bool check, bool write, bool diff, bool verbose, bool heal)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("format");
@@ -88,7 +95,9 @@ public static class FormatCommand
 
             try
             {
-                var result = await FormatFileAsync(file.FullName, verbose);
+                var result = heal
+                    ? await HealFileAsync(file.FullName)
+                    : await FormatFileAsync(file.FullName, verbose);
 
                 if (!result.Success)
                 {
@@ -109,12 +118,12 @@ public static class FormatCommand
 
                     if (check)
                     {
-                        Console.WriteLine($"Would reformat: {file.Name}");
+                        Console.WriteLine($"{(heal ? "Would heal" : "Would reformat")}: {file.Name}");
                     }
                     else if (write)
                     {
                         await File.WriteAllTextAsync(file.FullName, result.Formatted);
-                        Console.WriteLine($"Formatted: {file.Name}");
+                        Console.WriteLine($"{(heal ? "Healed" : "Formatted")}: {file.Name}");
                         formattedFiles++;
                     }
                     else
@@ -176,6 +185,51 @@ public static class FormatCommand
         {
             IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "format", "Format check failed");
         }
+    }
+
+    /// <summary>
+    /// <c>--heal</c> path: source-level best-effort repair via
+    /// <see cref="SourceHealer"/>. Unlike <see cref="FormatFileAsync"/> this
+    /// never requires the input to parse — that is the point: it repairs
+    /// files the AST formatter must reject. If the healed output still fails
+    /// to parse, the remaining diagnostics are printed to stderr as a
+    /// heads-up, but healing still succeeds (best effort).
+    /// </summary>
+    private static async Task<FormatResult> HealFileAsync(string filePath)
+    {
+        var source = await File.ReadAllTextAsync(filePath);
+
+        var healer = new SourceHealer();
+        var healed = healer.Heal(source);
+
+        if (healed != source)
+        {
+            var diagnostics = new DiagnosticBag();
+            diagnostics.SetFilePath(filePath);
+            var lexer = new Lexer(healed, diagnostics);
+            var tokens = lexer.TokenizeAllForParser();
+            if (!diagnostics.HasErrors)
+            {
+                var parser = new Parser(tokens, diagnostics);
+                parser.Parse();
+            }
+            if (diagnostics.HasErrors)
+            {
+                Console.Error.WriteLine($"Note: {Path.GetFileName(filePath)} still has parse errors after healing:");
+                foreach (var error in diagnostics.Errors.Take(5))
+                {
+                    Console.Error.WriteLine($"  {error}");
+                }
+            }
+        }
+
+        return new FormatResult
+        {
+            Success = true,
+            Original = source,
+            Formatted = healed,
+            Errors = new List<string>()
+        };
     }
 
     private static async Task<FormatResult> FormatFileAsync(string filePath, bool verbose)

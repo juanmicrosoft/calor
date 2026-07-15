@@ -26,6 +26,24 @@ public static class DiagnosticCode
     public const string UnknownSectionMarker = "Calor0006";
     public const string InvalidSectionOperator = "Calor0007";
 
+    /// <summary>
+    /// Warning: leading whitespace uses tab characters. Calor indentation is
+    /// canonically 2 spaces per level; tabs are tolerated (each counts as one
+    /// column) but easily produce dedent mismatches when later lines use
+    /// spaces. Reported once per file with a machine-applicable fix that
+    /// rewrites every tab-indented line (tab → 2 spaces).
+    /// </summary>
+    public const string TabIndentation = "Calor0008";
+
+    /// <summary>
+    /// Warning: a new indentation level is not exactly 2 spaces deeper than
+    /// its parent (e.g. 3- or 4-space steps). The file may still parse —
+    /// indentation is stack-relative — but non-standard widths are the top
+    /// source of agent authoring thrash. Carries a machine-applicable fix
+    /// that re-indents the line to the canonical 2-spaces-per-level column.
+    /// </summary>
+    public const string NonStandardIndentWidth = "Calor0009";
+
     // Phase 3 lexer errors (RFC §4.1)
     public const string MixedIndentation = "Calor0099";
 
@@ -59,6 +77,16 @@ public static class DiagnosticCode
     /// legitimately take a fourth modifier field.
     /// </summary>
     public const string MalformedFunctionHeader = "Calor0116";
+
+    /// <summary>
+    /// Error: a <c>§EI</c>/<c>§EL</c> clause appears where a statement was
+    /// expected — its indentation does not align with any open <c>§IF</c>.
+    /// The most common agent mistake is dedenting the clause too far (past
+    /// the <c>§IF</c> column) so the if-chain closes before the clause is
+    /// seen. Carries a machine-applicable fix that re-indents the clause to
+    /// the column of the nearest preceding <c>§IF</c>.
+    /// </summary>
+    public const string MisalignedElseClause = "Calor0117";
 
     // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
 

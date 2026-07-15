@@ -398,6 +398,16 @@ public sealed class Lexer
         bool atLineStart = true;
         int currentIndent = 0;
         bool sawMixedIndent = false;
+        bool currentIndentHasTab = false;
+
+        // Aggregated fixable indentation issues (reported once per file, at
+        // EOF, with one machine-applicable edit per offending line so a
+        // single fix application heals the whole file).
+        var tabIndentEdits = new List<TextEdit>();
+        var widthEdits = new List<TextEdit>();
+        Token? firstTabIndentTok = null;
+        Token? firstWidthTok = null;
+        var filePath = _diagnostics.CurrentFilePath ?? "";
 
         for (int i = 0; i < raw.Count; i++)
         {
@@ -414,9 +424,25 @@ public sealed class Lexer
                 if (hasTab && hasSpace && !sawMixedIndent)
                 {
                     sawMixedIndent = true;
-                    _diagnostics.ReportError(tok.Span, DiagnosticCode.MixedIndentation,
-                        "Mixed tabs and spaces in leading whitespace. Use one or the other consistently.");
+                    var fix = new SuggestedFix(
+                        "Replace leading whitespace with spaces (each tab becomes 2 spaces)",
+                        TextEdit.Replace(filePath, tok.Span.Line, 1,
+                            tok.Span.Line, text.Length + 1, ExpandIndentTabs(text)));
+                    _diagnostics.ReportErrorWithFix(tok.Span, DiagnosticCode.MixedIndentation,
+                        "Mixed tabs and spaces in leading whitespace. Use one or the other consistently.",
+                        fix);
                 }
+                else if (hasTab && !hasSpace)
+                {
+                    // Tab-only indentation: tolerated (each tab counts as one
+                    // column) but non-canonical and a frequent source of
+                    // dedent mismatches. Collect one edit per line; reported
+                    // once at EOF as Calor0008 with all edits in a single fix.
+                    firstTabIndentTok ??= tok;
+                    tabIndentEdits.Add(TextEdit.Replace(filePath, tok.Span.Line, 1,
+                        tok.Span.Line, text.Length + 1, ExpandIndentTabs(text)));
+                }
+                currentIndentHasTab = hasTab;
                 currentIndent = text.Length;
                 continue; // do not emit whitespace
             }
@@ -428,6 +454,7 @@ public sealed class Lexer
                     yield return tok;
                     atLineStart = true;
                     currentIndent = 0;
+                    currentIndentHasTab = false;
                 }
                 else
                 {
@@ -455,9 +482,10 @@ public sealed class Lexer
                 }
                 else
                 {
+                    int lastPopped = top;
                     while (indentStack.Peek() > currentIndent)
                     {
-                        indentStack.Pop();
+                        lastPopped = indentStack.Pop();
                         yield return new Token(TokenKind.Dedent, "",
                             new TextSpan(tok.Span.Start, 0, tok.Span.Line, 1));
                     }
@@ -466,9 +494,42 @@ public sealed class Lexer
                         if (!sawMixedIndent)
                         {
                             sawMixedIndent = true;
-                            _diagnostics.ReportError(tok.Span, DiagnosticCode.MixedIndentation,
-                                $"Dedent to column {currentIndent} does not match any enclosing indent level.");
+                            // Snap to the nearest enclosing level: either the
+                            // level just below (stack top) or the one just
+                            // above (last popped). Ties prefer the deeper
+                            // level (an off-by-one dedent usually means the
+                            // line was meant to stay inside the block).
+                            int below = indentStack.Peek();
+                            int target = (currentIndent - below) < (lastPopped - currentIndent)
+                                ? below
+                                : lastPopped;
+                            var fix = new SuggestedFix(
+                                $"Re-indent line to the enclosing indent level ({target} spaces)",
+                                TextEdit.Replace(filePath, tok.Span.Line, 1,
+                                    tok.Span.Line, currentIndent + 1, new string(' ', target)));
+                            _diagnostics.ReportErrorWithFix(tok.Span, DiagnosticCode.MixedIndentation,
+                                $"Dedent to column {currentIndent} does not match any enclosing indent level.",
+                                fix);
                         }
+                    }
+                }
+
+                // Non-standard indent width (e.g. 3- or 4-space levels). The
+                // file still parses — indentation is stack-relative — but the
+                // line is not at its canonical 2-spaces-per-level column.
+                // Collect one edit per offending line (siblings included);
+                // level count is width-independent, so applying all edits in
+                // one pass heals the whole file. Reported once at EOF as
+                // Calor0009. Tab-indented lines are handled by Calor0008 and
+                // dedent mismatches by the Calor0099 fix above.
+                if (!currentIndentHasTab && indentStack.Peek() == currentIndent)
+                {
+                    int canonical = 2 * (indentStack.Count - 1);
+                    if (canonical != currentIndent)
+                    {
+                        firstWidthTok ??= tok;
+                        widthEdits.Add(TextEdit.Replace(filePath, tok.Span.Line, 1,
+                            tok.Span.Line, currentIndent + 1, new string(' ', canonical)));
                     }
                 }
                 atLineStart = false;
@@ -491,6 +552,26 @@ public sealed class Lexer
 
             if (tok.Kind == TokenKind.Eof)
             {
+                // Report aggregated fixable indentation issues once per file.
+                if (firstTabIndentTok is { } tabTok)
+                {
+                    _diagnostics.ReportWarningWithFix(tabTok.Span, DiagnosticCode.TabIndentation,
+                        $"Leading whitespace uses tabs on {tabIndentEdits.Count} line(s). " +
+                        "Calor indentation is canonically 2 spaces per level.",
+                        new SuggestedFix(
+                            "Replace tab indentation with spaces (each tab becomes 2 spaces)",
+                            tabIndentEdits));
+                }
+                if (firstWidthTok is { } widthTok)
+                {
+                    _diagnostics.ReportWarningWithFix(widthTok.Span, DiagnosticCode.NonStandardIndentWidth,
+                        $"Indentation step is not 2 spaces on {widthEdits.Count} line(s). " +
+                        "Calor indentation is canonically 2 spaces per level.",
+                        new SuggestedFix(
+                            "Re-indent to 2 spaces per level",
+                            widthEdits));
+                }
+
                 // Drain remaining indent stack.
                 while (indentStack.Count > 1)
                 {
@@ -514,6 +595,13 @@ public sealed class Lexer
             yield return tok;
         }
     }
+
+    /// <summary>
+    /// Expands leading-whitespace tabs to 2 spaces each (spaces preserved).
+    /// Used to build machine-applicable indentation fixes.
+    /// </summary>
+    internal static string ExpandIndentTabs(string leadingWhitespace)
+        => leadingWhitespace.Replace("\t", "  ", StringComparison.Ordinal);
 
     public List<Token> TokenizeWithIndentAll()
         => TokenizeWithIndent().ToList();
