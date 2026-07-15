@@ -1,0 +1,272 @@
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
+using Calor.Compiler.Parsing;
+using Calor.Compiler.SelfCheck;
+using Xunit;
+
+namespace Calor.Compiler.Tests;
+
+/// <summary>
+/// Tests for the docs-drift checker behind <c>calor self-check docs</c>
+/// (Phase 1 item 6: spec single-sourcing). Each test injects a fake drifted
+/// doc string and asserts the drift is detected — or that clean docs pass.
+/// </summary>
+public class DocDriftCheckerTests
+{
+    private static DocDriftInputs BaseInputs(
+        DocFile[]? keywordDocs = null,
+        DocFile[]? diagnosticCodeDocs = null,
+        DocFile? effectsReferenceDoc = null,
+        DocFile[]? effectDocsForwardOnly = null,
+        DocFile? cliCodesDoc = null,
+        DocFile[]? versionScanDocs = null)
+    {
+        return new DocDriftInputs
+        {
+            Version = "0.9.9",
+            LexerKeywords = ["M", "F", "EACH", "/C", "IV", "Pf", "PP", "/PP"],
+            DiagnosticCodes = ["Calor0001", "Calor0830", "Calor1300", "Calor1310", "Calor1320"],
+            KnownEffectCodes = ["cw", "mut", "mut:col", "fw"],
+            DocumentedEffectCodes = ["cw", "mut", "mut:col"],
+            KeywordDocs = keywordDocs ?? [],
+            DiagnosticCodeDocs = diagnosticCodeDocs ?? [],
+            EffectsReferenceDoc = effectsReferenceDoc,
+            EffectDocsForwardOnly = effectDocsForwardOnly ?? [],
+            CliCodesDoc = cliCodesDoc,
+            VersionScanDocs = versionScanDocs ?? [],
+        };
+    }
+
+    // --- Keyword drift (the §FOREACH-vs-§EACH class) ---
+
+    [Fact]
+    public void UnknownKeywordIsDetected()
+    {
+        var doc = new DocFile("fake.md", "Use `§FOREACH{id}` to loop over collections.");
+        var findings = DocDriftChecker.Check(BaseInputs(keywordDocs: [doc]));
+
+        var finding = Assert.Single(findings);
+        Assert.Equal(DiagnosticCode.DocDriftUnknownKeyword, finding.Code);
+        Assert.Contains("§FOREACH", finding.Message);
+        Assert.Equal("fake.md", finding.FilePath);
+        Assert.Equal(1, finding.Span.Line);
+    }
+
+    [Fact]
+    public void KnownKeywordsPass()
+    {
+        var doc = new DocFile("fake.md",
+            "`§M{Name}` opens a module, `§EACH` iterates, `§/C` closes calls,\n" +
+            "`§IV (expr)` declares an invariant, `§Pf` prints, `§PP{X}`...`§/PP{X}` wraps.");
+        var findings = DocDriftChecker.Check(BaseInputs(keywordDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void UnknownClosingKeywordIsDetected()
+    {
+        var doc = new DocFile("fake.md", "Close with `§/FOREACH`.");
+        var findings = DocDriftChecker.Check(BaseInputs(keywordDocs: [doc]));
+
+        var finding = Assert.Single(findings);
+        Assert.Equal(DiagnosticCode.DocDriftUnknownKeyword, finding.Code);
+        Assert.Contains("§/FOREACH", finding.Message);
+    }
+
+    // --- Diagnostic-code drift (the Calor0820-vs-0830 class) ---
+
+    [Fact]
+    public void UnknownDiagnosticCodeIsDetected()
+    {
+        var doc = new DocFile("fake.md", "Closer tags raise `Calor0820`.");
+        var findings = DocDriftChecker.Check(BaseInputs(diagnosticCodeDocs: [doc]));
+
+        var finding = Assert.Single(findings);
+        Assert.Equal(DiagnosticCode.DocDriftUnknownDiagnosticCode, finding.Code);
+        Assert.Contains("Calor0820", finding.Message);
+    }
+
+    [Fact]
+    public void KnownDiagnosticCodeAndPopulatedRangePass()
+    {
+        var doc = new DocFile("fake.md",
+            "Closer tags raise `Calor0830`. Bands: Calor0001–0099 (lexer), `Calor1300`–`Calor1399` (CLI).");
+        var findings = DocDriftChecker.Check(BaseInputs(diagnosticCodeDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void EmptyDiagnosticRangeIsDetected()
+    {
+        var doc = new DocFile("fake.md", "Reserved: Calor5000–5099 (future).");
+        var findings = DocDriftChecker.Check(BaseInputs(diagnosticCodeDocs: [doc]));
+
+        var finding = Assert.Single(findings);
+        Assert.Equal(DiagnosticCode.DocDriftEmptyDiagnosticRange, finding.Code);
+    }
+
+    [Fact]
+    public void RangeEndpointsAreNotRequiredToExistIndividually()
+    {
+        // Calor1399 does not exist as a concrete code, but the 1300 band is populated.
+        var doc = new DocFile("fake.md", "CLI codes are Calor1300-Calor1399.");
+        var findings = DocDriftChecker.Check(BaseInputs(diagnosticCodeDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    // --- Effect-code drift (the undocumented-mut class) ---
+
+    private const string EffectsDocHeader = "# Effects\n\n## Effect Codes\n\n| Code | Effect |\n|:-----|:-------|\n";
+
+    [Fact]
+    public void UndocumentedEffectCodeIsDetected()
+    {
+        // 'mut' and 'mut:col' are implemented but missing from the table.
+        var doc = new DocFile("effects.md", EffectsDocHeader + "| `cw` | Console write |\n");
+        var findings = DocDriftChecker.Check(BaseInputs(effectsReferenceDoc: doc));
+
+        Assert.Equal(2, findings.Count);
+        Assert.All(findings, f => Assert.Equal(DiagnosticCode.DocDriftUndocumentedEffectCode, f.Code));
+        Assert.Contains(findings, f => f.Message.Contains("'mut'"));
+        Assert.Contains(findings, f => f.Message.Contains("'mut:col'"));
+    }
+
+    [Fact]
+    public void UnknownEffectCodeIsDetected()
+    {
+        var doc = new DocFile("effects.md", EffectsDocHeader +
+            "| `cw` | Console write |\n| `mut` | Mutation |\n| `mut:col` | Collection mutation |\n| `zap` | Not real |\n");
+        var findings = DocDriftChecker.Check(BaseInputs(effectsReferenceDoc: doc));
+
+        var finding = Assert.Single(findings);
+        Assert.Equal(DiagnosticCode.DocDriftUnknownEffectCode, finding.Code);
+        Assert.Contains("'zap'", finding.Message);
+    }
+
+    [Fact]
+    public void CompleteEffectTablePasses()
+    {
+        var doc = new DocFile("effects.md", EffectsDocHeader +
+            "| `cw` | Console write |\n| `mut` | Mutation |\n| `mut:col` | Collection mutation |\n");
+        var findings = DocDriftChecker.Check(BaseInputs(effectsReferenceDoc: doc));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void LegacyEffectCodesAreAcceptedButNotRequired()
+    {
+        // 'fw' is legacy: allowed in the table, but its absence is not drift.
+        var doc = new DocFile("effects.md", EffectsDocHeader +
+            "| `cw` | Console write |\n| `mut` | Mutation |\n| `mut:col` | Collection mutation |\n| `fw` | Legacy file write |\n");
+        var findings = DocDriftChecker.Check(BaseInputs(effectsReferenceDoc: doc));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void ForwardOnlyEffectDocNeedNotBeComplete()
+    {
+        var doc = new DocFile("index.md", EffectsDocHeader + "| `cw` | Console write |\n");
+        var findings = DocDriftChecker.Check(BaseInputs(effectDocsForwardOnly: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void MissingEffectCodesSectionIsDetected()
+    {
+        var doc = new DocFile("effects.md", "# Effects\n\nNo table here.\n");
+        var findings = DocDriftChecker.Check(BaseInputs(effectsReferenceDoc: doc));
+
+        var finding = Assert.Single(findings);
+        Assert.Equal(DiagnosticCode.DocDriftMissingInput, finding.Code);
+    }
+
+    // --- CLI code-table completeness ---
+
+    [Fact]
+    public void MissingCliCodeTableEntryIsDetected()
+    {
+        var doc = new DocFile("structured-output.md",
+            "| Code | Meaning |\n|:-----|:--------|\n| `Calor1300` | Lint finding |\n| `Calor1310` | Input not found |\n");
+        var findings = DocDriftChecker.Check(BaseInputs(cliCodesDoc: doc));
+
+        var finding = Assert.Single(findings);
+        Assert.Equal(DiagnosticCode.DocDriftUndocumentedCliCode, finding.Code);
+        Assert.Contains("Calor1320", finding.Message);
+    }
+
+    [Fact]
+    public void CompleteCliCodeTablePasses()
+    {
+        var doc = new DocFile("structured-output.md",
+            "| `Calor1300` | Lint |\n| `Calor1310` | Input |\n| `Calor1320` | Drift |\n");
+        var findings = DocDriftChecker.Check(BaseInputs(cliCodesDoc: doc));
+
+        Assert.Empty(findings);
+    }
+
+    // --- Hardcoded version (the stale-0.3.5 class) ---
+
+    [Fact]
+    public void HardcodedCurrentVersionIsDetected()
+    {
+        var doc = new DocFile("fake.md", "Install calor 0.9.9 from NuGet.");
+        var findings = DocDriftChecker.Check(BaseInputs(versionScanDocs: [doc]));
+
+        var finding = Assert.Single(findings);
+        Assert.Equal(DiagnosticCode.DocDriftHardcodedVersion, finding.Code);
+    }
+
+    [Fact]
+    public void OtherVersionStringsAreNotFlagged()
+    {
+        var doc = new DocFile("fake.md",
+            "Historic release 0.3.5; unrelated 10.9.9 and 0.9.9.1 and v0.9.90 are fine.");
+        var findings = DocDriftChecker.Check(BaseInputs(versionScanDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    // --- Ground truth wiring: the real registries are enumerable ---
+
+    [Fact]
+    public void LexerExposesKeywordsIncludingSpecialForms()
+    {
+        Assert.Contains("EACH", Lexer.KeywordNames);
+        Assert.Contains("IV", Lexer.KeywordNames);
+        Assert.Contains("PP", Lexer.KeywordNames);
+        Assert.Contains("/PP", Lexer.KeywordNames);
+        Assert.DoesNotContain("FOREACH", Lexer.KeywordNames);
+        Assert.DoesNotContain("INV", Lexer.KeywordNames);
+    }
+
+    [Fact]
+    public void EffectCodeRegistryPreservesToCompactBehavior()
+    {
+        Assert.Equal("cw", EffectCodes.ToCompact("io", "console_write"));
+        Assert.Equal("fs:r", EffectCodes.ToCompact("IO", "Filesystem_Read"));
+        Assert.Equal("mut:col", EffectCodes.ToCompact("mutation", "collection"));
+        Assert.Equal("db:r", EffectCodes.ToCompact("io", "dbr"));
+        Assert.Equal("something_else", EffectCodes.ToCompact("io", "something_else"));
+
+        Assert.Contains("mut", EffectCodes.DocumentedCompactCodes);
+        Assert.Contains("mut:col", EffectCodes.DocumentedCompactCodes);
+        Assert.DoesNotContain("fw", EffectCodes.DocumentedCompactCodes);
+        Assert.Contains("fw", EffectCodes.KnownCompactCodes);
+    }
+
+    [Fact]
+    public void ImplementedDiagnosticCodesIncludeKnownConstants()
+    {
+        var codes = DocDriftChecker.GetImplementedDiagnosticCodes();
+        Assert.Contains("Calor0830", codes);
+        Assert.Contains("Calor0702", codes); // verification-pass code, registered via constant
+        Assert.Contains("Calor1320", codes);
+        Assert.DoesNotContain("Calor9876", codes);
+    }
+}
