@@ -70,11 +70,11 @@ public class Program
 
         var noCacheOption = new Option<bool>(
             aliases: ["--no-cache"],
-            description: "Disable verification result caching");
+            description: "Disable caching (verification results and the incremental-build cache)");
 
         var clearCacheOption = new Option<bool>(
             aliases: ["--clear-cache"],
-            description: "Clear verification cache before compiling");
+            description: "Clear caches before compiling (verification cache and .calor-build-state.json)");
 
         var verificationTimeoutOption = new Option<int>(
             aliases: ["--verification-timeout"],
@@ -340,6 +340,33 @@ public class Program
 
             var parsedContractMode = CompilationDriver.ParseContractMode(contractMode);
 
+            // Incremental-build cache (.calor-build-state.json next to the outputs):
+            // active for the default output layout (.g.cs alongside each input);
+            // --output redirects the single output elsewhere, so it stays uncached.
+            // --no-cache / --clear-cache govern this cache and the verification cache.
+            CompilationDriver.DriverCacheSettings? buildCache = null;
+            if (output == null)
+            {
+                var stateDirectory = Incremental.BuildStateCache.ComputeCommonDirectory(input);
+                if (noCache)
+                {
+                    if (clearCache)
+                    {
+                        Incremental.BuildStateCache.Delete(stateDirectory);
+                    }
+                }
+                else
+                {
+                    buildCache = new CompilationDriver.DriverCacheSettings(
+                        stateDirectory,
+                        BuildOptionsToken(strictApi, requireDocs, enforceEffects, strictEffects,
+                            permissiveEffects, contractMode, verify, verificationTimeout, analyze,
+                            allFindings, strictBindInference, experimentalFlags),
+                        ClearFirst: clearCache,
+                        OutputPathFor: file => Path.ChangeExtension(file.FullName, ".g.cs"));
+                }
+            }
+
             var driverResult = CompilationDriver.CompileAll(
                 input,
                 file =>
@@ -415,7 +442,13 @@ public class Program
 
                     statusOut.WriteLine($"Compilation successful: {outputPath}");
                 },
-                diagnosticSink: diagnosticSink);
+                diagnosticSink: diagnosticSink,
+                cache: buildCache,
+                onSkipped: (file, outputPath) =>
+                {
+                    var statusOut = structuredOutput ? Console.Error : Console.Out;
+                    statusOut.WriteLine($"Up-to-date (cached): {outputPath}");
+                });
 
             return Finish(driverResult.AnyErrors ? 1 : 0);
         }
@@ -429,6 +462,28 @@ public class Program
                 DiagnosticSeverity.Error));
             return Finish(1);
         }
+    }
+
+    /// <summary>
+    /// Canonical token of every diagnostics-affecting compile option, folded into the
+    /// incremental-build cache's options hash — flipping any of these invalidates all
+    /// cached (skipped) files so their diagnostics are recomputed under the new option
+    /// set. Presentation-only options (verbose, --format) are deliberately excluded.
+    /// Shared by the top-level compile command and <c>calor watch</c>.
+    /// </summary>
+    internal static string BuildOptionsToken(bool strictApi, bool requireDocs, bool enforceEffects,
+        bool strictEffects, bool permissiveEffects, string contractMode, bool verify,
+        int verificationTimeout, bool analyze, bool allFindings, bool strictBindInference,
+        string[]? experimentalFlags)
+    {
+        var experimental = experimentalFlags == null
+            ? ""
+            : string.Join(",", experimentalFlags.OrderBy(f => f, StringComparer.Ordinal));
+        return $"strictApi:{strictApi}|requireDocs:{requireDocs}|enforceEffects:{enforceEffects}" +
+               $"|strictEffects:{strictEffects}|permissiveEffects:{permissiveEffects}" +
+               $"|contractMode:{contractMode.ToLowerInvariant()}|verify:{verify}" +
+               $"|verificationTimeout:{verificationTimeout}|analyze:{analyze}|allFindings:{allFindings}" +
+               $"|strictBindInference:{strictBindInference}|experimental:{experimental}";
     }
 
     private static void WriteHelp(TextWriter writer)
@@ -457,8 +512,8 @@ public class Program
         writer.WriteLine("  --verify          Enable static contract verification with Z3");
         writer.WriteLine("  --verification-timeout  Z3 solver timeout per contract in ms (default: 5000)");
         writer.WriteLine("  --analyze         Enable advanced analyses (dataflow, bugs, taint)");
-        writer.WriteLine("  --no-cache        Disable verification result caching");
-        writer.WriteLine("  --clear-cache     Clear verification cache before compiling");
+        writer.WriteLine("  --no-cache        Disable caching (verification results and incremental builds)");
+        writer.WriteLine("  --clear-cache     Clear caches before compiling (verification + build state)");
         writer.WriteLine("  --format          Diagnostic output format: text, json, sarif (default: text)");
         writer.WriteLine();
         writer.WriteLine("Run 'calor --help' for more information.");
