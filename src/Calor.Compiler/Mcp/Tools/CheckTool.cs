@@ -148,47 +148,7 @@ public sealed class CheckTool : McpToolBase
             };
 
             var result = Program.Compile(source, "mcp-input.calr", compileOptions);
-
-            var fixLookup = result.Diagnostics.DiagnosticsWithFixes
-                .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
-                .ToDictionary(g => g.Key, g => g.First());
-
-            var diagnostics = result.Diagnostics.Select(d =>
-            {
-                var diagOutput = new DiagnoseDiagnosticOutput
-                {
-                    Severity = d.IsError ? "error" : "warning",
-                    Code = d.Code.ToString(),
-                    Message = d.Message,
-                    Line = d.Span.Line,
-                    Column = d.Span.Column
-                };
-
-                var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
-                if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
-                {
-                    diagOutput.Suggestion = diagnosticWithFix.Fix.Description;
-                    diagOutput.Fix = new FixOutput
-                    {
-                        Description = diagnosticWithFix.Fix.Description,
-                        Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditOutput
-                        {
-                            StartLine = e.StartLine,
-                            StartColumn = e.StartColumn,
-                            EndLine = e.EndLine,
-                            EndColumn = e.EndColumn,
-                            NewText = e.NewText
-                        }).ToList()
-                    };
-                }
-
-                if (diagOutput.Suggestion == null)
-                {
-                    diagOutput.CommonMistake = FindCommonMistake(d.Message, d.Code.ToString());
-                }
-
-                return diagOutput;
-            }).ToList();
+            var diagnostics = BuildDiagnoseDiagnostics(result);
 
             string? fixedSource = null;
             var fixesApplied = 0;
@@ -212,6 +172,13 @@ public sealed class CheckTool : McpToolBase
                         {
                             fixedSource = candidate;
                             healed = true;
+
+                            // The response must describe the state of
+                            // fixedSource, not the pre-heal input: replace the
+                            // diagnostics (so coordinates match fixedSource)
+                            // and derive success/isError from the recheck.
+                            result = recheck;
+                            diagnostics = BuildDiagnoseDiagnostics(recheck);
                         }
                     }
                 }
@@ -234,6 +201,54 @@ public sealed class CheckTool : McpToolBase
         {
             return Task.FromResult(McpToolResult.Error($"Diagnose failed: {ex.Message}"));
         }
+    }
+
+    /// <summary>
+    /// Projects a compilation's diagnostics (with any machine-applicable
+    /// fixes and common-mistake hints) into the diagnose response shape.
+    /// </summary>
+    private static List<DiagnoseDiagnosticOutput> BuildDiagnoseDiagnostics(CompilationResult result)
+    {
+        var fixLookup = result.Diagnostics.DiagnosticsWithFixes
+            .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        return result.Diagnostics.Select(d =>
+        {
+            var diagOutput = new DiagnoseDiagnosticOutput
+            {
+                Severity = d.IsError ? "error" : "warning",
+                Code = d.Code.ToString(),
+                Message = d.Message,
+                Line = d.Span.Line,
+                Column = d.Span.Column
+            };
+
+            var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
+            if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
+            {
+                diagOutput.Suggestion = diagnosticWithFix.Fix.Description;
+                diagOutput.Fix = new FixOutput
+                {
+                    Description = diagnosticWithFix.Fix.Description,
+                    Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditOutput
+                    {
+                        StartLine = e.StartLine,
+                        StartColumn = e.StartColumn,
+                        EndLine = e.EndLine,
+                        EndColumn = e.EndColumn,
+                        NewText = e.NewText
+                    }).ToList()
+                };
+            }
+
+            if (diagOutput.Suggestion == null)
+            {
+                diagOutput.CommonMistake = FindCommonMistake(d.Message, d.Code.ToString());
+            }
+
+            return diagOutput;
+        }).ToList();
     }
 
     private static string ApplyFixes(string source, IReadOnlyList<DiagnosticWithFix> diagnosticsWithFixes, out int fixesApplied)
@@ -748,7 +763,10 @@ public sealed class CheckTool : McpToolBase
 
         /// <summary>
         /// True when the source-level healer (calor format --heal) was applied
-        /// on top of the targeted fix edits because errors remained.
+        /// on top of the targeted fix edits because errors remained. When true,
+        /// success/errorCount/warningCount/diagnostics describe the post-heal
+        /// recheck of fixedSource — coordinates match fixedSource, not the
+        /// original input.
         /// </summary>
         [JsonPropertyName("healed")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

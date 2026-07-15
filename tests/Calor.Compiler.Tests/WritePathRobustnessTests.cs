@@ -503,13 +503,21 @@ public class WritePathRobustnessTests
         var toolResult = await tool.ExecuteAsync(args);
 
         var doc = System.Text.Json.JsonDocument.Parse(toolResult.Content![0].Text!);
-        Assert.False(doc.RootElement.GetProperty("success").GetBoolean());
         Assert.True(doc.RootElement.GetProperty("healed").GetBoolean());
 
         var fixedSource = doc.RootElement.GetProperty("fixedSource").GetString();
         Assert.NotNull(fixedSource);
         Assert.False(ParseSource(fixedSource!).HasErrors,
             $"healed fixedSource should parse:\n{fixedSource}");
+
+        // When healed==true the response must describe fixedSource, not the
+        // pre-heal input: the heal fully repaired this file, so the recheck
+        // is clean and the tool result is not an error.
+        Assert.True(doc.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal(0, doc.RootElement.GetProperty("errorCount").GetInt32());
+        Assert.DoesNotContain(doc.RootElement.GetProperty("diagnostics").EnumerateArray(),
+            d => d.GetProperty("severity").GetString() == "error");
+        Assert.False(toolResult.IsError);
     }
 
     [Fact]
