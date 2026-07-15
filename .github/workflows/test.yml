@@ -29,6 +29,33 @@ jobs:
       - name: Run all tests
         run: dotnet test -c Release --no-build --verbosity normal
 
+  spec-drift:
+    # Phase 1 item 6 (agent-native strategy): agent-facing docs are machine-
+    # checked against the implementation. Fails when CLAUDE.md or docs/ cite
+    # §-keywords, diagnostic codes, or effect codes that don't exist, when an
+    # implemented effect code is undocumented, or when a doc hardcodes the
+    # current version.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build compiler
+        run: dotnet build src/Calor.Compiler -c Release --no-restore
+
+      - name: Check agent-facing docs against the implementation
+        run: dotnet run --project src/Calor.Compiler -c Release --no-build -- self-check docs
+
   enforcement-tests:
     runs-on: ubuntu-latest
 
