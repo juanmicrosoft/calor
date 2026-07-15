@@ -33,6 +33,8 @@ dotnet tool update -g calor
 | Command | Description |
 |:--------|:------------|
 | `calor` (default) | Compile Calor source files to C# |
+| `calor run` | Compile and execute a Calor program in one step (no project file required) |
+| `calor test` | Compile Calor sources and run xUnit tests against them (no project file required) |
 | `calor --analyze` | Static analysis: find bugs via dataflow, Z3 verification, and taint tracking |
 | [`calor assess`](/calor/cli/assess/) | Score C# files for Calor migration potential |
 | [`calor init`](/calor/cli/init/) | Initialize Calor with AI agent support and .csproj integration |

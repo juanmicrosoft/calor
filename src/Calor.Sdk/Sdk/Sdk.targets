@@ -6,6 +6,8 @@
     <!-- CalorCompilerOverride: point at a local Calor.Tasks.dll to use a dev-built compiler -->
     <CalorTasksAssembly Condition="'$(CalorCompilerOverride)' != '' and '$(CalorTasksAssembly)' == ''">$(CalorCompilerOverride)</CalorTasksAssembly>
     <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net10.0\Calor.Tasks.dll</CalorTasksAssembly>
+    <!-- Effect enforcement: default true, matching CompilationOptions.EnforceEffects -->
+    <CalorEnforceEffects Condition="'$(CalorEnforceEffects)' == ''">true</CalorEnforceEffects>
   </PropertyGroup>
 
   <!-- IL analysis: resolve runtime directory for BCL implementation assemblies -->
@@ -42,6 +44,7 @@
         OutputDirectory="$(CalorOutputDirectory)"
         ProjectDirectory="$(MSBuildProjectDirectory)"
         Verbose="$(CalorVerbose)"
+        EnforceEffects="$(CalorEnforceEffects)"
         EnableILAnalysis="$(CalorEnableILAnalysis)"
         ReferencedAssemblies="@(ReferencePath)"
         RuntimeDirectory="$(_CalorRuntimeDir)"

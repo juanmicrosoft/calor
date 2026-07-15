@@ -15,73 +15,44 @@ public static class RunCommand
     {
         var pathArgument = new Argument<string>(
             name: "path",
-            description: "A .calr file, or a directory containing .calr files (bin/, obj/ and tests/ subdirectories are excluded)");
-
-        var permissiveOption = new Option<bool>(
-            aliases: ["--permissive"],
-            description: "Relax effect enforcement: unknown calls assumed pure, forbidden effects demoted to warnings");
-
-        var keepTempOption = new Option<bool>(
-            aliases: ["--keep-temp"],
-            description: "Preserve the materialized temp project and print its path");
-
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Show compilation and build details");
+            description: "A .calr file, or a directory containing .calr files (bin/, obj/ and reference/ subdirectories are excluded)");
 
         var command = new Command("run", "Compile and execute a Calor program (no project file required)")
         {
-            pathArgument,
-            permissiveOption,
-            keepTempOption,
-            verboseOption
+            pathArgument
         };
 
-        command.SetHandler(async (InvocationContext ctx) =>
+        var bindSettings = ExecutionWorkspace.AddCommonOptions(command);
+
+        command.SetHandler((InvocationContext ctx) =>
         {
             var path = ctx.ParseResult.GetValueForArgument(pathArgument);
-            var permissive = ctx.ParseResult.GetValueForOption(permissiveOption);
-            var keepTemp = ctx.ParseResult.GetValueForOption(keepTempOption);
-            var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-            ctx.ExitCode = await Task.Run(() => Execute(path, permissive, keepTemp, verbose));
+            ctx.ExitCode = Execute(path, bindSettings(ctx));
         });
 
         return command;
     }
 
-    private static int Execute(string path, bool permissive, bool keepTemp, bool verbose)
+    private static int Execute(string path, ExecutionWorkspace.ExecutionSettings settings)
     {
-        var sources = ExecutionWorkspace.ResolveSources(path, out var error);
-        if (sources == null)
+        var prepared = ExecutionWorkspace.Prepare(path, settings, out var exitCode);
+        if (prepared == null)
         {
-            Console.Error.WriteLine($"Error: {error}");
-            return 2;
-        }
-
-        var dotnet = ExecutionWorkspace.FindDotnet();
-        if (dotnet == null)
-        {
-            Console.Error.WriteLine(ExecutionWorkspace.DotnetMissingMessage);
-            return 2;
-        }
-
-        var units = ExecutionWorkspace.CompileSources(sources, permissive, verbose);
-        if (units == null)
-        {
-            return 1;
+            return exitCode;
         }
 
         var workspace = ExecutionWorkspace.CreateWorkspace("calor-run");
         try
         {
             var projectPath = ExecutionWorkspace.WriteProject(
-                Path.Combine(workspace, "app"), "CalorApp", executable: true, units);
+                Path.Combine(workspace, "app"), "CalorApp", executable: true, prepared.Units);
 
             var outDir = Path.Combine(workspace, "out");
-            var buildExit = ExecutionWorkspace.RunProcessCaptured(dotnet,
-                ["build", projectPath, "--nologo", "-o", outDir, "-v", verbose ? "minimal" : "quiet"],
+            var buildExit = ExecutionWorkspace.RunProcessCaptured(prepared.Dotnet,
+                ["build", projectPath, "--nologo", "-o", outDir, "-v", settings.Verbose ? "minimal" : "quiet"],
                 workspace,
-                echoAlways: verbose);
+                stream: settings.Verbose,
+                settings.Timeout);
             if (buildExit != 0)
             {
                 Console.Error.WriteLine("Error: build of the generated C# project failed (see output above).");
@@ -90,13 +61,14 @@ public static class RunCommand
 
             // Run from the user's current directory so relative-path file IO in the
             // program behaves as expected; exit code is the program's exit code.
-            return ExecutionWorkspace.RunProcess(dotnet,
+            return ExecutionWorkspace.RunProcess(prepared.Dotnet,
                 [Path.Combine(outDir, "CalorApp.dll")],
-                Environment.CurrentDirectory);
+                Environment.CurrentDirectory,
+                settings.Timeout);
         }
         finally
         {
-            ExecutionWorkspace.FinishWorkspace(workspace, keepTemp);
+            ExecutionWorkspace.FinishWorkspace(workspace, settings.KeepTemp);
         }
     }
 }

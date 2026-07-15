@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -6,7 +5,7 @@ namespace Calor.Compiler.Tests;
 /// <summary>
 /// End-to-end CLI tests: invoke calor.dll as a subprocess with multiple --input flags
 /// and verify cross-module effect enforcement fires through the real command-line pipeline
-/// (System.CommandLine parsing → CompileAsync → CrossModuleEffectEnforcementPass).
+/// (System.CommandLine parsing → CompilationDriver → CrossModuleEffectEnforcementPass).
 /// </summary>
 public class CliMultiFileTests : IDisposable
 {
@@ -21,52 +20,13 @@ public class CliMultiFileTests : IDisposable
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { }
-    }
-
-    private static string FindCalorDll()
-    {
-        var dir = Directory.GetCurrentDirectory();
-        while (dir != null)
-        {
-            var candidate = Path.Combine(dir, "src", "Calor.Compiler", "bin", "Debug", "net10.0", "calor.dll");
-            if (File.Exists(candidate)) return candidate;
-            candidate = Path.Combine(dir, "src", "Calor.Compiler", "bin", "Release", "net10.0", "calor.dll");
-            if (File.Exists(candidate)) return candidate;
-            var parent = Directory.GetParent(dir);
-            if (parent == null) break;
-            dir = parent.FullName;
-        }
-        throw new InvalidOperationException("calor.dll not found — build the compiler first.");
+        GC.SuppressFinalize(this);
     }
 
     private (int ExitCode, string StdOut, string StdErr) RunCli(params string[] args)
-    {
-        var dll = FindCalorDll();
-        var argLine = "\"" + dll + "\" --no-telemetry " + string.Join(" ", args);
+        => CliTestHarness.RunCli(_tempDir, args);
 
-        var psi = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            Arguments = argLine,
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            WorkingDirectory = _tempDir
-        };
-
-        using var proc = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to start calor CLI process.");
-
-        var stdOut = proc.StandardOutput.ReadToEnd();
-        var stdErr = proc.StandardError.ReadToEnd();
-        proc.WaitForExit(60_000);
-
-        return (proc.ExitCode, stdOut, stdErr);
-    }
-
-    [Fact]
-    public void MultiFile_CrossModuleEffect_Violation_Errors()
+    private (string APath, string BPath) WriteCrossModuleViolationPair()
     {
         var aPath = Path.Combine(_tempDir, "a.calr");
         var bPath = Path.Combine(_tempDir, "b.calr");
@@ -83,6 +43,13 @@ public class CliMultiFileTests : IDisposable
                 §C{SaveOrder}
                 §/C
             """);
+        return (aPath, bPath);
+    }
+
+    [Fact]
+    public void MultiFile_CrossModuleEffect_Violation_Errors()
+    {
+        var (aPath, bPath) = WriteCrossModuleViolationPair();
 
         var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
 
@@ -91,6 +58,22 @@ public class CliMultiFileTests : IDisposable
         Assert.Contains("Calor0410", combined);
         Assert.Contains("HandleRequest", combined);
         Assert.Contains("db:w", combined);
+    }
+
+    [Fact]
+    public void MultiFile_CrossModuleEffect_Violation_PermissiveEffects_WarnsAndSucceeds()
+    {
+        // --permissive-effects must reach the cross-module pass: the violation is
+        // demoted to a warning (still visible on stderr) and the compile succeeds.
+        var (aPath, bPath) = WriteCrossModuleViolationPair();
+
+        var (exit, stdOut, stdErr) = RunCli(
+            "--input", aPath, "--input", bPath, "--permissive-effects");
+
+        Assert.True(exit == 0, $"Expected exit 0 under --permissive-effects. Exit={exit}\nStdOut:\n{stdOut}\nStdErr:\n{stdErr}");
+        Assert.Contains("warning Calor0410", stdErr);
+        Assert.Contains("HandleRequest", stdErr);
+        Assert.DoesNotContain("error Calor0410", stdOut + stdErr);
     }
 
     [Fact]

@@ -9,69 +9,46 @@ namespace Calor.Compiler.Commands;
 /// materialized as a temporary class library; when the target directory has a
 /// tests/ subdirectory of C# files (the benchmark-pair layout: src .calr +
 /// tests/*.cs), a generated xUnit project referencing the library runs them via
-/// <c>dotnet test</c>. Otherwise <c>dotnet test</c> runs on the materialized
-/// library itself, which validates that the generated C# builds.
+/// <c>dotnet test</c>. When no tests are found, the library is still built to
+/// validate the generated C#, and the command exits with
+/// <see cref="NoTestsExitCode"/>.
 /// </summary>
 public static class TestCommand
 {
+    /// <summary>
+    /// Exit code when the target compiled and built but no tests were found —
+    /// distinct from test failure (non-zero from dotnet test) and usage errors (2).
+    /// </summary>
+    public const int NoTestsExitCode = 3;
+
     public static Command Create()
     {
         var pathArgument = new Argument<string>(
             name: "path",
-            description: "A .calr file, or a directory containing .calr files (with an optional tests/ subdirectory of *.cs xUnit tests)");
-
-        var permissiveOption = new Option<bool>(
-            aliases: ["--permissive"],
-            description: "Relax effect enforcement: unknown calls assumed pure, forbidden effects demoted to warnings");
-
-        var keepTempOption = new Option<bool>(
-            aliases: ["--keep-temp"],
-            description: "Preserve the materialized temp projects and print their path");
-
-        var verboseOption = new Option<bool>(
-            aliases: ["--verbose", "-v"],
-            description: "Show compilation and build details");
+            description: "A .calr file, or a directory containing .calr files (with an optional tests/ subdirectory of *.cs xUnit tests; bin/, obj/ and reference/ subdirectories are excluded)");
 
         var command = new Command("test", "Compile Calor sources and run tests against them (no project file required)")
         {
-            pathArgument,
-            permissiveOption,
-            keepTempOption,
-            verboseOption
+            pathArgument
         };
 
-        command.SetHandler(async (InvocationContext ctx) =>
+        var bindSettings = ExecutionWorkspace.AddCommonOptions(command);
+
+        command.SetHandler((InvocationContext ctx) =>
         {
             var path = ctx.ParseResult.GetValueForArgument(pathArgument);
-            var permissive = ctx.ParseResult.GetValueForOption(permissiveOption);
-            var keepTemp = ctx.ParseResult.GetValueForOption(keepTempOption);
-            var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
-            ctx.ExitCode = await Task.Run(() => Execute(path, permissive, keepTemp, verbose));
+            ctx.ExitCode = Execute(path, bindSettings(ctx));
         });
 
         return command;
     }
 
-    private static int Execute(string path, bool permissive, bool keepTemp, bool verbose)
+    private static int Execute(string path, ExecutionWorkspace.ExecutionSettings settings)
     {
-        var sources = ExecutionWorkspace.ResolveSources(path, out var error);
-        if (sources == null)
+        var prepared = ExecutionWorkspace.Prepare(path, settings, out var exitCode);
+        if (prepared == null)
         {
-            Console.Error.WriteLine($"Error: {error}");
-            return 2;
-        }
-
-        var dotnet = ExecutionWorkspace.FindDotnet();
-        if (dotnet == null)
-        {
-            Console.Error.WriteLine(ExecutionWorkspace.DotnetMissingMessage);
-            return 2;
-        }
-
-        var units = ExecutionWorkspace.CompileSources(sources, permissive, verbose);
-        if (units == null)
-        {
-            return 1;
+            return exitCode;
         }
 
         var testFiles = FindTestFiles(path);
@@ -80,26 +57,39 @@ public static class TestCommand
         try
         {
             var srcProjectPath = ExecutionWorkspace.WriteProject(
-                Path.Combine(workspace, "src"), "CalorSrc", executable: false, units);
+                Path.Combine(workspace, "src"), "CalorSrc", executable: false, prepared.Units);
 
-            string testTarget;
-            if (testFiles.Count > 0)
+            if (testFiles.Count == 0)
             {
-                testTarget = WriteTestProject(Path.Combine(workspace, "tests"), testFiles);
-            }
-            else
-            {
-                Console.WriteLine("No tests/ directory with .cs files found — running 'dotnet test' on the compiled sources only.");
-                testTarget = srcProjectPath;
+                // No tests to run: still build the library so the generated C#
+                // is validated, then report the distinct "no tests" exit code.
+                var buildExit = ExecutionWorkspace.RunProcessCaptured(prepared.Dotnet,
+                    ["build", srcProjectPath, "--nologo", "-v", settings.Verbose ? "minimal" : "quiet"],
+                    workspace,
+                    stream: settings.Verbose,
+                    settings.Timeout);
+                if (buildExit != 0)
+                {
+                    Console.Error.WriteLine("Error: build of the generated C# project failed (see output above).");
+                    return buildExit;
+                }
+
+                Console.Error.WriteLine(
+                    "No tests found: no tests/ directory with .cs files next to the sources. " +
+                    "The generated C# builds successfully.");
+                return NoTestsExitCode;
             }
 
-            return ExecutionWorkspace.RunProcess(dotnet,
-                ["test", testTarget, "--nologo", "-v", verbose ? "normal" : "minimal"],
-                workspace);
+            var testProjectPath = WriteTestProject(Path.Combine(workspace, "tests"), testFiles);
+
+            return ExecutionWorkspace.RunProcess(prepared.Dotnet,
+                ["test", testProjectPath, "--nologo", "-v", settings.Verbose ? "normal" : "minimal"],
+                workspace,
+                settings.Timeout);
         }
         finally
         {
-            ExecutionWorkspace.FinishWorkspace(workspace, keepTemp);
+            ExecutionWorkspace.FinishWorkspace(workspace, settings.KeepTemp);
         }
     }
 
@@ -145,8 +135,9 @@ public static class TestCommand
             File.Copy(sourcePath, Path.Combine(projectDir, targetName), overwrite: true);
         }
 
-        // Package versions match the repository's own test projects so they
-        // resolve from the local NuGet cache in typical dev environments.
+        // Package versions match the phase0 benchmark harness pins
+        // (bench/phase0-agent-native/run-pair.sh) so both execution paths
+        // resolve identical test-stack versions from the local NuGet cache.
         const string csproj = """
             <Project Sdk="Microsoft.NET.Sdk">
 
@@ -158,9 +149,9 @@ public static class TestCommand
               </PropertyGroup>
 
               <ItemGroup>
-                <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-                <PackageReference Include="xunit" Version="2.6.2" />
-                <PackageReference Include="xunit.runner.visualstudio" Version="2.5.4" />
+                <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+                <PackageReference Include="xunit" Version="2.9.2" />
+                <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
               </ItemGroup>
 
               <ItemGroup>

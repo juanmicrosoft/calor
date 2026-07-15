@@ -1,16 +1,19 @@
+using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
 using System.Security;
+using System.Text;
 using Calor.Compiler.Effects;
 
 namespace Calor.Compiler.Commands;
 
 /// <summary>
 /// Shared workspace materialization for the <c>calor run</c> and <c>calor test</c>
-/// commands. Compiles .calr sources in-process (effects enforcement on by default,
-/// same defaults as <see cref="Program.Compile(string, string, CompilationOptions?)"/>),
-/// writes the generated C# into a temporary project referencing the Calor.Runtime
-/// assembly that ships alongside the compiler, and shells out to the dotnet CLI
-/// to build/run/test it. No hand-wired MSBuild required.
+/// commands. Compiles .calr sources in-process via <see cref="CompilationDriver"/>
+/// (the same orchestration as the top-level compile command), writes the generated
+/// C# into a temporary project referencing the Calor.Runtime assembly that ships
+/// alongside the compiler, and shells out to the dotnet CLI to build/run/test it.
+/// No hand-wired MSBuild required.
 /// </summary>
 internal static class ExecutionWorkspace
 {
@@ -19,12 +22,137 @@ internal static class ExecutionWorkspace
         "The .NET SDK (10.0 or later) is required to execute Calor programs. " +
         "Install it from https://dotnet.microsoft.com/download and ensure 'dotnet' is on PATH.";
 
+    /// <summary>Default per-child-process timeout in seconds (overridable via --timeout).</summary>
+    internal const int DefaultTimeoutSeconds = 600;
+
+    /// <summary>Exit code used when a child process exceeds the timeout.</summary>
+    internal const int TimeoutExitCode = 2;
+
     internal sealed record CompiledUnit(string FileName, string GeneratedCode);
 
     /// <summary>
+    /// Settings shared by <c>calor run</c> and <c>calor test</c>, bound from the
+    /// common CLI options declared in <see cref="AddCommonOptions"/>.
+    /// </summary>
+    internal sealed record ExecutionSettings(
+        bool Permissive,
+        bool KeepTemp,
+        bool Verbose,
+        bool EnforceEffects,
+        bool Verify,
+        string ContractMode,
+        int TimeoutSeconds)
+    {
+        public TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds);
+    }
+
+    /// <summary>
+    /// Declares the CLI options shared by run/test, adds them to
+    /// <paramref name="command"/>, and returns a binder that extracts an
+    /// <see cref="ExecutionSettings"/> from an invocation.
+    /// </summary>
+    internal static Func<InvocationContext, ExecutionSettings> AddCommonOptions(Command command)
+    {
+        var permissiveOption = new Option<bool>(
+            aliases: ["--permissive"],
+            description: "Relax effect enforcement: unknown calls assumed pure, forbidden effects (including cross-module violations) demoted to warnings");
+
+        var keepTempOption = new Option<bool>(
+            aliases: ["--keep-temp"],
+            description: "Preserve the materialized temp project and print its path");
+
+        var verboseOption = new Option<bool>(
+            aliases: ["--verbose", "-v"],
+            description: "Show compilation details and stream build output live");
+
+        var enforceEffectsOption = new Option<bool>(
+            aliases: ["--enforce-effects"],
+            description: "Enforce effect declarations (default: true; pass 'false' to opt out)",
+            getDefaultValue: () => true);
+
+        var verifyOption = new Option<bool>(
+            aliases: ["--verify"],
+            description: "Enable static contract verification with Z3 SMT solver");
+
+        var contractModeOption = new Option<string>(
+            aliases: ["--contract-mode"],
+            description: "Contract enforcement mode: off, debug, or release (default: debug)",
+            getDefaultValue: () => "debug");
+
+        var timeoutOption = new Option<int>(
+            aliases: ["--timeout"],
+            description: $"Timeout in seconds for each child process (build/run/test; default: {DefaultTimeoutSeconds})",
+            getDefaultValue: () => DefaultTimeoutSeconds);
+        timeoutOption.AddValidator(result =>
+        {
+            if (result.GetValueOrDefault<int>() <= 0)
+            {
+                result.ErrorMessage = "Timeout must be a positive number of seconds";
+            }
+        });
+
+        command.AddOption(permissiveOption);
+        command.AddOption(keepTempOption);
+        command.AddOption(verboseOption);
+        command.AddOption(enforceEffectsOption);
+        command.AddOption(verifyOption);
+        command.AddOption(contractModeOption);
+        command.AddOption(timeoutOption);
+
+        return ctx => new ExecutionSettings(
+            Permissive: ctx.ParseResult.GetValueForOption(permissiveOption),
+            KeepTemp: ctx.ParseResult.GetValueForOption(keepTempOption),
+            Verbose: ctx.ParseResult.GetValueForOption(verboseOption),
+            EnforceEffects: ctx.ParseResult.GetValueForOption(enforceEffectsOption),
+            Verify: ctx.ParseResult.GetValueForOption(verifyOption),
+            ContractMode: ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",
+            TimeoutSeconds: ctx.ParseResult.GetValueForOption(timeoutOption));
+    }
+
+    internal sealed record PreparedExecution(string Dotnet, List<CompiledUnit> Units);
+
+    /// <summary>
+    /// Shared run/test prologue: resolve sources, locate the dotnet CLI, and
+    /// compile everything. Returns null with <paramref name="exitCode"/> set
+    /// when any step fails.
+    /// </summary>
+    internal static PreparedExecution? Prepare(string path, ExecutionSettings settings, out int exitCode)
+    {
+        exitCode = 0;
+
+        var sources = ResolveSources(path, out var error);
+        if (sources == null)
+        {
+            Console.Error.WriteLine($"Error: {error}");
+            exitCode = 2;
+            return null;
+        }
+
+        var dotnet = FindDotnet();
+        if (dotnet == null)
+        {
+            Console.Error.WriteLine(DotnetMissingMessage);
+            exitCode = 2;
+            return null;
+        }
+
+        var units = CompileSources(sources, settings);
+        if (units == null)
+        {
+            exitCode = 1;
+            return null;
+        }
+
+        return new PreparedExecution(dotnet, units);
+    }
+
+    /// <summary>
     /// Resolves a path argument (a .calr file or a directory containing .calr files)
-    /// to the list of source files. Returns null and sets <paramref name="error"/>
-    /// when the path is invalid or contains no Calor sources.
+    /// to the list of source files. Files under bin/, obj/, or reference/ directory
+    /// segments are skipped (with a stderr warning listing them) — reference/ holds
+    /// benchmark-pair reference solutions that duplicate the primary modules.
+    /// Returns null and sets <paramref name="error"/> when the path is invalid or
+    /// contains no Calor sources.
     /// </summary>
     internal static List<FileInfo>? ResolveSources(string path, out string error)
     {
@@ -43,11 +171,27 @@ internal static class ExecutionWorkspace
 
         if (Directory.Exists(path))
         {
-            var sources = Directory.EnumerateFiles(path, "*.calr", SearchOption.AllDirectories)
-                .Where(f => !IsInExcludedDirectory(path, f))
-                .OrderBy(f => f, StringComparer.Ordinal)
-                .Select(f => new FileInfo(Path.GetFullPath(f)))
-                .ToList();
+            var sources = new List<FileInfo>();
+            var skipped = new List<string>();
+            foreach (var file in Directory.EnumerateFiles(path, "*.calr", SearchOption.AllDirectories)
+                         .OrderBy(f => f, StringComparer.Ordinal))
+            {
+                if (IsInExcludedDirectory(path, file))
+                {
+                    skipped.Add(Path.GetRelativePath(path, file));
+                }
+                else
+                {
+                    sources.Add(new FileInfo(Path.GetFullPath(file)));
+                }
+            }
+
+            if (skipped.Count > 0)
+            {
+                Console.Error.WriteLine(
+                    $"Warning: skipping {skipped.Count} .calr file(s) under bin/, obj/, or reference/ directories: " +
+                    string.Join(", ", skipped));
+            }
 
             if (sources.Count == 0)
             {
@@ -66,89 +210,51 @@ internal static class ExecutionWorkspace
     {
         var relative = Path.GetRelativePath(root, file);
         var segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return segments.Any(s =>
+        // Only directory segments count — the file name itself is never an exclusion key.
+        return segments.Take(segments.Length - 1).Any(s =>
             s.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
             s.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
-            s.Equals("tests", StringComparison.OrdinalIgnoreCase));
+            s.Equals("reference", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
-    /// Compiles all sources in-process. Effects enforcement is ON by default;
-    /// <paramref name="permissive"/> switches unknown-call handling to the
-    /// permissive policy (unknown calls assumed pure, forbidden effects demoted
-    /// to warnings). Prints diagnostics to stderr and returns null on errors.
+    /// Compiles all sources in-process through <see cref="CompilationDriver"/> —
+    /// the same orchestration as the top-level compile command, so warnings
+    /// (including permissive demotions) are always printed and cross-module
+    /// effect enforcement honors the permissive policy. Returns null on errors.
     /// </summary>
-    internal static List<CompiledUnit>? CompileSources(IReadOnlyList<FileInfo> sources, bool permissive, bool verbose)
+    internal static List<CompiledUnit>? CompileSources(IReadOnlyList<FileInfo> sources, ExecutionSettings settings)
     {
         var units = new List<CompiledUnit>();
         var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var modules = new List<(Ast.ModuleNode Ast, string FilePath)>();
-        var anyErrors = false;
+        var policy = settings.Permissive ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict;
 
-        foreach (var file in sources)
-        {
-            if (verbose)
+        var result = CompilationDriver.CompileAll(
+            sources,
+            file => new CompilationOptions
             {
-                Console.WriteLine($"Compiling: {file.FullName}");
-            }
-
-            var source = File.ReadAllText(file.FullName);
-            var options = new CompilationOptions
-            {
-                Verbose = verbose,
-                EnforceEffects = true,
-                UnknownCallPolicy = permissive ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
+                Verbose = settings.Verbose,
+                EnforceEffects = settings.EnforceEffects,
+                UnknownCallPolicy = policy,
+                VerifyContracts = settings.Verify,
+                ContractMode = CompilationDriver.ParseContractMode(settings.ContractMode),
                 ProjectDirectory = Path.GetDirectoryName(file.FullName)
-            };
-
-            var result = Program.Compile(source, file.FullName, options);
-            if (result.HasErrors)
+            },
+            crossModuleEnforcement: settings.EnforceEffects,
+            crossModulePolicy: policy,
+            onCompiled: (file, compileResult) =>
             {
-                foreach (var diagnostic in result.Diagnostics)
+                var baseName = Path.GetFileNameWithoutExtension(file.Name);
+                var fileName = $"{baseName}.g.cs";
+                for (var i = 2; !usedNames.Add(fileName); i++)
                 {
-                    Console.Error.WriteLine(diagnostic);
+                    fileName = $"{baseName}_{i}.g.cs";
                 }
 
-                anyErrors = true;
-                continue;
-            }
+                units.Add(new CompiledUnit(fileName, compileResult.GeneratedCode));
+            });
 
-            var baseName = Path.GetFileNameWithoutExtension(file.Name);
-            var fileName = $"{baseName}.g.cs";
-            for (var i = 2; !usedNames.Add(fileName); i++)
-            {
-                fileName = $"{baseName}_{i}.g.cs";
-            }
-
-            units.Add(new CompiledUnit(fileName, result.GeneratedCode));
-
-            if (result.Ast != null)
-            {
-                modules.Add((result.Ast, file.FullName));
-            }
-        }
-
-        // Cross-module effect enforcement, same as the top-level compile command.
-        if (!anyErrors && modules.Count > 1)
-        {
-            var registry = CrossModuleEffectRegistry.Build(modules);
-            foreach (var diagnostic in registry.BuildDiagnostics)
-            {
-                Console.Error.WriteLine(diagnostic);
-            }
-
-            var crossDiagnostics = new CrossModuleEffectEnforcementPass().Enforce(modules, registry);
-            foreach (var diagnostic in crossDiagnostics)
-            {
-                Console.Error.WriteLine(diagnostic);
-                if (diagnostic.IsError)
-                {
-                    anyErrors = true;
-                }
-            }
-        }
-
-        return anyErrors ? null : units;
+        return result.AnyErrors ? null : units;
     }
 
     /// <summary>
@@ -184,7 +290,7 @@ internal static class ExecutionWorkspace
             ? $"""
                  <ItemGroup>
                    <Reference Include="Calor.Runtime">
-                     <HintPath>{SecurityElement.Escape(runtimePath)}</HintPath>
+                     <HintPath>{EscapeForMsBuildValue(runtimePath)}</HintPath>
                      <Private>true</Private>
                    </Reference>
                  </ItemGroup>
@@ -213,6 +319,24 @@ internal static class ExecutionWorkspace
     }
 
     /// <summary>
+    /// Escapes a path for use as an MSBuild element value: first MSBuild special
+    /// characters (%, $, @, ', ;, ?, *) so the evaluator takes them literally,
+    /// then XML entities so the project file stays well-formed.
+    /// </summary>
+    internal static string EscapeForMsBuildValue(string value)
+    {
+        var msbuildEscaped = value
+            .Replace("%", "%25") // must be first — the escapes below introduce '%'
+            .Replace("$", "%24")
+            .Replace("@", "%40")
+            .Replace("'", "%27")
+            .Replace(";", "%3B")
+            .Replace("?", "%3F")
+            .Replace("*", "%2A");
+        return SecurityElement.Escape(msbuildEscaped) ?? msbuildEscaped;
+    }
+
+    /// <summary>
     /// Locates the dotnet CLI on PATH (or DOTNET_ROOT). Returns null when the
     /// .NET SDK is not installed.
     /// </summary>
@@ -225,7 +349,8 @@ internal static class ExecutionWorkspace
         {
             try
             {
-                var candidate = Path.Combine(dir.Trim(), exeName);
+                // Windows PATH entries may be quoted ("C:\Program Files\dotnet").
+                var candidate = Path.Combine(dir.Trim().Trim('"'), exeName);
                 if (File.Exists(candidate))
                 {
                     return candidate;
@@ -252,9 +377,10 @@ internal static class ExecutionWorkspace
 
     /// <summary>
     /// Runs a process with inherited stdio (output streams directly to the console)
-    /// and returns its exit code.
+    /// and returns its exit code. If the process exceeds <paramref name="timeout"/>,
+    /// its entire process tree is killed and <see cref="TimeoutExitCode"/> is returned.
     /// </summary>
-    internal static int RunProcess(string fileName, IReadOnlyList<string> arguments, string workingDirectory)
+    internal static int RunProcess(string fileName, IReadOnlyList<string> arguments, string workingDirectory, TimeSpan timeout)
     {
         var psi = new ProcessStartInfo
         {
@@ -275,16 +401,24 @@ internal static class ExecutionWorkspace
             return 2;
         }
 
-        process.WaitForExit();
+        if (!process.WaitForExit((int)timeout.TotalMilliseconds))
+        {
+            KillProcessTree(process);
+            Console.Error.WriteLine($"Error: process timed out after {timeout.TotalSeconds:0}s: {fileName} {string.Join(' ', arguments)}");
+            return TimeoutExitCode;
+        }
+
         return process.ExitCode;
     }
 
     /// <summary>
     /// Runs a process capturing its combined output. Used for build steps so
-    /// MSBuild noise stays hidden unless the build fails (or --verbose is set),
-    /// in which case the full output is replayed.
+    /// MSBuild noise stays hidden unless the build fails, in which case the
+    /// buffered output is replayed. With <paramref name="stream"/> (--verbose)
+    /// output is streamed to the console live instead of buffered. Applies the
+    /// same timeout/kill-tree semantics as <see cref="RunProcess"/>.
     /// </summary>
-    internal static int RunProcessCaptured(string fileName, IReadOnlyList<string> arguments, string workingDirectory, bool echoAlways)
+    internal static int RunProcessCaptured(string fileName, IReadOnlyList<string> arguments, string workingDirectory, bool stream, TimeSpan timeout)
     {
         var psi = new ProcessStartInfo
         {
@@ -300,34 +434,90 @@ internal static class ExecutionWorkspace
             psi.ArgumentList.Add(arg);
         }
 
-        using var process = Process.Start(psi);
-        if (process == null)
+        var stdOut = new StringBuilder();
+        var stdErr = new StringBuilder();
+
+        using var process = new Process();
+        process.StartInfo = psi;
+        process.OutputDataReceived += (_, e) =>
         {
-            Console.Error.WriteLine($"Error: failed to start process: {fileName}");
+            if (e.Data == null) return;
+            if (stream)
+            {
+                Console.Out.WriteLine(e.Data);
+            }
+            else
+            {
+                lock (stdOut) stdOut.AppendLine(e.Data);
+            }
+        };
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data == null) return;
+            if (stream)
+            {
+                Console.Error.WriteLine(e.Data);
+            }
+            else
+            {
+                lock (stdErr) stdErr.AppendLine(e.Data);
+            }
+        };
+
+        try
+        {
+            if (!process.Start())
+            {
+                Console.Error.WriteLine($"Error: failed to start process: {fileName}");
+                return 2;
+            }
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            Console.Error.WriteLine($"Error: failed to start process: {fileName} ({ex.Message})");
             return 2;
         }
 
-        var stdOutTask = process.StandardOutput.ReadToEndAsync();
-        var stdErrTask = process.StandardError.ReadToEndAsync();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        if (!process.WaitForExit((int)timeout.TotalMilliseconds))
+        {
+            KillProcessTree(process);
+            Console.Error.WriteLine($"Error: process timed out after {timeout.TotalSeconds:0}s: {fileName} {string.Join(' ', arguments)}");
+            return TimeoutExitCode;
+        }
+
+        // A second, untimed WaitForExit drains the async output handlers
+        // (WaitForExit(int) returning true does not wait for stream EOF).
         process.WaitForExit();
 
-        var stdOut = stdOutTask.GetAwaiter().GetResult();
-        var stdErr = stdErrTask.GetAwaiter().GetResult();
-
-        if (echoAlways || process.ExitCode != 0)
+        if (!stream && process.ExitCode != 0)
         {
-            if (stdOut.Length > 0)
+            lock (stdOut)
             {
-                Console.Out.Write(stdOut);
+                if (stdOut.Length > 0) Console.Out.Write(stdOut.ToString());
             }
 
-            if (stdErr.Length > 0)
+            lock (stdErr)
             {
-                Console.Error.Write(stdErr);
+                if (stdErr.Length > 0) Console.Error.Write(stdErr.ToString());
             }
         }
 
         return process.ExitCode;
+    }
+
+    private static void KillProcessTree(Process process)
+    {
+        try
+        {
+            process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+            // Best-effort: the process may have exited between the timeout and the kill.
+        }
     }
 
     /// <summary>

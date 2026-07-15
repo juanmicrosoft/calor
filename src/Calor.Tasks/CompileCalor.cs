@@ -66,6 +66,14 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public string DepsFilePath { get; set; } = string.Empty;
 
     /// <summary>
+    /// Enforce effect declarations (§E coverage) during compilation, including
+    /// cross-module enforcement. Default: true, matching
+    /// <see cref="Calor.Compiler.CompilationOptions.EnforceEffects"/>.
+    /// Set the MSBuild property <c>CalorEnforceEffects</c> to override.
+    /// </summary>
+    public bool EnforceEffects { get; set; } = true;
+
+    /// <summary>
     /// Semicolon- or comma-separated list of experimental feature flag names to enable.
     /// Plumbed through to <see cref="Calor.Compiler.CompilationOptions.ExperimentalFlags"/>.
     /// Unknown flags are accepted silently — see <see cref="Calor.Compiler.ExperimentalFlags"/>.
@@ -100,7 +108,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // 2. Compute global hashes
         var tasksAssemblyPath = typeof(CompileCalor).Assembly.Location;
         var compilerHash = BuildStateCache.ComputeCompilerHash(tasksAssemblyPath);
-        var optionsHash = BuildStateCache.ComputeOptionsHash();
+        var optionsHash = BuildStateCache.ComputeOptionsHash(EnforceEffects);
         var manifestHash = BuildStateCache.ComputeManifestHash(ProjectDirectory);
 
         // 3. Global invalidation check
@@ -288,6 +296,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 var compileOptions = new CompilationOptions
                 {
                     Verbose = Verbose,
+                    EnforceEffects = EnforceEffects,
                     ProjectDirectory = ProjectDirectory,
                     Context = compilationContext,
                     EnableILAnalysis = EnableILAnalysis,
@@ -388,7 +397,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         //     the build cache, warm builds get complete cross-module coverage without any
         //     re-parsing: skipped files contribute their cached summary and freshly-compiled
         //     files contribute a newly-built one.
-        if (moduleSummaries.Count > 1)
+        if (EnforceEffects && moduleSummaries.Count > 1)
         {
             try
             {

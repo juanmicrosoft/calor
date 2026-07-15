@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -25,70 +24,8 @@ public class RunTestCommandTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private static string FindRepoRoot()
-    {
-        var dir = Directory.GetCurrentDirectory();
-        while (dir != null)
-        {
-            if (File.Exists(Path.Combine(dir, "samples", "FizzBuzz", "fizzbuzz.calr")))
-            {
-                return dir;
-            }
-
-            var parent = Directory.GetParent(dir);
-            if (parent == null) break;
-            dir = parent.FullName;
-        }
-
-        throw new InvalidOperationException("Repository root not found from " + Directory.GetCurrentDirectory());
-    }
-
-    private static string FindCalorDll()
-    {
-        var root = FindRepoRoot();
-        foreach (var config in new[] { "Debug", "Release" })
-        {
-            var candidate = Path.Combine(root, "src", "Calor.Compiler", "bin", config, "net10.0", "calor.dll");
-            if (File.Exists(candidate)) return candidate;
-        }
-
-        throw new InvalidOperationException("calor.dll not found — build the compiler first.");
-    }
-
     private (int ExitCode, string StdOut, string StdErr) RunCli(params string[] args)
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            WorkingDirectory = _tempDir
-        };
-        psi.ArgumentList.Add(FindCalorDll());
-        psi.ArgumentList.Add("--no-telemetry");
-        foreach (var arg in args)
-        {
-            psi.ArgumentList.Add(arg);
-        }
-
-        using var proc = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to start calor CLI process.");
-
-        // Read both streams concurrently to avoid pipe-buffer deadlocks.
-        var stdOutTask = proc.StandardOutput.ReadToEndAsync();
-        var stdErrTask = proc.StandardError.ReadToEndAsync();
-
-        // Generous timeout: these tests restore/build/run real dotnet projects.
-        if (!proc.WaitForExit(300_000))
-        {
-            try { proc.Kill(entireProcessTree: true); } catch { }
-            throw new TimeoutException("calor CLI did not exit within 5 minutes: " + string.Join(" ", args));
-        }
-
-        return (proc.ExitCode, stdOutTask.Result, stdErrTask.Result);
-    }
+        => CliTestHarness.RunCli(_tempDir, args);
 
     // ------------------------------------------------------------------
     // calor run
@@ -97,7 +34,7 @@ public class RunTestCommandTests : IDisposable
     [Fact]
     public void Run_FizzBuzzSample_PrintsFizzBuzzAndExitsZero()
     {
-        var sample = Path.Combine(FindRepoRoot(), "samples", "FizzBuzz", "fizzbuzz.calr");
+        var sample = Path.Combine(CliTestHarness.FindRepoRoot(), "samples", "FizzBuzz", "fizzbuzz.calr");
 
         var (exitCode, stdOut, stdErr) = RunCli("run", sample);
 
@@ -172,6 +109,67 @@ public class RunTestCommandTests : IDisposable
     }
 
     // ------------------------------------------------------------------
+    // effect enforcement on calor run
+    // ------------------------------------------------------------------
+
+    private string WritePureViolator()
+    {
+        // Declares §E{} (pure) but prints — a forbidden 'cw' effect.
+        var file = Path.Combine(_tempDir, "pureviolator.calr");
+        File.WriteAllText(file, """
+            §M{m001:PureViolator}
+              §F{f001:Main:pub} () -> void
+                §E{}
+                §P "side effect!"
+            """);
+        return file;
+    }
+
+    [Fact]
+    public void Run_EffectViolation_Strict_ExitsOneWithError()
+    {
+        var (exitCode, _, stdErr) = RunCli("run", WritePureViolator());
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("error Calor04", stdErr);
+    }
+
+    [Fact]
+    public void Run_EffectViolation_Permissive_RunsAndPrintsDemotedWarning()
+    {
+        var (exitCode, stdOut, stdErr) = RunCli("run", WritePureViolator(), "--permissive");
+
+        Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
+        Assert.Contains("side effect!", stdOut);
+        // The demoted warning must be visible even though compilation succeeded.
+        Assert.Contains("warning Calor04", stdErr);
+    }
+
+    [Fact]
+    public void Run_EffectViolation_EnforceEffectsFalse_RunsWithoutDiagnostics()
+    {
+        var (exitCode, stdOut, stdErr) = RunCli("run", WritePureViolator(), "--enforce-effects", "false");
+
+        Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
+        Assert.DoesNotContain("Calor04", stdErr);
+    }
+
+    [Fact]
+    public void TopLevelCompile_PermissiveEffects_WarningVisibleOnSuccess()
+    {
+        // Same visibility guarantee on the top-level compile command: demoted
+        // warnings print even though the compilation succeeds.
+        var file = WritePureViolator();
+
+        var (exitCode, stdOut, stdErr) = RunCli(
+            "--input", file, "--enforce-effects", "--permissive-effects");
+
+        Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
+        Assert.Contains("warning Calor04", stdErr);
+        Assert.Contains("Compilation successful", stdOut);
+    }
+
+    // ------------------------------------------------------------------
     // calor test
     // ------------------------------------------------------------------
 
@@ -225,7 +223,7 @@ public class RunTestCommandTests : IDisposable
     }
 
     [Fact]
-    public void Test_SingleFileWithoutTests_BuildsAndExitsZero()
+    public void Test_SingleFileWithoutTests_BuildsAndExitsThree()
     {
         var file = Path.Combine(_tempDir, "lib.calr");
         File.WriteAllText(file, """
@@ -236,7 +234,48 @@ public class RunTestCommandTests : IDisposable
 
         var (exitCode, stdOut, stdErr) = RunCli("test", file);
 
+        Assert.True(exitCode == 3, $"expected exit 3 (no tests found), got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
+        Assert.Contains("No tests found", stdErr);
+    }
+
+    [Fact]
+    public void Test_BenchmarkPairDirectory_N1003CsvRow_PassesAndExitsZero()
+    {
+        // The real benchmark-pair layout: calor/ sources, a same-module copy under
+        // reference/calor/, and tests/ with a Calor-arm shim. reference/ must be
+        // excluded (with a warning) or the materialized project fails with CS0101.
+        // The checked-in calor/ fixture is the unsolved scaffold by design, so the
+        // pair is copied and solved (reference implementation applied) to get a
+        // green run — reference/ stays in place to exercise the exclusion.
+        var pairDir = Path.Combine(CliTestHarness.FindRepoRoot(),
+            "bench", "phase0-agent-native", "pairs", "N1-003-csv-row");
+        Assert.True(Directory.Exists(pairDir), $"benchmark pair not found: {pairDir}");
+
+        var pairCopy = Path.Combine(_tempDir, "N1-003-csv-row");
+        CopyDirectory(pairDir, pairCopy);
+        File.Copy(
+            Path.Combine(pairCopy, "reference", "calor", "CsvRow.calr"),
+            Path.Combine(pairCopy, "calor", "CsvRow.calr"),
+            overwrite: true);
+
+        var (exitCode, stdOut, stdErr) = RunCli("test", pairCopy);
+
         Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}\nstdout: {stdOut}");
-        Assert.Contains("No tests/ directory", stdOut);
+        Assert.Contains("skipping", stdErr);
+        Assert.Contains("reference", stdErr);
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (var dir in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+        {
+            Directory.CreateDirectory(Path.Combine(target, Path.GetRelativePath(source, dir)));
+        }
+
+        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        {
+            File.Copy(file, Path.Combine(target, Path.GetRelativePath(source, file)));
+        }
     }
 }
