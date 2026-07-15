@@ -116,24 +116,21 @@ internal static class BuildStateCache
         }
     }
 
-    // Cached since options don't change within a process lifetime.
-    // When codegen-affecting properties are added, this must take them as explicit parameters.
-    private static readonly string CachedOptionsHash = ComputeOptionsHashCore();
-
-    public static string ComputeOptionsHash() => CachedOptionsHash;
-
-    private static string ComputeOptionsHashCore()
+    public static string ComputeOptionsHash(bool enforceEffects = true)
     {
-        // Currently the task only passes Verbose (excluded — doesn't affect output or diagnostics).
-        // The hash exists for forward compatibility. When properties like ContractMode,
-        // EnforceEffects, StrictEffects, RequireDocs, StrictApi are added to the task,
-        // they MUST be added here as explicit parameters.
+        // Diagnostics-affecting options must be folded in: an option flip between
+        // builds has to invalidate cached (skipped) files, otherwise violations that
+        // the new option set would report are silently missed on warm builds.
+        // When properties like ContractMode, StrictEffects, RequireDocs, StrictApi
+        // are added to the task, they MUST be added here as explicit parameters.
+        // (Verbose is excluded — it doesn't affect output or diagnostics.)
         //
         // The set of EffectKind enum values is also folded in: cached EffectSummary entries
         // reference kinds by name, and a kind added/removed/renamed in a compiler upgrade
         // must force a cold rebuild so old summaries don't silently drop effects on parse.
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         sha.AppendData(Encoding.UTF8.GetBytes("options:v1"));
+        sha.AppendData(Encoding.UTF8.GetBytes($"|enforceEffects:{enforceEffects}"));
         sha.AppendData(Encoding.UTF8.GetBytes("|effectkinds:"));
         foreach (var kind in Enum.GetNames(typeof(Calor.Compiler.Effects.EffectKind)))
         {

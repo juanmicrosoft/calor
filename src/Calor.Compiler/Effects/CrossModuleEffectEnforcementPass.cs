@@ -12,11 +12,19 @@ namespace Calor.Compiler.Effects;
 /// Unlike the per-module <see cref="EffectEnforcementPass"/>, this pass:
 ///   - Works across multiple modules using their declared (contract) effects
 ///   - Sees bare-name cross-module calls (e.g., §C{SaveOrder})
-///   - Reports cross-module violations as errors unconditionally — Permissive mode in
-///     the per-file pass only demotes unknown-call warnings, not known-callee mismatches
+///   - Honors <see cref="UnknownCallPolicy"/>: under <see cref="UnknownCallPolicy.Permissive"/>
+///     cross-module violations are demoted to warnings (matching the per-file pass's
+///     permissive treatment of forbidden effects); otherwise they are errors
 /// </summary>
 public sealed class CrossModuleEffectEnforcementPass
 {
+    private readonly UnknownCallPolicy _policy;
+
+    public CrossModuleEffectEnforcementPass(UnknownCallPolicy policy = UnknownCallPolicy.Strict)
+    {
+        _policy = policy;
+    }
+
     /// <summary>
     /// Enforce cross-module effect propagation over a collection of module summaries.
     /// Null or missing list fields on a summary are tolerated as empty — this keeps
@@ -62,7 +70,7 @@ public sealed class CrossModuleEffectEnforcementPass
         return Enforce(summaries, registry);
     }
 
-    private static void CheckCaller(
+    private void CheckCaller(
         EffectCallerSummary caller,
         string filePath,
         HashSet<string> internalNames,
@@ -144,7 +152,7 @@ public sealed class CrossModuleEffectEnforcementPass
         return false;
     }
 
-    private static void VerifyEffects(
+    private void VerifyEffects(
         EffectCallerSummary caller,
         string callerFilePath,
         CrossModuleResolution resolution,
@@ -158,6 +166,11 @@ public sealed class CrossModuleEffectEnforcementPass
         var diagnosticSpan = new TextSpan(0, 0, caller.DiagnosticLine, caller.DiagnosticColumn);
         // Caller names for class methods are formatted "ClassName.MethodName".
         var callerKind = caller.CallerName.Contains('.') ? "Method" : "Function";
+        // Permissive mode demotes cross-module violations to warnings, mirroring the
+        // per-file pass's permissive handling of forbidden effects.
+        var severity = _policy == UnknownCallPolicy.Permissive
+            ? DiagnosticSeverity.Warning
+            : DiagnosticSeverity.Error;
 
         foreach (var (kind, value) in forbidden)
         {
@@ -167,7 +180,7 @@ public sealed class CrossModuleEffectEnforcementPass
                 $"via cross-module call to '{resolution.FunctionName}' (in module '{resolution.ModuleName}') " +
                 $"but does not declare it.",
                 diagnosticSpan,
-                DiagnosticSeverity.Error,
+                severity,
                 callerFilePath));
         }
     }

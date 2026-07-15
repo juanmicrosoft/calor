@@ -235,6 +235,8 @@ public class Program
         rootCommand.AddCommand(CoverageCommand.Create());
         rootCommand.AddCommand(SelfTestCommand.Create());
         rootCommand.AddCommand(EvaluationCommand.Create());
+        rootCommand.AddCommand(RunCommand.Create());
+        rootCommand.AddCommand(TestCommand.Create());
 
         // Initialize telemetry for subcommands
         // Parse --no-telemetry early from args
@@ -259,7 +261,10 @@ public class Program
         return result;
     }
 
-    private static async Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true)
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true)
+        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference));
+
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference)
     {
         try
         {
@@ -312,122 +317,78 @@ public class Program
                 return 1;
             }
 
-            var parsedContractMode = contractMode?.ToLowerInvariant() switch
-            {
-                "off" => ContractMode.Off,
-                "release" => ContractMode.Release,
-                _ => ContractMode.Debug
-            };
+            var parsedContractMode = CompilationDriver.ParseContractMode(contractMode);
 
-            var compiledModules = new List<(Ast.ModuleNode Ast, string FilePath)>();
-            var anyErrors = false;
-
-            foreach (var file in input)
-            {
-                if (verbose)
+            var driverResult = CompilationDriver.CompileAll(
+                input,
+                file =>
                 {
-                    Console.WriteLine($"Compiling: {file.FullName}");
-                }
-
-                var source = await File.ReadAllTextAsync(file.FullName);
-                var cacheOptions = new VerificationCacheOptions
-                {
-                    Enabled = !noCache,
-                    ClearBeforeVerification = clearCache,
-                    ProjectDirectory = Path.GetDirectoryName(file.FullName)
-                };
-                var options = new CompilationOptions
-                {
-                    Verbose = verbose,
-                    StrictApi = strictApi,
-                    RequireDocs = requireDocs,
-                    EnforceEffects = enforceEffects,
-                    StrictEffects = strictEffects,
-                    UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
-                    ContractMode = parsedContractMode,
-                    VerifyContracts = verify,
-                    ProjectDirectory = Path.GetDirectoryName(file.FullName),
-                    VerificationCacheOptions = cacheOptions,
-                    VerificationTimeoutMs = (uint)verificationTimeout,
-                    EnableVerificationAnalyses = analyze,
-                    VerificationAnalysisOptions = analyze ? new Analysis.VerificationAnalysisOptions
+                    var cacheOptions = new VerificationCacheOptions
                     {
-                        BugPatternOptions = new Analysis.BugPatterns.BugPatternOptions
+                        Enabled = !noCache,
+                        ClearBeforeVerification = clearCache,
+                        ProjectDirectory = Path.GetDirectoryName(file.FullName)
+                    };
+                    return new CompilationOptions
+                    {
+                        Verbose = verbose,
+                        StrictApi = strictApi,
+                        RequireDocs = requireDocs,
+                        EnforceEffects = enforceEffects,
+                        StrictEffects = strictEffects,
+                        UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
+                        ContractMode = parsedContractMode,
+                        VerifyContracts = verify,
+                        ProjectDirectory = Path.GetDirectoryName(file.FullName),
+                        VerificationCacheOptions = cacheOptions,
+                        VerificationTimeoutMs = (uint)verificationTimeout,
+                        EnableVerificationAnalyses = analyze,
+                        VerificationAnalysisOptions = analyze ? new Analysis.VerificationAnalysisOptions
                         {
-                            ReportOnlyVerified = !allFindings,
-                            Z3TimeoutMs = (uint)verificationTimeout
-                        },
-                        TaintOptions = new Analysis.Security.TaintAnalysisOptions
-                        {
-                            MinTaintHops = allFindings ? 1 : 2
-                        }
-                    } : null,
-                    ExperimentalFlags = experimentalFlags != null && experimentalFlags.Length > 0
-                        ? new ExperimentalFlags(experimentalFlags)
-                        : ExperimentalFlags.None,
-                    StrictBindInference = strictBindInference
-                };
-                var result = Compile(source, file.FullName, options);
-
-                if (result.HasErrors)
+                            BugPatternOptions = new Analysis.BugPatterns.BugPatternOptions
+                            {
+                                ReportOnlyVerified = !allFindings,
+                                Z3TimeoutMs = (uint)verificationTimeout
+                            },
+                            TaintOptions = new Analysis.Security.TaintAnalysisOptions
+                            {
+                                MinTaintHops = allFindings ? 1 : 2
+                            }
+                        } : null,
+                        ExperimentalFlags = experimentalFlags != null && experimentalFlags.Length > 0
+                            ? new ExperimentalFlags(experimentalFlags)
+                            : ExperimentalFlags.None,
+                        StrictBindInference = strictBindInference
+                    };
+                },
+                // Cross-module enforcement always ran for the top-level compile
+                // command (independent of --enforce-effects); preserved here.
+                crossModuleEnforcement: true,
+                crossModulePolicy: permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
+                onCompiled: (file, result) =>
                 {
-                    foreach (var diagnostic in result.Diagnostics)
+                    // Determine output path
+                    var outputPath = (output?.FullName)
+                        ?? Path.ChangeExtension(file.FullName, ".g.cs");
+
+                    // Ensure output directory exists
+                    var outputDir = Path.GetDirectoryName(outputPath);
+                    if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                     {
-                        Console.Error.WriteLine(diagnostic);
+                        Directory.CreateDirectory(outputDir);
                     }
-                    anyErrors = true;
-                    continue;
-                }
 
-                // Determine output path
-                var outputPath = (output?.FullName)
-                    ?? Path.ChangeExtension(file.FullName, ".g.cs");
+                    File.WriteAllText(outputPath, result.GeneratedCode);
 
-                // Ensure output directory exists
-                var outputDir = Path.GetDirectoryName(outputPath);
-                if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
-                {
-                    Directory.CreateDirectory(outputDir);
-                }
-
-                await File.WriteAllTextAsync(outputPath, result.GeneratedCode);
-
-                if (verbose)
-                {
-                    Console.WriteLine($"Output written to: {outputPath}");
-                }
-
-                Console.WriteLine($"Compilation successful: {outputPath}");
-
-                if (result.Ast != null)
-                {
-                    compiledModules.Add((result.Ast, file.FullName));
-                }
-            }
-
-            // Cross-module effect enforcement across successfully compiled modules.
-            if (compiledModules.Count > 1)
-            {
-                var registry = Effects.CrossModuleEffectRegistry.Build(compiledModules);
-                foreach (var diagnostic in registry.BuildDiagnostics)
-                {
-                    Console.Error.WriteLine(diagnostic);
-                }
-
-                var crossPass = new Effects.CrossModuleEffectEnforcementPass();
-                var crossDiagnostics = crossPass.Enforce(compiledModules, registry);
-
-                foreach (var diagnostic in crossDiagnostics)
-                {
-                    Console.Error.WriteLine(diagnostic);
-                    if (diagnostic.IsError)
+                    if (verbose)
                     {
-                        anyErrors = true;
+                        Console.WriteLine($"Output written to: {outputPath}");
                     }
-                }
-            }
 
-            return anyErrors ? 1 : 0;
+                    Console.WriteLine($"Compilation successful: {outputPath}");
+                });
+
+            return driverResult.AnyErrors ? 1 : 0;
         }
         catch (Exception ex)
         {
