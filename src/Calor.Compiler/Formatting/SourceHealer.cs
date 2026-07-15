@@ -30,6 +30,11 @@ namespace Calor.Compiler.Formatting;
 /// The transform is idempotent: healed output re-heals to itself, because
 /// every emitted indent is exactly the canonical column its own structure
 /// implies on re-reading.
+///
+/// <para><b>Healing is NOT semantics-preserving.</b> Re-anchoring a trailing
+/// statement into a chain-clause body (see <see cref="Ambiguities"/>) is a
+/// guess about the author's intended control flow. Callers must surface
+/// ambiguous decisions and tell the author to review the healed output.</para>
 /// </summary>
 public sealed class SourceHealer
 {
@@ -42,9 +47,23 @@ public sealed class SourceHealer
         ["FI"] = "TR",
     };
 
+    private readonly List<HealAmbiguity> _ambiguities = new();
+
+    /// <summary>
+    /// Control-flow guesses made by the most recent <see cref="Heal"/> call.
+    /// Healing is NOT semantics-preserving: when a chain clause (<c>§EI</c>/
+    /// <c>§EL</c>/<c>§CA</c>/<c>§FI</c>) was written deeper than its opener,
+    /// any following statement written at the clause's own column is
+    /// ambiguous — it could belong to the clause body or be a sibling after
+    /// the chain. The healer keeps it inside the clause body and records the
+    /// decision here so callers can surface it for review.
+    /// </summary>
+    public IReadOnlyList<HealAmbiguity> Ambiguities => _ambiguities;
+
     /// <summary>Heal a Calor source text. Returns the healed text (may equal the input).</summary>
     public string Heal(string source)
     {
+        _ambiguities.Clear();
         if (string.IsNullOrEmpty(source))
         {
             return source;
@@ -57,14 +76,21 @@ public sealed class SourceHealer
 
         // The migrator removes closer text but keeps the line; delete lines
         // that were non-blank before the strip and whitespace-only after it.
+        // Original 1-based line numbers ride along so ambiguity reports
+        // reference the file as the author wrote it.
         var originalLines = SplitLines(source);
-        var lines = SplitLines(stripped);
-        if (removals.Count > 0 && originalLines.Length == lines.Length)
+        var strippedLines = SplitLines(stripped);
+        bool canDropEmptied = removals.Count > 0 && originalLines.Length == strippedLines.Length;
+        var lines = new List<(string Text, int OriginalLine)>(strippedLines.Length);
+        for (int i = 0; i < strippedLines.Length; i++)
         {
-            lines = lines
-                .Where((line, i) => !(string.IsNullOrWhiteSpace(line)
-                                      && !string.IsNullOrWhiteSpace(originalLines[i])))
-                .ToArray();
+            if (canDropEmptied
+                && string.IsNullOrWhiteSpace(strippedLines[i])
+                && !string.IsNullOrWhiteSpace(originalLines[i]))
+            {
+                continue; // line emptied by the closer strip
+            }
+            lines.Add((strippedLines[i], i + 1));
         }
 
         // Step 2 — classify lines (verbatim regions, bracket continuations)
@@ -72,7 +98,7 @@ public sealed class SourceHealer
         var infos = ClassifyLines(lines);
 
         // Step 3 — re-derive indentation from relative nesting.
-        var healed = Relevel(infos);
+        var healed = Relevel(infos, _ambiguities);
 
         var result = string.Join('\n', healed);
         result = result.TrimEnd('\r', '\n');
@@ -98,22 +124,24 @@ public sealed class SourceHealer
         public string? Tag;
         /// <summary>Raw indent of the next non-blank structural line, or -1.</summary>
         public int NextStructuralIndent = -1;
+        /// <summary>1-based line number in the original (pre-strip) source.</summary>
+        public int OriginalLine;
     }
 
     private static string[] SplitLines(string text)
         => text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
 
-    private static LineInfo[] ClassifyLines(string[] lines)
+    private static LineInfo[] ClassifyLines(List<(string Text, int OriginalLine)> lines)
     {
-        var infos = new LineInfo[lines.Length];
+        var infos = new LineInfo[lines.Count];
         bool inRawBlock = false;
         string rawEndMarker = "";
         int bracketDepth = 0;
 
-        for (int i = 0; i < lines.Length; i++)
+        for (int i = 0; i < lines.Count; i++)
         {
-            var line = lines[i];
-            var info = new LineInfo { Original = line };
+            var line = lines[i].Text;
+            var info = new LineInfo { Original = line, OriginalLine = lines[i].OriginalLine };
             infos[i] = info;
 
             if (inRawBlock)
@@ -179,7 +207,7 @@ public sealed class SourceHealer
 
         // Opener detection input: raw indent of the next structural line.
         int next = -1;
-        for (int i = lines.Length - 1; i >= 0; i--)
+        for (int i = lines.Count - 1; i >= 0; i--)
         {
             infos[i].NextStructuralIndent = next;
             if (!infos[i].Verbatim && !infos[i].Blank)
@@ -207,9 +235,20 @@ public sealed class SourceHealer
         /// <summary>Canonical level of the opener line (0 = top level).</summary>
         public int Level;
         public string Tag = "";
+        /// <summary>
+        /// Written indent of the chain clause that re-anchored this block
+        /// deeper (<see cref="AnchorRaw"/> ≠ <see cref="OpenRaw"/>), or -1.
+        /// A following statement written at exactly this column is an
+        /// ambiguous re-anchoring decision — see <see cref="Ambiguities"/>.
+        /// </summary>
+        public int ClauseRaw = -1;
+        /// <summary>Original line of that clause (valid when ClauseRaw ≥ 0).</summary>
+        public int ClauseLine;
+        /// <summary>Tag of that clause, e.g. "EI" (valid when ClauseRaw ≥ 0).</summary>
+        public string ClauseTag = "";
     }
 
-    private static List<string> Relevel(LineInfo[] infos)
+    private static List<string> Relevel(LineInfo[] infos, List<HealAmbiguity> ambiguities)
     {
         var output = new List<string>(infos.Length);
         var stack = new List<OpenBlock>();
@@ -242,7 +281,18 @@ public sealed class SourceHealer
                 stack.RemoveRange(openerIndex + 1, stack.Count - openerIndex - 1);
                 var opener = stack[openerIndex];
                 level = opener.Level;
-                opener.AnchorRaw = r > opener.OpenRaw ? r - 1 : opener.OpenRaw;
+                if (r > opener.OpenRaw)
+                {
+                    opener.AnchorRaw = r - 1;
+                    opener.ClauseRaw = r;
+                    opener.ClauseLine = info.OriginalLine;
+                    opener.ClauseTag = info.Tag!;
+                }
+                else
+                {
+                    opener.AnchorRaw = opener.OpenRaw;
+                    opener.ClauseRaw = -1;
+                }
             }
             else
             {
@@ -251,6 +301,19 @@ public sealed class SourceHealer
                     stack.RemoveAt(stack.Count - 1);
                 }
                 level = stack.Count;
+
+                // Ambiguous re-anchoring: this statement is written at the
+                // same column as a chain clause that we re-anchored deeper.
+                // Keeping it inside the clause body is a control-flow GUESS —
+                // it could equally be a sibling after the chain. Record the
+                // decision so the CLI can tell the author to review it.
+                if (stack.Count > 0 && stack[^1].ClauseRaw == r)
+                {
+                    ambiguities.Add(new HealAmbiguity(info.OriginalLine,
+                        $"statement is at the same column as the §{stack[^1].ClauseTag} on line " +
+                        $"{stack[^1].ClauseLine}; heal kept it inside that clause's body, but it may have " +
+                        "been intended as a statement after the chain — review the healed control flow"));
+                }
 
                 // Empirical opener detection: a structural line followed by a
                 // deeper structural line opens a block. (Arrow-form one-liners
@@ -390,3 +453,10 @@ public sealed class SourceHealer
         return delta;
     }
 }
+
+/// <summary>
+/// A control-flow guess made while healing. Line is the 1-based line number
+/// in the original source; Message explains the decision the healer took and
+/// why it is ambiguous.
+/// </summary>
+public readonly record struct HealAmbiguity(int Line, string Message);

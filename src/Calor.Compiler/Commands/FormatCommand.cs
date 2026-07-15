@@ -43,7 +43,10 @@ public static class FormatCommand
             aliases: ["--heal"],
             description: "Best-effort source-level repair: strip forbidden structural closers, " +
                          "normalize indentation to 2-space levels from structural nesting, and fix " +
-                         "common whitespace issues. Works on files too broken for the AST formatter. Idempotent.");
+                         "common whitespace issues. Works on files too broken for the AST formatter. Idempotent. " +
+                         "WARNING: healing is NOT semantics-preserving — re-anchoring ambiguous statements " +
+                         "into a chain-clause body guesses the intended control flow (each guess is reported " +
+                         "as a warning). Always review the healed output.");
 
         var command = new Command("format", "Format Calor source files to canonical style")
         {
@@ -112,13 +115,30 @@ public static class FormatCommand
 
                 var isFormatted = result.Original == result.Formatted;
 
+                // Healing is NOT semantics-preserving: surface every
+                // control-flow guess with a file:line so the author can
+                // review the healed output.
+                if (heal && result.Ambiguities.Count > 0)
+                {
+                    foreach (var ambiguity in result.Ambiguities)
+                    {
+                        Console.Error.WriteLine(
+                            $"Warning: {file.FullName}:{ambiguity.Line}: {ambiguity.Message}");
+                    }
+                    Console.Error.WriteLine(
+                        "Warning: heal guesses control flow when re-anchoring statements and is " +
+                        "NOT semantics-preserving — review the healed output.");
+                }
+
                 if (!isFormatted)
                 {
                     hasUnformatted = true;
 
                     if (check)
                     {
-                        Console.WriteLine($"{(heal ? "Would heal" : "Would reformat")}: {file.Name}");
+                        Console.WriteLine(heal
+                            ? $"Would heal: {file.Name} (ambiguousDecisions: {result.Ambiguities.Count})"
+                            : $"Would reformat: {file.Name}");
                     }
                     else if (write)
                     {
@@ -228,7 +248,8 @@ public static class FormatCommand
             Success = true,
             Original = source,
             Formatted = healed,
-            Errors = new List<string>()
+            Errors = new List<string>(),
+            Ambiguities = healer.Ambiguities.ToList()
         };
     }
 
@@ -347,5 +368,8 @@ public static class FormatCommand
         public required string Original { get; init; }
         public required string Formatted { get; init; }
         public required List<string> Errors { get; init; }
+
+        /// <summary>Control-flow guesses made by the healer (heal path only).</summary>
+        public List<HealAmbiguity> Ambiguities { get; init; } = new();
     }
 }

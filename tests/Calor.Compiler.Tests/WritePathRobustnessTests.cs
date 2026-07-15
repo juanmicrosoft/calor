@@ -320,6 +320,47 @@ public class WritePathRobustnessTests
     }
 
     [Fact]
+    public void Heal_AmbiguousTrailingStatement_IsReportedWithOriginalLine()
+    {
+        // Reviewer probe: §P "b" sits at the same column as the body-level
+        // §EI above it. Heal keeps it inside the clause body — a control-flow
+        // GUESS that must be surfaced, not silently applied.
+        var source = string.Join('\n',
+            "§M{m1:T}",
+            "  §F{f1:Main:pub} () -> void",
+            "    §IF{i1} (== 1 1)",
+            "      §P \"a\"",
+            "      §EI (== 1 2)", // written at body level
+            "      §P \"b\"");    // ambiguous: clause body or statement after the chain?
+
+        var healer = new SourceHealer();
+        var healed = healer.Heal(source);
+
+        var ambiguity = Assert.Single(healer.Ambiguities);
+        Assert.Equal(6, ambiguity.Line);
+        Assert.Contains("§EI", ambiguity.Message);
+        Assert.Contains("line 5", ambiguity.Message);
+
+        // The guess itself: §P "b" healed into the else-if body.
+        var expected = string.Join('\n',
+            "§M{m1:T}",
+            "  §F{f1:Main:pub} () -> void",
+            "    §IF{i1} (== 1 1)",
+            "      §P \"a\"",
+            "    §EI (== 1 2)",
+            "      §P \"b\"");
+        Assert.Equal(expected, healed);
+    }
+
+    [Fact]
+    public void Heal_UnambiguousFile_ReportsNoAmbiguities()
+    {
+        var healer = new SourceHealer();
+        healer.Heal(CanonicalFizzBuzz);
+        Assert.Empty(healer.Ambiguities);
+    }
+
+    [Fact]
     public void Heal_TrailingWhitespaceAndCrlf_Normalized()
     {
         var source = "§M{m1:T}\r\n  §F{f1:Main:pub} () -> void   \r\n    §P \"x\"\t\r\n";
