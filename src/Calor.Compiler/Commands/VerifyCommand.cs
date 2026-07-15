@@ -220,13 +220,25 @@ public static class VerifyCommand
             }
         }
 
+        // Compiler diagnostics are serialized through the shared
+        // JsonDiagnosticFormatter so the per-diagnostic schema
+        // (file/line/column/severity/code/message + fix edits) is identical to
+        // `calor --format json`. The legacy flat errors/warnings string arrays
+        // are kept for backward compatibility with existing consumers.
+        JsonElement diagnosticsElement;
+        using (var doc = JsonDocument.Parse(new JsonDiagnosticFormatter().Format(result.Diagnostics)))
+        {
+            diagnosticsElement = doc.RootElement.GetProperty("diagnostics").Clone();
+        }
+
         return new FileVerificationResult(
             file.Name,
             file.FullName,
             new SummaryOutput(summary.Proven, summary.Unproven, summary.Disproven, summary.Unsupported, summary.Skipped),
             functions,
             result.Diagnostics.Errors.Select(d => d.Message).ToList(),
-            result.Diagnostics.Warnings.Select(d => d.Message).ToList());
+            result.Diagnostics.Warnings.Select(d => d.Message).ToList(),
+            diagnosticsElement);
     }
 
     private static string FormatOutput(List<FileVerificationResult> results, string format)
@@ -373,7 +385,8 @@ public static class VerifyCommand
         SummaryOutput Summary,
         List<FunctionVerificationOutput> Functions,
         List<string> Errors,
-        List<string> Warnings)
+        List<string> Warnings,
+        JsonElement Diagnostics)
     {
         public bool HasDisproven => Summary.Disproven > 0;
     }

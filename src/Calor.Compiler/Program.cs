@@ -116,6 +116,12 @@ public class Program
             description: "Enable an experimental feature flag (repeatable). Flag names are defined in docs/experiments/registry.json. Unknown flags are accepted silently.")
         { Arity = ArgumentArity.ZeroOrMore };
 
+        var formatOption = new Option<string>(
+            aliases: ["--format", "-f"],
+            getDefaultValue: () => "text",
+            description: "Diagnostic output format: text (human-readable, stderr), json, or sarif (machine-readable, stdout)");
+        formatOption.FromAmong("text", "json", "sarif");
+
         var rootCommand = new RootCommand("Calor Compiler - Compiles Calor source to C# and migrates between languages")
         {
             inputOption,
@@ -136,7 +142,8 @@ public class Program
             allFindingsOption,
             strictBindInferenceOption,
             noStrictBindInferenceOption,
-            experimentalOption
+            experimentalOption,
+            formatOption
         };
 
         // Legacy compile handler (when --input is provided)
@@ -173,6 +180,7 @@ public class Program
             // --no-strict-bind-inference always wins over the default
             if (noStrictBindInference) strictBindInference = false;
             var experimental = ctx.ParseResult.GetValueForOption(experimentalOption) ?? Array.Empty<string>();
+            var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
 
             telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
             {
@@ -192,7 +200,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference);
+                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format);
             }
             catch (Exception ex)
             {
@@ -261,11 +269,17 @@ public class Program
         return result;
     }
 
-    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true)
-        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference));
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text")
+        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format));
 
-    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference)
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text")
     {
+        // Structured diagnostic output (--format json|sarif): diagnostics are
+        // aggregated across files and serialized once through the shared
+        // DiagnosticFormatter surface to stdout; human-oriented status messages
+        // move to stderr so stdout stays machine-parseable.
+        var structuredOutput = !format.Equals("text", StringComparison.OrdinalIgnoreCase);
+        var diagnosticSink = structuredOutput ? new DiagnosticBag() : null;
         try
         {
             // If no input provided, show help
@@ -297,6 +311,7 @@ public class Program
                 Console.WriteLine("  --analyze         Enable advanced analyses (dataflow, bugs, taint)");
                 Console.WriteLine("  --no-cache        Disable verification result caching");
                 Console.WriteLine("  --clear-cache     Clear verification cache before compiling");
+                Console.WriteLine("  --format          Diagnostic output format: text, json, sarif (default: text)");
                 Console.WriteLine();
                 Console.WriteLine("Run 'calor --help' for more information.");
                 return 0;
@@ -380,13 +395,24 @@ public class Program
 
                     File.WriteAllText(outputPath, result.GeneratedCode);
 
+                    // In structured mode stdout is reserved for the serialized
+                    // diagnostics; status messages go to stderr.
+                    var statusOut = structuredOutput ? Console.Error : Console.Out;
+
                     if (verbose)
                     {
-                        Console.WriteLine($"Output written to: {outputPath}");
+                        statusOut.WriteLine($"Output written to: {outputPath}");
                     }
 
-                    Console.WriteLine($"Compilation successful: {outputPath}");
-                });
+                    statusOut.WriteLine($"Compilation successful: {outputPath}");
+                },
+                diagnosticSink: diagnosticSink);
+
+            if (diagnosticSink != null)
+            {
+                var formatter = DiagnosticFormatterFactory.Create(format);
+                Console.WriteLine(formatter.Format(diagnosticSink));
+            }
 
             return driverResult.AnyErrors ? 1 : 0;
         }

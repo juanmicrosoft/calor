@@ -34,12 +34,20 @@ internal static class CompilationDriver
     /// (its historical behavior); run/test pass their effective effects-enforcement
     /// setting.
     /// </param>
+    /// <param name="diagnosticSink">
+    /// When non-null, diagnostics (per-file and cross-module) are collected into
+    /// this bag instead of being printed to stderr. Used by structured output
+    /// modes (<c>--format json|sarif</c>) where a <see cref="Diagnostics.IDiagnosticFormatter"/>
+    /// serializes the aggregate at the end; fix information is preserved via
+    /// <see cref="DiagnosticBag.AddRange"/>.
+    /// </param>
     internal static DriverResult CompileAll(
         IReadOnlyList<FileInfo> sources,
         Func<FileInfo, CompilationOptions> optionsFactory,
         bool crossModuleEnforcement,
         UnknownCallPolicy crossModulePolicy,
-        Action<FileInfo, CompilationResult>? onCompiled = null)
+        Action<FileInfo, CompilationResult>? onCompiled = null,
+        DiagnosticBag? diagnosticSink = null)
     {
         var compiled = new List<FileResult>();
         var modules = new List<(ModuleNode Ast, string FilePath)>();
@@ -56,7 +64,14 @@ internal static class CompilationDriver
             var source = File.ReadAllText(file.FullName);
             var result = Program.Compile(source, file.FullName, options);
 
-            PrintDiagnostics(result.Diagnostics, includeAll: result.HasErrors);
+            if (diagnosticSink != null)
+            {
+                diagnosticSink.AddRange(result.Diagnostics);
+            }
+            else
+            {
+                PrintDiagnostics(result.Diagnostics, includeAll: result.HasErrors);
+            }
 
             if (result.HasErrors)
             {
@@ -81,7 +96,14 @@ internal static class CompilationDriver
             var registry = CrossModuleEffectRegistry.Build(modules);
             foreach (var diagnostic in registry.BuildDiagnostics)
             {
-                Console.Error.WriteLine(diagnostic);
+                if (diagnosticSink != null)
+                {
+                    diagnosticSink.Add(diagnostic);
+                }
+                else
+                {
+                    Console.Error.WriteLine(diagnostic);
+                }
             }
 
             var crossPass = new CrossModuleEffectEnforcementPass(crossModulePolicy);
@@ -89,7 +111,15 @@ internal static class CompilationDriver
 
             foreach (var diagnostic in crossDiagnostics)
             {
-                Console.Error.WriteLine(diagnostic);
+                if (diagnosticSink != null)
+                {
+                    diagnosticSink.Add(diagnostic);
+                }
+                else
+                {
+                    Console.Error.WriteLine(diagnostic);
+                }
+
                 if (diagnostic.IsError)
                 {
                     anyErrors = true;

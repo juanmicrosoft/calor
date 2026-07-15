@@ -210,6 +210,36 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    private readonly string _toolName;
+    private readonly Func<string, string>? _ruleDescriptionProvider;
+    private readonly Func<string, string>? _ruleHelpUriProvider;
+
+    /// <summary>
+    /// Creates the default SARIF formatter for compiler diagnostics
+    /// (tool name "calor", rule metadata from <see cref="DiagnosticCode"/>).
+    /// </summary>
+    public SarifDiagnosticFormatter() : this("calor")
+    {
+    }
+
+    /// <summary>
+    /// Creates a SARIF formatter for a specific tool surface. Commands that emit
+    /// non-compiler rule IDs (e.g. <c>calor assess</c>) supply their own tool name
+    /// and rule metadata providers instead of maintaining a duplicate SARIF object model.
+    /// </summary>
+    /// <param name="toolName">SARIF tool.driver.name (e.g. "calor-assess").</param>
+    /// <param name="ruleDescriptionProvider">Maps a rule ID to its short description; null uses compiler defaults.</param>
+    /// <param name="ruleHelpUriProvider">Maps a rule ID to its help URI; null uses compiler defaults.</param>
+    public SarifDiagnosticFormatter(
+        string toolName,
+        Func<string, string>? ruleDescriptionProvider = null,
+        Func<string, string>? ruleHelpUriProvider = null)
+    {
+        _toolName = toolName;
+        _ruleDescriptionProvider = ruleDescriptionProvider;
+        _ruleHelpUriProvider = ruleHelpUriProvider;
+    }
+
     public string Format(IEnumerable<Diagnostic> diagnostics)
     {
         var sarif = new SarifLog
@@ -224,7 +254,7 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
                     {
                         Driver = new SarifToolDriver
                         {
-                            Name = "calor",
+                            Name = _toolName,
                             Version = "1.0.0",
                             InformationUri = "https://github.com/calor-lang/calor",
                             Rules = GetRules(diagnostics)
@@ -360,7 +390,7 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
                     {
                         Driver = new SarifToolDriver
                         {
-                            Name = "calor",
+                            Name = _toolName,
                             Version = "1.0.0",
                             InformationUri = "https://github.com/calor-lang/calor",
                             Rules = GetRules(diagnostics)
@@ -374,7 +404,7 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         return JsonSerializer.Serialize(sarif, s_options);
     }
 
-    private static List<SarifRule> GetRules(IEnumerable<Diagnostic> diagnostics)
+    private List<SarifRule> GetRules(IEnumerable<Diagnostic> diagnostics)
     {
         return diagnostics
             .Select(d => d.Code)
@@ -382,8 +412,12 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
             .Select(code => new SarifRule
             {
                 Id = code,
-                ShortDescription = new SarifMessage { Text = GetRuleDescription(code) },
-                HelpUri = $"https://calor-lang.org/docs/diagnostics/{code}"
+                ShortDescription = new SarifMessage
+                {
+                    Text = _ruleDescriptionProvider?.Invoke(code) ?? GetRuleDescription(code)
+                },
+                HelpUri = _ruleHelpUriProvider?.Invoke(code)
+                    ?? $"https://calor-lang.org/docs/diagnostics/{code}"
             })
             .ToList();
     }

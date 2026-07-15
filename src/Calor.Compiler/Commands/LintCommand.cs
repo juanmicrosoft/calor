@@ -36,20 +36,28 @@ public static class LintCommand
             aliases: ["--verbose", "-v"],
             description: "Show detailed lint issues");
 
+        // No -f short alias: it is taken by --fix on this command.
+        var formatOption = new Option<string>(
+            aliases: ["--format"],
+            getDefaultValue: () => "text",
+            description: "Output format: text (human-readable), json, or sarif (machine-readable diagnostics on stdout)");
+        formatOption.FromAmong("text", "json", "sarif");
+
         var command = new Command("lint", "Check and fix Calor code for agent-optimal format")
         {
             inputArgument,
             fixOption,
             checkOption,
-            verboseOption
+            verboseOption,
+            formatOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, fixOption, checkOption, verboseOption);
+        command.SetHandler(ExecuteAsync, inputArgument, fixOption, checkOption, verboseOption, formatOption);
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo[] files, bool fix, bool check, bool verbose)
+    private static async Task ExecuteAsync(FileInfo[] files, bool fix, bool check, bool verbose, string format)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("lint");
@@ -59,6 +67,14 @@ public static class LintCommand
             telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
         }
         var sw = Stopwatch.StartNew();
+
+        // Structured output (--format json|sarif): all diagnostics (parse errors
+        // and lint style issues) are aggregated and serialized through the shared
+        // DiagnosticFormatter surface to stdout; human-oriented status messages
+        // move to stderr so stdout stays machine-parseable.
+        var structuredOutput = !format.Equals("text", StringComparison.OrdinalIgnoreCase);
+        var diagnosticSink = structuredOutput ? new DiagnosticBag() : null;
+        var statusOut = structuredOutput ? Console.Error : Console.Out;
 
         var totalFiles = 0;
         var filesWithIssues = 0;
@@ -86,13 +102,17 @@ public static class LintCommand
             try
             {
                 var result = await LintFileAsync(file.FullName, verbose);
+                diagnosticSink?.AddRange(result.Diagnostics);
 
                 if (!result.ParseSuccess)
                 {
-                    Console.Error.WriteLine($"Error parsing {file.Name}:");
-                    foreach (var error in result.ParseErrors)
+                    if (!structuredOutput)
                     {
-                        Console.Error.WriteLine($"  {error}");
+                        Console.Error.WriteLine($"Error parsing {file.Name}:");
+                        foreach (var error in result.ParseErrors)
+                        {
+                            Console.Error.WriteLine($"  {error}");
+                        }
                     }
                     errorFiles++;
                     continue;
@@ -104,7 +124,7 @@ public static class LintCommand
                 {
                     filesWithIssues++;
 
-                    if (verbose || (!fix && !check))
+                    if (!structuredOutput && (verbose || (!fix && !check)))
                     {
                         Console.WriteLine($"{file.Name}: {result.Issues.Count} issue(s)");
                         foreach (var issue in result.Issues)
@@ -116,15 +136,15 @@ public static class LintCommand
                     if (fix)
                     {
                         await File.WriteAllTextAsync(file.FullName, result.FixedContent);
-                        Console.WriteLine($"Fixed: {file.Name}");
+                        statusOut.WriteLine($"Fixed: {file.Name}");
                         fixedFiles++;
                     }
-                    else if (check)
+                    else if (check && !structuredOutput)
                     {
                         Console.WriteLine($"Would fix: {file.Name} ({result.Issues.Count} issues)");
                     }
                 }
-                else if (verbose)
+                else if (verbose && !structuredOutput)
                 {
                     Console.WriteLine($"{file.Name}: OK");
                 }
@@ -136,8 +156,14 @@ public static class LintCommand
             }
         }
 
+        if (diagnosticSink != null)
+        {
+            var formatter = DiagnosticFormatterFactory.Create(format);
+            Console.WriteLine(formatter.Format(diagnosticSink));
+        }
+
         // Summary
-        if (verbose || files.Length > 1)
+        if (!structuredOutput && (verbose || files.Length > 1))
         {
             Console.WriteLine();
             Console.WriteLine($"Linted {totalFiles} file(s), {totalIssues} issue(s) found");
@@ -238,6 +264,16 @@ public static class LintCommand
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath(filePath);
 
+        // Report style issues as warnings so they flow through the shared
+        // structured diagnostic output (--format json|sarif).
+        foreach (var issue in issues)
+        {
+            diagnostics.ReportWarning(
+                new TextSpan(0, 0, issue.Line, 1),
+                DiagnosticCode.LintStyleIssue,
+                issue.Message);
+        }
+
         var lexer = new Lexer(source, diagnostics);
         var tokens = lexer.TokenizeAllForParser();
 
@@ -249,7 +285,8 @@ public static class LintCommand
                 ParseErrors = diagnostics.Errors.Select(e => e.Message).ToList(),
                 Issues = issues,
                 OriginalContent = source,
-                FixedContent = source
+                FixedContent = source,
+                Diagnostics = diagnostics
             };
         }
 
@@ -264,7 +301,8 @@ public static class LintCommand
                 ParseErrors = diagnostics.Errors.Select(e => e.Message).ToList(),
                 Issues = issues,
                 OriginalContent = source,
-                FixedContent = source
+                FixedContent = source,
+                Diagnostics = diagnostics
             };
         }
 
@@ -278,7 +316,8 @@ public static class LintCommand
             ParseErrors = new List<string>(),
             Issues = issues,
             OriginalContent = source,
-            FixedContent = fixedContent
+            FixedContent = fixedContent,
+            Diagnostics = diagnostics
         };
     }
 
@@ -289,6 +328,7 @@ public static class LintCommand
         public required List<LintIssue> Issues { get; init; }
         public required string OriginalContent { get; init; }
         public required string FixedContent { get; init; }
+        public required DiagnosticBag Diagnostics { get; init; }
     }
 
     private sealed record LintIssue(int Line, string Message);

@@ -4,7 +4,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Init;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
@@ -294,51 +296,42 @@ public static class AssessCommand
         });
     }
 
+    /// <summary>
+    /// SARIF output is produced by the shared <see cref="SarifDiagnosticFormatter"/>
+    /// (single SARIF implementation for the whole CLI); assess results are mapped
+    /// to <see cref="Diagnostic"/> instances with per-dimension rule IDs, and rule
+    /// metadata (descriptions, migration-doc help URIs) is supplied via the
+    /// formatter's provider hooks.
+    /// </summary>
     private static string FormatSarif(ProjectAnalysisResult result, int threshold)
     {
-        var sarif = new SarifLog
-        {
-            Schema = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-            Version = "2.1.0",
-            Runs = new List<SarifRun>
-            {
-                new SarifRun
-                {
-                    Tool = new SarifTool
+        var diagnostics = result.GetFilesAboveThreshold(threshold)
+            .SelectMany(f => f.Dimensions
+                .Where(kv => kv.Value.PatternCount > 0)
+                .Select(kv => new Diagnostic(
+                    $"Calor-{kv.Key}",
+                    $"Score: {kv.Value.RawScore:F0}/100. {kv.Value.PatternCount} patterns detected. " +
+                    $"Examples: {string.Join(", ", kv.Value.Examples.Take(3))}",
+                    new TextSpan(0, 0, 1, 1),
+                    f.Priority switch
                     {
-                        Driver = new SarifDriver
-                        {
-                            Name = "calor-assess",
-                            Version = "1.0.0",
-                            InformationUri = "https://github.com/calor-lang/calor",
-                            Rules = GetSarifRules()
-                        }
+                        MigrationPriority.Critical => DiagnosticSeverity.Error,
+                        MigrationPriority.High => DiagnosticSeverity.Warning,
+                        _ => DiagnosticSeverity.Info
                     },
-                    Results = result.GetFilesAboveThreshold(threshold)
-                        .SelectMany(f => CreateSarifResults(f))
-                        .ToList()
-                }
-            }
-        };
-
-        return JsonSerializer.Serialize(sarif, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        });
-    }
-
-    private static List<SarifRule> GetSarifRules()
-    {
-        return Enum.GetValues<ScoreDimension>()
-            .Select(d => new SarifRule
-            {
-                Id = $"Calor-{d}",
-                ShortDescription = new SarifMessage { Text = GetDimensionDescription(d) },
-                HelpUri = $"https://calor-lang.org/docs/migration/{d.ToString().ToLower()}"
-            })
+                    f.RelativePath)))
             .ToList();
+
+        var formatter = new SarifDiagnosticFormatter(
+            toolName: "calor-assess",
+            ruleDescriptionProvider: ruleId =>
+                Enum.TryParse<ScoreDimension>(ruleId.Replace("Calor-", ""), out var dimension)
+                    ? GetDimensionDescription(dimension)
+                    : "Calor migration opportunity",
+            ruleHelpUriProvider: ruleId =>
+                $"https://calor-lang.org/docs/migration/{ruleId.Replace("Calor-", "").ToLowerInvariant()}");
+
+        return formatter.Format(diagnostics);
     }
 
     private static string GetDimensionDescription(ScoreDimension dimension) => dimension switch
@@ -353,42 +346,6 @@ public static class AssessCommand
         ScoreDimension.LinqPotential => "Code uses LINQ patterns that map to Calor collection operations",
         _ => "Calor migration opportunity"
     };
-
-    private static IEnumerable<SarifResult> CreateSarifResults(FileMigrationScore file)
-    {
-        foreach (var (dimension, score) in file.Dimensions.Where(kv => kv.Value.PatternCount > 0))
-        {
-            yield return new SarifResult
-            {
-                RuleId = $"Calor-{dimension}",
-                Level = file.Priority switch
-                {
-                    MigrationPriority.Critical => "error",
-                    MigrationPriority.High => "warning",
-                    _ => "note"
-                },
-                Message = new SarifMessage
-                {
-                    Text = $"Score: {score.RawScore:F0}/100. {score.PatternCount} patterns detected. " +
-                           $"Examples: {string.Join(", ", score.Examples.Take(3))}"
-                },
-                Locations = new List<SarifLocation>
-                {
-                    new SarifLocation
-                    {
-                        PhysicalLocation = new SarifPhysicalLocation
-                        {
-                            ArtifactLocation = new SarifArtifactLocation
-                            {
-                                Uri = file.RelativePath
-                            },
-                            Region = new SarifRegion { StartLine = 1 }
-                        }
-                    }
-                }
-            };
-        }
-    }
 
     // JSON output classes
     private sealed class JsonOutput
@@ -435,74 +392,5 @@ public static class AssessCommand
         public double Weight { get; init; }
         public int PatternCount { get; init; }
         public required List<string> Examples { get; init; }
-    }
-
-    // SARIF output classes
-    private sealed class SarifLog
-    {
-        [JsonPropertyName("$schema")]
-        public required string Schema { get; init; }
-        public required string Version { get; init; }
-        public required List<SarifRun> Runs { get; init; }
-    }
-
-    private sealed class SarifRun
-    {
-        public required SarifTool Tool { get; init; }
-        public required List<SarifResult> Results { get; init; }
-    }
-
-    private sealed class SarifTool
-    {
-        public required SarifDriver Driver { get; init; }
-    }
-
-    private sealed class SarifDriver
-    {
-        public required string Name { get; init; }
-        public required string Version { get; init; }
-        public string? InformationUri { get; init; }
-        public required List<SarifRule> Rules { get; init; }
-    }
-
-    private sealed class SarifRule
-    {
-        public required string Id { get; init; }
-        public required SarifMessage ShortDescription { get; init; }
-        public string? HelpUri { get; init; }
-    }
-
-    private sealed class SarifResult
-    {
-        public required string RuleId { get; init; }
-        public required string Level { get; init; }
-        public required SarifMessage Message { get; init; }
-        public required List<SarifLocation> Locations { get; init; }
-    }
-
-    private sealed class SarifMessage
-    {
-        public required string Text { get; init; }
-    }
-
-    private sealed class SarifLocation
-    {
-        public required SarifPhysicalLocation PhysicalLocation { get; init; }
-    }
-
-    private sealed class SarifPhysicalLocation
-    {
-        public required SarifArtifactLocation ArtifactLocation { get; init; }
-        public required SarifRegion Region { get; init; }
-    }
-
-    private sealed class SarifArtifactLocation
-    {
-        public required string Uri { get; init; }
-    }
-
-    private sealed class SarifRegion
-    {
-        public int StartLine { get; init; }
     }
 }

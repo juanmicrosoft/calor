@@ -336,6 +336,16 @@ public static class DiagnosticCode
     /// </summary>
     public const string LegacyCloserForm = "Calor0830";
 
+    // CLI style lint (Calor0850-0859) — issues surfaced by `calor lint`
+
+    /// <summary>
+    /// Warning (lint): a style issue reported by <c>calor lint</c> —
+    /// trailing whitespace or a non-abbreviated construct ID. Used so
+    /// lint findings flow through the shared structured diagnostic
+    /// output (<c>--format json|sarif</c>) with a stable code.
+    /// </summary>
+    public const string LintStyleIssue = "Calor0850";
+
     // Contract simplification (Calor0330-0339)
 
     /// <summary>
