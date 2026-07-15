@@ -176,6 +176,55 @@ public class WritePathRobustnessTests
             string.Join("\n", ParseSource(healed).Errors.Select(e => e.Message)));
     }
 
+    [Fact]
+    public void MisalignedElseClause_InFunctionWithNoIf_EmitsNoFix()
+    {
+        // Reviewer probe: f1 contains a §IF at the same column as f2's stray
+        // §EI. Before the _lastIfToken function-boundary reset, the fix
+        // referenced f1's §IF — and because the clause already sat at that
+        // column, applying it was a no-op: apply → identical file → same
+        // error, forever (a probe-confirmed infinite agent loop).
+        var source = string.Join('\n',
+            "§M{m1:T}",
+            "  §F{f1:A:pub} () -> void",
+            "    §IF{i1} (== 1 1)",
+            "      §P \"a\"",
+            "  §F{f2:B:pub} () -> void",
+            "    §EI (== 1 2)",
+            "      §P \"b\"");
+
+        var diagnostics = ParseSource(source);
+
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.MisalignedElseClause);
+        // No fix: there is no §IF in this function to align with.
+        Assert.DoesNotContain(diagnostics.DiagnosticsWithFixes,
+            d => d.Code == DiagnosticCode.MisalignedElseClause);
+    }
+
+    [Fact]
+    public void MisalignedElseClause_ClauseAlreadyAtIfColumn_EmitsNoNoOpFix()
+    {
+        // Same-function variant of the no-op hazard: the stray clause is
+        // already at its §IF's column, but the chain closed early because a
+        // statement at the same column ended the if. Re-indenting to the §IF
+        // column would not change the file, so no fix may be emitted.
+        var source = string.Join('\n',
+            "§M{m1:T}",
+            "  §F{f1:A:pub} () -> void",
+            "    §IF{i1} (== 1 1)",
+            "      §P \"a\"",
+            "    §P \"x\"",
+            "    §EI (== 1 2)",
+            "      §P \"b\"");
+
+        var diagnostics = ParseSource(source);
+
+        Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.MisalignedElseClause);
+        Assert.DoesNotContain(diagnostics.DiagnosticsWithFixes,
+            d => d.Code == DiagnosticCode.MisalignedElseClause);
+    }
+
     // ===== 2. SourceHealer =====
 
     [Fact]

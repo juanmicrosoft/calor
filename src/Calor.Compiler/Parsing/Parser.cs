@@ -673,6 +673,7 @@ public sealed class Parser
     private FunctionNode ParseFunction()
     {
         var startToken = Expect(TokenKind.Func);
+        _lastIfToken = null; // scope Calor0117 fixes to this function's §IFs
         var headerOpen = Current;
         var attrs = ParseAttributes();
         CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
@@ -867,6 +868,7 @@ public sealed class Parser
     private FunctionNode ParseAsyncFunction()
     {
         var startToken = Expect(TokenKind.AsyncFunc);
+        _lastIfToken = null; // scope Calor0117 fixes to this function's §IFs
         var headerOpen = Current;
         var attrs = ParseAttributes();
         CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
@@ -1525,6 +1527,13 @@ public sealed class Parser
     /// clause line to the column of the most recently parsed <c>§IF</c>,
     /// then consumes the clause header so the following body parses as
     /// ordinary statements instead of cascading unexpected-token errors.
+    ///
+    /// Two guards keep the fix honest: <c>_lastIfToken</c> is reset at every
+    /// function/method boundary, so a stray clause in a function with no
+    /// <c>§IF</c> never gets a fix pointing at a different function's
+    /// <c>§IF</c>; and a fix is only emitted when applying it would actually
+    /// change the line — a no-op fix (clause already at the target column)
+    /// would send an agent apply→recheck loop into an infinite cycle.
     /// </summary>
     private StatementNode? ParseMisalignedElseClause()
     {
@@ -1533,7 +1542,13 @@ public sealed class Parser
         var message = $"'{tag}' is not aligned with any open §IF — the if-chain already closed at a " +
             "shallower indent level. Indent the clause to the same column as its §IF.";
 
-        if (_lastIfToken is { } ifTok)
+        // The edit replaces the clause line's leading columns with spaces;
+        // it is a no-op when the clause already sits at the target column.
+        // (Leading tabs cannot make same-width leading text differ here:
+        // token columns are computed after the lexer's tab handling, and
+        // tab-indented lines are already covered by Calor0008/Calor0099.)
+        if (_lastIfToken is { } ifTok
+            && ifTok.Span.Column != clauseToken.Span.Column)
         {
             int targetIndent = Math.Max(0, ifTok.Span.Column - 1);
             int leadingLength = Math.Max(0, clauseToken.Span.Column - 1);
@@ -7550,6 +7565,7 @@ public sealed class Parser
     private MethodNode ParseMethodDefinition()
     {
         var startToken = Expect(TokenKind.Method);
+        _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -7692,6 +7708,7 @@ public sealed class Parser
     private MethodNode ParseAsyncMethodDefinition()
     {
         var startToken = Expect(TokenKind.AsyncMethod);
+        _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 
