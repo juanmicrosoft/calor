@@ -361,6 +361,51 @@ public class WritePathRobustnessTests
     }
 
     [Fact]
+    public void Heal_UnclosedHeaderBrace_DoesNotVerbatimizeRestOfFile()
+    {
+        // Reviewer probe: `§F{f1:Main:pub ( )` leaves the header brace
+        // unclosed. Before the continuation cap, every following line was
+        // classified as bracket continuation and heal silently no-opped on
+        // the whole file. A continuation must end at a line starting with §.
+        var source = string.Join('\n',
+            "§M{m1:T}",
+            "  §F{f1:Main:pub ( ) -> void", // missing closing }
+            "      §P \"x\"",               // over-indented: must still normalize
+            "      §P \"y\"");
+
+        var healed = new SourceHealer().Heal(source);
+
+        var expected = string.Join('\n',
+            "§M{m1:T}",
+            "  §F{f1:Main:pub ( ) -> void",
+            "    §P \"x\"",
+            "    §P \"y\"");
+        Assert.Equal(expected, healed);
+    }
+
+    [Fact]
+    public void Heal_BracketContinuation_IsCappedAtTenLines()
+    {
+        // An unclosed bracket followed by many non-§ lines: only the first
+        // ten remain verbatim continuations; past the cap, lines are
+        // structural again (an unclosed bracket is assumed to be a typo).
+        var continuation = Enumerable.Range(1, 11).Select(n => $"      line{n}");
+        var source = string.Join('\n', new[]
+        {
+            "§M{m1:T}",
+            "  §B{x:str} (concat \"a\"", // unclosed ( — continuation begins
+        }.Concat(continuation));
+
+        var healed = new SourceHealer().Heal(source).Split('\n');
+
+        // Lines 3..12 (continuations 1..10) are verbatim: indent preserved.
+        Assert.Equal("      line1", healed[2]);
+        Assert.Equal("      line10", healed[11]);
+        // Line 13 (continuation 11) is past the cap: releveled.
+        Assert.Equal("    line11", healed[12]);
+    }
+
+    [Fact]
     public void Heal_TrailingWhitespaceAndCrlf_Normalized()
     {
         var source = "§M{m1:T}\r\n  §F{f1:Main:pub} () -> void   \r\n    §P \"x\"\t\r\n";

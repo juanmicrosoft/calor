@@ -78,6 +78,7 @@ public static class FormatCommand
         var totalFiles = 0;
         var formattedFiles = 0;
         var errorFiles = 0;
+        var unrepairedFiles = 0; // heal ran but the output still fails to parse
 
         foreach (var file in files)
         {
@@ -114,6 +115,11 @@ public static class FormatCommand
                 }
 
                 var isFormatted = result.Original == result.Formatted;
+
+                if (result.ResidualParseErrors)
+                {
+                    unrepairedFiles++;
+                }
 
                 // Healing is NOT semantics-preserving: surface every
                 // control-flow guess with a file:line so the author can
@@ -182,14 +188,20 @@ public static class FormatCommand
             {
                 Console.WriteLine($"  Errors: {errorFiles}");
             }
+            if (unrepairedFiles > 0)
+            {
+                Console.WriteLine($"  Still failing to parse after heal: {unrepairedFiles}");
+            }
         }
 
-        // Exit code
+        // Exit code. A heal that leaves (or found and could not touch) parse
+        // errors must not exit 0 — silence would let an agent loop believe
+        // the file was repaired.
         if (errorFiles > 0)
         {
             Environment.ExitCode = 2;
         }
-        else if (check && hasUnformatted)
+        else if ((check && hasUnformatted) || unrepairedFiles > 0)
         {
             Environment.ExitCode = 1;
         }
@@ -211,9 +223,10 @@ public static class FormatCommand
     /// <c>--heal</c> path: source-level best-effort repair via
     /// <see cref="SourceHealer"/>. Unlike <see cref="FormatFileAsync"/> this
     /// never requires the input to parse — that is the point: it repairs
-    /// files the AST formatter must reject. If the healed output still fails
-    /// to parse, the remaining diagnostics are printed to stderr as a
-    /// heads-up, but healing still succeeds (best effort).
+    /// files the AST formatter must reject. The healed output is ALWAYS
+    /// re-parsed — including when it is identical to the input, so a heal
+    /// no-op on a broken file never exits silently — and residual errors are
+    /// reported on stderr and drive a nonzero exit code.
     /// </summary>
     private static async Task<FormatResult> HealFileAsync(string filePath)
     {
@@ -222,24 +235,23 @@ public static class FormatCommand
         var healer = new SourceHealer();
         var healed = healer.Heal(source);
 
-        if (healed != source)
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath(filePath);
+        var lexer = new Lexer(healed, diagnostics);
+        var tokens = lexer.TokenizeAllForParser();
+        if (!diagnostics.HasErrors)
         {
-            var diagnostics = new DiagnosticBag();
-            diagnostics.SetFilePath(filePath);
-            var lexer = new Lexer(healed, diagnostics);
-            var tokens = lexer.TokenizeAllForParser();
-            if (!diagnostics.HasErrors)
+            var parser = new Parser(tokens, diagnostics);
+            parser.Parse();
+        }
+        if (diagnostics.HasErrors)
+        {
+            Console.Error.WriteLine(healed == source
+                ? $"Note: {Path.GetFileName(filePath)} has parse errors that heal could not repair (no changes made):"
+                : $"Note: {Path.GetFileName(filePath)} still has parse errors after healing; heal could not fully repair it:");
+            foreach (var error in diagnostics.Errors.Take(5))
             {
-                var parser = new Parser(tokens, diagnostics);
-                parser.Parse();
-            }
-            if (diagnostics.HasErrors)
-            {
-                Console.Error.WriteLine($"Note: {Path.GetFileName(filePath)} still has parse errors after healing:");
-                foreach (var error in diagnostics.Errors.Take(5))
-                {
-                    Console.Error.WriteLine($"  {error}");
-                }
+                Console.Error.WriteLine($"  {error}");
             }
         }
 
@@ -249,7 +261,8 @@ public static class FormatCommand
             Original = source,
             Formatted = healed,
             Errors = new List<string>(),
-            Ambiguities = healer.Ambiguities.ToList()
+            Ambiguities = healer.Ambiguities.ToList(),
+            ResidualParseErrors = diagnostics.HasErrors
         };
     }
 
@@ -371,5 +384,8 @@ public static class FormatCommand
 
         /// <summary>Control-flow guesses made by the healer (heal path only).</summary>
         public List<HealAmbiguity> Ambiguities { get; init; } = new();
+
+        /// <summary>True when the healed output still fails to parse (heal path only).</summary>
+        public bool ResidualParseErrors { get; init; }
     }
 }

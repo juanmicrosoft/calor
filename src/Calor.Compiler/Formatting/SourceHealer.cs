@@ -131,12 +131,23 @@ public sealed class SourceHealer
     private static string[] SplitLines(string text)
         => text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
 
+    /// <summary>
+    /// Upper bound on how many lines a bracket continuation may span. A
+    /// single unbalanced <c>{</c>/<c>(</c> (the canonical agent typo:
+    /// <c>§F{f1:Main:pub ( ) -> void</c> with the header brace never closed)
+    /// would otherwise mark every following line as continuation and make
+    /// heal a silent no-op on the whole file. Genuine multi-line bracketed
+    /// expressions are short; long C# payloads belong in §RAW/§CSHARP blocks.
+    /// </summary>
+    private const int MaxBracketContinuationLines = 10;
+
     private static LineInfo[] ClassifyLines(List<(string Text, int OriginalLine)> lines)
     {
         var infos = new LineInfo[lines.Count];
         bool inRawBlock = false;
         string rawEndMarker = "";
         int bracketDepth = 0;
+        int continuationRun = 0;
 
         for (int i = 0; i < lines.Count; i++)
         {
@@ -156,13 +167,24 @@ public sealed class SourceHealer
 
             if (bracketDepth > 0)
             {
-                // Continuation of a multi-line bracketed expression: the
-                // parser ignores its indentation, and its content may be a
-                // §CS{…} C# payload — pass through untouched (except CR).
-                info.Verbatim = true;
-                info.Original = line.TrimEnd('\r');
-                bracketDepth = Math.Max(0, bracketDepth + BracketDelta(line));
-                continue;
+                // A continuation may not cross a line that starts a §-tag,
+                // and may not exceed MaxBracketContinuationLines: past either
+                // bound the open bracket is assumed to be an authoring typo
+                // (never closed), and the line is treated as structural again.
+                bool startsStructuralTag = line.TrimStart(' ', '\t').StartsWith('§');
+                if (!startsStructuralTag && continuationRun < MaxBracketContinuationLines)
+                {
+                    // Continuation of a multi-line bracketed expression: the
+                    // parser ignores its indentation, and its content may be a
+                    // §CS{…} C# payload — pass through untouched (except CR).
+                    info.Verbatim = true;
+                    info.Original = line.TrimEnd('\r');
+                    bracketDepth = Math.Max(0, bracketDepth + BracketDelta(line));
+                    continuationRun = bracketDepth > 0 ? continuationRun + 1 : 0;
+                    continue;
+                }
+                bracketDepth = 0;
+                continuationRun = 0;
             }
 
             var trimmedEnd = line.TrimEnd();
