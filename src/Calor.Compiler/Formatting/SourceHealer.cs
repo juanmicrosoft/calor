@@ -144,12 +144,16 @@ public sealed class SourceHealer
                 continue;
             }
 
-            // Expand leading tabs (2 spaces each) and measure the indent.
+            // Expand leading tabs and measure the indent. Tabs count as 4
+            // columns for MEASUREMENT only: levels are re-derived and emitted
+            // at 2 spaces each regardless, and width 4 orders tab-indented
+            // lines correctly against both 2- and 4-space neighbours in
+            // files that mix conventions.
             int ws = 0;
             var indent = new StringBuilder();
             while (ws < trimmedEnd.Length && (trimmedEnd[ws] == ' ' || trimmedEnd[ws] == '\t'))
             {
-                indent.Append(trimmedEnd[ws] == '\t' ? "  " : " ");
+                indent.Append(trimmedEnd[ws] == '\t' ? "    " : " ");
                 ws++;
             }
 
@@ -190,9 +194,16 @@ public sealed class SourceHealer
     /// <summary>An open block on the relevel stack.</summary>
     private sealed class OpenBlock
     {
-        /// <summary>Raw (as-written) indent of the opener line — updated when a
-        /// chain clause re-anchors the block at its own written indent.</summary>
+        /// <summary>Raw (as-written) indent of the opener line.</summary>
         public int OpenRaw;
+        /// <summary>
+        /// Raw indent used for pop comparisons: a line stays inside this
+        /// block while written deeper than <c>AnchorRaw</c>. Normally equals
+        /// <see cref="OpenRaw"/>; a chain clause written at body level moves
+        /// it just below the clause's own indent so the clause body (written
+        /// at the clause's level) still nests inside the block.
+        /// </summary>
+        public int AnchorRaw;
         /// <summary>Canonical level of the opener line (0 = top level).</summary>
         public int Level;
         public string Tag = "";
@@ -223,16 +234,19 @@ public sealed class SourceHealer
                 && TryFindChainOpener(stack, openerTag, r, out int openerIndex))
             {
                 // Chain clause: align with its opener's column, popping any
-                // blocks opened inside the preceding clause body. Re-anchor
-                // the opener at the clause's written indent so the clause
-                // body (written relative to the clause) levels correctly.
+                // blocks opened inside the preceding clause body. When the
+                // clause was written DEEPER than its opener (the classic
+                // body-level §EI mistake), re-anchor the block just below
+                // the clause's written indent so the clause body — written
+                // at the clause's own level — still nests inside the block.
                 stack.RemoveRange(openerIndex + 1, stack.Count - openerIndex - 1);
-                level = stack[openerIndex].Level;
-                stack[openerIndex].OpenRaw = r;
+                var opener = stack[openerIndex];
+                level = opener.Level;
+                opener.AnchorRaw = r > opener.OpenRaw ? r - 1 : opener.OpenRaw;
             }
             else
             {
-                while (stack.Count > 0 && r <= stack[^1].OpenRaw)
+                while (stack.Count > 0 && r <= stack[^1].AnchorRaw)
                 {
                     stack.RemoveAt(stack.Count - 1);
                 }
@@ -245,7 +259,7 @@ public sealed class SourceHealer
                 // on broken input.)
                 if (info.NextStructuralIndent > r)
                 {
-                    stack.Add(new OpenBlock { OpenRaw = r, Level = level, Tag = info.Tag ?? "" });
+                    stack.Add(new OpenBlock { OpenRaw = r, AnchorRaw = r, Level = level, Tag = info.Tag ?? "" });
                 }
             }
 
