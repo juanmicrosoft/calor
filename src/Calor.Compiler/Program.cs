@@ -245,6 +245,7 @@ public class Program
         rootCommand.AddCommand(EvaluationCommand.Create());
         rootCommand.AddCommand(RunCommand.Create());
         rootCommand.AddCommand(TestCommand.Create());
+        rootCommand.AddCommand(WatchCommand.Create());
 
         // Initialize telemetry for subcommands
         // Parse --no-telemetry early from args
@@ -493,6 +494,7 @@ public class Program
         writer.WriteLine("Usage:");
         writer.WriteLine("  calor --input <file.calr> [--output <file.cs>]   Compile a single Calor file");
         writer.WriteLine("  calor --input <a.calr> --input <b.calr>          Compile multiple files with cross-module effect checking");
+        writer.WriteLine("  calor watch <dir|files>                          Watch sources and recompile incrementally on change");
         writer.WriteLine("  calor convert <file>                             Convert between C# and Calor");
         writer.WriteLine("  calor migrate <project>                          Migrate entire project");
         writer.WriteLine("  calor assess <directory>                         Assess C# for migration potential");

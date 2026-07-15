@@ -307,18 +307,27 @@ internal static class BuildStateCache
     /// directory — out-of-project sanitization keeps the remaining keys stable.
     /// </summary>
     public static string ComputeCommonDirectory(IReadOnlyList<FileInfo> files)
+        => ComputeCommonDirectoryOfDirs(
+            files.Select(f => Path.GetDirectoryName(Path.GetFullPath(f.FullName))!).ToList());
+
+    /// <summary>
+    /// Deepest directory containing all of <paramref name="directories"/>. Directories
+    /// on disjoint roots (e.g., different drives) fall back to the first directory —
+    /// out-of-project sanitization keeps the remaining keys stable.
+    /// </summary>
+    public static string ComputeCommonDirectoryOfDirs(IReadOnlyList<string> directories)
     {
-        var common = Path.GetDirectoryName(Path.GetFullPath(files[0].FullName))!;
-        foreach (var file in files)
+        var first = Path.GetFullPath(directories[0]);
+        var common = first;
+        foreach (var directory in directories)
         {
-            var dir = Path.GetDirectoryName(Path.GetFullPath(file.FullName))!;
+            var dir = Path.GetFullPath(directory);
             while (!IsWithin(dir, common))
             {
                 var parent = Path.GetDirectoryName(common);
                 if (parent == null)
                 {
-                    // Disjoint roots — fall back to the first file's directory.
-                    return Path.GetDirectoryName(Path.GetFullPath(files[0].FullName))!;
+                    return first; // disjoint roots
                 }
                 common = parent;
             }
