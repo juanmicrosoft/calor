@@ -5,6 +5,9 @@
     <InternalsVisibleTo Include="Calor.Enforcement.Tests" />
     <InternalsVisibleTo Include="Calor.ILAnalysis.Tests" />
     <InternalsVisibleTo Include="McpBenchHarness" />
+    <InternalsVisibleTo Include="Calor.Tasks" />
+    <InternalsVisibleTo Include="Calor.Tasks.Tests" />
+    <InternalsVisibleTo Include="IncrementalBuildBench" />
   </ItemGroup>
 
   <PropertyGroup>

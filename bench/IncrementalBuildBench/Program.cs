@@ -1,3 +1,6 @@
+// The build-state cache moved to Calor.Compiler (shared with the CLI compile path).
+global using BuildStateCache = Calor.Compiler.Incremental.BuildStateCache;
+
 using System.Diagnostics;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
