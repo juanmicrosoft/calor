@@ -222,6 +222,7 @@ Get machine-readable diagnostics from Calor source code. Includes suggestions an
 ```json
 {
   "source": "string (required) - Calor source code to diagnose",
+  "apply": "boolean - Apply all available fix edits and return the fixed source; if errors remain, a source-level heal is attempted (default: false)",
   "options": {
     "strictApi": "boolean - Enable strict API checking (default: false)",
     "requireDocs": "boolean - Require documentation on public functions (default: false)"
@@ -260,11 +261,32 @@ Get machine-readable diagnostics from Calor source code. Includes suggestions an
 }
 ```
 
+With `"apply": true` the response additionally contains:
+
+```json
+{
+  "fixedSource": "string - the source after applying every machine-applicable fix edit",
+  "fixesApplied": 2,
+  "healed": true
+}
+```
+
+`healed` is present (and `true`) only when the targeted fix edits were not
+enough and the source-level healer (the same transform as
+`calor format --heal`) was applied on top and strictly reduced the error
+count. **When `healed` is `true`, `success`, `errorCount`, `warningCount`,
+and `diagnostics` describe the post-heal recheck of `fixedSource`** — all
+diagnostic coordinates match `fixedSource`, not the original input. Note
+that healing is not semantics-preserving (it guesses control flow when
+re-anchoring ambiguous statements) — review `fixedSource` before using it.
+
 **Fix-Supported Diagnostics:**
 - Typos in operators (e.g., "cotains" → "contains")
 - Mismatched closing tag IDs
 - Undefined variables with similar names in scope
 - C# constructs with Calor alternatives (e.g., "nameof" → use string literal)
+- Indentation issues: tabs (`Calor0008`), non-standard widths (`Calor0009`), mixed/misaligned dedents (`Calor0099`), misaligned `§EI`/`§EL` clauses (`Calor0117`)
+- Forbidden structural closers (`Calor0830`)
 
 ### calor_validate_snippet
 

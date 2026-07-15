@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Write-path robustness (Phase 1 item 5): fixable indentation diagnostics, `calor format --heal`, MCP auto-heal (#699).**
+  - New diagnostics with machine-applicable fixes: `Calor0008` (tab indentation, warning), `Calor0009` (non-standard indent width, warning), `Calor0117` (misaligned `§EI`/`§EL` in statement position, error); `Calor0099` mixed-indentation/dedent-mismatch errors now carry fixes. `Calor0117` fixes are scoped to the current function and are never emitted when applying them would not change the line (a no-op fix would trap agent apply→recheck loops in an infinite cycle).
+  - **Note for existing code:** the `Calor0008`/`Calor0009` warnings fire on legacy tab-indented and 4-space-indented files that previously compiled silently. Such files still compile — the warnings carry one-pass fixes (`calor format --heal`, `calor check --apply`, or the attached edits) that re-indent to the canonical 2 spaces per level.
+  - `calor format --heal`: best-effort source-level repair (structural closers, indentation re-derivation, chain-clause re-alignment) for files too broken for the AST formatter. Healing is **not semantics-preserving**: ambiguous re-anchoring decisions are reported per `file:line` (`--check` prints an `ambiguousDecisions` count), and if the healed output still fails to parse the command reports it and exits 1 instead of silently succeeding.
+  - MCP `calor_check` (`diagnose` action): `apply: true` returns `fixedSource`/`fixesApplied`, plus `healed: true` when the source-level healer ran; a healed response's `success`/`errorCount`/`diagnostics` describe the post-heal `fixedSource`.
+
 ## [0.6.8] - 2026-07-01
 
 ### Benchmark Results (Statistical: 30 runs)

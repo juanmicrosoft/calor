@@ -147,6 +147,17 @@ level). There are no closer tags — an explicit `§/X` was removed in
 Phase 4d and now raises `Calor0830`. See
 [Structure Tags](/calor/syntax-reference/structure-tags/) for details.
 
+The compiler diagnoses non-canonical indentation, and each of these
+diagnostics carries a machine-applicable fix (surfaced via `calor check`
+and the MCP `calor_check` tool; `calor format --heal` repairs the same
+issues at the source level):
+
+| Code | Severity | Meaning |
+|:-----|:---------|:--------|
+| `Calor0008` | warning | Leading whitespace uses tabs. One warning per file with one fix edit per tab line (each tab becomes 2 spaces). Fires on legacy tab-indented files that previously parsed silently. |
+| `Calor0009` | warning | Indentation step is not 2 spaces (e.g. 3- or 4-space levels). The file still parses — indentation is stack-relative — but the fix re-indents every offending line to its canonical `2 × level` column. Fires on legacy 4-space files that previously parsed silently. |
+| `Calor0117` | error | A `§EI`/`§EL` clause sits in statement position because it does not align with any open `§IF` (usually dedented too far). When the current function contains a `§IF` and re-indenting would actually change the line, the fix re-indents the clause to that `§IF`'s column. |
+
 ---
 
 ## Detailed Reference
