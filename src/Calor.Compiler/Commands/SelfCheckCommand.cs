@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.SelfCheck;
 
@@ -42,19 +43,23 @@ public static class SelfCheckCommand
             formatOption
         };
 
-        docsCommand.SetHandler(Execute, rootOption, formatOption);
+        docsCommand.SetHandler((InvocationContext ctx) =>
+        {
+            var root = ctx.ParseResult.GetValueForOption(rootOption);
+            var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
+            ctx.ExitCode = Execute(root, format);
+        });
         return docsCommand;
     }
 
-    private static void Execute(string? root, string format)
+    private static int Execute(string? root, string format)
     {
         var resolvedRoot = root ?? FindRepositoryRoot(Directory.GetCurrentDirectory());
         if (resolvedRoot == null)
         {
             Console.Error.WriteLine(
                 "error: could not locate a repository root (a directory containing CLAUDE.md and Directory.Build.props); pass --root");
-            Environment.ExitCode = 2;
-            return;
+            return 2;
         }
 
         var diagnostics = new List<Diagnostic>();
@@ -78,10 +83,7 @@ public static class SelfCheckCommand
                 : $"calor self-check docs — {diagnostics.Count} drift finding(s) (root: {resolvedRoot})");
         }
 
-        if (diagnostics.Count > 0)
-        {
-            Environment.ExitCode = 1;
-        }
+        return diagnostics.Count > 0 ? 1 : 0;
     }
 
     private static string? FindRepositoryRoot(string startDirectory)

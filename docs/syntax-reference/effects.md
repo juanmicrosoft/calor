@@ -63,12 +63,26 @@ Place the effect declaration after the output type:
 | `fs:r` | Filesystem read | Read from filesystem | `File.ReadAllText()` |
 | `fs:w` | Filesystem write | Write to filesystem | `File.WriteAllText()` |
 | `fs:rw` | Filesystem read/write | Read and write filesystem | `File.Copy()` |
+| `net` | Network | Unspecified network access | `Socket` operations |
 | `net:r` | Network read | HTTP GET, etc. | `HttpClient.GetStringAsync()` |
 | `net:w` | Network write | HTTP POST, etc. | `HttpClient.PostAsync()` |
 | `net:rw` | Network read/write | HTTP operations | `HttpClient.SendAsync()` |
+| `http` | HTTP | HTTP client operations | `HttpClient` usage |
+| `db` | Database | Unspecified database access | Connection setup |
 | `db:r` | Database read | Database queries | `SELECT` queries |
 | `db:w` | Database write | Database mutations | `INSERT/UPDATE/DELETE` |
 | `db:rw` | Database read/write | Database operations | ORM calls |
+| `env` | Environment | Unspecified environment access | `Environment` usage |
+| `env:r` | Environment read | Read environment variables | `Environment.GetEnvironmentVariable()` |
+| `env:w` | Environment write | Write environment variables | `Environment.SetEnvironmentVariable()` |
+| `env:rw` | Environment read/write | Environment operations | Read-modify-write of env vars |
+| `proc` | Process | Spawn or control processes | `Process.Start()` |
+| `mut` | Mutation | Writes to heap state (fields, collections) | `list.Add()`, field assignment |
+| `mut:col` | Collection mutation | Mutates a collection | `dict[key] = value` |
+| `alloc` | Allocation | Explicit memory allocation | `stackalloc`, unsafe buffers |
+| `time` | Time | Reads the clock (nondeterministic) | `DateTime.Now` |
+| `rand` | Randomness | Random number generation (nondeterministic) | `Random.Next()` |
+| `throw` | Exception | Intentionally throws exceptions | `throw` statements |
 
 ---
 
