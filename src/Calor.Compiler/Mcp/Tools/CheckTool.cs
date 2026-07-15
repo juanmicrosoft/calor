@@ -38,7 +38,7 @@ public sealed class CheckTool : McpToolBase
                 },
                 "apply": {
                     "type": "boolean",
-                    "description": "When true, automatically apply all available fix edits and return the fixed source alongside diagnostics (diagnose action, default: false)"
+                    "description": "When true, automatically apply all available fix edits and return the fixed source alongside diagnostics; if errors remain, a source-level heal (indentation + structural-closer repair) is attempted (diagnose action, default: false)"
                 },
                 "strictApi": {
                     "type": "boolean",
@@ -148,53 +148,40 @@ public sealed class CheckTool : McpToolBase
             };
 
             var result = Program.Compile(source, "mcp-input.calr", compileOptions);
-
-            var fixLookup = result.Diagnostics.DiagnosticsWithFixes
-                .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
-                .ToDictionary(g => g.Key, g => g.First());
-
-            var diagnostics = result.Diagnostics.Select(d =>
-            {
-                var diagOutput = new DiagnoseDiagnosticOutput
-                {
-                    Severity = d.IsError ? "error" : "warning",
-                    Code = d.Code.ToString(),
-                    Message = d.Message,
-                    Line = d.Span.Line,
-                    Column = d.Span.Column
-                };
-
-                var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
-                if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
-                {
-                    diagOutput.Suggestion = diagnosticWithFix.Fix.Description;
-                    diagOutput.Fix = new FixOutput
-                    {
-                        Description = diagnosticWithFix.Fix.Description,
-                        Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditOutput
-                        {
-                            StartLine = e.StartLine,
-                            StartColumn = e.StartColumn,
-                            EndLine = e.EndLine,
-                            EndColumn = e.EndColumn,
-                            NewText = e.NewText
-                        }).ToList()
-                    };
-                }
-
-                if (diagOutput.Suggestion == null)
-                {
-                    diagOutput.CommonMistake = FindCommonMistake(d.Message, d.Code.ToString());
-                }
-
-                return diagOutput;
-            }).ToList();
+            var diagnostics = BuildDiagnoseDiagnostics(result);
 
             string? fixedSource = null;
             var fixesApplied = 0;
+            bool healed = false;
             if (applyFixes)
             {
                 fixedSource = ApplyFixes(source, result.Diagnostics.DiagnosticsWithFixes, out fixesApplied);
+
+                // Auto-heal: if errors remain after applying the targeted fix
+                // edits, run the source-level healer (same transform as
+                // `calor format --heal`) and keep the result when it strictly
+                // reduces the error count. This lets agent check→fix loops
+                // self-heal indentation/closer thrash without a round-trip.
+                if (result.HasErrors)
+                {
+                    var candidate = new SourceHealer().Heal(fixedSource);
+                    if (candidate != fixedSource)
+                    {
+                        var recheck = Program.Compile(candidate, "mcp-input.calr", compileOptions);
+                        if (recheck.Diagnostics.Errors.Count < result.Diagnostics.Errors.Count)
+                        {
+                            fixedSource = candidate;
+                            healed = true;
+
+                            // The response must describe the state of
+                            // fixedSource, not the pre-heal input: replace the
+                            // diagnostics (so coordinates match fixedSource)
+                            // and derive success/isError from the recheck.
+                            result = recheck;
+                            diagnostics = BuildDiagnoseDiagnostics(recheck);
+                        }
+                    }
+                }
             }
 
             var output = new DiagnoseOutput
@@ -204,7 +191,8 @@ public sealed class CheckTool : McpToolBase
                 WarningCount = diagnostics.Count(d => d.Severity == "warning"),
                 Diagnostics = diagnostics,
                 FixedSource = fixedSource,
-                FixesApplied = applyFixes ? fixesApplied : null
+                FixesApplied = applyFixes ? fixesApplied : null,
+                Healed = healed ? true : null
             };
 
             return Task.FromResult(McpToolResult.Json(output, isError: result.HasErrors));
@@ -213,6 +201,54 @@ public sealed class CheckTool : McpToolBase
         {
             return Task.FromResult(McpToolResult.Error($"Diagnose failed: {ex.Message}"));
         }
+    }
+
+    /// <summary>
+    /// Projects a compilation's diagnostics (with any machine-applicable
+    /// fixes and common-mistake hints) into the diagnose response shape.
+    /// </summary>
+    private static List<DiagnoseDiagnosticOutput> BuildDiagnoseDiagnostics(CompilationResult result)
+    {
+        var fixLookup = result.Diagnostics.DiagnosticsWithFixes
+            .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
+            .ToDictionary(g => g.Key, g => g.First());
+
+        return result.Diagnostics.Select(d =>
+        {
+            var diagOutput = new DiagnoseDiagnosticOutput
+            {
+                Severity = d.IsError ? "error" : "warning",
+                Code = d.Code.ToString(),
+                Message = d.Message,
+                Line = d.Span.Line,
+                Column = d.Span.Column
+            };
+
+            var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
+            if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
+            {
+                diagOutput.Suggestion = diagnosticWithFix.Fix.Description;
+                diagOutput.Fix = new FixOutput
+                {
+                    Description = diagnosticWithFix.Fix.Description,
+                    Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditOutput
+                    {
+                        StartLine = e.StartLine,
+                        StartColumn = e.StartColumn,
+                        EndLine = e.EndLine,
+                        EndColumn = e.EndColumn,
+                        NewText = e.NewText
+                    }).ToList()
+                };
+            }
+
+            if (diagOutput.Suggestion == null)
+            {
+                diagOutput.CommonMistake = FindCommonMistake(d.Message, d.Code.ToString());
+            }
+
+            return diagOutput;
+        }).ToList();
     }
 
     private static string ApplyFixes(string source, IReadOnlyList<DiagnosticWithFix> diagnosticsWithFixes, out int fixesApplied)
@@ -724,6 +760,17 @@ public sealed class CheckTool : McpToolBase
         [JsonPropertyName("fixesApplied")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? FixesApplied { get; init; }
+
+        /// <summary>
+        /// True when the source-level healer (calor format --heal) was applied
+        /// on top of the targeted fix edits because errors remained. When true,
+        /// success/errorCount/warningCount/diagnostics describe the post-heal
+        /// recheck of fixedSource — coordinates match fixedSource, not the
+        /// original input.
+        /// </summary>
+        [JsonPropertyName("healed")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? Healed { get; init; }
     }
 
     private sealed class DiagnoseDiagnosticOutput

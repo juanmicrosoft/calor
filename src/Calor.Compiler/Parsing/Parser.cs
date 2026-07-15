@@ -25,6 +25,14 @@ public sealed class Parser
     private int _inOuterCallArgDepth;
 
     /// <summary>
+    /// The most recently parsed <c>§IF</c> opener token. Used by
+    /// <see cref="ParseStatement"/>'s stray-<c>§EI</c>/<c>§EL</c> recovery
+    /// to build a re-indentation fix that aligns a misaligned else clause
+    /// with the <c>§IF</c> it most plausibly belongs to.
+    /// </summary>
+    private Token? _lastIfToken;
+
+    /// <summary>
     /// Phase 4d — TokenKinds whose textual form is a legacy structural
     /// closing tag (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …) that indent
     /// form has fully replaced. Encountering any of these in the token
@@ -665,6 +673,7 @@ public sealed class Parser
     private FunctionNode ParseFunction()
     {
         var startToken = Expect(TokenKind.Func);
+        _lastIfToken = null; // scope Calor0117 fixes to this function's §IFs
         var headerOpen = Current;
         var attrs = ParseAttributes();
         CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
@@ -859,6 +868,7 @@ public sealed class Parser
     private FunctionNode ParseAsyncFunction()
     {
         var startToken = Expect(TokenKind.AsyncFunc);
+        _lastIfToken = null; // scope Calor0117 fixes to this function's §IFs
         var headerOpen = Current;
         var attrs = ParseAttributes();
         CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
@@ -1496,9 +1506,71 @@ public sealed class Parser
             var expr = ParseExpression();
             return new ExpressionStatementNode(expr.Span, expr);
         }
+        // Stray §EI/§EL: the clause was dedented past its §IF, so the
+        // if-chain closed before the clause was seen and it now sits in
+        // statement position. Report with a re-indentation fix and recover.
+        else if (Check(TokenKind.ElseIf) || Check(TokenKind.Else))
+        {
+            return ParseMisalignedElseClause();
+        }
 
         _diagnostics.ReportUnexpectedToken(Current.Span, "statement", Current.Kind);
         Advance();
+        return null;
+    }
+
+    /// <summary>
+    /// Error recovery for a <c>§EI</c>/<c>§EL</c> clause encountered in
+    /// statement position (Calor0117). The clause's indentation did not
+    /// align with any open <c>§IF</c> — almost always because it was
+    /// dedented too far. Emits a machine-applicable fix that re-indents the
+    /// clause line to the column of the most recently parsed <c>§IF</c>,
+    /// then consumes the clause header so the following body parses as
+    /// ordinary statements instead of cascading unexpected-token errors.
+    ///
+    /// Two guards keep the fix honest: <c>_lastIfToken</c> is reset at every
+    /// function/method boundary, so a stray clause in a function with no
+    /// <c>§IF</c> never gets a fix pointing at a different function's
+    /// <c>§IF</c>; and a fix is only emitted when applying it would actually
+    /// change the line — a no-op fix (clause already at the target column)
+    /// would send an agent apply→recheck loop into an infinite cycle.
+    /// </summary>
+    private StatementNode? ParseMisalignedElseClause()
+    {
+        var clauseToken = Advance(); // §EI or §EL
+        var tag = clauseToken.Kind == TokenKind.ElseIf ? "§EI" : "§EL";
+        var message = $"'{tag}' is not aligned with any open §IF — the if-chain already closed at a " +
+            "shallower indent level. Indent the clause to the same column as its §IF.";
+
+        // The edit replaces the clause line's leading columns with spaces;
+        // it is a no-op when the clause already sits at the target column.
+        // (Leading tabs cannot make same-width leading text differ here:
+        // token columns are computed after the lexer's tab handling, and
+        // tab-indented lines are already covered by Calor0008/Calor0099.)
+        if (_lastIfToken is { } ifTok
+            && ifTok.Span.Column != clauseToken.Span.Column)
+        {
+            int targetIndent = Math.Max(0, ifTok.Span.Column - 1);
+            int leadingLength = Math.Max(0, clauseToken.Span.Column - 1);
+            var fix = new SuggestedFix(
+                $"Re-indent '{tag}' to column {ifTok.Span.Column} (aligned with the §IF on line {ifTok.Span.Line})",
+                TextEdit.Replace(_diagnostics.CurrentFilePath ?? "", clauseToken.Span.Line, 1,
+                    clauseToken.Span.Line, leadingLength + 1, new string(' ', targetIndent)));
+            _diagnostics.ReportErrorWithFix(clauseToken.Span,
+                DiagnosticCode.MisalignedElseClause, message, fix);
+        }
+        else
+        {
+            _diagnostics.ReportError(clauseToken.Span,
+                DiagnosticCode.MisalignedElseClause, message);
+        }
+
+        // Consume the §EI condition so the clause body that follows parses
+        // as ordinary statements.
+        if (clauseToken.Kind == TokenKind.ElseIf && IsExpressionStart())
+        {
+            ParseExpression();
+        }
         return null;
     }
 
@@ -4381,6 +4453,7 @@ public sealed class Parser
     private IfStatementNode ParseIfStatement()
     {
         var startToken = Expect(TokenKind.If);
+        _lastIfToken = startToken;
         var attrs = ParseAttributes();
 
         // Interpret if attributes
@@ -7492,6 +7565,7 @@ public sealed class Parser
     private MethodNode ParseMethodDefinition()
     {
         var startToken = Expect(TokenKind.Method);
+        _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 
@@ -7634,6 +7708,7 @@ public sealed class Parser
     private MethodNode ParseAsyncMethodDefinition()
     {
         var startToken = Expect(TokenKind.AsyncMethod);
+        _lastIfToken = null; // scope Calor0117 fixes to this method's §IFs
         var attrs = ParseAttributes();
         var csharpAttrs = ParseCSharpAttributes();
 

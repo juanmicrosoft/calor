@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
@@ -39,21 +40,44 @@ public static class FormatCommand
             aliases: ["--verbose", "-v"],
             description: "Enable verbose output");
 
+        var healOption = new Option<bool>(
+            aliases: ["--heal"],
+            description: "Best-effort source-level repair: strip forbidden structural closers, " +
+                         "normalize indentation to 2-space levels from structural nesting, and fix " +
+                         "common whitespace issues. Works on files too broken for the AST formatter. Idempotent. " +
+                         "WARNING: healing is NOT semantics-preserving — re-anchoring ambiguous statements " +
+                         "into a chain-clause body guesses the intended control flow (each guess is reported " +
+                         "as a warning). Always review the healed output.");
+
         var command = new Command("format", "Format Calor source files to canonical style")
         {
             inputArgument,
             checkOption,
             writeOption,
             diffOption,
-            verboseOption
+            verboseOption,
+            healOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, checkOption, writeOption, diffOption, verboseOption);
+        // Return the exit code through the handler (ctx.ExitCode) instead of
+        // stomping Environment.ExitCode: the root command's InvokeAsync
+        // result is what Program.Main returns, so a code parked only on
+        // Environment.ExitCode is overwritten by Main's return value.
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            ctx.ExitCode = await ExecuteAsync(
+                ctx.ParseResult.GetValueForArgument(inputArgument),
+                ctx.ParseResult.GetValueForOption(checkOption),
+                ctx.ParseResult.GetValueForOption(writeOption),
+                ctx.ParseResult.GetValueForOption(diffOption),
+                ctx.ParseResult.GetValueForOption(verboseOption),
+                ctx.ParseResult.GetValueForOption(healOption));
+        });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo[] files, bool check, bool write, bool diff, bool verbose)
+    private static async Task<int> ExecuteAsync(FileInfo[] files, bool check, bool write, bool diff, bool verbose, bool heal)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("format");
@@ -68,6 +92,7 @@ public static class FormatCommand
         var totalFiles = 0;
         var formattedFiles = 0;
         var errorFiles = 0;
+        var unrepairedFiles = 0; // heal ran but the output still fails to parse
 
         foreach (var file in files)
         {
@@ -88,7 +113,9 @@ public static class FormatCommand
 
             try
             {
-                var result = await FormatFileAsync(file.FullName, verbose);
+                var result = heal
+                    ? await HealFileAsync(file.FullName)
+                    : await FormatFileAsync(file.FullName, verbose);
 
                 if (!result.Success)
                 {
@@ -103,18 +130,40 @@ public static class FormatCommand
 
                 var isFormatted = result.Original == result.Formatted;
 
+                if (result.ResidualParseErrors)
+                {
+                    unrepairedFiles++;
+                }
+
+                // Healing is NOT semantics-preserving: surface every
+                // control-flow guess with a file:line so the author can
+                // review the healed output.
+                if (heal && result.Ambiguities.Count > 0)
+                {
+                    foreach (var ambiguity in result.Ambiguities)
+                    {
+                        Console.Error.WriteLine(
+                            $"Warning: {file.FullName}:{ambiguity.Line}: {ambiguity.Message}");
+                    }
+                    Console.Error.WriteLine(
+                        "Warning: heal guesses control flow when re-anchoring statements and is " +
+                        "NOT semantics-preserving — review the healed output.");
+                }
+
                 if (!isFormatted)
                 {
                     hasUnformatted = true;
 
                     if (check)
                     {
-                        Console.WriteLine($"Would reformat: {file.Name}");
+                        Console.WriteLine(heal
+                            ? $"Would heal: {file.Name} (ambiguousDecisions: {result.Ambiguities.Count})"
+                            : $"Would reformat: {file.Name}");
                     }
                     else if (write)
                     {
                         await File.WriteAllTextAsync(file.FullName, result.Formatted);
-                        Console.WriteLine($"Formatted: {file.Name}");
+                        Console.WriteLine($"{(heal ? "Healed" : "Formatted")}: {file.Name}");
                         formattedFiles++;
                     }
                     else
@@ -153,29 +202,84 @@ public static class FormatCommand
             {
                 Console.WriteLine($"  Errors: {errorFiles}");
             }
+            if (unrepairedFiles > 0)
+            {
+                Console.WriteLine($"  Still failing to parse after heal: {unrepairedFiles}");
+            }
         }
 
-        // Exit code
+        // Exit code. A heal that leaves (or found and could not touch) parse
+        // errors must not exit 0 — silence would let an agent loop believe
+        // the file was repaired.
+        int exitCode = 0;
         if (errorFiles > 0)
         {
-            Environment.ExitCode = 2;
+            exitCode = 2;
         }
-        else if (check && hasUnformatted)
+        else if ((check && hasUnformatted) || unrepairedFiles > 0)
         {
-            Environment.ExitCode = 1;
+            exitCode = 1;
         }
 
         sw.Stop();
-        telemetry?.TrackCommand("format", Environment.ExitCode, new Dictionary<string, string>
+        telemetry?.TrackCommand("format", exitCode, new Dictionary<string, string>
         {
             ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
             ["fileCount"] = totalFiles.ToString(),
             ["errorCount"] = errorFiles.ToString()
         });
-        if (Environment.ExitCode != 0)
+        if (exitCode != 0)
         {
             IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "format", "Format check failed");
         }
+        return exitCode;
+    }
+
+    /// <summary>
+    /// <c>--heal</c> path: source-level best-effort repair via
+    /// <see cref="SourceHealer"/>. Unlike <see cref="FormatFileAsync"/> this
+    /// never requires the input to parse — that is the point: it repairs
+    /// files the AST formatter must reject. The healed output is ALWAYS
+    /// re-parsed — including when it is identical to the input, so a heal
+    /// no-op on a broken file never exits silently — and residual errors are
+    /// reported on stderr and drive a nonzero exit code.
+    /// </summary>
+    private static async Task<FormatResult> HealFileAsync(string filePath)
+    {
+        var source = await File.ReadAllTextAsync(filePath);
+
+        var healer = new SourceHealer();
+        var healed = healer.Heal(source);
+
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath(filePath);
+        var lexer = new Lexer(healed, diagnostics);
+        var tokens = lexer.TokenizeAllForParser();
+        if (!diagnostics.HasErrors)
+        {
+            var parser = new Parser(tokens, diagnostics);
+            parser.Parse();
+        }
+        if (diagnostics.HasErrors)
+        {
+            Console.Error.WriteLine(healed == source
+                ? $"Note: {Path.GetFileName(filePath)} has parse errors that heal could not repair (no changes made):"
+                : $"Note: {Path.GetFileName(filePath)} still has parse errors after healing; heal could not fully repair it:");
+            foreach (var error in diagnostics.Errors.Take(5))
+            {
+                Console.Error.WriteLine($"  {error}");
+            }
+        }
+
+        return new FormatResult
+        {
+            Success = true,
+            Original = source,
+            Formatted = healed,
+            Errors = new List<string>(),
+            Ambiguities = healer.Ambiguities.ToList(),
+            ResidualParseErrors = diagnostics.HasErrors
+        };
     }
 
     private static async Task<FormatResult> FormatFileAsync(string filePath, bool verbose)
@@ -293,5 +397,11 @@ public static class FormatCommand
         public required string Original { get; init; }
         public required string Formatted { get; init; }
         public required List<string> Errors { get; init; }
+
+        /// <summary>Control-flow guesses made by the healer (heal path only).</summary>
+        public List<HealAmbiguity> Ambiguities { get; init; } = new();
+
+        /// <summary>True when the healed output still fails to parse (heal path only).</summary>
+        public bool ResidualParseErrors { get; init; }
     }
 }

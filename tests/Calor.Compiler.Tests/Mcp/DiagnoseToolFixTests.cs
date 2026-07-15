@@ -209,24 +209,19 @@ public class DiagnoseToolFixTests
         Assert.Contains("§F", message);
     }
 
+    private const string LegacyCloserSource =
+        "§M{m1:Calc}\n  §F{f1:Add:pub}\n    §I{i32:a}\n    §I{i32:b}\n    §O{i32}\n    §R (+ a b)\n  §/F{f1}\n§/M{m1}";
+
     [Fact]
-    public async Task ExecuteAsync_WithLegacyClosers_Apply_HealsToCompilingSource()
+    public async Task ExecuteAsync_WithLegacyClosers_ReportsCalor0830WithFix()
     {
-        // Closer-form source hard-errors (Calor0830). With apply=true the
-        // diagnose path must strip the closers via their SuggestedFix and
-        // return source that compiles clean indent-only.
-        var args = JsonDocument.Parse("""
-            {
-                "action": "diagnose",
-                "apply": true,
-                "source": "§M{m1:Calc}\n  §F{f1:Add:pub}\n    §I{i32:a}\n    §I{i32:b}\n    §O{i32}\n    §R (+ a b)\n  §/F{f1}\n§/M{m1}"
-            }
-            """).RootElement;
+        // Closer-form source hard-errors (Calor0830) and the diagnostic must
+        // carry a machine-applicable fix stripping the closer.
+        var args = JsonSerializer.SerializeToElement(new { action = "diagnose", source = LegacyCloserSource });
 
         var result = await _tool.ExecuteAsync(args);
         var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
 
-        // A Calor0830 diagnostic must be present with a fix attached.
         var hasCloserDiag = false;
         foreach (var diag in json.GetProperty("diagnostics").EnumerateArray())
         {
@@ -239,11 +234,37 @@ public class DiagnoseToolFixTests
             }
         }
         Assert.True(hasCloserDiag, "Expected a Calor0830 diagnostic");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithLegacyClosers_Apply_HealsToCompilingSource()
+    {
+        // With apply=true the diagnose path strips the closers via their
+        // SuggestedFix (plus the source healer for the emptied lines) and
+        // returns source that compiles clean indent-only. When healed=true,
+        // success/errorCount/diagnostics describe the POST-heal fixedSource —
+        // the pre-heal Calor0830s are consumed by the repair, not echoed with
+        // stale coordinates.
+        var args = JsonDocument.Parse("""
+            {
+                "action": "diagnose",
+                "apply": true,
+                "source": "§M{m1:Calc}\n  §F{f1:Add:pub}\n    §I{i32:a}\n    §I{i32:b}\n    §O{i32}\n    §R (+ a b)\n  §/F{f1}\n§/M{m1}"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+        var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
 
         Assert.True(json.TryGetProperty("fixedSource", out var fixedSourceEl));
         var healed = fixedSourceEl.GetString()!;
         Assert.DoesNotContain("§/", healed);
         Assert.True(json.GetProperty("fixesApplied").GetInt32() >= 2);
+
+        // The repair fully fixed the file, so the response reflects that.
+        Assert.True(json.GetProperty("success").GetBoolean());
+        Assert.Equal(0, json.GetProperty("errorCount").GetInt32());
+        Assert.False(result.IsError);
 
         // Re-diagnose the healed source: it must now compile clean.
         var reArgs = JsonSerializer.SerializeToElement(new { action = "diagnose", source = healed });
