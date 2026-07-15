@@ -242,6 +242,34 @@ public static class DiagnosticCode
     /// </summary>
     public const string SemanticsVersionIncompatible = "Calor0701";
 
+    // Contract verification results (Calor0702-0705) — emitted by
+    // Verification/ContractVerificationPass. Note: the verification pass also
+    // reuses Calor0700 (Z3 unavailable, info) and Calor0701 (precondition may
+    // be violated, warning) with meanings that differ from the semantics-version
+    // constants above; that pre-existing collision is preserved for
+    // compatibility and is scheduled for renumbering.
+
+    /// <summary>
+    /// Warning: Z3 disproved a postcondition; a counterexample is reported.
+    /// </summary>
+    public const string PostconditionMayBeViolated = "Calor0702";
+
+    /// <summary>
+    /// Info: a postcondition was statically proven; its runtime check is elided.
+    /// </summary>
+    public const string PostconditionProven = "Calor0703";
+
+    /// <summary>
+    /// Info: per-module contract verification summary (proven / unproven /
+    /// potentially violated / unsupported counts).
+    /// </summary>
+    public const string VerificationSummary = "Calor0704";
+
+    /// <summary>
+    /// Info (verbose): verification cache statistics.
+    /// </summary>
+    public const string VerificationCacheStats = "Calor0705";
+
     // ID errors (Calor0800-0899)
     /// <summary>
     /// Error: Declaration is missing a required ID.
@@ -671,6 +699,57 @@ public static class DiagnosticCode
     /// produce a parseable document on crash paths.
     /// </summary>
     public const string CliInternalError = "Calor1312";
+
+    // `calor self-check docs` drift findings (Calor1320-1329) — agent-facing
+    // documentation contradicts the implementation. See SelfCheck/DocDriftChecker.
+
+    /// <summary>
+    /// Error (docs drift): a §-keyword cited in agent-facing docs does not
+    /// exist in the lexer's keyword table (the "§FOREACH vs §EACH" class).
+    /// </summary>
+    public const string DocDriftUnknownKeyword = "Calor1320";
+
+    /// <summary>
+    /// Error (docs drift): a diagnostic code cited in agent-facing docs is not
+    /// defined in <see cref="DiagnosticCode"/> (the "Calor0820 vs Calor0830" class).
+    /// </summary>
+    public const string DocDriftUnknownDiagnosticCode = "Calor1321";
+
+    /// <summary>
+    /// Error (docs drift): a documented diagnostic-code range (band) contains
+    /// no implemented diagnostic codes.
+    /// </summary>
+    public const string DocDriftEmptyDiagnosticRange = "Calor1322";
+
+    /// <summary>
+    /// Error (docs drift): an effect code listed in the docs is unknown to the
+    /// compiler's effect-code registry.
+    /// </summary>
+    public const string DocDriftUnknownEffectCode = "Calor1323";
+
+    /// <summary>
+    /// Error (docs drift): an implemented (non-legacy) effect code is missing
+    /// from the effect-code documentation (the undocumented-<c>mut</c> class).
+    /// </summary>
+    public const string DocDriftUndocumentedEffectCode = "Calor1324";
+
+    /// <summary>
+    /// Error (docs drift): a doc file hardcodes the current compiler version
+    /// string; versions belong in Directory.Build.props only (the stale-version class).
+    /// </summary>
+    public const string DocDriftHardcodedVersion = "Calor1325";
+
+    /// <summary>
+    /// Error (docs drift): a file or doc section the self-check needs is
+    /// missing or unreadable.
+    /// </summary>
+    public const string DocDriftMissingInput = "Calor1326";
+
+    /// <summary>
+    /// Error (docs drift): a CLI diagnostic code (Calor1300-1399) is not listed
+    /// in docs/cli/structured-output.md's code table.
+    /// </summary>
+    public const string DocDriftUndocumentedCliCode = "Calor1327";
 }
 
 /// <summary>

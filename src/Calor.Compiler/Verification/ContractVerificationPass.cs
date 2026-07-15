@@ -81,7 +81,7 @@ public sealed class ContractVerificationPass
                 {
                     _diagnostics.ReportInfo(
                         module.Span,
-                        "Calor0705",
+                        DiagnosticCode.VerificationCacheStats,
                         $"Verification cache: {stats.Hits} hits, {stats.Misses} misses ({stats.HitRate:F1}% hit rate)");
                 }
             }
@@ -174,7 +174,7 @@ public sealed class ContractVerificationPass
             {
                 _diagnostics.ReportWarning(
                     postNode.Span,
-                    "Calor0702",
+                    DiagnosticCode.PostconditionMayBeViolated,
                     $"Postcondition may be violated in function '{function.Name}'. {postResult.CounterexampleDescription}");
             }
         }
@@ -191,7 +191,7 @@ public sealed class ContractVerificationPass
                 {
                     _diagnostics.ReportInfo(
                         postNode.Span,
-                        "Calor0703",
+                        DiagnosticCode.PostconditionProven,
                         $"Postcondition statically verified in function '{function.Name}'. Runtime check elided.");
                 }
             }
@@ -211,11 +211,11 @@ public sealed class ContractVerificationPass
 
         if (summary.Disproven > 0)
         {
-            _diagnostics.ReportInfo(module.Span, "Calor0704", message);
+            _diagnostics.ReportInfo(module.Span, DiagnosticCode.VerificationSummary, message);
         }
         else if (_options.Verbose)
         {
-            _diagnostics.ReportInfo(module.Span, "Calor0704", message);
+            _diagnostics.ReportInfo(module.Span, DiagnosticCode.VerificationSummary, message);
         }
     }
 
