@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
@@ -36,11 +37,12 @@ public static class LintCommand
             aliases: ["--verbose", "-v"],
             description: "Show detailed lint issues");
 
-        // No -f short alias: it is taken by --fix on this command.
+        // Unlike the root command, --format has NO -f short alias here: -f is
+        // taken by --fix on lint. Documented in docs/cli/structured-output.md.
         var formatOption = new Option<string>(
             aliases: ["--format"],
             getDefaultValue: () => "text",
-            description: "Output format: text (human-readable), json, or sarif (machine-readable diagnostics on stdout)");
+            description: "Output format: text (human-readable), json, or sarif (machine-readable diagnostics on stdout). Note: no -f alias on lint (-f means --fix).");
         formatOption.FromAmong("text", "json", "sarif");
 
         var command = new Command("lint", "Check and fix Calor code for agent-optimal format")
@@ -52,12 +54,23 @@ public static class LintCommand
             formatOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, fixOption, checkOption, verboseOption, formatOption);
+        // Set the exit code through InvocationContext: Main returns InvokeAsync's
+        // result as the process exit code, which would stomp a bare
+        // Environment.ExitCode assignment (lint --check must exit nonzero on issues).
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            ctx.ExitCode = await ExecuteAsync(
+                ctx.ParseResult.GetValueForArgument(inputArgument),
+                ctx.ParseResult.GetValueForOption(fixOption),
+                ctx.ParseResult.GetValueForOption(checkOption),
+                ctx.ParseResult.GetValueForOption(verboseOption),
+                ctx.ParseResult.GetValueForOption(formatOption) ?? "text");
+        });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo[] files, bool fix, bool check, bool verbose, string format)
+    private static async Task<int> ExecuteAsync(FileInfo[] files, bool fix, bool check, bool verbose, string format)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("lint");
@@ -88,6 +101,12 @@ public static class LintCommand
 
             if (!file.Exists)
             {
+                diagnosticSink?.Add(new Diagnostic(
+                    DiagnosticCode.LintFileNotFound,
+                    $"File not found: {file.FullName}",
+                    new TextSpan(0, 0, 1, 1),
+                    DiagnosticSeverity.Error,
+                    file.FullName));
                 Console.Error.WriteLine($"Error: File not found: {file.FullName}");
                 errorFiles++;
                 continue;
@@ -95,7 +114,16 @@ public static class LintCommand
 
             if (!file.Extension.Equals(".calr", StringComparison.OrdinalIgnoreCase))
             {
-                Console.Error.WriteLine($"Warning: Skipping non-Calor file: {file.Name}");
+                // Not lintable — an error in all output modes so `calor lint`
+                // never silently exits 0 after skipping its input.
+                diagnosticSink?.Add(new Diagnostic(
+                    DiagnosticCode.LintUnsupportedFileType,
+                    $"Cannot lint non-Calor file: {file.Name}",
+                    new TextSpan(0, 0, 1, 1),
+                    DiagnosticSeverity.Error,
+                    file.FullName));
+                Console.Error.WriteLine($"Error: Cannot lint non-Calor file: {file.Name}");
+                errorFiles++;
                 continue;
             }
 
@@ -151,6 +179,12 @@ public static class LintCommand
             }
             catch (Exception ex)
             {
+                diagnosticSink?.Add(new Diagnostic(
+                    DiagnosticCode.LintProcessingError,
+                    $"Error processing {file.Name}: {ex.Message}",
+                    new TextSpan(0, 0, 1, 1),
+                    DiagnosticSeverity.Error,
+                    file.FullName));
                 Console.Error.WriteLine($"Error processing {file.Name}: {ex.Message}");
                 errorFiles++;
             }
@@ -177,27 +211,32 @@ public static class LintCommand
             }
         }
 
-        // Exit code
+        // Exit code: 2 = file/processing errors, 1 = lint issues found
+        // (without --fix), 0 = clean. Returned (not set via Environment.ExitCode,
+        // which Main's InvokeAsync return value would stomp).
+        var exitCode = 0;
         if (errorFiles > 0)
         {
-            Environment.ExitCode = 2;
+            exitCode = 2;
         }
         else if ((check || !fix) && filesWithIssues > 0)
         {
-            Environment.ExitCode = 1;
+            exitCode = 1;
         }
 
         sw.Stop();
-        telemetry?.TrackCommand("lint", Environment.ExitCode, new Dictionary<string, string>
+        telemetry?.TrackCommand("lint", exitCode, new Dictionary<string, string>
         {
             ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
             ["fileCount"] = totalFiles.ToString(),
             ["issueCount"] = totalIssues.ToString()
         });
-        if (Environment.ExitCode != 0)
+        if (exitCode != 0)
         {
             IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "lint", "Lint check failed");
         }
+
+        return exitCode;
     }
 
     private static async Task<LintResult> LintFileAsync(string filePath, bool verbose)
@@ -218,7 +257,7 @@ public static class LintCommand
             // Check for trailing whitespace
             if (line.Length > 0 && line.TrimEnd('\r') != line.TrimEnd('\r').TrimEnd())
             {
-                issues.Add(new LintIssue(lineNum, "Line has trailing whitespace"));
+                issues.Add(new LintIssue(lineNum, DiagnosticCode.LintTrailingWhitespace, "Line has trailing whitespace"));
             }
 
             // Check for non-abbreviated IDs: m001, f001, etc.
@@ -230,7 +269,7 @@ public static class LintCommand
                 var number = paddedIdMatch.Groups[3].Value;
                 var oldId = prefix + zeros + number;
                 var newId = prefix + number;
-                issues.Add(new LintIssue(lineNum, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
+                issues.Add(new LintIssue(lineNum, DiagnosticCode.LintNonAbbreviatedId, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
             }
 
             // Check for verbose loop/condition IDs: for1, if1, while1, do1
@@ -253,7 +292,7 @@ public static class LintCommand
                 {
                     var oldId = match.Groups[1].Value + match.Groups[2].Value;
                     var newId = replacement + match.Groups[2].Value;
-                    issues.Add(new LintIssue(lineNum, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
+                    issues.Add(new LintIssue(lineNum, DiagnosticCode.LintNonAbbreviatedId, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
                 }
             }
 
@@ -270,7 +309,7 @@ public static class LintCommand
         {
             diagnostics.ReportWarning(
                 new TextSpan(0, 0, issue.Line, 1),
-                DiagnosticCode.LintStyleIssue,
+                issue.Code,
                 issue.Message);
         }
 
@@ -331,5 +370,5 @@ public static class LintCommand
         public required DiagnosticBag Diagnostics { get; init; }
     }
 
-    private sealed record LintIssue(int Line, string Message);
+    private sealed record LintIssue(int Line, string Code, string Message);
 }

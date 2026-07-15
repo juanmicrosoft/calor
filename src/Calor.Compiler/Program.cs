@@ -280,56 +280,62 @@ public class Program
         // move to stderr so stdout stays machine-parseable.
         var structuredOutput = !format.Equals("text", StringComparison.OrdinalIgnoreCase);
         var diagnosticSink = structuredOutput ? new DiagnosticBag() : null;
+        var structuredEmitted = false;
+
+        // In structured mode a JSON/SARIF document is ALWAYS emitted to stdout,
+        // including early-exit error paths (missing input, usage errors, crashes),
+        // so machine consumers never have to special-case an empty stdout.
+        int Finish(int exitCode)
+        {
+            if (diagnosticSink != null && !structuredEmitted)
+            {
+                structuredEmitted = true;
+                Console.WriteLine(DiagnosticFormatterFactory.Create(format).Format(diagnosticSink));
+            }
+            return exitCode;
+        }
+
         try
         {
-            // If no input provided, show help
+            // If no input provided, show help. In structured mode the help text
+            // goes to stderr so stdout stays reserved for the (empty) document.
             if (input == null || input.Length == 0)
             {
-                Console.WriteLine("Calor Compiler - Compiles Calor source to C# and migrates between languages");
-                Console.WriteLine();
-                Console.WriteLine("Usage:");
-                Console.WriteLine("  calor --input <file.calr> [--output <file.cs>]   Compile a single Calor file");
-                Console.WriteLine("  calor --input <a.calr> --input <b.calr>          Compile multiple files with cross-module effect checking");
-                Console.WriteLine("  calor convert <file>                             Convert between C# and Calor");
-                Console.WriteLine("  calor migrate <project>                          Migrate entire project");
-                Console.WriteLine("  calor assess <directory>                         Assess C# for migration potential");
-                Console.WriteLine("  calor benchmark [options]                        Compare token economics");
-                Console.WriteLine("  calor init --ai <agent>                          Initialize for AI coding agents");
-                Console.WriteLine("  calor format <files>                             Format Calor source files");
-                Console.WriteLine("  calor feature-check <feature>                    Check C# feature support");
-                Console.WriteLine("  calor coverage <file>                            Analyze C# file for conversion coverage");
-                Console.WriteLine();
-                Console.WriteLine("Strictness options:");
-                Console.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
-                Console.WriteLine("  --require-docs    Require documentation on public functions");
-                Console.WriteLine("  --enforce-effects Enforce effect declarations (default: false)");
-                Console.WriteLine("  --strict-effects  Promote unknown external call warnings to errors");
-                Console.WriteLine("  --permissive-effects  Permissive mode for converted code (suppress effect errors)");
-                Console.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
-                Console.WriteLine("  --verify          Enable static contract verification with Z3");
-                Console.WriteLine("  --verification-timeout  Z3 solver timeout per contract in ms (default: 5000)");
-                Console.WriteLine("  --analyze         Enable advanced analyses (dataflow, bugs, taint)");
-                Console.WriteLine("  --no-cache        Disable verification result caching");
-                Console.WriteLine("  --clear-cache     Clear verification cache before compiling");
-                Console.WriteLine("  --format          Diagnostic output format: text, json, sarif (default: text)");
-                Console.WriteLine();
-                Console.WriteLine("Run 'calor --help' for more information.");
-                return 0;
+                var helpOut = structuredOutput ? Console.Error : Console.Out;
+                WriteHelp(helpOut);
+                return Finish(0);
             }
 
+            var anyMissing = false;
             foreach (var file in input)
             {
                 if (!file.Exists)
                 {
+                    diagnosticSink?.Add(new Diagnostic(
+                        DiagnosticCode.CliInputNotFound,
+                        $"Input file not found: {file.FullName}",
+                        new TextSpan(0, 0, 1, 1),
+                        DiagnosticSeverity.Error,
+                        file.FullName));
                     Console.Error.WriteLine($"Error: Input file not found: {file.FullName}");
-                    return 1;
+                    anyMissing = true;
                 }
+            }
+            if (anyMissing)
+            {
+                return Finish(1);
             }
 
             if (output != null && input.Length > 1)
             {
-                Console.Error.WriteLine("Error: --output is only supported when compiling a single file. When passing multiple --input files, generated .g.cs files are written alongside each input.");
-                return 1;
+                const string usageError = "--output is only supported when compiling a single file. When passing multiple --input files, generated .g.cs files are written alongside each input.";
+                diagnosticSink?.Add(new Diagnostic(
+                    DiagnosticCode.CliUsageError,
+                    usageError,
+                    new TextSpan(0, 0, 1, 1),
+                    DiagnosticSeverity.Error));
+                Console.Error.WriteLine($"Error: {usageError}");
+                return Finish(1);
             }
 
             var parsedContractMode = CompilationDriver.ParseContractMode(contractMode);
@@ -347,6 +353,9 @@ public class Program
                     return new CompilationOptions
                     {
                         Verbose = verbose,
+                        // Keep stdout machine-parseable in structured mode:
+                        // verbose phase messages go to stderr.
+                        StatusWriter = structuredOutput ? Console.Error : null,
                         StrictApi = strictApi,
                         RequireDocs = requireDocs,
                         EnforceEffects = enforceEffects,
@@ -408,19 +417,51 @@ public class Program
                 },
                 diagnosticSink: diagnosticSink);
 
-            if (diagnosticSink != null)
-            {
-                var formatter = DiagnosticFormatterFactory.Create(format);
-                Console.WriteLine(formatter.Format(diagnosticSink));
-            }
-
-            return driverResult.AnyErrors ? 1 : 0;
+            return Finish(driverResult.AnyErrors ? 1 : 0);
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
-            return 1;
+            diagnosticSink?.Add(new Diagnostic(
+                DiagnosticCode.CliInternalError,
+                $"Unhandled error: {ex.Message}",
+                new TextSpan(0, 0, 1, 1),
+                DiagnosticSeverity.Error));
+            return Finish(1);
         }
+    }
+
+    private static void WriteHelp(TextWriter writer)
+    {
+        writer.WriteLine("Calor Compiler - Compiles Calor source to C# and migrates between languages");
+        writer.WriteLine();
+        writer.WriteLine("Usage:");
+        writer.WriteLine("  calor --input <file.calr> [--output <file.cs>]   Compile a single Calor file");
+        writer.WriteLine("  calor --input <a.calr> --input <b.calr>          Compile multiple files with cross-module effect checking");
+        writer.WriteLine("  calor convert <file>                             Convert between C# and Calor");
+        writer.WriteLine("  calor migrate <project>                          Migrate entire project");
+        writer.WriteLine("  calor assess <directory>                         Assess C# for migration potential");
+        writer.WriteLine("  calor benchmark [options]                        Compare token economics");
+        writer.WriteLine("  calor init --ai <agent>                          Initialize for AI coding agents");
+        writer.WriteLine("  calor format <files>                             Format Calor source files");
+        writer.WriteLine("  calor feature-check <feature>                    Check C# feature support");
+        writer.WriteLine("  calor coverage <file>                            Analyze C# file for conversion coverage");
+        writer.WriteLine();
+        writer.WriteLine("Strictness options:");
+        writer.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
+        writer.WriteLine("  --require-docs    Require documentation on public functions");
+        writer.WriteLine("  --enforce-effects Enforce effect declarations (default: false)");
+        writer.WriteLine("  --strict-effects  Promote unknown external call warnings to errors");
+        writer.WriteLine("  --permissive-effects  Permissive mode for converted code (suppress effect errors)");
+        writer.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
+        writer.WriteLine("  --verify          Enable static contract verification with Z3");
+        writer.WriteLine("  --verification-timeout  Z3 solver timeout per contract in ms (default: 5000)");
+        writer.WriteLine("  --analyze         Enable advanced analyses (dataflow, bugs, taint)");
+        writer.WriteLine("  --no-cache        Disable verification result caching");
+        writer.WriteLine("  --clear-cache     Clear verification cache before compiling");
+        writer.WriteLine("  --format          Diagnostic output format: text, json, sarif (default: text)");
+        writer.WriteLine();
+        writer.WriteLine("Run 'calor --help' for more information.");
     }
 
     /// <summary>
@@ -440,6 +481,10 @@ public class Program
         diagnostics.SetFilePath(filePath);
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         var phaseSw = new Stopwatch();
+
+        // Verbose/status messages go through the configurable status writer so
+        // structured output modes can keep stdout machine-parseable.
+        var status = options.StatusWriter ?? Console.Out;
 
         // Experimental pilot flag — emits one info diagnostic per compilation when
         // the pilot-hello-world flag is enabled. Verifies end-to-end plumbing from
@@ -477,7 +522,7 @@ public class Program
 
         if (options.Verbose)
         {
-            Console.WriteLine($"Lexer produced {tokens.Count} tokens");
+            status.WriteLine($"Lexer produced {tokens.Count} tokens");
         }
 
         if (diagnostics.HasErrors)
@@ -495,7 +540,7 @@ public class Program
 
         if (options.Verbose)
         {
-            Console.WriteLine("Parsing completed successfully");
+            status.WriteLine("Parsing completed successfully");
         }
 
         if (diagnostics.HasErrors)
@@ -515,7 +560,7 @@ public class Program
 
             if (options.Verbose)
             {
-                Console.WriteLine("Type checking completed");
+                status.WriteLine("Type checking completed");
             }
 
             if (diagnostics.HasErrors)
@@ -570,7 +615,7 @@ public class Program
 
             if (options.Verbose)
             {
-                Console.WriteLine("API strictness checking completed");
+                status.WriteLine("API strictness checking completed");
             }
         }
 
@@ -592,7 +637,7 @@ public class Program
 
             if (options.Verbose)
             {
-                Console.WriteLine("Effect enforcement completed");
+                status.WriteLine("Effect enforcement completed");
             }
         }
 
@@ -614,7 +659,7 @@ public class Program
 
         if (options.Verbose)
         {
-            Console.WriteLine("Contract inheritance checking completed");
+            status.WriteLine("Contract inheritance checking completed");
         }
 
         if (diagnostics.HasErrors)
@@ -632,7 +677,7 @@ public class Program
 
         if (options.Verbose)
         {
-            Console.WriteLine("Contract semantic verification completed");
+            status.WriteLine("Contract semantic verification completed");
         }
 
         // Contract simplification pass
@@ -644,7 +689,7 @@ public class Program
 
         if (options.Verbose)
         {
-            Console.WriteLine("Contract simplification completed");
+            status.WriteLine("Contract simplification completed");
         }
 
         // Refinement type obligation generation and verification (optional)
@@ -716,7 +761,7 @@ public class Program
             if (options.Verbose)
             {
                 var summary = obligationTracker.GetSummary();
-                Console.WriteLine($"Obligation verification: {summary.Total} total, " +
+                status.WriteLine($"Obligation verification: {summary.Total} total, " +
                     $"{summary.Discharged} discharged, {summary.Failed} failed, " +
                     $"{summary.Boundary} boundary, {summary.Timeout} timeout");
             }
@@ -741,7 +786,7 @@ public class Program
 
             if (options.Verbose)
             {
-                Console.WriteLine("Contract verification completed");
+                status.WriteLine("Contract verification completed");
             }
         }
 
@@ -764,7 +809,7 @@ public class Program
 
             if (options.Verbose)
             {
-                Console.WriteLine($"Verification analyses completed: {options.VerificationAnalysisResult.FunctionsAnalyzed} functions, " +
+                status.WriteLine($"Verification analyses completed: {options.VerificationAnalysisResult.FunctionsAnalyzed} functions, " +
                     $"{options.VerificationAnalysisResult.BugPatternsFound} bug patterns, " +
                     $"{options.VerificationAnalysisResult.TaintVulnerabilities} taint issues");
             }
@@ -783,7 +828,7 @@ public class Program
 
         if (options.Verbose)
         {
-            Console.WriteLine("Code generation completed successfully");
+            status.WriteLine("Code generation completed successfully");
         }
 
         // Compilation outcome & determinism telemetry (Phase 5)
@@ -860,6 +905,10 @@ public class Program
                 < 800 => "Verification",
                 < 900 => "Import",
                 < 1000 => "Conversion",
+                < 1100 => "CodeGen",
+                < 1200 => "Verification",
+                < 1300 => "Experimental",
+                < 1400 => "Cli",
                 _ => "Other"
             };
         }
@@ -876,6 +925,14 @@ public sealed class CompilationOptions
     /// Enable verbose output.
     /// </summary>
     public bool Verbose { get; init; }
+
+    /// <summary>
+    /// Writer for verbose/status messages emitted during compilation phases.
+    /// Null (the default) means standard output. Structured output modes
+    /// (<c>--format json|sarif</c>) redirect this to standard error so stdout
+    /// stays reserved for the machine-readable diagnostic document.
+    /// </summary>
+    public TextWriter? StatusWriter { get; init; }
 
     /// <summary>
     /// Enable strict API mode: requires §BREAKING markers for public API changes.

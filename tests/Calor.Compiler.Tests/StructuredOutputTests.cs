@@ -110,6 +110,59 @@ public class StructuredOutputTests : IDisposable
         Assert.Equal(0, doc.RootElement.GetProperty("summary").GetProperty("errors").GetInt32());
     }
 
+    [Fact]
+    public void Compile_FormatJson_Verbose_KeepsStdoutPureJson()
+    {
+        var file = WriteGoodFile();
+
+        var (exitCode, stdOut, stdErr) = RunCli("--input", file, "--format", "json", "--verbose");
+
+        Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}");
+
+        // stdout must parse as a single JSON document even with --verbose:
+        // all verbose phase messages are routed to stderr in structured mode.
+        using var doc = JsonDocument.Parse(stdOut);
+        Assert.Equal(0, doc.RootElement.GetProperty("summary").GetProperty("errors").GetInt32());
+
+        Assert.Contains("Lexer produced", stdErr);
+        Assert.Contains("Code generation completed", stdErr);
+    }
+
+    [Fact]
+    public void Compile_FormatJson_MissingInput_EmitsDocumentAndExitsNonzero()
+    {
+        var missing = Path.Combine(_tempDir, "nope.calr");
+
+        var (exitCode, stdOut, _) = RunCli("--input", missing, "--format", "json");
+
+        Assert.Equal(1, exitCode);
+
+        // Structured mode must ALWAYS emit a document, even on early-exit
+        // error paths that never reach the compilation pipeline.
+        using var doc = JsonDocument.Parse(stdOut);
+        var diagnostics = doc.RootElement.GetProperty("diagnostics");
+        Assert.True(diagnostics.GetArrayLength() >= 1);
+        Assert.Equal(DiagnosticCode.CliInputNotFound, diagnostics[0].GetProperty("code").GetString());
+        Assert.Equal("error", diagnostics[0].GetProperty("severity").GetString());
+        Assert.EndsWith("nope.calr", diagnostics[0].GetProperty("location").GetProperty("file").GetString());
+        Assert.True(doc.RootElement.GetProperty("summary").GetProperty("errors").GetInt32() >= 1);
+    }
+
+    [Fact]
+    public void Compile_FormatSarif_MissingInput_EmitsDocumentAndExitsNonzero()
+    {
+        var missing = Path.Combine(_tempDir, "nope.calr");
+
+        var (exitCode, stdOut, _) = RunCli("--input", missing, "--format", "sarif");
+
+        Assert.Equal(1, exitCode);
+
+        using var doc = JsonDocument.Parse(stdOut);
+        var results = doc.RootElement.GetProperty("runs")[0].GetProperty("results");
+        Assert.True(results.GetArrayLength() >= 1);
+        Assert.Equal(DiagnosticCode.CliInputNotFound, results[0].GetProperty("ruleId").GetString());
+    }
+
     // ------------------------------------------------------------------
     // calor --input <file> --format sarif
     // ------------------------------------------------------------------
@@ -194,17 +247,18 @@ public class StructuredOutputTests : IDisposable
             "    §E{cw}\n" +
             "    §P \"hi\"\n");
 
-        // Note: lint exit codes are not asserted here — `calor lint` sets
-        // Environment.ExitCode, which Main's returned InvokeAsync result
-        // overrides (pre-existing behavior, unchanged by structured output).
-        var (_, stdOut, _) = RunCli("lint", file, "--format", "json");
+        var (exitCode, stdOut, _) = RunCli("lint", file, "--format", "json");
+
+        // Lint issues found (no --fix) → exit 1, propagated through
+        // InvocationContext.ExitCode so InvokeAsync returns it.
+        Assert.Equal(1, exitCode);
 
         using var doc = JsonDocument.Parse(stdOut);
         var diagnostics = doc.RootElement.GetProperty("diagnostics");
         Assert.True(diagnostics.GetArrayLength() >= 1);
 
         var issue = diagnostics[0];
-        Assert.Equal(DiagnosticCode.LintStyleIssue, issue.GetProperty("code").GetString());
+        Assert.Equal(DiagnosticCode.LintTrailingWhitespace, issue.GetProperty("code").GetString());
         Assert.Equal("warning", issue.GetProperty("severity").GetString());
         Assert.Equal(1, issue.GetProperty("location").GetProperty("line").GetInt32());
         Assert.Contains("whitespace", issue.GetProperty("message").GetString());
@@ -216,10 +270,89 @@ public class StructuredOutputTests : IDisposable
         var file = Path.Combine(_tempDir, "badparse.calr");
         File.WriteAllText(file, "§M{m001:Bad}\n  §F{f001:Main:pub () -> void\n");
 
-        var (_, stdOut, _) = RunCli("lint", file, "--format", "json");
+        var (exitCode, stdOut, _) = RunCli("lint", file, "--format", "json");
+
+        Assert.Equal(2, exitCode); // parse failure counts as an error file
 
         using var doc = JsonDocument.Parse(stdOut);
         Assert.True(doc.RootElement.GetProperty("summary").GetProperty("errors").GetInt32() >= 1);
+    }
+
+    [Fact]
+    public void Lint_FormatJson_MissingFile_InjectsDiagnosticAndExitsNonzero()
+    {
+        var missing = Path.Combine(_tempDir, "missing.calr");
+
+        var (exitCode, stdOut, _) = RunCli("lint", missing, "--format", "json");
+
+        Assert.Equal(2, exitCode);
+
+        using var doc = JsonDocument.Parse(stdOut);
+        var diagnostics = doc.RootElement.GetProperty("diagnostics");
+        Assert.True(diagnostics.GetArrayLength() >= 1);
+        Assert.Equal(DiagnosticCode.LintFileNotFound, diagnostics[0].GetProperty("code").GetString());
+        Assert.Equal("error", diagnostics[0].GetProperty("severity").GetString());
+        Assert.True(doc.RootElement.GetProperty("summary").GetProperty("errors").GetInt32() >= 1);
+    }
+
+    [Fact]
+    public void Lint_FormatJson_NonCalorFile_InjectsDiagnosticAndExitsNonzero()
+    {
+        var csFile = Path.Combine(_tempDir, "notcalor.cs");
+        File.WriteAllText(csFile, "public class C { }");
+
+        var (exitCode, stdOut, _) = RunCli("lint", csFile, "--format", "json");
+
+        Assert.Equal(2, exitCode);
+
+        using var doc = JsonDocument.Parse(stdOut);
+        var diagnostics = doc.RootElement.GetProperty("diagnostics");
+        Assert.True(diagnostics.GetArrayLength() >= 1);
+        Assert.Equal(DiagnosticCode.LintUnsupportedFileType, diagnostics[0].GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public void Lint_Check_TextMode_WithIssues_ExitsNonzero()
+    {
+        var file = Path.Combine(_tempDir, "check.calr");
+        File.WriteAllText(file,
+            "§M{m001:Check}   \n" +
+            "  §F{f001:Main:pub} () -> void\n" +
+            "    §E{cw}\n" +
+            "    §P \"hi\"\n");
+
+        var (exitCode, _, _) = RunCli("lint", file, "--check");
+
+        Assert.Equal(1, exitCode);
+    }
+
+    // ------------------------------------------------------------------
+    // Info-level diagnostics are reported consistently: both text mode and
+    // the structured formats include Info severity.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Compile_InfoDiagnostics_AppearInBothTextAndJson()
+    {
+        var file = WriteGoodFile();
+
+        // The pilot experimental flag deterministically emits one Info
+        // diagnostic (Calor1200) per compilation.
+        var (textExit, _, textErr) = RunCli(
+            "--input", file, "--experimental", "pilot-hello-world");
+        Assert.Equal(0, textExit);
+        Assert.Contains("Calor1200", textErr);
+
+        var (jsonExit, stdOut, _) = RunCli(
+            "--input", file, "--experimental", "pilot-hello-world", "--format", "json");
+        Assert.Equal(0, jsonExit);
+
+        using var doc = JsonDocument.Parse(stdOut);
+        var diagnostics = doc.RootElement.GetProperty("diagnostics");
+        Assert.Contains(diagnostics.EnumerateArray(), d =>
+            d.GetProperty("code").GetString() == "Calor1200" &&
+            d.GetProperty("severity").GetString() == "info");
+        Assert.True(doc.RootElement.GetProperty("summary").GetProperty("info").GetInt32() >= 1);
     }
 
     // ------------------------------------------------------------------

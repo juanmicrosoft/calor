@@ -440,6 +440,14 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         DiagnosticCode.CodeGenSyntaxError => "Generated C# code contains syntax errors",
         DiagnosticCode.UnterminatedCSharpInteropBlock => "Unterminated C# interop block",
         DiagnosticCode.CSharpInteropBlockPreserved => "C# code preserved in interop block",
+        DiagnosticCode.LintTrailingWhitespace => "Line has trailing whitespace",
+        DiagnosticCode.LintNonAbbreviatedId => "Construct ID is not in abbreviated form",
+        DiagnosticCode.LintFileNotFound => "Lint input file not found",
+        DiagnosticCode.LintUnsupportedFileType => "Lint input file is not a .calr file",
+        DiagnosticCode.LintProcessingError => "Unexpected error while linting a file",
+        DiagnosticCode.CliInputNotFound => "Input file not found",
+        DiagnosticCode.CliUsageError => "Invalid command-line argument combination",
+        DiagnosticCode.CliInternalError => "Unhandled compiler error",
         _ => "Calor compiler diagnostic"
     };
 

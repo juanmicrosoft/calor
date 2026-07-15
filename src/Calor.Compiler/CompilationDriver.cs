@@ -58,7 +58,7 @@ internal static class CompilationDriver
             var options = optionsFactory(file);
             if (options.Verbose)
             {
-                Console.WriteLine($"Compiling: {file.FullName}");
+                (options.StatusWriter ?? Console.Out).WriteLine($"Compiling: {file.FullName}");
             }
 
             var source = File.ReadAllText(file.FullName);
@@ -70,7 +70,7 @@ internal static class CompilationDriver
             }
             else
             {
-                PrintDiagnostics(result.Diagnostics, includeAll: result.HasErrors);
+                PrintDiagnostics(result.Diagnostics);
             }
 
             if (result.HasErrors)
@@ -131,18 +131,16 @@ internal static class CompilationDriver
     }
 
     /// <summary>
-    /// Prints diagnostics to stderr. Errors and warnings are always printed;
-    /// informational diagnostics are included only when the compilation failed
-    /// (preserving the historical quiet-on-success output).
+    /// Prints every diagnostic — including Info severity — to stderr. This
+    /// deliberately matches the structured output modes (--format json|sarif),
+    /// which serialize all severities, so text and machine output report the
+    /// same set of diagnostics.
     /// </summary>
-    private static void PrintDiagnostics(DiagnosticBag diagnostics, bool includeAll)
+    private static void PrintDiagnostics(DiagnosticBag diagnostics)
     {
         foreach (var diagnostic in diagnostics)
         {
-            if (includeAll || diagnostic.IsError || diagnostic.IsWarning)
-            {
-                Console.Error.WriteLine(diagnostic);
-            }
+            Console.Error.WriteLine(diagnostic);
         }
     }
 

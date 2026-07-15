@@ -64,7 +64,7 @@ C# Source → Roslyn Parse → SyntaxTree → RoslynSyntaxVisitor → AST → Ca
 | `Ids/IdScanner.cs` | 330 | IAstVisitor — scans/validates node IDs |
 | `Verification/ExpressionSimplifier.cs` | 1,400 | IAstVisitor\<T\> — simplifies expressions for Z3 |
 | `Analysis/BugPatterns/Patterns/` | dir | Checkers: div-by-zero, null-deref, off-by-one, overflow, index-OOB |
-| `Diagnostics/Diagnostic.cs` | — | All diagnostic codes (Calor0001–Calor0899) |
+| `Diagnostics/Diagnostic.cs` | — | All diagnostic codes (Calor0001–Calor1399) |
 
 All paths relative to `src/Calor.Compiler/`.
 
@@ -139,7 +139,7 @@ Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`):
 - **VariableSymbol.IsParameter** — distinguishes function parameters from locals; used by analysis passes
 - **BoundCallExpression.Target** is a `string` — `NullDereferenceChecker` checks for `.unwrap` suffix
 - **Option\<T\> and Result\<T,E\>** are valid generic types in Calor's type system
-- **Diagnostic codes** — Calor0001–0099 (lexer), 0100–0199 (parser), 0200–0299 (semantic), 0300–0399 (contracts), 0400–0499 (effects), 0500–0599 (patterns), 0600–0699 (API strictness), 0700–0799 (semantics version), 0800–0899 (ID validation)
+- **Diagnostic codes** — Calor0001–0099 (lexer), 0100–0199 (parser), 0200–0299 (semantic), 0300–0399 (contracts), 0400–0499 (effects), 0500–0599 (patterns), 0600–0699 (API strictness), 0700–0799 (semantics version), 0800–0899 (ID validation), 0900–0999 (dataflow/bug patterns/taint), 1000–1099 (codegen/interop), 1100–1199 (refinements/obligations), 1200–1299 (experimental), 1300–1399 (CLI: lint findings and command-level errors)
 
 ## Project Layout
 
