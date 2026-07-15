@@ -35,6 +35,24 @@ namespace Calor.Compiler.Formatting;
 /// statement into a chain-clause body (see <see cref="Ambiguities"/>) is a
 /// guess about the author's intended control flow. Callers must surface
 /// ambiguous decisions and tell the author to review the healed output.</para>
+///
+/// <para><b>Design decision — this is intentionally a second layout engine.</b>
+/// The healer re-implements the lexer's layout heuristics on raw text because
+/// it must work on exactly the files the lexer/parser reject; it cannot call
+/// into them. Known divergences from the lexer
+/// (<c>Lexer.PostProcessIndent</c>):
+/// (1) bracket continuation is an approximation — <see cref="BracketDelta"/>
+/// counts brackets textually (skipping strings/char literals/<c>//</c>
+/// comments) instead of tracking token-level depth, and continuations are
+/// capped (<see cref="MaxBracketContinuationLines"/> lines, ended by any
+/// §-tag line) whereas the lexer's are unbounded;
+/// (2) block structure is inferred empirically (a line followed by a deeper
+/// line opens a block) instead of from tag semantics.
+/// Tab measurement is deliberately kept ALIGNED at 2 columns per tab, the
+/// same width the lexer's Calor0008 fix substitutes.
+/// Maintenance rule: any change to the lexer's layout rules (indent stack,
+/// tab handling, implicit bracket continuations) must be mirrored here and
+/// covered in <c>WritePathRobustnessTests</c>.</para>
 /// </summary>
 public sealed class SourceHealer
 {
@@ -194,16 +212,16 @@ public sealed class SourceHealer
                 continue;
             }
 
-            // Expand leading tabs and measure the indent. Tabs count as 4
-            // columns for MEASUREMENT only: levels are re-derived and emitted
-            // at 2 spaces each regardless, and width 4 orders tab-indented
-            // lines correctly against both 2- and 4-space neighbours in
-            // files that mix conventions.
+            // Expand leading tabs and measure the indent. Tabs count as 2
+            // columns for MEASUREMENT only (levels are re-derived and emitted
+            // at 2 spaces each regardless) — the same width the lexer's
+            // Calor0008 fix uses when replacing tab indentation, so both
+            // layout engines order tab-indented lines identically.
             int ws = 0;
             var indent = new StringBuilder();
             while (ws < trimmedEnd.Length && (trimmedEnd[ws] == ' ' || trimmedEnd[ws] == '\t'))
             {
-                indent.Append(trimmedEnd[ws] == '\t' ? "    " : " ");
+                indent.Append(trimmedEnd[ws] == '\t' ? "  " : " ");
                 ws++;
             }
 
