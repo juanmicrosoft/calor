@@ -199,7 +199,12 @@ internal static class CompilationDriver
                 moduleSummaries.Add((summary, file.FullName));
             }
 
-            if (newState != null && relativeKey != null)
+            // Only diagnostic-clean files are cached: a skipped file emits nothing,
+            // so caching a file with warnings/info would silently drop those
+            // diagnostics from warm builds. (Cross-module diagnostics are exempt —
+            // they are recomputed from summaries every run, so skipped files still
+            // surface them.)
+            if (newState != null && relativeKey != null && result.Diagnostics.Count == 0)
             {
                 var entry = BuildStateCache.CreateFileEntry(file.FullName);
                 entry.EffectSummary = summary;
