@@ -93,11 +93,28 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _contractMode = contractMode;
     }
 
+    /// <summary>
+    /// When set, the emitter writes <c>#line</c> directives before each
+    /// statement-level construct so Roslyn diagnostics, debugger sessions and
+    /// stack traces map back to the original <c>.calr</c> source instead of the
+    /// generated <c>.g.cs</c> file. Generated-only regions (headers, contract
+    /// checks, closing braces) are reset with <c>#line default</c> so they
+    /// attribute honestly to the generated file. Null (the default) disables
+    /// source mapping entirely.
+    /// </summary>
+    public string? LineDirectiveFilePath { get; set; }
+
+    // Escaped form of LineDirectiveFilePath, computed once per Emit call.
+    private string? _lineDirectiveFile;
+
     public string Emit(ModuleNode module, string? filePath = null)
     {
         _builder.Clear();
         _indentLevel = 0;
         _currentFilePath = filePath;
+        _lineDirectiveFile = string.IsNullOrEmpty(LineDirectiveFilePath)
+            ? null
+            : EscapeString(LineDirectiveFilePath);
 
         var result = Visit(module);
         return result;
@@ -106,6 +123,48 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Emit(ModuleNode module)
     {
         return Emit(module, null);
+    }
+
+    /// <summary>
+    /// Emits a single statement, sandwiched between <c>#line</c> directives when
+    /// source mapping is enabled (see <see cref="LineDirectiveFilePath"/>).
+    /// Block statements (if/while/for/...) write directly to the builder and
+    /// return an empty string; the trailing empty <c>AppendLine</c> preserves the
+    /// blank line the previous inline emission produced.
+    /// </summary>
+    private void EmitStatement(AstNode statement, bool skipEmptyLine = false)
+    {
+        var mapped = TryBeginLineMapping(statement);
+        var code = statement.Accept(this);
+        if (!skipEmptyLine || !string.IsNullOrEmpty(code))
+        {
+            AppendLine(code);
+        }
+        EndLineMapping(mapped);
+    }
+
+    /// <summary>
+    /// Writes a <c>#line</c> directive mapping the next output line to the
+    /// node's source location. Returns true if a directive was written (caller
+    /// must then close the region with <see cref="EndLineMapping"/>).
+    /// </summary>
+    private bool TryBeginLineMapping(AstNode node)
+    {
+        if (_lineDirectiveFile == null || node.Span.Line <= 0)
+        {
+            return false;
+        }
+
+        AppendLine($"#line {node.Span.Line} \"{_lineDirectiveFile}\"");
+        return true;
+    }
+
+    private void EndLineMapping(bool mapped)
+    {
+        if (mapped)
+        {
+            AppendLine("#line default");
+        }
     }
 
     private void AppendLine(string line = "")
@@ -500,13 +559,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
                 {
+                    var mappedReturn = TryBeginLineMapping(statement);
                     var expr = returnStmt.Expression.Accept(this);
                     AppendLine($"__result__ = {expr};");
+                    EndLineMapping(mappedReturn);
                 }
                 else
                 {
-                    var stmtCode = statement.Accept(this);
-                    AppendLine(stmtCode);
+                    EmitStatement(statement);
                 }
             }
 
@@ -526,8 +586,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // No postconditions or void return - emit body normally
             foreach (var statement in node.Body)
             {
-                var stmtCode = statement.Accept(this);
-                AppendLine(stmtCode);
+                EmitStatement(statement);
             }
 
             // Emit postconditions for void functions (they can't reference 'result')
@@ -957,8 +1016,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.Body)
         {
-            var stmtCode = stmt.Accept(this);
-            AppendLine(stmtCode);
+            EmitStatement(stmt);
         }
 
         Dedent();
@@ -977,8 +1035,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.Body)
         {
-            var stmtCode = stmt.Accept(this);
-            AppendLine(stmtCode);
+            EmitStatement(stmt);
         }
 
         Dedent();
@@ -997,8 +1054,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.Body)
         {
-            var stmtCode = stmt.Accept(this);
-            AppendLine(stmtCode);
+            EmitStatement(stmt);
         }
 
         Dedent();
@@ -1017,8 +1073,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.ThenBody)
         {
-            var stmtCode = stmt.Accept(this);
-            AppendLine(stmtCode);
+            EmitStatement(stmt);
         }
 
         Dedent();
@@ -1034,8 +1089,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             foreach (var stmt in elseIf.Body)
             {
-                var stmtCode = stmt.Accept(this);
-                AppendLine(stmtCode);
+                EmitStatement(stmt);
             }
 
             Dedent();
@@ -1051,8 +1105,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             foreach (var stmt in node.ElseBody)
             {
-                var stmtCode = stmt.Accept(this);
-                AppendLine(stmtCode);
+                EmitStatement(stmt);
             }
 
             Dedent();
@@ -1429,13 +1482,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
                 {
+                    var mappedReturn = TryBeginLineMapping(statement);
                     var expr = returnStmt.Expression.Accept(this);
                     AppendLine($"__result__ = {expr};");
+                    EndLineMapping(mappedReturn);
                 }
                 else
                 {
-                    var stmtCode = statement.Accept(this);
-                    AppendLine(stmtCode);
+                    EmitStatement(statement);
                 }
             }
 
@@ -1452,8 +1506,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             foreach (var statement in method.Body)
             {
-                var stmtCode = statement.Accept(this);
-                AppendLine(stmtCode);
+                EmitStatement(statement);
             }
 
             foreach (var ensures in method.Postconditions)
@@ -1570,8 +1623,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             foreach (var stmt in matchCase.Body)
             {
-                var stmtCode = stmt.Accept(this);
-                AppendLine(stmtCode);
+                EmitStatement(stmt);
             }
 
             AppendLine("break;");
@@ -1855,8 +1907,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             foreach (var stmt in node.Body)
             {
-                var stmtCode = stmt.Accept(this);
-                AppendLine(stmtCode);
+                EmitStatement(stmt);
             }
 
             Dedent();
@@ -1870,8 +1921,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             foreach (var stmt in node.Body)
             {
-                var stmtCode = stmt.Accept(this);
-                AppendLine(stmtCode);
+                EmitStatement(stmt);
             }
 
             Dedent();
@@ -2014,8 +2064,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.Body)
         {
-            var stmtCode = stmt.Accept(this);
-            AppendLine(stmtCode);
+            EmitStatement(stmt);
         }
 
         Dedent();
@@ -2509,13 +2558,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
                 {
+                    var mappedReturn = TryBeginLineMapping(statement);
                     var expr = returnStmt.Expression.Accept(this);
                     AppendLine($"__result__ = {expr};");
+                    EndLineMapping(mappedReturn);
                 }
                 else
                 {
-                    var stmtCode = statement.Accept(this);
-                    AppendLine(stmtCode);
+                    EmitStatement(statement);
                 }
             }
 
@@ -2545,8 +2595,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             foreach (var statement in node.Body)
             {
-                var stmtCode = statement.Accept(this);
-                AppendLine(stmtCode);
+                EmitStatement(statement);
             }
 
             foreach (var ensures in node.Postconditions)
@@ -2639,13 +2688,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 if (statement is ReturnStatementNode returnStmt && returnStmt.Expression != null)
                 {
+                    var mappedReturn = TryBeginLineMapping(statement);
                     var expr = returnStmt.Expression.Accept(this);
                     AppendLine($"__result__ = {expr};");
+                    EndLineMapping(mappedReturn);
                 }
                 else
                 {
-                    var stmtCode = statement.Accept(this);
-                    AppendLine(stmtCode);
+                    EmitStatement(statement);
                 }
             }
 
@@ -2663,8 +2713,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             foreach (var statement in node.Body)
             {
-                var stmtCode = statement.Accept(this);
-                AppendLine(stmtCode);
+                EmitStatement(statement);
             }
 
             foreach (var ensures in node.Postconditions)
@@ -2971,7 +3020,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             foreach (var stmt in node.Body)
             {
-                AppendLine(stmt.Accept(this));
+                EmitStatement(stmt);
             }
 
             Dedent();
@@ -3028,7 +3077,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.Body)
         {
-            AppendLine(stmt.Accept(this));
+            EmitStatement(stmt);
         }
 
         Dedent();
@@ -3083,7 +3132,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 }
                 else
                 {
-                    AppendLine(stmt.Accept(this));
+                    EmitStatement(stmt);
                 }
             }
 
@@ -3099,7 +3148,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             foreach (var stmt in node.Body)
             {
-                AppendLine(stmt.Accept(this));
+                EmitStatement(stmt);
             }
         }
 
@@ -3156,7 +3205,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.Body)
         {
-            AppendLine(stmt.Accept(this));
+            EmitStatement(stmt);
         }
 
         Dedent();
@@ -3175,7 +3224,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.TryBody)
         {
-            AppendLine(stmt.Accept(this));
+            EmitStatement(stmt);
         }
 
         Dedent();
@@ -3194,7 +3243,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             foreach (var stmt in node.FinallyBody)
             {
-                AppendLine(stmt.Accept(this));
+                EmitStatement(stmt);
             }
 
             Dedent();
@@ -3233,7 +3282,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         foreach (var stmt in node.Body)
         {
-            AppendLine(stmt.Accept(this));
+            EmitStatement(stmt);
         }
 
         Dedent();
@@ -3367,7 +3416,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 Indent();
                 foreach (var stmt in node.AddBody)
                 {
-                    AppendLine(stmt.Accept(this));
+                    EmitStatement(stmt);
                 }
                 Dedent();
                 AppendLine("}");
@@ -3381,7 +3430,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 Indent();
                 foreach (var stmt in node.RemoveBody)
                 {
-                    AppendLine(stmt.Accept(this));
+                    EmitStatement(stmt);
                 }
                 Dedent();
                 AppendLine("}");
@@ -4432,16 +4481,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine($"#if {node.Condition}");
         foreach (var stmt in node.Body)
         {
-            var code = stmt.Accept(this);
-            if (!string.IsNullOrEmpty(code)) AppendLine(code);
+            EmitStatement(stmt, skipEmptyLine: true);
         }
         if (node.ElseBody != null && node.ElseBody.Count > 0)
         {
             AppendLine("#else");
             foreach (var stmt in node.ElseBody)
             {
-                var code = stmt.Accept(this);
-                if (!string.IsNullOrEmpty(code)) AppendLine(code);
+                EmitStatement(stmt, skipEmptyLine: true);
             }
         }
         AppendLine("#endif");
@@ -4852,8 +4899,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Indent();
         foreach (var stmt in node.Body)
         {
-            var stmtCode = stmt.Accept(this);
-            AppendLine(stmtCode);
+            EmitStatement(stmt);
         }
         Dedent();
         AppendLine("}");
@@ -4868,8 +4914,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Indent();
         foreach (var stmt in node.Body)
         {
-            var stmtCode = stmt.Accept(this);
-            AppendLine(stmtCode);
+            EmitStatement(stmt);
         }
         Dedent();
         AppendLine("}");
@@ -4885,8 +4930,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Indent();
         foreach (var stmt in node.Body)
         {
-            var stmtCode = stmt.Accept(this);
-            AppendLine(stmtCode);
+            EmitStatement(stmt);
         }
         Dedent();
         AppendLine("}");
