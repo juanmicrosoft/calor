@@ -143,7 +143,12 @@ public static class DocDriftChecker
         var effectsDoc = LoadDoc(root, Path.Combine("docs", "syntax-reference", "effects.md"), loadErrors);
         var cliCodesDoc = LoadDoc(root, Path.Combine("docs", "cli", "structured-output.md"), loadErrors);
 
+        var syntaxDocs = LoadDocsInDirectory(root, Path.Combine("docs", "syntax-reference"), loadErrors);
         var cliDocs = LoadDocsInDirectory(root, Path.Combine("docs", "cli"), loadErrors);
+
+        // The scanned set for the keyword and diagnostic-code checks:
+        // CLAUDE.md + every docs/syntax-reference/*.md + every docs/cli/*.md.
+        var scannedDocs = NonNull(claudeMd).Concat(syntaxDocs).Concat(cliDocs).ToList();
 
         // Version scan covers all agent-facing docs. Dated planning/experiment
         // records legitimately cite historical versions and are excluded.
@@ -160,8 +165,8 @@ public static class DocDriftChecker
             DiagnosticCodes = GetImplementedDiagnosticCodes(),
             KnownEffectCodes = Effects.EffectCodes.KnownCompactCodes,
             DocumentedEffectCodes = Effects.EffectCodes.DocumentedCompactCodes,
-            KeywordDocs = NonNull(claudeMd, syntaxIndex),
-            DiagnosticCodeDocs = NonNull(claudeMd).Concat(cliDocs).ToList(),
+            KeywordDocs = scannedDocs,
+            DiagnosticCodeDocs = scannedDocs,
             EffectsReferenceDoc = effectsDoc,
             EffectDocsForwardOnly = NonNull(syntaxIndex),
             CliCodesDoc = cliCodesDoc,

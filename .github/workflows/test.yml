@@ -31,10 +31,13 @@ jobs:
 
   spec-drift:
     # Phase 1 item 6 (agent-native strategy): agent-facing docs are machine-
-    # checked against the implementation. Fails when CLAUDE.md or docs/ cite
-    # §-keywords, diagnostic codes, or effect codes that don't exist, when an
-    # implemented effect code is undocumented, or when a doc hardcodes the
-    # current version.
+    # checked against the implementation. Covered files: CLAUDE.md, every
+    # docs/syntax-reference/*.md, and every docs/cli/*.md (plus docs/**/*.md
+    # for the version scan). Checks: documented §-keywords exist in the lexer,
+    # cited CalorNNNN codes exist (and cited bands are non-empty), the effect
+    # table in docs/syntax-reference/effects.md matches the effect registry in
+    # both directions, the Calor13xx table in docs/cli/structured-output.md is
+    # complete, and no doc hardcodes the current version.
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

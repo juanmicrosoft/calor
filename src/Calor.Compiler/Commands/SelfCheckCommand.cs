@@ -35,9 +35,14 @@ public static class SelfCheckCommand
         formatOption.FromAmong("text", "json");
 
         var docsCommand = new Command("docs",
-            "Check agent-facing docs (CLAUDE.md, syntax reference, CLI docs) against the compiler implementation: " +
-            "documented §-keywords must exist in the lexer, cited diagnostic codes in DiagnosticCode, " +
-            "effect codes in the effect registry (both directions), and no doc may hardcode the current version")
+            "Check agent-facing docs against the compiler implementation. " +
+            "Covered files: CLAUDE.md, docs/syntax-reference/*.md, and docs/cli/*.md " +
+            "(plus docs/**/*.md for the version scan). Checks: (1) every documented §-keyword " +
+            "exists in the lexer; (2) every cited CalorNNNN diagnostic code exists (and cited " +
+            "bands are non-empty); (3) effect codes in docs/syntax-reference/effects.md match " +
+            "the effect registry in both directions; (4) the Calor13xx table in " +
+            "docs/cli/structured-output.md is complete; (5) no doc hardcodes the current version. " +
+            "Exits 1 when drift is found")
         {
             rootOption,
             formatOption

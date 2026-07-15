@@ -179,12 +179,12 @@ Use `§EACHKV` to iterate over key-value pairs in a dictionary.
     §P key
 ```
 
-### Comparison with §FOREACH
+### Comparison with §EACH
 
 | Loop Type | Use Case |
 |:----------|:---------|
 | `§L{id:var:from:to:step}` | Numeric ranges |
-| `§FOREACH{id:var} collection` | Lists, arrays, sets |
+| `§EACH{id:var} collection` | Lists, arrays, sets |
 | `§EACHKV{id:k:v} dict` | Dictionaries (key-value pairs) |
 
 ---

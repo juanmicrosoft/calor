@@ -241,6 +241,12 @@ public class DocDriftCheckerTests
         Assert.Contains("IV", Lexer.KeywordNames);
         Assert.Contains("PP", Lexer.KeywordNames);
         Assert.Contains("/PP", Lexer.KeywordNames);
+        Assert.Contains("PPE", Lexer.KeywordNames);
+        Assert.Contains("CS", Lexer.KeywordNames);
+        Assert.Contains("RAW", Lexer.KeywordNames);
+        Assert.Contains("/RAW", Lexer.KeywordNames);
+        Assert.Contains("CSHARP", Lexer.KeywordNames);
+        Assert.Contains("/CSHARP", Lexer.KeywordNames);
         Assert.DoesNotContain("FOREACH", Lexer.KeywordNames);
         Assert.DoesNotContain("INV", Lexer.KeywordNames);
     }
@@ -268,5 +274,69 @@ public class DocDriftCheckerTests
         Assert.Contains("Calor0702", codes); // verification-pass code, registered via constant
         Assert.Contains("Calor1320", codes);
         Assert.DoesNotContain("Calor9876", codes);
+    }
+
+    // --- Coverage probes: LoadFromRepository must scan the full doc set.
+    // Reviewer cases: §BOGUS planted in docs/syntax-reference/structure-tags.md
+    // and Calor9876 planted in docs/syntax-reference/index.md must be detected.
+
+    private static string CreateFakeRepo(
+        string structureTagsContent = "# Structure Tags\n",
+        string syntaxIndexContent = "# Syntax Reference\n")
+    {
+        var root = Path.Combine(Path.GetTempPath(), "calor-drift-probe-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "docs", "syntax-reference"));
+        Directory.CreateDirectory(Path.Combine(root, "docs", "cli"));
+        File.WriteAllText(
+            Path.Combine(root, "Directory.Build.props"),
+            "<Project><PropertyGroup><Version>9.9.9</Version></PropertyGroup></Project>");
+        File.WriteAllText(Path.Combine(root, "CLAUDE.md"), "# CLAUDE\n");
+        File.WriteAllText(Path.Combine(root, "docs", "syntax-reference", "index.md"), syntaxIndexContent);
+        File.WriteAllText(Path.Combine(root, "docs", "syntax-reference", "structure-tags.md"), structureTagsContent);
+        File.WriteAllText(Path.Combine(root, "docs", "syntax-reference", "effects.md"), "# Effects\n");
+        File.WriteAllText(Path.Combine(root, "docs", "cli", "structured-output.md"), "# Structured Output\n");
+        return root;
+    }
+
+    private static List<Diagnostic> CheckFakeRepo(string root)
+    {
+        try
+        {
+            var loadErrors = new List<Diagnostic>();
+            var inputs = DocDriftChecker.LoadFromRepository(root, loadErrors);
+            var findings = DocDriftChecker.Check(inputs);
+            findings.AddRange(loadErrors);
+            return findings;
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RepositoryScanDetectsUnknownKeywordPlantedInStructureTagsDoc()
+    {
+        var root = CreateFakeRepo(
+            structureTagsContent: "# Structure Tags\n\nClose every block with `§BOGUS`.\n");
+        var findings = CheckFakeRepo(root);
+
+        var finding = Assert.Single(findings, f => f.Code == DiagnosticCode.DocDriftUnknownKeyword);
+        Assert.Contains("§BOGUS", finding.Message);
+        Assert.Contains("structure-tags.md", finding.FilePath);
+        Assert.Equal(3, finding.Span.Line);
+    }
+
+    [Fact]
+    public void RepositoryScanDetectsUnknownDiagnosticCodePlantedInSyntaxIndex()
+    {
+        var root = CreateFakeRepo(
+            syntaxIndexContent: "# Syntax Reference\n\nViolations raise `Calor9876`.\n");
+        var findings = CheckFakeRepo(root);
+
+        var finding = Assert.Single(findings, f => f.Code == DiagnosticCode.DocDriftUnknownDiagnosticCode);
+        Assert.Contains("Calor9876", finding.Message);
+        Assert.Contains("index.md", finding.FilePath);
+        Assert.Equal(3, finding.Span.Line);
     }
 }
