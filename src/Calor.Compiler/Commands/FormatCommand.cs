@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
@@ -58,12 +59,25 @@ public static class FormatCommand
             healOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, checkOption, writeOption, diffOption, verboseOption, healOption);
+        // Return the exit code through the handler (ctx.ExitCode) instead of
+        // stomping Environment.ExitCode: the root command's InvokeAsync
+        // result is what Program.Main returns, so a code parked only on
+        // Environment.ExitCode is overwritten by Main's return value.
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            ctx.ExitCode = await ExecuteAsync(
+                ctx.ParseResult.GetValueForArgument(inputArgument),
+                ctx.ParseResult.GetValueForOption(checkOption),
+                ctx.ParseResult.GetValueForOption(writeOption),
+                ctx.ParseResult.GetValueForOption(diffOption),
+                ctx.ParseResult.GetValueForOption(verboseOption),
+                ctx.ParseResult.GetValueForOption(healOption));
+        });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo[] files, bool check, bool write, bool diff, bool verbose, bool heal)
+    private static async Task<int> ExecuteAsync(FileInfo[] files, bool check, bool write, bool diff, bool verbose, bool heal)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("format");
@@ -197,26 +211,28 @@ public static class FormatCommand
         // Exit code. A heal that leaves (or found and could not touch) parse
         // errors must not exit 0 — silence would let an agent loop believe
         // the file was repaired.
+        int exitCode = 0;
         if (errorFiles > 0)
         {
-            Environment.ExitCode = 2;
+            exitCode = 2;
         }
         else if ((check && hasUnformatted) || unrepairedFiles > 0)
         {
-            Environment.ExitCode = 1;
+            exitCode = 1;
         }
 
         sw.Stop();
-        telemetry?.TrackCommand("format", Environment.ExitCode, new Dictionary<string, string>
+        telemetry?.TrackCommand("format", exitCode, new Dictionary<string, string>
         {
             ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
             ["fileCount"] = totalFiles.ToString(),
             ["errorCount"] = errorFiles.ToString()
         });
-        if (Environment.ExitCode != 0)
+        if (exitCode != 0)
         {
             IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "format", "Format check failed");
         }
+        return exitCode;
     }
 
     /// <summary>
