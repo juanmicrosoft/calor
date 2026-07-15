@@ -48,6 +48,10 @@ dotnet tool update -g calor
 | `calor lsp` | Start Language Server Protocol server for IDE features |
 | [`calor hook`](/calor/cli/hook/) | Claude Code hook commands (internal) |
 
+Machine-readable diagnostics: the compile and lint commands support
+`--format json|sarif` — see [Structured Output](/calor/cli/structured-output/)
+for the JSON schema, SARIF mapping, and exit-code contract.
+
 ---
 
 ## Compilation (Default Command)
@@ -65,6 +69,7 @@ calor --input file.calr --output file.g.cs
 | `--input`, `-i` | Input Calor file path (required) |
 | `--output`, `-o` | Output C# file path (required) |
 | `--verbose`, `-v` | Show detailed compilation output |
+| `--format`, `-f` | Diagnostic output format: `text` (default), `json`, or `sarif` — see [Structured Output](/calor/cli/structured-output/) |
 
 ### Example
 

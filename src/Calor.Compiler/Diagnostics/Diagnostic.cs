@@ -589,6 +589,60 @@ public static class DiagnosticCode
     /// compilation when the <c>pilot-hello-world</c> flag is enabled.
     /// </summary>
     public const string ExperimentalFlagPilot = "Calor1200";
+
+    // CLI diagnostics (Calor1300-1399) — issues surfaced by CLI commands
+    // themselves (file resolution, usage errors, lint style findings) rather
+    // than by the compilation pipeline. Carrying stable codes lets them flow
+    // through the structured output formats (--format json|sarif).
+
+    // `calor lint` style findings (Calor1300-1309)
+
+    /// <summary>
+    /// Warning (lint): a line has trailing whitespace.
+    /// </summary>
+    public const string LintTrailingWhitespace = "Calor1300";
+
+    /// <summary>
+    /// Warning (lint): a construct ID is not in abbreviated form
+    /// (e.g. <c>f001</c> instead of <c>f1</c>, or <c>for1</c> instead of <c>l1</c>).
+    /// </summary>
+    public const string LintNonAbbreviatedId = "Calor1301";
+
+    /// <summary>
+    /// Error (lint): an input file passed to <c>calor lint</c> does not exist.
+    /// </summary>
+    public const string LintFileNotFound = "Calor1302";
+
+    /// <summary>
+    /// Error (lint): an input file passed to <c>calor lint</c> is not a
+    /// <c>.calr</c> file and cannot be linted.
+    /// </summary>
+    public const string LintUnsupportedFileType = "Calor1303";
+
+    /// <summary>
+    /// Error (lint): an unexpected exception occurred while linting a file.
+    /// </summary>
+    public const string LintProcessingError = "Calor1304";
+
+    // Root compile command (Calor1310-1319)
+
+    /// <summary>
+    /// Error (CLI): an input file passed via <c>--input</c> does not exist.
+    /// </summary>
+    public const string CliInputNotFound = "Calor1310";
+
+    /// <summary>
+    /// Error (CLI): invalid combination of command-line arguments
+    /// (e.g. <c>--output</c> with multiple <c>--input</c> files).
+    /// </summary>
+    public const string CliUsageError = "Calor1311";
+
+    /// <summary>
+    /// Error (CLI): an unhandled exception occurred during compilation.
+    /// Emitted so structured output modes (<c>--format json|sarif</c>) still
+    /// produce a parseable document on crash paths.
+    /// </summary>
+    public const string CliInternalError = "Calor1312";
 }
 
 /// <summary>

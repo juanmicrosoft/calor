@@ -34,12 +34,20 @@ internal static class CompilationDriver
     /// (its historical behavior); run/test pass their effective effects-enforcement
     /// setting.
     /// </param>
+    /// <param name="diagnosticSink">
+    /// When non-null, diagnostics (per-file and cross-module) are collected into
+    /// this bag instead of being printed to stderr. Used by structured output
+    /// modes (<c>--format json|sarif</c>) where a <see cref="Diagnostics.IDiagnosticFormatter"/>
+    /// serializes the aggregate at the end; fix information is preserved via
+    /// <see cref="DiagnosticBag.AddRange"/>.
+    /// </param>
     internal static DriverResult CompileAll(
         IReadOnlyList<FileInfo> sources,
         Func<FileInfo, CompilationOptions> optionsFactory,
         bool crossModuleEnforcement,
         UnknownCallPolicy crossModulePolicy,
-        Action<FileInfo, CompilationResult>? onCompiled = null)
+        Action<FileInfo, CompilationResult>? onCompiled = null,
+        DiagnosticBag? diagnosticSink = null)
     {
         var compiled = new List<FileResult>();
         var modules = new List<(ModuleNode Ast, string FilePath)>();
@@ -50,13 +58,20 @@ internal static class CompilationDriver
             var options = optionsFactory(file);
             if (options.Verbose)
             {
-                Console.WriteLine($"Compiling: {file.FullName}");
+                (options.StatusWriter ?? Console.Out).WriteLine($"Compiling: {file.FullName}");
             }
 
             var source = File.ReadAllText(file.FullName);
             var result = Program.Compile(source, file.FullName, options);
 
-            PrintDiagnostics(result.Diagnostics, includeAll: result.HasErrors);
+            if (diagnosticSink != null)
+            {
+                diagnosticSink.AddRange(result.Diagnostics);
+            }
+            else
+            {
+                PrintDiagnostics(result.Diagnostics);
+            }
 
             if (result.HasErrors)
             {
@@ -81,7 +96,14 @@ internal static class CompilationDriver
             var registry = CrossModuleEffectRegistry.Build(modules);
             foreach (var diagnostic in registry.BuildDiagnostics)
             {
-                Console.Error.WriteLine(diagnostic);
+                if (diagnosticSink != null)
+                {
+                    diagnosticSink.Add(diagnostic);
+                }
+                else
+                {
+                    Console.Error.WriteLine(diagnostic);
+                }
             }
 
             var crossPass = new CrossModuleEffectEnforcementPass(crossModulePolicy);
@@ -89,7 +111,15 @@ internal static class CompilationDriver
 
             foreach (var diagnostic in crossDiagnostics)
             {
-                Console.Error.WriteLine(diagnostic);
+                if (diagnosticSink != null)
+                {
+                    diagnosticSink.Add(diagnostic);
+                }
+                else
+                {
+                    Console.Error.WriteLine(diagnostic);
+                }
+
                 if (diagnostic.IsError)
                 {
                     anyErrors = true;
@@ -101,18 +131,16 @@ internal static class CompilationDriver
     }
 
     /// <summary>
-    /// Prints diagnostics to stderr. Errors and warnings are always printed;
-    /// informational diagnostics are included only when the compilation failed
-    /// (preserving the historical quiet-on-success output).
+    /// Prints every diagnostic — including Info severity — to stderr. This
+    /// deliberately matches the structured output modes (--format json|sarif),
+    /// which serialize all severities, so text and machine output report the
+    /// same set of diagnostics.
     /// </summary>
-    private static void PrintDiagnostics(DiagnosticBag diagnostics, bool includeAll)
+    private static void PrintDiagnostics(DiagnosticBag diagnostics)
     {
         foreach (var diagnostic in diagnostics)
         {
-            if (includeAll || diagnostic.IsError || diagnostic.IsWarning)
-            {
-                Console.Error.WriteLine(diagnostic);
-            }
+            Console.Error.WriteLine(diagnostic);
         }
     }
 

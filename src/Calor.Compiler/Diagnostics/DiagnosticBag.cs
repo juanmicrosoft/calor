@@ -42,6 +42,15 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
         _diagnostics.Add(new Diagnostic(code, message, span, severity, _currentFilePath));
     }
 
+    /// <summary>
+    /// Adds an already-constructed diagnostic (e.g. from cross-module passes
+    /// that produce <see cref="Diagnostic"/> instances directly).
+    /// </summary>
+    public void Add(Diagnostic diagnostic)
+    {
+        _diagnostics.Add(diagnostic);
+    }
+
     public void ReportError(TextSpan span, string code, string message)
         => Report(span, code, message, DiagnosticSeverity.Error);
 
