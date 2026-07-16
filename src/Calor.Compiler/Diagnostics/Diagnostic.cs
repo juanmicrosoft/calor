@@ -247,7 +247,8 @@ public static class DiagnosticCode
     // reuses Calor0700 (Z3 unavailable, info) and Calor0701 (precondition may
     // be violated, warning) with meanings that differ from the semantics-version
     // constants above; that pre-existing collision is preserved for
-    // compatibility and is scheduled for renumbering.
+    // compatibility and its renumbering is tracked in
+    // https://github.com/juanmicrosoft/calor/issues/702.
 
     /// <summary>
     /// Warning: Z3 disproved a postcondition; a counterexample is reported.
