@@ -68,13 +68,17 @@ public class Program
             aliases: ["--verify"],
             description: "Enable static contract verification with Z3 SMT solver");
 
+        var cacheOption = new Option<bool>(
+            aliases: ["--cache"],
+            description: "Enable the incremental-build cache (.calor-build-state.json next to the outputs): unchanged files are skipped and report 'Up-to-date (cached)'. Opt-in for plain compiles; 'calor watch' always caches.");
+
         var noCacheOption = new Option<bool>(
             aliases: ["--no-cache"],
-            description: "Disable verification result caching");
+            description: "Disable caching (verification results and the incremental-build cache; overrides --cache)");
 
         var clearCacheOption = new Option<bool>(
             aliases: ["--clear-cache"],
-            description: "Clear verification cache before compiling");
+            description: "Clear caches before compiling (verification cache and .calor-build-state.json)");
 
         var verificationTimeoutOption = new Option<int>(
             aliases: ["--verification-timeout"],
@@ -134,6 +138,7 @@ public class Program
             permissiveEffectsOption,
             contractModeOption,
             verifyOption,
+            cacheOption,
             noCacheOption,
             clearCacheOption,
             verificationTimeoutOption,
@@ -170,6 +175,7 @@ public class Program
             var permissiveEffects = ctx.ParseResult.GetValueForOption(permissiveEffectsOption);
             var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
             var verify = ctx.ParseResult.GetValueForOption(verifyOption);
+            var cache = ctx.ParseResult.GetValueForOption(cacheOption);
             var noCache = ctx.ParseResult.GetValueForOption(noCacheOption);
             var clearCache = ctx.ParseResult.GetValueForOption(clearCacheOption);
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
@@ -200,7 +206,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format);
+                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format);
             }
             catch (Exception ex)
             {
@@ -246,6 +252,7 @@ public class Program
         rootCommand.AddCommand(EvaluationCommand.Create());
         rootCommand.AddCommand(RunCommand.Create());
         rootCommand.AddCommand(TestCommand.Create());
+        rootCommand.AddCommand(WatchCommand.Create());
 
         // Initialize telemetry for subcommands
         // Parse --no-telemetry early from args
@@ -270,10 +277,10 @@ public class Program
         return result;
     }
 
-    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text")
-        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format));
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text")
+        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format));
 
-    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text")
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text")
     {
         // Structured diagnostic output (--format json|sarif): diagnostics are
         // aggregated across files and serialized once through the shared
@@ -340,6 +347,33 @@ public class Program
             }
 
             var parsedContractMode = CompilationDriver.ParseContractMode(contractMode);
+
+            // Incremental-build cache (.calor-build-state.json next to the outputs):
+            // OPT-IN via --cache for plain compiles (calor watch always caches —
+            // incrementality is its point). Only active for the default output
+            // layout (.g.cs alongside each input); --output redirects the single
+            // output elsewhere, so it stays uncached. --no-cache is the explicit
+            // off switch (and overrides --cache); --clear-cache deletes the state
+            // file either way.
+            CompilationDriver.DriverCacheSettings? buildCache = null;
+            if (output == null)
+            {
+                var stateDirectory = Incremental.BuildStateCache.ComputeCommonDirectory(input);
+                if (cache && !noCache)
+                {
+                    buildCache = new CompilationDriver.DriverCacheSettings(
+                        stateDirectory,
+                        BuildOptionsToken(strictApi, requireDocs, enforceEffects, strictEffects,
+                            permissiveEffects, contractMode, verify, verificationTimeout, analyze,
+                            allFindings, strictBindInference, experimentalFlags),
+                        ClearFirst: clearCache,
+                        OutputPathFor: file => Path.ChangeExtension(file.FullName, ".g.cs"));
+                }
+                else if (clearCache)
+                {
+                    Incremental.BuildStateCache.Delete(stateDirectory);
+                }
+            }
 
             var driverResult = CompilationDriver.CompileAll(
                 input,
@@ -416,7 +450,13 @@ public class Program
 
                     statusOut.WriteLine($"Compilation successful: {outputPath}");
                 },
-                diagnosticSink: diagnosticSink);
+                diagnosticSink: diagnosticSink,
+                cache: buildCache,
+                onSkipped: (file, outputPath) =>
+                {
+                    var statusOut = structuredOutput ? Console.Error : Console.Out;
+                    statusOut.WriteLine($"Up-to-date (cached): {outputPath}");
+                });
 
             return Finish(driverResult.AnyErrors ? 1 : 0);
         }
@@ -432,6 +472,28 @@ public class Program
         }
     }
 
+    /// <summary>
+    /// Canonical token of every diagnostics-affecting compile option, folded into the
+    /// incremental-build cache's options hash — flipping any of these invalidates all
+    /// cached (skipped) files so their diagnostics are recomputed under the new option
+    /// set. Presentation-only options (verbose, --format) are deliberately excluded.
+    /// Shared by the top-level compile command and <c>calor watch</c>.
+    /// </summary>
+    internal static string BuildOptionsToken(bool strictApi, bool requireDocs, bool enforceEffects,
+        bool strictEffects, bool permissiveEffects, string contractMode, bool verify,
+        int verificationTimeout, bool analyze, bool allFindings, bool strictBindInference,
+        string[]? experimentalFlags)
+    {
+        var experimental = experimentalFlags == null
+            ? ""
+            : string.Join(",", experimentalFlags.OrderBy(f => f, StringComparer.Ordinal));
+        return $"strictApi:{strictApi}|requireDocs:{requireDocs}|enforceEffects:{enforceEffects}" +
+               $"|strictEffects:{strictEffects}|permissiveEffects:{permissiveEffects}" +
+               $"|contractMode:{contractMode.ToLowerInvariant()}|verify:{verify}" +
+               $"|verificationTimeout:{verificationTimeout}|analyze:{analyze}|allFindings:{allFindings}" +
+               $"|strictBindInference:{strictBindInference}|experimental:{experimental}";
+    }
+
     private static void WriteHelp(TextWriter writer)
     {
         writer.WriteLine("Calor Compiler - Compiles Calor source to C# and migrates between languages");
@@ -439,6 +501,7 @@ public class Program
         writer.WriteLine("Usage:");
         writer.WriteLine("  calor --input <file.calr> [--output <file.cs>]   Compile a single Calor file");
         writer.WriteLine("  calor --input <a.calr> --input <b.calr>          Compile multiple files with cross-module effect checking");
+        writer.WriteLine("  calor watch <dir|files>                          Watch sources and recompile incrementally on change");
         writer.WriteLine("  calor convert <file>                             Convert between C# and Calor");
         writer.WriteLine("  calor migrate <project>                          Migrate entire project");
         writer.WriteLine("  calor assess <directory>                         Assess C# for migration potential");
@@ -458,8 +521,9 @@ public class Program
         writer.WriteLine("  --verify          Enable static contract verification with Z3");
         writer.WriteLine("  --verification-timeout  Z3 solver timeout per contract in ms (default: 5000)");
         writer.WriteLine("  --analyze         Enable advanced analyses (dataflow, bugs, taint)");
-        writer.WriteLine("  --no-cache        Disable verification result caching");
-        writer.WriteLine("  --clear-cache     Clear verification cache before compiling");
+        writer.WriteLine("  --cache           Enable the incremental-build cache (skip unchanged files; opt-in)");
+        writer.WriteLine("  --no-cache        Disable caching (verification results and incremental builds)");
+        writer.WriteLine("  --clear-cache     Clear caches before compiling (verification + build state)");
         writer.WriteLine("  --format          Diagnostic output format: text, json, sarif (default: text)");
         writer.WriteLine();
         writer.WriteLine("Run 'calor --help' for more information.");

@@ -79,3 +79,6 @@ docs/plans/archive/
 
 # Calor template backup files
 CLAUDE.md.bak
+
+# Calor incremental build state (calor --cache / calor watch / MSBuild task)
+.calor-build-state.json

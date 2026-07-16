@@ -48,12 +48,40 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--analyze` | | No | Enable static analysis (dataflow, bug patterns, taint tracking) |
 | `--all-findings` | | No | Report all findings including inconclusive (requires `--analyze`) |
 | `--permissive-effects` | | No | Suppress unknown-effect warnings (recommended for converted code) |
-| `--no-cache` | | No | Disable verification result caching |
-| `--clear-cache` | | No | Clear verification cache before compiling |
+| `--cache` | | No | Enable the incremental-build cache — see below (opt-in) |
+| `--no-cache` | | No | Disable caching (verification results and incremental builds; overrides `--cache`) |
+| `--clear-cache` | | No | Clear caches before compiling (verification cache and `.calor-build-state.json`) |
 | `--contract-mode` | | No | Contract enforcement mode: off, debug, release (default: debug) |
 | `--strict-api` | | No | Require `§BR` breaking-change markers for public API changes |
 | `--require-docs` | | No | Require documentation on public functions |
 | `--enforce-effects` | | No | Enforce effect declarations (default: true) |
+
+---
+
+## Incremental builds (`--cache`, opt-in)
+
+With `--cache`, the compiler persists `.calor-build-state.json` at the common
+ancestor of the inputs (next to the generated `.g.cs` files) and skips files
+that are provably unchanged: same source content hash, same recorded output
+content hash, options/compiler/effect-manifests unchanged, and a cached
+per-module effect summary available so cross-module effect enforcement still
+runs over skipped modules.
+
+```bash
+calor --input a.calr --input b.calr --cache    # first run: compiles both
+calor --input a.calr --input b.calr --cache    # second run: skips both
+```
+
+**Output-shape difference:** a skipped file prints
+`Up-to-date (cached): <path>.g.cs` instead of
+`Compilation successful: <path>.g.cs`. Tools that scrape per-file success
+lines should account for both, or pass `--no-cache`.
+
+Caching is **opt-in** for plain compiles; `calor watch` always caches
+(see [watch](/calor/cli/watch/)). `--no-cache` is the explicit off switch and
+overrides `--cache`; `--clear-cache` deletes the state file first. Add
+`.calor-build-state.json` to `.gitignore` (`calor init` does this for you).
+Only diagnostic-clean files are cached, so warnings reappear on every run.
 
 ---
 

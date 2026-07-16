@@ -43,6 +43,22 @@ In a structured format (`json` or `sarif`):
   set of diagnostics (to stderr), so text and structured output never disagree
   about what was reported.
 
+### Streaming commands: NDJSON
+
+Single-shot commands emit one (pretty-printed) document per process. Streaming
+commands — currently [`calor watch`](/calor/cli/watch/) with `--format json` —
+emit **one compact JSON document per line** on stdout (NDJSON), one line per
+rebuild, using the same JSON schema below. Compact means no embedded newlines,
+so consumers split the stream on `\n` and parse each line independently:
+
+```bash
+calor watch src/ --format json | jq -c .summary   # jq handles NDJSON natively
+```
+
+A line is emitted for every rebuild, including clean and crashed ones, so line
+count always equals rebuild count. `watch` does not support `sarif` (SARIF has
+no streaming form). Human-oriented status stays on stderr, as above.
+
 ## JSON schema
 
 ```json

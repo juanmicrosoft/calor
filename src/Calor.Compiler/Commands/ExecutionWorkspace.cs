@@ -206,7 +206,7 @@ internal static class ExecutionWorkspace
         return null;
     }
 
-    private static bool IsInExcludedDirectory(string root, string file)
+    internal static bool IsInExcludedDirectory(string root, string file)
     {
         var relative = Path.GetRelativePath(root, file);
         var segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
