@@ -512,3 +512,918 @@ INVALID run detected (pair=N1-003-csv-row arm=csharp run=5 attempt=0): agent out
   "nullAgent": false
 }
 2026-07-16T18:23:49Z BLOCK DONE pair=N1-003-csv-row arm=csharp
+[e1a-attribution 681e3580] data: E1a checkpoint — N1-003-csv-row / csharp (30-run block)
+ 392 files changed, 7945 insertions(+)
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-1/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-10/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-11/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-12/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-13/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-14/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-15/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-16/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-17/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-18/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-19/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-2/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-20/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-21/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-22/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-23/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-24/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-25/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-26/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-27/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-28/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-29/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-3/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-30/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-4/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/invalid.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-5/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-6/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-7/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-8/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/heldout/CsvRowHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/csharp/run-9/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/driver.log
+To https://github.com/juanmicrosoft/calor.git
+   d182905a..681e3580  e1a-attribution -> e1a-attribution
+2026-07-16T18:23:51Z checkpoint pushed: data: E1a checkpoint — N1-003-csv-row / csharp (30-run block)
+2026-07-16T18:23:51Z BLOCK START pair=N1-003-csv-row arm=calor runs=30
+INVALID run detected (pair=N1-003-csv-row arm=calor run=1 attempt=0): agent output matches error marker: "api error"
+INVALID run detected (pair=N1-003-csv-row arm=calor run=1 attempt=1): agent output matches error marker: "api error"
+INVALID run detected (pair=N1-003-csv-row arm=calor run=1 attempt=2): agent output matches error marker: "overloaded"
+Retry cap reached; counting run 1 as task failure (invalid)
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 1,
+  "taskSuccess": false,
+  "escapedBugs": 20,
+  "heldoutPassed": 0,
+  "iterations": 0,
+  "iterationsToGreen": 11,
+  "censored": true,
+  "invalid": true,
+  "tokens": {
+    "input": 0,
+    "output": 0
+  },
+  "nullAgent": false
+}
+INVALID run detected (pair=N1-003-csv-row arm=calor run=2 attempt=0): agent output matches error marker: "api error"
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5390,
+    "output": 15577
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 3,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5673,
+    "output": 20090
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 4,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5372,
+    "output": 13475
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 5,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5685,
+    "output": 16083
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 6,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5816,
+    "output": 18259
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 7,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5818,
+    "output": 20634
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 8,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5670,
+    "output": 18937
+  },
+  "nullAgent": false
+}
+INVALID run detected (pair=N1-003-csv-row arm=calor run=9 attempt=0): agent output matches error marker: "api error"
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 9,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5529,
+    "output": 20257
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 10,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5830,
+    "output": 22229
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 11,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5840,
+    "output": 19259
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 12,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5670,
+    "output": 21574
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 13,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5225,
+    "output": 6075
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 14,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 1172,
+    "output": 17532
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 15,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5399,
+    "output": 9393
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 16,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5670,
+    "output": 20558
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 17,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5685,
+    "output": 18626
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 18,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5370,
+    "output": 13695
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 19,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 1164,
+    "output": 17751
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 20,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5530,
+    "output": 14645
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 21,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 1041,
+    "output": 16115
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 22,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 9725,
+    "output": 15477
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 23,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5671,
+    "output": 16391
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 24,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 6803,
+    "output": 18994
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 25,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5683,
+    "output": 15285
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 26,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5533,
+    "output": 18271
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 27,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5133,
+    "output": 16600
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 28,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4974,
+    "output": 19679
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 29,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4976,
+    "output": 18166
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 30,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 4,
+  "iterationsToGreen": 4,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5257,
+    "output": 22464
+  },
+  "nullAgent": false
+}
+2026-07-16T23:19:50Z BLOCK DONE pair=N1-003-csv-row arm=calor
