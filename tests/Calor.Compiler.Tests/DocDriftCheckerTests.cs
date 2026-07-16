@@ -16,6 +16,7 @@ public class DocDriftCheckerTests
     private static DocDriftInputs BaseInputs(
         DocFile[]? keywordDocs = null,
         DocFile[]? diagnosticCodeDocs = null,
+        DocFile[]? parseExampleDocs = null,
         DocFile? effectsReferenceDoc = null,
         DocFile[]? effectDocsForwardOnly = null,
         DocFile? cliCodesDoc = null,
@@ -30,6 +31,7 @@ public class DocDriftCheckerTests
             DocumentedEffectCodes = ["cw", "mut", "mut:col"],
             KeywordDocs = keywordDocs ?? [],
             DiagnosticCodeDocs = diagnosticCodeDocs ?? [],
+            ParseExampleDocs = parseExampleDocs ?? [],
             EffectsReferenceDoc = effectsReferenceDoc,
             EffectDocsForwardOnly = effectDocsForwardOnly ?? [],
             CliCodesDoc = cliCodesDoc,
@@ -276,6 +278,75 @@ public class DocDriftCheckerTests
 
         var finding = Assert.Single(findings);
         Assert.Contains(DocDriftChecker.SuppressionMarker, finding.Message);
+    }
+
+    // --- Parse-the-examples (the rotted-snippet class) ---
+
+    private const string FizzBuzzExample =
+        "§M{m001:FizzBuzz}\n" +
+        "  §F{f001:Main:pub} () -> void\n" +
+        "    §E{cw}\n" +
+        "    §L{for1:i:1:100:1}\n" +
+        "      §IF{if1} (== (% i 15) 0)\n" +
+        "        §P \"FizzBuzz\"\n" +
+        "      §EI (== (% i 3) 0)\n" +
+        "        §P \"Fizz\"\n" +
+        "      §EL\n" +
+        "        §P i\n";
+
+    [Fact]
+    public void CompleteProgramExampleThatParsesPasses()
+    {
+        var doc = new DocFile("fake.md", "Example:\n\n```calor\n" + FizzBuzzExample + "```\n");
+        var findings = DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void RottedCompleteProgramExampleIsDetected()
+    {
+        // §FOREACH does not lex; a doc example using it has rotted.
+        var doc = new DocFile("fake.md",
+            "Example:\n\n```calor\n§M{m1:Loops}\n  §F{f1:Sum:pub} (i32[]:items) -> void\n    §FOREACH{e1:x} items\n      §P x\n```\n");
+        var findings = DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc]));
+
+        Assert.NotEmpty(findings);
+        Assert.All(findings, f => Assert.Equal(DiagnosticCode.DocDriftExampleParseError, f.Code));
+        var finding = findings[0];
+        Assert.Equal("fake.md", finding.FilePath);
+        Assert.Equal(6, finding.Span.Line); // §FOREACH sits on doc line 6
+    }
+
+    [Fact]
+    public void CalorFragmentsNotStartingWithModuleAreSkipped()
+    {
+        // No §M on the first non-blank line => deliberate fragment, not parsed.
+        var doc = new DocFile("fake.md",
+            "```calor\n// Before (inconsistent)\n§FOREACH{e1:x} items\n```\n");
+        var findings = DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void SuppressionMarkerBeforeFenceExemptsTheExample()
+    {
+        var doc = new DocFile("fake.md",
+            "<!-- drift:ignore -->\n```calor\n§M{m1:Hypothetical}\n  §FUTURE syntax sketch\n```\n");
+        var findings = DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void NonCalorFencesAreNotParseChecked()
+    {
+        var doc = new DocFile("fake.md",
+            "```\n§M{m1:Bare}\n  §FOREACH{e1:x} items\n```\n\n```text\n§M{m2:Text}\n  §FOREACH{e2:x} items\n```\n");
+        var findings = DocDriftChecker.Check(BaseInputs(parseExampleDocs: [doc]));
+
+        Assert.Empty(findings);
     }
 
     // --- Hardcoded version (the stale-0.3.5 class) ---

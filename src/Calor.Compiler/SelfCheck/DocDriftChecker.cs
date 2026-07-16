@@ -39,6 +39,14 @@ public sealed class DocDriftInputs
     public IReadOnlyList<DocFile> DiagnosticCodeDocs { get; init; } = [];
 
     /// <summary>
+    /// Docs whose fenced <c>```calor</c> examples are parse-checked with the
+    /// real lexer and parser. Only blocks whose first non-blank line starts
+    /// with §M are checked (the complete-program convention); anything else is
+    /// treated as a deliberate fragment and skipped.
+    /// </summary>
+    public IReadOnlyList<DocFile> ParseExampleDocs { get; init; } = [];
+
+    /// <summary>
     /// The effect-code reference doc (docs/syntax-reference/effects.md): its
     /// "Effect Codes" table is checked in both directions (unknown codes flagged,
     /// and every documented effect code must be present).
@@ -115,6 +123,11 @@ public static class DocDriftChecker
             CheckDiagnosticCodes(doc, inputs.DiagnosticCodes, diagnostics);
         }
 
+        foreach (var doc in inputs.ParseExampleDocs)
+        {
+            CheckCalorExamples(doc, diagnostics);
+        }
+
         if (inputs.EffectsReferenceDoc is { } effectsDoc)
         {
             CheckEffectCodes(effectsDoc, inputs, requireComplete: true, diagnostics);
@@ -175,6 +188,7 @@ public static class DocDriftChecker
             DocumentedEffectCodes = Effects.EffectCodes.DocumentedCompactCodes,
             KeywordDocs = scannedDocs,
             DiagnosticCodeDocs = scannedDocs,
+            ParseExampleDocs = scannedDocs,
             EffectsReferenceDoc = effectsDoc,
             EffectDocsForwardOnly = NonNull(syntaxIndex),
             CliCodesDoc = cliCodesDoc,
@@ -271,6 +285,104 @@ public static class DocDriftChecker
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Parse-checks fenced <c>```calor</c> examples with the real lexer and
+    /// parser. A block whose first non-blank line starts with §M declares a
+    /// complete program and must parse cleanly; any other block is a fragment
+    /// and is skipped. A <see cref="SuppressionMarker"/> on the line before
+    /// the opening fence exempts the whole block.
+    /// </summary>
+    private static void CheckCalorExamples(DocFile doc, List<Diagnostic> diagnostics)
+    {
+        foreach (var block in FindCalorFences(doc))
+        {
+            var firstContent = block.Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
+            if (block.Suppressed ||
+                firstContent == null ||
+                !firstContent.TrimStart().StartsWith("§M", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var source = string.Join("\n", block.Lines) + "\n";
+            var bag = new DiagnosticBag();
+            try
+            {
+                var lexer = new Parsing.Lexer(source, bag);
+                var tokens = lexer.TokenizeAllForParser();
+                if (!bag.HasErrors)
+                {
+                    _ = new Parsing.Parser(tokens, bag).Parse();
+                }
+            }
+            catch (Exception ex)
+            {
+                diagnostics.Add(Drift(
+                    DiagnosticCode.DocDriftExampleParseError,
+                    $"Fenced calor example crashed the parser: {ex.Message}",
+                    doc.Path, block.FirstContentLine, 1));
+                continue;
+            }
+
+            foreach (var error in bag.Errors)
+            {
+                diagnostics.Add(Drift(
+                    DiagnosticCode.DocDriftExampleParseError,
+                    $"Fenced calor example no longer parses: {error.Code}: {error.Message}",
+                    doc.Path,
+                    block.FirstContentLine + Math.Max(error.Span.Line - 1, 0),
+                    Math.Max(error.Span.Column, 1)));
+            }
+        }
+    }
+
+    /// <summary>A fenced ```calor block: its content lines (CR stripped), the
+    /// document line number of the first content line, and whether the line
+    /// before the opening fence carried the suppression marker.</summary>
+    private sealed record CalorFence(List<string> Lines, int FirstContentLine, bool Suppressed);
+
+    private static List<CalorFence> FindCalorFences(DocFile doc)
+    {
+        var fences = new List<CalorFence>();
+        var lines = doc.Content.Split('\n');
+        string? fenceInfo = null;
+        CalorFence? current = null;
+
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].TrimEnd('\r').TrimStart();
+            if (trimmed.StartsWith("```", StringComparison.Ordinal))
+            {
+                if (fenceInfo == null)
+                {
+                    fenceInfo = trimmed[3..].Trim();
+                    if (fenceInfo == "calor")
+                    {
+                        var suppressed = i > 0 &&
+                            lines[i - 1].Contains(SuppressionMarker, StringComparison.Ordinal);
+                        current = new CalorFence([], i + 2, suppressed);
+                    }
+                }
+                else
+                {
+                    if (current != null)
+                    {
+                        fences.Add(current);
+                        current = null;
+                    }
+
+                    fenceInfo = null;
+                }
+
+                continue;
+            }
+
+            current?.Lines.Add(lines[i].TrimEnd('\r'));
+        }
+
+        return fences;
     }
 
     private static void CheckEffectCodes(

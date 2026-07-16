@@ -37,7 +37,9 @@ jobs:
     # cited CalorNNNN codes exist (and cited bands are non-empty), the effect
     # table in docs/syntax-reference/effects.md matches the effect registry in
     # both directions, the Calor13xx table in docs/cli/structured-output.md is
-    # complete, and no doc hardcodes the current version.
+    # complete, no doc hardcodes the current version, and every fenced
+    # ```calor example declaring a complete program (starts with §M) still
+    # parses with the current compiler.
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

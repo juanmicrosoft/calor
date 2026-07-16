@@ -750,6 +750,13 @@ public static class DiagnosticCode
     /// in docs/cli/structured-output.md's code table.
     /// </summary>
     public const string DocDriftUndocumentedCliCode = "Calor1327";
+
+    /// <summary>
+    /// Error (docs drift): a fenced ```calor example that declares a complete
+    /// program (first non-blank line starts with §M) no longer lexes/parses
+    /// with the current compiler — the example has rotted.
+    /// </summary>
+    public const string DocDriftExampleParseError = "Calor1328";
 }
 
 /// <summary>

@@ -41,8 +41,11 @@ public static class SelfCheckCommand
             "exists in the lexer; (2) every cited CalorNNNN diagnostic code exists (and cited " +
             "bands are non-empty); (3) effect codes in docs/syntax-reference/effects.md match " +
             "the effect registry in both directions; (4) the Calor13xx table in " +
-            "docs/cli/structured-output.md is complete; (5) no doc hardcodes the current version. " +
-            "Exits 1 when drift is found")
+            "docs/cli/structured-output.md is complete; (5) no doc hardcodes the current version; " +
+            "(6) every fenced ```calor example that declares a complete program (first non-blank " +
+            "line starts with §M) parses with the current compiler. " +
+            "Suppress an intentional-meta-notation finding by putting <!-- drift:ignore --> on the " +
+            "preceding line (see docs/cli/self-check.md). Exits 1 when drift is found")
         {
             rootOption,
             formatOption

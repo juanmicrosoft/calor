@@ -93,9 +93,10 @@ The only closers you should ever write are `§/C` (call argument lists) and `§/
 §IV (expr)                 Invariant
 ```
 
-Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`):
+Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`; fenced
+` ```calor ` blocks starting with `§M` are parse-checked by `calor self-check docs`):
 
-```
+```calor
 §M{m001:FizzBuzz}
   §F{f001:Main:pub} () -> void
     §E{cw}

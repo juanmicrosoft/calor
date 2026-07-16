@@ -145,6 +145,7 @@ pipeline) so they can flow through the structured formats:
 | `Calor1325` | Docs drift: doc file hardcodes the current compiler version |
 | `Calor1326` | Docs drift: a file or doc section the self-check needs is missing |
 | `Calor1327` | Docs drift: CLI diagnostic code missing from this table |
+| `Calor1328` | Docs drift: fenced ```` ```calor ```` example (complete program starting with `§M`) no longer parses |
 
 ## Notes on specific commands
 
@@ -158,5 +159,5 @@ pipeline) so they can flow through the structured formats:
   per file (alongside its legacy flat `errors`/`warnings` string arrays), but
   its top-level document is command-specific.
 - **`calor self-check docs --format json`** emits the unified schema on stdout
-  with docs-drift findings (`Calor1320`–`Calor1327`) and exits 1 when drift is
+  with docs-drift findings (`Calor1320`–`Calor1328`) and exits 1 when drift is
   found (text mode reports the same findings on stderr).
