@@ -45,7 +45,7 @@ dotnet tool update -g calor
 | [`calor format`](/calor/cli/format/) | Format Calor source files to canonical style |
 | [`calor fix`](/calor/cli/fix/) | Bulk, reversible source rewrites (e.g. drop legacy closing-tag IDs) |
 | [`calor mcp`](/calor/cli/mcp/) | Start MCP server for AI agent tool integration |
-| `calor self-check docs` | Verify agent-facing docs against the implementation (keywords, diagnostic codes, effect codes, version); exits nonzero on drift |
+| [`calor self-check docs`](/calor/cli/self-check/) | Verify agent-facing docs against the implementation (keywords, diagnostic codes, effect codes, parseable examples, version); exits nonzero on drift |
 | `calor lsp` | Start Language Server Protocol server for IDE features |
 | [`calor hook`](/calor/cli/hook/) | Claude Code hook commands (internal) |
 
