@@ -40,12 +40,36 @@ public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
 {
     public string ContentType => "application/json";
 
-    private static readonly JsonSerializerOptions s_options = new()
+    private static readonly JsonSerializerOptions s_indentedOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
+
+    private static readonly JsonSerializerOptions s_compactOptions = new()
+    {
+        WriteIndented = false,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    private readonly JsonSerializerOptions _options;
+
+    /// <summary>Indented single-document formatter (default; compile/lint output).</summary>
+    public JsonDiagnosticFormatter() : this(writeIndented: true)
+    {
+    }
+
+    /// <summary>
+    /// With <paramref name="writeIndented"/> false the document is compact — no
+    /// embedded newlines — as required by NDJSON stream producers that emit one
+    /// document per line (<c>calor watch --format json</c>).
+    /// </summary>
+    public JsonDiagnosticFormatter(bool writeIndented)
+    {
+        _options = writeIndented ? s_indentedOptions : s_compactOptions;
+    }
 
     public string Format(IEnumerable<Diagnostic> diagnostics)
     {
@@ -76,7 +100,7 @@ public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
             }
         };
 
-        return JsonSerializer.Serialize(output, s_options);
+        return JsonSerializer.Serialize(output, _options);
     }
 
     public string Format(DiagnosticBag diagnostics)
@@ -142,7 +166,7 @@ public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
             }
         };
 
-        return JsonSerializer.Serialize(output, s_options);
+        return JsonSerializer.Serialize(output, _options);
     }
 
     private sealed class DiagnosticOutput

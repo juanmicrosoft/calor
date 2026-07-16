@@ -204,9 +204,18 @@ public class WatchSessionTests : IDisposable
         var exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(0, exitCode);
 
-        // json mode: exactly one diagnostics document per rebuild on stdout.
-        var documents = output.ToString().Split("\"version\"").Length - 1;
-        Assert.Equal(2, documents);
+        // json mode is NDJSON: one compact, independently parseable JSON document
+        // per line, one line per rebuild. Parse the lines — substring counting
+        // cannot prove the stream is splittable.
+        var lines = output.ToString()
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        Assert.Equal(2, lines.Length);
+        foreach (var line in lines)
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(line);
+            Assert.Equal("1.0", doc.RootElement.GetProperty("version").GetString());
+            Assert.True(doc.RootElement.TryGetProperty("summary", out _));
+        }
 
         // Status stream (stderr surrogate) carries the human-readable summaries.
         var statusText = status.ToString();

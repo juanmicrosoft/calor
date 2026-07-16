@@ -13,9 +13,9 @@ namespace Calor.Compiler.Commands;
 /// <c>calor watch &lt;dir|files...&gt;</c> — initial full compile, then recompiles on
 /// every <c>*.calr</c> (or effect-manifest) change, debounced, using the incremental
 /// build cache so unchanged files are skipped. Compile-only in v1 (no --run).
-/// Per-rebuild diagnostics respect <c>--format text|json</c>: in json mode one JSON
-/// document is written to stdout per rebuild; status always goes to stderr. Exits
-/// cleanly on Ctrl+C / SIGTERM.
+/// Per-rebuild diagnostics respect <c>--format text|json</c>: json mode is NDJSON —
+/// one compact JSON document per line, one line per rebuild, on stdout; status
+/// always goes to stderr. Exits cleanly on Ctrl+C / SIGTERM.
 /// </summary>
 public static class WatchCommand
 {
@@ -29,7 +29,7 @@ public static class WatchCommand
         var formatOption = new Option<string>(
             aliases: ["--format", "-f"],
             getDefaultValue: () => "text",
-            description: "Diagnostic output format per rebuild: text (stderr) or json (one document per rebuild on stdout)");
+            description: "Diagnostic output format per rebuild: text (stderr) or json (NDJSON on stdout: one compact document per line, one line per rebuild)");
         formatOption.FromAmong("text", "json");
 
         var verboseOption = new Option<bool>(["--verbose", "-v"], "Enable verbose output");
@@ -340,11 +340,13 @@ internal sealed class WatchSession
             summary = new DriverResultSummary(0, 0, AnyErrors: true);
         }
 
-        // One document per rebuild on stdout in json mode — even for crashed or
-        // clean rebuilds, so machine consumers see exactly one document each time.
+        // NDJSON: exactly one *compact* JSON document per line, one line per
+        // rebuild — even for crashed or clean rebuilds. Consumers split the
+        // stream on newlines and parse each line independently; a pretty-printed
+        // document here would make the concatenated stream unsplittable.
         if (diagnosticSink != null)
         {
-            _output.WriteLine(DiagnosticFormatterFactory.Create(_settings.Format).Format(diagnosticSink));
+            _output.WriteLine(new JsonDiagnosticFormatter(writeIndented: false).Format(diagnosticSink));
             _output.Flush();
         }
 
