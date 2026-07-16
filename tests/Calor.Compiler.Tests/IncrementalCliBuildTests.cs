@@ -392,8 +392,9 @@ public class IncrementalCliBuildTests : IDisposable
 }
 
 /// <summary>
-/// End-to-end incrementality through the real CLI (subprocess): the second
-/// identical invocation reports cache hits, and --no-cache suppresses them.
+/// End-to-end incrementality through the real CLI (subprocess): with --cache the
+/// second identical invocation reports cache hits; caching is opt-in (a plain
+/// compile never caches) and --no-cache overrides --cache.
 /// </summary>
 public class IncrementalCliEndToEndTests : IDisposable
 {
@@ -412,7 +413,7 @@ public class IncrementalCliEndToEndTests : IDisposable
     }
 
     [Fact]
-    public void SecondRun_ReportsUpToDate_AndNoCacheDisablesIt()
+    public void SecondRun_WithCacheFlag_ReportsUpToDate_AndNoCacheOverrides()
     {
         var a = Path.Combine(_tempDir, "a.calr");
         var b = Path.Combine(_tempDir, "b.calr");
@@ -429,18 +430,44 @@ public class IncrementalCliEndToEndTests : IDisposable
                 §P "wave"
             """);
 
-        var cold = CliTestHarness.RunCli(_tempDir, "--input", a, "--input", b);
+        var cold = CliTestHarness.RunCli(_tempDir, "--input", a, "--input", b, "--cache");
         Assert.Equal(0, cold.ExitCode);
         Assert.DoesNotContain("Up-to-date (cached)", cold.StdOut);
 
-        var warm = CliTestHarness.RunCli(_tempDir, "--input", a, "--input", b);
+        var warm = CliTestHarness.RunCli(_tempDir, "--input", a, "--input", b, "--cache");
         Assert.Equal(0, warm.ExitCode);
         Assert.Contains("Up-to-date (cached)", warm.StdOut);
         Assert.DoesNotContain("Compilation successful", warm.StdOut);
 
-        var uncached = CliTestHarness.RunCli(_tempDir, "--input", a, "--input", b, "--no-cache");
+        // --no-cache is the explicit off switch and wins over --cache.
+        var uncached = CliTestHarness.RunCli(_tempDir, "--input", a, "--input", b, "--cache", "--no-cache");
         Assert.Equal(0, uncached.ExitCode);
         Assert.DoesNotContain("Up-to-date (cached)", uncached.StdOut);
         Assert.Contains("Compilation successful", uncached.StdOut);
+    }
+
+    [Fact]
+    public void PlainCompile_DoesNotCache_ByDefault()
+    {
+        // Policy: incremental caching is opt-in for plain compiles. Without
+        // --cache no state file is written and repeat runs always recompile.
+        var a = Path.Combine(_tempDir, "a.calr");
+        File.WriteAllText(a, """
+            §M{m001:Alpha}
+              §F{f001:Greet:pub} () -> void
+                §E{cw}
+                §P "hello"
+            """);
+
+        for (var run = 0; run < 2; run++)
+        {
+            var result = CliTestHarness.RunCli(_tempDir, "--input", a);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Compilation successful", result.StdOut);
+            Assert.DoesNotContain("Up-to-date (cached)", result.StdOut);
+        }
+
+        Assert.False(File.Exists(Path.Combine(_tempDir, ".calor-build-state.json")),
+            "plain compile must not write build state without --cache");
     }
 }

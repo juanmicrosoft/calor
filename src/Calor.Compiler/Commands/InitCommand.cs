@@ -198,6 +198,9 @@ public static class InitCommand
         // Initialize .gitattributes for GitHub linguist
         var (gitAttrCreated, gitAttrUpdated) = await GitAttributesInitializer.InitializeAsync(solutionDirectory);
 
+        // Initialize .gitignore for Calor build artifacts (.calor-build-state.json)
+        var (gitIgnoreCreated, gitIgnoreUpdated) = await GitIgnoreInitializer.InitializeAsync(solutionDirectory);
+
         // Check if calor is available in PATH
         var warnings = new List<string>(result.Warnings);
         if (!IsCalorcInPath())
@@ -239,6 +242,15 @@ public static class InitCommand
         else if (gitAttrUpdated)
         {
             updatedFiles.Add(Path.Combine(solutionDirectory, ".gitattributes"));
+        }
+
+        if (gitIgnoreCreated)
+        {
+            createdFiles.Add(Path.Combine(solutionDirectory, ".gitignore"));
+        }
+        else if (gitIgnoreUpdated)
+        {
+            updatedFiles.Add(Path.Combine(solutionDirectory, ".gitignore"));
         }
 
         // Show created files
@@ -428,6 +440,17 @@ public static class InitCommand
         else if (gitAttrUpdated)
         {
             updatedFiles.Add(Path.Combine(targetDirectory, ".gitattributes"));
+        }
+
+        // Step 5: Initialize .gitignore for Calor build artifacts (.calor-build-state.json)
+        var (gitIgnoreCreated, gitIgnoreUpdated) = await GitIgnoreInitializer.InitializeAsync(targetDirectory);
+        if (gitIgnoreCreated)
+        {
+            createdFiles.Add(Path.Combine(targetDirectory, ".gitignore"));
+        }
+        else if (gitIgnoreUpdated)
+        {
+            updatedFiles.Add(Path.Combine(targetDirectory, ".gitignore"));
         }
 
         // Check if calor is available in PATH
