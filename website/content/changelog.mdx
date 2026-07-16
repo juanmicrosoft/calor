@@ -10,6 +10,28 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-16
+
+The agent dev-loop release: Phase 1 of the agent-native strategy complete — six items, each hardened by adversarial review.
+
+### Added
+- **Source maps.** The compiler emits `#line` directives mapping generated C# back to `.calr` source: downstream compiler errors, runtime stack traces, and debugger sessions report your `.calr` file and line instead of a generated `.g.cs` location.
+- **`calor run` and `calor test`.** One command to execute or test any `.calr` file or directory — no MSBuild wiring. Effects enforcement on by default (`--permissive` to relax, violations now visible as warnings), `--verify`/`--contract-mode` pass-through, process timeouts, real exit codes.
+- **Structured diagnostics.** `--format text|json|sarif` on compile and `lint`: stdout is always one machine-parseable document (status goes to stderr), early-exit errors included, honest exit codes. Schema documented in [structured output](/docs/cli/structured-output/).
+- **`calor format --heal`.** Best-effort source-level repair for files too broken to parse — indentation re-derivation, closer stripping, chain-clause re-alignment — with every ambiguous decision reported per `file:line`. New fixable indentation diagnostics (`Calor0008`/`Calor0009`/`Calor0117`) carry one-pass machine-applicable edits, and the MCP `calor_check` tool auto-heals in agent loops.
+- **`calor self-check docs`.** Machine-verifies the docs against the implementation — §-keywords vs the lexer, diagnostic codes, effect codes, and every fenced Calor example parsed with the real parser — and runs in CI, so documentation drift is now a build failure.
+- **`calor watch`.** Debounced incremental recompiles with NDJSON structured output; incremental caching shares the MSBuild engine with hardened trust boundaries (content hashed from compiled bytes, effect summaries required for cache hits, outputs verified by hash). Plain-compile caching is opt-in via `--cache`.
+
+### Fixed
+- **Obligation fact scoping:** guard facts were collected function-wide, so contradictory sibling branch guards could vacuously discharge every proof obligation in a function; facts are now scoped to the range they dominate with an UNSAT pre-check.
+- `NullDereferenceChecker` order-dependent classification of `unwrap_or`/`unwrap_or_default`.
+- `Option`/`Result` combinators resolve through effect manifests as pure-modulo-arguments; Calor surface types (`?T`, `T!E`) map to runtime manifest keys.
+- Agent-facing docs corrected (keyword accuracy, effect-code completeness) and now drift-guarded in CI.
+
+### Changed
+- New diagnostic bands: 1300–1399 (CLI findings and command-level errors, incl. doc-drift codes).
+- `Calor0008`/`Calor0009` warnings fire on legacy tab/4-space-indented files (with attached one-pass fixes).
+
 ## [0.6.8] - 2026-07-01
 
 ### Added

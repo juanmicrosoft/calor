@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.6.8</span>
+            <span className="font-semibold text-calor-cerulean">v0.7.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">New <code>calor fix --heal-closers</code> CLI rewrites legacy closer-form source (<code>§/F</code>, <code>§/M</code>, …) into canonical indent-only form &mdash; reversibly and byte-exactly &mdash; finishing the <code>Calor0830</code> auto-heal story. Internally, return-value classification is now single-sourced in a shared <code>ReturnShape</code> helper. A tooling-and-refactor release with no benchmark-affecting changes.</span>
+            <span className="text-foreground">The agent dev-loop release: <code>#line</code> source maps put compiler errors and stack traces in your <code>.calr</code> source; new <code>calor run</code>, <code>calor test</code>, and <code>calor watch</code> commands; machine-parseable <code>--format json|sarif</code> diagnostics; <code>calor format --heal</code> repairs broken agent output; and <code>calor self-check docs</code> keeps the docs honest in CI.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"

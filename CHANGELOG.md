@@ -4,12 +4,40 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-16
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x (Calor wins)
+  - ErrorDetection: 1.49x (Calor wins)
+  - TokenEconomics: 1.42x (Calor wins)
+  - RefactoringStability: 1.38x (Calor wins)
+  - EditPrecision: 1.36x (Calor wins)
+  - InformationDensity: 0.98x (C# wins)
+- **Programs Tested**: 217
+
+> The agent dev-loop release: Phase 1 of the agent-native strategy (docs/plans/agent-native-strategy.md) complete — six items, each hardened by adversarial review. Static benchmark profile unchanged from v0.6.8 (these are tooling/dev-loop changes).
+
 ### Added
-- **Write-path robustness (Phase 1 item 5): fixable indentation diagnostics, `calor format --heal`, MCP auto-heal (#699).**
-  - New diagnostics with machine-applicable fixes: `Calor0008` (tab indentation, warning), `Calor0009` (non-standard indent width, warning), `Calor0117` (misaligned `§EI`/`§EL` in statement position, error); `Calor0099` mixed-indentation/dedent-mismatch errors now carry fixes. `Calor0117` fixes are scoped to the current function and are never emitted when applying them would not change the line (a no-op fix would trap agent apply→recheck loops in an infinite cycle).
-  - **Note for existing code:** the `Calor0008`/`Calor0009` warnings fire on legacy tab-indented and 4-space-indented files that previously compiled silently. Such files still compile — the warnings carry one-pass fixes (`calor format --heal`, `calor check --apply`, or the attached edits) that re-indent to the canonical 2 spaces per level.
-  - `calor format --heal`: best-effort source-level repair (structural closers, indentation re-derivation, chain-clause re-alignment) for files too broken for the AST formatter. Healing is **not semantics-preserving**: ambiguous re-anchoring decisions are reported per `file:line` (`--check` prints an `ambiguousDecisions` count), and if the healed output still fails to parse the command reports it and exits 1 instead of silently succeeding.
-  - MCP `calor_check` (`diagnose` action): `apply: true` returns `fixedSource`/`fixesApplied`, plus `healed: true` when the source-level healer ran; a healed response's `success`/`errorCount`/`diagnostics` describe the post-heal `fixedSource`.
+- **Source maps (#696).** `CSharpEmitter` emits `#line` directives mapping generated C# back to `.calr` source: downstream Roslyn errors, runtime stack traces, and debugger sessions now report `.calr` file/line instead of stranding agents in generated `.g.cs` files. Opt-out via `CompilationOptions.EmitLineDirectives`.
+- **`calor run` and `calor test` (#697).** One-command execution of any `.calr` file or directory via temp-project materialization: effects enforcement on by default (`--permissive` to relax, now visible as warnings and threaded through cross-module enforcement), `--verify`/`--contract-mode`/`--enforce-effects` pass-through, process timeouts with entire-tree kill, exit-code propagation. Compilation unified in a shared `CompilationDriver` used by run/test and the root compile. The `CompileCalor` MSBuild task gains an `EnforceEffects` parameter and `Sdk.targets` passes `$(CalorEnforceEffects)`.
+- **Structured diagnostics (#698, Phase 1 item 3 part 1).** `--format text|json|sarif` on the root compile and `lint`; a JSON/SARIF document is always emitted in structured mode (including early-exit errors, new Calor1300-band codes); `--verbose` routes status to stderr so stdout stays machine-parseable; lint returns real exit codes; schema documented in docs/cli/structured-output.md.
+- **Write-path robustness (#699, Phase 1 item 5).** Fixable indentation diagnostics (`Calor0008`/`Calor0009`/`Calor0117`, all with machine-applicable one-pass fixes, no-op fixes never emitted); `calor format --heal` source-level repair with ambiguity reporting (not semantics-preserving — decisions surfaced per `file:line`); MCP `calor_check` auto-heal with post-heal diagnostics. Note: `Calor0008`/`Calor0009` warnings now fire on legacy tab/4-space files (fixes attached).
+- **Doc drift detection (#700, Phase 1 item 6 part 1).** `calor self-check docs` machine-verifies agent-facing docs against the implementation: §-keywords vs the lexer, diagnostic codes vs bands, effect codes bidirectionally, hardcoded versions, and fenced `calor` examples parsed with the real parser (Calor1320-band findings; `drift:ignore` suppression convention). Runs in CI. First run found and fixed 30+ drift instances including documented-but-nonexistent keywords (`§INV`→`§IV`, `§FOREACH`→`§EACH`, `§MATCH`→`§W`) and 14 undocumented effect codes.
+- **`calor watch` + CLI incrementality (#701, Phase 1 item 4).** Debounced incremental recompiles with NDJSON structured output; the MSBuild `BuildStateCache` moved into the compiler and shared. Cache trust boundaries hardened after adversarial review: content hashed from the bytes actually compiled (TOCTOU), summary-less cache hits recompile (cross-module effect enforcement survives warm builds), outputs verified by content hash. Plain-compile caching is opt-in via `--cache`; watch caches by default.
+- **Phase 0 agent-native benchmark (#687–#694).** Two-arm live-agent measurement harness (`bench/phase0-agent-native/`), 16 determinism-validated fixture pairs, ~165 published live runs, and the pre-registered gates protocol (docs/plans/agent-native-gates.md). Outcome recorded honestly: the escaped-bugs gate is unmeasurable at authorable-fixture scale at current model capability (strategy §9, Option B); durable finding — Calor pays 2.7x iterations on green-field authoring but reaches full parity on modification tasks.
+
+### Fixed
+- **Obligation fact scoping (#686).** `FactCollector` collected if/while guards function-wide, so contradictory sibling guards made the assumption set UNSAT and vacuously discharged every obligation in the function; facts are now scoped to the source range they dominate, killed on rebinding, and an UNSAT pre-check refuses vacuous discharge.
+- **`NullDereferenceChecker` (#686):** `unwrap_or`/`unwrap_or_default` classification was order-dependent due to an operator-precedence bug.
+- **Calor runtime effect manifests (#687):** `Option`/`Result` combinators are manifest-entered as pure-modulo-arguments and Calor surface types (`?T`, `T!E`) resolve to runtime manifest keys, so combinator calls no longer hit the unknown-call path.
+- **macOS portability (#688):** agent-invocation timeout no longer requires coreutils.
+
+### Changed
+- **Agent-facing docs corrected and drift-guarded:** CLAUDE.md/syntax-reference fixes (closer-form guidance, effect-code table completeness, keyword accuracy) now enforced by the CI spec-drift check.
+- Diagnostic code space extended: 1300–1399 (CLI lint findings and command-level errors), 1320–1328 (doc drift). Calor0700/0701 band collision tracked in #702.
 
 ## [0.6.8] - 2026-07-01
 
