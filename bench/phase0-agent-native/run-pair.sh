@@ -88,6 +88,7 @@ OUT_DIR="$SCRIPT_DIR/epochs/adhoc"
 NULL_AGENT=0
 ITERATION_BUDGET=10
 TIMEOUT_SECS=600
+EXEMPLAR_FILE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -96,12 +97,23 @@ while [[ $# -gt 0 ]]; do
         --runs) RUNS="$2"; shift 2 ;;
         --out) OUT_DIR="$2"; shift 2 ;;
         --null-agent) NULL_AGENT=1; shift ;;
+        --exemplar) EXEMPLAR_FILE="$2"; shift 2 ;;
         *) echo "Unknown arg: $1" >&2; exit 2 ;;
     esac
 done
 
-[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--out <dir>]" >&2; exit 2; }
+[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--exemplar <file>] [--out <dir>]" >&2; exit 2; }
 [[ "$ARM" == "calor" || "$ARM" == "csharp" ]] || { echo "--arm must be calor|csharp" >&2; exit 2; }
+
+# --exemplar <file>: append the file's content to the agent prompt (E1a
+# attribution experiment, machine-zone.md §9). Results for the exemplar arm
+# are labeled "<arm>+exemplar" so they never collide with the baseline arm.
+ARM_LABEL="$ARM"
+if [[ -n "$EXEMPLAR_FILE" ]]; then
+    [[ -s "$EXEMPLAR_FILE" ]] || { echo "--exemplar file missing or empty: $EXEMPLAR_FILE" >&2; exit 2; }
+    EXEMPLAR_FILE="$(cd "$(dirname "$EXEMPLAR_FILE")" && pwd)/$(basename "$EXEMPLAR_FILE")"
+    ARM_LABEL="${ARM}+exemplar"
+fi
 PAIR_DIR="$(cd "$PAIR_DIR" && pwd)"
 PAIR_ID="$(jq -r .id "$PAIR_DIR/pair.json")"
 TIMEOUT_SECS="$(jq -r '.timeoutSeconds // 600' "$PAIR_DIR/pair.json")"
@@ -265,6 +277,9 @@ run_agent() {
     AGENT_RC=0
     local prompt
     prompt="You are working in $ws/src. Read $ws/spec.md and complete the task it describes — implementing missing operations and/or modifying existing behavior as specified — in the existing source files, following the conventions already present. The iteration budget is $ITERATION_BUDGET build/test cycles. Build with 'dotnet build' from $ws/src to check your work. Do not create test files; do not modify the project file. Stop when the spec is fully satisfied and the project builds cleanly (the starter already builds, so a clean build alone does not mean you are done)."
+    if [[ -n "$EXEMPLAR_FILE" ]]; then
+        prompt+=$'\n\n'"$(cat "$EXEMPLAR_FILE")"
+    fi
 
     if [[ $NULL_AGENT -eq 1 ]]; then
         # First build the starter as shipped (observed, through the shim) so
@@ -336,7 +351,7 @@ extract_metrics() {
     fi
 
     jq -n \
-        --arg pair "$PAIR_ID" --arg arm "$ARM" --argjson run "$run_idx" \
+        --arg pair "$PAIR_ID" --arg arm "$ARM_LABEL" --argjson run "$run_idx" \
         --argjson success "$([[ $final_fail -eq 0 ]] && echo true || echo false)" \
         --argjson escaped "$final_fail" --argjson passed "$final_pass" \
         --argjson iterations "$iterations" --argjson itg "$iters_to_green" \
@@ -359,7 +374,7 @@ extract_metrics() {
 write_invalid_result() {
     local ws_out="$1" run_idx="$2"
     jq -n \
-        --arg pair "$PAIR_ID" --arg arm "$ARM" --argjson run "$run_idx" \
+        --arg pair "$PAIR_ID" --arg arm "$ARM_LABEL" --argjson run "$run_idx" \
         --argjson itg "$((ITERATION_BUDGET + 1))" \
         --argjson escaped "$HELDOUT_TEST_COUNT" \
         --argjson null_agent "$NULL_AGENT" \
@@ -381,7 +396,7 @@ wipe_ws_out() {
 # ---------------------------------------------------------------------------
 check_pins
 for (( run=1; run<=RUNS; run++ )); do
-    WS_OUT="$OUT_DIR/$PAIR_ID/$ARM/run-$run"
+    WS_OUT="$OUT_DIR/$PAIR_ID/$ARM_LABEL/run-$run"
     mkdir -p "$WS_OUT"
 
     # Invalid-run re-attempt loop (gates doc §0.2): a detected-invalid run is
