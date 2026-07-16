@@ -242,6 +242,7 @@ public class Program
         rootCommand.AddCommand(FeatureCheckCommand.Create());
         rootCommand.AddCommand(CoverageCommand.Create());
         rootCommand.AddCommand(SelfTestCommand.Create());
+        rootCommand.AddCommand(SelfCheckCommand.Create());
         rootCommand.AddCommand(EvaluationCommand.Create());
         rootCommand.AddCommand(RunCommand.Create());
         rootCommand.AddCommand(TestCommand.Create());

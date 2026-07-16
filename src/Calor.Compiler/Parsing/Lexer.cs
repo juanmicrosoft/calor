@@ -296,6 +296,18 @@ public sealed class Lexer
         ["Pf"] = TokenKind.PrintF,          // §Pf = Console.Write
     };
 
+    /// <summary>
+    /// Every §-keyword the lexer accepts, including forms handled outside the
+    /// keyword dictionary: preprocessor conditionals (§PP / §/PP / §PPE),
+    /// inline C# expressions (§CS), raw passthrough blocks (§RAW / §/RAW),
+    /// and C# interop blocks (§CSHARP / §/CSHARP). Single source of truth for
+    /// the docs-drift check (<c>calor self-check docs</c>).
+    /// </summary>
+    public static IReadOnlyCollection<string> KeywordNames { get; } =
+        Keywords.Keys
+            .Concat(["PP", "/PP", "PPE", "CS", "RAW", "/RAW", "CSHARP", "/CSHARP"])
+            .ToArray();
+
     public Lexer(string source, DiagnosticBag diagnostics)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));

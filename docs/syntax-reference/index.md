@@ -35,14 +35,14 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Ensures | `§S expr` | `§S (>= result 0)` |
 | For Loop | `§L{var:from:to:step}` | `§L{i:1:100:1}` |
 | While Loop | `§WH condition` | `§WH (> i 0)` |
-| Do-While Loop | `§DO` (body indented) | `§DO` then `§WHILE cond` |
+| Do-While Loop | `§DO{id}` (body indented) | `§DO{do1}` then `§/DO{do1} cond` |
 | If/ElseIf/Else | `§IF cond` then `§EI` / `§EL` at same column | `§IF (> x 0)` |
 | Call | `§C{target}...§/C` | `§C{Math.Max} §A 1 §A 2 §/C` |
 | C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |
 | Print | `§P expr` | `§P "Hello"` |
 | Return | `§R expr` | `§R (+ a b)` |
 | Binding | `§B{name} expr` | `§B{x} (+ 1 2)` (see [Bindings](/calor/syntax-reference/binding/)) |
-| Operations | `(op args...)` | `(+ a b)`, `(== x 0)` |
+| Operations | `(op args...)` | `(+ a b)`, `(== x 0)` | <!-- drift:ignore -->
 | Block end | _dedent_ (Python-style) | _(no `§/X` needed)_ |
 | List | `§LIST{id:type}` | `§LIST{nums:i32}` |
 | Dictionary | `§DICT{id:kType:vType}` | `§DICT{ages:str:i32}` |
@@ -55,7 +55,7 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Count | `§CNT{coll}` | `§CNT{nums}` |
 | Dict Foreach | `§EACHKV{id:k:v} dict` | `§EACHKV{e1:k:v} ages` |
 | Enum | `§EN{id:name}` | `§EN{e001:Color}` |
-| Enum Extension | `§EXT{id:enumName}` | `§EXT{ext001:Color}` |
+| Enum Extension | `§EEXT{id:enumName}` | `§EEXT{ext001:Color}` |
 | Switch | `§W{id} expr` | `§W{sw1} score` |
 | Case | `§K pattern → result` | `§K 200 → "OK"` |
 | Wildcard | `§K _` | `§K _ → "default"` |
@@ -142,7 +142,7 @@ to reference the element from external tooling (e.g. `calor navigate`).
       §EL → §P i
 ```
 
-Blocks are delimited by **indentation** (default 2 spaces per nesting
+Blocks are delimited by **indentation** (default 2 spaces per nesting <!-- drift:ignore -->
 level). There are no closer tags — an explicit `§/X` was removed in
 Phase 4d and now raises `Calor0830`. See
 [Structure Tags](/calor/syntax-reference/structure-tags/) for details.

@@ -29,6 +29,20 @@ jobs:
       - name: Run all tests
         run: dotnet test -c Release --no-build --verbosity normal
 
+      # Spec drift (Phase 1 item 6, agent-native strategy): agent-facing docs
+      # are machine-checked against the implementation, reusing this job's
+      # build. Covered files: CLAUDE.md, every docs/syntax-reference/*.md, and
+      # every docs/cli/*.md (plus docs/**/*.md for the version scan). Checks:
+      # documented §-keywords exist in the lexer, cited CalorNNNN codes exist
+      # (and cited bands are non-empty), the effect table in
+      # docs/syntax-reference/effects.md matches the effect registry in both
+      # directions, the Calor13xx table in docs/cli/structured-output.md is
+      # complete, no doc hardcodes the current version, and every fenced
+      # ```calor example declaring a complete program (starts with §M) still
+      # parses with the current compiler.
+      - name: Check agent-facing docs against the implementation (spec drift)
+        run: dotnet run --project src/Calor.Compiler -c Release --no-build -- self-check docs
+
   enforcement-tests:
     runs-on: ubuntu-latest
 

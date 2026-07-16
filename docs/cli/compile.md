@@ -51,7 +51,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--no-cache` | | No | Disable verification result caching |
 | `--clear-cache` | | No | Clear verification cache before compiling |
 | `--contract-mode` | | No | Contract enforcement mode: off, debug, release (default: debug) |
-| `--strict-api` | | No | Require §BREAKING markers for public API changes |
+| `--strict-api` | | No | Require `§BR` breaking-change markers for public API changes |
 | `--require-docs` | | No | Require documentation on public functions |
 | `--enforce-effects` | | No | Enforce effect declarations (default: true) |
 

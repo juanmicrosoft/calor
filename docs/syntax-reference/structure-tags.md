@@ -669,7 +669,7 @@ dedents back to (or past) the parent column.
 2. Tabs and spaces must not be mixed within a block
 3. Chain continuations (`§EI`, `§EL`, `§K`, `§WHEN`, `§CA`, `§FI`)
    sit at the **same** column as their parent (`§IF`, `§W`, `§TR`),
-   not indented inside it
+   not indented inside it <!-- drift:ignore -->
 4. Closer tags were removed in Phase 4d — an explicit `§/X` raises `Calor0830`
 
 ### Example
@@ -849,7 +849,7 @@ Attributes can be attached to:
 
 ## Why Indent-Based Blocks?
 
-1. **Familiar to agents** - LLMs trained on Python have strong priors for indentation
+1. **Familiar to agents** - LLMs trained on Python have strong priors for indentation <!-- drift:ignore -->
 2. **Tag-light** - No `§/X` to type, no mismatched-closer errors
 3. **Refactoring safe** - Stable IDs on openers still survive code movement
 4. **Lower edit cost** - In edit-workload studies, indent form reduced agent token cost by ~16% with no regression in correctness

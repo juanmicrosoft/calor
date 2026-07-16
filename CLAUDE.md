@@ -90,12 +90,13 @@ The only closers you should ever write are `§/C` (call argument lists) and `§/
 §E{codes}                  Effects (§E{} = pure)
 §Q (expr)                  Precondition
 §S (expr)                  Postcondition
-§INV                       Invariant
+§IV (expr)                 Invariant
 ```
 
-Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`):
+Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`; fenced
+` ```calor ` blocks starting with `§M` are parse-checked by `calor self-check docs`):
 
-```
+```calor
 §M{m001:FizzBuzz}
   §F{f001:Main:pub} () -> void
     §E{cw}
@@ -139,7 +140,7 @@ Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`):
 - **VariableSymbol.IsParameter** — distinguishes function parameters from locals; used by analysis passes
 - **BoundCallExpression.Target** is a `string` — `NullDereferenceChecker` checks for `.unwrap` suffix
 - **Option\<T\> and Result\<T,E\>** are valid generic types in Calor's type system
-- **Diagnostic codes** — Calor0001–0099 (lexer), 0100–0199 (parser), 0200–0299 (semantic), 0300–0399 (contracts), 0400–0499 (effects), 0500–0599 (patterns), 0600–0699 (API strictness), 0700–0799 (semantics version), 0800–0899 (ID validation), 0900–0999 (dataflow/bug patterns/taint), 1000–1099 (codegen/interop), 1100–1199 (refinements/obligations), 1200–1299 (experimental), 1300–1399 (CLI: lint findings and command-level errors)
+- **Diagnostic codes** — Calor0001–0099 (lexer), 0100–0199 (parser), 0200–0299 (semantic), 0300–0399 (contracts), 0400–0499 (effects), 0500–0599 (patterns), 0600–0699 (API strictness), 0700–0799 (semantics version + contract verification results), 0800–0899 (ID validation), 0900–0999 (dataflow/bug patterns/taint), 1000–1099 (codegen/interop), 1100–1199 (refinements/obligations), 1200–1299 (experimental), 1300–1399 (CLI: lint findings and command-level errors)
 
 ## Project Layout
 
