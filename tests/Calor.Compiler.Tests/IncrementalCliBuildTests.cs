@@ -232,6 +232,30 @@ public class IncrementalCliBuildTests : IDisposable
     }
 
     [Fact]
+    public void CorruptedOutput_IsNotTrusted_ForcesRecompile()
+    {
+        // Adversarial probe: the warm path used to check only File.Exists(output),
+        // so a corrupted/truncated .g.cs survived as "Up-to-date". The entry now
+        // records the output's content hash; any mismatch is a miss.
+        var (a, b) = WriteIndependentPair();
+        Run([a, b]);
+
+        var aOutput = Path.ChangeExtension(a, ".g.cs");
+        File.WriteAllText(aOutput, "// corrupted by an errant process");
+
+        var warm = Run([a, b]);
+        Assert.Equal([a], warm.CompiledFiles);
+        Assert.Equal([Path.ChangeExtension(b, ".g.cs")], warm.SkippedOutputs);
+        // The recompile restored a real output.
+        Assert.DoesNotContain("corrupted", File.ReadAllText(aOutput));
+
+        // And the restored output is trusted again on the next run.
+        var settled = Run([a, b]);
+        Assert.Empty(settled.CompiledFiles);
+        Assert.Equal(2, settled.SkippedOutputs.Count);
+    }
+
+    [Fact]
     public void FailedFile_IsNotCached_AndRecompilesNextRun()
     {
         var (a, _) = WriteIndependentPair();

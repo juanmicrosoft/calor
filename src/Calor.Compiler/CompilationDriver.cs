@@ -153,8 +153,13 @@ internal static class CompilationDriver
                     && cachedEntry.EffectSummary != null
                     && BuildStateCache.IsFileUpToDate(cachedEntry, file.FullName))
                 {
+                    // The output is only trusted when its content hash matches what
+                    // the producing compile observed: a corrupted, truncated, or
+                    // manually edited .g.cs must be a miss, not "Up-to-date".
                     var outputPath = cache.OutputPathFor(file);
-                    if (File.Exists(outputPath))
+                    if (cachedEntry.OutputContentHash != null
+                        && File.Exists(outputPath)
+                        && BuildStateCache.ComputeFileHash(outputPath) == cachedEntry.OutputContentHash)
                     {
                         newState.Files[relativeKey] = cachedEntry;
                         skipped.Add(file);
@@ -212,10 +217,18 @@ internal static class CompilationDriver
             // diagnostics from warm builds. (Cross-module diagnostics are exempt —
             // they are recomputed from summaries every run, so skipped files still
             // surface them.)
-            if (newState != null && relativeKey != null && result.Diagnostics.Count == 0)
+            if (newState != null && relativeKey != null && cache != null
+                && result.Diagnostics.Count == 0)
             {
                 var entry = BuildStateCache.CreateFileEntry(statBeforeRead, sourceBytes);
                 entry.EffectSummary = summary;
+                // Record what the output actually contains after onCompiled wrote
+                // it; warm builds only skip when the on-disk output still hashes
+                // to this value. No output observed -> entry never skips.
+                var writtenOutputPath = cache.OutputPathFor(file);
+                entry.OutputContentHash = File.Exists(writtenOutputPath)
+                    ? BuildStateCache.ComputeFileHash(writtenOutputPath)
+                    : null;
                 newState.Files[relativeKey] = entry;
             }
         }

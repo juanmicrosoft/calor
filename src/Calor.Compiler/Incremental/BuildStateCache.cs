@@ -38,6 +38,17 @@ internal sealed class BuildFileEntry
     /// Null for entries from older cache versions or files that failed to compile.
     /// </summary>
     public EffectSummary? EffectSummary { get; set; }
+
+    /// <summary>
+    /// Content hash of the generated output (.g.cs) as observed right after the
+    /// compile that produced this entry. A warm build only trusts an output whose
+    /// current hash matches — a corrupted or manually edited output is a cache
+    /// miss, not "Up-to-date". Null (older caches, or the output was never
+    /// observed) is also a miss. Populated by the CLI driver; the MSBuild task
+    /// does not populate it yet and still trusts bare output existence
+    /// (known limitation — follow-up).
+    /// </summary>
+    public string? OutputContentHash { get; set; }
 }
 
 internal static class BuildStateCache
