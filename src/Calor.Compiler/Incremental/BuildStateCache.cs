@@ -264,6 +264,40 @@ internal static class BuildStateCache
         };
     }
 
+    /// <summary>
+    /// File metadata snapshot taken eagerly (unlike <see cref="FileInfo"/>, whose
+    /// stat is lazy and would otherwise happen after the source read).
+    /// </summary>
+    public readonly record struct FileStat(DateTime LastWriteTimeUtc, long Length);
+
+    /// <summary>Stats <paramref name="filePath"/> now and returns the snapshot.</summary>
+    public static FileStat StatFile(string filePath)
+    {
+        var info = new FileInfo(filePath);
+        return new FileStat(info.LastWriteTimeUtc, info.Length);
+    }
+
+    /// <summary>
+    /// Builds a cache entry from the exact bytes that were compiled, plus a stat
+    /// snapshot taken <em>before</em> those bytes were read. Re-reading the file
+    /// here (as <see cref="CreateFileEntry(string)"/> does) races with concurrent
+    /// editors: an edit landing mid-compile would be hashed as if it had been
+    /// compiled, so the next run would skip it and the new content would never
+    /// be compiled. Stat-before-read matters for the same reason — a stale
+    /// (mtime,size) fails the level-1 gate and falls through to the content hash,
+    /// whereas a too-new (mtime,size) paired with an old hash could level-1-skip
+    /// content that was never compiled.
+    /// </summary>
+    public static BuildFileEntry CreateFileEntry(FileStat statBeforeRead, byte[] compiledContent)
+    {
+        return new BuildFileEntry
+        {
+            ContentHash = Convert.ToHexStringLower(SHA256.HashData(compiledContent)),
+            LastModified = statBeforeRead.LastWriteTimeUtc,
+            FileSize = statBeforeRead.Length
+        };
+    }
+
     public static string NormalizeRelativePath(string relativePath)
     {
         // Replace backslashes with forward slashes for consistent keys across platforms

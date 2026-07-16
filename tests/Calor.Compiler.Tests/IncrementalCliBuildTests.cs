@@ -59,7 +59,9 @@ public class IncrementalCliBuildTests : IDisposable
         List<string> SkippedOutputs,
         DiagnosticBag Diagnostics);
 
-    private RunOutcome Run(string[] files, string optionsToken = "opts", bool clearFirst = false)
+    private RunOutcome Run(
+        string[] files, string optionsToken = "opts", bool clearFirst = false,
+        Action<FileInfo>? afterCompile = null)
     {
         var sources = files.Select(f => new FileInfo(f)).ToList();
         var compiled = new List<string>();
@@ -75,6 +77,7 @@ public class IncrementalCliBuildTests : IDisposable
             {
                 compiled.Add(file.FullName);
                 File.WriteAllText(Path.ChangeExtension(file.FullName, ".g.cs"), compileResult.GeneratedCode);
+                afterCompile?.Invoke(file);
             },
             diagnosticSink: sink,
             cache: new CompilationDriver.DriverCacheSettings(
@@ -124,6 +127,42 @@ public class IncrementalCliBuildTests : IDisposable
         var warm = Run([a, b]);
         Assert.Equal([a], warm.CompiledFiles);
         Assert.Equal([Path.ChangeExtension(b, ".g.cs")], warm.SkippedOutputs);
+    }
+
+    [Fact]
+    public void MidCompileEdit_IsNotRecordedAsCompiled_NextRunRecompiles()
+    {
+        // Adversarial TOCTOU probe: an editor save landing mid-compile (here: from
+        // the onCompiled callback, i.e. after the source was read but before the
+        // cache entry is recorded) must not poison the cache. The entry has to hash
+        // the bytes that were actually compiled — if it re-read the file, the next
+        // run would skip and the edited content would never be compiled.
+        var (a, b) = WriteIndependentPair();
+        var edited = """
+            §M{m001:Alpha}
+              §F{f001:Greet:pub} () -> void
+                §E{cw}
+                §P "edited mid-compile"
+            """;
+
+        var cold = Run([a, b], afterCompile: file =>
+        {
+            if (file.FullName == a)
+            {
+                File.WriteAllText(a, edited);
+            }
+        });
+        Assert.Equal(2, cold.CompiledFiles.Count);
+
+        // The mid-compile edit was never compiled, so the next run must recompile it.
+        var warm = Run([a, b]);
+        Assert.Equal([a], warm.CompiledFiles);
+        Assert.Contains("edited mid-compile", File.ReadAllText(Path.ChangeExtension(a, ".g.cs")));
+
+        // And once the edited content has genuinely been compiled, it caches normally.
+        var settled = Run([a, b]);
+        Assert.Empty(settled.CompiledFiles);
+        Assert.Equal(2, settled.SkippedOutputs.Count);
     }
 
     [Fact]

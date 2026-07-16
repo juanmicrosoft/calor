@@ -169,7 +169,13 @@ internal static class CompilationDriver
                 (options.StatusWriter ?? Console.Out).WriteLine($"Compiling: {file.FullName}");
             }
 
-            var source = File.ReadAllText(file.FullName);
+            // Stat first, then read the bytes that are actually compiled. The cache
+            // entry is built from these exact bytes (never re-read from disk): a
+            // concurrent edit landing mid-compile must not be recorded as compiled,
+            // or the next run would skip it and the new content would never build.
+            var statBeforeRead = BuildStateCache.StatFile(file.FullName);
+            var sourceBytes = File.ReadAllBytes(file.FullName);
+            var source = DecodeSource(sourceBytes);
             var result = Program.Compile(source, file.FullName, options);
 
             if (diagnosticSink != null)
@@ -206,7 +212,7 @@ internal static class CompilationDriver
             // surface them.)
             if (newState != null && relativeKey != null && result.Diagnostics.Count == 0)
             {
-                var entry = BuildStateCache.CreateFileEntry(file.FullName);
+                var entry = BuildStateCache.CreateFileEntry(statBeforeRead, sourceBytes);
                 entry.EffectSummary = summary;
                 newState.Files[relativeKey] = entry;
             }
@@ -258,6 +264,17 @@ internal static class CompilationDriver
         }
 
         return new DriverResult(compiled, anyErrors, skipped);
+    }
+
+    /// <summary>
+    /// Decodes source bytes with the same semantics as <see cref="File.ReadAllText(string)"/>
+    /// (UTF-8 default, BOM detection) so the compiled text matches what a plain
+    /// read would have produced while the cache hashes the raw bytes.
+    /// </summary>
+    private static string DecodeSource(byte[] bytes)
+    {
+        using var reader = new StreamReader(new MemoryStream(bytes), detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 
     /// <summary>
