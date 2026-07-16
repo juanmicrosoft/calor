@@ -31,8 +31,8 @@ public static class SelfCheckCommand
         var formatOption = new Option<string>(
             aliases: ["--format"],
             getDefaultValue: () => "text",
-            description: "Output format: text (human-readable, stderr) or json (structured document on stdout)");
-        formatOption.FromAmong("text", "json");
+            description: "Output format: text (human-readable, stderr), json (unified schema on stdout), or sarif (SARIF 2.1.0 on stdout)");
+        formatOption.FromAmong("text", "json", "sarif");
 
         var docsCommand = new Command("docs",
             "Check agent-facing docs against the compiler implementation. " +
@@ -74,10 +74,11 @@ public static class SelfCheckCommand
         var inputs = DocDriftChecker.LoadFromRepository(resolvedRoot, diagnostics);
         diagnostics.AddRange(DocDriftChecker.Check(inputs));
 
-        if (format.Equals("json", StringComparison.OrdinalIgnoreCase))
+        if (format.Equals("json", StringComparison.OrdinalIgnoreCase) ||
+            format.Equals("sarif", StringComparison.OrdinalIgnoreCase))
         {
             // Structured-output contract: exactly one parseable document on stdout.
-            Console.WriteLine(new JsonDiagnosticFormatter().Format(diagnostics));
+            Console.WriteLine(DiagnosticFormatterFactory.Create(format).Format(diagnostics));
         }
         else
         {
