@@ -278,6 +278,42 @@ public class IncrementalCliBuildTests : IDisposable
     }
 
     [Fact]
+    public void EntryWithoutEffectSummary_IsNotACacheHit_SoViolationsStillSurface()
+    {
+        // Adversarial probe: a cached entry whose effect summary is missing (older
+        // cache, corruption, manual edit) must not be skipped — skipping would drop
+        // the module from cross-module enforcement and Calor0410 would silently
+        // disappear on warm builds. Rule: no summary, no hit.
+        var callee = WriteSource("callee2.calr", """
+            §M{m001:OrderService}
+              §F{f001:SaveOrder:pub} () -> void
+                §E{db:w}
+            """);
+        var caller = WriteSource("caller2.calr", """
+            §M{m002:App}
+              §F{f001:Main:pub} () -> void
+                §E{}
+                §C{OrderService.SaveOrder} §/C
+            """);
+
+        var cold = Run([callee, caller]);
+        Assert.True(cold.Result.AnyErrors);
+
+        // Null out the callee's persisted summary, simulating a degraded state file.
+        var state = BuildStateCache.Load(_tempDir);
+        Assert.NotNull(state);
+        state!.Files["callee2.calr"].EffectSummary = null;
+        BuildStateCache.Save(state, _tempDir);
+
+        var warm = Run([callee, caller]);
+        // The degraded entry is recompiled, not skipped...
+        Assert.Contains(callee, warm.CompiledFiles);
+        // ...and the cross-module violation still fails the warm build.
+        Assert.True(warm.Result.AnyErrors);
+        Assert.Contains(warm.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Fact]
     public void FileWithNonErrorDiagnostics_IsNeverSkipped_SoTheyReappearOnWarmRuns()
     {
         // The pilot-hello-world experimental flag deterministically emits one Info

@@ -146,6 +146,11 @@ internal static class CompilationDriver
 
                 if (priorFiles != null
                     && priorFiles.TryGetValue(relativeKey, out var cachedEntry)
+                    // A cache hit without an effect summary is NOT a hit: skipping
+                    // would silently drop this module from cross-module effect
+                    // enforcement (its Calor0410 violations would vanish on warm
+                    // builds). Recompile to rebuild the summary.
+                    && cachedEntry.EffectSummary != null
                     && BuildStateCache.IsFileUpToDate(cachedEntry, file.FullName))
                 {
                     var outputPath = cache.OutputPathFor(file);
@@ -153,10 +158,7 @@ internal static class CompilationDriver
                     {
                         newState.Files[relativeKey] = cachedEntry;
                         skipped.Add(file);
-                        if (cachedEntry.EffectSummary != null)
-                        {
-                            moduleSummaries.Add((cachedEntry.EffectSummary, file.FullName));
-                        }
+                        moduleSummaries.Add((cachedEntry.EffectSummary, file.FullName));
                         onSkipped?.Invoke(file, outputPath);
                         continue;
                     }
