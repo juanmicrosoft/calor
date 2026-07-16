@@ -1,0 +1,514 @@
+2026-07-16T17:43:30Z E1a driver starting (pid 91790)
+2026-07-16T17:43:30Z BLOCK START pair=N1-003-csv-row arm=csharp runs=30
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5256,
+    "output": 3266
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5252,
+    "output": 2067
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 3,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5090,
+    "output": 3111
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 4,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5090,
+    "output": 2492
+  },
+  "nullAgent": false
+}
+INVALID run detected (pair=N1-003-csv-row arm=csharp run=5 attempt=0): agent output matches error marker: "api error"
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 5,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5252,
+    "output": 2083
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 6,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5254,
+    "output": 3340
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 7,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5252,
+    "output": 2116
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 8,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5387,
+    "output": 3447
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 9,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5223,
+    "output": 3371
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 10,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5241,
+    "output": 2809
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 11,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5256,
+    "output": 3188
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 12,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5092,
+    "output": 2720
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 13,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5254,
+    "output": 2422
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 14,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5088,
+    "output": 2315
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 15,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5003,
+    "output": 1942
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 16,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5090,
+    "output": 2122
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 17,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5387,
+    "output": 3283
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 18,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5252,
+    "output": 2063
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 19,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5088,
+    "output": 2164
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 20,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5094,
+    "output": 3017
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 21,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5140,
+    "output": 3794
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 22,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 745,
+    "output": 3280
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 23,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5256,
+    "output": 3746
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 24,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5088,
+    "output": 2206
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 25,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5094,
+    "output": 3335
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 26,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5252,
+    "output": 2196
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 27,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5250,
+    "output": 2073
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 28,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5090,
+    "output": 2349
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 29,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5096,
+    "output": 3345
+  },
+  "nullAgent": false
+}
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 30,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5088,
+    "output": 1867
+  },
+  "nullAgent": false
+}
+2026-07-16T18:23:49Z BLOCK DONE pair=N1-003-csv-row arm=csharp

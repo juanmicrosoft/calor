@@ -1,0 +1,17 @@
+{
+  "pair": "N1-003-csv-row",
+  "arm": "csharp",
+  "run": 17,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5387,
+    "output": 3283
+  },
+  "nullAgent": false
+}
