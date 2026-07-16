@@ -42,8 +42,8 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Print | `§P expr` | `§P "Hello"` |
 | Return | `§R expr` | `§R (+ a b)` |
 | Binding | `§B{name} expr` | `§B{x} (+ 1 2)` (see [Bindings](/calor/syntax-reference/binding/)) |
-| Operations | `(op args...)` | `(+ a b)`, `(== x 0)` |
-| Block end | _dedent_ (Python-style) | _(no closer tag needed)_ |
+| Operations | `(op args...)` | `(+ a b)`, `(== x 0)` | <!-- drift:ignore -->
+| Block end | _dedent_ (Python-style) | _(no `§/X` needed)_ |
 | List | `§LIST{id:type}` | `§LIST{nums:i32}` |
 | Dictionary | `§DICT{id:kType:vType}` | `§DICT{ages:str:i32}` |
 | HashSet | `§HSET{id:type}` | `§HSET{tags:str}` |
@@ -142,9 +142,9 @@ to reference the element from external tooling (e.g. `calor navigate`).
       §EL → §P i
 ```
 
-Blocks are delimited by **indentation** (default 2 spaces per nesting
-level). There are no structural closer tags — explicit closers were
-removed in Phase 4d and now raise `Calor0830`. See
+Blocks are delimited by **indentation** (default 2 spaces per nesting <!-- drift:ignore -->
+level). There are no closer tags — an explicit `§/X` was removed in
+Phase 4d and now raises `Calor0830`. See
 [Structure Tags](/calor/syntax-reference/structure-tags/) for details.
 
 The compiler diagnoses non-canonical indentation, and each of these

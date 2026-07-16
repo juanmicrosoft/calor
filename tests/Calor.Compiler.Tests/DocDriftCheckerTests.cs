@@ -210,6 +210,74 @@ public class DocDriftCheckerTests
         Assert.Empty(findings);
     }
 
+    // --- Meta-notation escapes: foreign fences and the suppression marker ---
+
+    [Fact]
+    public void FencedBlocksWithForeignInfoStringAreNotScanned()
+    {
+        var doc = new DocFile("fake.md",
+            "Prose.\n\n```text\n§FOREACH is hypothetical here.\n```\n\n" +
+            "```csharp\n// mentions Calor9876 in C# code\nvar s = \"§BOGUS\";\n```\n");
+        var findings = DocDriftChecker.Check(BaseInputs(keywordDocs: [doc], diagnosticCodeDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void BareAndCalorFencesAreStillScanned()
+    {
+        var doc = new DocFile("fake.md",
+            "```\n§FOREACH{x} items\n```\n\n```calor\n§FOREACH{y} items\n```\n");
+        var findings = DocDriftChecker.Check(BaseInputs(keywordDocs: [doc]));
+
+        Assert.Equal(2, findings.Count);
+        Assert.All(findings, f => Assert.Equal(DiagnosticCode.DocDriftUnknownKeyword, f.Code));
+        Assert.Equal(new[] { 2, 6 }, findings.Select(f => f.Span.Line).OrderBy(l => l).ToArray());
+    }
+
+    [Fact]
+    public void SuppressionMarkerCoversTheNextLineOnly()
+    {
+        var doc = new DocFile("fake.md",
+            "<!-- drift:ignore -->\nAn explicit `§/X` raises an error.\nBut `§/Y` here is drift.\n");
+        var findings = DocDriftChecker.Check(BaseInputs(keywordDocs: [doc]));
+
+        var finding = Assert.Single(findings);
+        Assert.Contains("§/Y", finding.Message);
+        Assert.Equal(3, finding.Span.Line);
+    }
+
+    [Fact]
+    public void SuppressionMarkerMayTrailThePrecedingLine()
+    {
+        var doc = new DocFile("fake.md",
+            "| Ops | `(+ a b)` | <!-- drift:ignore -->\n| Block end | _(no `§/X` needed)_ |\n");
+        var findings = DocDriftChecker.Check(BaseInputs(keywordDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void SuppressionMarkerAppliesToDiagnosticCodeAndVersionScans()
+    {
+        var doc = new DocFile("fake.md",
+            "<!-- drift:ignore -->\nA hypothetical `Calor9876` code.\n" +
+            "<!-- drift:ignore -->\nHistoric example: version 0.9.9 shipped it.\n");
+        var findings = DocDriftChecker.Check(BaseInputs(diagnosticCodeDocs: [doc], versionScanDocs: [doc]));
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void UnknownKeywordMessageMentionsTheSuppressionMarker()
+    {
+        var doc = new DocFile("fake.md", "Use `§BOGUS` here.");
+        var findings = DocDriftChecker.Check(BaseInputs(keywordDocs: [doc]));
+
+        var finding = Assert.Single(findings);
+        Assert.Contains(DocDriftChecker.SuppressionMarker, finding.Message);
+    }
+
     // --- Hardcoded version (the stale-0.3.5 class) ---
 
     [Fact]

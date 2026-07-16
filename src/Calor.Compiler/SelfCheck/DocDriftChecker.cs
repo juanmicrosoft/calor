@@ -91,6 +91,14 @@ public static class DocDriftChecker
         @"^\|\s*`(?<code>Calor\d{4})`\s*\|", RegexOptions.Compiled);
 
     /// <summary>
+    /// Inline suppression marker (meta-notation escape). A line containing
+    /// this marker suppresses all drift findings on the <em>next</em> line —
+    /// use it for intentional placeholders like <c>§/X</c> or hypothetical
+    /// diagnostic codes. See docs/cli/self-check.md.
+    /// </summary>
+    public const string SuppressionMarker = "<!-- drift:ignore -->";
+
+    /// <summary>
     /// Runs every drift check and returns the findings (empty list = no drift).
     /// </summary>
     public static List<Diagnostic> Check(DocDriftInputs inputs)
@@ -192,20 +200,26 @@ public static class DocDriftChecker
         DocFile doc, IReadOnlyCollection<string> keywords, List<Diagnostic> diagnostics)
     {
         var keywordSet = keywords as ISet<string> ?? new HashSet<string>(keywords, StringComparer.Ordinal);
-        ForEachLine(doc, (line, lineNumber) =>
+        foreach (var line in ClassifyLines(doc))
         {
-            foreach (Match match in KeywordRef.Matches(line))
+            if (line.InForeignFence || line.Suppressed)
+            {
+                continue;
+            }
+
+            foreach (Match match in KeywordRef.Matches(line.Text))
             {
                 var name = match.Groups[1].Value;
                 if (!keywordSet.Contains(name))
                 {
                     diagnostics.Add(Drift(
                         DiagnosticCode.DocDriftUnknownKeyword,
-                        $"Documented keyword '§{name}' does not exist in the lexer's keyword table",
-                        doc.Path, lineNumber, match.Index + 1));
+                        $"Documented keyword '§{name}' does not exist in the lexer's keyword table " +
+                        $"(if this is intentional meta-notation, put '{SuppressionMarker}' on the preceding line)",
+                        doc.Path, line.Number, match.Index + 1));
                 }
             }
-        });
+        }
     }
 
     private static void CheckDiagnosticCodes(
@@ -216,11 +230,16 @@ public static class DocDriftChecker
             .Select(c => int.Parse(c["Calor".Length..]))
             .ToArray();
 
-        ForEachLine(doc, (line, lineNumber) =>
+        foreach (var line in ClassifyLines(doc))
         {
+            if (line.InForeignFence || line.Suppressed)
+            {
+                continue;
+            }
+
             // Band citations first: "Calor0800–0899", "Calor1300-Calor1399".
             var rangeSpans = new List<(int Start, int End)>();
-            foreach (Match range in CodeRange.Matches(line))
+            foreach (Match range in CodeRange.Matches(line.Text))
             {
                 rangeSpans.Add((range.Index, range.Index + range.Length));
                 var lo = int.Parse(range.Groups["lo"].Value);
@@ -230,12 +249,12 @@ public static class DocDriftChecker
                     diagnostics.Add(Drift(
                         DiagnosticCode.DocDriftEmptyDiagnosticRange,
                         $"Documented diagnostic band Calor{lo:D4}-Calor{hi:D4} contains no implemented diagnostic codes",
-                        doc.Path, lineNumber, range.Index + 1));
+                        doc.Path, line.Number, range.Index + 1));
                 }
             }
 
             // Standalone citations (not part of a band citation) must exist exactly.
-            foreach (Match match in CodeRef.Matches(line))
+            foreach (Match match in CodeRef.Matches(line.Text))
             {
                 if (rangeSpans.Any(s => match.Index >= s.Start && match.Index < s.End))
                 {
@@ -246,11 +265,12 @@ public static class DocDriftChecker
                 {
                     diagnostics.Add(Drift(
                         DiagnosticCode.DocDriftUnknownDiagnosticCode,
-                        $"Documented diagnostic code '{match.Value}' is not defined in DiagnosticCode",
-                        doc.Path, lineNumber, match.Index + 1));
+                        $"Documented diagnostic code '{match.Value}' is not defined in DiagnosticCode " +
+                        $"(if this is intentional meta-notation, put '{SuppressionMarker}' on the preceding line)",
+                        doc.Path, line.Number, match.Index + 1));
                 }
             }
-        });
+        }
     }
 
     private static void CheckEffectCodes(
@@ -270,10 +290,10 @@ public static class DocDriftChecker
         }
 
         var documented = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (code, lineNumber, column) in rows)
+        foreach (var (code, lineNumber, column, suppressed) in rows)
         {
             documented.Add(code);
-            if (!known.Contains(code))
+            if (!known.Contains(code) && !suppressed)
             {
                 diagnostics.Add(Drift(
                     DiagnosticCode.DocDriftUnknownEffectCode,
@@ -348,22 +368,30 @@ public static class DocDriftChecker
             return;
         }
 
+        // The version scan deliberately looks inside all fenced blocks (a
+        // hardcoded version in an install snippet is exactly the drift it
+        // exists to catch); only the suppression marker exempts a line.
         var pattern = new Regex($@"(?<![0-9.]){Regex.Escape(version)}(?![0-9.])");
-        ForEachLine(doc, (line, lineNumber) =>
+        foreach (var line in ClassifyLines(doc))
         {
-            foreach (Match match in pattern.Matches(line))
+            if (line.Suppressed)
+            {
+                continue;
+            }
+
+            foreach (Match match in pattern.Matches(line.Text))
             {
                 diagnostics.Add(Drift(
                     DiagnosticCode.DocDriftHardcodedVersion,
                     $"Doc hardcodes the current compiler version '{version}'; version is single-sourced in Directory.Build.props",
-                    doc.Path, lineNumber, match.Index + 1));
+                    doc.Path, line.Number, match.Index + 1));
             }
-        });
+        }
     }
 
-    private static (List<(string Code, int Line, int Column)> Rows, int SectionLine) FindEffectTableRows(DocFile doc)
+    private static (List<(string Code, int Line, int Column, bool Suppressed)> Rows, int SectionLine) FindEffectTableRows(DocFile doc)
     {
-        var rows = new List<(string, int, int)>();
+        var rows = new List<(string, int, int, bool)>();
         var sectionLine = 0;
         var inSection = false;
 
@@ -389,7 +417,8 @@ public static class DocDriftChecker
                 var match = EffectTableRow.Match(line);
                 if (match.Success)
                 {
-                    rows.Add((match.Groups["code"].Value, i + 1, match.Groups["code"].Index + 1));
+                    var suppressed = i > 0 && lines[i - 1].Contains(SuppressionMarker, StringComparison.Ordinal);
+                    rows.Add((match.Groups["code"].Value, i + 1, match.Groups["code"].Index + 1, suppressed));
                 }
             }
         }
@@ -404,6 +433,46 @@ public static class DocDriftChecker
         {
             action(lines[i], i + 1);
         }
+    }
+
+    /// <summary>
+    /// One markdown line with its scan classification: whether keyword /
+    /// diagnostic-code scanning applies (false inside fenced code blocks whose
+    /// info string is something other than <c>calor</c>, e.g. ```csharp or
+    /// ```text — bare ``` fences and ```calor fences are scanned), and whether
+    /// the preceding line carried the <see cref="SuppressionMarker"/>.
+    /// </summary>
+    private sealed record ScannedLine(string Text, int Number, bool InForeignFence, bool Suppressed);
+
+    private static List<ScannedLine> ClassifyLines(DocFile doc)
+    {
+        var lines = doc.Content.Split('\n');
+        var result = new List<ScannedLine>(lines.Length);
+        string? fenceInfo = null; // non-null while inside a fenced code block
+        var previousHadMarker = false;
+
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            var trimmed = line.TrimEnd('\r').TrimStart();
+            var isFenceDelimiter = trimmed.StartsWith("```", StringComparison.Ordinal);
+            var inForeignFence = fenceInfo is not (null or "" or "calor");
+
+            if (isFenceDelimiter)
+            {
+                fenceInfo = fenceInfo == null
+                    ? trimmed[3..].Trim()   // opening fence: capture the info string
+                    : null;                 // closing fence
+                // The opening delimiter line itself is skipped for foreign
+                // fences (its info string is not Calor syntax either way).
+                inForeignFence = inForeignFence || fenceInfo is not (null or "" or "calor");
+            }
+
+            result.Add(new ScannedLine(line, i + 1, inForeignFence, previousHadMarker));
+            previousHadMarker = line.Contains(SuppressionMarker, StringComparison.Ordinal);
+        }
+
+        return result;
     }
 
     private static Diagnostic Drift(string code, string message, string path, int line, int column)
