@@ -188,3 +188,9 @@ Panel credit recorded: accept-dialects-store-canonical judged "the correct hedge
 8. **Self-certification acknowledged:** the review loop's scores are self-assessed; independent review is now the standard for any 'loop closed' claim on this document line.
 9. **Blast radius corrected:** source-tree .calr count is **506** (the 1,267 figure counted bin/obj build outputs — the exact unchecked-number drift class self-check docs exists to catch; noted with due irony).
 10. **Smaller:** machine-zone comment staleness downgraded from CI failure to compiler-fixed-on-write (no human ceremony in the unwatched zone); packet-rendered helper contracts COUNT as body-reads (the peephole is closed; they are machine-zone content); public-promotion of a helper requires spec-surface re-authorship + attestation (zone transitions are events).
+
+## 13. E1a verdict (2026-07-17) — H1 KILLED; binding descope
+
+180 runs, n=30/cell, pre-registered baseline-relative rule (§12.4), transcripts archived (`epochs/e1a-attribution/`, PR #706). Pooled: R_base 2.38 (effect reproduced concurrently), exemplar reduction of excess **55%** ≥ 30% kill line; W3-003 collapsed to **1.00 — full parity** from a 60-line syntax exemplar. Robustness: the exemplar itself contained a `[str]` error biasing *against* the kill (29/30 N1 runs copied it); H1 died anyway.
+
+**Binding consequences (§12.2c applied):** M2 (structured editing) and M1's canonicalizer-as-write-path are **descoped**. The document's remaining scope is the spec-surface/evidence line (M0, packet, dogfood) plus identity/keying work only as the evidence layer requires it. The green-field tax is missing in-context syntax knowledge; the remedy is a correct, parse-checked, drift-guarded exemplar shipped in every agent-facing surface (init templates, CLAUDE.md, MCP prompt) — exemplars are load-bearing infrastructure and get `self-check` treatment.

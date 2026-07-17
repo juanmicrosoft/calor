@@ -33,7 +33,7 @@ Expressions are prefix s-expressions: `(+ a b)`, `(== a b)`, `(&& p q)`, `(! p)`
 
 ```
 §C{Obj.Method} §A arg1 §A arg2 §/C     each arg prefixed §A, closed with §/C
-§B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+§B{lines:List<str>  <!-- NOT [str]: the E1a-measured bug; list types emit List<T> -->} §C{File.ReadAllLines} §A path §/C
 §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
 §B{ok:bool} §C{File.Exists} §A path §/C
 §B{n:i32} §C{LocalFunc} §A x §/C       user functions are called the same way
