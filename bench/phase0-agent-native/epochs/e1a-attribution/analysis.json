@@ -1,0 +1,58 @@
+{
+  "perPair": [
+    {
+      "pair": "N1-003-csv-row",
+      "csharp": {
+        "n": 30,
+        "mean": 1
+      },
+      "calor": {
+        "n": 30,
+        "mean": 2.5
+      },
+      "exemplar": {
+        "n": 30,
+        "mean": 2.2333333333333334
+      },
+      "R_base": 2.5,
+      "R_ex": 2.2333333333333334,
+      "reductionFraction": 0.17777777777777773
+    },
+    {
+      "pair": "W3-003-kv-journal",
+      "csharp": {
+        "n": 30,
+        "mean": 1
+      },
+      "calor": {
+        "n": 30,
+        "mean": 2.2666666666666666
+      },
+      "exemplar": {
+        "n": 30,
+        "mean": 1
+      },
+      "R_base": 2.2666666666666666,
+      "R_ex": 1,
+      "reductionFraction": 1
+    }
+  ],
+  "pooled": {
+    "csharp": {
+      "n": 60,
+      "mean": 1
+    },
+    "calor": {
+      "n": 60,
+      "mean": 2.3833333333333333
+    },
+    "exemplar": {
+      "n": 60,
+      "mean": 1.6166666666666667
+    },
+    "R_base": 2.3833333333333333,
+    "R_ex": 1.6166666666666667,
+    "reductionFraction": 0.5542168674698795
+  },
+  "verdict": "H1 KILLED (exemplar reduced the ratio by >= 30%)"
+}

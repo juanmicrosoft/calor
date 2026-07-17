@@ -1,0 +1,60 @@
+[
+  {
+    "pair": "N1-003-csv-row",
+    "arms": [
+      {
+        "arm": "calor",
+        "n": 30,
+        "meanItg": 2.5,
+        "censored": 1,
+        "invalid": 1,
+        "successRate": 0.9666666666666667
+      },
+      {
+        "arm": "calor+exemplar",
+        "n": 30,
+        "meanItg": 2.2333333333333334,
+        "censored": 0,
+        "invalid": 0,
+        "successRate": 1
+      },
+      {
+        "arm": "csharp",
+        "n": 30,
+        "meanItg": 1,
+        "censored": 0,
+        "invalid": 0,
+        "successRate": 1
+      }
+    ]
+  },
+  {
+    "pair": "W3-003-kv-journal",
+    "arms": [
+      {
+        "arm": "calor",
+        "n": 30,
+        "meanItg": 2.2666666666666666,
+        "censored": 0,
+        "invalid": 0,
+        "successRate": 1
+      },
+      {
+        "arm": "calor+exemplar",
+        "n": 30,
+        "meanItg": 1,
+        "censored": 0,
+        "invalid": 0,
+        "successRate": 1
+      },
+      {
+        "arm": "csharp",
+        "n": 30,
+        "meanItg": 1,
+        "censored": 0,
+        "invalid": 0,
+        "successRate": 1
+      }
+    ]
+  }
+]
