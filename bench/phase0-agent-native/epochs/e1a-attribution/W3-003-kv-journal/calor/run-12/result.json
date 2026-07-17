@@ -1,0 +1,17 @@
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor",
+  "run": 12,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 5124,
+    "output": 22789
+  },
+  "nullAgent": false
+}
