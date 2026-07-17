@@ -1,0 +1,17 @@
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor+exemplar",
+  "run": 17,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4832,
+    "output": 11360
+  },
+  "nullAgent": false
+}
