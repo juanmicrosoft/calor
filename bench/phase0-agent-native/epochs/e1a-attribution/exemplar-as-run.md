@@ -1,7 +1,6 @@
 # Calor syntax exemplar (reference sheet)
 
 Calor is an indentation-only DSL (2 spaces per level, Python-style) that compiles
-<!-- drift:ignore -->
 to C#. **Never write structural closer tags** (`§/M`, `§/F`, `§/IF`, `§/WH`,
 `§/EACH`, ... are hard errors); blocks end by dedent. The only closers ever
 written are `§/C` (call arg lists), `§/LAM` (block lambdas), `§/NEW`, and
@@ -67,5 +66,3 @@ Expressions are prefix s-expressions: `(+ a b)`, `(== a b)`, `(&& p q)`, `(! p)`
 A function whose body mutates a collection (`§PUSH`, `§PUT`, `§SETIDX`) must
 declare `mut` in `§E{...}`; file reads/writes need `fs:r` / `fs:w` / `fs:rw`.
 Callers must declare (at least) the union of their callees' effects.
-
-**Arrays vs lists (E1a-measured trap):** `File.ReadAllLines` returns an ARRAY — bind it as `[str]`. Do NOT copy `[str]` into signatures that require `List<str>`; match the type the surrounding surface declares.

@@ -166,10 +166,13 @@ public static class DocDriftChecker
 
         var syntaxDocs = LoadDocsInDirectory(root, Path.Combine("docs", "syntax-reference"), loadErrors);
         var cliDocs = LoadDocsInDirectory(root, Path.Combine("docs", "cli"), loadErrors);
+        // Exemplar sheets are load-bearing agent infrastructure (E1a: agents
+        // copy their lines verbatim) and get full drift treatment.
+        var exemplarDoc = LoadDoc(root, Path.Combine("bench", "phase0-agent-native", "exemplar.md"), loadErrors);
 
         // The scanned set for the keyword and diagnostic-code checks:
         // CLAUDE.md + every docs/syntax-reference/*.md + every docs/cli/*.md.
-        var scannedDocs = NonNull(claudeMd).Concat(syntaxDocs).Concat(cliDocs).ToList();
+        var scannedDocs = NonNull(claudeMd).Concat(syntaxDocs).Concat(cliDocs).Concat(NonNull(exemplarDoc)).ToList();
 
         // Version scan covers all agent-facing docs. Dated planning/experiment
         // records legitimately cite historical versions and are excluded.
