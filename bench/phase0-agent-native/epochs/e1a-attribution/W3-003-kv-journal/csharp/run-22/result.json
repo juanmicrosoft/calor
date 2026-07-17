@@ -1,0 +1,17 @@
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "csharp",
+  "run": 22,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4541,
+    "output": 1802
+  },
+  "nullAgent": false
+}

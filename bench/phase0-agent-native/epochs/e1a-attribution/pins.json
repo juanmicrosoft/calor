@@ -1,0 +1,23 @@
+{
+  "experiment": "E1a attribution (machine-zone.md §1/§9 item E1a, §12.4 re-registration)",
+  "compilerCommit": "0f205e05d2e8d23d5b712a81dee99e8eb9266e63",
+  "suiteDirtyFiles": 0,
+  "agentVersion": "2.1.204 (Claude Code)",
+  "modelPin": "default",
+  "startedAt": "2026-07-16T17:38:30Z",
+  "mode": "live",
+  "pairs": [
+    "N1-003-csv-row",
+    "W3-003-kv-journal"
+  ],
+  "arms": [
+    "csharp",
+    "calor",
+    "calor+exemplar"
+  ],
+  "runsPerArmPerPair": 30,
+  "exemplarFile": "bench/phase0-agent-native/exemplar.md",
+  "exemplarSha256": "d0d34f841fd0e065a1086eaddfc460873a002b1da4f4ef4c7bbcd7927e1f7f23",
+  "metric": "iterationsToGreen (censored at budget+1 = 11)",
+  "decisionRule": "H1 survives iff (R_base - R_ex)/(R_base - 1) < 0.30 with R_base > 1; if pooled R_base < 1.3, verdict is: baseline regression to mean — 2.7x not reproduced"
+}

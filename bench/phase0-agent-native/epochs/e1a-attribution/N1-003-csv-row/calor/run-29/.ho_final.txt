@@ -1,0 +1,4 @@
+Test run for /Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-29/heldout/bin/Debug/net10.0/HeldOut.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:    20, Skipped:     0, Total:    20, Duration: 21 ms - HeldOut.dll (net10.0)

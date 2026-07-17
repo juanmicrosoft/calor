@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -uo pipefail
+if [[ "${CALOR_P0_SHIM_OFF:-0}" == "1" ]]; then exec "/opt/homebrew/bin/dotnet" "$@"; fi
+"/opt/homebrew/bin/dotnet" "$@"; rc=$?
+case "${1:-}" in
+  build|test|run)
+    # bin/obj are excluded: generated outputs (e.g. the calor arm's obj/calor/
+    # *.g.cs) would otherwise flip the hash on the first build and journal a
+    # phantom edited:true iteration with zero agent edits
+    hash=$(find "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/p0-N1-003-csv-row-calor-WapZxH/src" -type f \( -name '*.cs' -o -name '*.calr' \) -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
+    prev=$(cat "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-20/.lasthash" 2>/dev/null || echo none)
+    edited=$([[ "$hash" != "$prev" ]] && echo true || echo false)
+    echo "$hash" > "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-20/.lasthash"
+    ho_pass=0; ho_fail=20
+    # Fresh, decoupled src build; only if it succeeds is the dll current and
+    # the held-out result meaningful (non-compiling state = all failing)
+    if CALOR_P0_SHIM_OFF=1 "/opt/homebrew/bin/dotnet" build "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/p0-N1-003-csv-row-calor-WapZxH/src/Src.csproj" --nologo -v q > "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-20/.src_build.txt" 2>&1; then
+      if CALOR_P0_SHIM_OFF=1 "/opt/homebrew/bin/dotnet" test "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-20/heldout/HeldOut.csproj" --nologo -v q > "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-20/.ho_last.txt" 2>&1; then
+        ho_fail=0
+        ho_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-20/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
+      else
+        ho_fail=$(grep -oE 'Failed:[[:space:]]+[0-9]+' "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-20/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 20)
+        ho_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-20/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
+      fi
+    fi
+    printf '{"ts":"%s","cmd":"%s","exit":%d,"edited":%s,"heldout_pass":%s,"heldout_fail":%s}\n'       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${1}" "$rc" "$edited" "$ho_pass" "$ho_fail" >> "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.claude/worktrees/agent-a2cd6bc0876e7b51f/bench/phase0-agent-native/epochs/e1a-attribution/N1-003-csv-row/calor/run-20/journal.jsonl"
+    ;;
+esac
+exit $rc
