@@ -4146,3 +4146,910 @@ To https://github.com/juanmicrosoft/calor.git
   "nullAgent": false
 }
 2026-07-17T06:26:06Z BLOCK DONE pair=W3-003-kv-journal arm=calor
+[e1a-attribution f4c726b5] data: E1a checkpoint — W3-003-kv-journal / calor (30-run block)
+ 391 files changed, 9152 insertions(+)
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-1/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-10/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-11/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-12/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-13/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-14/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-15/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-16/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-17/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-18/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-19/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-2/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-20/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-21/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-22/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-23/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-24/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-25/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-26/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-27/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-28/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-29/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-3/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-30/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-4/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-5/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-6/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-7/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-8/result.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/.ho_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/.ho_last.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/.lasthash
+ create mode 100755 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/.shim/dotnet
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/.src_build.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/.src_final.txt
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/agent.err
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/agent.json
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/heldout/HeldOut.csproj
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/heldout/KvJournalHeldOutTests.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/heldout/TestShim.cs
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/journal.jsonl
+ create mode 100644 bench/phase0-agent-native/epochs/e1a-attribution/W3-003-kv-journal/calor/run-9/result.json
+To https://github.com/juanmicrosoft/calor.git
+   6fe9a4f7..f4c726b5  e1a-attribution -> e1a-attribution
+2026-07-17T06:26:08Z checkpoint pushed: data: E1a checkpoint — W3-003-kv-journal / calor (30-run block)
+2026-07-17T06:26:08Z BLOCK START pair=W3-003-kv-journal arm=calor+exemplar runs=30
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4541,
+    "output": 5613
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4678,
+    "output": 7363
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 3,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4680,
+    "output": 7456
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 4,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4681,
+    "output": 8566
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 5,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4674,
+    "output": 7486
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 6,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4679,
+    "output": 7341
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 7,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4544,
+    "output": 6690
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 8,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4674,
+    "output": 6689
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 9,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4679,
+    "output": 7205
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 10,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4672,
+    "output": 7152
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 11,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4689,
+    "output": 8993
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 12,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4708,
+    "output": 7767
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 13,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4680,
+    "output": 7367
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 14,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4675,
+    "output": 7186
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 15,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4675,
+    "output": 7061
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 16,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4544,
+    "output": 5432
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 17,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4681,
+    "output": 6841
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 18,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4677,
+    "output": 7557
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 19,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4676,
+    "output": 6982
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 20,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4674,
+    "output": 6023
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 21,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4544,
+    "output": 7497
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 22,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4674,
+    "output": 7145
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 23,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4676,
+    "output": 8000
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 24,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4676,
+    "output": 7171
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 25,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4676,
+    "output": 7226
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 26,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4674,
+    "output": 6232
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 27,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4543,
+    "output": 6631
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 28,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4681,
+    "output": 9276
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 29,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4675,
+    "output": 7054
+  },
+  "nullAgent": false
+}
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+exemplar",
+  "run": 30,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "tokens": {
+    "input": 4686,
+    "output": 10002
+  },
+  "nullAgent": false
+}
+2026-07-17T07:33:25Z BLOCK DONE pair=W3-003-kv-journal arm=calor+exemplar
