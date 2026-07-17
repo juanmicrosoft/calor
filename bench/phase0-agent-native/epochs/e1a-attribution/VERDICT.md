@@ -72,3 +72,5 @@ All 180 agent transcripts (`agent.json`), journals, invalid-run logs, per-run
 (`run-driver.sh`, `driver.log`), the pre-registered analysis script
 (`analyze.sh`), and its outputs (`analysis.json`, `per-pair.json`) live in
 this epoch directory. Total agent tokens: ~0.88M in / ~1.75M out.
+
+> As-run exemplar sheet archived in this directory as `exemplar-as-run.md` (sha256 matches pins.json).

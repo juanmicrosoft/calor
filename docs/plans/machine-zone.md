@@ -125,7 +125,7 @@ v1's body-reads metric was gameable (n=1 counter, definitional discretion, and z
 
 | Stage | Content | Gate (falsifiable) |
 |---|---|---|
-| **E1a** (days) | Attribution experiment, two arms runnable NOW: baseline vs +syntax-exemplar on the 2.7× pairs; **pre-registered**: n ≥ 10 runs/arm/pair, H1 survives only if the exemplar arm's ratio stays ≥ 1.8× | H1 kept/killed on pre-registered numbers, not eyeballs |
+| **E1a** (days) | Attribution experiment, two arms runnable NOW: baseline vs +syntax-exemplar on the 2.7× pairs; **pre-registered**: superseded; see §12.4 (protocol: n=30/arm/pair, baseline-relative <30% rule) and §13 (verdict) | H1 kept/killed on pre-registered numbers, not eyeballs |
 | **E1b** (with M2 prototype) | Structured-edit arm of the attribution experiment | Gates M2 promotion (the structured path cannot be tested before it exists — v2's E1 was circular) |
 | **M0** (small) | `calor spec` rendering + header diffs; body-read counting (pre-registered defn); **eject mirror in CI + fidelity tests + one game day**; red-team injection protocol | Spec-only review survives real changes; red-team detection ≥ baseline; game-day MTTR within pre-set bound |
 | **M1** (large — DA-6's blast radius owned: ~1,267 `.calr`, 285 goldens, doc blocks, samples, **frozen benchmark suite conflict resolved before migration**: the frozen pairs are either exempted as a pinned dialect the canonicalizer accepts forever, or the suite is versioned with re-baselining declared — decided in a one-page addendum first) | Canonicalizer + repo migration + canonical-form-spec v1 + identity keys | Formatter-is-identity holds repo-wide; no proof-key churn beyond re-keying migration |
@@ -188,3 +188,9 @@ Panel credit recorded: accept-dialects-store-canonical judged "the correct hedge
 8. **Self-certification acknowledged:** the review loop's scores are self-assessed; independent review is now the standard for any 'loop closed' claim on this document line.
 9. **Blast radius corrected:** source-tree .calr count is **506** (the 1,267 figure counted bin/obj build outputs — the exact unchecked-number drift class self-check docs exists to catch; noted with due irony).
 10. **Smaller:** machine-zone comment staleness downgraded from CI failure to compiler-fixed-on-write (no human ceremony in the unwatched zone); packet-rendered helper contracts COUNT as body-reads (the peephole is closed; they are machine-zone content); public-promotion of a helper requires spec-surface re-authorship + attestation (zone transitions are events).
+
+## 13. E1a verdict (2026-07-17) — H1 KILLED; binding descope
+
+180 runs, n=30/cell, pre-registered baseline-relative rule (§12.4), transcripts archived (`epochs/e1a-attribution/`, PR #706). Pooled: R_base 2.38 (effect reproduced concurrently), exemplar reduction of excess **55%** ≥ 30% kill line; W3-003 collapsed to **1.00 — full parity** from a 60-line syntax exemplar. Robustness: the exemplar itself contained a `[str]` error biasing *against* the kill (29/30 N1 runs copied it); H1 died anyway.
+
+**Binding consequences (§12.2c applied):** M2 (structured editing) and M1's canonicalizer-as-write-path are **descoped**. The document's remaining scope is the spec-surface/evidence line (M0, packet, dogfood) plus identity/keying work only as the evidence layer requires it. The green-field tax is missing in-context syntax knowledge; the remedy is a correct, parse-checked, drift-guarded exemplar shipped in every agent-facing surface (init templates, CLAUDE.md, MCP prompt) — exemplars are load-bearing infrastructure and get `self-check` treatment.
