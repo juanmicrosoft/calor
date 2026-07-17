@@ -125,7 +125,7 @@ v1's body-reads metric was gameable (n=1 counter, definitional discretion, and z
 
 | Stage | Content | Gate (falsifiable) |
 |---|---|---|
-| **E1a** (days) | Attribution experiment, two arms runnable NOW: baseline vs +syntax-exemplar on the 2.7× pairs; **pre-registered**: n ≥ 10 runs/arm/pair, H1 survives only if the exemplar arm's ratio stays ≥ 1.8× | H1 kept/killed on pre-registered numbers, not eyeballs |
+| **E1a** (days) | Attribution experiment, two arms runnable NOW: baseline vs +syntax-exemplar on the 2.7× pairs; **pre-registered**: superseded; see §12.4 (protocol: n=30/arm/pair, baseline-relative <30% rule) and §13 (verdict) | H1 kept/killed on pre-registered numbers, not eyeballs |
 | **E1b** (with M2 prototype) | Structured-edit arm of the attribution experiment | Gates M2 promotion (the structured path cannot be tested before it exists — v2's E1 was circular) |
 | **M0** (small) | `calor spec` rendering + header diffs; body-read counting (pre-registered defn); **eject mirror in CI + fidelity tests + one game day**; red-team injection protocol | Spec-only review survives real changes; red-team detection ≥ baseline; game-day MTTR within pre-set bound |
 | **M1** (large — DA-6's blast radius owned: ~1,267 `.calr`, 285 goldens, doc blocks, samples, **frozen benchmark suite conflict resolved before migration**: the frozen pairs are either exempted as a pinned dialect the canonicalizer accepts forever, or the suite is versioned with re-baselining declared — decided in a one-page addendum first) | Canonicalizer + repo migration + canonical-form-spec v1 + identity keys | Formatter-is-identity holds repo-wide; no proof-key churn beyond re-keying migration |
