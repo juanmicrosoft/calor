@@ -160,6 +160,12 @@ public static class DocDriftChecker
         var version = ReadVersion(Path.Combine(root, "Directory.Build.props"), loadErrors);
 
         var claudeMd = LoadDoc(root, "CLAUDE.md", loadErrors);
+        // The repository's own GitHub Copilot instructions (issue #710): a
+        // hand-maintained agent-facing dev guide that byte-copied CLAUDE.md and
+        // silently rotted (it taught closer-form syntax that now hard-errors).
+        // Folding it into the scan set is the guardrail that keeps it honest —
+        // "byte-copy outside drift checks" is the measured rot failure mode.
+        var copilotInstructions = LoadDoc(root, Path.Combine(".github", "copilot-instructions.md"), loadErrors);
         var syntaxIndex = LoadDoc(root, Path.Combine("docs", "syntax-reference", "index.md"), loadErrors);
         var effectsDoc = LoadDoc(root, Path.Combine("docs", "syntax-reference", "effects.md"), loadErrors);
         var cliCodesDoc = LoadDoc(root, Path.Combine("docs", "cli", "structured-output.md"), loadErrors);
@@ -171,8 +177,14 @@ public static class DocDriftChecker
         var exemplarDoc = LoadDoc(root, Path.Combine("bench", "phase0-agent-native", "exemplar.md"), loadErrors);
 
         // The scanned set for the keyword and diagnostic-code checks:
-        // CLAUDE.md + every docs/syntax-reference/*.md + every docs/cli/*.md.
-        var scannedDocs = NonNull(claudeMd).Concat(syntaxDocs).Concat(cliDocs).Concat(NonNull(exemplarDoc)).ToList();
+        // CLAUDE.md + .github/copilot-instructions.md + every docs/syntax-reference/*.md
+        // + every docs/cli/*.md + the exemplar sheet.
+        var scannedDocs = NonNull(claudeMd)
+            .Concat(NonNull(copilotInstructions))
+            .Concat(syntaxDocs)
+            .Concat(cliDocs)
+            .Concat(NonNull(exemplarDoc))
+            .ToList();
 
         // Version scan covers all agent-facing docs. Dated planning/experiment
         // records legitimately cite historical versions and are excluded.
@@ -195,7 +207,7 @@ public static class DocDriftChecker
             EffectsReferenceDoc = effectsDoc,
             EffectDocsForwardOnly = NonNull(syntaxIndex),
             CliCodesDoc = cliCodesDoc,
-            VersionScanDocs = NonNull(claudeMd).Concat(versionDocs).ToList(),
+            VersionScanDocs = NonNull(claudeMd).Concat(NonNull(copilotInstructions)).Concat(versionDocs).ToList(),
         };
     }
 

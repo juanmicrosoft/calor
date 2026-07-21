@@ -31,8 +31,9 @@ jobs:
 
       # Spec drift (Phase 1 item 6, agent-native strategy): agent-facing docs
       # are machine-checked against the implementation, reusing this job's
-      # build. Covered files: CLAUDE.md, every docs/syntax-reference/*.md, and
-      # every docs/cli/*.md (plus docs/**/*.md for the version scan). Checks:
+      # build. Covered files: CLAUDE.md, .github/copilot-instructions.md, every
+      # docs/syntax-reference/*.md, and every docs/cli/*.md (plus docs/**/*.md
+      # for the version scan). Checks:
       # documented §-keywords exist in the lexer, cited CalorNNNN codes exist
       # (and cited bands are non-empty), the effect table in
       # docs/syntax-reference/effects.md matches the effect registry in both

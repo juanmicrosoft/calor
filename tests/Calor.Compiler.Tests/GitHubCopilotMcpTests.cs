@@ -1,4 +1,6 @@
+using System.Linq;
 using System.Text.Json;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Init;
 using Xunit;
 
@@ -252,5 +254,77 @@ public class GitHubCopilotMcpTests : IDisposable
         // New messaging should be present
         Assert.Contains("MCP server", allMessages);
         Assert.Contains("guidance-based", allMessages);
+    }
+
+    // ------------------------------------------------------------------
+    // Copilot support smoke (issue #710). The generated instructions must
+    // carry the E1a-hardened exemplar idioms, and a program built purely from
+    // those idioms must compile with the real compiler. This is the
+    // reproducible form of the issue's "Copilot-driven smoke task": init the
+    // config, then compile against it.
+    // ------------------------------------------------------------------
+
+    // Program built purely from the exemplar idioms shipped in
+    // copilot-instructions.md.template: inline §F signature, §E{mut} for a
+    // mutating body, the empty-list literal, §PUSH under a loop, §CNT, and §R.
+    private const string ExemplarIdiomProgram =
+        "§M{m001:CopilotSmoke}\n" +
+        "  §F{f001:Collect:pub} (i32:n) -> i32\n" +
+        "    §E{mut}\n" +
+        "    §LIST{items:i32}\n" +
+        "    §/LIST{items}\n" +
+        "    §L{l001:i:1:n:1}\n" +
+        "      §PUSH{items} i\n" +
+        "    §B{count:i32} §CNT{items}\n" +
+        "    §R count\n";
+
+    [Fact]
+    public async Task Smoke_GeneratedInstructions_CarryExemplarIdioms()
+    {
+        var initializer = new GitHubCopilotInitializer();
+        var result = await initializer.InitializeAsync(_testDir, force: false);
+        Assert.True(result.Success);
+
+        var instructionsPath = Path.Combine(_testDir, ".github", "copilot-instructions.md");
+        Assert.True(File.Exists(instructionsPath), ".github/copilot-instructions.md should be created");
+
+        var content = await File.ReadAllTextAsync(instructionsPath);
+
+        // The E1a-hardened exemplar must be present in the shipped artifact.
+        Assert.Contains("Exemplar idioms", content);
+        Assert.Contains("§A", content);                 // call-argument prefix
+        Assert.Contains("§/C", content);                 // call-argument list closer
+        Assert.Contains("returns an ARRAY", content);    // the arrays-vs-lists trap
+    }
+
+    [Fact]
+    public async Task Smoke_GeneratedConfig_EnablesCompilingExemplarIdiomProgram()
+    {
+        // Generate the Copilot config exactly as `calor init` would.
+        var initializer = new GitHubCopilotInitializer();
+        var initResult = await initializer.InitializeAsync(_testDir, force: false);
+        Assert.True(initResult.Success);
+
+        var mcpJsonPath = Path.Combine(_testDir, ".vscode", "mcp.json");
+        Assert.True(File.Exists(mcpJsonPath), ".vscode/mcp.json should be created");
+
+        // Smoke: a program written from the generated exemplar idioms must compile.
+        var options = new CompilationOptions
+        {
+            ContractMode = ContractMode.Debug,
+            UnknownCallPolicy = UnknownCallPolicy.Warn,
+            EnforceEffects = true,
+            StrictEffects = false,
+            VerifyContracts = false,
+        };
+
+        var result = Program.Compile(ExemplarIdiomProgram, "copilot-smoke.calr", options);
+        var errors = result.Diagnostics.Where(d => d.IsError).ToList();
+
+        Assert.True(
+            errors.Count == 0,
+            "Exemplar-idiom program must compile cleanly but produced errors:\n" +
+            string.Join("\n", errors.Select(e => $"  [{e.Code}] L{e.Span.Line}:{e.Span.Column} {e.Message}")) +
+            $"\n--- source ---\n{ExemplarIdiomProgram}");
     }
 }

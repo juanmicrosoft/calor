@@ -426,10 +426,12 @@ public class DocDriftCheckerTests
         var root = Path.Combine(Path.GetTempPath(), "calor-drift-probe-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "docs", "syntax-reference"));
         Directory.CreateDirectory(Path.Combine(root, "docs", "cli"));
+        Directory.CreateDirectory(Path.Combine(root, ".github"));
         File.WriteAllText(
             Path.Combine(root, "Directory.Build.props"),
             "<Project><PropertyGroup><Version>9.9.9</Version></PropertyGroup></Project>");
         File.WriteAllText(Path.Combine(root, "CLAUDE.md"), "# CLAUDE\n");
+        File.WriteAllText(Path.Combine(root, ".github", "copilot-instructions.md"), "# Copilot Instructions\n");
         File.WriteAllText(Path.Combine(root, "docs", "syntax-reference", "index.md"), syntaxIndexContent);
         File.WriteAllText(Path.Combine(root, "docs", "syntax-reference", "structure-tags.md"), structureTagsContent);
         File.WriteAllText(Path.Combine(root, "docs", "syntax-reference", "effects.md"), "# Effects\n");
