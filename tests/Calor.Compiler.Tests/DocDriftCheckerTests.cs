@@ -20,7 +20,8 @@ public class DocDriftCheckerTests
         DocFile? effectsReferenceDoc = null,
         DocFile[]? effectDocsForwardOnly = null,
         DocFile? cliCodesDoc = null,
-        DocFile[]? versionScanDocs = null)
+        DocFile[]? versionScanDocs = null,
+        MirrorDoc[]? mirrorDocs = null)
     {
         return new DocDriftInputs
         {
@@ -36,7 +37,54 @@ public class DocDriftCheckerTests
             EffectDocsForwardOnly = effectDocsForwardOnly ?? [],
             CliCodesDoc = cliCodesDoc,
             VersionScanDocs = versionScanDocs ?? [],
+            MirrorDocs = mirrorDocs ?? [],
         };
+    }
+
+    // --- Mirror-doc drift (AGENTS.md single-sourced from CLAUDE.md, #708) ---
+
+    private const string SampleClaude =
+        "# CLAUDE.md — Calor Compiler\n\nBuild with `dotnet build`. Use `§F{id:Name:pub}`.\n";
+
+    [Fact]
+    public void AgentsMdTransform_SwapsTitle_AddsBanner_IsIdempotent()
+    {
+        var once = DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude);
+        Assert.StartsWith("# AGENTS.md — Calor Compiler\n", once);
+        Assert.Contains("Generated from CLAUDE.md", once);
+        Assert.DoesNotContain("# CLAUDE.md — Calor Compiler", once);
+        // Body is preserved verbatim after the swapped head.
+        Assert.Contains("Build with `dotnet build`. Use `§F{id:Name:pub}`.", once);
+        // Regenerating from CLAUDE.md yields the same bytes (deterministic).
+        Assert.Equal(once, DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude));
+    }
+
+    [Fact]
+    public void MirrorInSync_PassesClean()
+    {
+        var expected = DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude);
+        var mirror = new MirrorDoc("AGENTS.md", "CLAUDE.md", expected, expected);
+        Assert.Empty(DocDriftChecker.Check(BaseInputs(mirrorDocs: [mirror])));
+    }
+
+    [Fact]
+    public void MirrorOutOfSync_IsDetected()
+    {
+        var expected = DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude);
+        var mirror = new MirrorDoc("AGENTS.md", "CLAUDE.md", expected + "hand edit\n", expected);
+        var finding = Assert.Single(DocDriftChecker.Check(BaseInputs(mirrorDocs: [mirror])));
+        Assert.Equal(DiagnosticCode.DocDriftMirrorOutOfSync, finding.Code);
+        Assert.Contains("out of sync", finding.Message);
+    }
+
+    [Fact]
+    public void MirrorMissing_IsDetected()
+    {
+        var expected = DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude);
+        var mirror = new MirrorDoc("AGENTS.md", "CLAUDE.md", Actual: null, expected);
+        var finding = Assert.Single(DocDriftChecker.Check(BaseInputs(mirrorDocs: [mirror])));
+        Assert.Equal(DiagnosticCode.DocDriftMirrorOutOfSync, finding.Code);
+        Assert.Contains("is missing", finding.Message);
     }
 
     // --- Keyword drift (the §FOREACH-vs-§EACH class) ---

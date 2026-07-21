@@ -758,6 +758,14 @@ public static class DiagnosticCode
     /// with the current compiler — the example has rotted.
     /// </summary>
     public const string DocDriftExampleParseError = "Calor1328";
+
+    /// <summary>
+    /// Error (docs drift): a mirror doc (AGENTS.md) is out of sync with its
+    /// single source (CLAUDE.md). The mirror is a deterministic title-swapped
+    /// derivative — regenerate it with <c>calor self-check docs --fix</c> rather
+    /// than hand-editing, so the two agent manuals cannot silently diverge.
+    /// </summary>
+    public const string DocDriftMirrorOutOfSync = "Calor1329";
 }
 
 /// <summary>
