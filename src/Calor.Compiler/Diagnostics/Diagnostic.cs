@@ -242,14 +242,14 @@ public static class DiagnosticCode
     /// </summary>
     public const string SemanticsVersionIncompatible = "Calor0701";
 
-    // Contract verification results (Calor0710-0719) — emitted by
-    // Verification/ContractVerificationPass. This sub-band is disjoint from the
-    // semantics-version codes above: prior to #702, the verification pass reused
-    // Calor0700 (Z3 unavailable) and Calor0701 (precondition may be violated),
-    // colliding with SemanticsVersionMismatch/Incompatible. All verification
-    // results now live in 0710-0719 so no code number carries two meanings.
-    // Agents that filtered on the old 0700-0705 numbers must switch to 0710-0715
-    // (see CHANGELOG.md).
+    // Contract verification results (Calor0710-0719 reserved; 0710-0715 assigned)
+    // — emitted by Verification/ContractVerificationPass. This sub-band is disjoint
+    // from the semantics-version codes above: prior to #702, the verification pass
+    // reused Calor0700 (Z3 unavailable) and Calor0701 (precondition may be violated),
+    // colliding with SemanticsVersionMismatch/Incompatible. All verification results
+    // now live in 0710-0715 so no code number carries two meanings; 0716-0719 are
+    // reserved headroom for future verification diagnostics. Agents that filtered on
+    // the old 0700-0705 numbers must switch to 0710-0715 (see CHANGELOG.md).
 
     /// <summary>
     /// Info: static contract verification was skipped because the Z3 SMT solver
