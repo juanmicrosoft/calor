@@ -38,13 +38,33 @@ public class WatchDebouncerTests
         var channel = Channel.CreateUnbounded<string>();
         channel.Writer.TryWrite("/p/a.calr");
 
-        var read = WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, CancellationToken.None);
-        // A follow-up event landing well inside the quiet period joins the batch.
-        await Task.Delay(20);
+        // Deterministic quiet timer (no wall-clock race, #714): the FIRST quiet period
+        // never elapses, so the follow-up event is guaranteed to win the WhenAny and
+        // join the batch; the SECOND quiet period elapses immediately, ending the batch
+        // once no further events remain.
+        var firstQuietEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var neverCompletes = new TaskCompletionSource();
+        var calls = 0;
+        Task Delay(TimeSpan _, CancellationToken ct)
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                firstQuietEntered.TrySetResult();
+                return neverCompletes.Task.WaitAsync(ct); // first quiet period never elapses
+            }
+            return Task.CompletedTask; // subsequent quiet period elapses immediately
+        }
+
+        var read = WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, CancellationToken.None, Delay);
+
+        // "a" is drained and we are parked in the (never-elapsing) first quiet period,
+        // so the follow-up event deterministically joins the same batch.
+        await firstQuietEntered.Task.WaitAsync(TestTimeout);
         channel.Writer.TryWrite("/p/b.calr");
 
         var batch = await read.WaitAsync(TestTimeout);
         Assert.NotNull(batch);
+        Assert.Contains("/p/a.calr", batch!);
         Assert.Contains("/p/b.calr", batch!);
     }
 

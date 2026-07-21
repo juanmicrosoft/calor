@@ -19,8 +19,14 @@ internal static class WatchDebouncer
     public static async Task<IReadOnlyCollection<string>?> ReadBatchAsync(
         ChannelReader<string> reader,
         TimeSpan quietPeriod,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
+        // The quiet-period timer is injectable so tests can drive batch boundaries
+        // deterministically instead of racing a real wall clock (see #714); production
+        // uses Task.Delay.
+        delay ??= static (period, ct) => Task.Delay(period, ct);
+
         var batch = new HashSet<string>(
             OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
@@ -39,7 +45,7 @@ internal static class WatchDebouncer
             // Drain follow-up events until a full quiet period passes.
             while (true)
             {
-                var quiet = Task.Delay(quietPeriod, cancellationToken);
+                var quiet = delay(quietPeriod, cancellationToken);
                 var more = reader.WaitToReadAsync(cancellationToken).AsTask();
                 var completed = await Task.WhenAny(quiet, more).ConfigureAwait(false);
                 if (completed == quiet)
