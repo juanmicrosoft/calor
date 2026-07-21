@@ -526,7 +526,7 @@ public class DocDriftCheckerTests
     {
         var codes = DocDriftChecker.GetImplementedDiagnosticCodes();
         Assert.Contains("Calor0830", codes);
-        Assert.Contains("Calor0702", codes); // verification-pass code, registered via constant
+        Assert.Contains("Calor0712", codes); // verification-pass code, registered via constant
         Assert.Contains("Calor1320", codes);
         Assert.DoesNotContain("Calor9876", codes);
     }

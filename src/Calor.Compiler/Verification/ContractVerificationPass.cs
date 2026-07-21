@@ -34,7 +34,7 @@ public sealed class ContractVerificationPass
         {
             _diagnostics.ReportInfo(
                 module.Span,
-                "Calor0700",
+                DiagnosticCode.Z3Unavailable,
                 "Static contract verification skipped: Z3 SMT solver is not available. " +
                 "Install the Z3 native library for static verification support.");
 
@@ -159,7 +159,7 @@ public sealed class ContractVerificationPass
             {
                 _diagnostics.ReportWarning(
                     preNode.Span,
-                    "Calor0701",
+                    DiagnosticCode.PreconditionMayBeViolated,
                     $"Precondition may be violated in function '{function.Name}'. {preResult.CounterexampleDescription}");
             }
         }

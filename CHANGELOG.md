@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Diagnostic renumbering — contract-verification results moved to Calor0710–0715 (#702).** The contract-verification pass previously reused `Calor0700`/`Calor0701`, which already meant `SemanticsVersionMismatch`/`SemanticsVersionIncompatible` — one number, two meanings. All verification-result codes now occupy a disjoint sub-band and each has a named `DiagnosticCode` constant: Z3-unavailable `Calor0700→0710`, precondition-may-be-violated `Calor0701→0711`, postcondition-may-be-violated `Calor0702→0712`, postcondition-proven `Calor0703→0713`, verification-summary `Calor0704→0714`, verification-cache-stats `Calor0705→0715`. `Calor0700`/`Calor0701` now unambiguously mean the semantics-version diagnostics. **Action for agents:** any tooling filtering verification output on `Calor0700`–`Calor0705` must switch to `Calor0710`–`Calor0715`.
+
 ## [0.7.0] - 2026-07-16
 
 ### Benchmark Results (Statistical: 30 runs)

@@ -1,4 +1,5 @@
 using Calor.Compiler;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Verification.Z3;
 using Xunit;
 
@@ -116,7 +117,7 @@ public class IntegrationTests
         // If Z3 wasn't available, should have info message
         if (!Z3ContextFactory.IsAvailable)
         {
-            var infos = result.Diagnostics.Where(d => d.Code == "Calor0700").ToList();
+            var infos = result.Diagnostics.Where(d => d.Code == DiagnosticCode.Z3Unavailable).ToList();
             Assert.NotEmpty(infos);
         }
     }

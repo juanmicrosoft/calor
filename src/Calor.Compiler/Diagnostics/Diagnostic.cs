@@ -242,34 +242,49 @@ public static class DiagnosticCode
     /// </summary>
     public const string SemanticsVersionIncompatible = "Calor0701";
 
-    // Contract verification results (Calor0702-0705) — emitted by
-    // Verification/ContractVerificationPass. Note: the verification pass also
-    // reuses Calor0700 (Z3 unavailable, info) and Calor0701 (precondition may
-    // be violated, warning) with meanings that differ from the semantics-version
-    // constants above; that pre-existing collision is preserved for
-    // compatibility and its renumbering is tracked in
-    // https://github.com/juanmicrosoft/calor/issues/702.
+    // Contract verification results (Calor0710-0719 reserved; 0710-0715 assigned)
+    // — emitted by Verification/ContractVerificationPass. This sub-band is disjoint
+    // from the semantics-version codes above: prior to #702, the verification pass
+    // reused Calor0700 (Z3 unavailable) and Calor0701 (precondition may be violated),
+    // colliding with SemanticsVersionMismatch/Incompatible. All verification results
+    // now live in 0710-0715 so no code number carries two meanings; 0716-0719 are
+    // reserved headroom for future verification diagnostics. Agents that filtered on
+    // the old 0700-0705 numbers must switch to 0710-0715 (see CHANGELOG.md).
+
+    /// <summary>
+    /// Info: static contract verification was skipped because the Z3 SMT solver
+    /// is not available. (Renumbered from Calor0700 in #702.)
+    /// </summary>
+    public const string Z3Unavailable = "Calor0710";
+
+    /// <summary>
+    /// Warning: Z3 disproved a precondition; a counterexample is reported.
+    /// (Renumbered from Calor0701 in #702.)
+    /// </summary>
+    public const string PreconditionMayBeViolated = "Calor0711";
 
     /// <summary>
     /// Warning: Z3 disproved a postcondition; a counterexample is reported.
+    /// (Renumbered from Calor0702 in #702.)
     /// </summary>
-    public const string PostconditionMayBeViolated = "Calor0702";
+    public const string PostconditionMayBeViolated = "Calor0712";
 
     /// <summary>
     /// Info: a postcondition was statically proven; its runtime check is elided.
+    /// (Renumbered from Calor0703 in #702.)
     /// </summary>
-    public const string PostconditionProven = "Calor0703";
+    public const string PostconditionProven = "Calor0713";
 
     /// <summary>
     /// Info: per-module contract verification summary (proven / unproven /
-    /// potentially violated / unsupported counts).
+    /// potentially violated / unsupported counts). (Renumbered from Calor0704 in #702.)
     /// </summary>
-    public const string VerificationSummary = "Calor0704";
+    public const string VerificationSummary = "Calor0714";
 
     /// <summary>
-    /// Info (verbose): verification cache statistics.
+    /// Info (verbose): verification cache statistics. (Renumbered from Calor0705 in #702.)
     /// </summary>
-    public const string VerificationCacheStats = "Calor0705";
+    public const string VerificationCacheStats = "Calor0715";
 
     // ID errors (Calor0800-0899)
     /// <summary>
