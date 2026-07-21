@@ -1065,6 +1065,36 @@ public sealed class CalorEmitter : IAstVisitor<string>
         EmitBlockEnd($"§/W{{{id}}}");
     }
 
+    /// <summary>
+    /// Emits a hoisted block-bodied lambda as a binding in explicit block form:
+    /// <c>§B{...} §LAM{header}</c> on the opener line, body statements indented one
+    /// level under it, and <c>§/LAM{id}</c> at the binding's own column. This mirrors
+    /// the match-expression binding path and, crucially, routes body statements
+    /// through the normal statement visitor so their indentation tracks the current
+    /// scope instead of a fixed column (the #705 defect).
+    /// </summary>
+    private void EmitBlockLambdaAsBindingInitializer(string bindHeader, LambdaExpressionNode lambda)
+    {
+        var headerParts = new List<string> { lambda.Id };
+        if (lambda.IsStatic) headerParts.Add("static");
+        if (lambda.IsAsync) headerParts.Add("async");
+        foreach (var p in lambda.Parameters)
+        {
+            headerParts.Add(p.Name);
+            headerParts.Add(p.TypeName != null ? TypeMapper.CSharpToCalor(p.TypeName) : "object");
+        }
+        var header = string.Join(":", headerParts);
+
+        AppendLine($"{bindHeader} §LAM{{{header}}}");
+        Indent();
+        foreach (var stmt in lambda.StatementBody!)
+        {
+            stmt.Accept(this);
+        }
+        Dedent();
+        AppendLine($"§/LAM{{{lambda.Id}}}");
+    }
+
     public string Visit(CallStatementNode node)
     {
         // Emit named argument labels as §A[name] value when present.
@@ -1281,6 +1311,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Initializer is MatchExpressionNode matchExpr)
         {
             EmitMatchExpressionAsBindingInitializer(bindHeader, matchExpr);
+            return "";
+        }
+
+        // Block-bodied lambda initializer must use block form so its statements are
+        // emitted at the correct nested indent and §/LAM lands at the §B column.
+        // The naive `Initializer.Accept(this)` returns a multi-line string with a
+        // fixed indent that gets jammed onto the §B line and dedents below the
+        // enclosing scope, producing unparseable output (#705).
+        if (node.Initializer is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } blockLambda
+            && !(blockLambda.StatementBody.Count <= 2 && !blockLambda.StatementBody.Any(s => s is FallbackCommentNode)))
+        {
+            EmitBlockLambdaAsBindingInitializer(bindHeader, blockLambda);
             return "";
         }
 

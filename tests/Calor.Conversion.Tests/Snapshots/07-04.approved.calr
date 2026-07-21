@@ -1,0 +1,18 @@
+§M{m001:Test_07_04}
+  §U{System}
+  §U{System.Linq}
+
+  §CL{c001:BlockLambdaDemo:pub:stat}
+    §MT{m002:Run:pub:stat}
+      §B{_lam005} §LAM{lam003}
+        §B{_chainRange004} §C{Enumerable.Range} §A 1 §A 5 §/C
+        §B{nums} §C{_chainRange004.ToArray}
+        §B{total} §C{nums.Sum}
+        §R total
+      §/LAM{lam003}
+      §C{Handle} §A "/x" §A _lam005 §/C
+
+    §MT{m006:Handle:pub:stat} (str:route, Func<i32>:handler)
+      §R
+
+

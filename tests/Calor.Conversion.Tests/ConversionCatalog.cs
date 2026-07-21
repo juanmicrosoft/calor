@@ -379,6 +379,28 @@ public static class ConversionCatalog
         }
         """);
 
+    public static readonly ConversionSnippet BlockLambdaArgument = new(
+        "07-04", "Lambdas", "Block-bodied lambda passed as an argument (#705)",
+        """
+        using System;
+        using System.Linq;
+
+        public static class BlockLambdaDemo
+        {
+            public static void Run()
+            {
+                Handle("/x", () =>
+                {
+                    var nums = Enumerable.Range(1, 5).ToArray();
+                    var total = nums.Sum();
+                    return total;
+                });
+            }
+
+            public static void Handle(string route, Func<int> handler) { }
+        }
+        """);
+
     // ── 08: Modern C# ──
 
     public static readonly ConversionSnippet RequiredProperties = new(
@@ -962,6 +984,7 @@ public static class ConversionCatalog
         DelegateDeclarations,
         LambdaExpressions,
         StaticLambda,
+        BlockLambdaArgument,
         RequiredProperties,
         TupleLiteral,
         EmptyCollection,
