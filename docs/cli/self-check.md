@@ -111,5 +111,5 @@ calor self-check docs --fix
 ```
 
 `--fix` rewrites `AGENTS.md` from `CLAUDE.md` (idempotent; writes only on change).
-The CI `spec-drift` step runs `self-check docs` without `--fix`, so an un-regenerated
+The CI step "Check agent-facing docs against the implementation (spec drift)" runs `self-check docs` without `--fix`, so an un-regenerated
 `AGENTS.md` fails the build.

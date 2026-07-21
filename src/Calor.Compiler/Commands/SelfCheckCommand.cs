@@ -78,7 +78,27 @@ public static class SelfCheckCommand
 
         if (fix)
         {
-            return RegenerateMirrors(resolvedRoot);
+            // Regenerate mirror docs, then fall through to the full check so --fix
+            // never silently skips the other drift checks (keywords, codes, effects,
+            // versions, examples) and reports success. A source-missing error is fatal;
+            // an anchor mismatch is surfaced as a finding by the check below.
+            switch (DocDriftChecker.RegenerateAgentsMd(resolvedRoot))
+            {
+                case DocDriftChecker.MirrorRegenResult.SourceMissing:
+                    Console.Error.WriteLine("error: CLAUDE.md not found; cannot regenerate AGENTS.md");
+                    return 2;
+                case DocDriftChecker.MirrorRegenResult.AnchorMismatch:
+                    Console.Error.WriteLine(
+                        $"warning: CLAUDE.md H1 does not match '{DocDriftChecker.ClaudeTitleAnchor}'; " +
+                        "AGENTS.md not regenerated (reported below)");
+                    break;
+                case DocDriftChecker.MirrorRegenResult.Written:
+                    Console.Error.WriteLine($"Regenerated {DocDriftChecker.MirrorAgentsRelativePath} from CLAUDE.md.");
+                    break;
+                case DocDriftChecker.MirrorRegenResult.AlreadyInSync:
+                    Console.Error.WriteLine($"{DocDriftChecker.MirrorAgentsRelativePath} already in sync with CLAUDE.md.");
+                    break;
+            }
         }
 
         var diagnostics = new List<Diagnostic>();
@@ -104,34 +124,6 @@ public static class SelfCheckCommand
         }
 
         return diagnostics.Count > 0 ? 1 : 0;
-    }
-
-    /// <summary>
-    /// Regenerates generated mirror docs from their single source. Currently:
-    /// AGENTS.md from CLAUDE.md (#708). Idempotent; writes only on change.
-    /// </summary>
-    private static int RegenerateMirrors(string root)
-    {
-        var claudePath = Path.Combine(root, "CLAUDE.md");
-        if (!File.Exists(claudePath))
-        {
-            Console.Error.WriteLine($"error: CLAUDE.md not found at '{claudePath}'");
-            return 2;
-        }
-
-        var expected = DocDriftChecker.AgentsMdFromClaudeMd(File.ReadAllText(claudePath));
-        var agentsPath = Path.Combine(root, DocDriftChecker.MirrorAgentsRelativePath);
-        var current = File.Exists(agentsPath) ? File.ReadAllText(agentsPath).Replace("\r\n", "\n") : null;
-
-        if (current == expected)
-        {
-            Console.Error.WriteLine($"{DocDriftChecker.MirrorAgentsRelativePath} already in sync with CLAUDE.md.");
-            return 0;
-        }
-
-        File.WriteAllText(agentsPath, expected);
-        Console.Error.WriteLine($"Regenerated {DocDriftChecker.MirrorAgentsRelativePath} from CLAUDE.md.");
-        return 0;
     }
 
     private static string? FindRepositoryRoot(string startDirectory)

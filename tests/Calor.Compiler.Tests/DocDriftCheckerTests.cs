@@ -87,6 +87,74 @@ public class DocDriftCheckerTests
         Assert.Contains("is missing", finding.Message);
     }
 
+    [Fact]
+    public void AgentsMdTransform_ThrowsOnAnchorMismatch()
+    {
+        Assert.False(DocDriftChecker.TryAgentsMdFromClaudeMd("# Something Else\n\nbody\n", out _));
+        Assert.Throws<InvalidOperationException>(() =>
+            DocDriftChecker.AgentsMdFromClaudeMd("# Something Else\n"));
+    }
+
+    // --- RegenerateAgentsMd file-IO path (--fix) ---
+
+    private static string NewTempDir()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "calor-mirror-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    [Fact]
+    public void Regenerate_WritesWhenMissingOrStale_ThenIsIdempotent()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "CLAUDE.md"), SampleClaude);
+            var agents = Path.Combine(dir, "AGENTS.md");
+
+            // Missing → written.
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.Written, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.Equal(DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude), File.ReadAllText(agents));
+
+            // Already in sync → no write (idempotent).
+            var before = File.GetLastWriteTimeUtc(agents);
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.AlreadyInSync, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.Equal(before, File.GetLastWriteTimeUtc(agents));
+
+            // Stale → rewritten.
+            File.WriteAllText(agents, "hand edited\n");
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.Written, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.Equal(DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude), File.ReadAllText(agents));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void Regenerate_SourceMissing_DoesNotWrite()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.SourceMissing, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.False(File.Exists(Path.Combine(dir, "AGENTS.md")));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void Regenerate_AnchorMismatch_DoesNotWrite()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "CLAUDE.md"), "# Renamed Title\n\nbody\n");
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.AnchorMismatch, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.False(File.Exists(Path.Combine(dir, "AGENTS.md")));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
     // --- Keyword drift (the §FOREACH-vs-§EACH class) ---
 
     [Fact]

@@ -1,5 +1,5 @@
 # AGENTS.md — Calor Compiler
-<!-- Generated from CLAUDE.md by `calor self-check docs --fix`. Edit CLAUDE.md, not this file (#708). -->
+<!-- Generated from CLAUDE.md by `calor self-check docs --fix`. Edit CLAUDE.md, not this file. -->
 
 Calor is a DSL designed for AI agents that compiles to C# on .NET 10. The compiler lives in `src/Calor.Compiler/` and is packaged as the `calor` global tool. Version is tracked in `Directory.Build.props` (check there for the current version; do not trust a number written in docs).
 

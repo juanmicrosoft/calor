@@ -208,10 +208,23 @@ public static class DocDriftChecker
         var mirrorDocs = new List<MirrorDoc>();
         if (claudeMd is { } claude)
         {
-            var agentsPath = Path.Combine(root, MirrorAgentsRelativePath);
-            var actual = File.Exists(agentsPath) ? File.ReadAllText(agentsPath) : null;
-            mirrorDocs.Add(new MirrorDoc(
-                MirrorAgentsRelativePath, "CLAUDE.md", actual, AgentsMdFromClaudeMd(claude.Content)));
+            if (TryAgentsMdFromClaudeMd(claude.Content, out var expected))
+            {
+                var agentsPath = Path.Combine(root, MirrorAgentsRelativePath);
+                var actual = File.Exists(agentsPath) ? File.ReadAllText(agentsPath) : null;
+                mirrorDocs.Add(new MirrorDoc(MirrorAgentsRelativePath, "CLAUDE.md", actual, expected));
+            }
+            else
+            {
+                // The transform anchors on CLAUDE.md's H1; if that changed, the
+                // mirror can't be generated. Surface it loudly (never a silent guess).
+                loadErrors.Add(Drift(
+                    DiagnosticCode.DocDriftMirrorOutOfSync,
+                    $"CLAUDE.md H1 no longer matches the expected anchor '{ClaudeTitleAnchor}' — " +
+                    "the AGENTS.md mirror transform cannot run. Restore the H1 or update the anchor " +
+                    "in DocDriftChecker.",
+                    "CLAUDE.md", 1, 1));
+            }
         }
 
         return new DocDriftInputs
@@ -235,22 +248,68 @@ public static class DocDriftChecker
     /// <summary>Repo-relative path of the generated agent-manual mirror.</summary>
     public const string MirrorAgentsRelativePath = "AGENTS.md";
 
+    /// <summary>The CLAUDE.md H1 the AGENTS.md transform anchors on.</summary>
+    public const string ClaudeTitleAnchor = "# CLAUDE.md — Calor Compiler";
+
+    private const string AgentsHead =
+        "# AGENTS.md — Calor Compiler\n" +
+        "<!-- Generated from CLAUDE.md by `calor self-check docs --fix`. Edit CLAUDE.md, not this file. -->";
+
     /// <summary>
     /// The single-source transform: AGENTS.md is CLAUDE.md with the H1 title
     /// swapped and a generated-file banner, so editing CLAUDE.md and running
     /// <c>calor self-check docs --fix</c> keeps the two agent manuals identical
-    /// in content. Deterministic and idempotent.
+    /// in content. Deterministic and idempotent. Returns false (no silent guess)
+    /// when CLAUDE.md's H1 does not match <see cref="ClaudeTitleAnchor"/>.
     /// </summary>
-    public static string AgentsMdFromClaudeMd(string claudeContent)
+    public static bool TryAgentsMdFromClaudeMd(string claudeContent, out string result)
     {
         var normalized = claudeContent.Replace("\r\n", "\n");
-        const string claudeTitle = "# CLAUDE.md — Calor Compiler";
-        const string agentsHead =
-            "# AGENTS.md — Calor Compiler\n" +
-            "<!-- Generated from CLAUDE.md by `calor self-check docs --fix`. Edit CLAUDE.md, not this file (#708). -->";
-        return normalized.StartsWith(claudeTitle, StringComparison.Ordinal)
-            ? agentsHead + normalized[claudeTitle.Length..]
-            : agentsHead + "\n\n" + normalized;
+        if (!normalized.StartsWith(ClaudeTitleAnchor, StringComparison.Ordinal))
+        {
+            result = "";
+            return false;
+        }
+        result = AgentsHead + normalized[ClaudeTitleAnchor.Length..];
+        return true;
+    }
+
+    /// <summary>
+    /// Throwing convenience wrapper over <see cref="TryAgentsMdFromClaudeMd"/>.
+    /// </summary>
+    public static string AgentsMdFromClaudeMd(string claudeContent) =>
+        TryAgentsMdFromClaudeMd(claudeContent, out var result)
+            ? result
+            : throw new InvalidOperationException(
+                $"CLAUDE.md H1 does not match the expected anchor '{ClaudeTitleAnchor}'.");
+
+    /// <summary>Outcome of regenerating the AGENTS.md mirror from CLAUDE.md.</summary>
+    public enum MirrorRegenResult { AlreadyInSync, Written, SourceMissing, AnchorMismatch }
+
+    /// <summary>
+    /// Regenerates AGENTS.md from CLAUDE.md under <paramref name="root"/>. Idempotent:
+    /// writes only when the on-disk mirror differs from the transform. Does not write
+    /// on <see cref="MirrorRegenResult.SourceMissing"/> or <see cref="MirrorRegenResult.AnchorMismatch"/>.
+    /// </summary>
+    public static MirrorRegenResult RegenerateAgentsMd(string root)
+    {
+        var claudePath = Path.Combine(root, "CLAUDE.md");
+        if (!File.Exists(claudePath))
+        {
+            return MirrorRegenResult.SourceMissing;
+        }
+        if (!TryAgentsMdFromClaudeMd(File.ReadAllText(claudePath), out var expected))
+        {
+            return MirrorRegenResult.AnchorMismatch;
+        }
+        var agentsPath = Path.Combine(root, MirrorAgentsRelativePath);
+        var current = File.Exists(agentsPath) ? File.ReadAllText(agentsPath).Replace("\r\n", "\n") : null;
+        if (current == expected)
+        {
+            return MirrorRegenResult.AlreadyInSync;
+        }
+        File.WriteAllText(agentsPath, expected);
+        return MirrorRegenResult.Written;
     }
 
     private static void CheckMirror(MirrorDoc mirror, List<Diagnostic> diagnostics)
