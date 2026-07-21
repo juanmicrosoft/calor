@@ -34,6 +34,10 @@ public static class SelfCheckCommand
             description: "Output format: text (human-readable, stderr), json (unified schema on stdout), or sarif (SARIF 2.1.0 on stdout)");
         formatOption.FromAmong("text", "json", "sarif");
 
+        var fixOption = new Option<bool>(
+            aliases: ["--fix"],
+            description: "Regenerate generated mirror docs (AGENTS.md from CLAUDE.md) instead of only reporting drift");
+
         var docsCommand = new Command("docs",
             "Check agent-facing docs against the compiler implementation. " +
             "Covered files: CLAUDE.md, docs/syntax-reference/*.md, and docs/cli/*.md " +
@@ -43,24 +47,26 @@ public static class SelfCheckCommand
             "the effect registry in both directions; (4) the Calor13xx table in " +
             "docs/cli/structured-output.md is complete; (5) no doc hardcodes the current version; " +
             "(6) every fenced ```calor example that declares a complete program (first non-blank " +
-            "line starts with §M) parses with the current compiler. " +
+            "line starts with §M) parses with the current compiler; (7) AGENTS.md is in sync with its single source CLAUDE.md (--fix regenerates it). " +
             "Suppress an intentional-meta-notation finding by putting <!-- drift:ignore --> on the " +
             "preceding line (see docs/cli/self-check.md). Exits 1 when drift is found")
         {
             rootOption,
-            formatOption
+            formatOption,
+            fixOption
         };
 
         docsCommand.SetHandler((InvocationContext ctx) =>
         {
             var root = ctx.ParseResult.GetValueForOption(rootOption);
             var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
-            ctx.ExitCode = Execute(root, format);
+            var fix = ctx.ParseResult.GetValueForOption(fixOption);
+            ctx.ExitCode = Execute(root, format, fix);
         });
         return docsCommand;
     }
 
-    private static int Execute(string? root, string format)
+    private static int Execute(string? root, string format, bool fix = false)
     {
         var resolvedRoot = root ?? FindRepositoryRoot(Directory.GetCurrentDirectory());
         if (resolvedRoot == null)
@@ -68,6 +74,31 @@ public static class SelfCheckCommand
             Console.Error.WriteLine(
                 "error: could not locate a repository root (a directory containing CLAUDE.md and Directory.Build.props); pass --root");
             return 2;
+        }
+
+        if (fix)
+        {
+            // Regenerate mirror docs, then fall through to the full check so --fix
+            // never silently skips the other drift checks (keywords, codes, effects,
+            // versions, examples) and reports success. A source-missing error is fatal;
+            // an anchor mismatch is surfaced as a finding by the check below.
+            switch (DocDriftChecker.RegenerateAgentsMd(resolvedRoot))
+            {
+                case DocDriftChecker.MirrorRegenResult.SourceMissing:
+                    Console.Error.WriteLine("error: CLAUDE.md not found; cannot regenerate AGENTS.md");
+                    return 2;
+                case DocDriftChecker.MirrorRegenResult.AnchorMismatch:
+                    Console.Error.WriteLine(
+                        $"warning: CLAUDE.md H1 does not match '{DocDriftChecker.ClaudeTitleAnchor}'; " +
+                        "AGENTS.md not regenerated (reported below)");
+                    break;
+                case DocDriftChecker.MirrorRegenResult.Written:
+                    Console.Error.WriteLine($"Regenerated {DocDriftChecker.MirrorAgentsRelativePath} from CLAUDE.md.");
+                    break;
+                case DocDriftChecker.MirrorRegenResult.AlreadyInSync:
+                    Console.Error.WriteLine($"{DocDriftChecker.MirrorAgentsRelativePath} already in sync with CLAUDE.md.");
+                    break;
+            }
         }
 
         var diagnostics = new List<Diagnostic>();

@@ -20,7 +20,8 @@ public class DocDriftCheckerTests
         DocFile? effectsReferenceDoc = null,
         DocFile[]? effectDocsForwardOnly = null,
         DocFile? cliCodesDoc = null,
-        DocFile[]? versionScanDocs = null)
+        DocFile[]? versionScanDocs = null,
+        MirrorDoc[]? mirrorDocs = null)
     {
         return new DocDriftInputs
         {
@@ -36,7 +37,122 @@ public class DocDriftCheckerTests
             EffectDocsForwardOnly = effectDocsForwardOnly ?? [],
             CliCodesDoc = cliCodesDoc,
             VersionScanDocs = versionScanDocs ?? [],
+            MirrorDocs = mirrorDocs ?? [],
         };
+    }
+
+    // --- Mirror-doc drift (AGENTS.md single-sourced from CLAUDE.md, #708) ---
+
+    private const string SampleClaude =
+        "# CLAUDE.md — Calor Compiler\n\nBuild with `dotnet build`. Use `§F{id:Name:pub}`.\n";
+
+    [Fact]
+    public void AgentsMdTransform_SwapsTitle_AddsBanner_IsIdempotent()
+    {
+        var once = DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude);
+        Assert.StartsWith("# AGENTS.md — Calor Compiler\n", once);
+        Assert.Contains("Generated from CLAUDE.md", once);
+        Assert.DoesNotContain("# CLAUDE.md — Calor Compiler", once);
+        // Body is preserved verbatim after the swapped head.
+        Assert.Contains("Build with `dotnet build`. Use `§F{id:Name:pub}`.", once);
+        // Regenerating from CLAUDE.md yields the same bytes (deterministic).
+        Assert.Equal(once, DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude));
+    }
+
+    [Fact]
+    public void MirrorInSync_PassesClean()
+    {
+        var expected = DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude);
+        var mirror = new MirrorDoc("AGENTS.md", "CLAUDE.md", expected, expected);
+        Assert.Empty(DocDriftChecker.Check(BaseInputs(mirrorDocs: [mirror])));
+    }
+
+    [Fact]
+    public void MirrorOutOfSync_IsDetected()
+    {
+        var expected = DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude);
+        var mirror = new MirrorDoc("AGENTS.md", "CLAUDE.md", expected + "hand edit\n", expected);
+        var finding = Assert.Single(DocDriftChecker.Check(BaseInputs(mirrorDocs: [mirror])));
+        Assert.Equal(DiagnosticCode.DocDriftMirrorOutOfSync, finding.Code);
+        Assert.Contains("out of sync", finding.Message);
+    }
+
+    [Fact]
+    public void MirrorMissing_IsDetected()
+    {
+        var expected = DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude);
+        var mirror = new MirrorDoc("AGENTS.md", "CLAUDE.md", Actual: null, expected);
+        var finding = Assert.Single(DocDriftChecker.Check(BaseInputs(mirrorDocs: [mirror])));
+        Assert.Equal(DiagnosticCode.DocDriftMirrorOutOfSync, finding.Code);
+        Assert.Contains("is missing", finding.Message);
+    }
+
+    [Fact]
+    public void AgentsMdTransform_ThrowsOnAnchorMismatch()
+    {
+        Assert.False(DocDriftChecker.TryAgentsMdFromClaudeMd("# Something Else\n\nbody\n", out _));
+        Assert.Throws<InvalidOperationException>(() =>
+            DocDriftChecker.AgentsMdFromClaudeMd("# Something Else\n"));
+    }
+
+    // --- RegenerateAgentsMd file-IO path (--fix) ---
+
+    private static string NewTempDir()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "calor-mirror-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    [Fact]
+    public void Regenerate_WritesWhenMissingOrStale_ThenIsIdempotent()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "CLAUDE.md"), SampleClaude);
+            var agents = Path.Combine(dir, "AGENTS.md");
+
+            // Missing → written.
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.Written, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.Equal(DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude), File.ReadAllText(agents));
+
+            // Already in sync → no write (idempotent).
+            var before = File.GetLastWriteTimeUtc(agents);
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.AlreadyInSync, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.Equal(before, File.GetLastWriteTimeUtc(agents));
+
+            // Stale → rewritten.
+            File.WriteAllText(agents, "hand edited\n");
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.Written, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.Equal(DocDriftChecker.AgentsMdFromClaudeMd(SampleClaude), File.ReadAllText(agents));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void Regenerate_SourceMissing_DoesNotWrite()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.SourceMissing, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.False(File.Exists(Path.Combine(dir, "AGENTS.md")));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
+    }
+
+    [Fact]
+    public void Regenerate_AnchorMismatch_DoesNotWrite()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "CLAUDE.md"), "# Renamed Title\n\nbody\n");
+            Assert.Equal(DocDriftChecker.MirrorRegenResult.AnchorMismatch, DocDriftChecker.RegenerateAgentsMd(dir));
+            Assert.False(File.Exists(Path.Combine(dir, "AGENTS.md")));
+        }
+        finally { Directory.Delete(dir, recursive: true); }
     }
 
     // --- Keyword drift (the §FOREACH-vs-§EACH class) ---

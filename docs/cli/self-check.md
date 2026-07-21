@@ -97,3 +97,19 @@ checked for completeness), and anything in files outside the covered set.
 
 The check runs on every PR as a step of the `test` job in
 `.github/workflows/test.yml`, reusing that job's build.
+
+## Generated mirror docs (AGENTS.md)
+
+`AGENTS.md` is a **generated** derivative of `CLAUDE.md` — identical content with
+the H1 title swapped and a "generated" banner — so the two agent manuals cannot
+drift. It is single-sourced from `CLAUDE.md` and checked by `self-check docs`
+(`Calor1329` when out of sync or missing). Do not hand-edit `AGENTS.md`; edit
+`CLAUDE.md` and regenerate:
+
+```
+calor self-check docs --fix
+```
+
+`--fix` rewrites `AGENTS.md` from `CLAUDE.md` (idempotent; writes only on change).
+The CI step "Check agent-facing docs against the implementation (spec drift)" runs `self-check docs` without `--fix`, so an un-regenerated
+`AGENTS.md` fails the build.
