@@ -7,6 +7,10 @@ to C#. **Never write structural closer tags** (`§/M`, `§/F`, `§/IF`, `§/WH`,
 written are `§/C` (call arg lists), `§/LAM` (block lambdas), `§/NEW`, and
 `§/LIST`/`§/DICT` (empty collection literals).
 
+Every complete `§M{...}` program in the "Complete programs" section below compiles
+(the compiler's own tests prove it); the reference blocks show the shape of each
+construct, and every idiom in them is exercised by one of those programs.
+
 ## Core tags
 
 ```
@@ -17,6 +21,7 @@ written are `§/C` (call arg lists), `§/LAM` (block lambdas), `§/NEW`, and
 §B{name:str} expr               Immutable binding (type annotation optional: §B{name})
 §B{~name:i32} 0                 Mutable binding (~ prefix required to reassign)
 §ASSIGN name expr               Reassign a mutable binding
+§Q (pre)  §S (post)             Precondition / postcondition (post can use `result`)
 §R expr                         Return (bare §R for void)
 §P expr                         Print line
 §IF{id} (cond) / §EI (cond) / §EL   If / else-if / else (§EI/§EL at §IF's column)
@@ -68,9 +73,11 @@ A function whose body mutates a collection (`§PUSH`, `§PUT`, `§SETIDX`) must
 declare `mut` in `§E{...}`; file reads/writes need `fs:r` / `fs:w` / `fs:rw`.
 Callers must declare (at least) the union of their callees' effects.
 
-**Arrays vs lists (E1a-measured trap):** `File.ReadAllLines` returns an ARRAY — bind it as `[str]`. Do NOT copy `[str]` into signatures that require `List<str>`; match the type the surrounding surface declares.
+**Arrays vs lists (common trap):** `File.ReadAllLines` returns an ARRAY — bind it
+as `[str]`. Do NOT copy `[str]` into signatures that require `List<str>`; match
+the type the surrounding surface declares.
 
-## Complete programs (every one compiles)
+## Complete programs (the compiler's tests prove every one compiles)
 
 ```
 §M{m1:Contracts}
@@ -96,7 +103,42 @@ Callers must declare (at least) the union of their callees' effects.
 ```
 
 ```
-§M{m3:Effects}
+§M{m3:Files}
+  §F{f1:Append:pub} (str:path, str:key, str:value) -> void
+    §E{fs:w}
+    §C{File.AppendAllText} §A path §A (+ key (+ "=" (+ value "\n"))) §/C
+
+  §F{f2:CountLines:pub} (str:path) -> i32
+    §E{fs:r}
+    §B{ok:bool} §C{File.Exists} §A path §/C
+    §IF{if1} (! ok)
+      §R 0
+    §B{lines:[str]} §C{File.ReadAllLines} §A path §/C
+    §R (len lines)
+```
+
+```
+§M{m4:Strings}
+  §F{f1:FirstField:pub} (str:line) -> str
+    §E{}
+    §B{i:i32} (indexof line "," :ordinal)
+    §IF{if1} (< i 0)
+      §R line
+    §R (substr line 0 i)
+```
+
+```
+§M{m5:Collections}
+  §F{f1:Tally:pub} (str:key) -> i32
+    §E{mut}
+    §DICT{counts:str:i32}
+    §/DICT{counts}
+    §PUT{counts} key 1
+    §R §IDX counts key
+```
+
+```
+§M{m6:Effects}
   §F{f1:Greet:pub} (str:name) -> void
     §E{cw}
     §C{Console.WriteLine} §A "Hello" §/C
@@ -104,7 +146,7 @@ Callers must declare (at least) the union of their callees' effects.
 ```
 
 ```
-§M{m4:Loops}
+§M{m7:Loops}
   §F{f1:PrintOneToFive:pub} () -> void
     §E{cw}
     §L{l1:i:1:5:1}
@@ -112,7 +154,7 @@ Callers must declare (at least) the union of their callees' effects.
 ```
 
 ```
-§M{m5:Bindings}
+§M{m8:Bindings}
   §F{f1:Demo:pub} () -> void
     §E{cw}
     §B{greeting:str} "Ada"
@@ -122,23 +164,26 @@ Callers must declare (at least) the union of their callees' effects.
 ```
 
 ```
-§M{m6:Classes}
+§M{m9:Classes}
   §CL{c1:Greeter:pub}
     §MT{mt1:Greet:pub} () -> str
       §R "hello"
 ```
 
-## Common mistakes (do NOT write these)
+## Common mistakes (these do NOT compile — shown so you avoid them)
 
-- **Closer tags.** Never write slash-form closers for blocks; a block ends when
-  indentation decreases. The only closers ever written are the call/collection
-  ones listed at the top.
-- **Uppercase result.** The return value in a postcondition is lowercase
-  `result`: write `§S (>= result 0)`, not the uppercase form.
-- **If without an id / braces for the condition.** Write `§IF{if1} (> x 0)` —
-  ids are required and the condition goes in `(parens)`, never `{braces}`.
-- **Four-field function header.** A header like `§F{f1:Add:pub}` takes its return
-  type from the inline signature (`-> i32`); do not pack the return type into the
-  brace fields.
-- **`else`/`else-if` spelling.** Else is `§EL`, else-if is `§EI` (no id, at the
-  `§IF`'s column). Do not spell them out as words.
+```
+<!-- drift:ignore -->
+§/F §/M §/I §/L       removed; use indentation only (a block ends on dedent)
+<!-- drift:ignore -->
+§S (>= §RESULT 0)     wrong; the return value is lowercase: §S (>= result 0)
+§IF (> x 0)           wrong; §IF needs an id: §IF{if1} (> x 0)
+§IF{i1}{x > 0}        wrong; the condition goes in (parens), not braces
+<!-- drift:ignore -->
+§K   §ELSE            no such keywords; else is §EL, else-if is §EI (no id)
+§F{f1:Add:i32:pub}    wrong; a 4-field header drops the return type. Use:
+                     §F{f1:Add:pub} (i32:a, i32:b) -> i32
+```
+
+Effects: `§E{cw}` declares console write; declare effects on any function that
+performs I/O. See the `calor://effects` resource for the full effect catalog.

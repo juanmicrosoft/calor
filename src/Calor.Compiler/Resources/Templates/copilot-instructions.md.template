@@ -10,8 +10,8 @@ This project uses **Calor**, a DSL that compiles to C# on .NET 10. The Calor MCP
 3. **Never edit `.g.cs` files** — they are auto-generated from `.calr` sources.
 4. **Validate after writing** — run `calor_check` MCP tool (action=diagnose) after any `.calr` edit.
 5. **Read the primer once, up front** — read the `calor://primer` MCP resource at the
-   start of a Calor session (a measured syntax exemplar; in-context up front brings
-   green-field Calor to C# iteration parity), then use `calor_help` for specific lookups.
+   start of a Calor session (a measured syntax exemplar that in one
+   experiment (E1a, n=30) brought green-field Calor to C# iteration parity on one task), then use `calor_help` for specific lookups.
 
 ### MCP Tools (available via `calor mcp --stdio`)
 

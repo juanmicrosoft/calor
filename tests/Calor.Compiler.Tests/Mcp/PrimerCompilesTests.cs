@@ -94,8 +94,8 @@ public class PrimerCompilesTests
         // Guards against a silently-empty extractor: the primer's "Complete programs"
         // section teaches one compilable module per core construct.
         var names = PrimerModules().Select(o => (string)o[0]).ToList();
-        Assert.Equal(6, names.Count);
-        foreach (var construct in new[] { "Contracts", "Branching", "Effects", "Loops", "Bindings", "Classes" })
+        Assert.Equal(9, names.Count);
+        foreach (var construct in new[] { "Contracts", "Branching", "Files", "Strings", "Collections", "Effects", "Loops", "Bindings", "Classes" })
         {
             Assert.Contains(names, n => n.Contains(construct, System.StringComparison.Ordinal));
         }

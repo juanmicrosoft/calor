@@ -480,17 +480,29 @@ public sealed class McpMessageHandler
         | `HashSet<T>` | `§HSET{name:type}` | HashSet collection |
         """;
 
+    private static string? _primerCache;
+
     private static string GetPrimerContent()
     {
-        // Single source of truth: the E1a-validated, self-check-guarded syntax
-        // exemplar (docs & bench read the same embedded bytes). E1a (2026-07-17)
-        // measured a 60-line exemplar collapsing green-field iteration cost to
-        // C# parity on one pair; this is that sheet.
+        // Single source of truth: the self-check-guarded syntax exemplar
+        // (src/Calor.Compiler/Resources/agent-syntax-exemplar.md). E1a (2026-07-17,
+        // n=30/arm) measured a syntax exemplar bringing green-field Calor to C#
+        // iteration parity on one pair; this is that sheet. Throws if missing so a
+        // packaging error fails loudly rather than serving a stub.
+        if (_primerCache != null) return _primerCache;
         var assembly = Assembly.GetExecutingAssembly();
-        using var stream = assembly.GetManifestResourceStream("Calor.Compiler.Resources.agent-syntax-exemplar.md");
-        if (stream == null) return "Calor syntax exemplar unavailable.";
+        using var stream = assembly.GetManifestResourceStream("Calor.Compiler.Resources.agent-syntax-exemplar.md")
+            ?? throw new InvalidOperationException(
+                "Embedded resource 'Calor.Compiler.Resources.agent-syntax-exemplar.md' not found — " +
+                "csproj LogicalName and this string have drifted.");
         using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
+        var raw = reader.ReadToEnd();
+        // Strip authoring-only self-check suppression markers; they are noise to a
+        // reading agent and mean nothing outside the drift checker.
+        var lines = raw.Replace("\r\n", "\n").Split('\n')
+            .Where(l => l.Trim() != "<!-- drift:ignore -->");
+        _primerCache = string.Join("\n", lines);
+        return _primerCache;
     }
 
     internal static string GetPrimerContentPublic() => GetPrimerContent();
