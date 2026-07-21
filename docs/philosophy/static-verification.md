@@ -84,7 +84,7 @@ Z3 found a counterexample showing the contract can be violated. A warning is emi
 ```
 
 ```
-warning Calor0702: Postcondition may be violated in function 'BadDecrement'.
+warning Calor0712: Postcondition may be violated in function 'BadDecrement'.
   Contract: (>= result 0)
   Counterexample: x = 0
   Result: -1
