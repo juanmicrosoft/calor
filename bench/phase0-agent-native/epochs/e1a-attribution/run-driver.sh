@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # E1a attribution experiment driver (machine-zone.md §1/§9/§12.4).
 #
 # 2 pairs x 3 arms x 30 sequential runs = 180 runs. Blocks of 30 (one
@@ -45,6 +46,6 @@ log "E1a driver starting (pid $$)"
 for pair in N1-003-csv-row W3-003-kv-journal; do
     run_block "$pair" csharp ""                    csharp
     run_block "$pair" calor  ""                    calor
-    run_block "$pair" calor  "$BENCH/exemplar.md"  calor+exemplar
+    run_block "$pair" calor  "$SCRIPT_DIR/exemplar-as-run.md"  calor+exemplar
 done
 log "E1a driver complete"

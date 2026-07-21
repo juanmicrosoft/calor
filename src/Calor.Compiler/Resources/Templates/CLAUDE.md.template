@@ -7,7 +7,7 @@ This is an **Calor-first project**. All new code MUST be written in Calor. Exist
 ### MANDATORY Rules for AI Agents
 
 **Rule 0: Read the primer before writing Calor**
-- At session start, read `calor://primer` MCP resource for canonical Calor examples
+- **At session start, read the `calor://primer` MCP resource once** — a measured syntax exemplar that in one experiment (E1a, n=30) brought green-field Calor to C# iteration parity on one task. Having it in context up front matters more than any single lookup.
 - Use `calor_help` MCP tool for syntax guidance when needed
 
 **Rule 1: Never create new `.cs` files**
