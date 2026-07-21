@@ -24,7 +24,18 @@ public class PrimerCompilesTests
     /// </summary>
     public static IEnumerable<object[]> PrimerModules()
     {
-        var lines = McpResourceValidator.GetPrimer().Replace("\r\n", "\n").Split('\n');
+        var all = McpResourceValidator.GetPrimer().Replace("\r\n", "\n").Split('\n');
+
+        // Scope to the "## Complete programs" section: the compact "Core tags" reference
+        // block above it lists tag stubs (e.g. `§M{id:Name}  Module`) that are teaching
+        // templates, not compilable modules. Only the complete-programs section is the
+        // "every one compiles" contract.
+        var progStart = System.Array.FindIndex(all, l => l.StartsWith("## Complete programs", System.StringComparison.Ordinal));
+        Assert.True(progStart >= 0, "Primer no longer has a \"## Complete programs\" section.");
+        var progEnd = System.Array.FindIndex(all, progStart + 1, l => l.StartsWith("## ", System.StringComparison.Ordinal));
+        if (progEnd < 0) progEnd = all.Length;
+        var lines = all[progStart..progEnd];
+
         var i = 0;
         while (i < lines.Length)
         {
@@ -80,8 +91,13 @@ public class PrimerCompilesTests
     [Fact]
     public void Primer_ExposesEveryTaughtModule()
     {
-        // Guards against a silently-empty extractor: the primer teaches one complete
-        // module per construct (Basics, Effects, Contracts, Branching, Loops, Bindings, Classes).
-        Assert.Equal(7, PrimerModules().Count());
+        // Guards against a silently-empty extractor: the primer's "Complete programs"
+        // section teaches one compilable module per core construct.
+        var names = PrimerModules().Select(o => (string)o[0]).ToList();
+        Assert.Equal(6, names.Count);
+        foreach (var construct in new[] { "Contracts", "Branching", "Effects", "Loops", "Bindings", "Classes" })
+        {
+            Assert.Contains(names, n => n.Contains(construct, System.StringComparison.Ordinal));
+        }
     }
 }

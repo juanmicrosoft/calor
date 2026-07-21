@@ -69,3 +69,76 @@ declare `mut` in `§E{...}`; file reads/writes need `fs:r` / `fs:w` / `fs:rw`.
 Callers must declare (at least) the union of their callees' effects.
 
 **Arrays vs lists (E1a-measured trap):** `File.ReadAllLines` returns an ARRAY — bind it as `[str]`. Do NOT copy `[str]` into signatures that require `List<str>`; match the type the surrounding surface declares.
+
+## Complete programs (every one compiles)
+
+```
+§M{m1:Contracts}
+  §F{f1:Square:pub} (i32:x) -> i32
+    §Q (>= x 0)
+    §S (>= result 0)
+    §R (* x x)
+
+  §F{f2:Divide:pub} (i32:a, i32:b) -> i32
+    §Q{"divisor must not be zero"} (!= b 0)
+    §R (/ a b)
+```
+
+```
+§M{m2:Branching}
+  §F{f1:Sign:pub} (i32:x) -> i32
+    §IF{if1} (> x 0)
+      §R 1
+    §EI (< x 0)
+      §R (- 0 1)
+    §EL
+      §R 0
+```
+
+```
+§M{m3:Effects}
+  §F{f1:Greet:pub} (str:name) -> void
+    §E{cw}
+    §C{Console.WriteLine} §A "Hello" §/C
+    §C{Console.WriteLine} §A name §/C
+```
+
+```
+§M{m4:Loops}
+  §F{f1:PrintOneToFive:pub} () -> void
+    §E{cw}
+    §L{l1:i:1:5:1}
+      §C{Console.WriteLine} §A i §/C
+```
+
+```
+§M{m5:Bindings}
+  §F{f1:Demo:pub} () -> void
+    §E{cw}
+    §B{greeting:str} "Ada"
+    §B{~count:i32} 0
+    §C{Console.WriteLine} §A greeting §/C
+    §C{Console.WriteLine} §A count §/C
+```
+
+```
+§M{m6:Classes}
+  §CL{c1:Greeter:pub}
+    §MT{mt1:Greet:pub} () -> str
+      §R "hello"
+```
+
+## Common mistakes (do NOT write these)
+
+- **Closer tags.** Never write slash-form closers for blocks; a block ends when
+  indentation decreases. The only closers ever written are the call/collection
+  ones listed at the top.
+- **Uppercase result.** The return value in a postcondition is lowercase
+  `result`: write `§S (>= result 0)`, not the uppercase form.
+- **If without an id / braces for the condition.** Write `§IF{if1} (> x 0)` —
+  ids are required and the condition goes in `(parens)`, never `{braces}`.
+- **Four-field function header.** A header like `§F{f1:Add:pub}` takes its return
+  type from the inline signature (`-> i32`); do not pack the return type into the
+  brace fields.
+- **`else`/`else-if` spelling.** Else is `§EL`, else-if is `§EI` (no id, at the
+  `§IF`'s column). Do not spell them out as words.

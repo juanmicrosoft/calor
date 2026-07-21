@@ -480,112 +480,18 @@ public sealed class McpMessageHandler
         | `HashSet<T>` | `§HSET{name:type}` | HashSet collection |
         """;
 
-    private static string GetPrimerContent() => """
-        CALOR LANGUAGE PRIMER -- read once. Calor is INDENT-ONLY and every example below compiles.
-
-        Nesting uses indentation (2 spaces per level). There are NO closing tags such as
-        §/F, §/M, §/I, §/L -- a block ends when the indentation decreases. (The call
-        closer §/C still exists and is optional.) IDs like m1, f1, if1 are short labels
-        you choose; any token works.
-
-        -- Module + functions ------------------------------
-
-        §M{m1:Basics}
-          §F{f1:Add:pub} (i32:a, i32:b) -> i32
-            §R (+ a b)
-
-          §F{f2:IsPositive:pub} (i32:x) -> bool
-            §R (> x 0)
-
-        -- Effects + calls ---------------------------------
-
-        §M{m2:Effects}
-          §F{f1:Greet:pub} (str:name) -> void
-            §E{cw}
-            §C{Console.WriteLine} §A "Hello" §/C
-            §C{Console.WriteLine} §A name §/C
-
-        -- Contracts (pre/postconditions; result = return value) --
-
-        §M{m3:Contracts}
-          §F{f1:Square:pub} (i32:x) -> i32
-            §Q (>= x 0)
-            §S (>= result 0)
-            §R (* x x)
-
-          §F{f2:Divide:pub} (i32:a, i32:b) -> i32
-            §Q{"divisor must not be zero"} (!= b 0)
-            §R (/ a b)
-
-        -- If / else-if / else -----------------------------
-
-        §M{m4:Branching}
-          §F{f1:Sign:pub} (i32:x) -> i32
-            §IF{if1} (> x 0)
-              §R 1
-            §EI (< x 0)
-              §R (- 0 1)
-            §EL
-              §R 0
-
-        -- For loop ----------------------------------------
-
-        §M{m5:Loops}
-          §F{f1:PrintOneToFive:pub} () -> void
-            §E{cw}
-            §L{l1:i:1:5:1}
-              §C{Console.WriteLine} §A i §/C
-
-        -- Bindings (immutable, and ~mutable) --------------
-
-        §M{m6:Bindings}
-          §F{f1:Demo:pub} () -> void
-            §E{cw}
-            §B{greeting:str} "Ada"
-            §B{~count:i32} 0
-            §C{Console.WriteLine} §A greeting §/C
-            §C{Console.WriteLine} §A count §/C
-
-        -- Class with a method -----------------------------
-
-        §M{m7:Classes}
-          §CL{c1:Greeter:pub}
-            §MT{mt1:Greet:pub} () -> str
-              §R "hello"
-
-        -- Common mistakes (these do NOT compile) ----------
-
-          §/F §/M §/I §/L       removed; use indentation only (a block ends on dedent)
-          §S (>= §RESULT 0)     wrong; the return value is lowercase: §S (>= result 0)
-          §IF (> x 0)           wrong; §IF needs an id: §IF{if1} (> x 0)
-          §IF{i1}{x > 0}        wrong; the condition goes in (parens), not braces
-          §K   §ELSE            no such keywords; else is §EL, else-if is §EI (no id)
-          §F{f1:Add:i32:pub}    wrong; a 4-field header drops the return type. Use:
-                                §F{f1:Add:pub} (i32:a, i32:b) -> i32
-
-        -- Quick reference ---------------------------------
-
-        FUNCTION   §F{id:Name:vis} (type:param, ...) -> retType      vis = pub | priv
-        CALL       §C{Target} §A arg §/C         §/C optional; one §A per argument
-        RETURN     §R (expr)                     e.g. §R (+ a b)   §R x   §R "text"
-        PRINT      §P expr                       Console.WriteLine shorthand (needs §E{cw})
-        BIND       §B{name:type} value           §B{~name:type} value   (~ = mutable)
-        LOOP       §L{id:var:from:to:step}       e.g. §L{l1:i:1:5:1}
-        IF/ELSE    §IF{id} (cond) / §EI (cond) / §EL
-        CONTRACTS  §Q (pre)   §S (post; uses result)   §INV (invariant)
-        CLASS      §CL{id:Name:vis} / method §MT{id:Name:vis} (...) -> ret / field §FLD{type:name:vis}
-
-        EXPRESSIONS (Lisp prefix form)
-          arithmetic   (+ a b) (- a b) (* a b) (/ a b) (% a b)
-          comparison   (== x y) (!= x y) (< x y) (<= x y) (> x y) (>= x y)
-          logical      (&& a b) (|| a b) (! a)
-
-        LITERALS   integers 42   strings "hello"   booleans true / false   floats 3.14
-
-        EFFECTS    §E{cw} declares side effects (cw = console write). See calor://effects.
-                   Declare effects on any function that performs IO. Calls outside the
-                   standard library are not yet effect-resolved.
-        """;
+    private static string GetPrimerContent()
+    {
+        // Single source of truth: the E1a-validated, self-check-guarded syntax
+        // exemplar (docs & bench read the same embedded bytes). E1a (2026-07-17)
+        // measured a 60-line exemplar collapsing green-field iteration cost to
+        // C# parity on one pair; this is that sheet.
+        var assembly = Assembly.GetExecutingAssembly();
+        using var stream = assembly.GetManifestResourceStream("Calor.Compiler.Resources.agent-syntax-exemplar.md");
+        if (stream == null) return "Calor syntax exemplar unavailable.";
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
 
     internal static string GetPrimerContentPublic() => GetPrimerContent();
 

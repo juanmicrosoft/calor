@@ -168,7 +168,7 @@ public static class DocDriftChecker
         var cliDocs = LoadDocsInDirectory(root, Path.Combine("docs", "cli"), loadErrors);
         // Exemplar sheets are load-bearing agent infrastructure (E1a: agents
         // copy their lines verbatim) and get full drift treatment.
-        var exemplarDoc = LoadDoc(root, Path.Combine("bench", "phase0-agent-native", "exemplar.md"), loadErrors);
+        var exemplarDoc = LoadDoc(root, Path.Combine("src", "Calor.Compiler", "Resources", "agent-syntax-exemplar.md"), loadErrors);
 
         // The scanned set for the keyword and diagnostic-code checks:
         // CLAUDE.md + every docs/syntax-reference/*.md + every docs/cli/*.md.
