@@ -16,17 +16,17 @@ internal static class WatchDebouncer
     /// distinct set of changed paths. Returns null when the channel completes or
     /// <paramref name="cancellationToken"/> is cancelled (clean shutdown).
     /// </summary>
+    /// <param name="timeProvider">
+    /// Source of the quiet-period timer. Production passes <see cref="TimeProvider.System"/>;
+    /// tests pass a <c>FakeTimeProvider</c> to drive the quiet window on virtual time,
+    /// so batch boundaries are deterministic instead of racing a real clock (see #714).
+    /// </param>
     public static async Task<IReadOnlyCollection<string>?> ReadBatchAsync(
         ChannelReader<string> reader,
         TimeSpan quietPeriod,
-        CancellationToken cancellationToken,
-        Func<TimeSpan, CancellationToken, Task>? delay = null)
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
     {
-        // The quiet-period timer is injectable so tests can drive batch boundaries
-        // deterministically instead of racing a real wall clock (see #714); production
-        // uses Task.Delay.
-        delay ??= static (period, ct) => Task.Delay(period, ct);
-
         var batch = new HashSet<string>(
             OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
@@ -45,7 +45,7 @@ internal static class WatchDebouncer
             // Drain follow-up events until a full quiet period passes.
             while (true)
             {
-                var quiet = delay(quietPeriod, cancellationToken);
+                var quiet = Task.Delay(quietPeriod, timeProvider, cancellationToken);
                 var more = reader.WaitToReadAsync(cancellationToken).AsTask();
                 var completed = await Task.WhenAny(quiet, more).ConfigureAwait(false);
                 if (completed == quiet)

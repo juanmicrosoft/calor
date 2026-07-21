@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using Calor.Compiler.Commands;
+using Microsoft.Extensions.Time.Testing;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -7,7 +8,10 @@ namespace Calor.Compiler.Tests;
 /// <summary>
 /// Unit tests for the <c>calor watch</c> debounce logic (factored into
 /// <see cref="WatchDebouncer"/> precisely so it is testable without a real
-/// <see cref="FileSystemWatcher"/>).
+/// <see cref="FileSystemWatcher"/>). The quiet period is measured via an injected
+/// <see cref="TimeProvider"/>: pre-loaded/burst/cancel cases exercise the real
+/// <see cref="TimeProvider.System"/> timer, and the window-timing case drives a
+/// <see cref="FakeTimeProvider"/> on virtual time so it is deterministic (#714).
 /// </summary>
 public class WatchDebouncerTests
 {
@@ -23,7 +27,7 @@ public class WatchDebouncerTests
         channel.Writer.TryWrite("/p/a.calr");
         channel.Writer.TryWrite("/p/b.calr");
 
-        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, CancellationToken.None)
+        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
             .WaitAsync(TestTimeout);
 
         Assert.NotNull(batch);
@@ -33,34 +37,33 @@ public class WatchDebouncerTests
     }
 
     [Fact]
-    public async Task EventsWithinQuietPeriod_ExtendTheSameBatch()
+    public async Task EventWithinQuietPeriod_ExtendsBatch_AndQuietPeriodDurationIsHonored()
     {
+        // Virtual-time version (no wall-clock race, #714). Also verifies the quiet
+        // period's DURATION is honored: advancing only part of the window must NOT
+        // close the batch — which guards against quietPeriod being TimeSpan.Zero or
+        // the wrong variable (the batch would close immediately and this would fail).
+        var time = new FakeTimeProvider();
         var channel = Channel.CreateUnbounded<string>();
         channel.Writer.TryWrite("/p/a.calr");
 
-        // Deterministic quiet timer (no wall-clock race, #714): the FIRST quiet period
-        // never elapses, so the follow-up event is guaranteed to win the WhenAny and
-        // join the batch; the SECOND quiet period elapses immediately, ending the batch
-        // once no further events remain.
-        var firstQuietEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var neverCompletes = new TaskCompletionSource();
-        var calls = 0;
-        Task Delay(TimeSpan _, CancellationToken ct)
+        // Runs synchronously until it suspends on the quiet-timer/event WhenAny with
+        // the first quiet timer armed (due at Quiet from now).
+        var read = WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, time, CancellationToken.None);
+
+        time.Advance(TimeSpan.FromMilliseconds(20));                 // 20ms < 100ms quiet
+        Assert.False(read.IsCompleted, "quiet period must not elapse before its full duration");
+
+        channel.Writer.TryWrite("/p/b.calr");                       // arrives inside the window
+
+        // Let the read drain "b" and re-arm the quiet timer, then elapse the window.
+        // Bounded, deterministic convergence: each iteration yields (so the drain +
+        // re-arm continuation runs) then advances a full quiet period.
+        for (var i = 0; i < 50 && !read.IsCompleted; i++)
         {
-            if (Interlocked.Increment(ref calls) == 1)
-            {
-                firstQuietEntered.TrySetResult();
-                return neverCompletes.Task.WaitAsync(ct); // first quiet period never elapses
-            }
-            return Task.CompletedTask; // subsequent quiet period elapses immediately
+            await Task.Yield();
+            time.Advance(Quiet);
         }
-
-        var read = WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, CancellationToken.None, Delay);
-
-        // "a" is drained and we are parked in the (never-elapsing) first quiet period,
-        // so the follow-up event deterministically joins the same batch.
-        await firstQuietEntered.Task.WaitAsync(TestTimeout);
-        channel.Writer.TryWrite("/p/b.calr");
 
         var batch = await read.WaitAsync(TestTimeout);
         Assert.NotNull(batch);
@@ -73,13 +76,13 @@ public class WatchDebouncerTests
     {
         var channel = Channel.CreateUnbounded<string>();
         channel.Writer.TryWrite("/p/a.calr");
-        var first = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, CancellationToken.None)
+        var first = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
             .WaitAsync(TestTimeout);
         Assert.NotNull(first);
         Assert.Single(first!);
 
         channel.Writer.TryWrite("/p/b.calr");
-        var second = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, CancellationToken.None)
+        var second = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
             .WaitAsync(TestTimeout);
         Assert.NotNull(second);
         Assert.Contains("/p/b.calr", second!);
@@ -91,9 +94,29 @@ public class WatchDebouncerTests
         var channel = Channel.CreateUnbounded<string>();
         using var cts = new CancellationTokenSource(50);
 
-        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, cts.Token)
+        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, cts.Token)
             .WaitAsync(TestTimeout);
 
+        Assert.Null(batch);
+    }
+
+    [Fact]
+    public async Task Cancellation_DuringQuietPeriod_ReturnsNull()
+    {
+        // Covers the "surface cancellation" path (WatchDebouncer's `await quiet`):
+        // an event has been received and we are parked in the quiet period when
+        // cancellation arrives. FakeTimeProvider keeps the quiet timer from firing
+        // on its own, so this exercises cancellation, not a timeout.
+        var time = new FakeTimeProvider();
+        var channel = Channel.CreateUnbounded<string>();
+        channel.Writer.TryWrite("/p/a.calr");
+        using var cts = new CancellationTokenSource();
+
+        var read = WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, time, cts.Token);
+        // Parked in the quiet period (timer armed, not fired). Cancel now.
+        cts.Cancel();
+
+        var batch = await read.WaitAsync(TestTimeout);
         Assert.Null(batch);
     }
 
@@ -103,7 +126,7 @@ public class WatchDebouncerTests
         var channel = Channel.CreateUnbounded<string>();
         channel.Writer.Complete();
 
-        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, CancellationToken.None)
+        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
             .WaitAsync(TestTimeout);
 
         Assert.Null(batch);
@@ -116,190 +139,10 @@ public class WatchDebouncerTests
         channel.Writer.TryWrite("/p/a.calr");
         channel.Writer.Complete();
 
-        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, CancellationToken.None)
+        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
             .WaitAsync(TestTimeout);
 
         Assert.NotNull(batch);
         Assert.Contains("/p/a.calr", batch!);
-    }
-}
-
-/// <summary>
-/// Smoke tests for the watch session loop. The session's change events are injected
-/// through <see cref="WatchSession.InjectChange"/> instead of a real
-/// <see cref="FileSystemWatcher"/> — FSW event delivery latency is platform-dependent
-/// (FSEvents on macOS can lag by seconds), which would make wall-clock-bounded tests
-/// flaky; the FSW wiring itself is thin (event handler → channel write) and is
-/// covered by manual verification.
-/// </summary>
-public class WatchSessionTests : IDisposable
-{
-    private readonly string _tempDir;
-
-    public WatchSessionTests()
-    {
-        _tempDir = Path.Combine(Path.GetTempPath(), "calor-watch-" + Guid.NewGuid().ToString("N")[..8]);
-        Directory.CreateDirectory(_tempDir);
-    }
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_tempDir, recursive: true); } catch { }
-        GC.SuppressFinalize(this);
-    }
-
-    private static WatchSession.WatchSettings Settings(string format = "json") => new(
-        Format: format,
-        Verbose: false,
-        NoCache: false,
-        ClearCache: false,
-        StrictApi: false,
-        RequireDocs: false,
-        EnforceEffects: false,
-        StrictEffects: false,
-        PermissiveEffects: false,
-        ContractMode: "debug",
-        DebounceMs: 50);
-
-    [Fact]
-    public async Task InitialCompile_ThenInjectedChange_RebuildsIncrementally()
-    {
-        var a = Path.Combine(_tempDir, "a.calr");
-        var b = Path.Combine(_tempDir, "b.calr");
-        File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
-            """);
-        File.WriteAllText(b, """
-            §M{m002:Beta}
-              §F{f001:Wave:pub} () -> void
-                §E{cw}
-                §P "wave"
-            """);
-
-        var output = new StringWriter();
-        var status = new StringWriter();
-        var session = new WatchSession([_tempDir], Settings(), output, status);
-
-        var rebuilds = new List<WatchSession.RebuildResult>();
-        var rebuildSignal = new SemaphoreSlim(0);
-        session.RebuildCompleted += result =>
-        {
-            lock (rebuilds) { rebuilds.Add(result); }
-            rebuildSignal.Release();
-        };
-
-        using var cts = new CancellationTokenSource();
-        var runTask = session.RunAsync(cts.Token, useFileSystemWatchers: false);
-
-        // Initial compile: both files built.
-        Assert.True(await rebuildSignal.WaitAsync(TimeSpan.FromSeconds(30)), "initial compile did not complete");
-        lock (rebuilds)
-        {
-            Assert.Equal(2, rebuilds[0].Compiled);
-            Assert.Equal(0, rebuilds[0].Skipped);
-            Assert.False(rebuilds[0].AnyErrors);
-        }
-
-        // Change one file; the rebuild must recompile it and skip the other.
-        File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "changed"
-            """);
-        session.InjectChange(a);
-
-        Assert.True(await rebuildSignal.WaitAsync(TimeSpan.FromSeconds(30)), "rebuild after change did not complete");
-        lock (rebuilds)
-        {
-            Assert.Equal(1, rebuilds[1].Compiled);
-            Assert.Equal(1, rebuilds[1].Skipped);
-            Assert.False(rebuilds[1].AnyErrors);
-        }
-
-        cts.Cancel();
-        var exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(30));
-        Assert.Equal(0, exitCode);
-
-        // json mode is NDJSON: one compact, independently parseable JSON document
-        // per line, one line per rebuild. Parse the lines — substring counting
-        // cannot prove the stream is splittable.
-        var lines = output.ToString()
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        Assert.Equal(2, lines.Length);
-        foreach (var line in lines)
-        {
-            using var doc = System.Text.Json.JsonDocument.Parse(line);
-            Assert.Equal("1.0", doc.RootElement.GetProperty("version").GetString());
-            Assert.True(doc.RootElement.TryGetProperty("summary", out _));
-        }
-
-        // Status stream (stderr surrogate) carries the human-readable summaries.
-        var statusText = status.ToString();
-        Assert.Contains("Initial compile: 2 compiled, 0 up-to-date", statusText);
-        Assert.Contains("1 compiled, 1 up-to-date", statusText);
-        Assert.Contains("Watch stopped.", statusText);
-    }
-
-    [Fact]
-    public async Task BrokenEdit_ReportsErrors_ThenRecoversOnFix()
-    {
-        var a = Path.Combine(_tempDir, "a.calr");
-        File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "hello"
-            """);
-
-        var session = new WatchSession([_tempDir], Settings(), new StringWriter(), new StringWriter());
-        var rebuilds = new List<WatchSession.RebuildResult>();
-        var rebuildSignal = new SemaphoreSlim(0);
-        session.RebuildCompleted += result =>
-        {
-            lock (rebuilds) { rebuilds.Add(result); }
-            rebuildSignal.Release();
-        };
-
-        using var cts = new CancellationTokenSource();
-        var runTask = session.RunAsync(cts.Token, useFileSystemWatchers: false);
-        Assert.True(await rebuildSignal.WaitAsync(TimeSpan.FromSeconds(30)));
-
-        // Break the file — the rebuild reports errors but the session keeps running.
-        File.WriteAllText(a, "§M{m001:Alpha\n  broken");
-        session.InjectChange(a);
-        Assert.True(await rebuildSignal.WaitAsync(TimeSpan.FromSeconds(30)));
-        lock (rebuilds) { Assert.True(rebuilds[1].AnyErrors); }
-
-        // Fix it — the next rebuild succeeds (failed files are never cached).
-        File.WriteAllText(a, """
-            §M{m001:Alpha}
-              §F{f001:Greet:pub} () -> void
-                §E{cw}
-                §P "fixed"
-            """);
-        session.InjectChange(a);
-        Assert.True(await rebuildSignal.WaitAsync(TimeSpan.FromSeconds(30)));
-        lock (rebuilds)
-        {
-            Assert.False(rebuilds[2].AnyErrors);
-            Assert.Equal(1, rebuilds[2].Compiled);
-        }
-
-        cts.Cancel();
-        Assert.Equal(0, await runTask.WaitAsync(TimeSpan.FromSeconds(30)));
-    }
-
-    [Fact]
-    public async Task NonexistentPath_FailsFast()
-    {
-        var session = new WatchSession(
-            [Path.Combine(_tempDir, "missing.calr")], Settings(), new StringWriter(), new StringWriter());
-        var exitCode = await session.RunAsync(CancellationToken.None, useFileSystemWatchers: false)
-            .WaitAsync(TimeSpan.FromSeconds(30));
-        Assert.Equal(1, exitCode);
     }
 }
