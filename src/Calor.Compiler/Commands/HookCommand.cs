@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
 using Calor.Compiler.Init;
@@ -36,8 +37,134 @@ public static class HookCommand
         command.AddCommand(CreateValidateCalrContentCommand());
         command.AddCommand(CreatePostWriteLintCommand());
         command.AddCommand(CreateValidateIdsCommand());
+        command.AddCommand(CreateCodexWriteHookCommand());
 
         return command;
+    }
+
+    private static Command CreateCodexWriteHookCommand()
+    {
+        var phaseOption = new Option<string>("--phase", () => "pre", "Hook phase: pre or post");
+        var command = new Command("codex-write", "Validate Codex apply_patch writes using the Codex hook stdin schema")
+        {
+            phaseOption
+        };
+
+        command.SetHandler(async (System.CommandLine.Invocation.InvocationContext context) =>
+        {
+            var phase = context.ParseResult.GetValueForOption(phaseOption) ?? "pre";
+            var envelope = await Console.In.ReadToEndAsync();
+            context.ExitCode = await RunCodexWriteHookAsync(envelope, phase);
+        });
+
+        return command;
+    }
+
+    /// <summary>
+    /// Adapts Codex's hook envelope (delivered on stdin) to Calor's existing
+    /// per-file validators. Codex apply_patch calls carry paths inside the
+    /// patch command rather than in Claude's file_path field.
+    /// </summary>
+    public static async Task<int> RunCodexWriteHookAsync(string envelopeJson, string phase)
+        => await RunCodexWriteHookAsync(envelopeJson, phase, input => PostWriteLintAsync(input));
+
+    internal static async Task<int> RunCodexWriteHookAsync(
+        string envelopeJson,
+        string phase,
+        Func<string, Task<int>> postWriteLint)
+    {
+        var isPost = string.Equals(phase, "post", StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            using var document = JsonDocument.Parse(envelopeJson);
+            if (!document.RootElement.TryGetProperty("tool_input", out var toolInput) ||
+                toolInput.ValueKind != JsonValueKind.Object ||
+                !toolInput.TryGetProperty("command", out var commandElement) ||
+                commandElement.ValueKind != JsonValueKind.String)
+            {
+                return ReportCodexSchemaFailure(isPost, "Codex hook input did not contain tool_input.command.");
+            }
+
+            var patch = commandElement.GetString();
+            if (string.IsNullOrEmpty(patch))
+            {
+                return ReportCodexSchemaFailure(isPost, "Codex hook input contained an empty apply_patch command.");
+            }
+
+            var targets = ExtractApplyPatchTargets(patch);
+            if (!targets.HasRecognizedOperation)
+            {
+                return ReportCodexSchemaFailure(isPost, "Calor could not identify any destination paths in the apply_patch command.");
+            }
+            var paths = targets.DestinationPaths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+            if (isPost)
+            {
+                var failed = false;
+                foreach (var path in paths.Where(path => path.EndsWith(".calr", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var input = JsonSerializer.Serialize(new { file_path = path });
+                    failed |= await postWriteLint(input) != 0;
+                }
+                return failed ? 1 : 0;
+            }
+
+            foreach (var path in paths)
+            {
+                var input = JsonSerializer.Serialize(new { file_path = path });
+                var (exitCode, reason, _) = ValidateWriteWithReason(input);
+                if (exitCode != 0)
+                {
+                    Console.Error.WriteLine(reason);
+                    return 2; // Codex PreToolUse blocking exit code
+                }
+            }
+
+            return 0;
+        }
+        catch (JsonException)
+        {
+            return ReportCodexSchemaFailure(isPost, "Codex hook input was not valid JSON.");
+        }
+    }
+
+    private static int ReportCodexSchemaFailure(bool isPost, string detail)
+    {
+        Console.Error.WriteLine($"Calor Codex hook schema mismatch: {detail} Refusing to silently skip validation.");
+        return isPost ? 1 : 2;
+    }
+
+    private sealed record ApplyPatchTargets(bool HasRecognizedOperation, IReadOnlyList<string> DestinationPaths);
+
+    private static ApplyPatchTargets ExtractApplyPatchTargets(string patch)
+    {
+        var matches = Regex.Matches(
+            patch,
+            @"(?m)^\*\*\* (?<kind>Add|Update|Delete) File: (?<path>.+?)\r?$|^\*\*\* Move to: (?<move>.+?)\r?$",
+            RegexOptions.CultureInvariant);
+
+        var destinations = new List<string>();
+        for (var index = 0; index < matches.Count; index++)
+        {
+            var match = matches[index];
+            if (!match.Groups["kind"].Success || match.Groups["kind"].Value == "Delete")
+            {
+                continue;
+            }
+
+            var destination = match.Groups["path"].Value.Trim();
+            if (match.Groups["kind"].Value == "Update" &&
+                index + 1 < matches.Count &&
+                matches[index + 1].Groups["move"].Success)
+            {
+                destination = matches[index + 1].Groups["move"].Value.Trim();
+                index++;
+            }
+
+            destinations.Add(destination);
+        }
+
+        return new ApplyPatchTargets(matches.Count > 0, destinations);
     }
 
     private static Command CreateValidateWriteCommand()
@@ -339,6 +466,11 @@ public static class HookCommand
     /// Returns 0 if OK or not a .calr file, 1 if lint issues found.
     /// </summary>
     public static async Task<int> PostWriteLintAsync(string toolInputJson)
+        => await PostWriteLintAsync(toolInputJson, RunLintProcessAsync);
+
+    internal static async Task<int> PostWriteLintAsync(
+        string toolInputJson,
+        Func<string, Task<LintProcessResult>> runLint)
     {
         try
         {
@@ -363,40 +495,21 @@ public static class HookCommand
                 return 0;
             }
 
-            // Run calor lint --check on the file
-            var processInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "calor",
-                Arguments = $"lint --check \"{path}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
             try
             {
-                using var process = System.Diagnostics.Process.Start(processInfo);
-                if (process == null)
-                {
-                    return 0; // Can't start process, don't block
-                }
+                var result = await runLint(path);
 
-                var output = await process.StandardOutput.ReadToEndAsync();
-                var error = await process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                if (process.ExitCode != 0)
+                if (result.ExitCode != 0)
                 {
                     var fileName = Path.GetFileName(path);
                     Console.Error.WriteLine($"Lint issues found in {fileName}:");
-                    if (!string.IsNullOrEmpty(output))
+                    if (!string.IsNullOrEmpty(result.Output))
                     {
-                        Console.Error.WriteLine(output);
+                        Console.Error.WriteLine(result.Output);
                     }
-                    if (!string.IsNullOrEmpty(error))
+                    if (!string.IsNullOrEmpty(result.Error))
                     {
-                        Console.Error.WriteLine(error);
+                        Console.Error.WriteLine(result.Error);
                     }
                     Console.Error.WriteLine($"\nRun 'calor lint --fix {fileName}' to auto-fix.");
                     return 1;
@@ -414,6 +527,27 @@ public static class HookCommand
         {
             return 0;
         }
+    }
+
+    internal sealed record LintProcessResult(int ExitCode, string Output, string Error);
+
+    private static async Task<LintProcessResult> RunLintProcessAsync(string path)
+    {
+        var processInfo = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "calor",
+            Arguments = $"lint --check \"{path}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        using var process = System.Diagnostics.Process.Start(processInfo)
+            ?? throw new InvalidOperationException("Could not start calor lint.");
+        var output = await process.StandardOutput.ReadToEndAsync();
+        var error = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        return new LintProcessResult(process.ExitCode, output, error);
     }
 
     private sealed class WriteToolInput
