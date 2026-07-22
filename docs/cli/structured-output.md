@@ -163,6 +163,8 @@ pipeline) so they can flow through the structured formats:
 | `Calor1327` | Docs drift: CLI diagnostic code missing from this table |
 | `Calor1328` | Docs drift: fenced ```` ```calor ```` example (complete program starting with `§M`) no longer parses |
 | `Calor1329` | Docs drift: a generated mirror doc (AGENTS.md) is out of sync with its single source (CLAUDE.md) |
+| `Calor1330` | Docs drift: a complete `§M` program in the agent syntax exemplar no longer compiles to C# (Roslyn-semantic-checked, so type errors are caught) |
+| `Calor1331` | Docs drift: the exemplar binds an array-returning BCL call (e.g. `File.ReadAllLines`) to a generic collection type instead of the array form `[T]` |
 
 ## Notes on specific commands
 
@@ -176,5 +178,5 @@ pipeline) so they can flow through the structured formats:
   per file (alongside its legacy flat `errors`/`warnings` string arrays), but
   its top-level document is command-specific.
 - **`calor self-check docs --format json`** emits the unified schema on stdout
-  with docs-drift findings (`Calor1320`–`Calor1329`) and exits 1 when drift is
+  with docs-drift findings (`Calor1320`–`Calor1331`) and exits 1 when drift is
   found (text mode reports the same findings on stderr).

@@ -79,7 +79,7 @@ the type the surrounding surface declares.
 
 ## Complete programs (the compiler's tests prove every one compiles)
 
-```
+```calor
 §M{m1:Contracts}
   §F{f1:Square:pub} (i32:x) -> i32
     §Q (>= x 0)
@@ -91,7 +91,7 @@ the type the surrounding surface declares.
     §R (/ a b)
 ```
 
-```
+```calor
 §M{m2:Branching}
   §F{f1:Sign:pub} (i32:x) -> i32
     §IF{if1} (> x 0)
@@ -102,7 +102,7 @@ the type the surrounding surface declares.
       §R 0
 ```
 
-```
+```calor
 §M{m3:Files}
   §F{f1:Append:pub} (str:path, str:key, str:value) -> void
     §E{fs:w}
@@ -117,7 +117,7 @@ the type the surrounding surface declares.
     §R (len lines)
 ```
 
-```
+```calor
 §M{m4:Strings}
   §F{f1:FirstField:pub} (str:line) -> str
     §E{}
@@ -127,7 +127,7 @@ the type the surrounding surface declares.
     §R (substr line 0 i)
 ```
 
-```
+```calor
 §M{m5:Collections}
   §F{f1:Tally:pub} (str:key) -> i32
     §E{mut}
@@ -137,7 +137,7 @@ the type the surrounding surface declares.
     §R §IDX counts key
 ```
 
-```
+```calor
 §M{m6:Effects}
   §F{f1:Greet:pub} (str:name) -> void
     §E{cw}
@@ -145,7 +145,7 @@ the type the surrounding surface declares.
     §C{Console.WriteLine} §A name §/C
 ```
 
-```
+```calor
 §M{m7:Loops}
   §F{f1:PrintOneToFive:pub} () -> void
     §E{cw}
@@ -153,7 +153,7 @@ the type the surrounding surface declares.
       §C{Console.WriteLine} §A i §/C
 ```
 
-```
+```calor
 §M{m8:Bindings}
   §F{f1:Demo:pub} () -> void
     §E{cw}
@@ -163,7 +163,7 @@ the type the surrounding surface declares.
     §C{Console.WriteLine} §A count §/C
 ```
 
-```
+```calor
 §M{m9:Classes}
   §CL{c1:Greeter:pub}
     §MT{mt1:Greet:pub} () -> str

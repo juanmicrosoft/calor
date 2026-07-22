@@ -716,8 +716,9 @@ public static class DiagnosticCode
     /// </summary>
     public const string CliInternalError = "Calor1312";
 
-    // `calor self-check docs` drift findings (Calor1320-1329) — agent-facing
-    // documentation contradicts the implementation. See SelfCheck/DocDriftChecker.
+    // `calor self-check docs` drift findings (Calor1320-1331) — agent-facing
+    // documentation contradicts the implementation. See SelfCheck/DocDriftChecker
+    // (1320-1329) and SelfCheck/ExemplarCompileChecker (1330-1331).
 
     /// <summary>
     /// Error (docs drift): a §-keyword cited in agent-facing docs does not
@@ -781,6 +782,23 @@ public static class DiagnosticCode
     /// than hand-editing, so the two agent manuals cannot silently diverge.
     /// </summary>
     public const string DocDriftMirrorOutOfSync = "Calor1329";
+
+    /// <summary>
+    /// Error (docs drift): a complete §M program in the agent syntax exemplar no
+    /// longer compiles all the way to C#. Unlike <see cref="DocDriftExampleParseError"/>
+    /// (parse only), this compiles the emitted C# with Roslyn's semantic model, so
+    /// it catches type errors — e.g. binding <c>File.ReadAllLines</c> (an array) to
+    /// <c>List&lt;str&gt;</c>, which Calor emits but the C# compiler rejects (CS0029).
+    /// </summary>
+    public const string DocDriftExampleCompileError = "Calor1330";
+
+    /// <summary>
+    /// Error (docs drift): the exemplar binds an array-returning BCL call (e.g.
+    /// <c>File.ReadAllLines</c>) to a generic collection type instead of the array
+    /// form <c>[T]</c>. Guards the E1a array-vs-list trap on the copyable fragment
+    /// reference lines, which cannot be compiled standalone.
+    /// </summary>
+    public const string DocDriftArrayBindingTrap = "Calor1331";
 }
 
 /// <summary>

@@ -47,7 +47,8 @@ public static class SelfCheckCommand
             "the effect registry in both directions; (4) the Calor13xx table in " +
             "docs/cli/structured-output.md is complete; (5) no doc hardcodes the current version; " +
             "(6) every fenced ```calor example that declares a complete program (first non-blank " +
-            "line starts with §M) parses with the current compiler; (7) AGENTS.md is in sync with its single source CLAUDE.md (--fix regenerates it). " +
+            "line starts with §M) parses with the current compiler; (7) AGENTS.md is in sync with its single source CLAUDE.md (--fix regenerates it); " +
+            "(8) every complete program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) and no copyable line binds an array-returning call to a generic collection (the E1a trap). " +
             "Suppress an intentional-meta-notation finding by putting <!-- drift:ignore --> on the " +
             "preceding line (see docs/cli/self-check.md). Exits 1 when drift is found")
         {

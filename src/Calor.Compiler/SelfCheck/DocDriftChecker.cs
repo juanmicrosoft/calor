@@ -74,6 +74,14 @@ public sealed class DocDriftInputs
     /// two agent manuals silently diverging (#708).
     /// </summary>
     public IReadOnlyList<MirrorDoc> MirrorDocs { get; init; } = [];
+
+    /// <summary>
+    /// The agent syntax exemplar. Its complete §M programs are compiled all the
+    /// way to C# (Roslyn-semantic-checked, not just parsed) and its copyable
+    /// fragment lines are linted for the array-vs-collection trap (#712). See
+    /// <see cref="ExemplarCompileChecker"/>.
+    /// </summary>
+    public DocFile? ExemplarDoc { get; init; }
 }
 
 /// <summary>
@@ -167,6 +175,11 @@ public static class DocDriftChecker
             CheckMirror(mirror, diagnostics);
         }
 
+        if (inputs.ExemplarDoc is { } exemplar)
+        {
+            diagnostics.AddRange(ExemplarCompileChecker.Check(exemplar));
+        }
+
         return diagnostics;
     }
 
@@ -242,6 +255,7 @@ public static class DocDriftChecker
             CliCodesDoc = cliCodesDoc,
             VersionScanDocs = NonNull(claudeMd).Concat(versionDocs).ToList(),
             MirrorDocs = mirrorDocs,
+            ExemplarDoc = exemplarDoc,
         };
     }
 
