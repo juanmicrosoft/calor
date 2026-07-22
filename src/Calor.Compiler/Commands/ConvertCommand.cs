@@ -43,6 +43,10 @@ public static class ConvertCommand
             aliases: new[] { "--validate" },
             description: "Parse the generated Calor output and report any errors before writing");
 
+        var passthroughOption = new Option<bool>(
+            aliases: new[] { "--passthrough" },
+            description: "Preserve unconvertible members as §CSHARP interop blocks so the output always parses (C# → Calor). If a member's emitted Calor would be invalid, its original C# is kept verbatim instead of writing broken output.");
+
         var timeoutOption = new Option<int>(
             aliases: new[] { "--timeout", "-t" },
             description: "Timeout in seconds for the conversion (0 = no timeout)",
@@ -61,6 +65,7 @@ public static class ConvertCommand
             explainOption,
             noFallbackOption,
             validateOption,
+            passthroughOption,
             timeoutOption,
             explicitCallClosersOption
         };
@@ -74,15 +79,16 @@ public static class ConvertCommand
             var explain = ctx.ParseResult.GetValueForOption(explainOption);
             var noFallback = ctx.ParseResult.GetValueForOption(noFallbackOption);
             var validate = ctx.ParseResult.GetValueForOption(validateOption);
+            var passthrough = ctx.ParseResult.GetValueForOption(passthroughOption);
             var timeoutSeconds = ctx.ParseResult.GetValueForOption(timeoutOption);
             var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
-            await ExecuteAsync(input, output, benchmark, verbose, explain, noFallback, validate, timeoutSeconds, explicitCallClosers);
+            await ExecuteAsync(input, output, benchmark, verbose, explain, noFallback, validate, passthrough, timeoutSeconds, explicitCallClosers);
         });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, int timeoutSeconds, bool explicitCallClosers)
+    private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, int timeoutSeconds, bool explicitCallClosers)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -121,7 +127,7 @@ public static class ConvertCommand
             ConversionResult? conversionResult = null;
             if (direction == ConversionDirection.CSharpToCalor)
             {
-                conversionResult = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, timeoutSeconds, explicitCallClosers);
+                conversionResult = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, passthrough, timeoutSeconds, explicitCallClosers);
             }
             else
             {
@@ -183,16 +189,30 @@ public static class ConvertCommand
         }
     }
 
-    private static async Task<ConversionResult?> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, int timeoutSeconds, bool explicitCallClosers)
+    /// <summary>
+    /// Builds the <see cref="ConversionOptions"/> for a C# → Calor CLI conversion from the
+    /// parsed flags. Extracted so the flag→option mapping — in particular
+    /// <c>--passthrough</c> → <see cref="ConversionOptions.PassthroughOnError"/> (#736) — is
+    /// unit-testable without driving the full command handler.
+    /// </summary>
+    internal static ConversionOptions BuildCSharpToCalorOptions(
+        bool benchmark, bool verbose, bool explain, bool noFallback, bool passthrough, bool explicitCallClosers) => new()
     {
-        var converter = new CSharpToCalorConverter(new ConversionOptions
-        {
-            Verbose = verbose,
-            IncludeBenchmark = benchmark,
-            Explain = explain,
-            GracefulFallback = !noFallback,
-            UseImplicitCallCloser = !explicitCallClosers
-        });
+        Verbose = verbose,
+        IncludeBenchmark = benchmark,
+        Explain = explain,
+        GracefulFallback = !noFallback,
+        // #736: enabling passthrough runs the #717 post-conversion §CSHARP fallback, so an
+        // unconvertible member is preserved as an interop block rather than written as
+        // invalid Calor. Off by default, so default CLI behavior is unchanged.
+        PassthroughOnError = passthrough,
+        UseImplicitCallCloser = !explicitCallClosers
+    };
+
+    private static async Task<ConversionResult?> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, int timeoutSeconds, bool explicitCallClosers)
+    {
+        var converter = new CSharpToCalorConverter(
+            BuildCSharpToCalorOptions(benchmark, verbose, explain, noFallback, passthrough, explicitCallClosers));
 
         ConversionResult result;
         if (timeoutSeconds > 0)
@@ -220,9 +240,21 @@ public static class ConvertCommand
         if (!result.Success)
         {
             Console.Error.WriteLine("Conversion failed:");
-            foreach (var issue in result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error))
+            var errorIssues = result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Error).ToList();
+            foreach (var issue in errorIssues)
             {
                 Console.Error.WriteLine($"  {issue}");
+            }
+            // Under --passthrough the converter can fail with only a warning when the
+            // emitted Calor still does not parse and could not be fully preserved as
+            // §CSHARP (#717's "never ship broken output" contract). Surface that reason
+            // so the failure isn't silent.
+            if (errorIssues.Count == 0)
+            {
+                foreach (var warning in result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Warning))
+                {
+                    Console.Error.WriteLine($"  ⚠ {warning.Message}");
+                }
             }
             Environment.ExitCode = 1;
             return result;
@@ -249,6 +281,20 @@ public static class ConvertCommand
 
         Console.WriteLine($"✓ Conversion successful");
 
+        // #736: report the #717 passthrough fallback outcome. When --passthrough
+        // preserved one or more unconvertible members as §CSHARP interop blocks, say so —
+        // the output parses, but those members are raw C# that still needs migrating.
+        if (passthrough)
+        {
+            var interopCount = result.Context?.Stats.InteropBlocksEmitted ?? 0;
+            if (interopCount > 0)
+            {
+                Console.WriteLine(
+                    $"  ⓘ {interopCount} member{(interopCount == 1 ? "" : "s")} preserved as §CSHARP interop " +
+                    "block(s) — the output parses, but this C# still needs migrating.");
+            }
+        }
+
         // Show warnings
         var warnings = result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Warning).ToList();
         if (warnings.Count > 0)
@@ -266,7 +312,7 @@ public static class ConvertCommand
         }
 
         // Show explanation if requested
-        if (explain)
+        if (explain && result.Context != null)
         {
             Console.WriteLine();
             var explanation = result.Context.GetExplanation();
