@@ -107,6 +107,23 @@ public class ShadowingDifferentialTests
 
     // #732 (sibling mutable rebind → CS0103) is FIXED: the emitter is now scope-aware,
     // so that case moved to CleanWhenAccepted above ("sibling-mutable-rebind").
+    // #733 (type-changing rebind → CS0029) is FIXED for annotated and literal rebinds
+    // (Calor0256); the non-literal unannotated lane below is the remaining gap (#740).
+
+    [Fact]
+    public void KnownGap_UnannotatedNonLiteralRebind_EmitsCS0029() // #740
+    {
+        // An unannotated mutable rebind of a NON-literal mismatched value: the pass
+        // can't infer the value's type yet, so it accepts it, but Roslyn rejects the
+        // resulting `x = File.ReadAllText(p);` (string → int). Literal values are already
+        // caught by Calor0256; this needs value-type inference (#740).
+        var (accepted, roslynErrors) = Compile(
+            "§M{m:S}\n  §F{f:Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
+            "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n");
+
+        Assert.True(accepted);
+        Assert.Contains(roslynErrors, e => e.StartsWith("CS0029", StringComparison.Ordinal));
+    }
 
     [Fact]
     public void KnownGap_ForeachVariableRebind_EmitsCS1656() // #738

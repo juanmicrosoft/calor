@@ -27,11 +27,45 @@ public class RebindTypeMismatchTests
         return bag.ToList().Any(d => d.Code == DiagnosticCode.BindRebindTypeMismatch);
     }
 
+    private static IReadOnlyList<Diagnostic> Validate(string source)
+    {
+        var lex = new DiagnosticBag();
+        var tokens = new Lexer(source, lex).TokenizeAllForParser();
+        var parseBag = new DiagnosticBag();
+        var module = new Parser(tokens, parseBag).Parse();
+        var bag = new DiagnosticBag();
+        new BindValidationPass(bag, source, strictInference: true).Check(module);
+        return bag.ToList();
+    }
+
     [Fact]
     public void RebindWithDifferentType_IsRejected()
     {
         Assert.True(HasMismatch(
             "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n"));
+    }
+
+    [Fact]
+    public void UnannotatedRebindWithMismatchedLiteral_IsRejected()
+    {
+        // #740 common case: no annotation, but the literal's type is statically known.
+        Assert.True(HasMismatch(
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x} \"hi\"\n    §R 0\n"));
+    }
+
+    [Fact]
+    public void Message_UsesSurfaceSpellings_NotInternalForms()
+    {
+        // The message must teach the syntax the user writes (i32/str), never the
+        // expanded internal spelling (INT/STRING) — which isn't valid annotation syntax.
+        var diag = Validate(
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n")
+            .Single(d => d.Code == DiagnosticCode.BindRebindTypeMismatch);
+
+        Assert.Contains("'i32'", diag.Message);
+        Assert.Contains("'str'", diag.Message);
+        Assert.DoesNotContain("INT", diag.Message);
+        Assert.DoesNotContain("STRING", diag.Message);
     }
 
     [Fact]
