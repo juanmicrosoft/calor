@@ -237,6 +237,78 @@ public class ArrayToCollectionBindTests
     }
 
     [Fact]
+    public void ArgumentPosition_ArrayToCollectionParam_IsRejected()
+    {
+        // #725: an array argument passed where a user function declares a
+        // List<str> parameter (the call nested inside a return expression).
+        var diags = Validate(
+            "§M{m:T}\n" +
+            "  §F{f:Take:pub} (List<str>:items) -> i32\n" +
+            "    §R (len items)\n" +
+            "  §F{g:Use:pub} (str:path) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+
+        Assert.True(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void ArgumentPosition_ArrayFormParam_IsAccepted()
+    {
+        var diags = Validate(
+            "§M{m:T}\n" +
+            "  §F{f:Take:pub} ([str]:items) -> i32\n" +
+            "    §R (len items)\n" +
+            "  §F{g:Use:pub} (str:path) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+
+        Assert.False(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void ArgumentPosition_InCallStatement_IsRejected()
+    {
+        var diags = Validate(
+            "§M{m:T}\n" +
+            "  §F{f:Take:pub} (List<str>:items) -> void\n" +
+            "    §P (len items)\n" +
+            "  §F{g:Use:pub} (str:path) -> void\n" +
+            "    §E{fs:r}\n" +
+            "    §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+
+        Assert.True(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void ArgumentPosition_OverloadArityDisambiguates()
+    {
+        // Two arity-based overloads of Take: the 1-arg takes List<str> (reject),
+        // the 2-arg's first param is [str] (accept). The call resolves by arity.
+        var oneArg = Validate(
+            "§M{m:T}\n" +
+            "  §F{f1:Take:pub} (List<str>:items) -> i32\n" +
+            "    §R (len items)\n" +
+            "  §F{f2:Take:pub} ([str]:items, i32:n) -> i32\n" +
+            "    §R n\n" +
+            "  §F{g:Use:pub} (str:path) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §/C\n");
+        Assert.True(HasArrayTrap(oneArg));
+
+        var twoArg = Validate(
+            "§M{m:T}\n" +
+            "  §F{f1:Take:pub} (List<str>:items) -> i32\n" +
+            "    §R (len items)\n" +
+            "  §F{f2:Take:pub} ([str]:items, i32:n) -> i32\n" +
+            "    §R n\n" +
+            "  §F{g:Use:pub} (str:path) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{Take} §A §C{File.ReadAllLines} §A path §/C §A INT:0 §/C\n");
+        Assert.False(HasArrayTrap(twoArg));
+    }
+
+    [Fact]
     public void HashSetFromArray_IsRejected()
     {
         // Generality on the collection side: not just List<T>.

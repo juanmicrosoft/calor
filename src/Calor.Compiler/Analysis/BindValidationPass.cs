@@ -45,6 +45,11 @@ public sealed class BindValidationPass
     // returns an array (e.g. §F ... -> [str]). Rebuilt on every Check(module).
     private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
 
+    // Parameter types of each user function/method, keyed by "name/arity" (and
+    // "Type.Method/arity"), so an array passed to a concrete-collection parameter
+    // at a call site can be flagged (#725). Rebuilt on every Check(module).
+    private readonly Dictionary<string, List<string>> _userParamTypes = new(StringComparer.Ordinal);
+
     // Lexical scope stack of name → declared type for the body currently being
     // walked, so the array-vs-collection check can validate §ASSIGN targets without
     // an inner-block declaration leaking out to shadow an outer variable. The base
@@ -113,7 +118,7 @@ public sealed class BindValidationPass
 
     public void Check(ModuleNode module)
     {
-        BuildUserReturnTypes(module);
+        BuildUserSignatures(module);
 
         foreach (var func in module.Functions)
         {
@@ -234,22 +239,44 @@ public sealed class BindValidationPass
                 CheckBind(bind);
                 break;
 
-            case ReturnStatementNode ret when ret.Expression != null && _currentReturnType != null:
-                CheckArrayToCollection(
-                    ret.Expression, _currentReturnType, ret.Span, "The declared return type");
+            case ReturnStatementNode ret:
+                if (ret.Expression != null)
+                {
+                    if (_currentReturnType != null)
+                        CheckArrayToCollection(
+                            ret.Expression, _currentReturnType, ret.Span, "The declared return type");
+                    ScanExpressionForCalls(ret.Expression);
+                }
                 break;
 
-            case AssignmentStatementNode assign
-                when assign.Target is ReferenceNode target &&
-                     TryLookupLocal(target.Name, out var targetType):
-                CheckArrayToCollection(
-                    assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+            case AssignmentStatementNode assign:
+                if (assign.Target is ReferenceNode target && TryLookupLocal(target.Name, out var targetType))
+                    CheckArrayToCollection(
+                        assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+                ScanExpressionForCalls(assign.Value);
+                break;
+
+            case CallStatementNode callStmt:
+                CheckCallArguments(callStmt.Target, callStmt.Arguments);
+                foreach (var a in callStmt.Arguments) ScanExpressionForCalls(a);
+                break;
+
+            case PrintStatementNode print:
+                ScanExpressionForCalls(print.Expression);
+                break;
+
+            case ExpressionStatementNode exprStmt:
+                ScanExpressionForCalls(exprStmt.Expression);
                 break;
 
             case IfStatementNode ifStmt:
+                ScanExpressionForCalls(ifStmt.Condition);
                 CheckBlock(ifStmt.ThenBody);
                 foreach (var ei in ifStmt.ElseIfClauses)
+                {
+                    ScanExpressionForCalls(ei.Condition);
                     CheckBlock(ei.Body);
+                }
                 if (ifStmt.ElseBody != null)
                     CheckBlock(ifStmt.ElseBody);
                 break;
@@ -259,14 +286,17 @@ public sealed class BindValidationPass
                 break;
 
             case ForeachStatementNode forEach:
+                ScanExpressionForCalls(forEach.Collection);
                 CheckBlock(forEach.Body);
                 break;
 
             case WhileStatementNode whileStmt:
+                ScanExpressionForCalls(whileStmt.Condition);
                 CheckBlock(whileStmt.Body);
                 break;
 
             case DoWhileStatementNode doWhileStmt:
+                ScanExpressionForCalls(doWhileStmt.Condition);
                 CheckBlock(doWhileStmt.Body);
                 break;
 
@@ -328,6 +358,10 @@ public sealed class BindValidationPass
                 bind.Initializer, bind.TypeName, bind.Span, $"Binding '{bind.Name}'");
         }
 
+        // Argument position (#725): calls inside the initializer (e.g. an array
+        // passed to a List<T> parameter of a user function) are checked too.
+        ScanExpressionForCalls(bind.Initializer);
+
         // Strict-mode checks (Calor0251-0253) — only when --strict-bind-inference is set
         // and the binding has no explicit type annotation. An explicit :type always wins.
         if (!_strictInference || bind.TypeName != null || bind.Initializer == null)
@@ -368,6 +402,58 @@ public sealed class BindValidationPass
     }
 
     /// <summary>
+    /// Recursively finds every call in <paramref name="expr"/> and checks each
+    /// argument against the callee's declared parameter types (#725 — argument
+    /// position). Only user functions/methods are resolved (BCL callees have no
+    /// parameter-type registry, a conservative false negative). The walker covers
+    /// the common composite expressions; unhandled node types simply stop the
+    /// descent (a safe false negative, never a false positive).
+    /// </summary>
+    private void ScanExpressionForCalls(ExpressionNode? expr)
+    {
+        switch (expr)
+        {
+            case CallExpressionNode call:
+                CheckCallArguments(call.Target, call.Arguments);
+                foreach (var arg in call.Arguments) ScanExpressionForCalls(arg);
+                break;
+            case BinaryOperationNode bin:
+                ScanExpressionForCalls(bin.Left);
+                ScanExpressionForCalls(bin.Right);
+                break;
+            case UnaryOperationNode un:
+                ScanExpressionForCalls(un.Operand);
+                break;
+            case ConditionalExpressionNode cond:
+                ScanExpressionForCalls(cond.Condition);
+                ScanExpressionForCalls(cond.WhenTrue);
+                ScanExpressionForCalls(cond.WhenFalse);
+                break;
+            case TypeOperationNode typeOp:
+                ScanExpressionForCalls(typeOp.Operand);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Flags an array argument passed to a concrete-collection parameter. Matched
+    /// positionally by name/arity so Calor's arity-based overloads resolve.
+    /// </summary>
+    private void CheckCallArguments(string target, IReadOnlyList<ExpressionNode> args)
+    {
+        if (!_userParamTypes.TryGetValue($"{target}/{args.Count}", out var paramTypes))
+        {
+            return;
+        }
+
+        for (var i = 0; i < args.Count && i < paramTypes.Count; i++)
+        {
+            CheckArrayToCollection(
+                args[i], paramTypes[i], args[i].Span, $"Parameter {i + 1} of '{target}'");
+        }
+    }
+
+    /// <summary>
     /// Returns the Calor element type if <paramref name="init"/> is known to be an
     /// array — a call to a known array-returning BCL method, or a call to a user
     /// function whose declared return type is an array (<c>[T]</c>). Null otherwise.
@@ -398,17 +484,22 @@ public sealed class BindValidationPass
     }
 
     // Note: this resolves only functions/methods declared in the module being
-    // checked. Array-returning functions imported from other modules are not
-    // seen, so they are conservative false negatives (never a false Calor0254).
-    private void BuildUserReturnTypes(ModuleNode module)
+    // checked. Cross-module callees are not seen, so they are conservative false
+    // negatives (never a false Calor0254). _userParamTypes is keyed by name/arity
+    // (and Type.Method/arity) to disambiguate Calor's arity-based overloads.
+    private void BuildUserSignatures(ModuleNode module)
     {
         _userReturnTypes.Clear();
+        _userParamTypes.Clear();
+
         foreach (var func in module.Functions)
         {
             if (func.Output?.TypeName is { } rt)
             {
                 _userReturnTypes[func.Name] = rt;
             }
+
+            RegisterParams(func.Name, func.Parameters);
         }
 
         foreach (var cls in module.Classes)
@@ -422,8 +513,17 @@ public sealed class BindValidationPass
                     _userReturnTypes[method.Name] = rt;
                     _userReturnTypes[$"{cls.Name}.{method.Name}"] = rt;
                 }
+
+                RegisterParams(method.Name, method.Parameters);
+                RegisterParams($"{cls.Name}.{method.Name}", method.Parameters);
             }
         }
+    }
+
+    private void RegisterParams(string name, IReadOnlyList<ParameterNode> parameters)
+    {
+        _userParamTypes[$"{name}/{parameters.Count}"] =
+            parameters.Select(p => p.TypeName).ToList();
     }
 
     private static bool IsArrayTypeName(string? typeName)
