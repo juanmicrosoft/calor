@@ -59,6 +59,19 @@ public sealed class BindValidationPass
     // per compilation); parallelizing over modules would need per-call state.
     private readonly List<Dictionary<string, string>> _scopes = [];
 
+    // Fields of the class whose member is currently being walked (null at module
+    // level). Kept separate from _scopes: a local may legally shadow a field, so
+    // fields must not count toward the CS0136 shadowing check (Calor0255), but they
+    // are still a §ASSIGN type-lookup fallback.
+    private IReadOnlyDictionary<string, string>? _fieldTypes;
+
+    // Names already §B-declared anywhere in the current function body — a flat set
+    // mirroring CSharpEmitter._declaredVariablesInCurrentScope. It is what decides
+    // whether a mutable §B is a REASSIGNMENT (emitter emits `x = …`, valid) versus a
+    // new declaration (emitter emits `T x = …`, which is CS0136 if it shadows). Only
+    // genuine new declarations can trip Calor0255. Cleared per body.
+    private readonly HashSet<string> _declaredInFunction = new(StringComparer.Ordinal);
+
     // Declared return type of the function-like body currently being walked, so the
     // check can validate §R. Null for bodies with no value return (ctors, setters).
     private string? _currentReturnType;
@@ -191,19 +204,29 @@ public sealed class BindValidationPass
     {
         _currentReturnType = returnType;
         _currentClassName = className;
-        _scopes.Clear();
-        var baseScope = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (fields != null)
-        {
-            foreach (var kv in fields) baseScope[kv.Key] = kv.Value;
-        }
 
+        // Fields are kept OUT of the scope stack: a local may legally shadow a field
+        // in C# (the local wins), so field names must not trip the CS0136 check —
+        // but they are still consulted by §ASSIGN type lookup as a fallback.
+        _fieldTypes = fields;
+
+        // Scope 0 holds parameters; scope 1 is the method-body scope. Keeping them
+        // separate means a body-top-level §B that reuses a parameter name is caught
+        // (the parameter is in an enclosing scope), matching C#'s CS0136.
+        _scopes.Clear();
+        var paramScope = new Dictionary<string, string>(StringComparer.Ordinal);
         if (parameters != null)
         {
-            foreach (var p in parameters) baseScope[p.Name] = p.TypeName; // parameters shadow fields
+            // Empty-string type is benign in the downstream lookups (the §ASSIGN /
+            // Calor0254 checks call TryGetConcreteCollectionName, which fails on "");
+            // the entry is only load-bearing for the shadowing check, which needs the
+            // name, not the type.
+            foreach (var p in parameters) paramScope[p.Name] = p.TypeName ?? "";
         }
 
-        _scopes.Add(baseScope);
+        _scopes.Add(paramScope);
+        _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+        _declaredInFunction.Clear();
         foreach (var stmt in body)
         {
             CheckStatement(stmt);
@@ -225,6 +248,43 @@ public sealed class BindValidationPass
 
     private void DeclareLocal(string name, string type) => _scopes[^1][name] = type;
 
+    // Walks a nested block whose scope is pre-seeded with iteration variables (the
+    // §L / §EACH / §EACHKV loop variables), so an inner §B reusing an iteration
+    // variable's name is caught (CS0136) — the loop variable lives in a scope
+    // enclosing the body, exactly as in C#.
+    private void CheckLoopBlock(IReadOnlyList<StatementNode> body, params string?[] loopVars)
+    {
+        var loopScope = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var name in loopVars)
+        {
+            if (!string.IsNullOrEmpty(name)) loopScope[name] = ""; // type irrelevant to shadowing
+        }
+
+        _scopes.Add(loopScope);
+        CheckBlock(body);
+        _scopes.RemoveAt(_scopes.Count - 1);
+    }
+
+    /// <summary>True if <paramref name="name"/> is already a local, parameter, or
+    /// loop variable in an <em>enclosing</em> scope (strictly above the current one)
+    /// — the CS0136 condition a new §B declaration would violate. Fields are excluded
+    /// from the scope stack, so a local may legally shadow a field, as in C#. Same-
+    /// scope duplicates (CS0128) are deliberately NOT flagged here (#731): the C#→Calor
+    /// converter emits array/list/dict reassignments as same-name creation blocks,
+    /// so that case needs the converter's cooperation, not a blanket reject.</summary>
+    private bool IsShadowingEnclosingScope(string name)
+    {
+        for (var i = 0; i < _scopes.Count - 1; i++)
+        {
+            if (_scopes[i].ContainsKey(name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private bool TryLookupLocal(string name, out string type)
     {
         for (var i = _scopes.Count - 1; i >= 0; i--)
@@ -233,6 +293,11 @@ public sealed class BindValidationPass
             {
                 return true;
             }
+        }
+
+        if (_fieldTypes != null && _fieldTypes.TryGetValue(name, out type!))
+        {
+            return true;
         }
 
         type = "";
@@ -290,12 +355,12 @@ public sealed class BindValidationPass
                 break;
 
             case ForStatementNode forStmt:
-                CheckBlock(forStmt.Body);
+                CheckLoopBlock(forStmt.Body, forStmt.VariableName);
                 break;
 
             case ForeachStatementNode forEach:
                 ScanExpressionForCalls(forEach.Collection);
-                CheckBlock(forEach.Body);
+                CheckLoopBlock(forEach.Body, forEach.VariableName, forEach.IndexVariableName);
                 break;
 
             case WhileStatementNode whileStmt:
@@ -355,10 +420,27 @@ public sealed class BindValidationPass
             return;
         }
 
-        // Track the declared type so later §ASSIGN to this variable can be checked.
-        if (bind.TypeName != null)
+        // A mutable §B whose name is already declared in this function is a
+        // reassignment (the emitter emits `x = …`), not a new local — so it neither
+        // shadows nor gets a fresh scope entry. Everything else is a new declaration.
+        var isReassignment = bind.IsMutable && _declaredInFunction.Contains(bind.Name);
+        if (!isReassignment)
         {
-            DeclareLocal(bind.Name, bind.TypeName);
+            // Calor0255 — a new local that reuses a local/parameter/loop-variable
+            // name in an enclosing scope is CS0136 in the emitted C#. Fields are
+            // excluded from the scope stack, so shadowing a field is allowed (as C#).
+            if (IsShadowingEnclosingScope(bind.Name))
+            {
+                _diagnostics.ReportError(bind.Span, DiagnosticCode.BindShadowsEnclosingScope,
+                    $"Binding '{bind.Name}' shadows a local, parameter, or loop variable of the same " +
+                    "name already in an enclosing scope. C# forbids this (CS0136), so the generated " +
+                    $"code would not compile — rename this binding (e.g. '{bind.Name}2').");
+            }
+
+            _declaredInFunction.Add(bind.Name);
+            // Track the name (with its declared type, or empty when untyped) so later
+            // §ASSIGN can be type-checked and nested §B can detect shadowing of it.
+            DeclareLocal(bind.Name, bind.TypeName ?? "");
         }
 
         // Calor0254 — always-on hard type error: an array bound to a concrete

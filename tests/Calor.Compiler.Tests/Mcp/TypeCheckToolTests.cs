@@ -306,13 +306,17 @@ public class TypeCheckToolTests
     [Fact]
     public async Task ExecuteAsync_ValidComplexSource_NoErrors()
     {
-        // Complex but valid source with multiple constructs
+        // Complex but valid source with multiple constructs.
+        // `result` is bound mutable (§B{~result}) so the in-branch and in-loop
+        // rebinds are reassignments (emitted as `result = …`); an immutable §B in a
+        // nested block would re-declare and shadow the outer local — CS0136, now
+        // caught as Calor0255 (#727).
         // Using correct IF syntax: §IF{id} condition ... §EL ... §/I{id}
         // Using correct FOR syntax: §L{id:var:from:to:step} ... §/L{id}
         var args = JsonDocument.Parse("""
             {
                 "action": "typecheck",
-                "source": "§M{m001:Test}\n§F{f001:Complex:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§B{result} 0\n§IF{if1} (> a b)\n  §B{result} a\n§EL\n  §B{result} b\n\n§L{l1:i:0:result:1}\n  §B{result} (+ result i)\n\n§R result\n\n"
+                "source": "§M{m001:Test}\n§F{f001:Complex:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§B{~result} 0\n§IF{if1} (> a b)\n  §B{~result} a\n§EL\n  §B{~result} b\n\n§L{l1:i:0:result:1}\n  §B{~result} (+ result i)\n\n§R result\n\n"
             }
             """).RootElement;
 
