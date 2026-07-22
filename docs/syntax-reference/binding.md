@@ -197,22 +197,32 @@ adding the annotation always silences the diagnostic.
 
 Unlike the strict-inference trio above, this is an **always-on hard type
 error** (not gated by `--no-strict-bind-inference`) and fires *because of*
-an explicit type: a binding declared as a concrete generic collection
-(`List<T>`, `HashSet<T>`, `Queue<T>`, `Stack<T>`, …) whose initializer is an
-**array**. In C# an array satisfies the collection *interfaces*
-(`IList<T>`, `IEnumerable<T>`, …) but is not implicitly convertible to a
-concrete collection class, so the emitted code would fail with `CS0029`.
-This is the E1a array-vs-list trap caught at compile time.
+an explicit type: a concrete generic collection (`List<T>`, `HashSet<T>`,
+`Queue<T>`, `Stack<T>`, …) is given an **array** value. In C# an array
+satisfies the collection *interfaces* (`IList<T>`, `IEnumerable<T>`, …) but is
+not implicitly convertible to a concrete collection class, so the emitted code
+would fail with `CS0029`. This is the E1a array-vs-list trap caught at compile
+time.
+
+It fires in three positions — binding, return, and reassignment:
 
 ```
-§B{lines:List<str>} §C{File.ReadAllLines} §A path §/C   // Calor0254
+§B{lines:List<str>} §C{File.ReadAllLines} §A path §/C   // Calor0254 (binding)
+
+§F{f:Get:pub} (str:path) -> List<str>                   // Calor0254 (return)
+  §R §C{File.ReadAllLines} §A path §/C
+
+§B{~items:List<str>}                                     // Calor0254 (reassign)
+§ASSIGN items §C{File.ReadAllLines} §A path §/C
+
 §B{lines:[str]} §C{File.ReadAllLines} §A path §/C        // ok — array form
 §B{lines:IEnumerable<str>} §C{File.ReadAllLines} §A path §/C  // ok — interface
 ```
 
-The array is recognized when the initializer calls a known array-returning
-BCL method (`File.ReadAllLines`/`ReadAllBytes`, `Directory.GetFiles`/
-`GetDirectories`/`GetFileSystemEntries`) or a user function declared `-> [T]`.
+The array is recognized when the value calls a known array-returning BCL method
+(`File.ReadAllLines`/`ReadAllBytes`, `Directory.GetFiles`/`GetDirectories`/
+`GetFileSystemEntries`) or a user function declared `-> [T]`. Argument position
+(an array passed to a `List<T>` parameter) is tracked in issue #725.
 
 LSP quick-fixes that insert the recommended annotation are available
 in v0.6.3 and surface in any IDE talking to the Calor language server.

@@ -116,6 +116,61 @@ public class ArrayToCollectionBindTests
     }
 
     [Fact]
+    public void ReturnPosition_ArrayToList_IsRejected()
+    {
+        // §R returning an array from a List<str>-typed function (#724). This is the
+        // signature variant the exemplar's own trap text warns about.
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Get:pub} (str:path) -> List<str>\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{File.ReadAllLines} §A path §/C\n");
+
+        Assert.True(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void ReturnPosition_ArrayFormReturnType_IsAccepted()
+    {
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Get:pub} (str:path) -> [str]\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{File.ReadAllLines} §A path §/C\n");
+
+        Assert.False(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void AssignPosition_ArrayToList_IsRejected()
+    {
+        // §ASSIGN reassigning an array into a List<str>-typed mutable variable (#724).
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Count:pub} (str:path) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §B{~items:List<str>}\n" +
+            "    §ASSIGN items §C{File.ReadAllLines} §A path §/C\n" +
+            "    §R (len items)\n");
+
+        Assert.True(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void AssignPosition_ArrayFormVariable_IsAccepted()
+    {
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Count:pub} (str:path) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §B{~items:[str]}\n" +
+            "    §ASSIGN items §C{File.ReadAllLines} §A path §/C\n" +
+            "    §R (len items)\n");
+
+        Assert.False(HasArrayTrap(diags));
+    }
+
+    [Fact]
     public void HashSetFromArray_IsRejected()
     {
         // Generality on the collection side: not just List<T>.

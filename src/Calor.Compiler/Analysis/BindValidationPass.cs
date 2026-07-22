@@ -45,6 +45,14 @@ public sealed class BindValidationPass
     // returns an array (e.g. §F ... -> [str]). Rebuilt on every Check(module).
     private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
 
+    // Declared type of each local binding in the body currently being walked, so
+    // the array-vs-collection check can validate §ASSIGN targets. Cleared per body.
+    private readonly Dictionary<string, string> _localVarTypes = new(StringComparer.Ordinal);
+
+    // Declared return type of the function-like body currently being walked, so the
+    // check can validate §R. Null for bodies with no value return (ctors, setters).
+    private string? _currentReturnType;
+
     // Concrete generic collection classes an array is NOT implicitly convertible
     // to in C# (unlike the collection interfaces IList<T>/IEnumerable<T>/…, which
     // arrays satisfy). Binding an array to one of these is CS0029.
@@ -104,87 +112,53 @@ public sealed class BindValidationPass
 
         foreach (var func in module.Functions)
         {
-            foreach (var stmt in func.Body)
-            {
-                CheckStatement(stmt);
-            }
+            CheckBody(func.Body, func.Output?.TypeName);
         }
 
         foreach (var cls in module.Classes)
         {
             foreach (var ctor in cls.Constructors)
             {
-                foreach (var stmt in ctor.Body)
-                {
-                    CheckStatement(stmt);
-                }
+                CheckBody(ctor.Body, returnType: null);
             }
 
             foreach (var method in cls.Methods)
             {
-                foreach (var stmt in method.Body)
-                {
-                    CheckStatement(stmt);
-                }
+                CheckBody(method.Body, method.Output?.TypeName);
             }
 
             foreach (var prop in cls.Properties)
             {
-                if (prop.Getter != null)
-                {
-                    foreach (var stmt in prop.Getter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (prop.Setter != null)
-                {
-                    foreach (var stmt in prop.Setter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (prop.Initer != null)
-                {
-                    foreach (var stmt in prop.Initer.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
+                // A getter returns the property's type; setters/initers do not.
+                if (prop.Getter != null) CheckBody(prop.Getter.Body, prop.TypeName);
+                if (prop.Setter != null) CheckBody(prop.Setter.Body, returnType: null);
+                if (prop.Initer != null) CheckBody(prop.Initer.Body, returnType: null);
             }
 
             foreach (var op in cls.OperatorOverloads)
             {
-                foreach (var stmt in op.Body)
-                {
-                    CheckStatement(stmt);
-                }
+                CheckBody(op.Body, op.Output?.TypeName);
             }
 
             foreach (var idx in cls.Indexers)
             {
-                if (idx.Getter != null)
-                {
-                    foreach (var stmt in idx.Getter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (idx.Setter != null)
-                {
-                    foreach (var stmt in idx.Setter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (idx.Initer != null)
-                {
-                    foreach (var stmt in idx.Initer.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
+                if (idx.Getter != null) CheckBody(idx.Getter.Body, idx.TypeName);
+                if (idx.Setter != null) CheckBody(idx.Setter.Body, returnType: null);
+                if (idx.Initer != null) CheckBody(idx.Initer.Body, returnType: null);
             }
+        }
+    }
+
+    // Walks one function-like body with its return-type context (for §R checks)
+    // and a fresh local-variable-type map (for §ASSIGN checks). Both are reset per
+    // body so context never leaks across members.
+    private void CheckBody(IReadOnlyList<StatementNode> body, string? returnType)
+    {
+        _currentReturnType = returnType;
+        _localVarTypes.Clear();
+        foreach (var stmt in body)
+        {
+            CheckStatement(stmt);
         }
     }
 
@@ -194,6 +168,20 @@ public sealed class BindValidationPass
         {
             case BindStatementNode bind:
                 CheckBind(bind);
+                break;
+
+            case ReturnStatementNode ret when ret.Expression != null && _currentReturnType != null:
+                CheckArrayToCollection(
+                    ret.Expression, _currentReturnType, ret.Span,
+                    $"This body returns '{_currentReturnType.Trim()}', but the returned value");
+                break;
+
+            case AssignmentStatementNode assign
+                when assign.Target is ReferenceNode target &&
+                     _localVarTypes.TryGetValue(target.Name, out var targetType):
+                CheckArrayToCollection(
+                    assign.Value, targetType, assign.Span,
+                    $"Variable '{target.Name}' has type '{targetType.Trim()}', but the assigned value");
                 break;
 
             case IfStatementNode ifStmt:
@@ -243,12 +231,20 @@ public sealed class BindValidationPass
             return;
         }
 
+        // Track the declared type so later §ASSIGN to this variable can be checked.
+        if (bind.TypeName != null)
+        {
+            _localVarTypes[bind.Name] = bind.TypeName;
+        }
+
         // Calor0254 — always-on hard type error: an array bound to a concrete
         // generic collection (the E1a trap). Independent of strict inference,
         // since the emitted C# would fail with CS0029 regardless.
         if (bind.TypeName != null && bind.Initializer != null)
         {
-            CheckArrayToCollectionAssignability(bind, bind.Initializer);
+            CheckArrayToCollection(
+                bind.Initializer, bind.TypeName, bind.Span,
+                $"Binding '{bind.Name}' declares '{bind.TypeName.Trim()}', but its initializer");
         }
 
         // Strict-mode checks (Calor0251-0253) — only when --strict-bind-inference is set
@@ -262,33 +258,30 @@ public sealed class BindValidationPass
     }
 
     /// <summary>
-    /// Rejects <c>§B{name:List&lt;T&gt;}</c> (or another concrete generic collection)
-    /// bound to an array initializer — the E1a trap. Mirrors C#: an array satisfies
-    /// the collection <em>interfaces</em> (<c>IList&lt;T&gt;</c>, <c>IEnumerable&lt;T&gt;</c>, …)
-    /// but is not implicitly convertible to a concrete collection class, so the
-    /// emitted C# would fail with CS0029. Caught here at compile time rather than
-    /// left for a downstream <c>dotnet build</c> (#722).
+    /// Reports Calor0254 when <paramref name="value"/> is an array and
+    /// <paramref name="declaredType"/> is a concrete generic collection. Shared by
+    /// binding, return, and assignment positions; <paramref name="leadIn"/> is the
+    /// position-specific sentence prefix ending just before "… is an array".
     /// </summary>
-    private void CheckArrayToCollectionAssignability(BindStatementNode bind, ExpressionNode init)
+    private void CheckArrayToCollection(
+        ExpressionNode value, string declaredType, Parsing.TextSpan span, string leadIn)
     {
-        var declared = bind.TypeName!.Trim();
-        if (!TryGetConcreteCollectionName(declared, out var collectionName))
+        if (!TryGetConcreteCollectionName(declaredType.Trim(), out var collectionName))
         {
             return;
         }
 
-        var elementType = InitializerArrayElement(init);
+        var elementType = InitializerArrayElement(value);
         if (elementType == null)
         {
             return;
         }
 
-        var arrayForm = $"[{elementType}]";
-        _diagnostics.ReportError(bind.Span, DiagnosticCode.BindArrayToConcreteCollection,
-            $"Binding '{bind.Name}' declares '{declared}', but its initializer is an array. " +
-            $"An array is not implicitly convertible to the concrete collection '{collectionName}<…>' " +
-            $"(the emitted C# would fail with CS0029). Use the array form '{arrayForm}', or wrap the " +
-            $"value explicitly (e.g. a new {collectionName} constructed from it).");
+        _diagnostics.ReportError(span, DiagnosticCode.BindArrayToConcreteCollection,
+            $"{leadIn} is an array. An array is not implicitly convertible to the concrete " +
+            $"collection '{collectionName}<…>' (the emitted C# would fail with CS0029). Use the " +
+            $"array form '[{elementType}]', or wrap the value explicitly (e.g. a new " +
+            $"{collectionName} constructed from it).");
     }
 
     /// <summary>
