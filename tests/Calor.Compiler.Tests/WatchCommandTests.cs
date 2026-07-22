@@ -20,25 +20,29 @@ public class WatchDebouncerTests
 
     /// <summary>
     /// Drives <paramref name="time"/> forward until the debouncer's quiet timer fires
-    /// and the batch closes. Deterministic because it never advances the clock while
-    /// an event is still buffered: with the clock stationary the quiet timer cannot
-    /// fire, so the read always resolves a pending event (draining it and re-arming
-    /// the timer) rather than racing the timer against the event. Only advances a full
-    /// quiet window once the channel is empty. Bounded so a logic error can't hang.
+    /// and the batch closes.
+    ///
+    /// <para><b>Race-freedom invariant:</b> the clock is advanced ONLY when the channel
+    /// is empty. While an event is still buffered the clock stays put, so the quiet
+    /// timer cannot fire and <c>WhenAny</c> must resolve the event first — draining it
+    /// into the batch and re-arming. The batch therefore never closes with an un-drained
+    /// event, no matter how starved the thread pool is (<c>TryRead</c> is what empties
+    /// the channel, so <c>Count == 0</c> implies every written event is already batched).</para>
+    ///
+    /// <para><b>Precondition:</b> no events may be written to the channel after this
+    /// helper starts. Every write must happen before the drive; a mid-drive write from
+    /// another task would reintroduce the Count-check race. The loop is wall-clock
+    /// bounded so it keeps advancing as long as the runner is alive rather than
+    /// exhausting a fixed iteration budget and then parking on a timer no one fires.</para>
     /// </summary>
     private static async Task<IReadOnlyCollection<string>?> DriveToClose(
         Task<IReadOnlyCollection<string>?> read, FakeTimeProvider time, ChannelReader<string> reader)
     {
-        // Invariant that makes this race-free under any scheduling: advance the clock
-        // ONLY when the channel is empty. While an event is still buffered the clock
-        // stays put, so the quiet timer cannot fire and WhenAny must resolve the event
-        // (draining it into the batch and re-arming). The batch therefore never closes
-        // with an un-drained event, no matter how starved the thread pool is. The bound
-        // is a safety net; the 15s WaitAsync below is the ultimate backstop.
-        for (var i = 0; i < 1000 && !read.IsCompleted; i++)
+        var deadline = System.Diagnostics.Stopwatch.StartNew();
+        while (!read.IsCompleted && deadline.Elapsed < TestTimeout)
         {
             await Task.Yield();
-            if (reader.Count == 0 && !read.IsCompleted)
+            if (reader.Count == 0)
             {
                 time.Advance(Quiet);
             }
@@ -120,6 +124,8 @@ public class WatchDebouncerTests
         var channel = Channel.CreateUnbounded<string>();
         using var cts = new CancellationTokenSource();
 
+        // Sound, not racy: ReadBatchAsync runs synchronously up to its first await
+        // (WaitToReadAsync), so the token is registered before Cancel() is called.
         var read = WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, time, cts.Token);
         cts.Cancel();
 
