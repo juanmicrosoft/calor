@@ -40,6 +40,36 @@ public sealed class BindValidationPass
     private readonly bool _strictInference;
     private readonly string? _source;
 
+    // Return type of each user function/method by name — built per module so the
+    // array-vs-collection check (Calor0254) can see when an initializer call
+    // returns an array (e.g. §F ... -> [str]). Rebuilt on every Check(module).
+    private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
+
+    // Well-known array-returning BCL methods, keyed by the call target as it
+    // appears in Calor (§C{Type.Method}), mapped to the Calor element type. The
+    // binder has no general BCL return-type model, so this small table is what
+    // lets Calor0254 fire for the common file/dir readers. To extend: add another
+    // array-returning method and its element type. Keep in step with
+    // SelfCheck/ExemplarCompileChecker's array-trap list (the docs-level guard).
+    private static readonly IReadOnlyDictionary<string, string> ArrayReturningBclMethods =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["File.ReadAllLines"] = "str",
+            ["File.ReadAllBytes"] = "u8",
+            ["Directory.GetFiles"] = "str",
+            ["Directory.GetDirectories"] = "str",
+            ["Directory.GetFileSystemEntries"] = "str",
+        };
+
+    // Concrete generic collection classes an array is NOT implicitly convertible
+    // to in C# (unlike the collection interfaces IList<T>/IEnumerable<T>/…, which
+    // arrays satisfy). Binding an array to one of these is CS0029.
+    private static readonly string[] ConcreteCollectionTypes =
+    [
+        "List", "HashSet", "SortedSet", "Queue", "Stack",
+        "LinkedList", "Collection", "ObservableCollection", "SortedList",
+    ];
+
     /// <summary>
     /// Well-known generic factory calls whose return type cannot be inferred
     /// without an explicit type argument. The value is a placeholder type
@@ -86,6 +116,8 @@ public sealed class BindValidationPass
 
     public void Check(ModuleNode module)
     {
+        BuildUserReturnTypes(module);
+
         foreach (var func in module.Functions)
         {
             foreach (var stmt in func.Body)
@@ -227,6 +259,14 @@ public sealed class BindValidationPass
             return;
         }
 
+        // Calor0254 — always-on hard type error: an array bound to a concrete
+        // generic collection (the E1a trap). Independent of strict inference,
+        // since the emitted C# would fail with CS0029 regardless.
+        if (bind.TypeName != null && bind.Initializer != null)
+        {
+            CheckArrayToCollectionAssignability(bind, bind.Initializer);
+        }
+
         // Strict-mode checks (Calor0251-0253) — only when --strict-bind-inference is set
         // and the binding has no explicit type annotation. An explicit :type always wins.
         if (!_strictInference || bind.TypeName != null || bind.Initializer == null)
@@ -235,6 +275,110 @@ public sealed class BindValidationPass
         }
 
         CheckStrictInitializer(bind, bind.Initializer);
+    }
+
+    /// <summary>
+    /// Rejects <c>§B{name:List&lt;T&gt;}</c> (or another concrete generic collection)
+    /// bound to an array initializer — the E1a trap. Mirrors C#: an array satisfies
+    /// the collection <em>interfaces</em> (<c>IList&lt;T&gt;</c>, <c>IEnumerable&lt;T&gt;</c>, …)
+    /// but is not implicitly convertible to a concrete collection class, so the
+    /// emitted C# would fail with CS0029. Caught here at compile time rather than
+    /// left for a downstream <c>dotnet build</c> (#722).
+    /// </summary>
+    private void CheckArrayToCollectionAssignability(BindStatementNode bind, ExpressionNode init)
+    {
+        var declared = bind.TypeName!.Trim();
+        if (!TryGetConcreteCollectionName(declared, out var collectionName))
+        {
+            return;
+        }
+
+        var elementType = InitializerArrayElement(init);
+        if (elementType == null)
+        {
+            return;
+        }
+
+        var arrayForm = $"[{elementType}]";
+        _diagnostics.ReportError(bind.Span, DiagnosticCode.BindArrayToConcreteCollection,
+            $"Binding '{bind.Name}' declares '{declared}', but its initializer is an array. " +
+            $"An array is not implicitly convertible to the concrete collection '{collectionName}<…>' " +
+            $"(the emitted C# would fail with CS0029). Use the array form '{arrayForm}', or wrap the " +
+            $"value explicitly (e.g. a new {collectionName} constructed from it).");
+    }
+
+    /// <summary>
+    /// Returns the Calor element type if <paramref name="init"/> is known to be an
+    /// array — a call to a known array-returning BCL method, or a call to a user
+    /// function whose declared return type is an array (<c>[T]</c>). Null otherwise.
+    /// </summary>
+    private string? InitializerArrayElement(ExpressionNode init)
+    {
+        if (init is not CallExpressionNode call)
+        {
+            return null;
+        }
+
+        if (ArrayReturningBclMethods.TryGetValue(call.Target, out var bclElement))
+        {
+            return bclElement;
+        }
+
+        if (_userReturnTypes.TryGetValue(call.Target, out var returnType) &&
+            IsArrayTypeName(returnType))
+        {
+            return returnType.Trim().TrimStart('[').TrimEnd(']').Trim();
+        }
+
+        return null;
+    }
+
+    private void BuildUserReturnTypes(ModuleNode module)
+    {
+        _userReturnTypes.Clear();
+        foreach (var func in module.Functions)
+        {
+            if (func.Output?.TypeName is { } rt)
+            {
+                _userReturnTypes[func.Name] = rt;
+            }
+        }
+
+        foreach (var cls in module.Classes)
+        {
+            foreach (var method in cls.Methods)
+            {
+                if (method.Output?.TypeName is { } rt)
+                {
+                    // Keyed by both the bare and the Type.Method spelling so either
+                    // call form resolves; last write wins on rare name collisions.
+                    _userReturnTypes[method.Name] = rt;
+                    _userReturnTypes[$"{cls.Name}.{method.Name}"] = rt;
+                }
+            }
+        }
+    }
+
+    private static bool IsArrayTypeName(string? typeName)
+        => typeName != null && typeName.TrimStart().StartsWith("[", StringComparison.Ordinal);
+
+    private static bool TryGetConcreteCollectionName(string declared, out string collectionName)
+    {
+        var open = declared.IndexOf('<');
+        if (open > 0)
+        {
+            var head = declared[..open].Trim();
+            var lastDot = head.LastIndexOf('.');
+            var simple = lastDot >= 0 ? head[(lastDot + 1)..] : head;
+            if (Array.Exists(ConcreteCollectionTypes, t => t == simple))
+            {
+                collectionName = simple;
+                return true;
+            }
+        }
+
+        collectionName = "";
+        return false;
     }
 
     private void CheckStrictInitializer(BindStatementNode bind, ExpressionNode init)

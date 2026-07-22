@@ -55,11 +55,11 @@ public class ExemplarCompilesTests
     [Fact]
     public void ReadAllLinesBoundToList_IsCaughtByTheCompilePipeline()
     {
-        // The E1a bug caught by the two-stage guard. Today Calor emits it happily
-        // and only the C# compiler rejects it (CS0029: string[] -> List<string>);
-        // when the binder learns to reject it (issue #722) `calorCaught` flips to
-        // true. Either layer catching it keeps the exemplar safe, so this asserts
-        // the disjunction rather than pinning the current (missing) binder behavior.
+        // The E1a bug. Since #722 the binder rejects it at the language level
+        // (Calor0254) so `calor -i` fails instead of emitting broken C#; the
+        // Roslyn layer remains as backstop for any array source the binder can't
+        // yet see. Asserting the disjunction keeps the test robust if either
+        // layer's coverage shifts, but today the Calor layer catches this case.
         const string calor =
             "§M{m:Files}\n" +
             "  §F{f:CountLines:pub} (str:path) -> i32\n" +
@@ -69,13 +69,18 @@ public class ExemplarCompilesTests
 
         var result = Program.Compile(calor, "mutation.calr");
         var calorCaught = result.Diagnostics.HasErrors;
-        var roslynCaught = !calorCaught &&
+
+        // #722: the binder now catches it directly.
+        Assert.True(calorCaught, "Calor should reject the array-to-List trap (Calor0254).");
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.BindArrayToConcreteCollection);
+
+        // Backstop still works for cases the binder can't see (initializer not a
+        // recognized array source): the generated C# fails the Roslyn compile.
+        var roslynCaught = calorCaught ||
             ExemplarCompileChecker.RoslynErrors(result.GeneratedCode)
                 .Any(e => e.StartsWith("CS0029", StringComparison.Ordinal));
-
-        Assert.True(
-            calorCaught || roslynCaught,
-            "The array-to-List trap must be caught at the Calor or the C# layer.");
+        Assert.True(roslynCaught);
     }
 
     [Fact]
