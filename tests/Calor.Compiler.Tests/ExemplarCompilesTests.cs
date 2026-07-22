@@ -53,10 +53,13 @@ public class ExemplarCompilesTests
     }
 
     [Fact]
-    public void ReadAllLinesBoundToList_FailsTheRoslynSemanticCompile()
+    public void ReadAllLinesBoundToList_IsCaughtByTheCompilePipeline()
     {
-        // The E1a bug at the layer that actually catches it. Calor emits this
-        // happily; only the C# compiler rejects it (CS0029: string[] -> List<string>).
+        // The E1a bug caught by the two-stage guard. Today Calor emits it happily
+        // and only the C# compiler rejects it (CS0029: string[] -> List<string>);
+        // when the binder learns to reject it (issue #722) `calorCaught` flips to
+        // true. Either layer catching it keeps the exemplar safe, so this asserts
+        // the disjunction rather than pinning the current (missing) binder behavior.
         const string calor =
             "§M{m:Files}\n" +
             "  §F{f:CountLines:pub} (str:path) -> i32\n" +
@@ -65,9 +68,14 @@ public class ExemplarCompilesTests
             "    §R (len lines)\n";
 
         var result = Program.Compile(calor, "mutation.calr");
-        Assert.False(result.Diagnostics.HasErrors); // Calor itself does NOT catch it
-        var errors = ExemplarCompileChecker.RoslynErrors(result.GeneratedCode);
-        Assert.Contains(errors, e => e.StartsWith("CS0029", StringComparison.Ordinal));
+        var calorCaught = result.Diagnostics.HasErrors;
+        var roslynCaught = !calorCaught &&
+            ExemplarCompileChecker.RoslynErrors(result.GeneratedCode)
+                .Any(e => e.StartsWith("CS0029", StringComparison.Ordinal));
+
+        Assert.True(
+            calorCaught || roslynCaught,
+            "The array-to-List trap must be caught at the Calor or the C# layer.");
     }
 
     [Fact]
@@ -91,6 +99,22 @@ public class ExemplarCompilesTests
         var doc = new DocFile(
             ExemplarCompileChecker.RelativePath,
             "```\n§B{lines:[str]} §C{File.ReadAllLines} §A path §/C\n```\n");
+
+        var findings = new List<Diagnostic>();
+        ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);
+
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void ArrayTrapLint_HonorsDriftIgnoreMarker()
+    {
+        // A deliberate negative example ("do NOT write this") is a normal way to
+        // teach the trap; the repo-wide drift:ignore escape must exempt it.
+        var doc = new DocFile(
+            ExemplarCompileChecker.RelativePath,
+            "## Common mistakes\n\n<!-- drift:ignore -->\n" +
+            "§B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n");
 
         var findings = new List<Diagnostic>();
         ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);

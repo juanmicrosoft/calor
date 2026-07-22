@@ -249,7 +249,12 @@ public static class DocDriftChecker
             DocumentedEffectCodes = Effects.EffectCodes.DocumentedCompactCodes,
             KeywordDocs = scannedDocs,
             DiagnosticCodeDocs = scannedDocs,
-            ParseExampleDocs = scannedDocs,
+            // The exemplar is excluded from the parse-only example check (Calor1328)
+            // because ExemplarCompileChecker gives it a strictly stronger compile
+            // check (Calor1330) whose stage 1 already reports any parse failure —
+            // leaving it here would double-report the same defect under two codes.
+            ParseExampleDocs = scannedDocs
+                .Where(d => d.Path != ExemplarCompileChecker.RelativePath).ToList(),
             EffectsReferenceDoc = effectsDoc,
             EffectDocsForwardOnly = NonNull(syntaxIndex),
             CliCodesDoc = cliCodesDoc,

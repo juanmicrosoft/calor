@@ -32,6 +32,10 @@ public static class ExemplarCompileChecker
     // A binding whose initializer is a call to an array-returning BCL API, e.g.
     // "§B{lines:[str]} §C{File.ReadAllLines} §A path §/C". Captures the declared
     // binding type and the API so the type can be required to be the array form.
+    // To extend: add another array-returning API to the (?<api>...) alternation.
+    // This is a deliberately closed list — it only guards the one recurring trap
+    // on fragment lines that cannot be compiled; the complete programs get the real
+    // Roslyn compile, which catches array/collection mismatches for any API.
     private static readonly Regex ArrayReturningBinding = new(
         @"§B\{\s*~?\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*(?<type>[^}]+?)\s*\}\s*" +
         @"§C\{\s*(?<api>File\.ReadAllLines|File\.ReadAllBytes|Directory\.GetFiles|Directory\.GetDirectories|Directory\.GetFileSystemEntries)\s*\}",
@@ -42,8 +46,9 @@ public static class ExemplarCompileChecker
         System.IO.Path.Combine("src", "Calor.Compiler", "Resources", "agent-syntax-exemplar.md");
 
     /// <summary>A complete §M program lifted from a fenced block, with the document
-    /// line of its first content line (for diagnostic anchoring).</summary>
-    public sealed record ExemplarProgram(string Source, int FirstContentLine);
+    /// line of its first content line (for diagnostic anchoring) and whether the
+    /// block was exempted by a preceding <c>drift:ignore</c> marker.</summary>
+    public sealed record ExemplarProgram(string Source, int FirstContentLine, bool Suppressed);
 
     /// <summary>
     /// Runs every exemplar-specific check and returns findings (empty = clean).
@@ -65,6 +70,13 @@ public static class ExemplarCompileChecker
     {
         foreach (var program in ExtractCompletePrograms(exemplar.Content))
         {
+            // A drift:ignore marker on the line before the fence exempts the block
+            // (same escape hatch the rest of self-check honors).
+            if (program.Suppressed)
+            {
+                continue;
+            }
+
             // Stage 1: Calor → C#. A failure here is a genuine Calor-level error.
             CompilationResult result;
             try
@@ -124,6 +136,13 @@ public static class ExemplarCompileChecker
                 continue;
             }
 
+            // Honor the repo-wide drift:ignore escape (e.g. a deliberate "do NOT
+            // write this" negative example in the Common mistakes section).
+            if (i > 0 && lines[i - 1].Contains(DocDriftChecker.SuppressionMarker, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             var type = match.Groups["type"].Value.Trim();
             if (type.StartsWith("[", StringComparison.Ordinal))
             {
@@ -155,6 +174,7 @@ public static class ExemplarCompileChecker
         var insideFence = false;      // inside any fenced block
         List<string>? current = null; // non-null only while capturing a ```calor block
         var fenceContentStart = 0;
+        var suppressed = false;       // drift:ignore on the line before the opening fence
 
         for (var i = 0; i < lines.Length; i++)
         {
@@ -170,7 +190,7 @@ public static class ExemplarCompileChecker
                         if (first != null && first.TrimStart().StartsWith("§M", StringComparison.Ordinal))
                         {
                             programs.Add(new ExemplarProgram(
-                                string.Join("\n", current) + "\n", fenceContentStart));
+                                string.Join("\n", current) + "\n", fenceContentStart, suppressed));
                         }
 
                         current = null;
@@ -186,6 +206,8 @@ public static class ExemplarCompileChecker
                     {
                         current = [];
                         fenceContentStart = i + 2; // 1-based line of the first content line
+                        suppressed = i > 0 &&
+                            lines[i - 1].Contains(DocDriftChecker.SuppressionMarker, StringComparison.Ordinal);
                     }
                 }
 
@@ -198,17 +220,16 @@ public static class ExemplarCompileChecker
         return programs;
     }
 
-    // Cached once — enumerating the trusted-platform-assembly set is not free and
-    // the reference set is constant for the process lifetime.
-    private static IReadOnlyList<MetadataReference>? _references;
+    // Built once — enumerating the trusted-platform-assembly set is not free and the
+    // reference set is constant for the process lifetime. Lazy<T> makes the one-time
+    // build thread-safe under xUnit's parallel test classes.
+    private static readonly Lazy<IReadOnlyList<MetadataReference>> _references =
+        new(BuildReferences);
 
-    private static IReadOnlyList<MetadataReference> References()
+    private static IReadOnlyList<MetadataReference> References() => _references.Value;
+
+    private static IReadOnlyList<MetadataReference> BuildReferences()
     {
-        if (_references != null)
-        {
-            return _references;
-        }
-
         var tpa = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? "";
         var references = tpa
             .Split(System.IO.Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
@@ -225,14 +246,17 @@ public static class ExemplarCompileChecker
             references.Add(MetadataReference.CreateFromFile(runtime));
         }
 
-        _references = references;
         return references;
     }
 
-    // The implicit global usings the Calor SDK provides to generated code
-    // (Microsoft.NET.Sdk's ImplicitUsings set). The emitter relies on these — it
-    // emits `File.ReadAllLines(...)` with no `using System.IO;` — so the generated
-    // C# only compiles standalone when they are supplied here too.
+    // The implicit global usings the Calor SDK provides to generated code — this
+    // mirrors Microsoft.NET.Sdk's ImplicitUsings set as of .NET 10 (see
+    // src/Calor.Sdk/obj/**/Calor.Sdk.GlobalUsings.g.cs, the ground truth). The
+    // emitter relies on these — it emits `File.ReadAllLines(...)` with no
+    // `using System.IO;` — so the generated C# only compiles standalone when they
+    // are supplied here too. If a future SDK grows the set and a program starts
+    // using a newly-implicit namespace, that program's Roslyn compile will fail
+    // here (CS0246/CS0103) until this list is updated to match.
     private const string GlobalUsingsPreamble =
         "global using System;\n" +
         "global using System.Collections.Generic;\n" +
