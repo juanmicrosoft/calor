@@ -237,11 +237,15 @@ declared `-> [T]`.
 
 Scope notes: the check runs inside every block body — loop bodies (including
 `§EACH`/`§EACHKV`), `§IF` branches, and while, match, try, using, sync, and
-unsafe/fixed blocks. Argument checking resolves only user functions/methods
-declared in the same module (BCL and cross-module callees have no parameter-type
-registry — a conservative false negative). It does **not** descend into
-block-lambda (`§LAM`) bodies, so a lambda declared `-> List<T>` returning an
-array is not checked.
+unsafe/fixed blocks. Argument checking resolves only free functions and methods
+declared in the same module; an unqualified call is resolved context-sensitively
+(a call inside class `C` prefers `C`'s member, then a module-level free function),
+so a method and a same-named free function do not collide. Callees it cannot see
+are conservative false negatives — BCL and cross-module functions (no signature
+registry), and constructors (`§NEW`), operator overloads, and indexers (their
+parameters are not registered). It does **not** descend into block-lambda
+(`§LAM`) bodies, so a lambda declared `-> List<T>` returning an array is not
+checked.
 
 LSP quick-fixes that insert the recommended annotation are available
 in v0.6.3 and surface in any IDE talking to the Calor language server.
