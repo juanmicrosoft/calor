@@ -45,6 +45,19 @@ public sealed class BindValidationPass
     // returns an array (e.g. §F ... -> [str]). Rebuilt on every Check(module).
     private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
 
+    // Lexical scope stack of name → declared type for the body currently being
+    // walked, so the array-vs-collection check can validate §ASSIGN targets without
+    // an inner-block declaration leaking out to shadow an outer variable. The base
+    // scope is seeded with the member's parameters and enclosing class fields; each
+    // nested block pushes a child scope. These instance fields make the pass
+    // single-threaded / non-reentrant, which matches its current usage (one pass
+    // per compilation); parallelizing over modules would need per-call state.
+    private readonly List<Dictionary<string, string>> _scopes = [];
+
+    // Declared return type of the function-like body currently being walked, so the
+    // check can validate §R. Null for bodies with no value return (ctors, setters).
+    private string? _currentReturnType;
+
     // Concrete generic collection classes an array is NOT implicitly convertible
     // to in C# (unlike the collection interfaces IList<T>/IEnumerable<T>/…, which
     // arrays satisfy). Binding an array to one of these is CS0029.
@@ -104,88 +117,113 @@ public sealed class BindValidationPass
 
         foreach (var func in module.Functions)
         {
-            foreach (var stmt in func.Body)
-            {
-                CheckStatement(stmt);
-            }
+            CheckBody(func.Body, func.Output?.TypeName, func.Parameters, fields: null);
         }
 
         foreach (var cls in module.Classes)
         {
+            var fields = CollectFieldTypes(cls);
+
             foreach (var ctor in cls.Constructors)
             {
-                foreach (var stmt in ctor.Body)
-                {
-                    CheckStatement(stmt);
-                }
+                CheckBody(ctor.Body, returnType: null, ctor.Parameters, fields);
             }
 
             foreach (var method in cls.Methods)
             {
-                foreach (var stmt in method.Body)
-                {
-                    CheckStatement(stmt);
-                }
+                CheckBody(method.Body, method.Output?.TypeName, method.Parameters, fields);
             }
 
             foreach (var prop in cls.Properties)
             {
-                if (prop.Getter != null)
-                {
-                    foreach (var stmt in prop.Getter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (prop.Setter != null)
-                {
-                    foreach (var stmt in prop.Setter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (prop.Initer != null)
-                {
-                    foreach (var stmt in prop.Initer.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
+                // A getter returns the property's type; setters/initers do not.
+                if (prop.Getter != null) CheckBody(prop.Getter.Body, prop.TypeName, parameters: null, fields);
+                if (prop.Setter != null) CheckBody(prop.Setter.Body, returnType: null, parameters: null, fields);
+                if (prop.Initer != null) CheckBody(prop.Initer.Body, returnType: null, parameters: null, fields);
             }
 
             foreach (var op in cls.OperatorOverloads)
             {
-                foreach (var stmt in op.Body)
-                {
-                    CheckStatement(stmt);
-                }
+                CheckBody(op.Body, op.Output?.TypeName, op.Parameters, fields);
             }
 
             foreach (var idx in cls.Indexers)
             {
-                if (idx.Getter != null)
-                {
-                    foreach (var stmt in idx.Getter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (idx.Setter != null)
-                {
-                    foreach (var stmt in idx.Setter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (idx.Initer != null)
-                {
-                    foreach (var stmt in idx.Initer.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
+                if (idx.Getter != null) CheckBody(idx.Getter.Body, idx.TypeName, parameters: null, fields);
+                if (idx.Setter != null) CheckBody(idx.Setter.Body, returnType: null, parameters: null, fields);
+                if (idx.Initer != null) CheckBody(idx.Initer.Body, returnType: null, parameters: null, fields);
             }
         }
+    }
+
+    private static Dictionary<string, string> CollectFieldTypes(ClassDefinitionNode cls)
+    {
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var field in cls.Fields)
+        {
+            fields[field.Name] = field.TypeName;
+        }
+
+        return fields;
+    }
+
+    // Walks one function-like body. Establishes the return-type context (for §R)
+    // and a fresh scope stack whose base scope holds the enclosing class fields and
+    // this member's parameters (so §ASSIGN to a field or parameter is checked, and a
+    // parameter correctly shadows a field of the same name). All reset per body.
+    private void CheckBody(
+        IReadOnlyList<StatementNode> body,
+        string? returnType,
+        IReadOnlyList<ParameterNode>? parameters,
+        IReadOnlyDictionary<string, string>? fields)
+    {
+        _currentReturnType = returnType;
+        _scopes.Clear();
+        var baseScope = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (fields != null)
+        {
+            foreach (var kv in fields) baseScope[kv.Key] = kv.Value;
+        }
+
+        if (parameters != null)
+        {
+            foreach (var p in parameters) baseScope[p.Name] = p.TypeName; // parameters shadow fields
+        }
+
+        _scopes.Add(baseScope);
+        foreach (var stmt in body)
+        {
+            CheckStatement(stmt);
+        }
+    }
+
+    // Walks a nested block in its own child scope so bindings declared inside it do
+    // not leak out to shadow (and mis-type) an outer variable of the same name.
+    private void CheckBlock(IReadOnlyList<StatementNode> body)
+    {
+        _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+        foreach (var stmt in body)
+        {
+            CheckStatement(stmt);
+        }
+
+        _scopes.RemoveAt(_scopes.Count - 1);
+    }
+
+    private void DeclareLocal(string name, string type) => _scopes[^1][name] = type;
+
+    private bool TryLookupLocal(string name, out string type)
+    {
+        for (var i = _scopes.Count - 1; i >= 0; i--)
+        {
+            if (_scopes[i].TryGetValue(name, out type!))
+            {
+                return true;
+            }
+        }
+
+        type = "";
+        return false;
     }
 
     private void CheckStatement(StatementNode stmt)
@@ -196,37 +234,69 @@ public sealed class BindValidationPass
                 CheckBind(bind);
                 break;
 
+            case ReturnStatementNode ret when ret.Expression != null && _currentReturnType != null:
+                CheckArrayToCollection(
+                    ret.Expression, _currentReturnType, ret.Span, "The declared return type");
+                break;
+
+            case AssignmentStatementNode assign
+                when assign.Target is ReferenceNode target &&
+                     TryLookupLocal(target.Name, out var targetType):
+                CheckArrayToCollection(
+                    assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+                break;
+
             case IfStatementNode ifStmt:
-                foreach (var s in ifStmt.ThenBody) CheckStatement(s);
+                CheckBlock(ifStmt.ThenBody);
                 foreach (var ei in ifStmt.ElseIfClauses)
-                    foreach (var s in ei.Body) CheckStatement(s);
+                    CheckBlock(ei.Body);
                 if (ifStmt.ElseBody != null)
-                    foreach (var s in ifStmt.ElseBody) CheckStatement(s);
+                    CheckBlock(ifStmt.ElseBody);
                 break;
 
             case ForStatementNode forStmt:
-                foreach (var s in forStmt.Body) CheckStatement(s);
+                CheckBlock(forStmt.Body);
+                break;
+
+            case ForeachStatementNode forEach:
+                CheckBlock(forEach.Body);
                 break;
 
             case WhileStatementNode whileStmt:
-                foreach (var s in whileStmt.Body) CheckStatement(s);
+                CheckBlock(whileStmt.Body);
                 break;
 
             case DoWhileStatementNode doWhileStmt:
-                foreach (var s in doWhileStmt.Body) CheckStatement(s);
+                CheckBlock(doWhileStmt.Body);
                 break;
 
             case MatchStatementNode match:
                 foreach (var c in match.Cases)
-                    foreach (var s in c.Body) CheckStatement(s);
+                    CheckBlock(c.Body);
                 break;
 
             case TryStatementNode tryStmt:
-                foreach (var s in tryStmt.TryBody) CheckStatement(s);
+                CheckBlock(tryStmt.TryBody);
                 foreach (var clause in tryStmt.CatchClauses)
-                    foreach (var s in clause.Body) CheckStatement(s);
+                    CheckBlock(clause.Body);
                 if (tryStmt.FinallyBody != null)
-                    foreach (var s in tryStmt.FinallyBody) CheckStatement(s);
+                    CheckBlock(tryStmt.FinallyBody);
+                break;
+
+            case UsingStatementNode usingStmt:
+                CheckBlock(usingStmt.Body);
+                break;
+
+            case SyncBlockNode sync:
+                CheckBlock(sync.Body);
+                break;
+
+            case UnsafeBlockNode unsafeBlock:
+                CheckBlock(unsafeBlock.Body);
+                break;
+
+            case FixedStatementNode fixedStmt:
+                CheckBlock(fixedStmt.Body);
                 break;
         }
     }
@@ -243,12 +313,19 @@ public sealed class BindValidationPass
             return;
         }
 
+        // Track the declared type so later §ASSIGN to this variable can be checked.
+        if (bind.TypeName != null)
+        {
+            DeclareLocal(bind.Name, bind.TypeName);
+        }
+
         // Calor0254 — always-on hard type error: an array bound to a concrete
         // generic collection (the E1a trap). Independent of strict inference,
         // since the emitted C# would fail with CS0029 regardless.
         if (bind.TypeName != null && bind.Initializer != null)
         {
-            CheckArrayToCollectionAssignability(bind, bind.Initializer);
+            CheckArrayToCollection(
+                bind.Initializer, bind.TypeName, bind.Span, $"Binding '{bind.Name}'");
         }
 
         // Strict-mode checks (Calor0251-0253) — only when --strict-bind-inference is set
@@ -262,33 +339,32 @@ public sealed class BindValidationPass
     }
 
     /// <summary>
-    /// Rejects <c>§B{name:List&lt;T&gt;}</c> (or another concrete generic collection)
-    /// bound to an array initializer — the E1a trap. Mirrors C#: an array satisfies
-    /// the collection <em>interfaces</em> (<c>IList&lt;T&gt;</c>, <c>IEnumerable&lt;T&gt;</c>, …)
-    /// but is not implicitly convertible to a concrete collection class, so the
-    /// emitted C# would fail with CS0029. Caught here at compile time rather than
-    /// left for a downstream <c>dotnet build</c> (#722).
+    /// Reports Calor0254 when <paramref name="value"/> is an array and
+    /// <paramref name="declaredType"/> is a concrete generic collection. Shared by
+    /// binding, return, and assignment positions; <paramref name="subject"/> names
+    /// the offending declaration (e.g. "Binding 'lines'"). The message references
+    /// the collection by name only — it never echoes the internal normalized type
+    /// spelling, so the surface-syntax recommendation ('[str]') is not paired with
+    /// a mismatched convention.
     /// </summary>
-    private void CheckArrayToCollectionAssignability(BindStatementNode bind, ExpressionNode init)
+    private void CheckArrayToCollection(
+        ExpressionNode value, string declaredType, Parsing.TextSpan span, string subject)
     {
-        var declared = bind.TypeName!.Trim();
-        if (!TryGetConcreteCollectionName(declared, out var collectionName))
+        if (!TryGetConcreteCollectionName(declaredType.Trim(), out var collectionName))
         {
             return;
         }
 
-        var elementType = InitializerArrayElement(init);
+        var elementType = InitializerArrayElement(value);
         if (elementType == null)
         {
             return;
         }
 
-        var arrayForm = $"[{elementType}]";
-        _diagnostics.ReportError(bind.Span, DiagnosticCode.BindArrayToConcreteCollection,
-            $"Binding '{bind.Name}' declares '{declared}', but its initializer is an array. " +
-            $"An array is not implicitly convertible to the concrete collection '{collectionName}<…>' " +
-            $"(the emitted C# would fail with CS0029). Use the array form '{arrayForm}', or wrap the " +
-            $"value explicitly (e.g. a new {collectionName} constructed from it).");
+        _diagnostics.ReportError(span, DiagnosticCode.BindArrayToConcreteCollection,
+            $"{subject} is a concrete collection ('{collectionName}<…>'), but the value is an array. " +
+            $"An array is not implicitly convertible to '{collectionName}<…>' in C# (CS0029). Use the " +
+            $"array form '[{elementType}]', or construct a new {collectionName} from the array.");
     }
 
     /// <summary>

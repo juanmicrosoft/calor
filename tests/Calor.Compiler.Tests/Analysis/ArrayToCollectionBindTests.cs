@@ -116,6 +116,127 @@ public class ArrayToCollectionBindTests
     }
 
     [Fact]
+    public void ReturnPosition_ArrayToList_IsRejected()
+    {
+        // §R returning an array from a List<str>-typed function (#724). This is the
+        // signature variant the exemplar's own trap text warns about.
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Get:pub} (str:path) -> List<str>\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{File.ReadAllLines} §A path §/C\n");
+
+        Assert.True(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void ReturnPosition_ArrayFormReturnType_IsAccepted()
+    {
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Get:pub} (str:path) -> [str]\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{File.ReadAllLines} §A path §/C\n");
+
+        Assert.False(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void AssignPosition_ArrayToList_IsRejected()
+    {
+        // §ASSIGN reassigning an array into a List<str>-typed mutable variable (#724).
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Count:pub} (str:path) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §B{~items:List<str>}\n" +
+            "    §ASSIGN items §C{File.ReadAllLines} §A path §/C\n" +
+            "    §R (len items)\n");
+
+        Assert.True(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void AssignPosition_ArrayFormVariable_IsAccepted()
+    {
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Count:pub} (str:path) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §B{~items:[str]}\n" +
+            "    §ASSIGN items §C{File.ReadAllLines} §A path §/C\n" +
+            "    §R (len items)\n");
+
+        Assert.False(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void TrapInsideForeachBody_IsRejected()
+    {
+        // Regression: the pass must recurse into §EACH bodies — file/dir iteration
+        // is the exact idiom where this trap occurs (PR #726 review finding 1).
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Scan:pub} (str:dir) -> i32\n" +
+            "    §E{fs:rw}\n" +
+            "    §B{dirs:[str]} §C{Directory.GetDirectories} §A dir §/C\n" +
+            "    §EACH{e1:d} dirs\n" +
+            "      §B{lines:List<str>} §C{File.ReadAllLines} §A d §/C\n" +
+            "    §R INT:0\n");
+
+        Assert.True(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void AssignToCollectionTypedField_IsRejected()
+    {
+        // §ASSIGN targeting a class field declared as a concrete collection.
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §CL{c1:Store:pub}\n" +
+            "    §FLD{List<str>:items:priv}\n" +
+            "    §MT{mt1:Load:pub} (str:path) -> void\n" +
+            "      §E{fs:r}\n" +
+            "      §ASSIGN items §C{File.ReadAllLines} §A path §/C\n");
+
+        Assert.True(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void AssignToArrayFormField_IsAccepted()
+    {
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §CL{c1:Store:pub}\n" +
+            "    §FLD{[str]:items:priv}\n" +
+            "    §MT{mt1:Load:pub} (str:path) -> void\n" +
+            "      §E{fs:r}\n" +
+            "      §ASSIGN items §C{File.ReadAllLines} §A path §/C\n");
+
+        Assert.False(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void InnerScopeShadow_DoesNotMistypeOuterAssign()
+    {
+        // Scope hygiene (PR #726 review finding 3): a List<str> binding inside a
+        // nested block must not overwrite the type of a same-named outer variable.
+        // The outer §ASSIGN of an array into an outer [str] variable is correct and
+        // must NOT be flagged by the inner shadow's type.
+        var diags = Validate(
+            "§M{m:Files}\n" +
+            "  §F{f:Do:pub} (str:path, bool:flag) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §B{~x:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §IF{if1} (== flag true)\n" +
+            "      §B{x:List<str>} §C{MakeList} §/C\n" +
+            "    §ASSIGN x §C{File.ReadAllLines} §A path §/C\n" +
+            "    §R INT:0\n");
+
+        Assert.False(HasArrayTrap(diags));
+    }
+
+    [Fact]
     public void HashSetFromArray_IsRejected()
     {
         // Generality on the collection side: not just List<T>.
