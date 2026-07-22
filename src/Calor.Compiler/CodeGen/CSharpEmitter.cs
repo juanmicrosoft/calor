@@ -57,19 +57,36 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     // scope; a rebind whose earlier declaration lives in a now-closed sibling block
     // re-declares (`var x = …`) instead — matching C#, which forbids reassigning an
     // out-of-scope local (CS0103). Push on entering a control-flow block, pop on leaving.
-    private readonly List<HashSet<string>> _declScopes = new();
+    // Starts with a base scope so isolated statement/expression emission (tests, or any
+    // path not entered through a function/method ResetDeclScopes) always has a live scope.
+    private readonly List<HashSet<string>> _declScopes = new() { new(StringComparer.Ordinal) };
 
-    private void ResetDeclScopes()
+    private void ResetDeclScopes(IReadOnlyList<ParameterNode>? parameters = null)
     {
         _declScopes.Clear();
         _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
+        if (parameters != null)
+        {
+            // Parameters live in the base scope so a mutable §B{~param} rebind is a
+            // reassignment (`param = …`, valid), not a re-declaration that shadows the
+            // parameter (CS0136) — matching BindValidationPass, which seeds parameters
+            // into its base scope too (#732).
+            foreach (var p in parameters)
+            {
+                _declScopes[0].Add(SanitizeIdentifier(p.Name));
+            }
+        }
     }
 
     private void PushDeclScope() => _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
 
     private void PopDeclScope()
     {
-        if (_declScopes.Count > 0)
+        // Popping should never reach the base scope — that means an unbalanced
+        // Push/Pop site. Assert in Debug/tests; guard in Release so a stray imbalance
+        // can't crash real codegen.
+        System.Diagnostics.Debug.Assert(_declScopes.Count > 1, "unbalanced PushDeclScope/PopDeclScope");
+        if (_declScopes.Count > 1)
         {
             _declScopes.RemoveAt(_declScopes.Count - 1);
         }
@@ -90,6 +107,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private void DeclareVarInScope(string name)
     {
+        System.Diagnostics.Debug.Assert(_declScopes.Count > 0, "DeclareVarInScope with no active scope");
         if (_declScopes.Count == 0)
         {
             ResetDeclScopes();
@@ -466,7 +484,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentPostconditionIndex = 0;
 
         // Clear declared variables tracking for new function scope
-        ResetDeclScopes();
+        ResetDeclScopes(node.Parameters);
 
         // Emit extended metadata as documentation comments
         foreach (var issue in node.Issues)
@@ -1061,6 +1079,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Indent();
 
         PushDeclScope();
+        DeclareVarInScope(varName); // the loop variable is in scope for the body (#732)
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
@@ -1966,6 +1985,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine($"{indexName}++;");
 
             PushDeclScope();
+            // Iteration/index variables are in scope for the body (#732). Note: a §B
+            // rebind of a foreach variable is not valid C# (CS1656) regardless — see #738.
+            DeclareVarInScope(varName);
+            DeclareVarInScope(indexName);
             foreach (var stmt in node.Body)
             {
                 EmitStatement(stmt);
@@ -1982,6 +2005,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             Indent();
 
             PushDeclScope();
+            DeclareVarInScope(varName);
             foreach (var stmt in node.Body)
             {
                 EmitStatement(stmt);
@@ -2127,6 +2151,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Indent();
 
         PushDeclScope();
+        DeclareVarInScope(keyName);
+        DeclareVarInScope(valueName);
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
@@ -2504,7 +2530,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(MethodNode node)
     {
         // Clear declared variables tracking for new method scope
-        ResetDeclScopes();
+        ResetDeclScopes(node.Parameters);
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -3099,7 +3125,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ConstructorNode node)
     {
         // Clear declared variables tracking for new constructor scope
-        ResetDeclScopes();
+        ResetDeclScopes(node.Parameters);
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -3154,7 +3180,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(OperatorOverloadNode node)
     {
-        ResetDeclScopes();
+        ResetDeclScopes(node.Parameters);
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -3270,6 +3296,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Indent();
 
         PushDeclScope();
+        if (node.VariableName != null)
+        {
+            DeclareVarInScope(namePart); // using resource binding is in scope for the body
+        }
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
@@ -3353,6 +3383,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         Indent();
 
         PushDeclScope();
+        if (node.VariableName != null)
+        {
+            DeclareVarInScope(SanitizeIdentifier(node.VariableName)); // exception variable is in scope
+        }
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
