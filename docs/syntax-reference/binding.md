@@ -219,10 +219,17 @@ It fires in three positions — binding, return, and reassignment:
 §B{lines:IEnumerable<str>} §C{File.ReadAllLines} §A path §/C  // ok — interface
 ```
 
-The array is recognized when the value calls a known array-returning BCL method
-(`File.ReadAllLines`/`ReadAllBytes`, `Directory.GetFiles`/`GetDirectories`/
-`GetFileSystemEntries`) or a user function declared `-> [T]`. Argument position
-(an array passed to a `List<T>` parameter) is tracked in issue #725.
+The reassignment target may be a local, a parameter, or a class field — all
+declared types the check can see. The array is recognized when the value calls a
+known array-returning BCL method (`File.ReadAllLines`/`ReadAllBytes`,
+`Directory.GetFiles`/`GetDirectories`/`GetFileSystemEntries`) or a user function
+declared `-> [T]`.
+
+Scope notes: the check runs inside every block body — loop bodies (including
+`§EACH`/`§EACHKV`), `§IF` branches, and while, match, try, using, sync, and
+unsafe/fixed blocks. It does **not** descend into block-lambda (`§LAM`) bodies,
+so a lambda declared `-> List<T>` returning an array is not checked. Argument
+position (an array passed to a `List<T>` parameter) is tracked in issue #725.
 
 LSP quick-fixes that insert the recommended annotation are available
 in v0.6.3 and surface in any IDE talking to the Calor language server.
