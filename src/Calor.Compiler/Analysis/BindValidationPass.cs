@@ -437,8 +437,15 @@ public sealed class BindValidationPass
     /// <summary>True only when <paramref name="declared"/> and <paramref name="value"/>
     /// are both known primitive categories that differ — the CS0029 case with no implicit
     /// conversion. Numeric-to-numeric (e.g. <c>i32</c>→<c>i64</c>) shares a category and is
-    /// never flagged, so implicit widening is never a false positive (and a narrowing that
-    /// needs a cast, CS0266, is a conservative miss).</summary>
+    /// never flagged, so implicit widening is never a false positive. The trade-off is that
+    /// within-<c>Numeric</c> conversions that require an explicit cast are conservative
+    /// misses (accepted though Roslyn rejects them with CS0266): an integral narrowing
+    /// (e.g. <c>i64</c>→<c>i32</c>) and the <c>decimal</c>↔<c>float</c>/<c>double</c> pair
+    /// (which has an explicit conversion but no implicit one, so CS0266 — not CS0029, since
+    /// a conversion does exist). All spell as <c>Numeric</c> here; a precise fix for the
+    /// decimal pair would split <c>decimal</c> into its own category AND reclassify decimal
+    /// literals (currently modeled as <c>FLOAT</c>). The differential suite pins the gap
+    /// (see <c>KnownGap_DecimalToFloatRebind_EmitsCS0266</c>).</summary>
     private static bool AreDefinitelyIncompatible(string declared, string value)
     {
         var a = ClassifyType(declared);

@@ -150,4 +150,22 @@ public class ShadowingDifferentialTests
         Assert.True(accepted);
         Assert.Contains(roslynErrors, e => e.StartsWith("CS0128", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void KnownGap_DecimalToFloatRebind_EmitsCS0266() // #740 within-Numeric miss
+    {
+        // decimal and float/double both classify as the single Numeric category, so a
+        // rebind across them is not flagged (the conservative-miss trade the Calor0256
+        // category model makes to avoid widening false positives). There is no *implicit*
+        // conversion between decimal and double, but an *explicit* one exists, so
+        // `double x = 0; x = d;` (d: decimal) is CS0266 ("a cast is missing"), NOT CS0029
+        // — this miss is the same cast-needed bucket as numeric narrowing. Pins the gap
+        // the AreDefinitelyIncompatible doc names.
+        var (accepted, roslynErrors) = Compile(
+            "§M{m:S}\n  §F{f:Do:pub} (decimal:d) -> i32\n" +
+            "    §B{~x:f64} 0.0\n    §B{~x} d\n    §R 0\n");
+
+        Assert.True(accepted);
+        Assert.Contains(roslynErrors, e => e.StartsWith("CS0266", StringComparison.Ordinal));
+    }
 }
