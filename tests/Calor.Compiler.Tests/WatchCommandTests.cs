@@ -8,27 +8,57 @@ namespace Calor.Compiler.Tests;
 /// <summary>
 /// Unit tests for the <c>calor watch</c> debounce logic (factored into
 /// <see cref="WatchDebouncer"/> precisely so it is testable without a real
-/// <see cref="FileSystemWatcher"/>). The quiet period is measured via an injected
-/// <see cref="TimeProvider"/>: pre-loaded/burst/cancel cases exercise the real
-/// <see cref="TimeProvider.System"/> timer, and the window-timing case drives a
-/// <see cref="FakeTimeProvider"/> on virtual time so it is deterministic (#714).
+/// <see cref="FileSystemWatcher"/>). Every case drives the quiet period via a
+/// <see cref="FakeTimeProvider"/> on virtual time, so batch boundaries are
+/// deterministic instead of racing a real clock under parallel test load
+/// (#714, #729). No test depends on wall-clock timing.
 /// </summary>
 public class WatchDebouncerTests
 {
     private static readonly TimeSpan Quiet = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(15);
 
+    /// <summary>
+    /// Drives <paramref name="time"/> forward until the debouncer's quiet timer fires
+    /// and the batch closes. Deterministic because it never advances the clock while
+    /// an event is still buffered: with the clock stationary the quiet timer cannot
+    /// fire, so the read always resolves a pending event (draining it and re-arming
+    /// the timer) rather than racing the timer against the event. Only advances a full
+    /// quiet window once the channel is empty. Bounded so a logic error can't hang.
+    /// </summary>
+    private static async Task<IReadOnlyCollection<string>?> DriveToClose(
+        Task<IReadOnlyCollection<string>?> read, FakeTimeProvider time, ChannelReader<string> reader)
+    {
+        // Invariant that makes this race-free under any scheduling: advance the clock
+        // ONLY when the channel is empty. While an event is still buffered the clock
+        // stays put, so the quiet timer cannot fire and WhenAny must resolve the event
+        // (draining it into the batch and re-arming). The batch therefore never closes
+        // with an un-drained event, no matter how starved the thread pool is. The bound
+        // is a safety net; the 15s WaitAsync below is the ultimate backstop.
+        for (var i = 0; i < 1000 && !read.IsCompleted; i++)
+        {
+            await Task.Yield();
+            if (reader.Count == 0 && !read.IsCompleted)
+            {
+                time.Advance(Quiet);
+            }
+        }
+
+        return await read.WaitAsync(TestTimeout);
+    }
+
     [Fact]
     public async Task Burst_IsCollapsedIntoOneDeduplicatedBatch()
     {
+        var time = new FakeTimeProvider();
         var channel = Channel.CreateUnbounded<string>();
         // Editor-style burst: several events for the same save, before any waiter.
         channel.Writer.TryWrite("/p/a.calr");
         channel.Writer.TryWrite("/p/a.calr");
         channel.Writer.TryWrite("/p/b.calr");
 
-        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
-            .WaitAsync(TestTimeout);
+        var read = WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, time, CancellationToken.None);
+        var batch = await DriveToClose(read, time, channel.Reader);
 
         Assert.NotNull(batch);
         Assert.Equal(2, batch!.Count);
@@ -39,10 +69,10 @@ public class WatchDebouncerTests
     [Fact]
     public async Task EventWithinQuietPeriod_ExtendsBatch_AndQuietPeriodDurationIsHonored()
     {
-        // Virtual-time version (no wall-clock race, #714). Also verifies the quiet
-        // period's DURATION is honored: advancing only part of the window must NOT
-        // close the batch — which guards against quietPeriod being TimeSpan.Zero or
-        // the wrong variable (the batch would close immediately and this would fail).
+        // Verifies the quiet period's DURATION is honored: advancing only part of the
+        // window must NOT close the batch — which guards against quietPeriod being
+        // TimeSpan.Zero or the wrong variable (the batch would close immediately and
+        // this would fail).
         var time = new FakeTimeProvider();
         var channel = Channel.CreateUnbounded<string>();
         channel.Writer.TryWrite("/p/a.calr");
@@ -56,16 +86,7 @@ public class WatchDebouncerTests
 
         channel.Writer.TryWrite("/p/b.calr");                       // arrives inside the window
 
-        // Let the read drain "b" and re-arm the quiet timer, then elapse the window.
-        // Bounded, deterministic convergence: each iteration yields (so the drain +
-        // re-arm continuation runs) then advances a full quiet period.
-        for (var i = 0; i < 50 && !read.IsCompleted; i++)
-        {
-            await Task.Yield();
-            time.Advance(Quiet);
-        }
-
-        var batch = await read.WaitAsync(TestTimeout);
+        var batch = await DriveToClose(read, time, channel.Reader);
         Assert.NotNull(batch);
         Assert.Contains("/p/a.calr", batch!);
         Assert.Contains("/p/b.calr", batch!);
@@ -74,16 +95,18 @@ public class WatchDebouncerTests
     [Fact]
     public async Task SeparateBursts_YieldSeparateBatches()
     {
+        var time = new FakeTimeProvider();
         var channel = Channel.CreateUnbounded<string>();
+
         channel.Writer.TryWrite("/p/a.calr");
-        var first = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
-            .WaitAsync(TestTimeout);
+        var first = await DriveToClose(
+            WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, time, CancellationToken.None), time, channel.Reader);
         Assert.NotNull(first);
         Assert.Single(first!);
 
         channel.Writer.TryWrite("/p/b.calr");
-        var second = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
-            .WaitAsync(TestTimeout);
+        var second = await DriveToClose(
+            WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, time, CancellationToken.None), time, channel.Reader);
         Assert.NotNull(second);
         Assert.Contains("/p/b.calr", second!);
     }
@@ -91,12 +114,16 @@ public class WatchDebouncerTests
     [Fact]
     public async Task Cancellation_WhileWaiting_ReturnsNull()
     {
+        // No events: the read is parked on the first WaitToReadAsync. Cancel it
+        // explicitly (no timed CancellationTokenSource, so no wall-clock race).
+        var time = new FakeTimeProvider();
         var channel = Channel.CreateUnbounded<string>();
-        using var cts = new CancellationTokenSource(50);
+        using var cts = new CancellationTokenSource();
 
-        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, cts.Token)
-            .WaitAsync(TestTimeout);
+        var read = WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, time, cts.Token);
+        cts.Cancel();
 
+        var batch = await read.WaitAsync(TestTimeout);
         Assert.Null(batch);
     }
 
@@ -123,10 +150,13 @@ public class WatchDebouncerTests
     [Fact]
     public async Task CompletedChannel_WithNoEvents_ReturnsNull()
     {
+        var time = new FakeTimeProvider();
         var channel = Channel.CreateUnbounded<string>();
         channel.Writer.Complete();
 
-        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
+        // Channel completion short-circuits the first WaitToReadAsync — returns
+        // without arming the quiet timer, so no clock advance is needed.
+        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, time, CancellationToken.None)
             .WaitAsync(TestTimeout);
 
         Assert.Null(batch);
@@ -135,11 +165,15 @@ public class WatchDebouncerTests
     [Fact]
     public async Task CompletedChannel_WithPendingEvents_DeliversThemFirst()
     {
+        var time = new FakeTimeProvider();
         var channel = Channel.CreateUnbounded<string>();
         channel.Writer.TryWrite("/p/a.calr");
         channel.Writer.Complete();
 
-        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, TimeProvider.System, CancellationToken.None)
+        // Pending events drain, then the drain loop's WaitToReadAsync sees the
+        // completed channel and returns the batch before the quiet timer fires — so
+        // this is deterministic without advancing the clock.
+        var batch = await WatchDebouncer.ReadBatchAsync(channel.Reader, Quiet, time, CancellationToken.None)
             .WaitAsync(TestTimeout);
 
         Assert.NotNull(batch);
