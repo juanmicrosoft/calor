@@ -250,14 +250,17 @@ checked.
 ### Calor0255 — `BindShadowsEnclosingScope`
 
 Another always-on hard error: a `§B` that declares a **new** local reusing the
-name of a local or parameter already in an **enclosing** scope. C# forbids a
-nested local from shadowing an enclosing local/parameter (CS0136), so the emitted
-code would not compile.
+name of a local, parameter, or **loop variable** already in an **enclosing**
+scope. C# forbids a nested local from shadowing an enclosing local/parameter
+(CS0136), so the emitted code would not compile.
 
 ```
 §B{~x:i32} 0
 §IF{i1} (> x 0)
   §B{x:str} "hi"   // Calor0255: inner local 'x' shadows the outer 'x'
+
+§L{l1:i:0:9:1}
+  §B{i:i32} 5      // Calor0255: shadows the loop variable 'i'
 ```
 
 Two things are deliberately **not** flagged, matching C#:
@@ -270,6 +273,12 @@ Two things are deliberately **not** flagged, matching C#:
   named like a class field is legal (the local wins), as in C#.
 
 Sibling (non-nested) blocks may each reuse a name — they are separate scopes.
+
+Not yet covered (each an exit-0-then-broken-`dotnet build` gap tracked by an
+issue, pinned by `ShadowingDifferentialTests`): same-scope duplicate `§B`
+(CS0128, #731, needs a converter change), a mutable rebind across sibling blocks
+(CS0103, #732, an emitter scoping bug), and a type-changing mutable rebind
+(CS0029, #733).
 
 LSP quick-fixes that insert the recommended annotation are available
 in v0.6.3 and surface in any IDE talking to the Calor language server.

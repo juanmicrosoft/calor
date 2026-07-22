@@ -217,6 +217,10 @@ public sealed class BindValidationPass
         var paramScope = new Dictionary<string, string>(StringComparer.Ordinal);
         if (parameters != null)
         {
+            // Empty-string type is benign in the downstream lookups (the §ASSIGN /
+            // Calor0254 checks call TryGetConcreteCollectionName, which fails on "");
+            // the entry is only load-bearing for the shadowing check, which needs the
+            // name, not the type.
             foreach (var p in parameters) paramScope[p.Name] = p.TypeName ?? "";
         }
 
@@ -244,9 +248,30 @@ public sealed class BindValidationPass
 
     private void DeclareLocal(string name, string type) => _scopes[^1][name] = type;
 
-    /// <summary>True if <paramref name="name"/> is already a local or parameter in
-    /// an <em>enclosing</em> scope (strictly above the current one) — the C# CS0136
-    /// condition. Fields are excluded (a local may legally shadow a field).</summary>
+    // Walks a nested block whose scope is pre-seeded with iteration variables (the
+    // §L / §EACH / §EACHKV loop variables), so an inner §B reusing an iteration
+    // variable's name is caught (CS0136) — the loop variable lives in a scope
+    // enclosing the body, exactly as in C#.
+    private void CheckLoopBlock(IReadOnlyList<StatementNode> body, params string?[] loopVars)
+    {
+        var loopScope = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var name in loopVars)
+        {
+            if (!string.IsNullOrEmpty(name)) loopScope[name] = ""; // type irrelevant to shadowing
+        }
+
+        _scopes.Add(loopScope);
+        CheckBlock(body);
+        _scopes.RemoveAt(_scopes.Count - 1);
+    }
+
+    /// <summary>True if <paramref name="name"/> is already a local, parameter, or
+    /// loop variable in an <em>enclosing</em> scope (strictly above the current one)
+    /// — the CS0136 condition a new §B declaration would violate. Fields are excluded
+    /// from the scope stack, so a local may legally shadow a field, as in C#. Same-
+    /// scope duplicates (CS0128) are deliberately NOT flagged here (#731): the C#→Calor
+    /// converter emits array/list/dict reassignments as same-name creation blocks,
+    /// so that case needs the converter's cooperation, not a blanket reject.</summary>
     private bool IsShadowingEnclosingScope(string name)
     {
         for (var i = 0; i < _scopes.Count - 1; i++)
@@ -330,12 +355,12 @@ public sealed class BindValidationPass
                 break;
 
             case ForStatementNode forStmt:
-                CheckBlock(forStmt.Body);
+                CheckLoopBlock(forStmt.Body, forStmt.VariableName);
                 break;
 
             case ForeachStatementNode forEach:
                 ScanExpressionForCalls(forEach.Collection);
-                CheckBlock(forEach.Body);
+                CheckLoopBlock(forEach.Body, forEach.VariableName, forEach.IndexVariableName);
                 break;
 
             case WhileStatementNode whileStmt:
@@ -401,15 +426,15 @@ public sealed class BindValidationPass
         var isReassignment = bind.IsMutable && _declaredInFunction.Contains(bind.Name);
         if (!isReassignment)
         {
-            // Calor0255 — a new local that reuses an enclosing local/parameter name
-            // is CS0136 in the emitted C#. Fields may be shadowed (they are excluded
-            // from the scope stack), matching C#.
+            // Calor0255 — a new local that reuses a local/parameter/loop-variable
+            // name in an enclosing scope is CS0136 in the emitted C#. Fields are
+            // excluded from the scope stack, so shadowing a field is allowed (as C#).
             if (IsShadowingEnclosingScope(bind.Name))
             {
                 _diagnostics.ReportError(bind.Span, DiagnosticCode.BindShadowsEnclosingScope,
-                    $"Binding '{bind.Name}' shadows a local or parameter of the same name already " +
-                    "in an enclosing scope. C# forbids this (CS0136), so the generated code would " +
-                    $"not compile — rename this binding (e.g. '{bind.Name}2').");
+                    $"Binding '{bind.Name}' shadows a local, parameter, or loop variable of the same " +
+                    "name already in an enclosing scope. C# forbids this (CS0136), so the generated " +
+                    $"code would not compile — rename this binding (e.g. '{bind.Name}2').");
             }
 
             _declaredInFunction.Add(bind.Name);

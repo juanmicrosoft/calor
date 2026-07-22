@@ -174,12 +174,13 @@ public static class DiagnosticCode
     public const string BindArrayToConcreteCollection = "Calor0254";
 
     /// <summary>
-    /// Error: a <c>§B</c> binding reuses the name of a local or parameter already
-    /// in an enclosing scope — e.g. an inner-block <c>§B{x}</c> when an outer
-    /// <c>§B{x}</c> or a parameter <c>x</c> is in scope. C# forbids a nested local
-    /// shadowing an enclosing local/parameter (CS0136), so the emitted code would
-    /// fail <c>dotnet build</c>. Shadowing a <em>field</em> is allowed (as in C#).
-    /// The fix is to rename the inner binding (#727).
+    /// Error: a <c>§B</c> binding reuses the name of a local, parameter, or loop
+    /// variable already in an enclosing scope — e.g. an inner-block <c>§B{x}</c>
+    /// when an outer <c>§B{x}</c>, a parameter <c>x</c>, or a loop variable <c>x</c>
+    /// is in scope. C# forbids a nested local shadowing an enclosing
+    /// local/parameter (CS0136), so the emitted code would fail <c>dotnet build</c>.
+    /// A mutable rebind (reassignment) and shadowing a <em>field</em> are allowed,
+    /// as in C#. The fix is to rename the inner binding (#727).
     /// </summary>
     public const string BindShadowsEnclosingScope = "Calor0255";
 

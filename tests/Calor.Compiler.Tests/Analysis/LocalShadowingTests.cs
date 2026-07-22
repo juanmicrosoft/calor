@@ -89,6 +89,20 @@ public class LocalShadowingTests
     }
 
     [Fact]
+    public void InnerBindingReusingALoopVariableName_IsRejected()
+    {
+        // #730 review finding 1: the loop variable is in scope for the body, so a
+        // §B reusing its name is CS0136 (for (int i…) { int i; }).
+        Assert.True(HasShadow(
+            "§M{m:S}\n" +
+            "  §F{f:Do:pub} () -> i32\n" +
+            "    §L{l1:i:0:3:1}\n" +
+            "      §B{i:i32} 9\n" +
+            "      §P i\n" +
+            "    §R 0\n"));
+    }
+
+    [Fact]
     public void InnerBindingReusingAParameterName_IsRejected()
     {
         // A nested local reusing a parameter name is CS0136.
