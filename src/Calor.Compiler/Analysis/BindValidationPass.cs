@@ -465,6 +465,9 @@ public sealed class BindValidationPass
                 ? Parsing.AttributeHelper.ExpandType(bind.TypeName.Trim())
                 : LiteralTypeOrNull(bind.Initializer);
 
+            // TryLookupLocal's field fallback is unreachable here: this branch runs only
+            // when isReassignment, which already requires the name in a live LOCAL scope,
+            // so declaredType is the variable's local/parameter type, never a field's.
             if (rebindType != null &&
                 TryLookupLocal(bind.Name, out var declaredType) &&
                 !string.IsNullOrEmpty(declaredType) &&
