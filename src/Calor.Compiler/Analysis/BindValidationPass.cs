@@ -45,6 +45,11 @@ public sealed class BindValidationPass
     // returns an array (e.g. §F ... -> [str]). Rebuilt on every Check(module).
     private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
 
+    // Parameter types of each user function/method, keyed by "name/arity" (and
+    // "Type.Method/arity"), so an array passed to a concrete-collection parameter
+    // at a call site can be flagged (#725). Rebuilt on every Check(module).
+    private readonly Dictionary<string, List<string>> _userParamTypes = new(StringComparer.Ordinal);
+
     // Lexical scope stack of name → declared type for the body currently being
     // walked, so the array-vs-collection check can validate §ASSIGN targets without
     // an inner-block declaration leaking out to shadow an outer variable. The base
@@ -57,6 +62,12 @@ public sealed class BindValidationPass
     // Declared return type of the function-like body currently being walked, so the
     // check can validate §R. Null for bodies with no value return (ctors, setters).
     private string? _currentReturnType;
+
+    // Name of the class whose member is currently being walked (null at module
+    // level). Signatures resolve context-sensitively: an unqualified call inside
+    // class C prefers C's member (implicit `this`); otherwise the free function.
+    // This is what keeps a same-named method and free function from colliding.
+    private string? _currentClassName;
 
     // Concrete generic collection classes an array is NOT implicitly convertible
     // to in C# (unlike the collection interfaces IList<T>/IEnumerable<T>/…, which
@@ -113,11 +124,11 @@ public sealed class BindValidationPass
 
     public void Check(ModuleNode module)
     {
-        BuildUserReturnTypes(module);
+        BuildUserSignatures(module);
 
         foreach (var func in module.Functions)
         {
-            CheckBody(func.Body, func.Output?.TypeName, func.Parameters, fields: null);
+            CheckBody(func.Body, func.Output?.TypeName, func.Parameters, fields: null, className: null);
         }
 
         foreach (var cls in module.Classes)
@@ -126,32 +137,32 @@ public sealed class BindValidationPass
 
             foreach (var ctor in cls.Constructors)
             {
-                CheckBody(ctor.Body, returnType: null, ctor.Parameters, fields);
+                CheckBody(ctor.Body, returnType: null, ctor.Parameters, fields, cls.Name);
             }
 
             foreach (var method in cls.Methods)
             {
-                CheckBody(method.Body, method.Output?.TypeName, method.Parameters, fields);
+                CheckBody(method.Body, method.Output?.TypeName, method.Parameters, fields, cls.Name);
             }
 
             foreach (var prop in cls.Properties)
             {
                 // A getter returns the property's type; setters/initers do not.
-                if (prop.Getter != null) CheckBody(prop.Getter.Body, prop.TypeName, parameters: null, fields);
-                if (prop.Setter != null) CheckBody(prop.Setter.Body, returnType: null, parameters: null, fields);
-                if (prop.Initer != null) CheckBody(prop.Initer.Body, returnType: null, parameters: null, fields);
+                if (prop.Getter != null) CheckBody(prop.Getter.Body, prop.TypeName, parameters: null, fields, cls.Name);
+                if (prop.Setter != null) CheckBody(prop.Setter.Body, returnType: null, parameters: null, fields, cls.Name);
+                if (prop.Initer != null) CheckBody(prop.Initer.Body, returnType: null, parameters: null, fields, cls.Name);
             }
 
             foreach (var op in cls.OperatorOverloads)
             {
-                CheckBody(op.Body, op.Output?.TypeName, op.Parameters, fields);
+                CheckBody(op.Body, op.Output?.TypeName, op.Parameters, fields, cls.Name);
             }
 
             foreach (var idx in cls.Indexers)
             {
-                if (idx.Getter != null) CheckBody(idx.Getter.Body, idx.TypeName, parameters: null, fields);
-                if (idx.Setter != null) CheckBody(idx.Setter.Body, returnType: null, parameters: null, fields);
-                if (idx.Initer != null) CheckBody(idx.Initer.Body, returnType: null, parameters: null, fields);
+                if (idx.Getter != null) CheckBody(idx.Getter.Body, idx.TypeName, parameters: null, fields, cls.Name);
+                if (idx.Setter != null) CheckBody(idx.Setter.Body, returnType: null, parameters: null, fields, cls.Name);
+                if (idx.Initer != null) CheckBody(idx.Initer.Body, returnType: null, parameters: null, fields, cls.Name);
             }
         }
     }
@@ -175,9 +186,11 @@ public sealed class BindValidationPass
         IReadOnlyList<StatementNode> body,
         string? returnType,
         IReadOnlyList<ParameterNode>? parameters,
-        IReadOnlyDictionary<string, string>? fields)
+        IReadOnlyDictionary<string, string>? fields,
+        string? className)
     {
         _currentReturnType = returnType;
+        _currentClassName = className;
         _scopes.Clear();
         var baseScope = new Dictionary<string, string>(StringComparer.Ordinal);
         if (fields != null)
@@ -234,22 +247,44 @@ public sealed class BindValidationPass
                 CheckBind(bind);
                 break;
 
-            case ReturnStatementNode ret when ret.Expression != null && _currentReturnType != null:
-                CheckArrayToCollection(
-                    ret.Expression, _currentReturnType, ret.Span, "The declared return type");
+            case ReturnStatementNode ret:
+                if (ret.Expression != null)
+                {
+                    if (_currentReturnType != null)
+                        CheckArrayToCollection(
+                            ret.Expression, _currentReturnType, ret.Span, "The declared return type");
+                    ScanExpressionForCalls(ret.Expression);
+                }
                 break;
 
-            case AssignmentStatementNode assign
-                when assign.Target is ReferenceNode target &&
-                     TryLookupLocal(target.Name, out var targetType):
-                CheckArrayToCollection(
-                    assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+            case AssignmentStatementNode assign:
+                if (assign.Target is ReferenceNode target && TryLookupLocal(target.Name, out var targetType))
+                    CheckArrayToCollection(
+                        assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+                ScanExpressionForCalls(assign.Value);
+                break;
+
+            case CallStatementNode callStmt:
+                CheckCallArguments(callStmt.Target, callStmt.Arguments);
+                foreach (var a in callStmt.Arguments) ScanExpressionForCalls(a);
+                break;
+
+            case PrintStatementNode print:
+                ScanExpressionForCalls(print.Expression);
+                break;
+
+            case ExpressionStatementNode exprStmt:
+                ScanExpressionForCalls(exprStmt.Expression);
                 break;
 
             case IfStatementNode ifStmt:
+                ScanExpressionForCalls(ifStmt.Condition);
                 CheckBlock(ifStmt.ThenBody);
                 foreach (var ei in ifStmt.ElseIfClauses)
+                {
+                    ScanExpressionForCalls(ei.Condition);
                     CheckBlock(ei.Body);
+                }
                 if (ifStmt.ElseBody != null)
                     CheckBlock(ifStmt.ElseBody);
                 break;
@@ -259,18 +294,22 @@ public sealed class BindValidationPass
                 break;
 
             case ForeachStatementNode forEach:
+                ScanExpressionForCalls(forEach.Collection);
                 CheckBlock(forEach.Body);
                 break;
 
             case WhileStatementNode whileStmt:
+                ScanExpressionForCalls(whileStmt.Condition);
                 CheckBlock(whileStmt.Body);
                 break;
 
             case DoWhileStatementNode doWhileStmt:
+                ScanExpressionForCalls(doWhileStmt.Condition);
                 CheckBlock(doWhileStmt.Body);
                 break;
 
             case MatchStatementNode match:
+                ScanExpressionForCalls(match.Target);
                 foreach (var c in match.Cases)
                     CheckBlock(c.Body);
                 break;
@@ -284,10 +323,12 @@ public sealed class BindValidationPass
                 break;
 
             case UsingStatementNode usingStmt:
+                ScanExpressionForCalls(usingStmt.Resource);
                 CheckBlock(usingStmt.Body);
                 break;
 
             case SyncBlockNode sync:
+                ScanExpressionForCalls(sync.LockExpression);
                 CheckBlock(sync.Body);
                 break;
 
@@ -296,6 +337,7 @@ public sealed class BindValidationPass
                 break;
 
             case FixedStatementNode fixedStmt:
+                ScanExpressionForCalls(fixedStmt.Initializer);
                 CheckBlock(fixedStmt.Body);
                 break;
         }
@@ -327,6 +369,10 @@ public sealed class BindValidationPass
             CheckArrayToCollection(
                 bind.Initializer, bind.TypeName, bind.Span, $"Binding '{bind.Name}'");
         }
+
+        // Argument position (#725): calls inside the initializer (e.g. an array
+        // passed to a List<T> parameter of a user function) are checked too.
+        ScanExpressionForCalls(bind.Initializer);
 
         // Strict-mode checks (Calor0251-0253) — only when --strict-bind-inference is set
         // and the binding has no explicit type annotation. An explicit :type always wins.
@@ -368,6 +414,89 @@ public sealed class BindValidationPass
     }
 
     /// <summary>
+    /// Recursively finds every call in <paramref name="expr"/> and checks each
+    /// argument against the callee's declared parameter types (#725 — argument
+    /// position). Only user functions/methods are resolved (BCL callees have no
+    /// parameter-type registry, a conservative false negative). The walker covers
+    /// the common composite expressions; unhandled node types simply stop the
+    /// descent (a safe false negative, never a false positive).
+    /// </summary>
+    private void ScanExpressionForCalls(ExpressionNode? expr)
+    {
+        switch (expr)
+        {
+            case CallExpressionNode call:
+                CheckCallArguments(call.Target, call.Arguments);
+                foreach (var arg in call.Arguments) ScanExpressionForCalls(arg);
+                break;
+            case BinaryOperationNode bin:
+                ScanExpressionForCalls(bin.Left);
+                ScanExpressionForCalls(bin.Right);
+                break;
+            case UnaryOperationNode un:
+                ScanExpressionForCalls(un.Operand);
+                break;
+            case ConditionalExpressionNode cond:
+                ScanExpressionForCalls(cond.Condition);
+                ScanExpressionForCalls(cond.WhenTrue);
+                ScanExpressionForCalls(cond.WhenFalse);
+                break;
+            case TypeOperationNode typeOp:
+                ScanExpressionForCalls(typeOp.Operand);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Flags an array argument passed to a concrete-collection parameter, matched
+    /// positionally against the resolved callee. Resolution is context-sensitive
+    /// (current class before module level) and keyed by arity so Calor's
+    /// arity-based overloads pick the right signature.
+    /// </summary>
+    private void CheckCallArguments(string target, IReadOnlyList<ExpressionNode> args)
+    {
+        if (!TryResolveParamTypes(target, args.Count, out var paramTypes))
+        {
+            return;
+        }
+
+        for (var i = 0; i < args.Count && i < paramTypes.Count; i++)
+        {
+            CheckArrayToCollection(
+                args[i], paramTypes[i], args[i].Span, $"Parameter {i + 1} of '{target}'");
+        }
+    }
+
+    // Resolves an unqualified call target the way Calor does: a call inside class C
+    // first tries C's member (implicit `this`), then falls back to a module-level
+    // free function (or an already-qualified target). Storing methods only under
+    // "Class.Member" and free functions under the bare name — and picking by
+    // context here — is what prevents a same-named method and free function from
+    // clobbering each other (PR #728 review finding 1). When neither is present the
+    // callee is unknown (BCL / cross-module): a conservative false negative.
+    private bool TryResolveReturnType(string target, out string returnType)
+    {
+        if (_currentClassName != null &&
+            _userReturnTypes.TryGetValue($"{_currentClassName}.{target}", out returnType!))
+        {
+            return true;
+        }
+
+        return _userReturnTypes.TryGetValue(target, out returnType!);
+    }
+
+    private bool TryResolveParamTypes(string target, int arity, out List<string> paramTypes)
+    {
+        if (_currentClassName != null &&
+            _userParamTypes.TryGetValue($"{_currentClassName}.{target}/{arity}", out paramTypes!))
+        {
+            return true;
+        }
+
+        return _userParamTypes.TryGetValue($"{target}/{arity}", out paramTypes!);
+    }
+
+    /// <summary>
     /// Returns the Calor element type if <paramref name="init"/> is known to be an
     /// array — a call to a known array-returning BCL method, or a call to a user
     /// function whose declared return type is an array (<c>[T]</c>). Null otherwise.
@@ -381,8 +510,9 @@ public sealed class BindValidationPass
 
         // User declarations win over the BCL heuristic, so a user type/method that
         // shadows a BCL name (e.g. a local `File.ReadAllLines -> List<str>`) is
-        // judged by its real return type, not the built-in assumption.
-        if (_userReturnTypes.TryGetValue(call.Target, out var returnType))
+        // judged by its real return type, not the built-in assumption. Resolution
+        // is context-sensitive (current class before module level).
+        if (TryResolveReturnType(call.Target, out var returnType))
         {
             return IsArrayTypeName(returnType)
                 ? returnType.Trim().TrimStart('[').TrimEnd(']').Trim()
@@ -397,33 +527,50 @@ public sealed class BindValidationPass
         return null;
     }
 
-    // Note: this resolves only functions/methods declared in the module being
-    // checked. Array-returning functions imported from other modules are not
-    // seen, so they are conservative false negatives (never a false Calor0254).
-    private void BuildUserReturnTypes(ModuleNode module)
+    // Resolves only functions/methods declared in the module being checked; cross-
+    // module callees are conservative false negatives. Free functions are stored
+    // under the bare name; methods ONLY under "Class.Member" — never the bare name —
+    // so a method cannot clobber a same-named free function's signature (PR #728
+    // review finding 1). Unqualified calls are matched context-sensitively at the
+    // call site (see TryResolveReturnType / TryResolveParamTypes). Constructors,
+    // operators, and indexers are intentionally not registered (§NEW / operator /
+    // indexer call forms are unchecked — a documented conservative false negative).
+    private void BuildUserSignatures(ModuleNode module)
     {
         _userReturnTypes.Clear();
+        _userParamTypes.Clear();
+
         foreach (var func in module.Functions)
         {
             if (func.Output?.TypeName is { } rt)
             {
                 _userReturnTypes[func.Name] = rt;
             }
+
+            RegisterParams(func.Name, func.Parameters);
         }
 
         foreach (var cls in module.Classes)
         {
             foreach (var method in cls.Methods)
             {
+                var key = $"{cls.Name}.{method.Name}";
                 if (method.Output?.TypeName is { } rt)
                 {
-                    // Keyed by both the bare and the Type.Method spelling so either
-                    // call form resolves; last write wins on rare name collisions.
-                    _userReturnTypes[method.Name] = rt;
-                    _userReturnTypes[$"{cls.Name}.{method.Name}"] = rt;
+                    _userReturnTypes[key] = rt;
                 }
+
+                RegisterParams(key, method.Parameters);
             }
         }
+    }
+
+    private void RegisterParams(string name, IReadOnlyList<ParameterNode> parameters)
+    {
+        // ParameterNode.TypeName is non-null (parser invariant); the ?? guard keeps
+        // a future nullable-annotation change from feeding null into the check.
+        _userParamTypes[$"{name}/{parameters.Count}"] =
+            parameters.Select(p => p.TypeName ?? "").ToList();
     }
 
     private static bool IsArrayTypeName(string? typeName)
