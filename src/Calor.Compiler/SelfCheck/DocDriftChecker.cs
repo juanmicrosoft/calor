@@ -270,13 +270,9 @@ public static class DocDriftChecker
             EffectsReferenceDoc = effectsDoc,
             EffectDocsForwardOnly = NonNull(syntaxIndex),
             CliCodesDoc = cliCodesDoc,
-<<<<<<< HEAD
             VersionScanDocs = NonNull(claudeMd).Concat(NonNull(copilotInstructions)).Concat(versionDocs).ToList(),
-=======
-            VersionScanDocs = NonNull(claudeMd).Concat(versionDocs).ToList(),
             MirrorDocs = mirrorDocs,
             ExemplarDoc = exemplarDoc,
->>>>>>> origin/main
         };
     }
 
