@@ -63,9 +63,11 @@ public class CodexInitializerTests : IDisposable
         var agentsMdPath = Path.Combine(_testDirectory, "AGENTS.md");
         var content = await File.ReadAllTextAsync(agentsMdPath);
 
-        // Should contain note about guidance-based enforcement
-        Assert.Contains("guidance-based", content);
-        Assert.Contains("Unlike Claude Code which uses hooks", content);
+        // Should describe best-effort hooks and the repository backstop.
+        Assert.Contains("best-effort", content);
+        Assert.Contains("repository CI", content);
+        Assert.Contains("backstop", content);
+        Assert.Contains("protected base", content);
     }
 
     [Fact]

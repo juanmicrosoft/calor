@@ -145,7 +145,7 @@ public class PrimerMistakesRejectedTests
         var start = Array.FindIndex(lines, l => l.Contains("Common mistakes", StringComparison.Ordinal));
         Assert.True(start >= 0, "Primer no longer has a \"Common mistakes\" section.");
 
-        var end = Array.FindIndex(lines, start + 1, l => l.TrimStart().StartsWith("-- ", StringComparison.Ordinal));
+        var end = Array.FindIndex(lines, start + 1, l => l.StartsWith("## ", StringComparison.Ordinal));
         if (end < 0) end = lines.Length;
 
         return string.Join("\n", lines[(start + 1)..end]);

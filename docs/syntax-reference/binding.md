@@ -193,6 +193,93 @@ adding the annotation always silences the diagnostic.
 §B{x:f64} (+ INT:0 FLOAT:0.0)      // silences Calor0253
 ```
 
+### Calor0254 — `BindArrayToConcreteCollection`
+
+Unlike the strict-inference trio above, this is an **always-on hard type
+error** (not gated by `--no-strict-bind-inference`) and fires *because of*
+an explicit type: a concrete generic collection (`List<T>`, `HashSet<T>`,
+`Queue<T>`, `Stack<T>`, …) is given an **array** value. In C# an array
+satisfies the collection *interfaces* (`IList<T>`, `IEnumerable<T>`, …) but is
+not implicitly convertible to a concrete collection class, so the emitted code
+would fail with `CS0029`. This is the E1a array-vs-list trap caught at compile
+time.
+
+It fires in three positions — binding, return, and reassignment:
+
+```
+§B{lines:List<str>} §C{File.ReadAllLines} §A path §/C   // Calor0254 (binding)
+
+§F{f:Get:pub} (str:path) -> List<str>                   // Calor0254 (return)
+  §R §C{File.ReadAllLines} §A path §/C
+
+§B{~items:List<str>}                                     // Calor0254 (reassign)
+§ASSIGN items §C{File.ReadAllLines} §A path §/C
+
+§B{lines:[str]} §C{File.ReadAllLines} §A path §/C        // ok — array form
+§B{lines:IEnumerable<str>} §C{File.ReadAllLines} §A path §/C  // ok — interface
+```
+
+It also fires in a fourth position — **argument**: an array passed where a user
+function/method declares a concrete-collection parameter (matched positionally,
+by call arity so overloads resolve):
+
+```
+§F{f:Take:pub} (List<str>:items) -> i32
+  §R (len items)
+§C{Take} §A §C{File.ReadAllLines} §A path §/C §/C   // Calor0254 at the argument
+```
+
+The reassignment target may be a local, a parameter, or a class field — all
+declared types the check can see. The array is recognized when the value calls a
+known array-returning BCL method (`File.ReadAllLines`/`ReadAllBytes`,
+`Directory.GetFiles`/`GetDirectories`/`GetFileSystemEntries`) or a user function
+declared `-> [T]`.
+
+Scope notes: the check runs inside every block body — loop bodies (including
+`§EACH`/`§EACHKV`), `§IF` branches, and while, match, try, using, sync, and
+unsafe/fixed blocks. Argument checking resolves only free functions and methods
+declared in the same module; an unqualified call is resolved context-sensitively
+(a call inside class `C` prefers `C`'s member, then a module-level free function),
+so a method and a same-named free function do not collide. Callees it cannot see
+are conservative false negatives — BCL and cross-module functions (no signature
+registry), and constructors (`§NEW`), operator overloads, and indexers (their
+parameters are not registered). It does **not** descend into block-lambda
+(`§LAM`) bodies, so a lambda declared `-> List<T>` returning an array is not
+checked.
+
+### Calor0255 — `BindShadowsEnclosingScope`
+
+Another always-on hard error: a `§B` that declares a **new** local reusing the
+name of a local, parameter, or **loop variable** already in an **enclosing**
+scope. C# forbids a nested local from shadowing an enclosing local/parameter
+(CS0136), so the emitted code would not compile.
+
+```
+§B{~x:i32} 0
+§IF{i1} (> x 0)
+  §B{x:str} "hi"   // Calor0255: inner local 'x' shadows the outer 'x'
+
+§L{l1:i:0:9:1}
+  §B{i:i32} 5      // Calor0255: shadows the loop variable 'i'
+```
+
+Two things are deliberately **not** flagged, matching C#:
+
+- **A mutable rebind is reassignment, not shadowing.** `§B{~x}` reusing a name
+  already bound in the function emits `x = …` (not a new declaration) — this is
+  the accumulator idiom (`§B{~result} (* result i)` inside a loop), and it is
+  fine.
+- **A local may shadow a field.** Only enclosing locals/parameters count; a local
+  named like a class field is legal (the local wins), as in C#.
+
+Sibling (non-nested) blocks may each reuse a name — they are separate scopes.
+
+Not yet covered (each an exit-0-then-broken-`dotnet build` gap tracked by an
+issue, pinned by `ShadowingDifferentialTests`): same-scope duplicate `§B`
+(CS0128, #731, needs a converter change), a mutable rebind across sibling blocks
+(CS0103, #732, an emitter scoping bug), and a type-changing mutable rebind
+(CS0029, #733).
+
 LSP quick-fixes that insert the recommended annotation are available
 in v0.6.3 and surface in any IDE talking to the Calor language server.
 Each diagnostic carries a `SuggestedFix` that inserts the default

@@ -163,6 +163,37 @@ public static class DiagnosticCode
     /// </summary>
     public const string BindAmbiguousNumeric = "Calor0253";
 
+    /// <summary>
+    /// Error: <c>§B{name:List&lt;T&gt;} …</c> whose initializer is an array
+    /// (<c>[T]</c>) — e.g. <c>§B{lines:List&lt;str&gt;} §C{File.ReadAllLines}</c>.
+    /// An array is not implicitly convertible to a concrete generic collection in
+    /// C# (CS0029), so the emitted code would fail <c>dotnet build</c>. The fix is
+    /// the array form <c>[T]</c>, or an explicit wrap. This is the E1a trap caught
+    /// at the language level (#722; the docs-level guard is <see cref="DocDriftArrayBindingTrap"/>).
+    /// </summary>
+    public const string BindArrayToConcreteCollection = "Calor0254";
+
+    /// <summary>
+    /// Error: a <c>§B</c> binding reuses the name of a local, parameter, or loop
+    /// variable already in an enclosing scope — e.g. an inner-block <c>§B{x}</c>
+    /// when an outer <c>§B{x}</c>, a parameter <c>x</c>, or a loop variable <c>x</c>
+    /// is in scope. C# forbids a nested local shadowing an enclosing
+    /// local/parameter (CS0136), so the emitted code would fail <c>dotnet build</c>.
+    /// A mutable rebind (reassignment) and shadowing a <em>field</em> are allowed,
+    /// as in C#. The fix is to rename the inner binding (#727).
+    /// </summary>
+    public const string BindShadowsEnclosingScope = "Calor0255";
+
+    /// <summary>
+    /// Error: a mutable <c>§B{~x:T2}</c> rebind re-annotates a variable declared with a
+    /// different type <c>T1</c> — e.g. <c>§B{~x:i32} 0</c> then <c>§B{~x:str} "hi"</c>.
+    /// A mutable rebind is a reassignment; the emitter emits <c>x = value</c> against the
+    /// original type <c>T1</c>, so a mismatched value fails to compile (CS0029/CS0266).
+    /// The variable's type is fixed at its first declaration — rename, or keep the type.
+    /// (#733)
+    /// </summary>
+    public const string BindRebindTypeMismatch = "Calor0256";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";
@@ -242,34 +273,49 @@ public static class DiagnosticCode
     /// </summary>
     public const string SemanticsVersionIncompatible = "Calor0701";
 
-    // Contract verification results (Calor0702-0705) — emitted by
-    // Verification/ContractVerificationPass. Note: the verification pass also
-    // reuses Calor0700 (Z3 unavailable, info) and Calor0701 (precondition may
-    // be violated, warning) with meanings that differ from the semantics-version
-    // constants above; that pre-existing collision is preserved for
-    // compatibility and its renumbering is tracked in
-    // https://github.com/juanmicrosoft/calor/issues/702.
+    // Contract verification results (Calor0710-0719 reserved; 0710-0715 assigned)
+    // — emitted by Verification/ContractVerificationPass. This sub-band is disjoint
+    // from the semantics-version codes above: prior to #702, the verification pass
+    // reused Calor0700 (Z3 unavailable) and Calor0701 (precondition may be violated),
+    // colliding with SemanticsVersionMismatch/Incompatible. All verification results
+    // now live in 0710-0715 so no code number carries two meanings; 0716-0719 are
+    // reserved headroom for future verification diagnostics. Agents that filtered on
+    // the old 0700-0705 numbers must switch to 0710-0715 (see CHANGELOG.md).
+
+    /// <summary>
+    /// Info: static contract verification was skipped because the Z3 SMT solver
+    /// is not available. (Renumbered from Calor0700 in #702.)
+    /// </summary>
+    public const string Z3Unavailable = "Calor0710";
+
+    /// <summary>
+    /// Warning: Z3 disproved a precondition; a counterexample is reported.
+    /// (Renumbered from Calor0701 in #702.)
+    /// </summary>
+    public const string PreconditionMayBeViolated = "Calor0711";
 
     /// <summary>
     /// Warning: Z3 disproved a postcondition; a counterexample is reported.
+    /// (Renumbered from Calor0702 in #702.)
     /// </summary>
-    public const string PostconditionMayBeViolated = "Calor0702";
+    public const string PostconditionMayBeViolated = "Calor0712";
 
     /// <summary>
     /// Info: a postcondition was statically proven; its runtime check is elided.
+    /// (Renumbered from Calor0703 in #702.)
     /// </summary>
-    public const string PostconditionProven = "Calor0703";
+    public const string PostconditionProven = "Calor0713";
 
     /// <summary>
     /// Info: per-module contract verification summary (proven / unproven /
-    /// potentially violated / unsupported counts).
+    /// potentially violated / unsupported counts). (Renumbered from Calor0704 in #702.)
     /// </summary>
-    public const string VerificationSummary = "Calor0704";
+    public const string VerificationSummary = "Calor0714";
 
     /// <summary>
-    /// Info (verbose): verification cache statistics.
+    /// Info (verbose): verification cache statistics. (Renumbered from Calor0705 in #702.)
     /// </summary>
-    public const string VerificationCacheStats = "Calor0705";
+    public const string VerificationCacheStats = "Calor0715";
 
     // ID errors (Calor0800-0899)
     /// <summary>
@@ -701,8 +747,9 @@ public static class DiagnosticCode
     /// </summary>
     public const string CliInternalError = "Calor1312";
 
-    // `calor self-check docs` drift findings (Calor1320-1329) — agent-facing
-    // documentation contradicts the implementation. See SelfCheck/DocDriftChecker.
+    // `calor self-check docs` drift findings (Calor1320-1331) — agent-facing
+    // documentation contradicts the implementation. See SelfCheck/DocDriftChecker
+    // (1320-1329) and SelfCheck/ExemplarCompileChecker (1330-1331).
 
     /// <summary>
     /// Error (docs drift): a §-keyword cited in agent-facing docs does not
@@ -758,6 +805,31 @@ public static class DiagnosticCode
     /// with the current compiler — the example has rotted.
     /// </summary>
     public const string DocDriftExampleParseError = "Calor1328";
+
+    /// <summary>
+    /// Error (docs drift): a mirror doc (AGENTS.md) is out of sync with its
+    /// single source (CLAUDE.md). The mirror is a deterministic title-swapped
+    /// derivative — regenerate it with <c>calor self-check docs --fix</c> rather
+    /// than hand-editing, so the two agent manuals cannot silently diverge.
+    /// </summary>
+    public const string DocDriftMirrorOutOfSync = "Calor1329";
+
+    /// <summary>
+    /// Error (docs drift): a complete §M program in the agent syntax exemplar no
+    /// longer compiles all the way to C#. Unlike <see cref="DocDriftExampleParseError"/>
+    /// (parse only), this compiles the emitted C# with Roslyn's semantic model, so
+    /// it catches type errors — e.g. binding <c>File.ReadAllLines</c> (an array) to
+    /// <c>List&lt;str&gt;</c>, which Calor emits but the C# compiler rejects (CS0029).
+    /// </summary>
+    public const string DocDriftExampleCompileError = "Calor1330";
+
+    /// <summary>
+    /// Error (docs drift): the exemplar binds an array-returning BCL call (e.g.
+    /// <c>File.ReadAllLines</c>) to a generic collection type instead of the array
+    /// form <c>[T]</c>. Guards the E1a array-vs-list trap on the copyable fragment
+    /// reference lines, which cannot be compiled standalone.
+    /// </summary>
+    public const string DocDriftArrayBindingTrap = "Calor1331";
 }
 
 /// <summary>

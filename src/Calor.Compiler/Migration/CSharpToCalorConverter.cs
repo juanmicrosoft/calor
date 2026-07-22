@@ -233,6 +233,46 @@ public sealed class CSharpToCalorConverter
             var emitter = new CalorEmitter(context);
             var calorSource = emitter.Emit(calorAst);
 
+            // Step 3b (#717): post-conversion parse validation. If the emitted Calor
+            // does not parse and we are in a C#-preserving mode (Interop /
+            // PassthroughOnError), rewrap each offending top-level member as a §CSHARP
+            // interop block carrying its original C#, so the output is always valid
+            // Calor rather than silently-broken text.
+            if (context.ShouldPreserveCSharp && !ParsesCleanly(calorSource))
+            {
+                var rewrapped = TryRewrapUnparseableMembers(calorAst, root, context);
+                if (rewrapped != null)
+                {
+                    calorAst = rewrapped;
+                    calorSource = new CalorEmitter(context).Emit(calorAst);
+                }
+
+                // Re-validate the (possibly rewrapped) output. If it still does not
+                // parse — nothing was rewrappable, a member could not be recovered, or
+                // the rewrap itself was insufficient — never ship it silently. Warn
+                // always, and fail under passthroughOnError, whose contract is exactly
+                // "never hand me broken output".
+                if (!ParsesCleanly(calorSource))
+                {
+                    context.AddWarning(
+                        "Emitted Calor does not parse and could not be fully preserved as " +
+                        "§CSHARP interop blocks; the output may be invalid.",
+                        feature: "post-validation-fallback");
+
+                    if (_options.PassthroughOnError)
+                    {
+                        return new ConversionResult
+                        {
+                            Success = false,
+                            CalorSource = calorSource,
+                            Ast = calorAst,
+                            Context = context,
+                            Duration = DateTime.UtcNow - startTime
+                        };
+                    }
+                }
+            }
+
             if (_options.Verbose)
             {
                 Console.WriteLine($"Converted {context.Stats.ConvertedNodes} nodes");
@@ -317,6 +357,235 @@ public sealed class CSharpToCalorConverter
             ".calr" => ConversionDirection.CalorToCSharp,
             _ => ConversionDirection.Unknown
         };
+    }
+
+    /// <summary>
+    /// Test seam (#717): overrides the post-conversion parse check. Natural inputs
+    /// that emit unparseable Calor are extremely rare (the converter's visitor-level
+    /// §CSHARP wrapping already handles unsupported features), so tests inject this to
+    /// exercise the fallback path deterministically. Null in production.
+    /// </summary>
+    internal Func<string, bool>? ParseValidatorOverride { get; set; }
+
+    /// <summary>True if <paramref name="calorSource"/> lexes and parses without errors.</summary>
+    private bool ParsesCleanly(string calorSource)
+    {
+        if (ParseValidatorOverride != null)
+        {
+            return ParseValidatorOverride(calorSource);
+        }
+
+        var diagnostics = new Diagnostics.DiagnosticBag();
+        var tokens = new Parsing.Lexer(calorSource, diagnostics).TokenizeAllForParser();
+        if (diagnostics.HasErrors)
+        {
+            return false;
+        }
+
+        _ = new Parsing.Parser(tokens, diagnostics).Parse();
+        return !diagnostics.HasErrors;
+    }
+
+    /// <summary>
+    /// Post-conversion fallback (#717): the full emitted Calor did not parse. Find each
+    /// top-level member whose own emission does not parse, and — when its original C#
+    /// can be recovered from <paramref name="root"/> — replace it with a §CSHARP interop
+    /// block preserving that C#. Returns a rewritten module, or null if nothing could be
+    /// rewrapped (leave the output unchanged for the caller to surface).
+    /// </summary>
+    private ModuleNode? TryRewrapUnparseableMembers(
+        ModuleNode module, CompilationUnitSyntax root, ConversionContext context)
+    {
+        var sources = CollectTopLevelTypeSources(root);
+
+        var failedClasses = new List<ClassDefinitionNode>();
+        var failedInterfaces = new List<InterfaceDefinitionNode>();
+        var failedEnums = new List<EnumDefinitionNode>();
+        var failedDelegates = new List<DelegateDefinitionNode>();
+        var interops = new List<CSharpInteropBlockNode>();
+
+        foreach (var cls in module.Classes)
+        {
+            if (!MemberParsesCleanly(module, classes: new[] { cls }) &&
+                TryTakeSource(sources, "class", cls.Name, out var csharp))
+            {
+                interops.Add(MakeFallbackInterop(csharp, cls.Name));
+                failedClasses.Add(cls);
+            }
+        }
+
+        foreach (var iface in module.Interfaces)
+        {
+            if (!MemberParsesCleanly(module, interfaces: new[] { iface }) &&
+                TryTakeSource(sources, "interface", iface.Name, out var csharp))
+            {
+                interops.Add(MakeFallbackInterop(csharp, iface.Name));
+                failedInterfaces.Add(iface);
+            }
+        }
+
+        foreach (var en in module.Enums)
+        {
+            if (!MemberParsesCleanly(module, enums: new[] { en }) &&
+                TryTakeSource(sources, "enum", en.Name, out var csharp))
+            {
+                interops.Add(MakeFallbackInterop(csharp, en.Name));
+                failedEnums.Add(en);
+            }
+        }
+
+        foreach (var del in module.Delegates)
+        {
+            if (!MemberParsesCleanly(module, delegates: new[] { del }) &&
+                TryTakeSource(sources, "delegate", del.Name, out var csharp))
+            {
+                interops.Add(MakeFallbackInterop(csharp, del.Name));
+                failedDelegates.Add(del);
+            }
+        }
+
+        if (interops.Count == 0)
+        {
+            return null;
+        }
+
+        context.Stats.InteropBlocksEmitted += interops.Count;
+
+        return new ModuleNode(
+            module.Span, module.Id, module.Name, module.Usings,
+            module.Interfaces.Where(i => !failedInterfaces.Contains(i)).ToList(),
+            module.Classes.Where(c => !failedClasses.Contains(c)).ToList(),
+            module.Enums.Where(e => !failedEnums.Contains(e)).ToList(),
+            module.EnumExtensions,
+            module.Delegates.Where(d => !failedDelegates.Contains(d)).ToList(),
+            module.Functions, module.Attributes, module.Issues, module.Assumptions,
+            module.Invariants, module.Decisions, module.Context,
+            module.InteropBlocks.Concat(interops).ToList(),
+            module.RefinementTypes, module.IndexedTypes, module.TypePreprocessorBlocks);
+    }
+
+    /// <summary>Emits a module containing only the given member(s) and reports whether
+    /// that emission parses — used to isolate which top-level member is unparseable.</summary>
+    private bool MemberParsesCleanly(
+        ModuleNode module,
+        IReadOnlyList<ClassDefinitionNode>? classes = null,
+        IReadOnlyList<InterfaceDefinitionNode>? interfaces = null,
+        IReadOnlyList<EnumDefinitionNode>? enums = null,
+        IReadOnlyList<DelegateDefinitionNode>? delegates = null)
+    {
+        var solo = new ModuleNode(
+            module.Span, module.Id, module.Name, module.Usings,
+            interfaces ?? Array.Empty<InterfaceDefinitionNode>(),
+            classes ?? Array.Empty<ClassDefinitionNode>(),
+            enums ?? Array.Empty<EnumDefinitionNode>(),
+            Array.Empty<EnumExtensionNode>(),
+            delegates ?? Array.Empty<DelegateDefinitionNode>(),
+            Array.Empty<FunctionNode>(), module.Attributes,
+            Array.Empty<IssueNode>(), Array.Empty<AssumeNode>(),
+            Array.Empty<InvariantNode>(), Array.Empty<DecisionNode>(), null);
+
+        // Fresh context so the probe emission does not perturb the real conversion's stats.
+        var emitted = new CalorEmitter(CreateContext(null)).Emit(solo);
+        return ParsesCleanly(emitted);
+    }
+
+    private static CSharpInteropBlockNode MakeFallbackInterop(string csharpSource, string memberName)
+        => new(
+            Parsing.TextSpan.Empty,
+            csharpSource,
+            featureName: "post-validation-fallback",
+            reason: $"Converted Calor for '{memberName}' did not parse; original C# preserved (#717).");
+
+    private sealed record TypeSource(bool IsPartial, string Text);
+
+    /// <summary>
+    /// Collects top-level (compilation-unit or namespace level) type declarations from the
+    /// C# tree, keyed by "kind/name" — the resolution the Calor side can address, since the
+    /// module flattens namespaces so a Calor member carries only its bare name. The value is
+    /// the list of C# declarations with that key: usually one, several when the type is
+    /// <c>partial</c>, or — the ambiguous case — several distinct types of the same name in
+    /// different namespaces. <see cref="TryTakeSource"/> decides what is safely recoverable.
+    /// </summary>
+    private static Dictionary<string, List<TypeSource>> CollectTopLevelTypeSources(CompilationUnitSyntax root)
+    {
+        var map = new Dictionary<string, List<TypeSource>>(StringComparer.Ordinal);
+        foreach (var member in root.DescendantNodes()
+                     .OfType<MemberDeclarationSyntax>()
+                     .Where(m => m.Parent is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax))
+        {
+            var (kind, name) = member switch
+            {
+                ClassDeclarationSyntax c => ("class", c.Identifier.Text),
+                StructDeclarationSyntax s => ("class", s.Identifier.Text),
+                RecordDeclarationSyntax r => ("class", r.Identifier.Text),
+                InterfaceDeclarationSyntax i => ("interface", i.Identifier.Text),
+                EnumDeclarationSyntax e => ("enum", e.Identifier.Text),
+                DelegateDeclarationSyntax d => ("delegate", d.Identifier.Text),
+                _ => (null, null),
+            };
+
+            if (kind == null || name == null)
+            {
+                continue;
+            }
+
+            var isPartial = member.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
+            var key = $"{kind}/{name}";
+            (map.TryGetValue(key, out var list) ? list : map[key] = new List<TypeSource>())
+                .Add(new TypeSource(isPartial, DeclarationSourceText(member)));
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// The declaration's source text with its doc-comment trivia preserved (so §CSHARP
+    /// fallbacks keep the docs — agents lose docs exactly on the members that most needed
+    /// them). Uses ToString() (not ToFullString()) for the body so leading namespace
+    /// indentation does not bleed in, then prepends only the XML doc trivia.
+    /// </summary>
+    private static string DeclarationSourceText(MemberDeclarationSyntax member)
+    {
+        var docs = string.Concat(member.GetLeadingTrivia()
+            .Where(t => t.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                     || t.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+            .Select(t => t.ToFullString()));
+        return docs + member.ToString();
+    }
+
+    /// <summary>
+    /// Recovers the original C# for a top-level member the Calor emitter could not render.
+    /// Safe cases: exactly one declaration with that kind/name, or several that are all
+    /// <c>partial</c> (one merged type — concatenate). The ambiguous case — two or more
+    /// distinct same-named types in different namespaces — is refused (returns false) rather
+    /// than risk dragging a healthy type into another's interop block. Entries are removed on
+    /// take so a second same-named failure cannot reuse them.
+    /// </summary>
+    private static bool TryTakeSource(
+        Dictionary<string, List<TypeSource>> sources, string kind, string name, out string csharp)
+    {
+        csharp = "";
+        var key = $"{kind}/{name}";
+        if (!sources.TryGetValue(key, out var list) || list.Count == 0)
+        {
+            return false;
+        }
+
+        if (list.Count == 1)
+        {
+            csharp = list[0].Text;
+        }
+        else if (list.All(s => s.IsPartial))
+        {
+            csharp = string.Join("\n\n", list.Select(s => s.Text));
+        }
+        else
+        {
+            return false; // ambiguous cross-namespace collision — not safely recoverable
+        }
+
+        sources.Remove(key);
+        return true;
     }
 
     private ConversionContext CreateContext(string? sourceFile)

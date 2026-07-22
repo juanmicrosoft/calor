@@ -8,6 +8,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  calor-first-guard:
+    # Lifecycle hooks are useful guidance, but specialized Codex tool paths
+    # can bypass them. This diff gate is the repository-level backstop.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Test Calor-first guard behavior
+        run: bash scripts/check-calor-first-diff-tests.sh
+
+      - name: Reject unapproved C# alongside Calor source
+        env:
+          CALOR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: bash scripts/check-calor-first-diff.sh
+
   test:
     runs-on: ubuntu-latest
 

@@ -1,0 +1,8 @@
+# Protect the policy and its enforcement from unreviewed weakening.
+/.github/CODEOWNERS @juanmicrosoft
+/.calor-csharp-allowlist @juanmicrosoft
+*.cs @juanmicrosoft
+**/*.cs @juanmicrosoft
+/scripts/check-calor-first-diff.sh @juanmicrosoft
+/scripts/check-calor-first-diff-tests.sh @juanmicrosoft
+/.github/workflows/test.yml @juanmicrosoft

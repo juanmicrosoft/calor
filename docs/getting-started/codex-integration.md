@@ -23,9 +23,8 @@ This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.codex/skills/calor/SKILL.md` | Teaches Codex Calor syntax for writing new code |
-| `.codex/skills/calor-convert/SKILL.md` | Teaches Codex how to convert C# to Calor |
 | `.codex/config.toml` | MCP server configuration for Calor tools |
+| `.codex/hooks.json` | Codex-native write validation and post-write Calor lint hooks |
 | `AGENTS.md` | Project documentation with Calor-first guidelines |
 
 You can run this command again anytime to update the Calor documentation section in AGENTS.md without losing your custom content.
@@ -53,6 +52,8 @@ args = ["mcp", "--stdio"]
 # END CalorC MCP SECTION
 ```
 
+Codex discovers `.codex/hooks.json` in trusted projects. On first use, run `/hooks`, review the generated commands, and trust them. The `PreToolUse` hook validates C# destinations submitted through covered file-edit tools, while the `PostToolUse` hook lints changed `.calr` files. The hook consumes Codex's JSON stdin envelope directly; it does not use Claude Code's `$TOOL_INPUT` environment-variable schema. Codex releases may route specialized file-change tools outside the lifecycle-hook path; run the smoke test in `bench/phase0-agent-native/CODEX-SMOKE.md` and keep CI verification enabled.
+
 ### Available Tools
 
 | Tool | Purpose |
@@ -71,91 +72,33 @@ See [`calor mcp`](/calor/cli/mcp/) for the complete list of 19 available tools.
 
 ## Enforcement
 
-Codex CLI does not support hooks like Claude Code. However, with MCP tools providing direct access to the Calor compiler, Codex can compile, verify, and convert code natively. Calor-first enforcement is still **guidance-based**, relying on instructions in `AGENTS.md` and the skill files:
-
-- MCP tools give Codex direct access to compile, verify, and convert Calor code
-- Codex *should* follow the instructions in AGENTS.md and create `.calr` files
-- Hooks are not supported, so enforcement is not automatic
-- Review file extensions after code generation
-- Use `calor assess` to find any unconverted `.cs` files
-
----
-
-## Available Skills
-
-### The `$calor` Skill
-
-When working with Codex CLI in an Calor-initialized project, use the `$calor` command to activate Calor-aware code generation.
-
-**Example prompts:**
-
-```
-$calor
-
-Write a function that calculates compound interest with:
-- Preconditions: principal > 0, rate >= 0, years > 0
-- Postcondition: result >= principal
-- Effects: pure (no side effects)
-```
-
-```
-$calor
-
-Create a UserService class with methods for:
-- GetUserById (returns Option<User>)
-- CreateUser (returns Result<User, ValidationError>)
-- DeleteUser (effects: database write)
-```
-
-### The `$calor-convert` Skill
-
-Use `$calor-convert` to convert existing C# code to Calor:
-
-```
-$calor-convert
-
-Convert this C# class to Calor:
-
-public class Calculator
-{
-    public int Add(int a, int b) => a + b;
-
-    public int Divide(int a, int b)
-    {
-        if (b == 0) throw new ArgumentException("Cannot divide by zero");
-        return a / b;
-    }
-}
-```
-
-Codex will:
-1. Convert the class structure to Calor syntax
-2. Add appropriate contracts (e.g., `§Q (!= b 0)` for the divide precondition)
-3. Generate unique IDs for all structural elements
-4. Declare effects based on detected side effects
+Codex supports project lifecycle hooks. Calor configures a `PreToolUse` hook for
+`apply_patch`/`Edit`/`Write` and a `PostToolUse` hook that lints changed `.calr`
+files. Project hooks run only after the repository and exact hook definitions
+are trusted; use `/hooks` to review their status.
+The write hook is a guardrail, not a complete security boundary. It validates
+rename destinations and every destination in multi-file patches. Shell commands
+and specialized tool paths can fall outside tool-hook coverage, so CI should
+still run `calor assess`, builds, and tests. A smoke run must confirm that the
+Codex tool path in use actually invokes both lifecycle hooks.
 
 ---
 
-## Skill Capabilities
+## Project Guidance
+`calor init --ai codex` writes Calor authoring and validation rules into the
+managed section of `AGENTS.md`. Codex loads this guidance automatically; the
+initializer does not generate project-local Codex skill files.
 
-The Calor skills teach Codex:
-
-### Syntax Knowledge
+The generated guidance covers:
 
 - All Calor structure tags (`§M`, `§F`, `§C`, etc.)
 - Lisp-style expressions: `(+ a b)`, `(== x 0)`, `(% i 15)`
 - Arrow syntax conditionals: `§IF{id} condition → action`
 - Type system: `i32`, `f64`, `str`, `bool`, `Option<T>`, `Result<T,E>`, arrays
-
-### Best Practices
-
 - Unique ID generation (`m001`, `f001`, `c001`, etc.)
 - Contract placement (`§Q` preconditions, `§S` postconditions)
 - Effect declarations (`§E{db:rw,net:rw,cw}`)
 - Proper indentation and block nesting
-
-### Code Patterns
-
 - Error handling with `Result<T,E>`
 - Null safety with `Option<T>`
 - Iteration patterns (for, while, do-while)
@@ -167,13 +110,10 @@ The Calor skills teach Codex:
 
 | Feature | Claude Code | Codex CLI |
 |:--------|:------------|:----------|
-| Skills directory | `.claude/skills/` | `.codex/skills/<name>/` |
-| Skill file format | `calor.md` | `SKILL.md` with YAML frontmatter |
 | Project instructions | `CLAUDE.md` | `AGENTS.md` |
-| Skill invocation | `/calor` | `$calor` |
 | MCP Tools | Yes | Yes |
-| Calor-first enforcement | **Hooks (enforced)** | **Guidance + MCP tools** |
-| Blocks `.cs` creation | Yes | No |
+| Calor-first enforcement | Hooks | Hooks for covered tools + `AGENTS.md` |
+| Blocks `.cs` file edits | Yes | Yes, for covered file-edit tools |
 
 ---
 
@@ -183,8 +123,6 @@ The Calor skills teach Codex:
 
 **Prompt:**
 ```
-$calor
-
 Write an Calor function that calculates factorial with a precondition
 that n >= 0 and postcondition that result >= 1
 ```
@@ -230,8 +168,6 @@ Otherwise division by zero is possible.
 ### Starting a New Feature
 
 ```
-$calor
-
 I need to implement [feature description].
 
 The requirements are:
@@ -244,8 +180,6 @@ Please create the Calor code with appropriate contracts and effects.
 ### Converting Existing Code
 
 ```
-$calor-convert
-
 Convert src/Services/PaymentService.cs to Calor, adding:
 - Contracts based on the validation logic
 - Effect declarations for database and network calls
@@ -253,7 +187,24 @@ Convert src/Services/PaymentService.cs to Calor, adding:
 
 ### Verifying Calor-First Compliance
 
-Since Codex doesn't have hooks for Calor-first enforcement, periodically check for unconverted files:
+Hooks catch covered Codex file edits, while these checks provide repository-wide verification:
+
+```bash
+# Repository/CI backstop for C# added beside a .calr source
+bash scripts/check-calor-first-diff.sh --working-tree
+
+# Optional local wrapper: audit after each Codex session
+bash scripts/codex-with-calor-check.sh codex exec --json
+```
+
+The guard fails for every new `.cs` path, including root-level and newly-created
+directories. Existing tracked C# is grandfathered for compiler/runtime
+maintenance but is protected by CODEOWNERS review. Generated output must use a
+path already present in the protected base-branch `.calor-csharp-allowlist`; an
+allowlist added by the same PR is not accepted, and filename suffixes such as
+`.g.cs` are not trusted. CI also runs behavioral tests for these cases,
+including deleted-source replacements. This remains necessary because Codex
+may route specialized file changes outside lifecycle-hook coverage.
 
 ```bash
 # Find C# files that might need conversion
@@ -268,9 +219,9 @@ find . -name "*.cs" -not -name "*.g.cs" -not -path "./obj/*"
 ## Best Practices
 
 1. **Use MCP tools** - Leverage MCP tools for compilation and verification
-2. **Review generated files** - Always check that Codex created `.calr` files, not `.cs`
+2. **Trust and inspect hooks** - Use `/hooks` after initialization or hook changes
 3. **Use explicit instructions** - Be specific about wanting Calor output
-4. **Include skill reference** - Start prompts with `$calor` or `$calor-convert`
+4. **Keep guidance current** - Re-run init to update the managed `AGENTS.md` section
 5. **Run analysis regularly** - Use `calor assess` to find migration candidates
 6. **Convert promptly** - If Codex creates a `.cs` file, convert it immediately
 
@@ -280,19 +231,19 @@ find . -name "*.cs" -not -name "*.g.cs" -not -path "./obj/*"
 
 ### Codex Creates `.cs` Files Instead of `.calr`
 
-This can happen since enforcement is guidance-based. Solutions:
+This can happen through a shell command, an uncovered tool path, or disabled/untrusted hooks. Solutions:
 
 1. Be more explicit: "Create this as an Calor file (`.calr`), not C#"
-2. Start your prompt with `$calor` to activate the skill
-3. Convert the file: `calor convert filename.cs`
+2. Run `/hooks` and verify both generated Calor hooks are enabled and trusted.
+3. Convert the file: `calor convert filename.cs`.
 
-### Skills Not Recognized
+### Hooks Not Running
 
-Ensure you've run `calor init --ai codex` and the skill files exist:
+Ensure initialization created the hook file, then review it in Codex:
 
 ```bash
-ls -la .codex/skills/calor/SKILL.md
-ls -la .codex/skills/calor-convert/SKILL.md
+cat .codex/hooks.json
+# In Codex CLI: /hooks
 ```
 
 ---

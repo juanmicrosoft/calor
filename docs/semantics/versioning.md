@@ -298,7 +298,7 @@ public enum VersionCompatibility
 Add to `src/Calor.Compiler/Diagnostics/Diagnostic.cs`:
 
 ```csharp
-// Semantics version (Calor0700-0799)
+// Semantics version (Calor0700-0709; contract-verification results live in 0710-0715)
 public const string SemanticsVersionMismatch = "Calor0700";     // Warning
 public const string SemanticsVersionIncompatible = "Calor0701"; // Error
 ```

@@ -40,6 +40,50 @@ public sealed class BindValidationPass
     private readonly bool _strictInference;
     private readonly string? _source;
 
+    // Return type of each user function/method by name — built per module so the
+    // array-vs-collection check (Calor0254) can see when an initializer call
+    // returns an array (e.g. §F ... -> [str]). Rebuilt on every Check(module).
+    private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
+
+    // Parameter types of each user function/method, keyed by "name/arity" (and
+    // "Type.Method/arity"), so an array passed to a concrete-collection parameter
+    // at a call site can be flagged (#725). Rebuilt on every Check(module).
+    private readonly Dictionary<string, List<string>> _userParamTypes = new(StringComparer.Ordinal);
+
+    // Lexical scope stack of name → declared type for the body currently being
+    // walked, so the array-vs-collection check can validate §ASSIGN targets without
+    // an inner-block declaration leaking out to shadow an outer variable. The base
+    // scope is seeded with the member's parameters and enclosing class fields; each
+    // nested block pushes a child scope. These instance fields make the pass
+    // single-threaded / non-reentrant, which matches its current usage (one pass
+    // per compilation); parallelizing over modules would need per-call state.
+    private readonly List<Dictionary<string, string>> _scopes = [];
+
+    // Fields of the class whose member is currently being walked (null at module
+    // level). Kept separate from _scopes: a local may legally shadow a field, so
+    // fields must not count toward the CS0136 shadowing check (Calor0255), but they
+    // are still a §ASSIGN type-lookup fallback.
+    private IReadOnlyDictionary<string, string>? _fieldTypes;
+
+    // Declared return type of the function-like body currently being walked, so the
+    // check can validate §R. Null for bodies with no value return (ctors, setters).
+    private string? _currentReturnType;
+
+    // Name of the class whose member is currently being walked (null at module
+    // level). Signatures resolve context-sensitively: an unqualified call inside
+    // class C prefers C's member (implicit `this`); otherwise the free function.
+    // This is what keeps a same-named method and free function from colliding.
+    private string? _currentClassName;
+
+    // Concrete generic collection classes an array is NOT implicitly convertible
+    // to in C# (unlike the collection interfaces IList<T>/IEnumerable<T>/…, which
+    // arrays satisfy). Binding an array to one of these is CS0029.
+    private static readonly string[] ConcreteCollectionTypes =
+    [
+        "List", "HashSet", "SortedSet", "Queue", "Stack",
+        "LinkedList", "Collection", "ObservableCollection", "SortedList",
+    ];
+
     /// <summary>
     /// Well-known generic factory calls whose return type cannot be inferred
     /// without an explicit type argument. The value is a placeholder type
@@ -86,90 +130,202 @@ public sealed class BindValidationPass
 
     public void Check(ModuleNode module)
     {
+        BuildUserSignatures(module);
+
         foreach (var func in module.Functions)
         {
-            foreach (var stmt in func.Body)
-            {
-                CheckStatement(stmt);
-            }
+            CheckBody(func.Body, func.Output?.TypeName, func.Parameters, fields: null, className: null);
         }
 
         foreach (var cls in module.Classes)
         {
+            var fields = CollectFieldTypes(cls);
+
             foreach (var ctor in cls.Constructors)
             {
-                foreach (var stmt in ctor.Body)
-                {
-                    CheckStatement(stmt);
-                }
+                CheckBody(ctor.Body, returnType: null, ctor.Parameters, fields, cls.Name);
             }
 
             foreach (var method in cls.Methods)
             {
-                foreach (var stmt in method.Body)
-                {
-                    CheckStatement(stmt);
-                }
+                CheckBody(method.Body, method.Output?.TypeName, method.Parameters, fields, cls.Name);
             }
 
             foreach (var prop in cls.Properties)
             {
-                if (prop.Getter != null)
-                {
-                    foreach (var stmt in prop.Getter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (prop.Setter != null)
-                {
-                    foreach (var stmt in prop.Setter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (prop.Initer != null)
-                {
-                    foreach (var stmt in prop.Initer.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
+                // A getter returns the property's type; setters/initers do not.
+                if (prop.Getter != null) CheckBody(prop.Getter.Body, prop.TypeName, parameters: null, fields, cls.Name);
+                if (prop.Setter != null) CheckBody(prop.Setter.Body, returnType: null, parameters: null, fields, cls.Name);
+                if (prop.Initer != null) CheckBody(prop.Initer.Body, returnType: null, parameters: null, fields, cls.Name);
             }
 
             foreach (var op in cls.OperatorOverloads)
             {
-                foreach (var stmt in op.Body)
-                {
-                    CheckStatement(stmt);
-                }
+                CheckBody(op.Body, op.Output?.TypeName, op.Parameters, fields, cls.Name);
             }
 
             foreach (var idx in cls.Indexers)
             {
-                if (idx.Getter != null)
-                {
-                    foreach (var stmt in idx.Getter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (idx.Setter != null)
-                {
-                    foreach (var stmt in idx.Setter.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
-                if (idx.Initer != null)
-                {
-                    foreach (var stmt in idx.Initer.Body)
-                    {
-                        CheckStatement(stmt);
-                    }
-                }
+                if (idx.Getter != null) CheckBody(idx.Getter.Body, idx.TypeName, parameters: null, fields, cls.Name);
+                if (idx.Setter != null) CheckBody(idx.Setter.Body, returnType: null, parameters: null, fields, cls.Name);
+                if (idx.Initer != null) CheckBody(idx.Initer.Body, returnType: null, parameters: null, fields, cls.Name);
             }
         }
+    }
+
+    private static Dictionary<string, string> CollectFieldTypes(ClassDefinitionNode cls)
+    {
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var field in cls.Fields)
+        {
+            fields[field.Name] = field.TypeName;
+        }
+
+        return fields;
+    }
+
+    // Walks one function-like body. Establishes the return-type context (for §R)
+    // and a fresh scope stack whose base scope holds the enclosing class fields and
+    // this member's parameters (so §ASSIGN to a field or parameter is checked, and a
+    // parameter correctly shadows a field of the same name). All reset per body.
+    private void CheckBody(
+        IReadOnlyList<StatementNode> body,
+        string? returnType,
+        IReadOnlyList<ParameterNode>? parameters,
+        IReadOnlyDictionary<string, string>? fields,
+        string? className)
+    {
+        _currentReturnType = returnType;
+        _currentClassName = className;
+
+        // Fields are kept OUT of the scope stack: a local may legally shadow a field
+        // in C# (the local wins), so field names must not trip the CS0136 check —
+        // but they are still consulted by §ASSIGN type lookup as a fallback.
+        _fieldTypes = fields;
+
+        // Scope 0 holds parameters; scope 1 is the method-body scope. Keeping them
+        // separate means a body-top-level §B that reuses a parameter name is caught
+        // (the parameter is in an enclosing scope), matching C#'s CS0136.
+        _scopes.Clear();
+        var paramScope = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (parameters != null)
+        {
+            // Empty-string type is benign in the downstream lookups (the §ASSIGN /
+            // Calor0254 checks call TryGetConcreteCollectionName, which fails on "");
+            // the entry is only load-bearing for the shadowing check, which needs the
+            // name, not the type.
+            foreach (var p in parameters) paramScope[p.Name] = p.TypeName ?? "";
+        }
+
+        _scopes.Add(paramScope);
+        _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+        foreach (var stmt in body)
+        {
+            CheckStatement(stmt);
+        }
+    }
+
+    // Walks a nested block in its own child scope so bindings declared inside it do
+    // not leak out to shadow (and mis-type) an outer variable of the same name.
+    private void CheckBlock(IReadOnlyList<StatementNode> body)
+    {
+        _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+        foreach (var stmt in body)
+        {
+            CheckStatement(stmt);
+        }
+
+        _scopes.RemoveAt(_scopes.Count - 1);
+    }
+
+    private void DeclareLocal(string name, string type) => _scopes[^1][name] = type;
+
+    // Walks a nested block whose scope is pre-seeded with iteration variables (the
+    // §L / §EACH / §EACHKV loop variables), so an inner §B reusing an iteration
+    // variable's name is caught (CS0136) — the loop variable lives in a scope
+    // enclosing the body, exactly as in C#.
+    private void CheckLoopBlock(IReadOnlyList<StatementNode> body, params string?[] loopVars)
+    {
+        var loopScope = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var name in loopVars)
+        {
+            if (!string.IsNullOrEmpty(name)) loopScope[name] = ""; // type irrelevant to shadowing
+        }
+
+        _scopes.Add(loopScope);
+        CheckBlock(body);
+        _scopes.RemoveAt(_scopes.Count - 1);
+    }
+
+    /// <summary>True if <paramref name="name"/> is already a local, parameter, or
+    /// loop variable in an <em>enclosing</em> scope (strictly above the current one)
+    /// — the CS0136 condition a new §B declaration would violate. Fields are excluded
+    /// from the scope stack, so a local may legally shadow a field, as in C#. Same-
+    /// scope duplicates (CS0128) are deliberately NOT flagged here (#731): the C#→Calor
+    /// converter emits array/list/dict reassignments as same-name creation blocks,
+    /// so that case needs the converter's cooperation, not a blanket reject.</summary>
+    private bool IsShadowingEnclosingScope(string name)
+    {
+        for (var i = 0; i < _scopes.Count - 1; i++)
+        {
+            if (_scopes[i].ContainsKey(name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>True if <paramref name="name"/> is a local declared in any live scope —
+    /// the current block or an enclosing one. Mirrors the (scope-aware, #732) emitter's
+    /// rule for classifying a mutable §B rebind: it is a reassignment (<c>x = …</c>) only
+    /// when the name is still visible, and otherwise a new declaration (<c>var x = …</c>)
+    /// — so a rebind in a now-closed sibling block re-declares rather than reassigning an
+    /// out-of-scope local (CS0103).</summary>
+    private bool IsDeclaredInAnyLiveScope(string name)
+    {
+        for (var i = 0; i < _scopes.Count; i++)
+        {
+            if (_scopes[i].ContainsKey(name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The expanded type of a literal initializer, or null if the initializer is
+    /// null or not a statically-typed literal (a non-literal value needs full type
+    /// inference — #740). Used to catch an unannotated mutable rebind of a mismatched
+    /// literal, e.g. <c>§B{~x:i32} 0</c> then <c>§B{~x} "hi"</c>.</summary>
+    private static string? LiteralTypeOrNull(ExpressionNode? initializer) => initializer switch
+    {
+        IntLiteralNode => "INT",
+        StringLiteralNode => "STRING",
+        BoolLiteralNode => "BOOL",
+        FloatLiteralNode or DecimalLiteralNode => "FLOAT",
+        _ => null,
+    };
+
+    private bool TryLookupLocal(string name, out string type)
+    {
+        for (var i = _scopes.Count - 1; i >= 0; i--)
+        {
+            if (_scopes[i].TryGetValue(name, out type!))
+            {
+                return true;
+            }
+        }
+
+        if (_fieldTypes != null && _fieldTypes.TryGetValue(name, out type!))
+        {
+            return true;
+        }
+
+        type = "";
+        return false;
     }
 
     private void CheckStatement(StatementNode stmt)
@@ -180,37 +336,98 @@ public sealed class BindValidationPass
                 CheckBind(bind);
                 break;
 
+            case ReturnStatementNode ret:
+                if (ret.Expression != null)
+                {
+                    if (_currentReturnType != null)
+                        CheckArrayToCollection(
+                            ret.Expression, _currentReturnType, ret.Span, "The declared return type");
+                    ScanExpressionForCalls(ret.Expression);
+                }
+                break;
+
+            case AssignmentStatementNode assign:
+                if (assign.Target is ReferenceNode target && TryLookupLocal(target.Name, out var targetType))
+                    CheckArrayToCollection(
+                        assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+                ScanExpressionForCalls(assign.Value);
+                break;
+
+            case CallStatementNode callStmt:
+                CheckCallArguments(callStmt.Target, callStmt.Arguments);
+                foreach (var a in callStmt.Arguments) ScanExpressionForCalls(a);
+                break;
+
+            case PrintStatementNode print:
+                ScanExpressionForCalls(print.Expression);
+                break;
+
+            case ExpressionStatementNode exprStmt:
+                ScanExpressionForCalls(exprStmt.Expression);
+                break;
+
             case IfStatementNode ifStmt:
-                foreach (var s in ifStmt.ThenBody) CheckStatement(s);
+                ScanExpressionForCalls(ifStmt.Condition);
+                CheckBlock(ifStmt.ThenBody);
                 foreach (var ei in ifStmt.ElseIfClauses)
-                    foreach (var s in ei.Body) CheckStatement(s);
+                {
+                    ScanExpressionForCalls(ei.Condition);
+                    CheckBlock(ei.Body);
+                }
                 if (ifStmt.ElseBody != null)
-                    foreach (var s in ifStmt.ElseBody) CheckStatement(s);
+                    CheckBlock(ifStmt.ElseBody);
                 break;
 
             case ForStatementNode forStmt:
-                foreach (var s in forStmt.Body) CheckStatement(s);
+                CheckLoopBlock(forStmt.Body, forStmt.VariableName);
+                break;
+
+            case ForeachStatementNode forEach:
+                ScanExpressionForCalls(forEach.Collection);
+                CheckLoopBlock(forEach.Body, forEach.VariableName, forEach.IndexVariableName);
                 break;
 
             case WhileStatementNode whileStmt:
-                foreach (var s in whileStmt.Body) CheckStatement(s);
+                ScanExpressionForCalls(whileStmt.Condition);
+                CheckBlock(whileStmt.Body);
                 break;
 
             case DoWhileStatementNode doWhileStmt:
-                foreach (var s in doWhileStmt.Body) CheckStatement(s);
+                ScanExpressionForCalls(doWhileStmt.Condition);
+                CheckBlock(doWhileStmt.Body);
                 break;
 
             case MatchStatementNode match:
+                ScanExpressionForCalls(match.Target);
                 foreach (var c in match.Cases)
-                    foreach (var s in c.Body) CheckStatement(s);
+                    CheckBlock(c.Body);
                 break;
 
             case TryStatementNode tryStmt:
-                foreach (var s in tryStmt.TryBody) CheckStatement(s);
+                CheckBlock(tryStmt.TryBody);
                 foreach (var clause in tryStmt.CatchClauses)
-                    foreach (var s in clause.Body) CheckStatement(s);
+                    CheckBlock(clause.Body);
                 if (tryStmt.FinallyBody != null)
-                    foreach (var s in tryStmt.FinallyBody) CheckStatement(s);
+                    CheckBlock(tryStmt.FinallyBody);
+                break;
+
+            case UsingStatementNode usingStmt:
+                ScanExpressionForCalls(usingStmt.Resource);
+                CheckBlock(usingStmt.Body);
+                break;
+
+            case SyncBlockNode sync:
+                ScanExpressionForCalls(sync.LockExpression);
+                CheckBlock(sync.Body);
+                break;
+
+            case UnsafeBlockNode unsafeBlock:
+                CheckBlock(unsafeBlock.Body);
+                break;
+
+            case FixedStatementNode fixedStmt:
+                ScanExpressionForCalls(fixedStmt.Initializer);
+                CheckBlock(fixedStmt.Body);
                 break;
         }
     }
@@ -227,6 +444,79 @@ public sealed class BindValidationPass
             return;
         }
 
+        // A mutable §B whose name is visible in a live scope is a reassignment (the
+        // scope-aware emitter emits `x = …`), not a new local — so it neither shadows
+        // nor gets a fresh scope entry. A mutable rebind whose earlier declaration lives
+        // in a now-closed sibling block is NOT visible, so it is a new declaration, just
+        // like the emitter now emits (#732). Everything else is a new declaration too.
+        var isReassignment = bind.IsMutable && IsDeclaredInAnyLiveScope(bind.Name);
+        if (isReassignment)
+        {
+            // Calor0256 — a mutable rebind whose type contradicts the variable's
+            // declaration. The variable's type is fixed at first declaration; the emitter
+            // emits `x = value` against that type, so a mismatched value fails to compile
+            // (CS0029/CS0266). The rebind's type is the explicit annotation when present,
+            // otherwise the statically-known type of a LITERAL initializer (the common
+            // unannotated case; a non-literal unannotated value needs full inference, #740).
+            // Both sides are canonicalized through ExpandType before comparing (§B
+            // annotations are pre-expanded, "INT"; parameter/loop-variable types are raw,
+            // "i32"). An unannotated original ("") has no known type, so it is skipped.
+            var rebindType = bind.TypeName != null
+                ? Parsing.AttributeHelper.ExpandType(bind.TypeName.Trim())
+                : LiteralTypeOrNull(bind.Initializer);
+
+            // TryLookupLocal's field fallback is unreachable here: this branch runs only
+            // when isReassignment, which already requires the name in a live LOCAL scope,
+            // so declaredType is the variable's local/parameter type, never a field's.
+            if (rebindType != null &&
+                TryLookupLocal(bind.Name, out var declaredType) &&
+                !string.IsNullOrEmpty(declaredType) &&
+                !string.Equals(
+                    Parsing.AttributeHelper.ExpandType(declaredType.Trim()),
+                    rebindType, StringComparison.Ordinal))
+            {
+                // Surface-spell both sides so the message never teaches an internal
+                // spelling the user can't write (i32/str, not INT/STRING).
+                var declaredSurface = Parsing.AttributeHelper.ToSurfaceSpelling(declaredType.Trim());
+                var rebindSurface = Parsing.AttributeHelper.ToSurfaceSpelling(rebindType);
+                _diagnostics.ReportError(bind.Span, DiagnosticCode.BindRebindTypeMismatch,
+                    $"Mutable binding '{bind.Name}' was declared '{declaredSurface}' but is rebound " +
+                    $"as '{rebindSurface}'. A mutable rebind is a reassignment; its type is fixed at the " +
+                    "first declaration, so the emitted C# would fail to compile (CS0029/CS0266). " +
+                    "Keep the original type, or use a differently-named binding.");
+            }
+        }
+        else
+        {
+            // Calor0255 — a new local that reuses a local/parameter/loop-variable
+            // name in an enclosing scope is CS0136 in the emitted C#. Fields are
+            // excluded from the scope stack, so shadowing a field is allowed (as C#).
+            if (IsShadowingEnclosingScope(bind.Name))
+            {
+                _diagnostics.ReportError(bind.Span, DiagnosticCode.BindShadowsEnclosingScope,
+                    $"Binding '{bind.Name}' shadows a local, parameter, or loop variable of the same " +
+                    "name already in an enclosing scope. C# forbids this (CS0136), so the generated " +
+                    $"code would not compile — rename this binding (e.g. '{bind.Name}2').");
+            }
+
+            // Track the name (with its declared type, or empty when untyped) so later
+            // §ASSIGN can be type-checked and nested §B can detect shadowing of it.
+            DeclareLocal(bind.Name, bind.TypeName ?? "");
+        }
+
+        // Calor0254 — always-on hard type error: an array bound to a concrete
+        // generic collection (the E1a trap). Independent of strict inference,
+        // since the emitted C# would fail with CS0029 regardless.
+        if (bind.TypeName != null && bind.Initializer != null)
+        {
+            CheckArrayToCollection(
+                bind.Initializer, bind.TypeName, bind.Span, $"Binding '{bind.Name}'");
+        }
+
+        // Argument position (#725): calls inside the initializer (e.g. an array
+        // passed to a List<T> parameter of a user function) are checked too.
+        ScanExpressionForCalls(bind.Initializer);
+
         // Strict-mode checks (Calor0251-0253) — only when --strict-bind-inference is set
         // and the binding has no explicit type annotation. An explicit :type always wins.
         if (!_strictInference || bind.TypeName != null || bind.Initializer == null)
@@ -235,6 +525,217 @@ public sealed class BindValidationPass
         }
 
         CheckStrictInitializer(bind, bind.Initializer);
+    }
+
+    /// <summary>
+    /// Reports Calor0254 when <paramref name="value"/> is an array and
+    /// <paramref name="declaredType"/> is a concrete generic collection. Shared by
+    /// binding, return, and assignment positions; <paramref name="subject"/> names
+    /// the offending declaration (e.g. "Binding 'lines'"). The message references
+    /// the collection by name only — it never echoes the internal normalized type
+    /// spelling, so the surface-syntax recommendation ('[str]') is not paired with
+    /// a mismatched convention.
+    /// </summary>
+    private void CheckArrayToCollection(
+        ExpressionNode value, string declaredType, Parsing.TextSpan span, string subject)
+    {
+        if (!TryGetConcreteCollectionName(declaredType.Trim(), out var collectionName))
+        {
+            return;
+        }
+
+        var elementType = InitializerArrayElement(value);
+        if (elementType == null)
+        {
+            return;
+        }
+
+        _diagnostics.ReportError(span, DiagnosticCode.BindArrayToConcreteCollection,
+            $"{subject} is a concrete collection ('{collectionName}<…>'), but the value is an array. " +
+            $"An array is not implicitly convertible to '{collectionName}<…>' in C# (CS0029). Use the " +
+            $"array form '[{elementType}]', or construct a new {collectionName} from the array.");
+    }
+
+    /// <summary>
+    /// Recursively finds every call in <paramref name="expr"/> and checks each
+    /// argument against the callee's declared parameter types (#725 — argument
+    /// position). Only user functions/methods are resolved (BCL callees have no
+    /// parameter-type registry, a conservative false negative). The walker covers
+    /// the common composite expressions; unhandled node types simply stop the
+    /// descent (a safe false negative, never a false positive).
+    /// </summary>
+    private void ScanExpressionForCalls(ExpressionNode? expr)
+    {
+        switch (expr)
+        {
+            case CallExpressionNode call:
+                CheckCallArguments(call.Target, call.Arguments);
+                foreach (var arg in call.Arguments) ScanExpressionForCalls(arg);
+                break;
+            case BinaryOperationNode bin:
+                ScanExpressionForCalls(bin.Left);
+                ScanExpressionForCalls(bin.Right);
+                break;
+            case UnaryOperationNode un:
+                ScanExpressionForCalls(un.Operand);
+                break;
+            case ConditionalExpressionNode cond:
+                ScanExpressionForCalls(cond.Condition);
+                ScanExpressionForCalls(cond.WhenTrue);
+                ScanExpressionForCalls(cond.WhenFalse);
+                break;
+            case TypeOperationNode typeOp:
+                ScanExpressionForCalls(typeOp.Operand);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Flags an array argument passed to a concrete-collection parameter, matched
+    /// positionally against the resolved callee. Resolution is context-sensitive
+    /// (current class before module level) and keyed by arity so Calor's
+    /// arity-based overloads pick the right signature.
+    /// </summary>
+    private void CheckCallArguments(string target, IReadOnlyList<ExpressionNode> args)
+    {
+        if (!TryResolveParamTypes(target, args.Count, out var paramTypes))
+        {
+            return;
+        }
+
+        for (var i = 0; i < args.Count && i < paramTypes.Count; i++)
+        {
+            CheckArrayToCollection(
+                args[i], paramTypes[i], args[i].Span, $"Parameter {i + 1} of '{target}'");
+        }
+    }
+
+    // Resolves an unqualified call target the way Calor does: a call inside class C
+    // first tries C's member (implicit `this`), then falls back to a module-level
+    // free function (or an already-qualified target). Storing methods only under
+    // "Class.Member" and free functions under the bare name — and picking by
+    // context here — is what prevents a same-named method and free function from
+    // clobbering each other (PR #728 review finding 1). When neither is present the
+    // callee is unknown (BCL / cross-module): a conservative false negative.
+    private bool TryResolveReturnType(string target, out string returnType)
+    {
+        if (_currentClassName != null &&
+            _userReturnTypes.TryGetValue($"{_currentClassName}.{target}", out returnType!))
+        {
+            return true;
+        }
+
+        return _userReturnTypes.TryGetValue(target, out returnType!);
+    }
+
+    private bool TryResolveParamTypes(string target, int arity, out List<string> paramTypes)
+    {
+        if (_currentClassName != null &&
+            _userParamTypes.TryGetValue($"{_currentClassName}.{target}/{arity}", out paramTypes!))
+        {
+            return true;
+        }
+
+        return _userParamTypes.TryGetValue($"{target}/{arity}", out paramTypes!);
+    }
+
+    /// <summary>
+    /// Returns the Calor element type if <paramref name="init"/> is known to be an
+    /// array — a call to a known array-returning BCL method, or a call to a user
+    /// function whose declared return type is an array (<c>[T]</c>). Null otherwise.
+    /// </summary>
+    private string? InitializerArrayElement(ExpressionNode init)
+    {
+        if (init is not CallExpressionNode call)
+        {
+            return null;
+        }
+
+        // User declarations win over the BCL heuristic, so a user type/method that
+        // shadows a BCL name (e.g. a local `File.ReadAllLines -> List<str>`) is
+        // judged by its real return type, not the built-in assumption. Resolution
+        // is context-sensitive (current class before module level).
+        if (TryResolveReturnType(call.Target, out var returnType))
+        {
+            return IsArrayTypeName(returnType)
+                ? returnType.Trim().TrimStart('[').TrimEnd(']').Trim()
+                : null;
+        }
+
+        if (ArrayReturningBcl.Methods.TryGetValue(call.Target, out var bclElement))
+        {
+            return bclElement;
+        }
+
+        return null;
+    }
+
+    // Resolves only functions/methods declared in the module being checked; cross-
+    // module callees are conservative false negatives. Free functions are stored
+    // under the bare name; methods ONLY under "Class.Member" — never the bare name —
+    // so a method cannot clobber a same-named free function's signature (PR #728
+    // review finding 1). Unqualified calls are matched context-sensitively at the
+    // call site (see TryResolveReturnType / TryResolveParamTypes). Constructors,
+    // operators, and indexers are intentionally not registered (§NEW / operator /
+    // indexer call forms are unchecked — a documented conservative false negative).
+    private void BuildUserSignatures(ModuleNode module)
+    {
+        _userReturnTypes.Clear();
+        _userParamTypes.Clear();
+
+        foreach (var func in module.Functions)
+        {
+            if (func.Output?.TypeName is { } rt)
+            {
+                _userReturnTypes[func.Name] = rt;
+            }
+
+            RegisterParams(func.Name, func.Parameters);
+        }
+
+        foreach (var cls in module.Classes)
+        {
+            foreach (var method in cls.Methods)
+            {
+                var key = $"{cls.Name}.{method.Name}";
+                if (method.Output?.TypeName is { } rt)
+                {
+                    _userReturnTypes[key] = rt;
+                }
+
+                RegisterParams(key, method.Parameters);
+            }
+        }
+    }
+
+    private void RegisterParams(string name, IReadOnlyList<ParameterNode> parameters)
+    {
+        // ParameterNode.TypeName is non-null (parser invariant); the ?? guard keeps
+        // a future nullable-annotation change from feeding null into the check.
+        _userParamTypes[$"{name}/{parameters.Count}"] =
+            parameters.Select(p => p.TypeName ?? "").ToList();
+    }
+
+    private static bool IsArrayTypeName(string? typeName)
+        => typeName != null && typeName.TrimStart().StartsWith("[", StringComparison.Ordinal);
+
+    private static bool TryGetConcreteCollectionName(string declared, out string collectionName)
+    {
+        var open = declared.IndexOf('<');
+        if (open > 0)
+        {
+            var head = declared[..open].Trim();
+            var lastDot = head.LastIndexOf('.');
+            var simple = lastDot >= 0 ? head[(lastDot + 1)..] : head;
+            if (Array.Exists(ConcreteCollectionTypes, t => t == simple))
+            {
+                collectionName = simple;
+                return true;
+            }
+        }
+
+        collectionName = "";
+        return false;
     }
 
     private void CheckStrictInitializer(BindStatementNode bind, ExpressionNode init)

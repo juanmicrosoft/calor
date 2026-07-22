@@ -200,9 +200,8 @@ Creates the following files:
 
 | File | Purpose |
 |:-----|:--------|
-| `.codex/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
-| `.codex/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
 | `.codex/config.toml` | MCP server configuration for Calor tools |
+| `.codex/hooks.json` | Codex-native pre-write validation and post-write lint hooks |
 | `AGENTS.md` | Project documentation with Calor-first guidelines |
 
 #### MCP Server Integration
@@ -221,21 +220,18 @@ See [`calor mcp`](/calor/cli/mcp/) for the complete list of available tools.
 
 #### Enforcement
 
-Codex CLI does not support hooks like Claude Code. MCP tools provide direct access to Calor compiler features, and Calor-first development is **guidance-based**, relying on instructions in `AGENTS.md` and the skill files.
-
-This means:
-- Codex *should* create `.calr` files based on the instructions
-- MCP tools give Codex native access to compile, verify, and convert
-- Hooks are not supported, so enforcement is not automatic
-- Review file extensions after code generation
-- Use `calor assess` to find any unconverted `.cs` files
-
-After initialization, use these Codex commands:
-
-| Command | Description |
-|:--------|:------------|
-| `$calor` | Write new Calor code with Codex's assistance |
-| `$calor-convert` | Convert existing C# code to Calor syntax |
+Codex CLI supports lifecycle hooks. The generated project hooks validate
+`apply_patch`/`Edit`/`Write` destinations before file changes and lint changed
+`.calr` files afterward. Use `/hooks` to review and trust the exact hook
+definitions. Specialized Codex file-change paths may bypass lifecycle hooks;
+run the Codex smoke test and retain repository builds, tests, and `calor assess`
+as required verification. For a merge-time backstop, run
+`bash scripts/check-calor-first-diff.sh --working-tree`; CI runs the same guard
+against the pull-request diff. The guard rejects every new `.cs` path; existing
+tracked C# is grandfathered for compiler/runtime maintenance, and generated
+paths require a pre-existing, reviewed base-branch allowlist entry.
+Existing tracked C# changes require code-owner review through the repository’s
+protected CODEOWNERS policy.
 
 #### Output Structure
 
@@ -243,11 +239,7 @@ After initialization, use these Codex commands:
 project/
 ├── .codex/
 │   ├── config.toml
-│   └── skills/
-│       ├── calor/
-│       │   └── SKILL.md
-│       └── calor-convert/
-│           └── SKILL.md
+│   └── hooks.json
 ├── AGENTS.md
 └── MyProject.csproj
 ```

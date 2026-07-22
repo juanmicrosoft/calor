@@ -188,7 +188,7 @@ internal sealed class WatchSession
             while (!cancellationToken.IsCancellationRequested)
             {
                 var batch = await WatchDebouncer.ReadBatchAsync(
-                    _changes.Reader, TimeSpan.FromMilliseconds(_settings.DebounceMs), cancellationToken);
+                    _changes.Reader, TimeSpan.FromMilliseconds(_settings.DebounceMs), TimeProvider.System, cancellationToken);
                 if (batch == null)
                 {
                     break; // cancelled or channel completed — clean shutdown

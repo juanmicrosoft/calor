@@ -583,6 +583,89 @@ public static class AttributeHelper
     }
 
     /// <summary>
+    /// Inverse of <see cref="ExpandType"/>: maps an expanded/internal type name back to
+    /// the compact surface spelling agents actually write (<c>INT</c> → <c>i32</c>,
+    /// <c>STRING</c> → <c>str</c>, <c>ARRAY[element=STRING]</c> → <c>[str]</c>, …). Use in
+    /// any diagnostic that echoes a type so the message never teaches an internal
+    /// spelling the user can't write. Idempotent on already-compact input.
+    /// </summary>
+    public static string ToSurfaceSpelling(string expandedType)
+    {
+        if (string.IsNullOrEmpty(expandedType))
+        {
+            return expandedType;
+        }
+
+        var t = expandedType.Trim();
+
+        // Composite forms, mirroring ExpandType (recurse into the payload).
+        if (t.StartsWith("ARRAY[element=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
+        {
+            return $"[{ToSurfaceSpelling(t["ARRAY[element=".Length..^1])}]";
+        }
+
+        if (t.StartsWith("OPTION[inner=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
+        {
+            return $"?{ToSurfaceSpelling(t["OPTION[inner=".Length..^1])}";
+        }
+
+        if (t.StartsWith("RESULT[ok=", StringComparison.Ordinal) && t.EndsWith("]", StringComparison.Ordinal))
+        {
+            var body = t["RESULT[ok=".Length..^1];
+            var sep = body.IndexOf("][err=", StringComparison.Ordinal);
+            if (sep > 0)
+            {
+                var ok = ToSurfaceSpelling(body[..sep]);
+                var err = ToSurfaceSpelling(body[(sep + "][err=".Length)..]);
+                return $"{ok}!{err}";
+            }
+        }
+
+        // Generic: Base<A, B> — surface-spell each argument.
+        var genericIndex = t.IndexOf('<');
+        if (genericIndex > 0 && t.EndsWith(">", StringComparison.Ordinal))
+        {
+            var baseName = t[..genericIndex];
+            var args = SplitGenericArgs(t[(genericIndex + 1)..^1]);
+            return $"{baseName}<{string.Join(", ", args.Select(a => ToSurfaceSpelling(a.Trim())))}>";
+        }
+
+        // C#-style array suffix: X[] / X[,] — surface-spell the element.
+        if (t.EndsWith("]", StringComparison.Ordinal))
+        {
+            var start = t.LastIndexOf('[');
+            if (start > 0)
+            {
+                var suffix = t[start..];
+                if (suffix == "[]" || (suffix.Length >= 3 && suffix.Skip(1).SkipLast(1).All(c => c == ',')))
+                {
+                    return ToSurfaceSpelling(t[..start]) + suffix;
+                }
+            }
+        }
+
+        return t switch
+        {
+            "INT" => "i32",
+            "INT[bits=8][signed=true]" => "i8",
+            "INT[bits=16][signed=true]" => "i16",
+            "INT[bits=64][signed=true]" => "i64",
+            "INT[bits=8][signed=false]" => "u8",
+            "INT[bits=16][signed=false]" => "u16",
+            "INT[bits=32][signed=false]" => "u32",
+            "INT[bits=64][signed=false]" => "u64",
+            "FLOAT" => "f64",
+            "FLOAT[bits=32]" => "f32",
+            "STRING" => "str",
+            "BOOL" => "bool",
+            "VOID" => "void",
+            "NEVER" => "never",
+            "CHAR" => "char",
+            _ => t // already surface, or an unknown/user type — leave as-is
+        };
+    }
+
+    /// <summary>
     /// Finds the index of a character at the top level (not inside angle brackets).
     /// Returns -1 if not found.
     /// </summary>

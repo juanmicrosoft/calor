@@ -240,7 +240,7 @@ When enabled, the compiler uses the Z3 theorem prover to statically verify contr
 Example output:
 ```
 Contract verification complete: 3 proven, 1 unproven, 1 potentially violated, 0 unsupported
-warning Calor0702: Postcondition may be violated in function 'BadFunction'. Counterexample: x=0, y=1
+warning Calor0712: Postcondition may be violated in function 'BadFunction'. Counterexample: x=0, y=1
 ```
 
 For proven contracts, the generated C# includes:

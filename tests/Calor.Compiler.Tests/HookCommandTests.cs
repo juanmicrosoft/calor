@@ -6,6 +6,172 @@ namespace Calor.Compiler.Tests;
 
 public class HookCommandTests : IDisposable
 {
+    [Fact]
+    public async Task CodexWriteHook_BlocksCSharpAddedByApplyPatch()
+    {
+        var envelope = """
+            {"tool_input":{"command":"*** Begin Patch\n*** Add File: NewThing.cs\n+class NewThing {}\n*** End Patch"}}
+            """;
+
+        var result = await HookCommand.RunCodexWriteHookAsync(envelope, "pre");
+
+        Assert.Equal(2, result);
+    }
+
+    [Fact]
+    public async Task CodexWriteHook_AllowsCalorAddedByApplyPatch()
+    {
+        var envelope = """
+            {"tool_input":{"command":"*** Begin Patch\n*** Add File: NewThing.calr\n+§M{m001:NewThing}\n*** End Patch"}}
+            """;
+
+        var result = await HookCommand.RunCodexWriteHookAsync(envelope, "pre");
+
+        Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public async Task CodexWriteHook_AllowsDeleteOnlyPatch()
+    {
+        var envelope = """
+            {"tool_input":{"command":"*** Begin Patch\n*** Delete File: Old.cs\n*** End Patch"}}
+            """;
+
+        Assert.Equal(0, await HookCommand.RunCodexWriteHookAsync(envelope, "pre"));
+        Assert.Equal(0, await HookCommand.RunCodexWriteHookAsync(envelope, "post"));
+    }
+
+    [Fact]
+    public async Task CodexWriteHook_CliAllowsDeleteOnlyPatchFromStdin()
+    {
+        var compilerDll = typeof(HookCommand).Assembly.Location;
+        var startInfo = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            Arguments = $"\"{compilerDll}\" hook codex-write --phase pre",
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        using var process = System.Diagnostics.Process.Start(startInfo)!;
+        await process.StandardInput.WriteAsync("{\"tool_input\":{\"command\":\"*** Begin Patch\\n*** Delete File: Old.cs\\n*** End Patch\"}}");
+        process.StandardInput.Close();
+        await process.WaitForExitAsync();
+
+        Assert.Equal(0, process.ExitCode);
+    }
+
+    [Fact]
+    public async Task CodexWriteHook_ValidatesMoveDestination()
+    {
+        var envelope = """
+            {"tool_input":{"command":"*** Begin Patch\n*** Update File: Service.calr\n*** Move to: Service.cs\n@@\n-old\n+new\n*** End Patch"}}
+            """;
+
+        Assert.Equal(2, await HookCommand.RunCodexWriteHookAsync(envelope, "pre"));
+    }
+
+    [Fact]
+    public async Task CodexWriteHook_AllowsMoveFromCSharpToCalor()
+    {
+        var envelope = """
+            {"tool_input":{"command":"*** Begin Patch\n*** Update File: Service.cs\n*** Move to: Service.calr\n@@\n-old\n+new\n*** End Patch"}}
+            """;
+
+        Assert.Equal(0, await HookCommand.RunCodexWriteHookAsync(envelope, "pre"));
+    }
+
+    [Fact]
+    public async Task CodexWriteHook_ValidatesEveryFileInMultiFilePatch()
+    {
+        var envelope = """
+            {"tool_input":{"command":"*** Begin Patch\n*** Add File: Good.calr\n+ok\n*** Add File: Bad.cs\n+bad\n*** End Patch"}}
+            """;
+
+        Assert.Equal(2, await HookCommand.RunCodexWriteHookAsync(envelope, "pre"));
+    }
+
+    [Theory]
+    [InlineData("not-json")]
+    [InlineData("{}")]
+    [InlineData("{\"tool_input\":{}}")]
+    [InlineData("{\"tool_input\":{\"command\":\"\"}}")]
+    public async Task CodexWriteHook_FailsClosedForMalformedEnvelope(string envelope)
+    {
+        Assert.Equal(2, await HookCommand.RunCodexWriteHookAsync(envelope, "pre"));
+    }
+
+    [Fact]
+    public async Task CodexWriteHook_CliReadsEnvelopeFromStdin()
+    {
+        var compilerDll = typeof(HookCommand).Assembly.Location;
+        var startInfo = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            Arguments = $"\"{compilerDll}\" hook codex-write --phase pre",
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        using var process = System.Diagnostics.Process.Start(startInfo)!;
+        await process.StandardInput.WriteAsync("{\"tool_input\":{\"command\":\"*** Begin Patch\\n*** Add File: FromStdin.cs\\n+x\\n*** End Patch\"}}");
+        process.StandardInput.Close();
+        var error = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        Assert.Equal(2, process.ExitCode);
+        Assert.Contains("BLOCKED", error);
+        Assert.Contains("FromStdin.cs", error);
+    }
+
+    [Fact]
+    public async Task CodexWriteHook_PostPhaseLintsMoveDestination()
+    {
+        var envelope = """
+            {"tool_input":{"command":"*** Begin Patch\n*** Update File: Old.cs\n*** Move to: New.calr\n@@\n-old\n+new\n*** End Patch"}}
+            """;
+        string? lintInput = null;
+
+        var result = await HookCommand.RunCodexWriteHookAsync(
+            envelope,
+            "post",
+            input =>
+            {
+                lintInput = input;
+                return Task.FromResult(0);
+            });
+
+        Assert.Equal(0, result);
+        Assert.Contains("New.calr", lintInput);
+        Assert.DoesNotContain("Old.cs", lintInput);
+    }
+
+    [Fact]
+    public async Task PostWriteLint_ReportsLintFailureToCodex()
+    {
+        var path = Path.Combine(_testDirectory, "Broken.calr");
+        await File.WriteAllTextAsync(path, "broken");
+        var originalError = Console.Error;
+        using var error = new StringWriter();
+        Console.SetError(error);
+        try
+        {
+            var input = System.Text.Json.JsonSerializer.Serialize(new { file_path = path });
+            var result = await HookCommand.PostWriteLintAsync(
+                input,
+                _ => Task.FromResult(new HookCommand.LintProcessResult(1, "CALOR0001", "parse failed")));
+
+            Assert.Equal(1, result);
+            Assert.Contains("Broken.calr", error.ToString());
+            Assert.Contains("CALOR0001", error.ToString());
+            Assert.Contains("parse failed", error.ToString());
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
     private readonly string _testDirectory;
 
     public HookCommandTests()

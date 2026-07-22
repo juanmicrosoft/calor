@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-22",
+  "codex_cli": "0.144.6",
+  "model": "gpt-5.6-sol",
+  "calor_version": "0.7.0",
+  "benchmark_pair": "W1-001-temperature-converter",
+  "invocation": "codex exec --json",
+  "hook_configuration": {
+    "pre_event": "PreToolUse",
+    "pre_matcher": "^(apply_patch|Edit|Write)$",
+    "pre_command": "calor hook codex-write --phase pre",
+    "post_event": "PostToolUse",
+    "post_matcher": "^(apply_patch|Edit|Write)$",
+    "post_command": "calor hook codex-write --phase post"
+  },
+  "observations": [
+    {
+      "event": "mcp",
+      "result": "pass",
+      "details": "Codex read the Calor primer and consumed help and compile tools."
+    },
+    {
+      "event": "file_change",
+      "result": "observed",
+      "details": "The session recorded file changes through a specialized file_change path."
+    },
+    {
+      "event": "pre_write_hook",
+      "result": "fail",
+      "details": "A C# probe was created without a denial."
+    },
+    {
+      "event": "post_write_hook",
+      "result": "fail",
+      "details": "An invalid Calor probe produced no lint feedback."
+    }
+  ],
+  "verification": {
+    "build": { "result": "pass", "warnings": 0, "errors": 0 },
+    "held_out_tests": { "result": "pass", "passed": 24, "failed": 0 }
+  },
+  "verdict": "runtime_hooks_not_intercepted; option1_repository_backstop"
+}

@@ -40,6 +40,105 @@ public class CodexInitializerMcpTests : IDisposable
     }
 
     [Fact]
+    public async Task Initialize_CreatesCodexNativeHooks()
+    {
+        var initializer = new CodexInitializer();
+        var result = await initializer.InitializeAsync(_testDir, force: false);
+
+        var hooksPath = Path.Combine(_testDir, ".codex", "hooks.json");
+        Assert.True(File.Exists(hooksPath));
+        Assert.Contains(hooksPath, result.CreatedFiles);
+
+        var content = await File.ReadAllTextAsync(hooksPath);
+        using var document = System.Text.Json.JsonDocument.Parse(content);
+        Assert.Contains("\"PreToolUse\"", content);
+        Assert.Contains("\"PostToolUse\"", content);
+        Assert.Contains("calor hook codex-write --phase pre", content);
+        Assert.Contains("calor hook codex-write --phase post", content);
+        Assert.Contains("apply_patch|Edit|Write", content);
+        Assert.Contains("\"commandWindows\": \"calor hook codex-write --phase pre\"", content);
+    }
+
+    [Fact]
+    public async Task Initialize_MergesExistingCodexHooks()
+    {
+        var hooksPath = Path.Combine(_testDir, ".codex", "hooks.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(hooksPath)!);
+        await File.WriteAllTextAsync(hooksPath, "{\"hooks\":{\"Stop\":[]}}");
+
+        var initializer = new CodexInitializer();
+        await initializer.InitializeAsync(_testDir, force: false);
+
+        var content = await File.ReadAllTextAsync(hooksPath);
+        Assert.Contains("\"Stop\"", content);
+        Assert.Contains("calor hook codex-write --phase pre", content);
+        Assert.Contains("calor hook codex-write --phase post", content);
+    }
+
+    [Fact]
+    public async Task Initialize_DoesNotTreatUnrelatedCommandTextAsInstalledHook()
+    {
+        var hooksPath = Path.Combine(_testDir, ".codex", "hooks.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(hooksPath)!);
+        await File.WriteAllTextAsync(hooksPath, "{\"description\":\"calor hook codex-write --phase pre\",\"hooks\":{}}");
+
+        var result = await new CodexInitializer().InitializeAsync(_testDir, force: false);
+        var content = await File.ReadAllTextAsync(hooksPath);
+
+        Assert.Contains(hooksPath, result.UpdatedFiles);
+        Assert.Contains("\"PreToolUse\"", content);
+        Assert.Contains("\"PostToolUse\"", content);
+    }
+
+    [Fact]
+    public async Task Initialize_DoesNotTreatCommandUnderWrongMatcherAsInstalledHook()
+    {
+        var hooksPath = Path.Combine(_testDir, ".codex", "hooks.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(hooksPath)!);
+        await File.WriteAllTextAsync(hooksPath, """
+            {"hooks":{"PreToolUse":[{"matcher":"^Bash$","hooks":[{"type":"command","command":"calor hook codex-write --phase pre"}]}]}}
+            """);
+
+        var result = await new CodexInitializer().InitializeAsync(_testDir, force: false);
+        var content = await File.ReadAllTextAsync(hooksPath);
+
+        Assert.Contains(hooksPath, result.UpdatedFiles);
+        Assert.Contains("^Bash$", content);
+        Assert.Contains("apply_patch|Edit|Write", content);
+        Assert.Equal(3, content.Split("calor hook codex-write --phase pre").Length - 1);
+    }
+
+    [Fact]
+    public async Task Initialize_TreatsWindowsCommandAsInstalledHook()
+    {
+        var hooksPath = Path.Combine(_testDir, ".codex", "hooks.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(hooksPath)!);
+        await File.WriteAllTextAsync(hooksPath, """
+            {"hooks":{"PreToolUse":[{"matcher":"^(apply_patch|Edit|Write)$","hooks":[{"type":"command","commandWindows":"calor hook codex-write --phase pre"}]}]}}
+            """);
+
+        var result = await new CodexInitializer().InitializeAsync(_testDir, force: false);
+        var content = await File.ReadAllTextAsync(hooksPath);
+
+        Assert.Contains(hooksPath, result.UpdatedFiles);
+        Assert.Equal(1, content.Split("calor hook codex-write --phase pre").Length - 1);
+    }
+
+    [Fact]
+    public async Task Initialize_InvalidHooksJson_IsPreservedAndReported()
+    {
+        var hooksPath = Path.Combine(_testDir, ".codex", "hooks.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(hooksPath)!);
+        await File.WriteAllTextAsync(hooksPath, "not-json");
+
+        var result = await new CodexInitializer().InitializeAsync(_testDir, force: false);
+
+        Assert.Equal("not-json", await File.ReadAllTextAsync(hooksPath));
+        Assert.Contains(result.Warnings, warning => warning.Contains("not a valid JSON object"));
+        Assert.DoesNotContain(result.Messages, message => message.Contains("lifecycle hooks configured"));
+    }
+
+    [Fact]
     public async Task Initialize_ConfigToml_HasSectionMarkers()
     {
         var initializer = new CodexInitializer();

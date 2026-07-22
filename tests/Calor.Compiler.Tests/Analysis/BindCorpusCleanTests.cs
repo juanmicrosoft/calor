@@ -53,6 +53,9 @@ public class BindCorpusCleanTests
             DiagnosticCode.BindCannotInferNullLiteral,
             DiagnosticCode.BindCannotInferGenericReturn,
             DiagnosticCode.BindAmbiguousNumeric,
+            DiagnosticCode.BindArrayToConcreteCollection,
+            DiagnosticCode.BindShadowsEnclosingScope,
+            DiagnosticCode.BindRebindTypeMismatch,
         };
 
         var failures = new List<string>();

@@ -153,6 +153,9 @@
     <EmbeddedResource Include="Manifests\*.calor-effects.json">
       <LogicalName>Calor.Compiler.Manifests.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Resources\agent-syntax-exemplar.md">
+      <LogicalName>Calor.Compiler.Resources.agent-syntax-exemplar.md</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="Resources\calor-syntax-documentation.json">
       <LogicalName>Calor.Compiler.Resources.calor-syntax-documentation.json</LogicalName>
     </EmbeddedResource>
