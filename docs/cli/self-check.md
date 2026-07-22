@@ -47,6 +47,9 @@ Findings use the `Calor1320`–`Calor1328` band (see
 | Required files/sections are present and readable | `Calor1326` |
 | Every implemented `Calor13xx` code is listed in `docs/cli/structured-output.md`'s table | `Calor1327` |
 | Every complete-program example still parses (see below) | `Calor1328` |
+| A generated mirror doc (AGENTS.md) matches its single source (CLAUDE.md) | `Calor1329` |
+| Every complete `§M` program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) | `Calor1330` |
+| The exemplar never binds an array-returning BCL call to a generic collection type (the E1a trap) | `Calor1331` |
 
 ## Parse-checked examples
 
@@ -55,6 +58,19 @@ Fenced code blocks tagged `calor` whose **first non-blank line starts with
 with the real compiler on every run — if the syntax rots, the check fails
 with `Calor1328` at the offending doc line. Blocks that do not start with
 `§M` are treated as deliberate fragments and are skipped.
+
+## Deep-checked exemplar
+
+The agent syntax exemplar
+(`src/Calor.Compiler/Resources/agent-syntax-exemplar.md`, served to agents as
+`calor://primer`) gets a stronger check than parse-only: every complete `§M`
+program in it is emitted to C# and the **generated C# is compiled with Roslyn's
+full semantic model** (`Calor1330`). That is the only layer that catches type
+errors — e.g. binding `File.ReadAllLines` (an array) to `List<str>`, which Calor
+emits but the C# compiler rejects (`CS0029`). The copyable fragment reference
+lines cannot be compiled standalone (they intermix prose and free identifiers),
+so that one recurring trap is additionally caught by a lint (`Calor1331`):
+array-returning BCL calls must bind to the array form `[T]`.
 
 ## Meta-notation policy
 

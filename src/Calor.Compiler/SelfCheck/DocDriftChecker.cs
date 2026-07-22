@@ -74,6 +74,14 @@ public sealed class DocDriftInputs
     /// two agent manuals silently diverging (#708).
     /// </summary>
     public IReadOnlyList<MirrorDoc> MirrorDocs { get; init; } = [];
+
+    /// <summary>
+    /// The agent syntax exemplar. Its complete §M programs are compiled all the
+    /// way to C# (Roslyn-semantic-checked, not just parsed) and its copyable
+    /// fragment lines are linted for the array-vs-collection trap (#712). See
+    /// <see cref="ExemplarCompileChecker"/>.
+    /// </summary>
+    public DocFile? ExemplarDoc { get; init; }
 }
 
 /// <summary>
@@ -167,6 +175,11 @@ public static class DocDriftChecker
             CheckMirror(mirror, diagnostics);
         }
 
+        if (inputs.ExemplarDoc is { } exemplar)
+        {
+            diagnostics.AddRange(ExemplarCompileChecker.Check(exemplar));
+        }
+
         return diagnostics;
     }
 
@@ -236,12 +249,18 @@ public static class DocDriftChecker
             DocumentedEffectCodes = Effects.EffectCodes.DocumentedCompactCodes,
             KeywordDocs = scannedDocs,
             DiagnosticCodeDocs = scannedDocs,
-            ParseExampleDocs = scannedDocs,
+            // The exemplar is excluded from the parse-only example check (Calor1328)
+            // because ExemplarCompileChecker gives it a strictly stronger compile
+            // check (Calor1330) whose stage 1 already reports any parse failure —
+            // leaving it here would double-report the same defect under two codes.
+            ParseExampleDocs = scannedDocs
+                .Where(d => d.Path != ExemplarCompileChecker.RelativePath).ToList(),
             EffectsReferenceDoc = effectsDoc,
             EffectDocsForwardOnly = NonNull(syntaxIndex),
             CliCodesDoc = cliCodesDoc,
             VersionScanDocs = NonNull(claudeMd).Concat(versionDocs).ToList(),
             MirrorDocs = mirrorDocs,
+            ExemplarDoc = exemplarDoc,
         };
     }
 
