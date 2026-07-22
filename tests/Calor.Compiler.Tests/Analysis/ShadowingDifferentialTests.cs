@@ -97,6 +97,17 @@ public class ShadowingDifferentialTests
             "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
             "    §EACH{e1:x} arr\n      §B{~x:str} \"y\"\n    §R 0\n" },
+        // Same defect via §ASSIGN rather than §B (#743 review): a write to a §EACH
+        // iteration variable is CS1656 whichever assignment form spells it (Calor0257).
+        new object[] { "foreach-var-assign",
+            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §EACH{e1:x} arr\n      §ASSIGN x \"y\"\n    §R 0\n" },
+        // Construct-variable-shaped row (#743 review finding 4): the LOOP variable is
+        // the shadower — `int x = 0;` then `for (var x = …)` is CS0136 (Calor0255).
+        new object[] { "loop-var-shadows-enclosing",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x} 0\n" +
+            "    §L{l1:x:0:3:1}\n      §ASSIGN x (+ x 1)\n    §R x\n" },
     };
 
     [Theory]

@@ -246,24 +246,40 @@ public sealed class BindValidationPass
     // #738). §L for-loop variables are reassignable and are NOT tracked here.
     private readonly HashSet<string> _foreachIterationVars = new(StringComparer.Ordinal);
 
-    // Walks a nested block whose scope is pre-seeded with iteration variables (the
-    // §L / §EACH / §EACHKV loop variables), so an inner §B reusing an iteration
-    // variable's name is caught (CS0136) — the loop variable lives in a scope
-    // enclosing the body, exactly as in C#. When <paramref name="isForeach"/> is set,
-    // the variables are foreach iteration variables (read-only), tracked so a mutable
-    // rebind of one is rejected (Calor0257).
-    private void CheckLoopBlock(IReadOnlyList<StatementNode> body, bool isForeach, params string?[] loopVars)
+    // Walks a nested loop body whose scope is pre-seeded with the loop's variables,
+    // so an inner §B reusing a loop variable's name is caught (CS0136) — the loop
+    // variable lives in a scope enclosing the body, exactly as in C#.
+    //
+    // <paramref name="readOnlyVars"/> are foreach iteration variables that are NOT
+    // assignable in C# — a §EACH item variable (`foreach (T x in …)`) and a §EACHKV
+    // key/value (`foreach (var (k, v) in …)`). They are tracked so a rebind of one is
+    // rejected (Calor0257). <paramref name="scopeVars"/> are reassignable loop-scoped
+    // locals — a §L for-loop variable (`for (int i = …)`) and a §EACH index variable
+    // (emitted as `var i = -1; … i++;`); they are seeded into scope for shadowing but
+    // NOT read-only, so rebinding them stays a legal `x = …`.
+    private void CheckLoopBlock(
+        Parsing.TextSpan loopSpan,
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyList<string?> readOnlyVars,
+        IReadOnlyList<string?> scopeVars)
     {
         var loopScope = new Dictionary<string, string>(StringComparer.Ordinal);
         var trackedIterVars = new List<string>();
-        foreach (var name in loopVars)
+        foreach (var name in readOnlyVars)
         {
             if (string.IsNullOrEmpty(name)) continue;
+            CheckLoopVarShadows(name, loopSpan);
             loopScope[name] = ""; // type irrelevant to shadowing
-            if (isForeach && _foreachIterationVars.Add(name))
+            if (_foreachIterationVars.Add(name))
             {
                 trackedIterVars.Add(name); // only remove the ones this frame added (nested same-name safe)
             }
+        }
+        foreach (var name in scopeVars)
+        {
+            if (string.IsNullOrEmpty(name)) continue;
+            CheckLoopVarShadows(name, loopSpan);
+            loopScope[name] = "";
         }
 
         _scopes.Add(loopScope);
@@ -271,6 +287,23 @@ public sealed class BindValidationPass
         _scopes.RemoveAt(_scopes.Count - 1);
         foreach (var name in trackedIterVars) _foreachIterationVars.Remove(name);
     }
+
+    // A loop variable (§L for-var, §EACH item/index, §EACHKV key/value) that reuses the
+    // name of a local/parameter/loop-variable already in scope is CS0136 in C# — e.g.
+    // `int x = 0;` then `for (var x = …)`. Same rule and diagnostic (Calor0255) as an
+    // inner §B shadowing declaration; a loop var may still legally shadow a field.
+    private void CheckLoopVarShadows(string name, Parsing.TextSpan span)
+    {
+        if (IsDeclaredInAnyLiveScope(name))
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.BindShadowsEnclosingScope,
+                $"Loop variable '{name}' has the same name as a variable already in scope. " +
+                "C# forbids a loop variable from shadowing an enclosing local or parameter " +
+                $"(CS0136) — the generated code would not compile. Rename the loop variable (e.g. '{name}2').");
+        }
+    }
+
+    private static readonly string?[] NoLoopVars = System.Array.Empty<string?>();
 
     /// <summary>True if <paramref name="name"/> is already a local, parameter, or
     /// loop variable in an <em>enclosing</em> scope (strictly above the current one)
@@ -362,9 +395,25 @@ public sealed class BindValidationPass
                 break;
 
             case AssignmentStatementNode assign:
-                if (assign.Target is ReferenceNode target && TryLookupLocal(target.Name, out var targetType))
-                    CheckArrayToCollection(
-                        assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+                if (assign.Target is ReferenceNode target)
+                {
+                    if (_foreachIterationVars.Contains(target.Name))
+                    {
+                        // Calor0257 — §ASSIGN to a §EACH/§EACHKV iteration variable. The
+                        // emitter emits `x = value` inside the foreach, which is CS1656
+                        // (cannot assign to an iteration variable). Same defect as a §B
+                        // rebind, spelled with the other assignment form.
+                        _diagnostics.ReportError(assign.Span, DiagnosticCode.BindReassignsIterationVariable,
+                            $"'{target.Name}' is a foreach iteration variable, which is read-only " +
+                            "in C# — assigning to it would not compile (CS1656). Copy the value " +
+                            "into a new variable instead.");
+                    }
+                    else if (TryLookupLocal(target.Name, out var targetType))
+                    {
+                        CheckArrayToCollection(
+                            assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+                    }
+                }
                 ScanExpressionForCalls(assign.Value);
                 break;
 
@@ -394,18 +443,29 @@ public sealed class BindValidationPass
                 break;
 
             case ForStatementNode forStmt:
-                // §L for-loop variables ARE reassignable, so not iteration variables.
-                CheckLoopBlock(forStmt.Body, isForeach: false, forStmt.VariableName);
+                // §L for-loop variables ARE reassignable, so not read-only iteration vars.
+                CheckLoopBlock(forStmt.Span, forStmt.Body, NoLoopVars, new[] { forStmt.VariableName });
                 break;
 
             case ForeachStatementNode forEach:
                 ScanExpressionForCalls(forEach.Collection);
-                CheckLoopBlock(forEach.Body, isForeach: true, forEach.VariableName, forEach.IndexVariableName);
+                // The item variable is a read-only foreach variable; the optional index
+                // variable is emitted as a plain reassignable local (`var i = -1; … i++`).
+                CheckLoopBlock(
+                    forEach.Span,
+                    forEach.Body,
+                    new[] { forEach.VariableName },
+                    new[] { forEach.IndexVariableName });
                 break;
 
             case DictionaryForeachNode dictForEach:
                 ScanExpressionForCalls(dictForEach.Dictionary);
-                CheckLoopBlock(dictForEach.Body, isForeach: true, dictForEach.KeyName, dictForEach.ValueName);
+                // §EACHKV emits `foreach (var (k, v) in …)`: both are read-only.
+                CheckLoopBlock(
+                    dictForEach.Span,
+                    dictForEach.Body,
+                    new[] { dictForEach.KeyName, dictForEach.ValueName },
+                    NoLoopVars);
                 break;
 
             case WhileStatementNode whileStmt:
