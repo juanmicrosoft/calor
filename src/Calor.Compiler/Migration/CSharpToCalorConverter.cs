@@ -246,6 +246,31 @@ public sealed class CSharpToCalorConverter
                     calorAst = rewrapped;
                     calorSource = new CalorEmitter(context).Emit(calorAst);
                 }
+
+                // Re-validate the (possibly rewrapped) output. If it still does not
+                // parse — nothing was rewrappable, a member could not be recovered, or
+                // the rewrap itself was insufficient — never ship it silently. Warn
+                // always, and fail under passthroughOnError, whose contract is exactly
+                // "never hand me broken output".
+                if (!ParsesCleanly(calorSource))
+                {
+                    context.AddWarning(
+                        "Emitted Calor does not parse and could not be fully preserved as " +
+                        "§CSHARP interop blocks; the output may be invalid.",
+                        feature: "post-validation-fallback");
+
+                    if (_options.PassthroughOnError)
+                    {
+                        return new ConversionResult
+                        {
+                            Success = false,
+                            CalorSource = calorSource,
+                            Ast = calorAst,
+                            Context = context,
+                            Duration = DateTime.UtcNow - startTime
+                        };
+                    }
+                }
             }
 
             if (_options.Verbose)
@@ -471,13 +496,19 @@ public sealed class CSharpToCalorConverter
             featureName: "post-validation-fallback",
             reason: $"Converted Calor for '{memberName}' did not parse; original C# preserved (#717).");
 
+    private sealed record TypeSource(bool IsPartial, string Text);
+
     /// <summary>
     /// Collects top-level (compilation-unit or namespace level) type declarations from the
-    /// C# tree, keyed by "kind/name". Partial types with the same name are concatenated.
+    /// C# tree, keyed by "kind/name" — the resolution the Calor side can address, since the
+    /// module flattens namespaces so a Calor member carries only its bare name. The value is
+    /// the list of C# declarations with that key: usually one, several when the type is
+    /// <c>partial</c>, or — the ambiguous case — several distinct types of the same name in
+    /// different namespaces. <see cref="TryTakeSource"/> decides what is safely recoverable.
     /// </summary>
-    private static Dictionary<string, string> CollectTopLevelTypeSources(CompilationUnitSyntax root)
+    private static Dictionary<string, List<TypeSource>> CollectTopLevelTypeSources(CompilationUnitSyntax root)
     {
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        var map = new Dictionary<string, List<TypeSource>>(StringComparer.Ordinal);
         foreach (var member in root.DescendantNodes()
                      .OfType<MemberDeclarationSyntax>()
                      .Where(m => m.Parent is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax))
@@ -498,17 +529,64 @@ public sealed class CSharpToCalorConverter
                 continue;
             }
 
+            var isPartial = member.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
             var key = $"{kind}/{name}";
-            var text = member.ToString(); // no leading trivia — the §CSHARP wrapper stands alone
-            map[key] = map.TryGetValue(key, out var existing) ? existing + "\n\n" + text : text;
+            (map.TryGetValue(key, out var list) ? list : map[key] = new List<TypeSource>())
+                .Add(new TypeSource(isPartial, DeclarationSourceText(member)));
         }
 
         return map;
     }
 
+    /// <summary>
+    /// The declaration's source text with its doc-comment trivia preserved (so §CSHARP
+    /// fallbacks keep the docs — agents lose docs exactly on the members that most needed
+    /// them). Uses ToString() (not ToFullString()) for the body so leading namespace
+    /// indentation does not bleed in, then prepends only the XML doc trivia.
+    /// </summary>
+    private static string DeclarationSourceText(MemberDeclarationSyntax member)
+    {
+        var docs = string.Concat(member.GetLeadingTrivia()
+            .Where(t => t.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                     || t.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+            .Select(t => t.ToFullString()));
+        return docs + member.ToString();
+    }
+
+    /// <summary>
+    /// Recovers the original C# for a top-level member the Calor emitter could not render.
+    /// Safe cases: exactly one declaration with that kind/name, or several that are all
+    /// <c>partial</c> (one merged type — concatenate). The ambiguous case — two or more
+    /// distinct same-named types in different namespaces — is refused (returns false) rather
+    /// than risk dragging a healthy type into another's interop block. Entries are removed on
+    /// take so a second same-named failure cannot reuse them.
+    /// </summary>
     private static bool TryTakeSource(
-        Dictionary<string, string> sources, string kind, string name, out string csharp)
-        => sources.TryGetValue($"{kind}/{name}", out csharp!);
+        Dictionary<string, List<TypeSource>> sources, string kind, string name, out string csharp)
+    {
+        csharp = "";
+        var key = $"{kind}/{name}";
+        if (!sources.TryGetValue(key, out var list) || list.Count == 0)
+        {
+            return false;
+        }
+
+        if (list.Count == 1)
+        {
+            csharp = list[0].Text;
+        }
+        else if (list.All(s => s.IsPartial))
+        {
+            csharp = string.Join("\n\n", list.Select(s => s.Text));
+        }
+        else
+        {
+            return false; // ambiguous cross-namespace collision — not safely recoverable
+        }
+
+        sources.Remove(key);
+        return true;
+    }
 
     private ConversionContext CreateContext(string? sourceFile)
     {
