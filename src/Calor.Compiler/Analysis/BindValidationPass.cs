@@ -65,13 +65,6 @@ public sealed class BindValidationPass
     // are still a §ASSIGN type-lookup fallback.
     private IReadOnlyDictionary<string, string>? _fieldTypes;
 
-    // Names already §B-declared anywhere in the current function body — a flat set
-    // mirroring CSharpEmitter._declaredVariablesInCurrentScope. It is what decides
-    // whether a mutable §B is a REASSIGNMENT (emitter emits `x = …`, valid) versus a
-    // new declaration (emitter emits `T x = …`, which is CS0136 if it shadows). Only
-    // genuine new declarations can trip Calor0255. Cleared per body.
-    private readonly HashSet<string> _declaredInFunction = new(StringComparer.Ordinal);
-
     // Declared return type of the function-like body currently being walked, so the
     // check can validate §R. Null for bodies with no value return (ctors, setters).
     private string? _currentReturnType;
@@ -226,7 +219,6 @@ public sealed class BindValidationPass
 
         _scopes.Add(paramScope);
         _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
-        _declaredInFunction.Clear();
         foreach (var stmt in body)
         {
             CheckStatement(stmt);
@@ -275,6 +267,25 @@ public sealed class BindValidationPass
     private bool IsShadowingEnclosingScope(string name)
     {
         for (var i = 0; i < _scopes.Count - 1; i++)
+        {
+            if (_scopes[i].ContainsKey(name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>True if <paramref name="name"/> is a local declared in any live scope —
+    /// the current block or an enclosing one. Mirrors the (scope-aware, #732) emitter's
+    /// rule for classifying a mutable §B rebind: it is a reassignment (<c>x = …</c>) only
+    /// when the name is still visible, and otherwise a new declaration (<c>var x = …</c>)
+    /// — so a rebind in a now-closed sibling block re-declares rather than reassigning an
+    /// out-of-scope local (CS0103).</summary>
+    private bool IsDeclaredInAnyLiveScope(string name)
+    {
+        for (var i = 0; i < _scopes.Count; i++)
         {
             if (_scopes[i].ContainsKey(name))
             {
@@ -420,10 +431,12 @@ public sealed class BindValidationPass
             return;
         }
 
-        // A mutable §B whose name is already declared in this function is a
-        // reassignment (the emitter emits `x = …`), not a new local — so it neither
-        // shadows nor gets a fresh scope entry. Everything else is a new declaration.
-        var isReassignment = bind.IsMutable && _declaredInFunction.Contains(bind.Name);
+        // A mutable §B whose name is visible in a live scope is a reassignment (the
+        // scope-aware emitter emits `x = …`), not a new local — so it neither shadows
+        // nor gets a fresh scope entry. A mutable rebind whose earlier declaration lives
+        // in a now-closed sibling block is NOT visible, so it is a new declaration, just
+        // like the emitter now emits (#732). Everything else is a new declaration too.
+        var isReassignment = bind.IsMutable && IsDeclaredInAnyLiveScope(bind.Name);
         if (!isReassignment)
         {
             // Calor0255 — a new local that reuses a local/parameter/loop-variable
@@ -437,7 +450,6 @@ public sealed class BindValidationPass
                     $"code would not compile — rename this binding (e.g. '{bind.Name}2').");
             }
 
-            _declaredInFunction.Add(bind.Name);
             // Track the name (with its declared type, or empty when untyped) so later
             // §ASSIGN can be type-checked and nested §B can detect shadowing of it.
             DeclareLocal(bind.Name, bind.TypeName ?? "");
