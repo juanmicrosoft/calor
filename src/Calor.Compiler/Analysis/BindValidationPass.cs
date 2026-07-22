@@ -240,21 +240,36 @@ public sealed class BindValidationPass
 
     private void DeclareLocal(string name, string type) => _scopes[^1][name] = type;
 
+    // Names of §EACH/§EACHKV iteration variables currently in scope. Foreach iteration
+    // variables are read-only in C#, so a mutable §B rebinding one is neither a valid
+    // reassignment (CS1656) nor a re-declaration (CS0136) — it is rejected (Calor0257,
+    // #738). §L for-loop variables are reassignable and are NOT tracked here.
+    private readonly HashSet<string> _foreachIterationVars = new(StringComparer.Ordinal);
+
     // Walks a nested block whose scope is pre-seeded with iteration variables (the
     // §L / §EACH / §EACHKV loop variables), so an inner §B reusing an iteration
     // variable's name is caught (CS0136) — the loop variable lives in a scope
-    // enclosing the body, exactly as in C#.
-    private void CheckLoopBlock(IReadOnlyList<StatementNode> body, params string?[] loopVars)
+    // enclosing the body, exactly as in C#. When <paramref name="isForeach"/> is set,
+    // the variables are foreach iteration variables (read-only), tracked so a mutable
+    // rebind of one is rejected (Calor0257).
+    private void CheckLoopBlock(IReadOnlyList<StatementNode> body, bool isForeach, params string?[] loopVars)
     {
         var loopScope = new Dictionary<string, string>(StringComparer.Ordinal);
+        var trackedIterVars = new List<string>();
         foreach (var name in loopVars)
         {
-            if (!string.IsNullOrEmpty(name)) loopScope[name] = ""; // type irrelevant to shadowing
+            if (string.IsNullOrEmpty(name)) continue;
+            loopScope[name] = ""; // type irrelevant to shadowing
+            if (isForeach && _foreachIterationVars.Add(name))
+            {
+                trackedIterVars.Add(name); // only remove the ones this frame added (nested same-name safe)
+            }
         }
 
         _scopes.Add(loopScope);
         CheckBlock(body);
         _scopes.RemoveAt(_scopes.Count - 1);
+        foreach (var name in trackedIterVars) _foreachIterationVars.Remove(name);
     }
 
     /// <summary>True if <paramref name="name"/> is already a local, parameter, or
@@ -379,12 +394,18 @@ public sealed class BindValidationPass
                 break;
 
             case ForStatementNode forStmt:
-                CheckLoopBlock(forStmt.Body, forStmt.VariableName);
+                // §L for-loop variables ARE reassignable, so not iteration variables.
+                CheckLoopBlock(forStmt.Body, isForeach: false, forStmt.VariableName);
                 break;
 
             case ForeachStatementNode forEach:
                 ScanExpressionForCalls(forEach.Collection);
-                CheckLoopBlock(forEach.Body, forEach.VariableName, forEach.IndexVariableName);
+                CheckLoopBlock(forEach.Body, isForeach: true, forEach.VariableName, forEach.IndexVariableName);
+                break;
+
+            case DictionaryForeachNode dictForEach:
+                ScanExpressionForCalls(dictForEach.Dictionary);
+                CheckLoopBlock(dictForEach.Body, isForeach: true, dictForEach.KeyName, dictForEach.ValueName);
                 break;
 
             case WhileStatementNode whileStmt:
@@ -450,7 +471,18 @@ public sealed class BindValidationPass
         // in a now-closed sibling block is NOT visible, so it is a new declaration, just
         // like the emitter now emits (#732). Everything else is a new declaration too.
         var isReassignment = bind.IsMutable && IsDeclaredInAnyLiveScope(bind.Name);
-        if (isReassignment)
+        if (isReassignment && _foreachIterationVars.Contains(bind.Name))
+        {
+            // Calor0257 — the reassignment target is a §EACH/§EACHKV iteration variable,
+            // which is read-only in C#. There is no valid emission (CS1656 as a
+            // reassignment, CS0136 as a re-declaration), so reject it outright — this
+            // supersedes the type-mismatch check below.
+            _diagnostics.ReportError(bind.Span, DiagnosticCode.BindReassignsIterationVariable,
+                $"Binding '{bind.Name}' rebinds a foreach iteration variable, which is read-only " +
+                "in C# — the generated code would not compile (CS1656). Rename this binding " +
+                $"(e.g. '{bind.Name}2'), or copy the value into a new variable.");
+        }
+        else if (isReassignment)
         {
             // Calor0256 — a mutable rebind whose type contradicts the variable's
             // declaration. The variable's type is fixed at first declaration; the emitter
