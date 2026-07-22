@@ -55,6 +55,7 @@ public class BindCorpusCleanTests
             DiagnosticCode.BindAmbiguousNumeric,
             DiagnosticCode.BindArrayToConcreteCollection,
             DiagnosticCode.BindShadowsEnclosingScope,
+            DiagnosticCode.BindRebindTypeMismatch,
         };
 
         var failures = new List<string>();

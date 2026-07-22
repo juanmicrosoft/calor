@@ -296,6 +296,19 @@ public sealed class BindValidationPass
         return false;
     }
 
+    /// <summary>The expanded type of a literal initializer, or null if the initializer is
+    /// null or not a statically-typed literal (a non-literal value needs full type
+    /// inference — #740). Used to catch an unannotated mutable rebind of a mismatched
+    /// literal, e.g. <c>§B{~x:i32} 0</c> then <c>§B{~x} "hi"</c>.</summary>
+    private static string? LiteralTypeOrNull(ExpressionNode? initializer) => initializer switch
+    {
+        IntLiteralNode => "INT",
+        StringLiteralNode => "STRING",
+        BoolLiteralNode => "BOOL",
+        FloatLiteralNode or DecimalLiteralNode => "FLOAT",
+        _ => null,
+    };
+
     private bool TryLookupLocal(string name, out string type)
     {
         for (var i = _scopes.Count - 1; i >= 0; i--)
@@ -437,7 +450,43 @@ public sealed class BindValidationPass
         // in a now-closed sibling block is NOT visible, so it is a new declaration, just
         // like the emitter now emits (#732). Everything else is a new declaration too.
         var isReassignment = bind.IsMutable && IsDeclaredInAnyLiveScope(bind.Name);
-        if (!isReassignment)
+        if (isReassignment)
+        {
+            // Calor0256 — a mutable rebind whose type contradicts the variable's
+            // declaration. The variable's type is fixed at first declaration; the emitter
+            // emits `x = value` against that type, so a mismatched value fails to compile
+            // (CS0029/CS0266). The rebind's type is the explicit annotation when present,
+            // otherwise the statically-known type of a LITERAL initializer (the common
+            // unannotated case; a non-literal unannotated value needs full inference, #740).
+            // Both sides are canonicalized through ExpandType before comparing (§B
+            // annotations are pre-expanded, "INT"; parameter/loop-variable types are raw,
+            // "i32"). An unannotated original ("") has no known type, so it is skipped.
+            var rebindType = bind.TypeName != null
+                ? Parsing.AttributeHelper.ExpandType(bind.TypeName.Trim())
+                : LiteralTypeOrNull(bind.Initializer);
+
+            // TryLookupLocal's field fallback is unreachable here: this branch runs only
+            // when isReassignment, which already requires the name in a live LOCAL scope,
+            // so declaredType is the variable's local/parameter type, never a field's.
+            if (rebindType != null &&
+                TryLookupLocal(bind.Name, out var declaredType) &&
+                !string.IsNullOrEmpty(declaredType) &&
+                !string.Equals(
+                    Parsing.AttributeHelper.ExpandType(declaredType.Trim()),
+                    rebindType, StringComparison.Ordinal))
+            {
+                // Surface-spell both sides so the message never teaches an internal
+                // spelling the user can't write (i32/str, not INT/STRING).
+                var declaredSurface = Parsing.AttributeHelper.ToSurfaceSpelling(declaredType.Trim());
+                var rebindSurface = Parsing.AttributeHelper.ToSurfaceSpelling(rebindType);
+                _diagnostics.ReportError(bind.Span, DiagnosticCode.BindRebindTypeMismatch,
+                    $"Mutable binding '{bind.Name}' was declared '{declaredSurface}' but is rebound " +
+                    $"as '{rebindSurface}'. A mutable rebind is a reassignment; its type is fixed at the " +
+                    "first declaration, so the emitted C# would fail to compile (CS0029/CS0266). " +
+                    "Keep the original type, or use a differently-named binding.");
+            }
+        }
+        else
         {
             // Calor0255 — a new local that reuses a local/parameter/loop-variable
             // name in an enclosing scope is CS0136 in the emitted C#. Fields are

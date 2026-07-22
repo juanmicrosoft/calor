@@ -87,6 +87,10 @@ public class ShadowingDifferentialTests
         new object[] { "array-to-list",
             "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
             "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n    §R (len lines)\n" },
+        // Type-changing mutable rebind (#733): rejected with Calor0256 instead of
+        // emitting `int x = 0; x = "hi";` (CS0029).
+        new object[] { "type-changing-mutable-rebind",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n" },
     };
 
     [Theory]
@@ -103,6 +107,23 @@ public class ShadowingDifferentialTests
 
     // #732 (sibling mutable rebind → CS0103) is FIXED: the emitter is now scope-aware,
     // so that case moved to CleanWhenAccepted above ("sibling-mutable-rebind").
+    // #733 (type-changing rebind → CS0029) is FIXED for annotated and literal rebinds
+    // (Calor0256); the non-literal unannotated lane below is the remaining gap (#740).
+
+    [Fact]
+    public void KnownGap_UnannotatedNonLiteralRebind_EmitsCS0029() // #740
+    {
+        // An unannotated mutable rebind of a NON-literal mismatched value: the pass
+        // can't infer the value's type yet, so it accepts it, but Roslyn rejects the
+        // resulting `x = File.ReadAllText(p);` (string → int). Literal values are already
+        // caught by Calor0256; this needs value-type inference (#740).
+        var (accepted, roslynErrors) = Compile(
+            "§M{m:S}\n  §F{f:Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
+            "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n");
+
+        Assert.True(accepted);
+        Assert.Contains(roslynErrors, e => e.StartsWith("CS0029", StringComparison.Ordinal));
+    }
 
     [Fact]
     public void KnownGap_ForeachVariableRebind_EmitsCS1656() // #738
@@ -119,15 +140,8 @@ public class ShadowingDifferentialTests
         Assert.Contains(roslynErrors, e => e.StartsWith("CS1656", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void KnownGap_TypeChangingMutableRebind_EmitsCS0029() // #733
-    {
-        var (accepted, roslynErrors) = Compile(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n");
-
-        Assert.True(accepted);
-        Assert.Contains(roslynErrors, e => e.StartsWith("CS0029", StringComparison.Ordinal));
-    }
+    // #733 (type-changing mutable rebind → CS0029) is FIXED: calor -i now rejects it
+    // with Calor0256, so it moved to RejectedIdioms above ("type-changing-mutable-rebind").
 
     [Fact]
     public void KnownGap_SameScopeDuplicate_EmitsCS0128() // #731

@@ -184,6 +184,16 @@ public static class DiagnosticCode
     /// </summary>
     public const string BindShadowsEnclosingScope = "Calor0255";
 
+    /// <summary>
+    /// Error: a mutable <c>§B{~x:T2}</c> rebind re-annotates a variable declared with a
+    /// different type <c>T1</c> — e.g. <c>§B{~x:i32} 0</c> then <c>§B{~x:str} "hi"</c>.
+    /// A mutable rebind is a reassignment; the emitter emits <c>x = value</c> against the
+    /// original type <c>T1</c>, so a mismatched value fails to compile (CS0029/CS0266).
+    /// The variable's type is fixed at its first declaration — rename, or keep the type.
+    /// (#733)
+    /// </summary>
+    public const string BindRebindTypeMismatch = "Calor0256";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";
