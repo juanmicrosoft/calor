@@ -163,6 +163,16 @@ public static class DiagnosticCode
     /// </summary>
     public const string BindAmbiguousNumeric = "Calor0253";
 
+    /// <summary>
+    /// Error: <c>§B{name:List&lt;T&gt;} …</c> whose initializer is an array
+    /// (<c>[T]</c>) — e.g. <c>§B{lines:List&lt;str&gt;} §C{File.ReadAllLines}</c>.
+    /// An array is not implicitly convertible to a concrete generic collection in
+    /// C# (CS0029), so the emitted code would fail <c>dotnet build</c>. The fix is
+    /// the array form <c>[T]</c>, or an explicit wrap. This is the E1a trap caught
+    /// at the language level (#722; the docs-level guard is <see cref="DocDriftArrayBindingTrap"/>).
+    /// </summary>
+    public const string BindArrayToConcreteCollection = "Calor0254";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

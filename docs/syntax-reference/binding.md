@@ -193,6 +193,27 @@ adding the annotation always silences the diagnostic.
 §B{x:f64} (+ INT:0 FLOAT:0.0)      // silences Calor0253
 ```
 
+### Calor0254 — `BindArrayToConcreteCollection`
+
+Unlike the strict-inference trio above, this is an **always-on hard type
+error** (not gated by `--no-strict-bind-inference`) and fires *because of*
+an explicit type: a binding declared as a concrete generic collection
+(`List<T>`, `HashSet<T>`, `Queue<T>`, `Stack<T>`, …) whose initializer is an
+**array**. In C# an array satisfies the collection *interfaces*
+(`IList<T>`, `IEnumerable<T>`, …) but is not implicitly convertible to a
+concrete collection class, so the emitted code would fail with `CS0029`.
+This is the E1a array-vs-list trap caught at compile time.
+
+```
+§B{lines:List<str>} §C{File.ReadAllLines} §A path §/C   // Calor0254
+§B{lines:[str]} §C{File.ReadAllLines} §A path §/C        // ok — array form
+§B{lines:IEnumerable<str>} §C{File.ReadAllLines} §A path §/C  // ok — interface
+```
+
+The array is recognized when the initializer calls a known array-returning
+BCL method (`File.ReadAllLines`/`ReadAllBytes`, `Directory.GetFiles`/
+`GetDirectories`/`GetFileSystemEntries`) or a user function declared `-> [T]`.
+
 LSP quick-fixes that insert the recommended annotation are available
 in v0.6.3 and surface in any IDE talking to the Calor language server.
 Each diagnostic carries a `SuggestedFix` that inserts the default

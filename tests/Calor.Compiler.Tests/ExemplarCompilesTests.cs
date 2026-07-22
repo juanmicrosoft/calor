@@ -55,11 +55,11 @@ public class ExemplarCompilesTests
     [Fact]
     public void ReadAllLinesBoundToList_IsCaughtByTheCompilePipeline()
     {
-        // The E1a bug caught by the two-stage guard. Today Calor emits it happily
-        // and only the C# compiler rejects it (CS0029: string[] -> List<string>);
-        // when the binder learns to reject it (issue #722) `calorCaught` flips to
-        // true. Either layer catching it keeps the exemplar safe, so this asserts
-        // the disjunction rather than pinning the current (missing) binder behavior.
+        // The E1a bug. Since #722 the binder rejects it at the language level
+        // (Calor0254) so `calor -i` fails instead of emitting broken C#; the
+        // Roslyn layer remains as backstop for any array source the binder can't
+        // yet see. Asserting the disjunction keeps the test robust if either
+        // layer's coverage shifts, but today the Calor layer catches this case.
         const string calor =
             "§M{m:Files}\n" +
             "  §F{f:CountLines:pub} (str:path) -> i32\n" +
@@ -67,15 +67,31 @@ public class ExemplarCompilesTests
             "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
             "    §R (len lines)\n";
 
+        // #722: the binder now catches the binding-position case directly.
         var result = Program.Compile(calor, "mutation.calr");
-        var calorCaught = result.Diagnostics.HasErrors;
-        var roslynCaught = !calorCaught &&
-            ExemplarCompileChecker.RoslynErrors(result.GeneratedCode)
-                .Any(e => e.StartsWith("CS0029", StringComparison.Ordinal));
+        Assert.True(result.Diagnostics.HasErrors, "Calor should reject the array-to-List trap.");
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.BindArrayToConcreteCollection);
+    }
 
-        Assert.True(
-            calorCaught || roslynCaught,
-            "The array-to-List trap must be caught at the Calor or the C# layer.");
+    [Fact]
+    public void ReturnPositionArrayToList_IsCaughtByTheRoslynBackstop()
+    {
+        // The array-to-collection trap in RETURN position is not yet caught at the
+        // Calor level (#722 covers binding position; return/assign/argument are
+        // tracked as follow-up). This genuinely exercises the Roslyn backstop: the
+        // Calor compile succeeds, but the emitted C# — a List<str>-returning method
+        // that returns a string[] — fails Roslyn with CS0029.
+        const string calor =
+            "§M{m:Files}\n" +
+            "  §F{f:Get:pub} (str:path) -> List<str>\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{File.ReadAllLines} §A path §/C\n";
+
+        var result = Program.Compile(calor, "return-mutation.calr");
+        Assert.False(result.Diagnostics.HasErrors); // binder does not (yet) catch return position
+        var errors = ExemplarCompileChecker.RoslynErrors(result.GeneratedCode);
+        Assert.Contains(errors, e => e.StartsWith("CS0029", StringComparison.Ordinal));
     }
 
     [Fact]
