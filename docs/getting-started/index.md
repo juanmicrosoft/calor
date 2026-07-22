@@ -81,16 +81,19 @@ For Claude Code (with enforced Calor-first via hooks):
 calor init --ai claude
 ```
 
-For OpenAI Codex CLI (guidance-based):
+For OpenAI Codex CLI (project hooks and MCP):
 ```bash
 calor init --ai codex
 ```
 
-This adds Calor skills and project documentation that instruct the AI to:
+This adds project documentation and agent configuration that instruct the AI to:
 - Write all new code in Calor (not C#)
 - Analyze existing C# files before modifying them to determine if they should be converted to Calor first
 
-**Note:** Claude Code enforces Calor-first via hooks (blocks `.cs` creation). Codex CLI is guidance-based only.
+**Note:** Both Claude Code and Codex configure Calor-first hooks. In Codex,
+review and trust the generated project hooks with `/hooks` before use, then
+confirm coverage with the Codex smoke test because specialized file-change
+paths may bypass lifecycle hooks.
 
 ### Step 4: Write Calor Code
 
@@ -151,10 +154,12 @@ See the [Adding Calor to Existing Projects](/calor/guides/adding-calor-to-existi
 
 | Component | Description |
 |:----------|:------------|
-| Codex skills | `$calor` to write Calor code, `$calor-convert` to convert C# |
-| AGENTS.md | Project guidelines (guidance-based, not enforced) |
+| Hook configuration | Validates covered file edits and lints changed `.calr` files |
+| MCP configuration | Direct compiler, verification, analysis, and conversion tools |
+| AGENTS.md | Automatically loaded Calor project guidelines |
 
-**Note:** Codex CLI does not support hooks, so Calor-first is guidance-based only. Review file extensions after generation.
+**Note:** Codex hooks require repository and hook trust. They are guardrails;
+builds, tests, and repository-wide checks remain necessary.
 
 ---
 
