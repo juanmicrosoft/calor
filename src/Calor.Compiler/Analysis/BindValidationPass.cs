@@ -437,7 +437,32 @@ public sealed class BindValidationPass
         // in a now-closed sibling block is NOT visible, so it is a new declaration, just
         // like the emitter now emits (#732). Everything else is a new declaration too.
         var isReassignment = bind.IsMutable && IsDeclaredInAnyLiveScope(bind.Name);
-        if (!isReassignment)
+        if (isReassignment)
+        {
+            // Calor0256 — a mutable rebind that re-annotates the variable with a
+            // DIFFERENT explicit type contradicts its declaration. The variable's type
+            // is fixed at first declaration; the emitter emits `x = value` against that
+            // type, so a mismatched value fails to compile (CS0029/CS0266). Both sides
+            // are canonicalized through ExpandType before comparing — §B annotations are
+            // already expanded ("INT") while parameter types are raw ("i32"), so a naive
+            // string compare would false-positive on a matching param rebind. An
+            // unannotated original ("") has no known type, so it is skipped.
+            if (bind.TypeName != null &&
+                TryLookupLocal(bind.Name, out var declaredType) &&
+                !string.IsNullOrEmpty(declaredType) &&
+                !string.Equals(
+                    Parsing.AttributeHelper.ExpandType(declaredType.Trim()),
+                    Parsing.AttributeHelper.ExpandType(bind.TypeName.Trim()),
+                    StringComparison.Ordinal))
+            {
+                _diagnostics.ReportError(bind.Span, DiagnosticCode.BindRebindTypeMismatch,
+                    $"Mutable binding '{bind.Name}' was declared '{declaredType.Trim()}' but is rebound " +
+                    $"as '{bind.TypeName.Trim()}'. A mutable rebind is a reassignment; its type is fixed " +
+                    "at the first declaration, so the emitted C# would fail to compile (CS0029/CS0266). " +
+                    "Keep the original type, or use a differently-named binding.");
+            }
+        }
+        else
         {
             // Calor0255 — a new local that reuses a local/parameter/loop-variable
             // name in an enclosing scope is CS0136 in the emitted C#. Fields are
