@@ -45,22 +45,6 @@ public sealed class BindValidationPass
     // returns an array (e.g. §F ... -> [str]). Rebuilt on every Check(module).
     private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
 
-    // Well-known array-returning BCL methods, keyed by the call target as it
-    // appears in Calor (§C{Type.Method}), mapped to the Calor element type. The
-    // binder has no general BCL return-type model, so this small table is what
-    // lets Calor0254 fire for the common file/dir readers. To extend: add another
-    // array-returning method and its element type. Keep in step with
-    // SelfCheck/ExemplarCompileChecker's array-trap list (the docs-level guard).
-    private static readonly IReadOnlyDictionary<string, string> ArrayReturningBclMethods =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["File.ReadAllLines"] = "str",
-            ["File.ReadAllBytes"] = "u8",
-            ["Directory.GetFiles"] = "str",
-            ["Directory.GetDirectories"] = "str",
-            ["Directory.GetFileSystemEntries"] = "str",
-        };
-
     // Concrete generic collection classes an array is NOT implicitly convertible
     // to in C# (unlike the collection interfaces IList<T>/IEnumerable<T>/…, which
     // arrays satisfy). Binding an array to one of these is CS0029.
@@ -319,20 +303,27 @@ public sealed class BindValidationPass
             return null;
         }
 
-        if (ArrayReturningBclMethods.TryGetValue(call.Target, out var bclElement))
+        // User declarations win over the BCL heuristic, so a user type/method that
+        // shadows a BCL name (e.g. a local `File.ReadAllLines -> List<str>`) is
+        // judged by its real return type, not the built-in assumption.
+        if (_userReturnTypes.TryGetValue(call.Target, out var returnType))
         {
-            return bclElement;
+            return IsArrayTypeName(returnType)
+                ? returnType.Trim().TrimStart('[').TrimEnd(']').Trim()
+                : null;
         }
 
-        if (_userReturnTypes.TryGetValue(call.Target, out var returnType) &&
-            IsArrayTypeName(returnType))
+        if (ArrayReturningBcl.Methods.TryGetValue(call.Target, out var bclElement))
         {
-            return returnType.Trim().TrimStart('[').TrimEnd(']').Trim();
+            return bclElement;
         }
 
         return null;
     }
 
+    // Note: this resolves only functions/methods declared in the module being
+    // checked. Array-returning functions imported from other modules are not
+    // seen, so they are conservative false negatives (never a false Calor0254).
     private void BuildUserReturnTypes(ModuleNode module)
     {
         _userReturnTypes.Clear();

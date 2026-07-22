@@ -67,20 +67,31 @@ public class ExemplarCompilesTests
             "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
             "    §R (len lines)\n";
 
+        // #722: the binder now catches the binding-position case directly.
         var result = Program.Compile(calor, "mutation.calr");
-        var calorCaught = result.Diagnostics.HasErrors;
-
-        // #722: the binder now catches it directly.
-        Assert.True(calorCaught, "Calor should reject the array-to-List trap (Calor0254).");
+        Assert.True(result.Diagnostics.HasErrors, "Calor should reject the array-to-List trap.");
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.BindArrayToConcreteCollection);
+    }
 
-        // Backstop still works for cases the binder can't see (initializer not a
-        // recognized array source): the generated C# fails the Roslyn compile.
-        var roslynCaught = calorCaught ||
-            ExemplarCompileChecker.RoslynErrors(result.GeneratedCode)
-                .Any(e => e.StartsWith("CS0029", StringComparison.Ordinal));
-        Assert.True(roslynCaught);
+    [Fact]
+    public void ReturnPositionArrayToList_IsCaughtByTheRoslynBackstop()
+    {
+        // The array-to-collection trap in RETURN position is not yet caught at the
+        // Calor level (#722 covers binding position; return/assign/argument are
+        // tracked as follow-up). This genuinely exercises the Roslyn backstop: the
+        // Calor compile succeeds, but the emitted C# — a List<str>-returning method
+        // that returns a string[] — fails Roslyn with CS0029.
+        const string calor =
+            "§M{m:Files}\n" +
+            "  §F{f:Get:pub} (str:path) -> List<str>\n" +
+            "    §E{fs:r}\n" +
+            "    §R §C{File.ReadAllLines} §A path §/C\n";
+
+        var result = Program.Compile(calor, "return-mutation.calr");
+        Assert.False(result.Diagnostics.HasErrors); // binder does not (yet) catch return position
+        var errors = ExemplarCompileChecker.RoslynErrors(result.GeneratedCode);
+        Assert.Contains(errors, e => e.StartsWith("CS0029", StringComparison.Ordinal));
     }
 
     [Fact]

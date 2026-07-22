@@ -1,6 +1,7 @@
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.SelfCheck;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -13,7 +14,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ArrayToCollectionBindTests
 {
-    private static IReadOnlyList<Diagnostic> Validate(string source)
+    private static IReadOnlyList<Diagnostic> Validate(string source, bool strictInference = true)
     {
         var lex = new DiagnosticBag();
         var tokens = new Lexer(source, lex).TokenizeAllForParser();
@@ -24,9 +25,16 @@ public class ArrayToCollectionBindTests
         Assert.False(parseBag.HasErrors, "parser errors: " + string.Join("; ", parseBag.Select(d => d.Message)));
 
         var bag = new DiagnosticBag();
-        new BindValidationPass(bag, source, strictInference: true).Check(module);
+        new BindValidationPass(bag, source, strictInference).Check(module);
         return bag.ToList();
     }
+
+    private const string ReadAllLinesToList =
+        "§M{m:Files}\n" +
+        "  §F{f:CountLines:pub} (str:path) -> i32\n" +
+        "    §E{fs:r}\n" +
+        "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
+        "    §R (len lines)\n";
 
     private static bool HasArrayTrap(IReadOnlyList<Diagnostic> diags) =>
         diags.Any(d => d.Code == DiagnosticCode.BindArrayToConcreteCollection);
@@ -34,14 +42,17 @@ public class ArrayToCollectionBindTests
     [Fact]
     public void ReadAllLines_BoundToList_IsRejected()
     {
-        var diags = Validate(
-            "§M{m:Files}\n" +
-            "  §F{f:CountLines:pub} (str:path) -> i32\n" +
-            "    §E{fs:r}\n" +
-            "    §B{lines:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §R (len lines)\n");
+        Assert.True(HasArrayTrap(Validate(ReadAllLinesToList)));
+    }
 
-        Assert.True(HasArrayTrap(diags));
+    [Fact]
+    public void IsAlwaysOn_EvenWithStrictInferenceDisabled()
+    {
+        // Calor0254 is a hard type error, NOT a strict-inference diagnostic — it
+        // must fire regardless of --strict-bind-inference (the CLI default is
+        // non-strict). Pins the "always-on" design claim so a future refactor
+        // cannot silently fold it into the strict-gated block.
+        Assert.True(HasArrayTrap(Validate(ReadAllLinesToList, strictInference: false)));
     }
 
     [Fact]
@@ -116,5 +127,40 @@ public class ArrayToCollectionBindTests
             "    §R INT:0\n");
 
         Assert.True(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void UserFunctionShadowingBclName_IsJudgedByItsRealReturnType()
+    {
+        // A user function named like a BCL method must win over the built-in
+        // heuristic: here File.ReadAllLines is a user method returning List<str>
+        // (not an array), so binding it to List<str> is correct — no false Calor0254.
+        var diags = Validate(
+            "§M{m:Shadow}\n" +
+            "  §CL{c1:File:pub}\n" +
+            "    §MT{mt1:ReadAllLines:pub} (str:path) -> List<str>\n" +
+            "      §R §C{MakeList} §/C\n" +
+            "  §F{f1:Use:pub} (str:path) -> i32\n" +
+            "    §B{items:List<str>} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §R INT:0\n");
+
+        Assert.False(HasArrayTrap(diags));
+    }
+
+    [Fact]
+    public void DocsAndCompilerGuards_ShareOneBclApiList()
+    {
+        // The Calor0254 compiler check and the Calor1331 docs lint must recognize
+        // the same array-returning APIs. They now read the same shared table; this
+        // pins that so a future edit to one path can't silently diverge.
+        foreach (var api in Calor.Compiler.Analysis.ArrayReturningBcl.Methods.Keys)
+        {
+            var doc = new DocFile(
+                Calor.Compiler.SelfCheck.ExemplarCompileChecker.RelativePath,
+                $"```\n§B{{x:List<str>}} §C{{{api}}} §A a §/C\n```\n");
+            var findings = new List<Diagnostic>();
+            Calor.Compiler.SelfCheck.ExemplarCompileChecker.CheckArrayBindingTraps(doc, findings);
+            Assert.Contains(findings, f => f.Code == DiagnosticCode.DocDriftArrayBindingTrap);
+        }
     }
 }

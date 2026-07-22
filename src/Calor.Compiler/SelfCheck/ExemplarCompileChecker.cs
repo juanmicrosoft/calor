@@ -32,13 +32,16 @@ public static class ExemplarCompileChecker
     // A binding whose initializer is a call to an array-returning BCL API, e.g.
     // "§B{lines:[str]} §C{File.ReadAllLines} §A path §/C". Captures the declared
     // binding type and the API so the type can be required to be the array form.
-    // To extend: add another array-returning API to the (?<api>...) alternation.
-    // This is a deliberately closed list — it only guards the one recurring trap
-    // on fragment lines that cannot be compiled; the complete programs get the real
+    // The recognized APIs come from the shared Analysis.ArrayReturningBcl table
+    // (same source the language-level Calor0254 check uses), so the docs-level lint
+    // and the compiler diagnostic cannot drift apart. This only guards the fragment
+    // reference lines that cannot be compiled; the complete programs get the real
     // Roslyn compile, which catches array/collection mismatches for any API.
     private static readonly Regex ArrayReturningBinding = new(
         @"§B\{\s*~?\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*(?<type>[^}]+?)\s*\}\s*" +
-        @"§C\{\s*(?<api>File\.ReadAllLines|File\.ReadAllBytes|Directory\.GetFiles|Directory\.GetDirectories|Directory\.GetFileSystemEntries)\s*\}",
+        @"§C\{\s*(?<api>" +
+        string.Join("|", Analysis.ArrayReturningBcl.Methods.Keys.Select(Regex.Escape)) +
+        @")\s*\}",
         RegexOptions.Compiled);
 
     /// <summary>The exemplar's repository-relative path.</summary>
