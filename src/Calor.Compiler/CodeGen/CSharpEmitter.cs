@@ -51,7 +51,53 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private int _currentPostconditionIndex;
 
     // Track declared variables in current function scope for reassignment detection
-    private readonly HashSet<string> _declaredVariablesInCurrentScope = new(StringComparer.Ordinal);
+    // Scope-aware declared-variable tracking (#732): a stack of block scopes, reset to
+    // a single base scope at each function/method/accessor/ctor. A mutable §B rebind
+    // emits a reassignment (`x = …`) only when the name is visible in a live (enclosing)
+    // scope; a rebind whose earlier declaration lives in a now-closed sibling block
+    // re-declares (`var x = …`) instead — matching C#, which forbids reassigning an
+    // out-of-scope local (CS0103). Push on entering a control-flow block, pop on leaving.
+    private readonly List<HashSet<string>> _declScopes = new();
+
+    private void ResetDeclScopes()
+    {
+        _declScopes.Clear();
+        _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
+    }
+
+    private void PushDeclScope() => _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
+
+    private void PopDeclScope()
+    {
+        if (_declScopes.Count > 0)
+        {
+            _declScopes.RemoveAt(_declScopes.Count - 1);
+        }
+    }
+
+    private bool IsVarDeclaredInScope(string name)
+    {
+        for (var i = _declScopes.Count - 1; i >= 0; i--)
+        {
+            if (_declScopes[i].Contains(name))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void DeclareVarInScope(string name)
+    {
+        if (_declScopes.Count == 0)
+        {
+            ResetDeclScopes();
+        }
+
+        _declScopes[^1].Add(name);
+    }
+
 
     // AST-level namespace usage tracking for conditional using emission
     private bool _usesCalorRuntime;
@@ -420,7 +466,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentPostconditionIndex = 0;
 
         // Clear declared variables tracking for new function scope
-        _declaredVariablesInCurrentScope.Clear();
+        ResetDeclScopes();
 
         // Emit extended metadata as documentation comments
         foreach (var issue in node.Issues)
@@ -1014,10 +1060,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
+        PushDeclScope();
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
 
         Dedent();
         AppendLine("}");
@@ -1033,10 +1081,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
+        PushDeclScope();
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
 
         Dedent();
         AppendLine("}");
@@ -1052,10 +1102,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
+        PushDeclScope();
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
 
         Dedent();
         AppendLine($"}} while ({condition});");
@@ -1071,10 +1123,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
+        PushDeclScope();
         foreach (var stmt in node.ThenBody)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
 
         Dedent();
         AppendLine("}");
@@ -1087,10 +1141,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine("{");
             Indent();
 
+            PushDeclScope();
             foreach (var stmt in elseIf.Body)
             {
                 EmitStatement(stmt);
             }
+            PopDeclScope();
 
             Dedent();
             AppendLine("}");
@@ -1103,10 +1159,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine("{");
             Indent();
 
+            PushDeclScope();
             foreach (var stmt in node.ElseBody)
             {
                 EmitStatement(stmt);
             }
+            PopDeclScope();
 
             Dedent();
             AppendLine("}");
@@ -1125,7 +1183,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // 2. AND it was already declared in this scope
         // This preserves Calor's shadowing semantics (S5-S6): immutable binds in inner
         // scopes create new shadowing variables, while mutable binds reassign.
-        if (node.IsMutable && _declaredVariablesInCurrentScope.Contains(varName))
+        if (node.IsMutable && IsVarDeclaredInScope(varName))
         {
             // Mutable rebind - emit assignment only
             if (node.Initializer != null)
@@ -1136,7 +1194,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             return "";
         }
 
-        _declaredVariablesInCurrentScope.Add(varName);
+        DeclareVarInScope(varName);
 
         if (node.Initializer != null)
         {
@@ -1621,10 +1679,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
             Indent();
 
+            PushDeclScope();
             foreach (var stmt in matchCase.Body)
             {
                 EmitStatement(stmt);
             }
+            PopDeclScope();
 
             AppendLine("break;");
             Dedent();
@@ -1905,10 +1965,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             Indent();
             AppendLine($"{indexName}++;");
 
+            PushDeclScope();
             foreach (var stmt in node.Body)
             {
                 EmitStatement(stmt);
             }
+            PopDeclScope();
 
             Dedent();
             AppendLine("}");
@@ -1919,10 +1981,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine("{");
             Indent();
 
+            PushDeclScope();
             foreach (var stmt in node.Body)
             {
                 EmitStatement(stmt);
             }
+            PopDeclScope();
 
             Dedent();
             AppendLine("}");
@@ -2062,10 +2126,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
+        PushDeclScope();
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
 
         Dedent();
         AppendLine("}");
@@ -2438,7 +2504,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(MethodNode node)
     {
         // Clear declared variables tracking for new method scope
-        _declaredVariablesInCurrentScope.Clear();
+        ResetDeclScopes();
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -3007,7 +3073,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         else
         {
             // Clear declared variables tracking for new accessor scope
-            _declaredVariablesInCurrentScope.Clear();
+            ResetDeclScopes();
 
             AppendLine($"{visibilityPrefix}{accessorKeyword}");
             AppendLine("{");
@@ -3033,7 +3099,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ConstructorNode node)
     {
         // Clear declared variables tracking for new constructor scope
-        _declaredVariablesInCurrentScope.Clear();
+        ResetDeclScopes();
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -3088,7 +3154,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(OperatorOverloadNode node)
     {
-        _declaredVariablesInCurrentScope.Clear();
+        ResetDeclScopes();
 
         EmitCSharpAttributes(node.CSharpAttributes);
 
@@ -3203,10 +3269,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
+        PushDeclScope();
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
 
         Dedent();
         AppendLine("}");
@@ -3222,10 +3290,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
+        PushDeclScope();
         foreach (var stmt in node.TryBody)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
 
         Dedent();
         AppendLine("}");
@@ -3241,10 +3311,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine("{");
             Indent();
 
+            PushDeclScope();
             foreach (var stmt in node.FinallyBody)
             {
                 EmitStatement(stmt);
             }
+            PopDeclScope();
 
             Dedent();
             AppendLine("}");
@@ -3280,10 +3352,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("{");
         Indent();
 
+        PushDeclScope();
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
 
         Dedent();
         AppendLine("}");
@@ -3410,7 +3484,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             if (node.AddBody != null)
             {
-                _declaredVariablesInCurrentScope.Clear();
+                ResetDeclScopes();
                 AppendLine("add");
                 AppendLine("{");
                 Indent();
@@ -3424,7 +3498,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             if (node.RemoveBody != null)
             {
-                _declaredVariablesInCurrentScope.Clear();
+                ResetDeclScopes();
                 AppendLine("remove");
                 AppendLine("{");
                 Indent();
@@ -4897,10 +4971,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine("unsafe");
         AppendLine("{");
         Indent();
+        PushDeclScope();
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
         Dedent();
         AppendLine("}");
         return "";
@@ -4912,10 +4988,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine($"lock ({lockExpr})");
         AppendLine("{");
         Indent();
+        PushDeclScope();
         foreach (var stmt in node.Body)
         {
             EmitStatement(stmt);
         }
+        PopDeclScope();
         Dedent();
         AppendLine("}");
         return "";

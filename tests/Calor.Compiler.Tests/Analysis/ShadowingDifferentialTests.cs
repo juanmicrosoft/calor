@@ -47,6 +47,11 @@ public class ShadowingDifferentialTests
         new object[] { "loop-var-ok",
             "§M{m:S}\n  §F{f:Sum:pub} (i32:n) -> i32\n    §B{~acc} 0\n" +
             "    §L{l1:i:0:n:1}\n      §B{~acc} (+ acc i)\n    §R acc\n" },
+        // Mutable §B reusing a name across sibling blocks — each re-declares (#732).
+        new object[] { "sibling-mutable-rebind",
+            "§M{m:S}\n  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
+            "    §IF{i1} (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
+            "    §IF{i2} (== b true)\n      §B{~x:i32} 2\n      §R x\n    §R 0\n" },
     };
 
     [Theory]
@@ -88,17 +93,8 @@ public class ShadowingDifferentialTests
     // by an issue; the assertion pins the CURRENT behavior so the gap is documented
     // and its eventual fix (accepted→clean, or rejected) trips this test to be flipped.
 
-    [Fact]
-    public void KnownGap_SiblingMutableRebind_EmitsCS0103() // #732
-    {
-        var (accepted, roslynErrors) = Compile(
-            "§M{m:S}\n  §F{f:Do:pub} (bool:a, bool:b) -> i32\n" +
-            "    §IF{i1} (== a true)\n      §B{~x:i32} 1\n      §R x\n" +
-            "    §IF{i2} (== b true)\n      §B{~x:i32} 2\n      §R x\n    §R 0\n");
-
-        Assert.True(accepted); // pass mirrors the (buggy) emitter, so it accepts
-        Assert.Contains(roslynErrors, e => e.StartsWith("CS0103", StringComparison.Ordinal));
-    }
+    // #732 (sibling mutable rebind → CS0103) is FIXED: the emitter is now scope-aware,
+    // so that case moved to CleanWhenAccepted above ("sibling-mutable-rebind").
 
     [Fact]
     public void KnownGap_TypeChangingMutableRebind_EmitsCS0029() // #733
