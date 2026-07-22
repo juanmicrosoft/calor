@@ -30,7 +30,6 @@ public static class ScalarReturningBcl
             ["Path.GetDirectoryName"] = "str",
             ["Path.GetFullPath"] = "str",
             ["Path.Combine"] = "str",
-            ["Guid.NewGuid.ToString"] = "str",
             ["Environment.GetEnvironmentVariable"] = "str",
         };
 }
