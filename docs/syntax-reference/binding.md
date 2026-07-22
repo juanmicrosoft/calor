@@ -247,6 +247,30 @@ parameters are not registered). It does **not** descend into block-lambda
 (`§LAM`) bodies, so a lambda declared `-> List<T>` returning an array is not
 checked.
 
+### Calor0255 — `BindShadowsEnclosingScope`
+
+Another always-on hard error: a `§B` that declares a **new** local reusing the
+name of a local or parameter already in an **enclosing** scope. C# forbids a
+nested local from shadowing an enclosing local/parameter (CS0136), so the emitted
+code would not compile.
+
+```
+§B{~x:i32} 0
+§IF{i1} (> x 0)
+  §B{x:str} "hi"   // Calor0255: inner local 'x' shadows the outer 'x'
+```
+
+Two things are deliberately **not** flagged, matching C#:
+
+- **A mutable rebind is reassignment, not shadowing.** `§B{~x}` reusing a name
+  already bound in the function emits `x = …` (not a new declaration) — this is
+  the accumulator idiom (`§B{~result} (* result i)` inside a loop), and it is
+  fine.
+- **A local may shadow a field.** Only enclosing locals/parameters count; a local
+  named like a class field is legal (the local wins), as in C#.
+
+Sibling (non-nested) blocks may each reuse a name — they are separate scopes.
+
 LSP quick-fixes that insert the recommended annotation are available
 in v0.6.3 and surface in any IDE talking to the Calor language server.
 Each diagnostic carries a `SuggestedFix` that inserts the default
