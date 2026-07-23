@@ -152,12 +152,12 @@ Classes:
 
 | Tool | Class | Envelope adopted? | Notes |
 |:-----|:------|:------------------|:------|
-| `calor_compile` | E | No | flat `{severity,code,message,line,column,fix}` DTO |
-| `calor_check` | E | No | richest diagnostics; flat DTO |
-| `calor_verify` | E | No | legacy enum names (`Unproven`); needs five-status |
-| `calor_refine` | E | No | obligation statuses, snake_case |
-| `calor_analyze` | E | No | issue DTOs, flat |
-| `calor_edit_preview` | E | No | error strings; verdict payload stays, diagnostics standardize |
+| `calor_compile` | E | **Yes** | `diagnostics[]` are envelope entries with `declarationId` |
+| `calor_check` | E | **Yes** | envelope entries; `commonMistake` hints moved to a sibling `hints[]` array |
+| `calor_verify` | E | **Yes** | five-status per contract (+`legacyStatus`), structured counterexamples, `proofStatusCounts` |
+| `calor_refine` | E | **Yes** | `proof_status` + `counterexample_bindings` added (snake_case retained) |
+| `calor_analyze` | E | **Yes** | issue groups are envelope entries with `declarationId` |
+| `calor_edit_preview` | E | **Yes** | `compilationResult.errors` are envelope entries; verdict payload unchanged |
 | `calor_convert` | E | No | conversion issues, flat |
 | `calor_batch` | E | No | per-file error strings |
 | `calor_migrate` | E | No | per-file `[Code] Ln: msg` strings |
