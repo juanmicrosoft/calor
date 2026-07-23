@@ -129,7 +129,7 @@ Classes:
 | `watch` | E | **Yes** (NDJSON, `--format json`) | one document per rebuild |
 | `self-check` | E | **Yes** (`--format json\|sarif`) | docs-drift findings |
 | `verify` | E | Partial | embeds envelope `diagnostics[]`; wrapper is command-specific and per-contract statuses still use legacy enum names |
-| `assess` | E | Partial | SARIF shared; JSON is pre-envelope (`data`-shaped but no wrapper) |
+| `assess` | E | **Yes** (`--format json\|sarif`) | JSON wraps the assessment under `data`; SARIF shared |
 | `convert` | E | No (text only) | needs `--format json` |
 | `format` | E | No (text only) | needs `--format json` |
 | `ids` | E | No | `check` emits `Calor0800`-band diagnostics; `index` is data |
