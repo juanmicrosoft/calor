@@ -130,8 +130,8 @@ Classes:
 | `self-check` | E | **Yes** (`--format json\|sarif`) | docs-drift findings |
 | `verify` | E | **Yes** (`--format json`) | envelope wrapper with `command: "verify"`; per-contract five-status (+`legacyStatus` for one release) and counterexamples under `data` |
 | `assess` | E | **Yes** (`--format json\|sarif`) | JSON wraps the assessment under `data`; SARIF shared |
-| `convert` | E | No (text only) | needs `--format json` |
-| `format` | E | No (text only) | needs `--format json` |
+| `convert` | E | **Yes** (`--format json`) | conversion issues as `Calor1343` envelope diagnostics; direction/features/benchmark under `data` |
+| `format` | E | **Yes** (`--format json`) | real parser diagnostics + `Calor1340`-band; per-file statuses under `data` |
 | `ids` | E | **Yes** (`check --format json`) | `Calor0800`-band findings as envelope diagnostics with `declarationId`; `index` artifact (`calor.ids.json`) unchanged |
 | `effects` | D | **Yes** (`--json`) | resolve/list/suggest stdout wrapped under `data`; manifest file stays raw |
 | `benchmark` | D | **Yes** (`--format json`) | quick/project/full payloads under `data`; string-interpolated JSON replaced with real serialization |
