@@ -167,3 +167,14 @@ Milestone map (recorded here so the numbering stops drifting — versioning runs
 | **v0.11** | The Wedge | Onboarding into mixed C#/Calor solutions; validated on the same loop telemetry |
 
 On PP-L5 hit, **v0.10 ("The Guarantees")** inherits this instrument: verification tiers (async Z3, never blocking the edit loop), capability-parameter evolution of `§E`, and contract provenance tiers are all *measured on the same loop telemetry* — which is the point of building the instrument first. **v0.11 ("The Wedge")** — mixed-project onboarding and the curated top-N package manifests — is likewise judged on loop metrics, so the per-module adoption story is measured, not asserted.
+
+### Package ingestion (`calor import <package>`) — placement
+
+A recurring idea — *import a .NET package and generate its annotations* — is **not one milestone item**. It splits along the effect/contract seam, and each half lands where its safety story lives. This productizes existing machinery (`calor effects suggest`, the IL analyzer in `Effects/IL/`, and the v4 plan in [`dotnet-ecosystem-effect-manifests.md`](dotnet-ecosystem-effect-manifests.md)) into a first-class command, rather than new design.
+
+| Half | Milestone | Rationale | Machinery today |
+|---|---|---|---|
+| **Effect manifest generation** | **v0.11 (The Wedge)** — early, as it is a *prerequisite* of onboarding | The Wedge cannot consume a real C# solution without effect manifests for its NuGet dependencies; this *is* the "curated top-N package manifests" line | Mostly exists — IL derivation for concrete chains (prototype: definitive for BCL leaves), `effects suggest` templates; the gap is curated interface-level manifests for dynamic dispatch (`ILogger`/`IMediator`/`DbContext`, where union-all is sound but too broad) |
+| **Contract synthesis (`§Q`/`§S`)** | **v0.10 (The Guarantees)** — gated behind provenance tiers | Synthesizing behavioral contracts from signatures/XML docs yields plausibly-wrong contracts; a trusted wrong contract poisons verification. Must be tagged `assumed` (assumption, never proof), never `verified` without human audit | New |
+
+Both halves plug into this plan's instrument: `calor import` emits the WS1 envelope (§2) and stamps **provenance** on every annotation, so an agent can distinguish `derived` (sound: IL-traced effects, nullability) from `assumed` (synthesized guess) programmatically. The honest limit stays the v4 plan's limit — IL analysis resolves concrete call chains, not irreducible dynamic dispatch — so ingestion **surfaces** what it could not resolve rather than silently under-approximating.
