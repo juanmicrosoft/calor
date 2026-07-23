@@ -134,7 +134,7 @@ Thresholds marked **[P]** are provisional until the M2 baseline epoch freezes th
 | **PP-L2** | Every failure the agent sees is machine-actionable | M-E1, M-E2, M-E3 | M-E1 = 100 %; M-E2 ≥ 90 %; M-E3 = 100 % | WS1 exits; envelope schema v1 frozen | Ship blocks: v0.9 does not release with silent cliffs or schema drift |
 | **PP-L3** | Node-addressed edits beat whole-file rewrites | M-L2 + tokens per accepted edit, MCP-node arm vs MCP-file arm (identical checking, D2.4) | M-L2(node) ≥ 95 %; tokens/accepted-edit ≥ 30 % lower **[P]** | `calor_edit_apply` becomes the recommended agent path in `calor init` guidance | Keep transactional file-level apply; demote node addressing to navigation-only; saves us from building on an unproven editing model |
 | **PP-L4** | Diagnostics steer the agent, not just inform it | M-L3 | ≥ 70 % **[P]** | Evidence that node-anchored envelopes work; cite in strategy doc §1.1 | Qualitative transcript review of misses; likely fix is envelope content (hints), not more metrics |
-| **PP-L5** | The v0.9 loop beats the baseline loop | M-L5 median paired ratio, v0.9 arm vs M2 baseline, same tasks/model/budget, Calor-only | ≥ 15 % fewer median iterations-to-green **[P]**, censored fraction not worse | The loop program continues into v1.0 (verification tiers) with the same measurement discipline | The tooling bet is not paying off as built — stop, analyze transcripts, and re-plan before v1.0 spends more |
+| **PP-L5** | The v0.9 loop beats the baseline loop | M-L5 median paired ratio, v0.9 arm vs M2 baseline, same tasks/model/budget, Calor-only | ≥ 15 % fewer median iterations-to-green **[P]**, censored fraction not worse | The loop program continues into v0.10 (verification tiers) with the same measurement discipline | The tooling bet is not paying off as built — stop, analyze transcripts, and re-plan before v0.10 spends more |
 | **PP-L6** | Loop work didn't corrupt the science | All frozen gate metrics on a smoke epoch | No frozen gate metric regresses beyond the gates doc's noise rule | — | Regression is a release blocker regardless of PP-L1–L5 |
 
 Two adversarial notes for the review, pre-empted: (1) PP-L5 compares Calor-to-Calor, so it cannot be contaminated by task-pair bias between languages — it reuses the same pairs both arms; (2) PP-L3's 95 % is deliberately near-absolute because a *checked* node edit that fails to parse means the addressing model itself is broken, not the agent.
@@ -144,8 +144,8 @@ Two adversarial notes for the review, pre-empted: (1) PP-L5 compares Calor-to-Ca
 ## 6. Decision gates summary
 
 - **PP-L1 hit → kill direct-to-IL forever.** This is the cheapest way to permanently close the most expensive item on the old proposal.
-- **PP-L3 miss → don't build v1.0 on node-addressed editing.** The mutation API stays, but as plumbing, not as the strategic bet.
-- **PP-L5 miss → freeze loop investment** until transcript analysis explains where iterations actually go. If iterations are spent on verification `unknown`s rather than bad diagnostics, the v1.0 priority flips from loop tooling to verification tiers.
+- **PP-L3 miss → don't build v0.10 on node-addressed editing.** The mutation API stays, but as plumbing, not as the strategic bet.
+- **PP-L5 miss → freeze loop investment** until transcript analysis explains where iterations actually go. If iterations are spent on verification `unknown`s rather than bad diagnostics, the v0.10 priority flips from loop tooling to verification tiers.
 - **PP-L6 is unconditional** — instrument work never gets to move the science.
 
 ## 7. Risks
@@ -156,6 +156,6 @@ Two adversarial notes for the review, pre-empted: (1) PP-L5 compares Calor-to-Ca
 4. **Measurement cost** — two epochs (baseline + comparison) at gates-doc rigor, plus re-runs. Cheaper than one wrong architecture bet; the spend goes through the same authorization process as Phase 2 (`phase-2-spend-authorisation.md`).
 5. **Audit drift at bus factor 1** — the strategy doc's revision log found factual drift three rounds running. D1.4's conformance test and this doc's §1 audit table (dated, file-anchored) are the mitigations; §1 should be re-audited at M5.
 
-## 8. Relationship to v1.0
+## 8. Relationship to v0.10
 
-On PP-L5 hit, v1.0 ("The Guarantees") inherits this instrument: verification tiers (async Z3, never blocking the edit loop), capability-parameter evolution of `§E`, and contract provenance tiers are all *measured on the same loop telemetry* — which is the point of building the instrument first.
+On PP-L5 hit, v0.10 ("The Guarantees") inherits this instrument: verification tiers (async Z3, never blocking the edit loop), capability-parameter evolution of `§E`, and contract provenance tiers are all *measured on the same loop telemetry* — which is the point of building the instrument first.
