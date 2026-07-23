@@ -75,12 +75,22 @@ exists_in_base() {
   git cat-file -e "${base}:$1" 2>/dev/null
 }
 
+is_test_source() {
+  # The Calor-first rule governs PRODUCT source (the compiler/runtime/SDK that
+  # ships), not the xUnit test suites — those are C# by nature and every new test
+  # is a new .cs file. Exempt the tests/ tree structurally so adding a test never
+  # needs an allowlist entry or an admin merge. Product code under src/, tools/,
+  # etc. stays fully governed.
+  [[ "$1" == tests/* ]]
+}
+
 violations=()
 for path in "${changed[@]}"; do
   [[ "$path" == *.cs ]] || continue
   # Existing tracked C# is grandfathered for compiler/runtime maintenance.
   # New paths must be Calor or be pre-approved on the protected base branch.
   exists_in_base "$path" && continue
+  is_test_source "$path" && continue
   is_base_allowlisted "$path" && continue
   [[ -f "$path" ]] || continue
   violations+=("$path")
