@@ -198,7 +198,8 @@ public class TypeCheckToolTests
             {
                 hasTypeMismatch = true;
                 Assert.Equal("Calor0202", error.GetProperty("code").GetString());
-                Assert.Contains("BOOL", error.GetProperty("message").GetString());
+                // #741: diagnostics surface-spell types, so the message says 'bool', not 'BOOL'.
+                Assert.Contains("bool", error.GetProperty("message").GetString());
                 break;
             }
         }
@@ -280,7 +281,8 @@ public class TypeCheckToolTests
         Assert.True(result.IsError);
         var text = result.Content[0].Text!;
         Assert.Contains("type_mismatch", text);
-        Assert.Contains("BOOL", text);
+        // #741: diagnostics surface-spell types, so the message says 'bool', not 'BOOL'.
+        Assert.Contains("bool", text);
     }
 
     [Fact]

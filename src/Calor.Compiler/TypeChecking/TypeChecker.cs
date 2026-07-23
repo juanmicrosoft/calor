@@ -198,13 +198,13 @@ public sealed class TypeChecker
         if (!IsNumeric(fromType))
         {
             _diagnostics.ReportError(forStmt.From.Span, DiagnosticCode.TypeMismatch,
-                $"FOR 'from' expression must be numeric, got {fromType.Name}");
+                $"FOR 'from' expression must be numeric, got {fromType.SurfaceName}");
         }
 
         if (!IsNumeric(toType))
         {
             _diagnostics.ReportError(forStmt.To.Span, DiagnosticCode.TypeMismatch,
-                $"FOR 'to' expression must be numeric, got {toType.Name}");
+                $"FOR 'to' expression must be numeric, got {toType.SurfaceName}");
         }
 
         if (forStmt.Step != null)
@@ -213,7 +213,7 @@ public sealed class TypeChecker
             if (!IsNumeric(stepType))
             {
                 _diagnostics.ReportError(forStmt.Step.Span, DiagnosticCode.TypeMismatch,
-                    $"FOR 'step' expression must be numeric, got {stepType.Name}");
+                    $"FOR 'step' expression must be numeric, got {stepType.SurfaceName}");
             }
         }
 
@@ -231,7 +231,7 @@ public sealed class TypeChecker
         if (!condType.Equals(PrimitiveType.Bool))
         {
             _diagnostics.ReportError(whileStmt.Condition.Span, DiagnosticCode.TypeMismatch,
-                $"WHILE condition must be BOOL, got {condType.Name}");
+                $"WHILE condition must be bool, got {condType.SurfaceName}");
         }
 
         _env.EnterScope();
@@ -248,7 +248,7 @@ public sealed class TypeChecker
         if (!condType.Equals(PrimitiveType.Bool))
         {
             _diagnostics.ReportError(ifStmt.Condition.Span, DiagnosticCode.TypeMismatch,
-                $"IF condition must be BOOL, got {condType.Name}");
+                $"IF condition must be bool, got {condType.SurfaceName}");
         }
 
         _env.EnterScope();
@@ -264,7 +264,7 @@ public sealed class TypeChecker
             if (!elseIfCondType.Equals(PrimitiveType.Bool))
             {
                 _diagnostics.ReportError(elseIf.Condition.Span, DiagnosticCode.TypeMismatch,
-                    $"ELSEIF condition must be BOOL, got {elseIfCondType.Name}");
+                    $"ELSEIF condition must be bool, got {elseIfCondType.SurfaceName}");
             }
 
             _env.EnterScope();
@@ -300,7 +300,7 @@ public sealed class TypeChecker
                 if (!IsAssignable(varType, initType))
                 {
                     _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
-                        $"Cannot assign {initType.Name} to variable of type {varType.Name}");
+                        $"Cannot assign {initType.SurfaceName} to variable of type {varType.SurfaceName}");
                 }
             }
             else
@@ -337,7 +337,7 @@ public sealed class TypeChecker
                 if (!guardType.Equals(PrimitiveType.Bool))
                 {
                     _diagnostics.ReportError(matchCase.Guard.Span, DiagnosticCode.TypeMismatch,
-                        $"Match guard must be BOOL, got {guardType.Name}");
+                        $"Match guard must be bool, got {guardType.SurfaceName}");
                 }
             }
 
@@ -371,19 +371,19 @@ public sealed class TypeChecker
                 if (!IsAssignable(elementType, valueType))
                 {
                     _diagnostics.ReportError(push.Value.Span, DiagnosticCode.TypeMismatch,
-                        $"Cannot add {valueType.Name} to {collectionType.Name}, expected {elementType.Name}");
+                        $"Cannot add {valueType.SurfaceName} to {collectionType.SurfaceName}, expected {elementType.SurfaceName}");
                 }
             }
             else
             {
                 _diagnostics.ReportError(push.Span, DiagnosticCode.TypeMismatch,
-                    $"PUSH operation requires List or HashSet, got {collectionType.Name}");
+                    $"PUSH operation requires List or HashSet, got {collectionType.SurfaceName}");
             }
         }
         else
         {
             _diagnostics.ReportError(push.Span, DiagnosticCode.TypeMismatch,
-                $"PUSH operation requires a collection type, got {collectionType.Name}");
+                $"PUSH operation requires a collection type, got {collectionType.SurfaceName}");
         }
     }
 
@@ -408,19 +408,19 @@ public sealed class TypeChecker
             if (!IsAssignable(expectedKeyType, keyType))
             {
                 _diagnostics.ReportError(put.Key.Span, DiagnosticCode.TypeMismatch,
-                    $"Dictionary key type mismatch: expected {expectedKeyType.Name}, got {keyType.Name}");
+                    $"Dictionary key type mismatch: expected {expectedKeyType.SurfaceName}, got {keyType.SurfaceName}");
             }
 
             if (!IsAssignable(expectedValueType, valueType))
             {
                 _diagnostics.ReportError(put.Value.Span, DiagnosticCode.TypeMismatch,
-                    $"Dictionary value type mismatch: expected {expectedValueType.Name}, got {valueType.Name}");
+                    $"Dictionary value type mismatch: expected {expectedValueType.SurfaceName}, got {valueType.SurfaceName}");
             }
         }
         else
         {
             _diagnostics.ReportError(put.Span, DiagnosticCode.TypeMismatch,
-                $"PUT operation requires a Dictionary, got {dictType?.Name ?? "unknown"}");
+                $"PUT operation requires a Dictionary, got {dictType?.SurfaceName ?? "unknown"}");
         }
     }
 
@@ -452,13 +452,13 @@ public sealed class TypeChecker
             if (expectedType != null && !IsAssignable(expectedType, removeType))
             {
                 _diagnostics.ReportError(remove.KeyOrValue.Span, DiagnosticCode.TypeMismatch,
-                    $"Cannot remove {removeType.Name} from {collectionType.Name}, expected {expectedType.Name}");
+                    $"Cannot remove {removeType.SurfaceName} from {collectionType.SurfaceName}, expected {expectedType.SurfaceName}");
             }
         }
         else
         {
             _diagnostics.ReportError(remove.Span, DiagnosticCode.TypeMismatch,
-                $"REM operation requires a collection type, got {collectionType.Name}");
+                $"REM operation requires a collection type, got {collectionType.SurfaceName}");
         }
     }
 
@@ -479,7 +479,7 @@ public sealed class TypeChecker
         if (!IsNumeric(indexType))
         {
             _diagnostics.ReportError(setIndex.Index.Span, DiagnosticCode.TypeMismatch,
-                $"List index must be numeric, got {indexType.Name}");
+                $"List index must be numeric, got {indexType.SurfaceName}");
         }
 
         if (collectionType is GenericInstanceType git && git.BaseName == "List" && git.TypeArguments.Count == 1)
@@ -488,13 +488,13 @@ public sealed class TypeChecker
             if (!IsAssignable(elementType, valueType))
             {
                 _diagnostics.ReportError(setIndex.Value.Span, DiagnosticCode.TypeMismatch,
-                    $"Cannot assign {valueType.Name} to list element of type {elementType.Name}");
+                    $"Cannot assign {valueType.SurfaceName} to list element of type {elementType.SurfaceName}");
             }
         }
         else
         {
             _diagnostics.ReportError(setIndex.Span, DiagnosticCode.TypeMismatch,
-                $"SETIDX operation requires a List, got {collectionType.Name}");
+                $"SETIDX operation requires a List, got {collectionType.SurfaceName}");
         }
     }
 
@@ -513,7 +513,7 @@ public sealed class TypeChecker
             (git.BaseName != "List" && git.BaseName != "Dictionary" && git.BaseName != "HashSet"))
         {
             _diagnostics.ReportError(clear.Span, DiagnosticCode.TypeMismatch,
-                $"CLR operation requires a collection type, got {collectionType.Name}");
+                $"CLR operation requires a collection type, got {collectionType.SurfaceName}");
         }
     }
 
@@ -534,7 +534,7 @@ public sealed class TypeChecker
         if (!IsNumeric(indexType))
         {
             _diagnostics.ReportError(insert.Index.Span, DiagnosticCode.TypeMismatch,
-                $"List index must be numeric, got {indexType.Name}");
+                $"List index must be numeric, got {indexType.SurfaceName}");
         }
 
         if (collectionType is GenericInstanceType git && git.BaseName == "List" && git.TypeArguments.Count == 1)
@@ -543,13 +543,13 @@ public sealed class TypeChecker
             if (!IsAssignable(elementType, valueType))
             {
                 _diagnostics.ReportError(insert.Value.Span, DiagnosticCode.TypeMismatch,
-                    $"Cannot insert {valueType.Name} into list of type {elementType.Name}");
+                    $"Cannot insert {valueType.SurfaceName} into list of type {elementType.SurfaceName}");
             }
         }
         else
         {
             _diagnostics.ReportError(insert.Span, DiagnosticCode.TypeMismatch,
-                $"INS operation requires a List, got {collectionType.Name}");
+                $"INS operation requires a List, got {collectionType.SurfaceName}");
         }
     }
 
@@ -571,7 +571,7 @@ public sealed class TypeChecker
         else
         {
             _diagnostics.ReportError(dictForeach.Dictionary.Span, DiagnosticCode.TypeMismatch,
-                $"EACHKV requires a Dictionary, got {dictType.Name}");
+                $"EACHKV requires a Dictionary, got {dictType.SurfaceName}");
 
             // Define variables with error type to allow body checking to continue
             _env.DefineVariable(dictForeach.KeyName, ErrorType.Instance);
@@ -604,7 +604,7 @@ public sealed class TypeChecker
                 if (!IsAssignable(expectedType, litType))
                 {
                     _diagnostics.ReportError(litPat.Span, DiagnosticCode.TypeMismatch,
-                        $"Pattern literal type {litType.Name} does not match expected type {expectedType.Name}");
+                        $"Pattern literal type {litType.SurfaceName} does not match expected type {expectedType.SurfaceName}");
                 }
                 break;
 
@@ -616,7 +616,7 @@ public sealed class TypeChecker
                 else
                 {
                     _diagnostics.ReportError(somePat.Span, DiagnosticCode.TypeMismatch,
-                        $"Some pattern can only match Option types, got {expectedType.Name}");
+                        $"Some pattern can only match Option types, got {expectedType.SurfaceName}");
                 }
                 break;
 
@@ -624,7 +624,7 @@ public sealed class TypeChecker
                 if (expectedType is not OptionType)
                 {
                     _diagnostics.ReportError(nonePat.Span, DiagnosticCode.TypeMismatch,
-                        $"None pattern can only match Option types, got {expectedType.Name}");
+                        $"None pattern can only match Option types, got {expectedType.SurfaceName}");
                 }
                 break;
 
@@ -636,7 +636,7 @@ public sealed class TypeChecker
                 else
                 {
                     _diagnostics.ReportError(okPat.Span, DiagnosticCode.TypeMismatch,
-                        $"Ok pattern can only match Result types, got {expectedType.Name}");
+                        $"Ok pattern can only match Result types, got {expectedType.SurfaceName}");
                 }
                 break;
 
@@ -648,7 +648,7 @@ public sealed class TypeChecker
                 else
                 {
                     _diagnostics.ReportError(errPat.Span, DiagnosticCode.TypeMismatch,
-                        $"Err pattern can only match Result types, got {expectedType.Name}");
+                        $"Err pattern can only match Result types, got {expectedType.SurfaceName}");
                 }
                 break;
             default:
@@ -699,7 +699,7 @@ public sealed class TypeChecker
             if (!IsAssignable(elementType, actualType))
             {
                 _diagnostics.ReportError(element.Span, DiagnosticCode.TypeMismatch,
-                    $"List element type mismatch: expected {elementType.Name}, got {actualType.Name}");
+                    $"List element type mismatch: expected {elementType.SurfaceName}, got {actualType.SurfaceName}");
             }
         }
 
@@ -724,13 +724,13 @@ public sealed class TypeChecker
             if (!IsAssignable(keyType, actualKeyType))
             {
                 _diagnostics.ReportError(entry.Key.Span, DiagnosticCode.TypeMismatch,
-                    $"Dictionary key type mismatch: expected {keyType.Name}, got {actualKeyType.Name}");
+                    $"Dictionary key type mismatch: expected {keyType.SurfaceName}, got {actualKeyType.SurfaceName}");
             }
 
             if (!IsAssignable(valueType, actualValueType))
             {
                 _diagnostics.ReportError(entry.Value.Span, DiagnosticCode.TypeMismatch,
-                    $"Dictionary value type mismatch: expected {valueType.Name}, got {actualValueType.Name}");
+                    $"Dictionary value type mismatch: expected {valueType.SurfaceName}, got {actualValueType.SurfaceName}");
             }
         }
 
@@ -752,7 +752,7 @@ public sealed class TypeChecker
             if (!IsAssignable(elementType, actualType))
             {
                 _diagnostics.ReportError(element.Span, DiagnosticCode.TypeMismatch,
-                    $"Set element type mismatch: expected {elementType.Name}, got {actualType.Name}");
+                    $"Set element type mismatch: expected {elementType.SurfaceName}, got {actualType.SurfaceName}");
             }
         }
 
@@ -809,7 +809,7 @@ public sealed class TypeChecker
             if (expectedType != null && !IsAssignable(expectedType, checkType))
             {
                 _diagnostics.ReportError(contains.KeyOrValue.Span, DiagnosticCode.TypeMismatch,
-                    $"Contains check type mismatch: expected {expectedType.Name}, got {checkType.Name}");
+                    $"Contains check type mismatch: expected {expectedType.SurfaceName}, got {checkType.SurfaceName}");
             }
         }
 
@@ -826,13 +826,13 @@ public sealed class TypeChecker
             if (git.BaseName != "List" && git.BaseName != "Dictionary" && git.BaseName != "HashSet")
             {
                 _diagnostics.ReportError(count.Collection.Span, DiagnosticCode.TypeMismatch,
-                    $"CNT requires a collection type, got {collectionType.Name}");
+                    $"CNT requires a collection type, got {collectionType.SurfaceName}");
             }
         }
         else if (collectionType is not ErrorType)
         {
             _diagnostics.ReportError(count.Collection.Span, DiagnosticCode.TypeMismatch,
-                $"CNT requires a collection type, got {collectionType.Name}");
+                $"CNT requires a collection type, got {collectionType.SurfaceName}");
         }
 
         return PrimitiveType.Int;
@@ -854,14 +854,14 @@ public sealed class TypeChecker
                 if (!IsAssignable(expectedKeyType, indexType))
                 {
                     _diagnostics.ReportError(arrayAccess.Index.Span, DiagnosticCode.TypeMismatch,
-                        $"Dictionary key type mismatch: expected {expectedKeyType.Name}, got {indexType.Name}");
+                        $"Dictionary key type mismatch: expected {expectedKeyType.SurfaceName}, got {indexType.SurfaceName}");
                 }
                 return git.TypeArguments[1]; // Return value type
             }
             else
             {
                 _diagnostics.ReportError(arrayAccess.Index.Span, DiagnosticCode.TypeMismatch,
-                    $"Array/List index must be numeric, got {indexType.Name}");
+                    $"Array/List index must be numeric, got {indexType.SurfaceName}");
             }
         }
 
@@ -939,7 +939,7 @@ public sealed class TypeChecker
             if (!leftType.Equals(PrimitiveType.Bool) || !rightType.Equals(PrimitiveType.Bool))
             {
                 _diagnostics.ReportError(binOp.Span, DiagnosticCode.TypeMismatch,
-                    "Logical operators require BOOL operands");
+                    "Logical operators require bool operands");
             }
             return PrimitiveType.Bool;
         }
@@ -950,7 +950,7 @@ public sealed class TypeChecker
             if (!(leftType is ErrorType) && !(rightType is ErrorType))
             {
                 _diagnostics.ReportError(binOp.Span, DiagnosticCode.TypeMismatch,
-                    $"Arithmetic operators require numeric operands, got {leftType.Name} and {rightType.Name}");
+                    $"Arithmetic operators require numeric operands, got {leftType.SurfaceName} and {rightType.SurfaceName}");
             }
             return ErrorType.Instance;
         }
@@ -1018,7 +1018,7 @@ public sealed class TypeChecker
                 if (!IsAssignable(field.Type, valueType))
                 {
                     _diagnostics.ReportError(fieldAssign.Span, DiagnosticCode.TypeMismatch,
-                        $"Cannot assign {valueType.Name} to field '{fieldAssign.FieldName}' of type {field.Type.Name}");
+                        $"Cannot assign {valueType.SurfaceName} to field '{fieldAssign.FieldName}' of type {field.Type.SurfaceName}");
                 }
             }
         }
@@ -1036,14 +1036,14 @@ public sealed class TypeChecker
             if (fieldDef == null)
             {
                 _diagnostics.ReportError(field.Span, DiagnosticCode.UndefinedReference,
-                    $"Unknown field '{field.FieldName}' on type '{recordType.Name}'");
+                    $"Unknown field '{field.FieldName}' on type '{recordType.SurfaceName}'");
                 return ErrorType.Instance;
             }
             return fieldDef.Type;
         }
 
         _diagnostics.ReportError(field.Span, DiagnosticCode.TypeMismatch,
-            $"Cannot access field on non-record type {targetType.Name}");
+            $"Cannot access field on non-record type {targetType.SurfaceName}");
         return ErrorType.Instance;
     }
 
@@ -1075,7 +1075,7 @@ public sealed class TypeChecker
                 else if (!unifiedType.Equals(caseType) && caseType is not ErrorType && unifiedType is not ErrorType)
                 {
                     _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
-                        $"Match expression branches have incompatible types: {unifiedType.Name} and {caseType.Name}");
+                        $"Match expression branches have incompatible types: {unifiedType.SurfaceName} and {caseType.SurfaceName}");
                 }
             }
         }
@@ -1150,8 +1150,15 @@ public sealed class TypeChecker
         if (userType != null)
             return userType;
 
+        // #741: surface-spell the echoed name. A sized numeric type reaches here as its
+        // expanded internal form (e.g. `INT[bits=64][signed=true]`, `FLOAT[bits=32]`),
+        // which would leak `INT`/`[bits=` — route it through ToSurfaceSpelling so the
+        // message reads `i64`/`f32`. (That these sized types are not yet *resolved* by the
+        // opt-in TypeChecker — so a valid `i64` binding still gets this spurious "Unknown
+        // type" — is a separate pre-existing gap outside this spelling change: the opt-in
+        // TypeChecker does not model sized numeric widths.)
         _diagnostics.ReportError(span, DiagnosticCode.UndefinedReference,
-            $"Unknown type '{typeName}'");
+            $"Unknown type '{Parsing.AttributeHelper.ToSurfaceSpelling(typeName)}'");
         return ErrorType.Instance;
     }
 
