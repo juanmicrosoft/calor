@@ -91,13 +91,15 @@ public static class ConvertCommand
             var timeoutSeconds = ctx.ParseResult.GetValueForOption(timeoutOption);
             var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
             var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
-            await ExecuteAsync(input, output, benchmark, verbose, explain, noFallback, validate, passthrough, timeoutSeconds, explicitCallClosers, format);
+            // Exit code returned through ctx.ExitCode: a code parked only on
+            // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+            ctx.ExitCode = await ExecuteAsync(input, output, benchmark, verbose, explain, noFallback, validate, passthrough, timeoutSeconds, explicitCallClosers, format);
         });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, int timeoutSeconds, bool explicitCallClosers, string format)
+    private static async Task<int> ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, int timeoutSeconds, bool explicitCallClosers, string format)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -121,8 +123,7 @@ public static class ConvertCommand
             envelope?.AddCommandError($"Input file not found: {input.FullName}", input.FullName);
             Console.Error.WriteLine($"Error: Input file not found: {input.FullName}");
             envelope?.Emit();
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
         var direction = CSharpToCalorConverter.DetectDirection(input.FullName);
@@ -132,8 +133,7 @@ public static class ConvertCommand
             envelope?.AddCommandError("Unknown file type. Expected .cs or .calr extension.", input.FullName);
             Console.Error.WriteLine($"Error: Unknown file type. Expected .cs or .calr extension.");
             envelope?.Emit();
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
         var outputPath = output?.FullName ?? GetDefaultOutputPath(input.FullName, direction);
@@ -146,12 +146,13 @@ public static class ConvertCommand
             statusOut.WriteLine($"Direction: {(direction == ConversionDirection.CSharpToCalor ? "C# → Calor" : "Calor → C#")}");
         }
 
+        var exitCode = 0;
         try
         {
             ConversionResult? conversionResult = null;
             if (direction == ConversionDirection.CSharpToCalor)
             {
-                conversionResult = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, passthrough, timeoutSeconds, explicitCallClosers, envelope);
+                (exitCode, conversionResult) = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, passthrough, timeoutSeconds, explicitCallClosers, envelope);
             }
             else
             {
@@ -161,7 +162,7 @@ public static class ConvertCommand
                     // §CSHARP preservation fallback). Say so rather than silently ignoring it.
                     Console.Error.WriteLine("Note: --passthrough has no effect converting Calor → C#; it is ignored.");
                 }
-                await ConvertCalorToCSharpAsync(input.FullName, outputPath, verbose, envelope);
+                exitCode = await ConvertCalorToCSharpAsync(input.FullName, outputPath, verbose, envelope);
             }
 
             if (conversionResult != null && telemetry != null)
@@ -204,22 +205,24 @@ public static class ConvertCommand
             envelope?.AddCommandError($"Unhandled error: {ex.Message}", input.FullName);
             Console.Error.WriteLine($"Error: {ex.Message}");
             telemetry?.TrackException(ex);
-            Environment.ExitCode = 1;
+            exitCode = 1;
         }
         finally
         {
             // Envelope mode: a document is ALWAYS emitted, including crash paths.
             envelope?.Emit();
             sw.Stop();
-            telemetry?.TrackCommand("convert", Environment.ExitCode, new Dictionary<string, string>
+            telemetry?.TrackCommand("convert", exitCode, new Dictionary<string, string>
             {
                 ["durationMs"] = sw.ElapsedMilliseconds.ToString()
             });
-            if (Environment.ExitCode != 0)
+            if (exitCode != 0)
             {
                 IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "convert", "Conversion failed");
             }
         }
+
+        return exitCode;
     }
 
     /// <summary>
@@ -242,7 +245,7 @@ public static class ConvertCommand
         UseImplicitCallCloser = !explicitCallClosers
     };
 
-    private static async Task<ConversionResult?> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope)
+    private static async Task<(int ExitCode, ConversionResult? Result)> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope)
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
 
@@ -264,8 +267,7 @@ public static class ConvertCommand
             {
                 envelope?.AddCommandError($"Conversion timed out after {timeoutSeconds}s", inputPath);
                 Console.Error.WriteLine($"Error: Conversion timed out after {timeoutSeconds}s");
-                Environment.ExitCode = 1;
-                return null;
+                return (1, null);
             }
         }
         else
@@ -307,8 +309,7 @@ public static class ConvertCommand
                     Console.Error.WriteLine($"  ⚠ {warning.Message}");
                 }
             }
-            Environment.ExitCode = 1;
-            return result;
+            return (1, result);
         }
 
         // Write output (use replacement fallback for files containing unpairable surrogates)
@@ -402,10 +403,10 @@ public static class ConvertCommand
         statusOut.WriteLine();
         statusOut.WriteLine($"Output: {outputPath}");
 
-        return result;
+        return (0, result);
     }
 
-    private static async Task ConvertCalorToCSharpAsync(string inputPath, string outputPath, bool verbose, ConvertEnvelope? envelope)
+    private static async Task<int> ConvertCalorToCSharpAsync(string inputPath, string outputPath, bool verbose, ConvertEnvelope? envelope)
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
 
@@ -426,8 +427,7 @@ public static class ConvertCommand
             {
                 Console.Error.WriteLine($"  {diag}");
             }
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
         await File.WriteAllTextAsync(outputPath, result.GeneratedCode);
@@ -439,6 +439,7 @@ public static class ConvertCommand
 
         statusOut.WriteLine($"✓ Conversion successful");
         statusOut.WriteLine($"Output: {outputPath}");
+        return 0;
     }
 
     private static string GetDefaultOutputPath(string inputPath, ConversionDirection direction)

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **`calor verify` now exits 1 on refuted contracts (review of #754).** Previously verify's exit code was effectively always 0: the handler parked its code on `Environment.ExitCode`, which `Program.Main`'s `InvokeAsync` return value stomped, so a refuted (disproven) contract — or even a missing input file — still exited 0 with the refutation buried in `data.summary.refuted`. Verify now exits **1** when any file is missing, any compile error occurs, or any contract is refuted, and **0** when all contracts are proven or merely inconclusive (unknown/timeout/unsupported — runtime checks are kept, so inconclusive is not failure). Applies to both text and JSON modes.
+
+### Fixed
+- **CLI exit codes now propagate on error paths (review of #754 item 1).** `verify`, `convert`, `coverage`, `benchmark`, `effects resolve`, `effects validate`, and `effects suggest` parked their error exit codes on `Environment.ExitCode`, which `Program.Main`'s `InvokeAsync` return value overwrote — their error paths actually exited 0. All now return through the invocation context (the `format`/`ids` pattern), keeping each command's documented code values (verify/convert/coverage/benchmark use 1; assess/fix/effects-usage errors keep 2).
+- **JSON mode always emits exactly one envelope document, including error paths.** `benchmark`, `assess`, `fix`, `effects resolve`, and `effects suggest` returned with empty stdout (or, for benchmark, mixed status text into stdout) on error paths in JSON mode, violating the envelope schema contract ("stdout carries exactly one document, always"). Each now emits a schema-v1.1 envelope with a CLI-band diagnostic (`Calor1310` missing input, `Calor1311` usage error, `Calor1312` internal error) before exiting; `coverage`'s existing error envelope now carries the CLI-band diagnostic too. Human-readable errors keep going to stderr; text-mode output is unchanged.
+
 ## [0.8.0] - 2026-07-23
 
 ### Benchmark Results (Statistical: 30 runs)

@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 
 namespace Calor.Compiler.Commands;
@@ -103,6 +104,21 @@ public static class FixCommand
         return command;
     }
 
+    /// <summary>
+    /// Envelope mode (--format json): stdout carries exactly one document,
+    /// always — including early-exit error paths, which get a CLI-band
+    /// diagnostic (Calor1310 missing input, Calor1311 usage error).
+    /// </summary>
+    private static void EmitErrorEnvelope(bool json, string code, string message, string? filePath)
+    {
+        if (!json)
+        {
+            return;
+        }
+        Console.WriteLine(EnvelopeWriter.Serialize("fix", null,
+            [new Diagnostic(code, DiagnosticSeverity.Error, message, filePath, line: 1, column: 1)]));
+    }
+
     private static async Task<int> ExecuteAsync(
         DirectoryInfo root,
         bool dropStructuralIds,
@@ -116,6 +132,8 @@ public static class FixCommand
     {
         if (!root.Exists)
         {
+            EmitErrorEnvelope(json, DiagnosticCode.CliInputNotFound,
+                $"root directory not found: {root.FullName}", root.FullName);
             Console.Error.WriteLine($"root directory not found: {root.FullName}");
             return 2;
         }
@@ -125,11 +143,15 @@ public static class FixCommand
                           + (healClosers ? 1 : 0);
         if (selectedCount == 0)
         {
+            EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
+                "specify --drop-structural-ids, --compact-ids, --elide-call-closers, or --heal-closers", filePath: null);
             Console.Error.WriteLine("specify --drop-structural-ids, --compact-ids, --elide-call-closers, or --heal-closers");
             return 2;
         }
         if (selectedCount > 1)
         {
+            EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
+                "--drop-structural-ids, --compact-ids, --elide-call-closers, and --heal-closers are mutually exclusive; run them separately", filePath: null);
             Console.Error.WriteLine("--drop-structural-ids, --compact-ids, --elide-call-closers, and --heal-closers are mutually exclusive; run them separately");
             return 2;
         }
@@ -264,6 +286,8 @@ public static class FixCommand
     {
         if (logFile == null || !logFile.Exists)
         {
+            EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
+                "--revert requires --log <existing migration.log.json>", logFile?.FullName);
             Console.Error.WriteLine("--revert requires --log <existing migration.log.json>");
             return 2;
         }
@@ -340,6 +364,8 @@ public static class FixCommand
     {
         if (logFile == null || !logFile.Exists)
         {
+            EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
+                "--revert requires --log <existing migration.log.json>", logFile?.FullName);
             Console.Error.WriteLine("--revert requires --log <existing migration.log.json>");
             return 2;
         }
@@ -430,6 +456,8 @@ public static class FixCommand
     {
         if (logFile == null || !logFile.Exists)
         {
+            EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
+                "--revert requires --log <existing migration.log.json>", logFile?.FullName);
             Console.Error.WriteLine("--revert requires --log <existing migration.log.json>");
             return 2;
         }
@@ -502,6 +530,8 @@ public static class FixCommand
     {
         if (logFile == null || !logFile.Exists)
         {
+            EmitErrorEnvelope(json, DiagnosticCode.CliUsageError,
+                "--revert requires --log <existing migration.log.json>", logFile?.FullName);
             Console.Error.WriteLine("--revert requires --log <existing migration.log.json>");
             return 2;
         }
