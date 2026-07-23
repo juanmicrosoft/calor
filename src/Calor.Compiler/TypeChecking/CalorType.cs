@@ -5,7 +5,22 @@ namespace Calor.Compiler.TypeChecking;
 /// </summary>
 public abstract class CalorType : IEquatable<CalorType>
 {
+    /// <summary>
+    /// The internal type name (e.g. <c>INT</c>, <c>STRING</c>). Used as an identity key
+    /// for equality/hashing and by <see cref="PrimitiveType.FromName"/> — NOT for
+    /// user-facing text. Diagnostics must use <see cref="SurfaceName"/> instead (#741).
+    /// </summary>
     public abstract string Name { get; }
+
+    /// <summary>
+    /// The compact surface spelling agents actually write (<c>i32</c>, <c>str</c>,
+    /// <c>bool</c>, <c>Option&lt;str&gt;</c>) — the form every diagnostic that echoes a
+    /// type must use, so the message never teaches an un-writable internal spelling.
+    /// Defaults to <see cref="Name"/> (correct for user/record/union/param types whose
+    /// name is already what the user wrote); primitives and composites override to
+    /// surface-spell themselves and recurse (#741).
+    /// </summary>
+    public virtual string SurfaceName => Name;
 
     public abstract bool Equals(CalorType? other);
     public override bool Equals(object? obj) => obj is CalorType other && Equals(other);
@@ -30,6 +45,17 @@ public sealed class PrimitiveType : CalorType
     public static readonly PrimitiveType Unit = new("UNIT");
 
     public override string Name { get; }
+
+    public override string SurfaceName => Name switch
+    {
+        "INT" => "i32",
+        "FLOAT" => "f64",
+        "BOOL" => "bool",
+        "STRING" => "str",
+        "VOID" => "void",
+        "UNIT" => "unit",
+        _ => Name,
+    };
 
     private PrimitiveType(string name)
     {
@@ -67,6 +93,7 @@ public sealed class OptionType : CalorType
 {
     public CalorType InnerType { get; }
     public override string Name => $"Option<{InnerType.Name}>";
+    public override string SurfaceName => $"Option<{InnerType.SurfaceName}>";
 
     public OptionType(CalorType innerType)
     {
@@ -87,6 +114,7 @@ public sealed class ResultType : CalorType
     public CalorType OkType { get; }
     public CalorType ErrType { get; }
     public override string Name => $"Result<{OkType.Name}, {ErrType.Name}>";
+    public override string SurfaceName => $"Result<{OkType.SurfaceName}, {ErrType.SurfaceName}>";
 
     public ResultType(CalorType okType, CalorType errType)
     {
@@ -193,6 +221,14 @@ public sealed class FunctionType : CalorType
             return $"({paramStr}) -> {ReturnType.Name}";
         }
     }
+    public override string SurfaceName
+    {
+        get
+        {
+            var paramStr = string.Join(", ", ParameterTypes.Select(p => p.SurfaceName));
+            return $"({paramStr}) -> {ReturnType.SurfaceName}";
+        }
+    }
 
     public FunctionType(IReadOnlyList<CalorType> parameterTypes, CalorType returnType)
     {
@@ -230,6 +266,7 @@ public sealed class RefinedType : CalorType
     public string PredicateText { get; }
     public Ast.ExpressionNode Predicate { get; }
     public override string Name => $"{BaseType.Name}{{{PredicateText}}}";
+    public override string SurfaceName => $"{BaseType.SurfaceName}{{{PredicateText}}}";
 
     public RefinedType(CalorType baseType, string predicateText, Ast.ExpressionNode predicate)
     {
@@ -273,6 +310,7 @@ public sealed class TypeVariable : CalorType
     public int Id { get; }
     public CalorType? ResolvedType { get; private set; }
     public override string Name => ResolvedType?.Name ?? $"T{Id}";
+    public override string SurfaceName => ResolvedType?.SurfaceName ?? $"T{Id}";
 
     public TypeVariable()
     {
@@ -337,6 +375,14 @@ public sealed class GenericInstanceType : CalorType
         get
         {
             var argsStr = string.Join(", ", TypeArguments.Select(a => a.Name));
+            return $"{BaseName}<{argsStr}>";
+        }
+    }
+    public override string SurfaceName
+    {
+        get
+        {
+            var argsStr = string.Join(", ", TypeArguments.Select(a => a.SurfaceName));
             return $"{BaseName}<{argsStr}>";
         }
     }
