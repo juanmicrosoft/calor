@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.7.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.8.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The agent dev-loop release: <code>#line</code> source maps put compiler errors and stack traces in your <code>.calr</code> source; new <code>calor run</code>, <code>calor test</code>, and <code>calor watch</code> commands; machine-parseable <code>--format json|sarif</code> diagnostics; <code>calor format --heal</code> repairs broken agent output; and <code>calor self-check docs</code> keeps the docs honest in CI.</span>
+            <span className="text-foreground">The correctness-hardening release: every exit-0-then-broken-build hole in the binding, rebind, and shadowing family is now caught at <code>calor -i</code> with a clear diagnostic (<code>Calor0254</code>&ndash;<code>0258</code>); every diagnostic surface-spells types for agents; and <code>calor convert --passthrough</code> keeps converter output always parseable.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"

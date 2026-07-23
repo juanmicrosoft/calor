@@ -10,6 +10,31 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-23
+
+The correctness-hardening release: every exit-0-then-broken-`dotnet build` hole in the binding/rebind/shadowing family is now caught at `calor -i` with a clear diagnostic, plus a systemic pass to keep every diagnostic agent-friendly.
+
+### Breaking
+- **New hard-error diagnostics (`Calor0254`–`0258`) reject programs that previously compiled.** Programs that used to exit 0 and then fail a downstream C# build now fail earlier at `calor -i`: array→concrete-collection (`Calor0254`), enclosing-scope shadowing (`Calor0255`), type-changing mutable rebind (`Calor0256`), foreach iteration-variable write (`Calor0257`), and same-scope duplicate `§B` (`Calor0258`).
+- **Contract-verification result codes renumbered `Calor0700`–`0705` → `Calor0710`–`0715`.** Tooling filtering verification output on `Calor0700`–`Calor0705` must switch to `Calor0710`–`Calor0715`; `Calor0700`/`Calor0701` now unambiguously mean the semantics-version diagnostics.
+
+### Added
+- **Array-to-collection type error (`Calor0254`).** `calor -i` rejects binding, returning, reassigning, or passing an array where a concrete generic collection (`List<T>`, `HashSet<T>`, …) is expected — e.g. `§B{lines:List<str>} §C{File.ReadAllLines}` — instead of emitting C# that fails with CS0029. Collection *interfaces* (`IList<T>`, `IEnumerable<T>`) are still accepted.
+- **Local-shadowing error (`Calor0255`).** Rejects a `§B` that shadows a local, parameter, or loop variable already in an enclosing scope (CS0136), in both directions (an inner binding, or a loop variable reusing an enclosing name). Mutable rebinds (the accumulator idiom) and legal field-shadowing are unaffected.
+- **Type-changing / mismatched mutable-rebind error (`Calor0256`).** Rejects a mutable `§B` reassignment whose value is a different, non-convertible type — from an explicit annotation, a literal, or (new) an inferred reference/call return type. Uses primitive-category comparison, so implicit numeric widening is never falsely flagged.
+- **Foreach iteration-variable rebind error (`Calor0257`).** Rejects writing to a read-only `§EACH`/`§EACHKV` iteration variable (CS1656); `§L` for-loop variables and `§EACH` index counters stay reassignable.
+- **Same-scope duplicate-binding error (`Calor0258`).** Rejects two `§B` reusing a name in one scope (CS0128); the C#→Calor converter now emits array/collection reassignments as reassignments rather than duplicate creation blocks.
+- **`calor convert --passthrough`.** The CLI C#→Calor converter can now preserve unconvertible members verbatim as `§CSHARP` interop blocks so the output always parses, reporting how many members were preserved.
+- **Surface-spelled diagnostics.** Every diagnostic that echoes a type now prints the compact surface spelling (`i32`, `str`, `bool`, `Option<str>`) instead of the internal form, guarded by a test that scans the whole corpus for leaks.
+- **Exemplar compile-checking.** `calor self-check docs` now compiles every program in the agent syntax exemplar all the way through Roslyn's semantic model, catching type errors the Calor pipeline emits without complaint.
+- **Converter §CSHARP fallback.** When a C#-preserving mode is active and the emitted Calor for a member would not parse, that member is re-emitted as a `§CSHARP` interop block so the output is always valid Calor.
+
+### Fixed
+- **Scope-aware mutable-rebind codegen.** The emitter now tracks declared variables in a scope stack, so a mutable `§B` in a closed sibling block re-declares (valid) rather than assigning to an out-of-scope variable (CS0103); loop variables, `catch`/`using` bindings, and parameters are modeled too.
+
+### Changed
+- **CI hardening.** The Calor-first guard exempts the `tests/` tree (xUnit tests are C# by nature), and the Z3 download retries transient network failures instead of breaking the build.
+
 ## [0.7.0] - 2026-07-16
 
 The agent dev-loop release: Phase 1 of the agent-native strategy complete — six items, each hardened by adversarial review.
