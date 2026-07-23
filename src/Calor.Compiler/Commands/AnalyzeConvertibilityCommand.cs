@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Diagnostics;
 using System.Text;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Init;
 using Calor.Compiler.Telemetry;
 
@@ -102,6 +103,19 @@ public static class AnalyzeConvertibilityCommand
             }
             else
             {
+                // Envelope mode: stdout carries exactly one document, always —
+                // including this early exit (envelope schema v1.1 contract).
+                if (format.Equals("json", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine(EnvelopeWriter.Serialize("analyze-convertibility", data: null,
+                        [new Diagnostic(
+                            DiagnosticCode.CliInputNotFound,
+                            DiagnosticSeverity.Error,
+                            $"Path not found: {path}",
+                            filePath: path,
+                            line: 1,
+                            column: 1)]));
+                }
                 Console.Error.WriteLine($"Error: Path not found: {path}");
                 return 2;
             }
@@ -121,6 +135,17 @@ public static class AnalyzeConvertibilityCommand
         }
         catch (Exception ex)
         {
+            if (format.Equals("json", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("analyze-convertibility", data: null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliInternalError,
+                        DiagnosticSeverity.Error,
+                        $"Analysis failed: {ex.Message}",
+                        filePath: path,
+                        line: 1,
+                        column: 1)]));
+            }
             Console.Error.WriteLine($"Error: {ex.Message}");
             telemetry?.TrackException(ex);
             exitCode = 2;

@@ -1,5 +1,7 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Telemetry;
 
@@ -35,12 +37,20 @@ public static class FeatureCheckCommand
             levelOption
         };
 
-        command.SetHandler(Execute, featureArgument, listOption, levelOption);
+        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+        command.SetHandler((InvocationContext ctx) =>
+        {
+            ctx.ExitCode = Execute(
+                ctx.ParseResult.GetValueForArgument(featureArgument),
+                ctx.ParseResult.GetValueForOption(listOption),
+                ctx.ParseResult.GetValueForOption(levelOption));
+        });
 
         return command;
     }
 
-    private static void Execute(string? feature, bool list, string? level)
+    private static int Execute(string? feature, bool list, string? level)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("feature-check");
@@ -51,8 +61,8 @@ public static class FeatureCheckCommand
         {
             if (list || string.IsNullOrEmpty(feature))
             {
-                ListFeatures(level);
-                return;
+                exitCode = ListFeatures(level);
+                return exitCode;
             }
 
             var info = FeatureSupport.GetFeatureInfo(feature);
@@ -70,7 +80,7 @@ public static class FeatureCheckCommand
                     Alternative = "Feature not in registry. It may be supported (basic C# features work), or check documentation."
                 };
                 Console.WriteLine(EnvelopeWriter.Serialize("feature-check", unknownResult));
-                return;
+                return exitCode;
             }
 
             var result = new FeatureCheckResult
@@ -84,6 +94,7 @@ public static class FeatureCheckCommand
             };
 
             Console.WriteLine(EnvelopeWriter.Serialize("feature-check", result));
+            return exitCode;
         }
         catch (Exception ex)
         {
@@ -103,7 +114,7 @@ public static class FeatureCheckCommand
         }
     }
 
-    private static void ListFeatures(string? levelFilter)
+    private static int ListFeatures(string? levelFilter)
     {
         var features = FeatureSupport.GetAllFeatures();
 
@@ -115,10 +126,19 @@ public static class FeatureCheckCommand
             }
             else
             {
+                // This command is JSON-only: stdout must carry exactly one
+                // envelope document even on this usage error (schema v1.1).
+                Console.WriteLine(EnvelopeWriter.Serialize("feature-check", data: null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliUsageError,
+                        DiagnosticSeverity.Error,
+                        $"Unknown support level: {levelFilter}. Valid levels: full, partial, notsupported, manualrequired",
+                        filePath: null,
+                        line: 1,
+                        column: 1)]));
                 Console.Error.WriteLine($"Unknown support level: {levelFilter}");
                 Console.Error.WriteLine("Valid levels: full, partial, notsupported, manualrequired");
-                Environment.ExitCode = 1;
-                return;
+                return 1;
             }
         }
 
@@ -142,6 +162,7 @@ public static class FeatureCheckCommand
         };
 
         Console.WriteLine(EnvelopeWriter.Serialize("feature-check", output));
+        return 0;
     }
 
     private sealed class FeatureCheckResult
