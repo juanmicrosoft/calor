@@ -156,6 +156,14 @@ Two adversarial notes for the review, pre-empted: (1) PP-L5 compares Calor-to-Ca
 4. **Measurement cost** — two epochs (baseline + comparison) at gates-doc rigor, plus re-runs. Cheaper than one wrong architecture bet; the spend goes through the same authorization process as Phase 2 (`phase-2-spend-authorisation.md`).
 5. **Audit drift at bus factor 1** — the strategy doc's revision log found factual drift three rounds running. D1.4's conformance test and this doc's §1 audit table (dated, file-anchored) are the mitigations; §1 should be re-audited at M5.
 
-## 8. Relationship to v0.10
+## 8. Relationship to the milestones that follow
 
-On PP-L5 hit, v0.10 ("The Guarantees") inherits this instrument: verification tiers (async Z3, never blocking the edit loop), capability-parameter evolution of `§E`, and contract provenance tiers are all *measured on the same loop telemetry* — which is the point of building the instrument first.
+Milestone map (recorded here so the numbering stops drifting — versioning runs 0.9 → 0.10 → 0.11, not toward 1.0):
+
+| Version | Theme | Relationship to this plan |
+|---|---|---|
+| **v0.9** | **The Loop** (this doc) | Builds the instrument |
+| **v0.10** | The Guarantees | Runs on the instrument |
+| **v0.11** | The Wedge | Onboarding into mixed C#/Calor solutions; validated on the same loop telemetry |
+
+On PP-L5 hit, **v0.10 ("The Guarantees")** inherits this instrument: verification tiers (async Z3, never blocking the edit loop), capability-parameter evolution of `§E`, and contract provenance tiers are all *measured on the same loop telemetry* — which is the point of building the instrument first. **v0.11 ("The Wedge")** — mixed-project onboarding and the curated top-N package manifests — is likewise judged on loop metrics, so the per-module adoption story is measured, not asserted.
