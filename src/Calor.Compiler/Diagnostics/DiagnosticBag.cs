@@ -51,6 +51,19 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
         _diagnostics.Add(diagnostic);
     }
 
+    /// <summary>
+    /// Reports a contract-verification diagnostic carrying the choke-point proof
+    /// outcome as its envelope verification payload.
+    /// </summary>
+    public void ReportVerification(TextSpan span, string code, string message,
+        DiagnosticSeverity severity, Verification.ProofOutcome outcome)
+    {
+        _diagnostics.Add(new Diagnostic(code, message, span, severity, _currentFilePath)
+        {
+            Verification = outcome
+        });
+    }
+
     public void ReportError(TextSpan span, string code, string message)
         => Report(span, code, message, DiagnosticSeverity.Error);
 

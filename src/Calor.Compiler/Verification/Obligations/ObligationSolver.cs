@@ -42,8 +42,8 @@ public sealed class ObligationSolver : IDisposable
             }
             else
             {
-                obligation.Status = ObligationStatus.Unsupported;
-                obligation.CounterexampleDescription = $"Function '{obligation.FunctionId}' not found";
+                obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    $"Function '{obligation.FunctionId}' not found")));
             }
         }
     }
@@ -65,9 +65,8 @@ public sealed class ObligationSolver : IDisposable
                 if (obligation.Kind == ObligationKind.IndexBounds)
                     continue;
 
-                obligation.Status = ObligationStatus.Unsupported;
-                obligation.CounterexampleDescription =
-                    ContractTranslator.DiagnoseUnsupportedType(type);
+                obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    ContractTranslator.DiagnoseUnsupportedType(type))));
                 obligation.SolverDuration = sw.Elapsed;
                 return;
             }
@@ -94,11 +93,10 @@ public sealed class ObligationSolver : IDisposable
         var conditionExpr = translator.TranslateBoolExpr(obligation.Condition);
         if (conditionExpr == null)
         {
-            obligation.Status = ObligationStatus.Unsupported;
-            obligation.CounterexampleDescription =
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
                 translator.DiagnoseBoolExprFailure(obligation.Condition)
                 ?? translator.DiagnoseTranslationFailure(obligation.Condition)
-                ?? "Obligation condition could not be translated to Z3";
+                ?? "Obligation condition could not be translated to Z3")));
             obligation.SolverDuration = sw.Elapsed;
 
             if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
@@ -158,10 +156,9 @@ public sealed class ObligationSolver : IDisposable
 
                 if (solver.Check() == Status.UNSATISFIABLE)
                 {
-                    obligation.Status = ObligationStatus.Unsupported;
-                    obligation.CounterexampleDescription =
+                    obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
                         "Assumption set is inconsistent (unsatisfiable preconditions); " +
-                        "vacuous discharge prevented";
+                        "vacuous discharge prevented")));
                     obligation.SolverDuration = sw.Elapsed;
                     return;
                 }
@@ -175,28 +172,12 @@ public sealed class ObligationSolver : IDisposable
             var status = solver.Check();
 
             obligation.SolverDuration = sw.Elapsed;
-
-            switch (status)
-            {
-                case Status.UNSATISFIABLE:
-                    obligation.Status = ObligationStatus.Discharged;
-                    break;
-
-                case Status.SATISFIABLE:
-                    obligation.Status = ObligationStatus.Failed;
-                    obligation.CounterexampleDescription =
-                        ExtractCounterexample(solver.Model, translator.Variables);
-                    break;
-
-                default:
-                    obligation.Status = ObligationStatus.Timeout;
-                    break;
-            }
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.SolverVerdict(
+                status, solver, translator.Variables, SatPolarity.SatIsRefutation)));
         }
         catch (Z3Exception ex)
         {
-            obligation.Status = ObligationStatus.Timeout;
-            obligation.CounterexampleDescription = $"Z3 solver error: {ex.Message}";
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.SolverError(ex)));
             obligation.SolverDuration = sw.Elapsed;
         }
         finally
@@ -204,38 +185,6 @@ public sealed class ObligationSolver : IDisposable
             if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
                 translator.PopSelfVariable();
         }
-    }
-
-    /// <summary>
-    /// Extract a human-readable counterexample from a Z3 model.
-    /// </summary>
-    private static string ExtractCounterexample(
-        Model model,
-        IReadOnlyDictionary<string, (Expr Expr, string Type)> variables)
-    {
-        var values = new List<string>();
-
-        foreach (var (name, (expr, _)) in variables)
-        {
-            // Skip internal variables
-            if (name.Contains("$") || name.StartsWith("__"))
-                continue;
-
-            try
-            {
-                var value = model.Evaluate(expr, true);
-                values.Add($"{name}={value}");
-            }
-            catch
-            {
-                values.Add($"{name}=<unavailable>");
-            }
-        }
-
-        if (values.Count == 0)
-            return "Counterexample found (values unavailable)";
-
-        return $"Counterexample: {string.Join(", ", values)}";
     }
 
     private static Dictionary<string, FunctionInfo> BuildFunctionInfo(ModuleNode module)

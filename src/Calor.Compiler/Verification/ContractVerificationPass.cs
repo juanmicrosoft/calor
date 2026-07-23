@@ -149,52 +149,93 @@ public sealed class ContractVerificationPass
 
     private void ReportDiagnostics(FunctionNode function, FunctionVerificationResult result)
     {
-        // Report disproven preconditions
         for (int i = 0; i < result.PreconditionResults.Count && i < function.Preconditions.Count; i++)
         {
-            var preResult = result.PreconditionResults[i];
-            var preNode = function.Preconditions[i];
-
-            if (preResult.Status == ContractVerificationStatus.Disproven)
-            {
-                _diagnostics.ReportWarning(
-                    preNode.Span,
-                    DiagnosticCode.PreconditionMayBeViolated,
-                    $"Precondition may be violated in function '{function.Name}'. {preResult.CounterexampleDescription}");
-            }
+            ReportContractDiagnostic(
+                function, result.PreconditionResults[i], function.Preconditions[i].Span, isPrecondition: true);
         }
 
-        // Report disproven postconditions
         for (int i = 0; i < result.PostconditionResults.Count && i < function.Postconditions.Count; i++)
         {
-            var postResult = result.PostconditionResults[i];
-            var postNode = function.Postconditions[i];
-
-            if (postResult.Status == ContractVerificationStatus.Disproven)
-            {
-                _diagnostics.ReportWarning(
-                    postNode.Span,
-                    DiagnosticCode.PostconditionMayBeViolated,
-                    $"Postcondition may be violated in function '{function.Name}'. {postResult.CounterexampleDescription}");
-            }
+            ReportContractDiagnostic(
+                function, result.PostconditionResults[i], function.Postconditions[i].Span, isPrecondition: false);
         }
+    }
 
-        // Report proven postconditions at info level if verbose
-        if (_options.Verbose)
+    /// <summary>
+    /// Reports one diagnostic per contract from the choke-point outcome. Every
+    /// non-proven status is surfaced — refuted as a warning, timeout / unknown /
+    /// unsupported as info — so no verification cliff is silent (loop plan D1.2).
+    /// Each diagnostic carries the outcome as its envelope verification payload.
+    /// </summary>
+    private void ReportContractDiagnostic(
+        FunctionNode function,
+        ContractVerificationResult contractResult,
+        Parsing.TextSpan span,
+        bool isPrecondition)
+    {
+        // Z3-unavailable runs are reported once per module via Calor0710
+        if (contractResult.Status == ContractVerificationStatus.Skipped)
+            return;
+
+        var outcome = contractResult.EffectiveOutcome;
+        var kind = isPrecondition ? "Precondition" : "Postcondition";
+
+        switch (outcome.Status)
         {
-            for (int i = 0; i < result.PostconditionResults.Count; i++)
-            {
-                var postResult = result.PostconditionResults[i];
-                var postNode = function.Postconditions[i];
+            case ProofStatus.Refuted:
+                _diagnostics.ReportVerification(
+                    span,
+                    isPrecondition
+                        ? DiagnosticCode.PreconditionMayBeViolated
+                        : DiagnosticCode.PostconditionMayBeViolated,
+                    $"{kind} may be violated in function '{function.Name}'. {contractResult.CounterexampleDescription}",
+                    DiagnosticSeverity.Warning,
+                    outcome);
+                break;
 
-                if (postResult.Status == ContractVerificationStatus.Proven)
+            case ProofStatus.Proven:
+                if (!isPrecondition && _options.Verbose)
                 {
-                    _diagnostics.ReportInfo(
-                        postNode.Span,
+                    _diagnostics.ReportVerification(
+                        span,
                         DiagnosticCode.PostconditionProven,
-                        $"Postcondition statically verified in function '{function.Name}'. Runtime check elided.");
+                        $"Postcondition statically verified in function '{function.Name}'. Runtime check elided.",
+                        DiagnosticSeverity.Info,
+                        outcome);
                 }
-            }
+                break;
+
+            case ProofStatus.Timeout:
+                _diagnostics.ReportVerification(
+                    span,
+                    DiagnosticCode.ContractVerificationTimeout,
+                    $"{kind} verification timed out in function '{function.Name}'. Runtime check kept.",
+                    DiagnosticSeverity.Info,
+                    outcome);
+                break;
+
+            case ProofStatus.Unsupported:
+                _diagnostics.ReportVerification(
+                    span,
+                    DiagnosticCode.ContractVerificationUnsupported,
+                    $"{kind} could not be translated for verification in function '{function.Name}'" +
+                        (outcome.Reason is { Length: > 0 } reason ? $": {reason}" : ".") +
+                        " Runtime check kept.",
+                    DiagnosticSeverity.Info,
+                    outcome);
+                break;
+
+            default:
+                _diagnostics.ReportVerification(
+                    span,
+                    DiagnosticCode.ContractVerificationInconclusive,
+                    $"{kind} verification was inconclusive in function '{function.Name}'" +
+                        (outcome.Reason is { Length: > 0 } why ? $" ({why})" : "") +
+                        ". Runtime check kept.",
+                    DiagnosticSeverity.Info,
+                    outcome);
+                break;
         }
     }
 

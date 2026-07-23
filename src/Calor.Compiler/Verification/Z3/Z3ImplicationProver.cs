@@ -38,10 +38,17 @@ public enum ImplicationStatus
 /// <param name="Status">The status of the proof attempt.</param>
 /// <param name="CounterexampleDescription">Description of a counterexample if Status is Disproven.</param>
 /// <param name="Duration">Time taken to perform the proof.</param>
+/// <param name="Outcome">The choke-point outcome (five-status vocabulary + structured counterexample).</param>
 public record ImplicationResult(
     ImplicationStatus Status,
     string? CounterexampleDescription = null,
-    TimeSpan? Duration = null);
+    TimeSpan? Duration = null,
+    ProofOutcome? Outcome = null)
+{
+    /// <summary>Builds a result whose legacy fields are derived from the choke-point outcome.</summary>
+    public static ImplicationResult FromOutcome(ProofOutcome outcome, TimeSpan? Duration = null)
+        => new(outcome.ToImplicationStatus(), outcome.Describe(), Duration, outcome);
+}
 
 /// <summary>
 /// Proves contract implications using Z3 SMT solving.
@@ -99,8 +106,9 @@ public sealed class Z3ImplicationProver : IDisposable
             if (!translator.DeclareVariable(name, type))
             {
                 // Unsupported parameter type (strings, floats, etc.)
-                return new ImplicationResult(
-                    ImplicationStatus.Unsupported,
+                return ImplicationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        ContractTranslator.DiagnoseUnsupportedType(type))),
                     Duration: sw.Elapsed);
             }
         }
@@ -113,8 +121,10 @@ public sealed class Z3ImplicationProver : IDisposable
         var antecedentExpr = translator.TranslateBoolExpr(antecedent);
         if (antecedentExpr == null)
         {
-            return new ImplicationResult(
-                ImplicationStatus.Unsupported,
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    translator.DiagnoseTranslationFailure(antecedent)
+                    ?? "Antecedent could not be translated to Z3")),
                 Duration: sw.Elapsed);
         }
 
@@ -122,38 +132,35 @@ public sealed class Z3ImplicationProver : IDisposable
         var consequentExpr = translator.TranslateBoolExpr(consequent);
         if (consequentExpr == null)
         {
-            return new ImplicationResult(
-                ImplicationStatus.Unsupported,
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    translator.DiagnoseTranslationFailure(consequent)
+                    ?? "Consequent could not be translated to Z3")),
                 Duration: sw.Elapsed);
         }
 
-        // Create solver and add constraint: A AND NOT(C)
-        var solver = _ctx.MkSolver();
-        solver.Set("timeout", _timeoutMs);
-        solver.Assert(antecedentExpr);
-        solver.Assert(_ctx.MkNot(consequentExpr));
-
-        // Check satisfiability
-        var status = solver.Check();
-
-        return status switch
+        try
         {
-            // UNSAT means no counterexample exists → A always implies C
-            Status.UNSATISFIABLE => new ImplicationResult(
-                ImplicationStatus.Proven,
-                Duration: sw.Elapsed),
+            // Create solver and add constraint: A AND NOT(C)
+            var solver = _ctx.MkSolver();
+            solver.Set("timeout", _timeoutMs);
+            solver.Assert(antecedentExpr);
+            solver.Assert(_ctx.MkNot(consequentExpr));
 
-            // SAT means counterexample found → A does not imply C
-            Status.SATISFIABLE => new ImplicationResult(
-                ImplicationStatus.Disproven,
-                CounterexampleDescription: ExtractCounterexample(solver.Model, translator.Variables),
-                Duration: sw.Elapsed),
+            // Check satisfiability: UNSAT means A always implies C
+            var status = solver.Check();
 
-            // UNKNOWN → timeout or too complex
-            _ => new ImplicationResult(
-                ImplicationStatus.Unknown,
-                Duration: sw.Elapsed)
-        };
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.SolverVerdict(
+                    status, solver, translator.Variables, SatPolarity.SatIsRefutation)),
+                Duration: sw.Elapsed);
+        }
+        catch (Z3Exception ex)
+        {
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.SolverError(ex)),
+                Duration: sw.Elapsed);
+        }
     }
 
     /// <summary>
@@ -201,8 +208,9 @@ public sealed class Z3ImplicationProver : IDisposable
         {
             if (!translator.DeclareVariable(name, type))
             {
-                return new ImplicationResult(
-                    ImplicationStatus.Unsupported,
+                return ImplicationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        ContractTranslator.DiagnoseUnsupportedType(type))),
                     Duration: sw.Elapsed);
             }
         }
@@ -212,8 +220,9 @@ public sealed class Z3ImplicationProver : IDisposable
         {
             if (!translator.DeclareVariable("result", outputType))
             {
-                return new ImplicationResult(
-                    ImplicationStatus.Unsupported,
+                return ImplicationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        ContractTranslator.DiagnoseUnsupportedType(outputType))),
                     Duration: sw.Elapsed);
             }
         }
@@ -227,8 +236,10 @@ public sealed class Z3ImplicationProver : IDisposable
         var implementerExpr = translator.TranslateBoolExpr(implementerPostcondition);
         if (implementerExpr == null)
         {
-            return new ImplicationResult(
-                ImplicationStatus.Unsupported,
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    translator.DiagnoseTranslationFailure(implementerPostcondition)
+                    ?? "Implementer postcondition could not be translated to Z3")),
                 Duration: sw.Elapsed);
         }
 
@@ -236,59 +247,36 @@ public sealed class Z3ImplicationProver : IDisposable
         var interfaceExpr = translator.TranslateBoolExpr(interfacePostcondition);
         if (interfaceExpr == null)
         {
-            return new ImplicationResult(
-                ImplicationStatus.Unsupported,
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    translator.DiagnoseTranslationFailure(interfacePostcondition)
+                    ?? "Interface postcondition could not be translated to Z3")),
                 Duration: sw.Elapsed);
         }
 
-        // For LSP: implementer postcondition must imply interface postcondition
-        // i.e., anything the implementer guarantees should also satisfy what the interface guarantees
-        // This means the implementer can only guarantee MORE (stronger postcondition)
-        var solver = _ctx.MkSolver();
-        solver.Set("timeout", _timeoutMs);
-        solver.Assert(implementerExpr);
-        solver.Assert(_ctx.MkNot(interfaceExpr));
-
-        var status = solver.Check();
-
-        return status switch
+        try
         {
-            Status.UNSATISFIABLE => new ImplicationResult(
-                ImplicationStatus.Proven,
-                Duration: sw.Elapsed),
-            Status.SATISFIABLE => new ImplicationResult(
-                ImplicationStatus.Disproven,
-                CounterexampleDescription: ExtractCounterexample(solver.Model, translator.Variables),
-                Duration: sw.Elapsed),
-            _ => new ImplicationResult(
-                ImplicationStatus.Unknown,
-                Duration: sw.Elapsed)
-        };
-    }
+            // For LSP: implementer postcondition must imply interface postcondition
+            // i.e., anything the implementer guarantees should also satisfy what the interface guarantees
+            // This means the implementer can only guarantee MORE (stronger postcondition)
+            var solver = _ctx.MkSolver();
+            solver.Set("timeout", _timeoutMs);
+            solver.Assert(implementerExpr);
+            solver.Assert(_ctx.MkNot(interfaceExpr));
 
-    private static string ExtractCounterexample(Model model, IReadOnlyDictionary<string, (Expr Expr, string Type)> variables)
-    {
-        var sb = new StringBuilder("Counterexample: ");
-        var values = new List<string>();
+            var status = solver.Check();
 
-        foreach (var (name, (expr, _)) in variables)
-        {
-            try
-            {
-                var value = model.Evaluate(expr, true);
-                values.Add($"{name}={value}");
-            }
-            catch (Exception ex)
-            {
-                values.Add($"{name}=<eval failed: {ex.GetType().Name}>");
-            }
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.SolverVerdict(
+                    status, solver, translator.Variables, SatPolarity.SatIsRefutation)),
+                Duration: sw.Elapsed);
         }
-
-        if (values.Count == 0)
-            return "Counterexample found (values unavailable)";
-
-        sb.Append(string.Join(", ", values));
-        return sb.ToString();
+        catch (Z3Exception ex)
+        {
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.SolverError(ex)),
+                Duration: sw.Elapsed);
+        }
     }
 
     public void Dispose()

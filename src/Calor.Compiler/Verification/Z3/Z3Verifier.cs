@@ -47,9 +47,9 @@ public sealed class Z3Verifier : IDisposable
         {
             if (!translator.DeclareVariable(name, type))
             {
-                return new ContractVerificationResult(
-                    ContractVerificationStatus.Unsupported,
-                    CounterexampleDescription: ContractTranslator.DiagnoseUnsupportedType(type),
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        ContractTranslator.DiagnoseUnsupportedType(type))),
                     Duration: sw.Elapsed);
             }
         }
@@ -61,9 +61,8 @@ public sealed class Z3Verifier : IDisposable
             var diagnostic = translator.DiagnoseBoolExprFailure(precondition.Condition)
                 ?? translator.DiagnoseTranslationFailure(precondition.Condition)
                 ?? "Unknown translation failure in precondition";
-            return new ContractVerificationResult(
-                ContractVerificationStatus.Unsupported,
-                CounterexampleDescription: diagnostic,
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(diagnostic)),
                 Duration: sw.Elapsed);
         }
 
@@ -79,28 +78,17 @@ public sealed class Z3Verifier : IDisposable
             var status = solver.Check();
             var warnings = translator.Warnings.Count > 0 ? translator.Warnings.ToList() : null;
 
-            return status switch
-            {
-                Status.SATISFIABLE => new ContractVerificationResult(
-                    ContractVerificationStatus.Proven,
-                    Warnings: warnings,
-                    Duration: sw.Elapsed),
-                Status.UNSATISFIABLE => new ContractVerificationResult(
-                    ContractVerificationStatus.Disproven,
-                    CounterexampleDescription: "Precondition is never satisfiable - function can never be called correctly",
-                    Warnings: warnings,
-                    Duration: sw.Elapsed),
-                _ => new ContractVerificationResult(
-                    ContractVerificationStatus.Unproven,
-                    Warnings: warnings,
-                    Duration: sw.Elapsed)
-            };
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.SolverVerdict(
+                    status, solver, translator.Variables, SatPolarity.SatIsProof,
+                    unsatNote: "Precondition is never satisfiable - function can never be called correctly")),
+                warnings,
+                sw.Elapsed);
         }
         catch (Z3Exception ex)
         {
-            return new ContractVerificationResult(
-                ContractVerificationStatus.Unproven,
-                CounterexampleDescription: $"Z3 solver error: {ex.Message}",
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.SolverError(ex)),
                 Duration: sw.Elapsed);
         }
     }
@@ -131,9 +119,9 @@ public sealed class Z3Verifier : IDisposable
         {
             if (!translator.DeclareVariable(name, type))
             {
-                return new ContractVerificationResult(
-                    ContractVerificationStatus.Unsupported,
-                    CounterexampleDescription: ContractTranslator.DiagnoseUnsupportedType(type),
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        ContractTranslator.DiagnoseUnsupportedType(type))),
                     Duration: sw.Elapsed);
             }
         }
@@ -143,9 +131,9 @@ public sealed class Z3Verifier : IDisposable
         {
             if (!translator.DeclareVariable("result", outputType))
             {
-                return new ContractVerificationResult(
-                    ContractVerificationStatus.Unsupported,
-                    CounterexampleDescription: ContractTranslator.DiagnoseUnsupportedType(outputType),
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        ContractTranslator.DiagnoseUnsupportedType(outputType))),
                     Duration: sw.Elapsed);
             }
         }
@@ -160,9 +148,8 @@ public sealed class Z3Verifier : IDisposable
                 var diagnostic = translator.DiagnoseBoolExprFailure(pre.Condition)
                     ?? translator.DiagnoseTranslationFailure(pre.Condition)
                     ?? "Unknown translation failure in precondition";
-                return new ContractVerificationResult(
-                    ContractVerificationStatus.Unsupported,
-                    CounterexampleDescription: diagnostic,
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(diagnostic)),
                     Duration: sw.Elapsed);
             }
             preconditionExprs.Add(preExpr);
@@ -175,9 +162,8 @@ public sealed class Z3Verifier : IDisposable
             var diagnostic = translator.DiagnoseBoolExprFailure(postcondition.Condition)
                 ?? translator.DiagnoseTranslationFailure(postcondition.Condition)
                 ?? "Unknown translation failure in postcondition";
-            return new ContractVerificationResult(
-                ContractVerificationStatus.Unsupported,
-                CounterexampleDescription: diagnostic,
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(diagnostic)),
                 Duration: sw.Elapsed);
         }
 
@@ -200,56 +186,18 @@ public sealed class Z3Verifier : IDisposable
             var status = solver.Check();
             var warnings = translator.Warnings.Count > 0 ? translator.Warnings.ToList() : null;
 
-            return status switch
-            {
-                Status.UNSATISFIABLE => new ContractVerificationResult(
-                    ContractVerificationStatus.Proven,
-                    Warnings: warnings,
-                    Duration: sw.Elapsed),
-                Status.SATISFIABLE => new ContractVerificationResult(
-                    ContractVerificationStatus.Disproven,
-                    CounterexampleDescription: ExtractCounterexample(solver.Model, translator.Variables),
-                    Warnings: warnings,
-                    Duration: sw.Elapsed),
-                _ => new ContractVerificationResult(
-                    ContractVerificationStatus.Unproven,
-                    Warnings: warnings,
-                    Duration: sw.Elapsed)
-            };
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.SolverVerdict(
+                    status, solver, translator.Variables, SatPolarity.SatIsRefutation)),
+                warnings,
+                sw.Elapsed);
         }
         catch (Z3Exception ex)
         {
-            return new ContractVerificationResult(
-                ContractVerificationStatus.Unproven,
-                CounterexampleDescription: $"Z3 solver error: {ex.Message}",
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.SolverError(ex)),
                 Duration: sw.Elapsed);
         }
-    }
-
-    private static string ExtractCounterexample(Model model, IReadOnlyDictionary<string, (Expr Expr, string Type)> variables)
-    {
-        var sb = new StringBuilder("Counterexample: ");
-        var values = new List<string>();
-
-        foreach (var (name, (expr, _)) in variables)
-        {
-            try
-            {
-                var value = model.Evaluate(expr, true);
-                values.Add($"{name}={value}");
-            }
-            catch (Exception ex)
-            {
-                // Record the variable with evaluation failure info for debugging
-                values.Add($"{name}=<eval failed: {ex.GetType().Name}>");
-            }
-        }
-
-        if (values.Count == 0)
-            return "Counterexample found (values unavailable)";
-
-        sb.Append(string.Join(", ", values));
-        return sb.ToString();
     }
 
     public void Dispose()

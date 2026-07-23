@@ -65,6 +65,20 @@ public sealed class Obligation
     public string? SuggestedFix { get; internal set; }
 
     /// <summary>
+    /// The choke-point outcome (five-status vocabulary + structured counterexample).
+    /// Null while Pending, and for Boundary obligations which are never solver-checked.
+    /// </summary>
+    public ProofOutcome? Outcome { get; private set; }
+
+    /// <summary>Applies a choke-point outcome, deriving the legacy status and description from it.</summary>
+    internal void ApplyOutcome(ProofOutcome outcome)
+    {
+        Outcome = outcome;
+        Status = outcome.ToObligationStatus();
+        CounterexampleDescription = outcome.Describe();
+    }
+
+    /// <summary>
     /// For RefinementEntry obligations: the parameter name being constrained.
     /// Used by ObligationSolver to bind # (self-ref) to the correct Z3 variable.
     /// </summary>
