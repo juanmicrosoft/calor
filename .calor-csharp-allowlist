@@ -1,0 +1,15 @@
+# Calor-first guard allowlist (scripts/check-calor-first-diff.sh).
+# Each entry is a glob for a NEW C# product-source path approved to exist
+# without Calor source. Entries must land on the protected base branch via
+# their own reviewed PR before the PR that adds the file can merge — a PR
+# cannot self-exempt. Keep entries specific; no directory wildcards.
+#
+# PR #754 (loop plan v0.9 M1/WS1) — compiler-internal envelope/verification
+# infrastructure. These are core compiler surfaces (diagnostic serialization,
+# solver-outcome modeling) that cannot be authored in Calor: they implement
+# the machinery Calor source is compiled *with*.
+src/Calor.Compiler/Commands/EnvelopeWriter.cs
+src/Calor.Compiler/Diagnostics/CommandEnvelope.cs
+src/Calor.Compiler/Diagnostics/DiagnosticEnvelope.cs
+src/Calor.Compiler/Ids/DeclarationIdResolver.cs
+src/Calor.Compiler/Verification/ProofOutcome.cs
