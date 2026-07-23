@@ -73,7 +73,7 @@ public class StructuredOutputTests : IDisposable
         using var doc = JsonDocument.Parse(stdOut);
         var root = doc.RootElement;
 
-        Assert.Equal("1.0", root.GetProperty("version").GetString());
+        Assert.Equal(JsonDiagnosticFormatter.SchemaVersion, root.GetProperty("version").GetString());
 
         var diagnostics = root.GetProperty("diagnostics");
         Assert.True(diagnostics.GetArrayLength() >= 1, $"expected diagnostics, stderr: {stdErr}");

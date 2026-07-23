@@ -57,6 +57,47 @@ calor format MyModule.calr --diff
 | `--diff` | `-d` | `false` | Show diff of formatting changes |
 | `--verbose` | `-v` | `false` | Enable verbose output |
 | `--heal` | — | `false` | Best-effort source-level repair of files too broken for the AST formatter. **Not semantics-preserving** — see [Heal Mode](#heal-mode) |
+| `--format` | — | `text` | Output format: `text` or `json` (envelope document on stdout) — see [JSON Output](#json-output---format-json). No `-f` short alias |
+
+---
+
+## JSON Output (`--format json`)
+
+With `--format json` stdout carries exactly one
+[envelope document](/calor/cli/envelope-schema/) — all human-oriented status
+moves to stderr, and a document is emitted on every path (including missing
+files). Exit codes are unchanged.
+
+```json
+{
+  "version": "1.1",
+  "command": "format",
+  "diagnostics": [
+    { "code": "Calor1340", "message": "File not found: …", "severity": "error",
+      "location": { "file": "…", "line": 1, "column": 1, "length": 0 } }
+  ],
+  "summary": { "total": 1, "errors": 1, "warnings": 0, "info": 0 },
+  "data": {
+    "files": [
+      { "path": "/abs/Good.calr", "changed": true, "status": "formatted",
+        "residualParseErrors": false }
+    ],
+    "totals": { "processed": 2, "formatted": 1, "errors": 1, "stillFailingAfterHeal": 0 }
+  }
+}
+```
+
+- `diagnostics[]` — the real parse/format diagnostics, plus CLI-level entries:
+  `Calor1340` (file not found), `Calor1341` (non-`.calr` input, warning),
+  `Calor1342` (processing error). Heal-mode residual parse errors appear with
+  their own parser codes.
+- `data.files[].status` — `formatted` | `already-formatted` | `would-reformat`
+  (`--check`) | `healed` (`--heal`) | `error` | `skipped` | `not-found`.
+- `data.files[].formatted` — the formatted source; present only in preview
+  mode (neither `--write` nor `--check`) for files that changed.
+- `data.files[].ambiguities` — heal mode: `[{ "line", "message" }]`
+  control-flow guesses; `residualParseErrors` is true when the healed output
+  still fails to parse.
 
 ---
 
