@@ -1,6 +1,6 @@
 # The Loop — v0.9 Execution Plan
 
-**Status:** Draft v2 — revised per adversarial review round 1 (verdict on v1: 55%, 2 CRITICAL / 9 MAJOR / 6 MINOR; dispositions in §10). Success metrics (§4) and proof points (§5) remain the review target.
+**Status:** Draft v2.1 — v2 (adversarial review round 1 applied; dispositions in §10) + program-level decision structure: WS5 wedge probe pulled into v0.9, Calls 1–3 in §6.2, one-way door register in §6.3. Success metrics (§4) and proof points (§5) remain the review target.
 **Author:** Juan Rivera (with Claude Code)
 **Created:** 2026-07-23 (v1 and v2 same day)
 **Parent:** [`agent-native-strategy.md`](agent-native-strategy.md) (v4.1 **including the §9 postscript**) and [`agent-native-gates.md`](agent-native-gates.md). This plan adds observational instrument-layer metrics only, via an **instrument-metrics annex** to be added to the gates doc *before* its freeze (§2 D4.4) — additive-only, observational-only, no gate-criterion cross-references. Note the gates are currently **frozen-ready but parked** per strategy §9 (the 2a gate is unfalsifiable at authorable fixture scale); this plan does not pretend otherwise.
@@ -89,11 +89,22 @@ Exit criteria: PP-L1 measured on D3.3; results published in the v0.9 release not
 
 Exit criteria: baseline build archived with pins; thresholds frozen via D4.5; annex registered.
 
+### WS5 — Wedge probe (size: S–M; new in v2.1)
+
+The program's differentiated-value claim — *enforcement catches what agent-generated C# evidence misses* — is currently 0-for-165 observed (zero escaped bugs in either arm across all epochs to date; strategy §9 parked the 2a gate over exactly this). Waiting until v0.11 to test it means carrying the whole program on an unmeasured claim. WS5 pulls the decisive measurement into v0.9 at probe scale, sidestepping the "organic bugs don't occur at authorable fixture scale" problem with **injected defects**.
+
+- **D5.1 Injected-defect fixture set**: mixed-project tasks (Calor module inside a C# solution) seeded with regressions of the kinds enforcement claims to catch — an undeclared side effect on an enforcement-covered path, a violated `§Q`/`§S` contract on scalar code, a capability/effect laundered through a covered call chain. Defects are injected on paths the enforcement machinery *claims* to cover (the known delegate/dispatch holes are excluded and listed — the probe measures the claim as stated, not the known gaps).
+- **D5.2 Probe epoch**: paired arms per gates-doc conventions — Calor arm with enforcement on vs C# arm with its full toolkit (NRT, analyzers, agent-generated tests, per strategy §0) — measuring **catch-rate delta**: the fraction of injected defects surfaced *before* declared-done in each arm. Threshold pre-registered via D4.4/D4.5 before the epoch runs.
+- **Honest limit, stated up front**: injected defects measure *detection capability*, not organic incidence. A hit proves the mechanism works where it claims to; it does not prove real codebases produce these defects at rates that matter — that remains `real-scale-benchmark-design.md` territory. A zero-vs-zero result, however, is decisive in the other direction: if enforcement cannot catch even *seeded* defects that the C# arm misses, the differentiated-value claim has failed its third and easiest measurement.
+- **Registration note**: distinct question from machine-zone §7's red-team gate (which measures spec-diff review as a *human-review replacement*); no registration overlap.
+
+WS5 depends only on M1 (envelope) and existing harness machinery — it runs parallel to M3/M4 and is adjudicated at M5 as part of Call 2 (§6).
+
 ---
 
 ## 3. Sequencing
 
-Calendar boxes are estimates recorded per the parent's planning discipline ("every phase has a calendar box and budget line"); they are confirmed or corrected at each milestone kickoff, and epoch spend is authorized through the `phase-2-spend-authorisation.md` process **with numbers entered before M2 kickoff** — three epochs total (threshold, comparison, PP-L6 smoke), not two as v1 under-counted.
+Calendar boxes are estimates recorded per the parent's planning discipline ("every phase has a calendar box and budget line"); they are confirmed or corrected at each milestone kickoff, and epoch spend is authorized through the `phase-2-spend-authorisation.md` process **with numbers entered before M2 kickoff** — **four** epochs total (threshold, comparison, PP-L6 smoke, wedge probe).
 
 | Milestone | Contents | Box (est.) | Depends on |
 |---|---|---|---|
@@ -101,7 +112,8 @@ Calendar boxes are estimates recorded per the parent's planning discipline ("eve
 | **M2** | WS4 D4.1–D4.3, D4.5: telemetry, **baseline build archived**, threshold epoch, feasibility dry-run | 2 wk | M1 |
 | **M3** | WS2 mutation loop (scope-gated by machine-zone E1) | 6–8 wk | M1; E1 verdict |
 | **M4** | WS3 warm feedback + latency fixture | 3 wk | D2.1 |
-| **M5** | **One simultaneous comparison epoch** (§5 PP-L5, PP-L3 sub-epoch), PP adjudication, published report | 2–3 wk | M2–M4, D4.4 |
+| **M4b** | WS5 wedge probe (fixtures + probe epoch) — runs parallel to M3/M4 | 2–3 wk | M1; D4.4 registration |
+| **M5** | **One simultaneous comparison epoch** (§5 PP-L5, PP-L3 sub-epoch), PP adjudication incl. PP-W1, published report, **Call 2 (§6)** | 2–3 wk | M2–M4b, D4.4 |
 
 **The hard rule, restated correctly** *(per review C2)*: what must precede WS2/WS3's merge is **archiving the control build** (build provenance), not running the control epoch (epoch timing). At M5, the control commit is checked out and both arms run **simultaneously, same day, same pins, same tasks** — per-task paired ratios, per the parent's rule that raw longitudinal comparisons are not evidence.
 
@@ -142,10 +154,13 @@ Calendar boxes are estimates recorded per the parent's planning discipline ("eve
 | **PP-L4** | Diagnostics steer the agent | M-L3 | ≥ 70 % **[P]** (frozen from the D4.3 threshold epoch) | Evidence node-anchored envelopes work | Transcript review of misses; likely fix is envelope content, not more metrics |
 | **PP-L5** | WS2+WS3 reduce iterations | M-L5 median paired ratio, **M5 arm A vs arm B, simultaneous** | ≥ 15 % fewer median iterations-to-green **[P]** (subject to D4.5 — may be re-based on the measured baseline median), censored rule per §4 | Loop program continues into v0.10 with the same discipline | The tooling bet is not paying off as built — stop, analyze transcripts, re-plan before v0.10 spends more |
 | **PP-L6** | Loop work didn't corrupt the science | *(narrowed per review M2)* (a) automated harness-config invariance check (gates doc §0.2 machinery) on a smoke epoch; (b) neutral-task iterations-to-green parity, arm A vs arm B, adjudicated by the gates doc §6.1 bootstrap | (a) zero config drift; (b) no significant regression per §6.1 | — | Release blocker regardless of PP-L1–L5. **Stated limit:** the escaped-bugs dimension is unmonitorable at authorable fixture scale (strategy §9: zero-vs-zero) until `real-scale-benchmark-design.md` lands — PP-L6 does not pretend to cover it |
+| **PP-W1** | Enforcement catches seeded defects the C# arm misses | WS5 probe epoch: catch-rate delta on D5.1 injected defects, Calor-enforcement arm vs C#-full-toolkit arm | Positive catch-rate delta at a pre-registered margin **[P]** (frozen via D4.5 before the probe epoch) | The differentiated-value claim has its first observed instance; v0.10/v0.11 proceed with it as the centerpiece | **Zero-vs-zero at seeded-defect scale = the claim has failed its third and easiest measurement.** Feeds Call 2 (§6): the program pivots or stops — this is pre-committed now, while neutral, precisely so sunk cost cannot renegotiate it later |
 
 ---
 
-## 6. Decision gates summary
+## 6. Decision structure
+
+### 6.1 Per-milestone gates
 
 - **PP-L1 hit → direct-to-IL retired permanently**, with the external proposal cited as the source of the idea and this data as its disposal.
 - **E1 kills H1 → WS2 descopes before it is built** (D2.2/D2.3 dropped; D2.4/D2.5 proceed). PP-L3 never runs; its miss-path outcome is adopted at zero measurement cost.
@@ -153,12 +168,29 @@ Calendar boxes are estimates recorded per the parent's planning discipline ("eve
 - **PP-L5 miss → freeze loop investment** pending transcript analysis. If iterations are spent on verification `unknown`s rather than bad diagnostics, v0.10's priority flips from loop tooling to verification tiers.
 - **PP-L6 is unconditional** within its stated coverage.
 
+### 6.2 Program-level calls (new in v2.1)
+
+Per-milestone gates decide *what to build next*; these three calls decide *whether the program continues*. They are pre-committed here, while neutral, because each milestone will otherwise end with plausible reasons to continue — sunk cost must not get a vote it wasn't given in advance.
+
+- **Call 1 (cheap, at M2 + E1 verdict):** E1's H1 disposition plus the D4.5 feasibility dry-run. Decides WS2's scope and whether the [P] thresholds are decidable at authorized spend. Already implied by v2; named here as a call.
+- **Call 2 (the program go/no-go, at M5):** adjudicated on **PP-L5 and PP-W1 together**. PP-W1 carries more weight: PP-L5 measures whether our tooling helps agents converge; PP-W1 measures whether the language's differentiated claim is real at all. Pre-committed criterion: **PP-W1 zero-vs-zero → the program pivots or stops** — v0.10/v0.11 do not proceed on the current thesis regardless of how the loop metrics look. PP-W1 hit + PP-L5 any → proceed, with v0.10 shaped by the PP-L5 transcript analysis. This is the point at which "should we go further" is decided — **not** at the Wedge.
+- **Call 3 (the one-way door, before any v0.11 adoption push):** external adoption is gated on Calls 1–2 having passed. By design this call should be nearly decided by the time it arrives.
+
+### 6.3 One-way door register (new in v2.1)
+
+Everything in v0.9–v0.10 is a **two-way door**: instrument work, verification tiers, even killing WS2 are all reversible at the cost of time spent. The register exists to name the exceptions so they cannot be walked through by drift:
+
+| Door | One-way because | Opens only on |
+|---|---|---|
+| **v0.11 Wedge adoption step** — real external teams put Calor modules in production C# solutions | Creates obligations that outlive a program decision: migration paths, compatibility promises, maintenance expectations, reputational exposure to adopters if later killed | Calls 1–2 passed; explicit sign-off at v0.11 planning |
+| **Time at bus factor 1** | Not a door but a compounding cost: every model generation improves at C# for free while the program spends calendar time. Recorded so schedule slips are read against it | — (mitigated by Call 2's early placement) |
+
 ## 7. Risks
 
 1. **Goodhart on M-L3** — mitigated: never gates alone; PP-L4 miss-path is transcript review; M-L5 anchors.
 2. **WS2 sizing** — the MCP server is a ~200-line stateless dispatcher; D2.1 adds session lifecycle, a project model over a format that does not yet exist, dirty-state invalidation, transactional apply, and parity paths. The 6–8 wk box is the honesty mechanism: if kickoff scoping busts it, the E1 scope gate and PP-L3's miss path define what to cut (D2.2/D2.3), not schedule slip.
 3. **Baseline invalidation** — the control is an **archived build run simultaneously at M5**, not an early epoch (v1 had this wrong — §10 C2). The M2 threshold epoch's results are never compared longitudinally against M5's.
-4. **Measurement cost** — **three** epochs (threshold, comparison incl. PP-L3 sub-epoch, PP-L6 smoke) plus D4.5 dry-runs and D4.6 replays; authorized with numbers via `phase-2-spend-authorisation.md` before M2.
+4. **Measurement cost** — **four** epochs (threshold, comparison incl. PP-L3 sub-epoch, PP-L6 smoke, WS5 wedge probe) plus D4.5 dry-runs and D4.6 replays; authorized with numbers via `phase-2-spend-authorisation.md` before M2.
 5. **Audit drift at bus factor 1** — v1 of this plan demonstrated the failure mode in its own §1 (§10 C1). Mitigations: the §1 anchor-verification rule (grep-verified, commit-stamped), D1.4 conformance in CI, re-audit at M5.
 6. **Registration drift between sibling docs** — two live pre-registrations existed for the text-vs-structured question (this plan's PP-L3 and machine-zone's E1). §9 resolves governance; any future overlap goes through the same explicit-governance rule.
 
@@ -210,3 +242,9 @@ The text-vs-structured-edit question has one governing registration: **machine-z
 - **m4 (accepted)**: D3.3 governance (content criteria, owner, regeneration policy, sample count).
 - **m5 (accepted)**: raw-file-edit node attribution priced into D4.1.
 - **m6 (accepted)**: censored-fraction rule defined; pair redefinition made explicit; M-L1 reclassified as a toolchain metric.
+
+**Draft v2.1 (2026-07-23)** — program-level decision structure, prompted by the question "should we go all the way to the Wedge before making a call, and is this a one-way door?":
+
+- **WS5 wedge probe** added: injected-defect measurement of the differentiated-value claim (enforcement vs C# full toolkit), pulled from v0.11 into v0.9 at probe scale (M4b, parallel to M3/M4). New proof point **PP-W1**; epoch count corrected to four.
+- **§6 restructured**: per-milestone gates (6.1) separated from **program-level Calls 1–3** (6.2). Call 2 at M5 is the program go/no-go, adjudicated on PP-L5 + PP-W1 with PP-W1 carrying more weight; its kill criterion (PP-W1 zero-vs-zero → pivot or stop) is pre-committed now so sunk cost cannot renegotiate it.
+- **§6.3 one-way door register**: names the v0.11 adoption step as the program's sole one-way door, gated on Calls 1–2; everything in v0.9–v0.10 is explicitly two-way.
