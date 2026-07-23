@@ -40,14 +40,20 @@ public static class IdsCommand
             aliases: ["--verbose", "-v"],
             description: "Show detailed output");
 
+        var formatOption = new Option<string>(
+            aliases: ["--format", "-f"],
+            getDefaultValue: () => "text",
+            description: "Output format: text or json (envelope v1.1)");
+
         var command = new Command("check", "Validate IDs (missing, duplicates, invalid format)")
         {
             pathsArgument,
             allowTestIdsOption,
-            verboseOption
+            verboseOption,
+            formatOption
         };
 
-        command.SetHandler(CheckAsync, pathsArgument, allowTestIdsOption, verboseOption);
+        command.SetHandler(CheckAsync, pathsArgument, allowTestIdsOption, verboseOption, formatOption);
 
         return command;
     }
@@ -115,8 +121,9 @@ public static class IdsCommand
         return command;
     }
 
-    private static async Task CheckAsync(string[] paths, bool allowTestIds, bool verbose)
+    private static async Task CheckAsync(string[] paths, bool allowTestIds, bool verbose, string format)
     {
+        var json = format.Equals("json", StringComparison.OrdinalIgnoreCase);
         var files = CollectFiles(paths);
         if (files.Count == 0)
         {
@@ -125,16 +132,17 @@ public static class IdsCommand
             return;
         }
 
-        if (verbose)
+        if (verbose && !json)
         {
             Console.WriteLine($"Checking {files.Count} file(s)...");
         }
 
         var allEntries = new List<IdEntry>();
+        var declarationIds = json ? new DeclarationIdResolver() : null;
 
         foreach (var file in files)
         {
-            var entries = await ScanFileAsync(file, verbose);
+            var entries = await ScanFileAsync(file, verbose, declarationIds);
             if (entries != null)
             {
                 allEntries.AddRange(entries);
@@ -142,6 +150,26 @@ public static class IdsCommand
         }
 
         var result = IdChecker.Check(allEntries, allowTestIds);
+
+        if (json)
+        {
+            var data = new
+            {
+                totalIds = allEntries.Count,
+                missing = result.MissingIds.Count,
+                invalidFormat = result.InvalidFormatIds.Count,
+                wrongPrefix = result.WrongPrefixIds.Count,
+                testIds = result.TestIdsInProduction.Count,
+                duplicateGroups = result.DuplicateGroups.Count
+            };
+            var jsonDiagnostics = IdChecker.GenerateDiagnostics(result)
+                .OrderBy(d => d.FilePath, StringComparer.Ordinal)
+                .ThenBy(d => d.Span.Line)
+                .ToList();
+            Console.WriteLine(EnvelopeWriter.Serialize("ids", data, jsonDiagnostics, declarationIds));
+            Environment.ExitCode = result.IsValid ? 0 : 1;
+            return;
+        }
 
         if (result.IsValid)
         {
@@ -339,7 +367,8 @@ public static class IdsCommand
         return files.Distinct().ToList();
     }
 
-    private static async Task<IReadOnlyList<IdEntry>?> ScanFileAsync(string filePath, bool verbose)
+    private static async Task<IReadOnlyList<IdEntry>?> ScanFileAsync(
+        string filePath, bool verbose, DeclarationIdResolver? declarationIds = null)
     {
         try
         {
@@ -370,6 +399,8 @@ public static class IdsCommand
                 }
                 return null;
             }
+
+            declarationIds?.AddFile(filePath, content, module);
 
             var scanner = new IdScanner();
             return scanner.Scan(module, filePath);

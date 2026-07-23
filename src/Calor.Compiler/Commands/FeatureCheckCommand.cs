@@ -1,7 +1,5 @@
 using System.CommandLine;
 using System.Diagnostics;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Telemetry;
 
@@ -71,7 +69,7 @@ public static class FeatureCheckCommand
                     Description = null,
                     Alternative = "Feature not in registry. It may be supported (basic C# features work), or check documentation."
                 };
-                Console.WriteLine(JsonSerializer.Serialize(unknownResult, JsonOptions));
+                Console.WriteLine(EnvelopeWriter.Serialize("feature-check", unknownResult));
                 return;
             }
 
@@ -85,7 +83,7 @@ public static class FeatureCheckCommand
                 Alternative = info.Workaround
             };
 
-            Console.WriteLine(JsonSerializer.Serialize(result, JsonOptions));
+            Console.WriteLine(EnvelopeWriter.Serialize("feature-check", result));
         }
         catch (Exception ex)
         {
@@ -143,15 +141,8 @@ public static class FeatureCheckCommand
             Features = grouped
         };
 
-        Console.WriteLine(JsonSerializer.Serialize(output, JsonOptions));
+        Console.WriteLine(EnvelopeWriter.Serialize("feature-check", output));
     }
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
 
     private sealed class FeatureCheckResult
     {

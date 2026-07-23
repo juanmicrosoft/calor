@@ -138,7 +138,7 @@ public static class EffectsCommand
                     : resolution.Effects.Effects.Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value)).ToArray(),
                 source = resolution.Source
             };
-            Console.WriteLine(JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine(EnvelopeWriter.Serialize("effects", output));
         }
         else
         {
@@ -242,7 +242,7 @@ public static class EffectsCommand
                 defaultEffects = t.DefaultEffects,
                 methodCount = t.MethodCount
             });
-            Console.WriteLine(JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine(EnvelopeWriter.Serialize("effects", output));
         }
         else
         {
@@ -422,7 +422,7 @@ public static class EffectsCommand
             if (!json)
                 Console.WriteLine("All external calls are resolved. No supplemental manifest needed.");
             else
-                Console.WriteLine("{\"unresolved\": 0, \"types\": []}");
+                Console.WriteLine(EnvelopeWriter.Serialize("effects", new { unresolved = 0, types = Array.Empty<object>() }));
             return;
         }
 
@@ -440,7 +440,9 @@ public static class EffectsCommand
 
         if (json)
         {
-            Console.WriteLine(manifestJson);
+            // Stdout is command output → envelope; the manifest file itself
+            // (written below in non-json mode) stays raw.
+            Console.WriteLine(EnvelopeWriter.Serialize("effects", manifest));
             return;
         }
 

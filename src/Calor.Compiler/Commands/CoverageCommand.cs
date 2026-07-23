@@ -1,7 +1,5 @@
 using System.CommandLine;
 using System.Diagnostics;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Telemetry;
 
@@ -53,7 +51,7 @@ public static class CoverageCommand
                 Success = false,
                 Error = "File not found"
             };
-            Console.WriteLine(JsonSerializer.Serialize(errorResult, JsonOptions));
+            Console.WriteLine(EnvelopeWriter.Serialize("coverage", errorResult));
             Environment.ExitCode = 1;
             exitCode = 1;
             telemetry?.TrackCommand("coverage", exitCode, new Dictionary<string, string>
@@ -77,7 +75,7 @@ public static class CoverageCommand
                     Success = false,
                     Error = score.SkipReason ?? "File was skipped"
                 };
-                Console.WriteLine(JsonSerializer.Serialize(skippedResult, JsonOptions));
+                Console.WriteLine(EnvelopeWriter.Serialize("coverage", skippedResult));
                 return;
             }
 
@@ -120,7 +118,7 @@ public static class CoverageCommand
                     }) : null
             };
 
-            Console.WriteLine(JsonSerializer.Serialize(result, JsonOptions));
+            Console.WriteLine(EnvelopeWriter.Serialize("coverage", result));
         }
         catch (Exception ex)
         {
@@ -130,7 +128,7 @@ public static class CoverageCommand
                 Success = false,
                 Error = ex.Message
             };
-            Console.WriteLine(JsonSerializer.Serialize(errorResult, JsonOptions));
+            Console.WriteLine(EnvelopeWriter.Serialize("coverage", errorResult));
             Environment.ExitCode = 1;
             exitCode = 1;
             telemetry?.TrackException(ex);
@@ -146,13 +144,6 @@ public static class CoverageCommand
             });
         }
     }
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
 
     private sealed class CoverageResult
     {

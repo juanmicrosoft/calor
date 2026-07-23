@@ -24,6 +24,7 @@ original file contents byte-for-byte.
 | `--revert` | Reverse a prior `--drop-structural-ids` operation using `--log`. |
 | `--log <file>` | Write (without `--revert`) or read (with `--revert`) the migration log. |
 | `--dry-run`, `-n` | Report what would change without writing files. |
+| `--format`, `-f` | Output format: `text` (default) or `json` (envelope v1.1). |
 
 ---
 
@@ -54,6 +55,31 @@ and opening tags are never touched.
 ```
 drop-structural-ids: files_changed=42 removals=178
 wrote .calor/migration.log.json
+```
+
+With `--format json`, the summary is emitted as an
+[envelope schema v1.1](/calor/cli/envelope-schema/) document instead
+(the `migration.log.json` file is unchanged — the envelope's `data`
+mirrors it at file granularity):
+
+```json
+{
+  "version": "1.1",
+  "command": "fix",
+  "diagnostics": [],
+  "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
+  "data": {
+    "operation": "drop-structural-ids",
+    "dryRun": false,
+    "fixedFiles": 42,
+    "totalFixes": 178,
+    "fixes": [
+      { "file": "src/math.calr", "count": 12 },
+      { "file": "src/utils.calr", "count": 7 }
+    ],
+    "log": "/abs/path/.calor/migration.log.json"
+  }
+}
 ```
 
 Exit codes: `0` on success, `2` on usage error.

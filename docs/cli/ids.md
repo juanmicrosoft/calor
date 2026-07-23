@@ -67,6 +67,7 @@ calor ids check <paths...> [options]
 | Option | Description |
 |:-------|:------------|
 | `--allow-test-ids` | Allow test IDs (`f001`) in any location |
+| `--format` | Output format: `text` (default) or `json` (envelope v1.1) |
 
 **Exit Codes:**
 
@@ -90,6 +91,36 @@ Error Calor0800: Missing ID
   src/services.calr:28 (function ProcessOrder)
 
 Found 2 issues in 2 files
+```
+
+**JSON output** (`--format json`) emits the
+[envelope schema v1.1](/calor/cli/envelope-schema/): the `Calor0800`-band
+findings are `diagnostics[]` entries (with `declarationId` where resolvable)
+and the counts summary lives under `data`:
+
+```json
+{
+  "version": "1.1",
+  "command": "ids",
+  "diagnostics": [
+    {
+      "code": "Calor0800",
+      "message": "Missing ID for Function 'ProcessOrder'",
+      "severity": "error",
+      "location": { "file": "src/services.calr", "line": 28, "column": 3, "length": 0 },
+      "declarationId": "m001"
+    }
+  ],
+  "summary": { "total": 1, "errors": 1, "warnings": 0, "info": 0 },
+  "data": {
+    "totalIds": 42,
+    "missing": 1,
+    "invalidFormat": 0,
+    "wrongPrefix": 0,
+    "testIds": 0,
+    "duplicateGroups": 0
+  }
+}
 ```
 
 ---

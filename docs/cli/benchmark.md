@@ -221,36 +221,49 @@ Creates a markdown report suitable for documentation or GitHub.
 calor benchmark ./src --format json --output benchmark.json
 ```
 
-Creates machine-readable output:
+Creates machine-readable output wrapped in the
+[envelope schema v1.1](/calor/cli/envelope-schema/) — the command's payload
+lives under `data`:
 
 ```json
 {
-  "version": "1.0",
-  "benchmarkedAt": "2025-01-15T10:30:00Z",
-  "mode": "project",
-  "path": "./src",
-  "pairedFiles": 12,
-  "results": {
-    "aggregate": {
-      "calor": 87.4,
-      "csharp": 68.9,
-      "advantage": 1.27
+  "version": "1.1",
+  "command": "benchmark",
+  "diagnostics": [],
+  "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
+  "data": {
+    "metadata": {
+      "generatedAt": "2025-01-15T10:30:00Z",
+      "version": "1.0",
+      "benchmarkCount": 12
     },
-    "categories": {
-      "TokenEconomics": {
-        "calor": 84.2,
-        "csharp": 56.8,
-        "advantage": 1.48
-      }
+    "summary": {
+      "overallCalorAdvantage": 1.27,
+      "categoryAdvantages": { "TokenEconomics": 1.48 }
     },
-    "files": [
-      {
-        "name": "PaymentService",
-        "calorPath": "src/PaymentService.calr",
-        "csharpPath": "src/PaymentService.cs",
-        "advantage": 1.42
-      }
-    ]
+    "categoryResults": { "...": "per-category scores" },
+    "detailedResults": [ { "...": "per-case metrics" } ]
+  }
+}
+```
+
+Quick mode (`--quick`) uses the same envelope with its token-only payload:
+
+```json
+{
+  "version": "1.1",
+  "command": "benchmark",
+  "diagnostics": [],
+  "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
+  "data": {
+    "mode": "quick",
+    "comparison": { "csharpFile": "file.cs", "calorFile": "file.calr" },
+    "metrics": {
+      "tokens": { "csharp": 420, "calor": 250, "savings": 40.5 },
+      "lines": { "csharp": 60, "calor": 38, "savings": 36.7 },
+      "characters": { "csharp": 1930, "calor": 1105, "savings": 42.7 }
+    },
+    "advantageRatio": 1.68
   }
 }
 ```
