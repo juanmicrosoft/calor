@@ -450,6 +450,7 @@ public sealed class CSharpToCalorConverter
         }
 
         context.Stats.InteropBlocksEmitted += interops.Count;
+        context.Stats.FallbackInteropBlocksEmitted += interops.Count;
 
         return new ModuleNode(
             module.Span, module.Id, module.Name, module.Usings,
