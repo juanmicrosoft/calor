@@ -131,6 +131,12 @@ public static class ConvertCommand
             }
             else
             {
+                if (passthrough)
+                {
+                    // --passthrough only affects the C# → Calor direction (it unlocks the
+                    // §CSHARP preservation fallback). Say so rather than silently ignoring it.
+                    Console.Error.WriteLine("Note: --passthrough has no effect converting Calor → C#; it is ignored.");
+                }
                 await ConvertCalorToCSharpAsync(input.FullName, outputPath, verbose);
             }
 
@@ -248,10 +254,15 @@ public static class ConvertCommand
             // Under --passthrough the converter can fail with only a warning when the
             // emitted Calor still does not parse and could not be fully preserved as
             // §CSHARP (#717's "never ship broken output" contract). Surface that reason
-            // so the failure isn't silent.
+            // so the failure isn't silent — the parse-fallback warning first, so on a
+            // conversion with many routine warnings the actual failure reason stays on top.
             if (errorIssues.Count == 0)
             {
-                foreach (var warning in result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Warning))
+                var failureWarnings = result.Issues
+                    .Where(i => i.Severity == ConversionIssueSeverity.Warning)
+                    .OrderByDescending(i => i.Feature == "post-validation-fallback")
+                    .ToList();
+                foreach (var warning in failureWarnings)
                 {
                     Console.Error.WriteLine($"  ⚠ {warning.Message}");
                 }
@@ -281,18 +292,20 @@ public static class ConvertCommand
 
         Console.WriteLine($"✓ Conversion successful");
 
-        // #736: report the #717 passthrough fallback outcome. When --passthrough
-        // preserved one or more unconvertible members as §CSHARP interop blocks, say so —
-        // the output parses, but those members are raw C# that still needs migrating.
-        if (passthrough)
+        // #736/#717: report §CSHARP interop blocks in the output — members preserved as
+        // raw C# that still need migrating. Reported whenever present, NOT gated on
+        // --passthrough: a file whose members were wrapped by the visitor (known-
+        // unsupported features) carries the same "N raw-C# members" caveat and the notice
+        // is useful there too. When the #717 passthrough fallback rescued some, attribute
+        // that subset so the flag's effect is visible without over-claiming the rest.
+        var interopCount = result.Context.Stats.InteropBlocksEmitted;
+        if (interopCount > 0)
         {
-            var interopCount = result.Context?.Stats.InteropBlocksEmitted ?? 0;
-            if (interopCount > 0)
-            {
-                Console.WriteLine(
-                    $"  ⓘ {interopCount} member{(interopCount == 1 ? "" : "s")} preserved as §CSHARP interop " +
-                    "block(s) — the output parses, but this C# still needs migrating.");
-            }
+            var fallbackCount = result.Context.Stats.FallbackInteropBlocksEmitted;
+            var attribution = fallbackCount > 0 ? $" ({fallbackCount} via --passthrough fallback)" : "";
+            Console.WriteLine(
+                $"  ⓘ {interopCount} member{(interopCount == 1 ? "" : "s")} preserved as §CSHARP interop " +
+                $"block(s){attribution} — the output parses, but this C# still needs migrating.");
         }
 
         // Show warnings
@@ -312,7 +325,7 @@ public static class ConvertCommand
         }
 
         // Show explanation if requested
-        if (explain && result.Context != null)
+        if (explain)
         {
             Console.WriteLine();
             var explanation = result.Context.GetExplanation();

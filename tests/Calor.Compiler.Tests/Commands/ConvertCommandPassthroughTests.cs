@@ -89,6 +89,34 @@ public class ConvertCommandPassthroughTests
         Assert.Contains("§CSHARP", result.CalorSource);
         Assert.Contains("class Breakme", result.CalorSource);
         Assert.Equal(1, result.Context!.Stats.InteropBlocksEmitted);
+        // The rescued block is attributed to the fallback specifically (#745 review
+        // finding 1), so the CLI can report "N (M via --passthrough fallback)".
+        Assert.Equal(1, result.Context!.Stats.FallbackInteropBlocksEmitted);
+    }
+
+    [Fact]
+    public void PassthroughGiveUp_FailsLoudly_NotSilentSuccess()
+    {
+        // #745 review finding 2: pin the "never ship broken output" contract the CLI's
+        // fail-loudly branch surfaces. Top-level statements become a synthetic Main with
+        // no single C# type source, so they cannot be rewrapped; with everything condemned
+        // the output stays unparseable — and the converter must return failure WITH a
+        // post-validation-fallback warning (which the CLI then prints), never Success=true.
+        var converter = new CSharpToCalorConverter(
+            ConvertCommand.BuildCSharpToCalorOptions(
+                benchmark: false, verbose: false, explain: false, noFallback: false,
+                passthrough: true, explicitCallClosers: false))
+        {
+            ParseValidatorOverride = _ => false,
+        };
+
+        var result = converter.Convert("System.Console.WriteLine(\"hi\");");
+
+        Assert.False(result.Success);
+        Assert.True(result.HasWarnings);
+        Assert.Contains(result.Issues, i =>
+            i.Severity == ConversionIssueSeverity.Warning && i.Feature == "post-validation-fallback");
+        Assert.Equal(0, result.Context!.Stats.FallbackInteropBlocksEmitted);
     }
 
     [Fact]

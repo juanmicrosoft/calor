@@ -156,6 +156,16 @@ public sealed class ConversionStats
     public int StatementsConverted { get; set; }
     public int ExpressionsConverted { get; set; }
     public int InteropBlocksEmitted { get; set; }
+
+    /// <summary>
+    /// The subset of <see cref="InteropBlocksEmitted"/> produced by the #717
+    /// post-validation fallback specifically — a member whose emitted Calor did not
+    /// parse, re-preserved as §CSHARP (as opposed to the visitor wrapping a known-
+    /// unsupported feature). Lets a caller attribute how many blocks a C#-preserving
+    /// mode (e.g. <c>--passthrough</c>) actually rescued.
+    /// </summary>
+    public int FallbackInteropBlocksEmitted { get; set; }
+
     public int MembersDropped { get; set; }
 
     public double ConversionRate => TotalNodes > 0 ? (double)ConvertedNodes / TotalNodes * 100 : 0;
