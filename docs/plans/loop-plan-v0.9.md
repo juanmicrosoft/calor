@@ -1,8 +1,9 @@
-# The Loop — v0.8 Execution Plan
+# The Loop — v0.9 Execution Plan
 
 **Status:** Draft v1 — for review (success metrics and proof points in §4–§5 are the review target)
 **Author:** Juan Rivera (with Claude Code)
 **Created:** 2026-07-23
+**Target release:** v0.9.0 (the Loop lands here, not v0.8.0). The §1 audit is a snapshot of the current v0.7.0 codebase; the control arm is the *pre-improvement* loop (WS1-only build), captured mid-development rather than pinned to any released version — see §2 WS4 and the baseline-invalidation risk in §7.
 **Parent:** [`agent-native-strategy.md`](agent-native-strategy.md) (v4.1) and [`agent-native-gates.md`](agent-native-gates.md). This plan does **not** modify any frozen gate criterion; everything it adds to measurement is observational instrument-layer metrics (§4), registered under the gates doc's supersession discipline before any comparison run.
 
 ---
@@ -11,7 +12,7 @@
 
 > **Minimize latency × iterations × ambiguity of the agent edit–feedback cycle, and prove the reduction with paired measurements.**
 
-The strategy doc's sub-claims 1–2 (fewer escaped bugs, bigger safe changes) are adjudicated by the frozen gates. This plan builds the *instrument* those gates run on — the loop the agent actually experiences — and separately proves that the v0.8 loop beats the v0.7 loop on loop-specific metrics. The two claims are kept apart on purpose: gate metrics tell us whether Calor beats C#; loop metrics tell us whether our tooling investment is paying off, at much lower measurement cost.
+The strategy doc's sub-claims 1–2 (fewer escaped bugs, bigger safe changes) are adjudicated by the frozen gates. This plan builds the *instrument* those gates run on — the loop the agent actually experiences — and separately proves that the v0.9 loop beats the pre-improvement baseline loop on loop-specific metrics. The two claims are kept apart on purpose: gate metrics tell us whether Calor beats C#; loop metrics tell us whether our tooling investment is paying off, at much lower measurement cost.
 
 Non-goals (kill list, per strategy doc): AST-only storage, direct-to-IL (revisited only via the PP-L1 decision gate below), custom metadata tables, event-sourced runtime semantics.
 
@@ -76,13 +77,13 @@ Exit criteria: an agent can complete a multi-edit task in the E2E harness exclus
 - **D3.2 Latency instrumentation**: every MCP check/apply and every `watch` rebuild logs edit→envelope wall time into the loop telemetry stream (WS4).
 - **D3.3 Latency fixture**: a pinned ~10 k-line multi-module Calor project (generated, checked in under `bench/`) as the standard latency workload — P50/P99 mean nothing without a pinned workload.
 
-Exit criteria: PP-L1 measured on the fixture; results published in the v0.8 release notes whichever way they land.
+Exit criteria: PP-L1 measured on the fixture; results published in the v0.9 release notes whichever way they land.
 
 ### WS4 — Loop instrumentation and the baseline epoch (size: M)
 
 - **D4.1 Loop telemetry schema**: per-iteration records (task, arm, iteration n, feedback latency, envelope schema-valid?, diagnostics returned [codes + node IDs], edit target node IDs, edit mechanism [MCP node / MCP file / raw file], apply verdict) written as JSONL next to the existing harness outputs (`runs.jsonl` convention from the Phase 2 monitoring setup).
 - **D4.2 Harness integration**: `tests/E2E/agent-tasks/` and `bench/phase0-agent-native/run-pair.sh` emit D4.1 records. Gate-relevant runs are untouched — telemetry is write-only observation.
-- **D4.3 Baseline epoch (v0.7 loop)**: before WS2/WS3 merge, run the E2E task set on v0.7.0-era tooling with telemetry on, pinned model, N repetitions per the gates doc's re-run rules. This is the control arm for PP-L5 and the source of provisional→final thresholds for PP-L4.
+- **D4.3 Baseline epoch (pre-improvement loop)**: before WS2/WS3 merge, run the E2E task set on the **WS1-only build** (envelope in place, WS2/WS3 not yet merged) with telemetry on, pinned model, N repetitions per the gates doc's re-run rules. This build — not a released version number — is the control arm for PP-L5 and the source of provisional→final thresholds for PP-L4. Pinning the baseline to the immediate pre-WS2/WS3 build (rather than v0.7.0 or v0.8.0) is what keeps the A/B measuring WS2+WS3 and nothing else.
 - **D4.4 Metric registration**: the §4 metric definitions and §5 thresholds are appended to the gates doc as *instrument metrics* (observational; no gate criterion changes) before the comparison epoch runs — same pre-registration discipline, same "no post-hoc exclusion" rule.
 
 Exit criteria: baseline epoch archived under `bench/` with pins recorded; thresholds frozen.
@@ -94,10 +95,10 @@ Exit criteria: baseline epoch archived under `bench/` with pins recorded; thresh
 | Milestone | Contents | Depends on |
 |---|---|---|
 | **M1** | WS1 complete (envelope everywhere, conformance test) | — |
-| **M2** | WS4 D4.1–D4.3: telemetry + **baseline epoch on the v0.7 loop** | M1 (envelope validity is a recorded field) |
+| **M2** | WS4 D4.1–D4.3: telemetry + **baseline epoch on the pre-improvement (WS1-only) loop** | M1 (envelope validity is a recorded field) |
 | **M3** | WS2 mutation loop | M1; D2.1 unblocks WS3 |
 | **M4** | WS3 warm feedback + latency fixture | D2.1 |
-| **M5** | Comparison epoch (v0.8 loop vs M2 baseline), PP adjudication, published report | M2–M4, D4.4 |
+| **M5** | Comparison epoch (v0.9 loop vs M2 baseline), PP adjudication, published report | M2–M4, D4.4 |
 
 The one hard rule: **M2 before M3/M4 merge to main.** Shipping the improvements before the baseline exists destroys the A/B.
 
@@ -130,10 +131,10 @@ Thresholds marked **[P]** are provisional until the M2 baseline epoch freezes th
 | # | Claim | Measurement | Threshold | On hit | On miss |
 |---|---|---|---|---|---|
 | **PP-L1** | Warm feedback is fast enough that backend latency is a non-issue | M-L1 on D3.3 fixture | P50 ≤ 300 ms, P99 ≤ 1 s | **Direct-to-IL permanently retired**; latency argument closed with data | Profile; only if the ceiling is Roslyn emit itself does a backend conversation reopen — with this data attached |
-| **PP-L2** | Every failure the agent sees is machine-actionable | M-E1, M-E2, M-E3 | M-E1 = 100 %; M-E2 ≥ 90 %; M-E3 = 100 % | WS1 exits; envelope schema v1 frozen | Ship blocks: v0.8 does not release with silent cliffs or schema drift |
+| **PP-L2** | Every failure the agent sees is machine-actionable | M-E1, M-E2, M-E3 | M-E1 = 100 %; M-E2 ≥ 90 %; M-E3 = 100 % | WS1 exits; envelope schema v1 frozen | Ship blocks: v0.9 does not release with silent cliffs or schema drift |
 | **PP-L3** | Node-addressed edits beat whole-file rewrites | M-L2 + tokens per accepted edit, MCP-node arm vs MCP-file arm (identical checking, D2.4) | M-L2(node) ≥ 95 %; tokens/accepted-edit ≥ 30 % lower **[P]** | `calor_edit_apply` becomes the recommended agent path in `calor init` guidance | Keep transactional file-level apply; demote node addressing to navigation-only; saves us from building on an unproven editing model |
 | **PP-L4** | Diagnostics steer the agent, not just inform it | M-L3 | ≥ 70 % **[P]** | Evidence that node-anchored envelopes work; cite in strategy doc §1.1 | Qualitative transcript review of misses; likely fix is envelope content (hints), not more metrics |
-| **PP-L5** | The v0.8 loop beats the v0.7 loop | M-L5 median paired ratio, v0.8 arm vs M2 baseline, same tasks/model/budget, Calor-only | ≥ 15 % fewer median iterations-to-green **[P]**, censored fraction not worse | The loop program continues into v0.9 (verification tiers) with the same measurement discipline | The tooling bet is not paying off as built — stop, analyze transcripts, and re-plan before v0.9 spends more |
+| **PP-L5** | The v0.9 loop beats the baseline loop | M-L5 median paired ratio, v0.9 arm vs M2 baseline, same tasks/model/budget, Calor-only | ≥ 15 % fewer median iterations-to-green **[P]**, censored fraction not worse | The loop program continues into v1.0 (verification tiers) with the same measurement discipline | The tooling bet is not paying off as built — stop, analyze transcripts, and re-plan before v1.0 spends more |
 | **PP-L6** | Loop work didn't corrupt the science | All frozen gate metrics on a smoke epoch | No frozen gate metric regresses beyond the gates doc's noise rule | — | Regression is a release blocker regardless of PP-L1–L5 |
 
 Two adversarial notes for the review, pre-empted: (1) PP-L5 compares Calor-to-Calor, so it cannot be contaminated by task-pair bias between languages — it reuses the same pairs both arms; (2) PP-L3's 95 % is deliberately near-absolute because a *checked* node edit that fails to parse means the addressing model itself is broken, not the agent.
@@ -143,18 +144,18 @@ Two adversarial notes for the review, pre-empted: (1) PP-L5 compares Calor-to-Ca
 ## 6. Decision gates summary
 
 - **PP-L1 hit → kill direct-to-IL forever.** This is the cheapest way to permanently close the most expensive item on the old proposal.
-- **PP-L3 miss → don't build v0.9 on node-addressed editing.** The mutation API stays, but as plumbing, not as the strategic bet.
-- **PP-L5 miss → freeze loop investment** until transcript analysis explains where iterations actually go. If iterations are spent on verification `unknown`s rather than bad diagnostics, the v0.9 priority flips from loop tooling to verification tiers.
+- **PP-L3 miss → don't build v1.0 on node-addressed editing.** The mutation API stays, but as plumbing, not as the strategic bet.
+- **PP-L5 miss → freeze loop investment** until transcript analysis explains where iterations actually go. If iterations are spent on verification `unknown`s rather than bad diagnostics, the v1.0 priority flips from loop tooling to verification tiers.
 - **PP-L6 is unconditional** — instrument work never gets to move the science.
 
 ## 7. Risks
 
 1. **Goodhart on M-L3** — an agent can "touch the named node" uselessly. Mitigation: M-L3 is never a gate alone; PP-L4's miss-path is transcript review, and M-L5 (which can't be gamed without actually going green) anchors PP-L5.
 2. **MCP statefulness refactor (D2.1) is the riskiest engineering** — it touches every tool. Mitigation: sessions are additive (stateless single-string paths remain for existing tools); land behind a capability flag; `SelfTestTool` extended to exercise session lifecycle.
-3. **Baseline invalidation** — if WS1 envelope changes alter agent behavior, the M2 baseline must run on the *envelope-bearing* v0.7-loop build (M1 before M2 exists precisely for this; the baseline isolates WS2+WS3, not WS1). Stated here so nobody "fixes" the ordering later.
+3. **Baseline invalidation** — if WS1 envelope changes alter agent behavior, the M2 baseline must run on the *envelope-bearing* WS1-only build (M1 before M2 exists precisely for this; the baseline isolates WS2+WS3, not WS1). Because the Loop ships in v0.9.0 with a v0.8.0 presumably in between, the control arm is deliberately the immediate pre-WS2/WS3 build, **not** a released version — pinning to v0.7.0 or v0.8.0 would fold their unrelated deltas into the measured effect. Stated here so nobody "fixes" the ordering — or the baseline's version pin — later.
 4. **Measurement cost** — two epochs (baseline + comparison) at gates-doc rigor, plus re-runs. Cheaper than one wrong architecture bet; the spend goes through the same authorization process as Phase 2 (`phase-2-spend-authorisation.md`).
 5. **Audit drift at bus factor 1** — the strategy doc's revision log found factual drift three rounds running. D1.4's conformance test and this doc's §1 audit table (dated, file-anchored) are the mitigations; §1 should be re-audited at M5.
 
-## 8. Relationship to v0.9
+## 8. Relationship to v1.0
 
-On PP-L5 hit, v0.9 ("The Guarantees") inherits this instrument: verification tiers (async Z3, never blocking the edit loop), capability-parameter evolution of `§E`, and contract provenance tiers are all *measured on the same loop telemetry* — which is the point of building the instrument first.
+On PP-L5 hit, v1.0 ("The Guarantees") inherits this instrument: verification tiers (async Z3, never blocking the edit loop), capability-parameter evolution of `§E`, and contract provenance tiers are all *measured on the same loop telemetry* — which is the point of building the instrument first.
