@@ -173,6 +173,12 @@ pipeline) so they can flow through the structured formats:
 | `Calor1329` | Docs drift: a generated mirror doc (AGENTS.md) is out of sync with its single source (CLAUDE.md) |
 | `Calor1330` | Docs drift: a complete `§M` program in the agent syntax exemplar no longer compiles to C# (Roslyn-semantic-checked, so type errors are caught) |
 | `Calor1331` | Docs drift: the exemplar binds an array-returning BCL call (e.g. `File.ReadAllLines`) to a generic collection type instead of the array form `[T]` |
+| `Calor1340` | Format: input file not found |
+| `Calor1341` | Format: input file is not a `.calr` file (skipped) |
+| `Calor1342` | Format: unexpected error while processing a file |
+| `Calor1343` | Convert: conversion issue (severity mirrors the issue; message prefixed with the feature name, e.g. `[local-functions] …`) |
+| `Calor1344` | Convert: `--validate` found a parse error in the generated output (warning — the output was still written) |
+| `Calor1345` | Convert: command-level failure — input not found, unknown file type, timeout, or crash |
 
 ## Notes on specific commands
 
@@ -194,3 +200,8 @@ pipeline) so they can flow through the structured formats:
 - **`calor self-check docs --format json`** emits the unified schema on stdout
   with docs-drift findings (`Calor1320`–`Calor1331`) and exits 1 when drift is
   found (text mode reports the same findings on stderr).
+- **`calor format --format json`** and **`calor convert --format json`** emit
+  the full envelope document (`version`/`command`/`diagnostics`/`summary`/`data`)
+  on stdout; see [calor format](/calor/cli/format/) and
+  [calor convert](/calor/cli/convert/) for their `data` payloads. Neither has a
+  `-f` short alias, consistent with `lint`.
