@@ -14,10 +14,14 @@ namespace Calor.Compiler.Tests;
 /// echoes a type must route it through <c>AttributeHelper.ToSurfaceSpelling</c> or
 /// <c>CalorType.SurfaceName</c> (the compact <c>i32</c>/<c>str</c>/<c>bool</c> forms).
 ///
-/// <para>This is the durable backstop the #739 review asked for: a curated set of programs
-/// that trigger every type-echoing diagnostic, plus the whole in-repo corpus, run through
-/// the compiler; the message text must contain no internal spelling token. A new diagnostic
-/// that leaks fails here instead of in review.</para>
+/// <para>This is the durable backstop the #739 review asked for. Two layers, both with
+/// type-checking enabled (the mode the MCP <c>calor_check</c>/<c>calor_refine</c> tools use,
+/// where the bulk of the type-echoing surface lives): (1) a curated set of programs that
+/// trigger the type-echoing diagnostics — including the sized numeric types
+/// (<c>i64</c>/<c>f32</c>/<c>i16</c>) whose expanded form (<c>INT[bits=64]…</c>) is the token
+/// family most prone to leak (#748 review); and (2) a scan of the whole in-repo corpus. Every
+/// diagnostic message produced must contain no internal spelling token, so a new leak fails
+/// here instead of in review.</para>
 /// </summary>
 public class DiagnosticSurfaceSpellingTests
 {
@@ -75,6 +79,17 @@ public class DiagnosticSurfaceSpellingTests
         // TypeChecker — arithmetic on non-numeric (echoes operand types).
         new object[] { "arith-non-numeric",
             "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{s:str} \"a\"\n    §B{r:i32} (+ s s)\n    §R r\n" },
+        // Sized numeric types (#748 review finding 2): these reach the checker as their
+        // EXPANDED internal form (INT[bits=64][signed=true], FLOAT[bits=32]) and are the
+        // token family most likely to leak `INT`/`[bits=`. Each must surface as i64/f32/i16.
+        new object[] { "sized-int-i64",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i64} 0\n    §R 0\n" },
+        new object[] { "sized-float-f32",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{y:f32} 0.0\n    §R 0\n" },
+        new object[] { "sized-int-i16",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{z:i16} 0\n    §R 0\n" },
+        new object[] { "sized-uint-u8",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{b:u8} 0\n    §R 0\n" },
     };
 
     [Theory]
@@ -98,16 +113,102 @@ public class DiagnosticSurfaceSpellingTests
     }
 
     [Fact]
-    public void SanityCheck_DetectorCatchesAKnownInternalSpelling()
+    public void SanityCheck_DetectorCatchesEveryForbiddenToken()
     {
-        // Guards the guard: the detector must actually fire on an internal spelling, and
-        // must NOT fire on the legitimate surface / typed-literal forms.
-        Assert.Equal("STRING", FirstLeak("Cannot assign STRING to variable of type INT"));
-        Assert.Equal("INT", FirstLeak("condition must be bool, got INT"));
-        Assert.Equal("ARRAY[element=", FirstLeak("value is ARRAY[element=i32]"));
+        // Guards the guard: EVERY entry in ForbiddenSpellings must be detectable (#748
+        // review finding 4 — the earlier sanity check exercised only 3 of 11). A message
+        // carrying just that token in isolation must be flagged with that token's name.
+        var isolated = new Dictionary<string, string>
+        {
+            ["STRING"] = "got STRING here",
+            ["INT"] = "got INT here",
+            ["BOOL"] = "must be BOOL",
+            ["FLOAT"] = "got FLOAT here",
+            ["VOID"] = "returns VOID",
+            ["UNIT"] = "is UNIT",
+            ["NEVER"] = "is NEVER",
+            ["ARRAY[element="] = "ARRAY[element=i32]",
+            ["OPTION[inner="] = "OPTION[inner=i32]",
+            ["RESULT[ok="] = "RESULT[ok=i32][err=str]",
+            ["[bits="] = "INT[bits=64][signed=true]",
+        };
+        foreach (var (token, message) in isolated)
+        {
+            Assert.True(FirstLeak(message) != null,
+                $"detector failed to flag forbidden token '{token}' in: {message}");
+        }
+
+        // And it must NOT fire on the legitimate surface / typed-literal forms.
         Assert.Null(FirstLeak("Cannot assign str to variable of type i32"));
         Assert.Null(FirstLeak("Invalid INT literal"));          // lexer keyword form
         Assert.Null(FirstLeak("write §Q (>= n INT:0)"));        // typed-literal syntax
         Assert.Null(FirstLeak("expected Option<str>, got i32"));
+        Assert.Null(FirstLeak("got i64 and f32"));              // surface sized types
+    }
+
+    [Fact]
+    public void Corpus_ProducesNoLeakingDiagnostics()
+    {
+        // Second layer (#748 review finding 4): run every in-repo .calr through the full
+        // compiler with type-checking on, and assert whatever diagnostics fire are
+        // surface-clean. Corpus files exercise real code — including sized numeric types —
+        // that the hand-written triggers might not cover.
+        var roots = ResolveCorpusRoots();
+        Assert.NotEmpty(roots);
+
+        var files = roots
+            .SelectMany(r => Directory.EnumerateFiles(r, "*.calr", SearchOption.AllDirectories))
+            .OrderBy(p => p, StringComparer.Ordinal)
+            .ToList();
+        Assert.NotEmpty(files);
+
+        var leaks = new List<string>();
+        foreach (var file in files)
+        {
+            string source;
+            try { source = File.ReadAllText(file); }
+            catch { continue; }
+
+            CompilationResult result;
+            try
+            {
+                result = Program.Compile(source, file, new CompilationOptions { EnableTypeChecking = true });
+            }
+            catch
+            {
+                continue; // a crashing corpus file is out of scope for this spelling audit
+            }
+
+            foreach (var d in result.Diagnostics)
+            {
+                var leak = FirstLeak(d.Message);
+                if (leak != null)
+                    leaks.Add($"{Path.GetFileName(file)}: {d.Code} leaks '{leak}' — {d.Message}");
+            }
+        }
+
+        Assert.True(leaks.Count == 0,
+            $"Diagnostics leaked internal type spellings across {files.Count} corpus files:\n  " +
+            string.Join("\n  ", leaks));
+    }
+
+    private static IReadOnlyList<string> ResolveCorpusRoots()
+    {
+        var dir = new DirectoryInfo(
+            Path.GetDirectoryName(typeof(DiagnosticSurfaceSpellingTests).Assembly.Location)!);
+        while (dir != null)
+        {
+            var samples = Path.Combine(dir.FullName, "samples");
+            var benchmarks = Path.Combine(dir.FullName, "tests", "TestData", "Benchmarks");
+            if (Directory.Exists(samples) && Directory.Exists(benchmarks))
+            {
+                var roots = new List<string>();
+                if (Directory.Exists(samples)) roots.Add(samples);
+                if (Directory.Exists(benchmarks)) roots.Add(benchmarks);
+                return roots;
+            }
+            dir = dir.Parent;
+        }
+        return Array.Empty<string>();
     }
 }

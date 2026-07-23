@@ -46,6 +46,16 @@ public sealed class PrimitiveType : CalorType
 
     public override string Name { get; }
 
+    /// <summary>
+    /// The surface spelling for a diagnostic. Note the type system collapses every integer
+    /// width into a single <see cref="Int"/> primitive and every float width into
+    /// <see cref="Float"/> (see <see cref="FromName"/>), so a collapsed primitive carries no
+    /// width — it renders as the canonical default (<c>i32</c>/<c>f64</c>). This is exact for
+    /// the only case that reaches here today: an <em>inferred</em> value (an integer literal
+    /// is i32, a float literal is f64). A sized annotation like <c>i64</c> does NOT collapse
+    /// to <c>i32</c> here — the opt-in checker does not resolve sized types at all, so they
+    /// surface from their carried width string via <c>ToSurfaceSpelling</c>, not this map.
+    /// </summary>
     public override string SurfaceName => Name switch
     {
         "INT" => "i32",

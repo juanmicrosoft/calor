@@ -939,7 +939,7 @@ public sealed class TypeChecker
             if (!leftType.Equals(PrimitiveType.Bool) || !rightType.Equals(PrimitiveType.Bool))
             {
                 _diagnostics.ReportError(binOp.Span, DiagnosticCode.TypeMismatch,
-                    "Logical operators require BOOL operands");
+                    "Logical operators require bool operands");
             }
             return PrimitiveType.Bool;
         }
@@ -1150,8 +1150,15 @@ public sealed class TypeChecker
         if (userType != null)
             return userType;
 
+        // #741: surface-spell the echoed name. A sized numeric type reaches here as its
+        // expanded internal form (e.g. `INT[bits=64][signed=true]`, `FLOAT[bits=32]`),
+        // which would leak `INT`/`[bits=` — route it through ToSurfaceSpelling so the
+        // message reads `i64`/`f32`. (That these sized types are not yet *resolved* by the
+        // opt-in TypeChecker — so a valid `i64` binding still gets this spurious "Unknown
+        // type" — is a separate pre-existing gap outside this spelling change: the opt-in
+        // TypeChecker does not model sized numeric widths.)
         _diagnostics.ReportError(span, DiagnosticCode.UndefinedReference,
-            $"Unknown type '{typeName}'");
+            $"Unknown type '{Parsing.AttributeHelper.ToSurfaceSpelling(typeName)}'");
         return ErrorType.Instance;
     }
 
