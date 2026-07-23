@@ -194,6 +194,15 @@ public static class DiagnosticCode
     /// </summary>
     public const string BindRebindTypeMismatch = "Calor0256";
 
+    /// <summary>
+    /// Error: a mutable <c>§B{~x}</c> rebinds a <c>§EACH</c>/<c>§EACHKV</c> iteration
+    /// variable — e.g. <c>§EACH{e1:x} arr</c> then <c>§B{~x} "y"</c>. A foreach iteration
+    /// variable is read-only in C#: the emitter would emit <c>x = "y"</c> (CS1656 — cannot
+    /// assign to an iteration variable), and a re-declaration would shadow it (CS0136), so
+    /// there is no valid emission. Rename the binding, or copy into a new variable. (#738)
+    /// </summary>
+    public const string BindReassignsIterationVariable = "Calor0257";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

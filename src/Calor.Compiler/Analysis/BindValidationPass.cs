@@ -240,22 +240,70 @@ public sealed class BindValidationPass
 
     private void DeclareLocal(string name, string type) => _scopes[^1][name] = type;
 
-    // Walks a nested block whose scope is pre-seeded with iteration variables (the
-    // §L / §EACH / §EACHKV loop variables), so an inner §B reusing an iteration
-    // variable's name is caught (CS0136) — the loop variable lives in a scope
-    // enclosing the body, exactly as in C#.
-    private void CheckLoopBlock(IReadOnlyList<StatementNode> body, params string?[] loopVars)
+    // Names of §EACH/§EACHKV iteration variables currently in scope. Foreach iteration
+    // variables are read-only in C#, so a mutable §B rebinding one is neither a valid
+    // reassignment (CS1656) nor a re-declaration (CS0136) — it is rejected (Calor0257,
+    // #738). §L for-loop variables are reassignable and are NOT tracked here.
+    private readonly HashSet<string> _foreachIterationVars = new(StringComparer.Ordinal);
+
+    // Walks a nested loop body whose scope is pre-seeded with the loop's variables,
+    // so an inner §B reusing a loop variable's name is caught (CS0136) — the loop
+    // variable lives in a scope enclosing the body, exactly as in C#.
+    //
+    // <paramref name="readOnlyVars"/> are foreach iteration variables that are NOT
+    // assignable in C# — a §EACH item variable (`foreach (T x in …)`) and a §EACHKV
+    // key/value (`foreach (var (k, v) in …)`). They are tracked so a rebind of one is
+    // rejected (Calor0257). <paramref name="scopeVars"/> are reassignable loop-scoped
+    // locals — a §L for-loop variable (`for (int i = …)`) and a §EACH index variable
+    // (emitted as `var i = -1; … i++;`); they are seeded into scope for shadowing but
+    // NOT read-only, so rebinding them stays a legal `x = …`.
+    private void CheckLoopBlock(
+        Parsing.TextSpan loopSpan,
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyList<string?> readOnlyVars,
+        IReadOnlyList<string?> scopeVars)
     {
         var loopScope = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var name in loopVars)
+        var trackedIterVars = new List<string>();
+        foreach (var name in readOnlyVars)
         {
-            if (!string.IsNullOrEmpty(name)) loopScope[name] = ""; // type irrelevant to shadowing
+            if (string.IsNullOrEmpty(name)) continue;
+            CheckLoopVarShadows(name, loopSpan);
+            loopScope[name] = ""; // type irrelevant to shadowing
+            if (_foreachIterationVars.Add(name))
+            {
+                trackedIterVars.Add(name); // only remove the ones this frame added (nested same-name safe)
+            }
+        }
+        foreach (var name in scopeVars)
+        {
+            if (string.IsNullOrEmpty(name)) continue;
+            CheckLoopVarShadows(name, loopSpan);
+            loopScope[name] = "";
         }
 
         _scopes.Add(loopScope);
         CheckBlock(body);
         _scopes.RemoveAt(_scopes.Count - 1);
+        foreach (var name in trackedIterVars) _foreachIterationVars.Remove(name);
     }
+
+    // A loop variable (§L for-var, §EACH item/index, §EACHKV key/value) that reuses the
+    // name of a local/parameter/loop-variable already in scope is CS0136 in C# — e.g.
+    // `int x = 0;` then `for (var x = …)`. Same rule and diagnostic (Calor0255) as an
+    // inner §B shadowing declaration; a loop var may still legally shadow a field.
+    private void CheckLoopVarShadows(string name, Parsing.TextSpan span)
+    {
+        if (IsDeclaredInAnyLiveScope(name))
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.BindShadowsEnclosingScope,
+                $"Loop variable '{name}' has the same name as a variable already in scope. " +
+                "C# forbids a loop variable from shadowing an enclosing local or parameter " +
+                $"(CS0136) — the generated code would not compile. Rename the loop variable (e.g. '{name}2').");
+        }
+    }
+
+    private static readonly string?[] NoLoopVars = System.Array.Empty<string?>();
 
     /// <summary>True if <paramref name="name"/> is already a local, parameter, or
     /// loop variable in an <em>enclosing</em> scope (strictly above the current one)
@@ -297,9 +345,8 @@ public sealed class BindValidationPass
     }
 
     /// <summary>The expanded type of a literal initializer, or null if the initializer is
-    /// null or not a statically-typed literal (a non-literal value needs full type
-    /// inference — #740). Used to catch an unannotated mutable rebind of a mismatched
-    /// literal, e.g. <c>§B{~x:i32} 0</c> then <c>§B{~x} "hi"</c>.</summary>
+    /// null or not a statically-typed literal. Used as the leaf case of
+    /// <see cref="TryInferValueType"/>.</summary>
     private static string? LiteralTypeOrNull(ExpressionNode? initializer) => initializer switch
     {
         IntLiteralNode => "INT",
@@ -308,6 +355,103 @@ public sealed class BindValidationPass
         FloatLiteralNode or DecimalLiteralNode => "FLOAT",
         _ => null,
     };
+
+    /// <summary>
+    /// Infers the type of a rebind value well enough to compare its <em>category</em>
+    /// against a declared type (#740). Handles the cases we can be certain about: a
+    /// literal, a reference to a typed local/parameter, and a call whose return type is
+    /// known (a user function/method, or a curated BCL method). Returns false for
+    /// anything else — a conservative miss, never a false positive on the hard-error
+    /// <c>Calor0256</c>.
+    /// </summary>
+    private bool TryInferValueType(ExpressionNode? value, out string type)
+    {
+        type = "";
+        switch (value)
+        {
+            case null:
+                return false;
+
+            case ReferenceNode reference:
+                // A reference to another local/parameter carries its declared type. An
+                // untyped (inferred) local has "" — not usable, so treat as unknown.
+                return TryLookupLocal(reference.Name, out type) && !string.IsNullOrEmpty(type);
+
+            case CallExpressionNode call:
+                if (TryResolveReturnType(call.Target, out type) && !string.IsNullOrEmpty(type))
+                {
+                    return true;
+                }
+                if (ScalarReturningBcl.Methods.TryGetValue(call.Target, out type!))
+                {
+                    return true;
+                }
+                type = "";
+                return false;
+
+            default:
+                var literal = LiteralTypeOrNull(value);
+                if (literal != null)
+                {
+                    type = literal;
+                    return true;
+                }
+                return false;
+        }
+    }
+
+    /// <summary>The primitive category of a Calor type name, accepting both the surface
+    /// spelling (<c>i32</c>, <c>str</c>, <c>bool</c>) and the expanded internal form
+    /// (<c>INT</c>, <c>STRING</c>, <c>BOOL</c>, <c>INT[bits=64]…</c>). These three
+    /// categories have no implicit conversions between them in C#, so a cross-category
+    /// rebind is always CS0029. Everything else — <c>char</c> (implicitly convertible to
+    /// the numeric types), <c>object</c>, user/reference types, arrays, generics —
+    /// classifies as <see cref="TypeCategory.Unknown"/> and is never flagged.</summary>
+    private enum TypeCategory { Unknown, String, Boolean, Numeric }
+
+    private static TypeCategory ClassifyType(string type)
+    {
+        var head = type.Trim();
+        var bracket = head.IndexOf('[');           // strip expanded attributes: INT[bits=64]…
+        if (bracket >= 0) head = head.Substring(0, bracket);
+
+        switch (head)
+        {
+            case "str": case "string": case "STRING":
+                return TypeCategory.String;
+            case "bool": case "boolean": case "BOOL":
+                return TypeCategory.Boolean;
+            case "int": case "uint": case "long": case "ulong":
+            case "short": case "ushort": case "byte": case "sbyte":
+            case "nint": case "nuint": case "float": case "double": case "decimal":
+            case "i8": case "i16": case "i32": case "i64":
+            case "u8": case "u16": case "u32": case "u64":
+            case "f32": case "f64":
+            case "INT": case "UINT": case "FLOAT": case "DECIMAL":
+                return TypeCategory.Numeric;
+            default:
+                return TypeCategory.Unknown;
+        }
+    }
+
+    /// <summary>True only when <paramref name="declared"/> and <paramref name="value"/>
+    /// are both known primitive categories that differ — the CS0029 case with no implicit
+    /// conversion. Numeric-to-numeric (e.g. <c>i32</c>→<c>i64</c>) shares a category and is
+    /// never flagged, so implicit widening is never a false positive. The trade-off is that
+    /// within-<c>Numeric</c> conversions that require an explicit cast are conservative
+    /// misses (accepted though Roslyn rejects them with CS0266): an integral narrowing
+    /// (e.g. <c>i64</c>→<c>i32</c>) and the <c>decimal</c>↔<c>float</c>/<c>double</c> pair
+    /// (which has an explicit conversion but no implicit one, so CS0266 — not CS0029, since
+    /// a conversion does exist). All spell as <c>Numeric</c> here; a precise fix for the
+    /// decimal pair would split <c>decimal</c> into its own category AND reclassify decimal
+    /// literals (currently modeled as <c>FLOAT</c>). The differential suite pins the gap
+    /// (see <c>KnownGap_DecimalToFloatRebind_EmitsCS0266</c>).</summary>
+    private static bool AreDefinitelyIncompatible(string declared, string value)
+    {
+        var a = ClassifyType(declared);
+        var b = ClassifyType(value);
+        return a != TypeCategory.Unknown && b != TypeCategory.Unknown && a != b;
+    }
 
     private bool TryLookupLocal(string name, out string type)
     {
@@ -347,9 +491,25 @@ public sealed class BindValidationPass
                 break;
 
             case AssignmentStatementNode assign:
-                if (assign.Target is ReferenceNode target && TryLookupLocal(target.Name, out var targetType))
-                    CheckArrayToCollection(
-                        assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+                if (assign.Target is ReferenceNode target)
+                {
+                    if (_foreachIterationVars.Contains(target.Name))
+                    {
+                        // Calor0257 — §ASSIGN to a §EACH/§EACHKV iteration variable. The
+                        // emitter emits `x = value` inside the foreach, which is CS1656
+                        // (cannot assign to an iteration variable). Same defect as a §B
+                        // rebind, spelled with the other assignment form.
+                        _diagnostics.ReportError(assign.Span, DiagnosticCode.BindReassignsIterationVariable,
+                            $"'{target.Name}' is a foreach iteration variable, which is read-only " +
+                            "in C# — assigning to it would not compile (CS1656). Copy the value " +
+                            "into a new variable instead.");
+                    }
+                    else if (TryLookupLocal(target.Name, out var targetType))
+                    {
+                        CheckArrayToCollection(
+                            assign.Value, targetType, assign.Span, $"Variable '{target.Name}'");
+                    }
+                }
                 ScanExpressionForCalls(assign.Value);
                 break;
 
@@ -379,12 +539,29 @@ public sealed class BindValidationPass
                 break;
 
             case ForStatementNode forStmt:
-                CheckLoopBlock(forStmt.Body, forStmt.VariableName);
+                // §L for-loop variables ARE reassignable, so not read-only iteration vars.
+                CheckLoopBlock(forStmt.Span, forStmt.Body, NoLoopVars, new[] { forStmt.VariableName });
                 break;
 
             case ForeachStatementNode forEach:
                 ScanExpressionForCalls(forEach.Collection);
-                CheckLoopBlock(forEach.Body, forEach.VariableName, forEach.IndexVariableName);
+                // The item variable is a read-only foreach variable; the optional index
+                // variable is emitted as a plain reassignable local (`var i = -1; … i++`).
+                CheckLoopBlock(
+                    forEach.Span,
+                    forEach.Body,
+                    new[] { forEach.VariableName },
+                    new[] { forEach.IndexVariableName });
+                break;
+
+            case DictionaryForeachNode dictForEach:
+                ScanExpressionForCalls(dictForEach.Dictionary);
+                // §EACHKV emits `foreach (var (k, v) in …)`: both are read-only.
+                CheckLoopBlock(
+                    dictForEach.Span,
+                    dictForEach.Body,
+                    new[] { dictForEach.KeyName, dictForEach.ValueName },
+                    NoLoopVars);
                 break;
 
             case WhileStatementNode whileStmt:
@@ -450,20 +627,32 @@ public sealed class BindValidationPass
         // in a now-closed sibling block is NOT visible, so it is a new declaration, just
         // like the emitter now emits (#732). Everything else is a new declaration too.
         var isReassignment = bind.IsMutable && IsDeclaredInAnyLiveScope(bind.Name);
-        if (isReassignment)
+        if (isReassignment && _foreachIterationVars.Contains(bind.Name))
         {
-            // Calor0256 — a mutable rebind whose type contradicts the variable's
-            // declaration. The variable's type is fixed at first declaration; the emitter
-            // emits `x = value` against that type, so a mismatched value fails to compile
-            // (CS0029/CS0266). The rebind's type is the explicit annotation when present,
-            // otherwise the statically-known type of a LITERAL initializer (the common
-            // unannotated case; a non-literal unannotated value needs full inference, #740).
-            // Both sides are canonicalized through ExpandType before comparing (§B
-            // annotations are pre-expanded, "INT"; parameter/loop-variable types are raw,
-            // "i32"). An unannotated original ("") has no known type, so it is skipped.
+            // Calor0257 — the reassignment target is a §EACH/§EACHKV iteration variable,
+            // which is read-only in C#. There is no valid emission (CS1656 as a
+            // reassignment, CS0136 as a re-declaration), so reject it outright — this
+            // supersedes the type-mismatch check below.
+            _diagnostics.ReportError(bind.Span, DiagnosticCode.BindReassignsIterationVariable,
+                $"Binding '{bind.Name}' rebinds a foreach iteration variable, which is read-only " +
+                "in C# — the generated code would not compile (CS1656). Rename this binding " +
+                $"(e.g. '{bind.Name}2'), or copy the value into a new variable.");
+        }
+        else if (isReassignment)
+        {
+            // Calor0256 — a mutable rebind whose value is of a type category that is not
+            // implicitly convertible to the variable's declaration. The variable's type is
+            // fixed at first declaration; the emitter emits `x = value` against that type,
+            // so a cross-category value (e.g. a string into an int) fails to compile
+            // (CS0029). The rebind's type is the explicit annotation when present, otherwise
+            // inferred from the value — a literal, a reference to a typed local, or a call
+            // with a known return type (#740, superseding the earlier literal-only lane).
+            // Comparison is by category (string / bool / numeric), so implicit numeric
+            // conversions (i32→i64, i32→f64) are never false-positived and an unknown/
+            // reference type is a conservative miss.
             var rebindType = bind.TypeName != null
                 ? Parsing.AttributeHelper.ExpandType(bind.TypeName.Trim())
-                : LiteralTypeOrNull(bind.Initializer);
+                : (TryInferValueType(bind.Initializer, out var inferred) ? inferred : null);
 
             // TryLookupLocal's field fallback is unreachable here: this branch runs only
             // when isReassignment, which already requires the name in a live LOCAL scope,
@@ -471,9 +660,7 @@ public sealed class BindValidationPass
             if (rebindType != null &&
                 TryLookupLocal(bind.Name, out var declaredType) &&
                 !string.IsNullOrEmpty(declaredType) &&
-                !string.Equals(
-                    Parsing.AttributeHelper.ExpandType(declaredType.Trim()),
-                    rebindType, StringComparison.Ordinal))
+                AreDefinitelyIncompatible(declaredType.Trim(), rebindType))
             {
                 // Surface-spell both sides so the message never teaches an internal
                 // spelling the user can't write (i32/str, not INT/STRING).
@@ -482,7 +669,8 @@ public sealed class BindValidationPass
                 _diagnostics.ReportError(bind.Span, DiagnosticCode.BindRebindTypeMismatch,
                     $"Mutable binding '{bind.Name}' was declared '{declaredSurface}' but is rebound " +
                     $"as '{rebindSurface}'. A mutable rebind is a reassignment; its type is fixed at the " +
-                    "first declaration, so the emitted C# would fail to compile (CS0029/CS0266). " +
+                    "first declaration, and there is no implicit conversion between these types, so the " +
+                    "emitted C# would fail to compile (CS0029). " +
                     "Keep the original type, or use a differently-named binding.");
             }
         }

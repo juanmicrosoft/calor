@@ -91,6 +91,29 @@ public class ShadowingDifferentialTests
         // emitting `int x = 0; x = "hi";` (CS0029).
         new object[] { "type-changing-mutable-rebind",
             "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n" },
+        // Rebinding a §EACH iteration variable (#738): read-only in C#, so rejected
+        // with Calor0257 instead of emitting `x = "y";` inside the foreach (CS1656).
+        new object[] { "foreach-var-rebind",
+            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §EACH{e1:x} arr\n      §B{~x:str} \"y\"\n    §R 0\n" },
+        // Same defect via §ASSIGN rather than §B (#743 review): a write to a §EACH
+        // iteration variable is CS1656 whichever assignment form spells it (Calor0257).
+        new object[] { "foreach-var-assign",
+            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §EACH{e1:x} arr\n      §ASSIGN x \"y\"\n    §R 0\n" },
+        // Construct-variable-shaped row (#743 review finding 4): the LOOP variable is
+        // the shadower — `int x = 0;` then `for (var x = …)` is CS0136 (Calor0255).
+        new object[] { "loop-var-shadows-enclosing",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x} 0\n" +
+            "    §L{l1:x:0:3:1}\n      §ASSIGN x (+ x 1)\n    §R x\n" },
+        // Unannotated non-literal rebind of a mismatched value (#740): value-type
+        // inference resolves the string-returning call, so `x = File.ReadAllText(p)`
+        // (string → int, CS0029) is rejected with Calor0256 instead of exiting 0.
+        new object[] { "unannotated-nonliteral-rebind",
+            "§M{m:S}\n  §F{f:Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
+            "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n" },
     };
 
     [Theory]
@@ -107,38 +130,13 @@ public class ShadowingDifferentialTests
 
     // #732 (sibling mutable rebind → CS0103) is FIXED: the emitter is now scope-aware,
     // so that case moved to CleanWhenAccepted above ("sibling-mutable-rebind").
-    // #733 (type-changing rebind → CS0029) is FIXED for annotated and literal rebinds
-    // (Calor0256); the non-literal unannotated lane below is the remaining gap (#740).
 
-    [Fact]
-    public void KnownGap_UnannotatedNonLiteralRebind_EmitsCS0029() // #740
-    {
-        // An unannotated mutable rebind of a NON-literal mismatched value: the pass
-        // can't infer the value's type yet, so it accepts it, but Roslyn rejects the
-        // resulting `x = File.ReadAllText(p);` (string → int). Literal values are already
-        // caught by Calor0256; this needs value-type inference (#740).
-        var (accepted, roslynErrors) = Compile(
-            "§M{m:S}\n  §F{f:Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
-            "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n");
+    // #740 (unannotated non-literal rebind → CS0029) is FIXED: value-type inference now
+    // resolves references and known call return types, so calor -i rejects it with
+    // Calor0256; it moved to RejectedIdioms above ("unannotated-nonliteral-rebind").
 
-        Assert.True(accepted);
-        Assert.Contains(roslynErrors, e => e.StartsWith("CS0029", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void KnownGap_ForeachVariableRebind_EmitsCS1656() // #738
-    {
-        // A §EACH iteration variable is not assignable in C#; the pass and emitter now
-        // agree it is in scope (so it's a reassignment), but the reassignment itself is
-        // invalid. The correct fix is a reject diagnostic (#738).
-        var (accepted, roslynErrors) = Compile(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
-            "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §B{~x:str} \"y\"\n    §R 0\n");
-
-        Assert.True(accepted);
-        Assert.Contains(roslynErrors, e => e.StartsWith("CS1656", StringComparison.Ordinal));
-    }
+    // #738 (§EACH iteration-variable rebind → CS1656) is FIXED: calor -i now rejects it
+    // with Calor0257, so it moved to RejectedIdioms above ("foreach-var-rebind").
 
     // #733 (type-changing mutable rebind → CS0029) is FIXED: calor -i now rejects it
     // with Calor0256, so it moved to RejectedIdioms above ("type-changing-mutable-rebind").
@@ -151,5 +149,23 @@ public class ShadowingDifferentialTests
 
         Assert.True(accepted);
         Assert.Contains(roslynErrors, e => e.StartsWith("CS0128", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void KnownGap_DecimalToFloatRebind_EmitsCS0266() // #740 within-Numeric miss
+    {
+        // decimal and float/double both classify as the single Numeric category, so a
+        // rebind across them is not flagged (the conservative-miss trade the Calor0256
+        // category model makes to avoid widening false positives). There is no *implicit*
+        // conversion between decimal and double, but an *explicit* one exists, so
+        // `double x = 0; x = d;` (d: decimal) is CS0266 ("a cast is missing"), NOT CS0029
+        // — this miss is the same cast-needed bucket as numeric narrowing. Pins the gap
+        // the AreDefinitelyIncompatible doc names.
+        var (accepted, roslynErrors) = Compile(
+            "§M{m:S}\n  §F{f:Do:pub} (decimal:d) -> i32\n" +
+            "    §B{~x:f64} 0.0\n    §B{~x} d\n    §R 0\n");
+
+        Assert.True(accepted);
+        Assert.Contains(roslynErrors, e => e.StartsWith("CS0266", StringComparison.Ordinal));
     }
 }
