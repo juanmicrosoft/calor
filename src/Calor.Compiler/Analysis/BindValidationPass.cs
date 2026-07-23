@@ -682,10 +682,11 @@ public sealed class BindValidationPass
             // reject now that the C#→Calor converter emits `arr = new T[]{…}` reassignments
             // as §ASSIGN rather than a fresh same-name §B creation block (#731).
             _diagnostics.ReportError(bind.Span, DiagnosticCode.BindDuplicateInScope,
-                $"Binding '{bind.Name}' is already declared in this scope. C# forbids two " +
-                "locals of the same name in one scope (CS0128), so the generated code would " +
-                $"not compile — rename this binding (e.g. '{bind.Name}2'), or use a mutable " +
-                $"rebind ('§B{{~{bind.Name}}}') if a reassignment was intended.");
+                $"Binding '{bind.Name}' is already declared in this scope. C# forbids two locals " +
+                "of the same name in one scope (CS0128). If you intended a reassignment, use a " +
+                $"mutable rebind ('§B{{~{bind.Name}}}'); if the two are independent, rename this one " +
+                $"(e.g. '{bind.Name}2'). (If this is C#→Calor converter output, the source likely " +
+                "had two separate '{ }' block scopes whose scoping the converter did not preserve.)");
             // Keep the existing declaration; don't overwrite its type with the duplicate's.
         }
         else

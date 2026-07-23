@@ -74,19 +74,58 @@ public class DuplicateBindingTests
             "§M{m:S}\n  §F{f:Do:pub} (i32:x) -> i32\n    §B{x:i32} 9\n    §R x\n"));
     }
 
-    [Fact]
-    public void ConverterArrayReassignment_RoundTripsToRoslynCleanCSharp()
+    // The converter side of #731: a `x = new …` reassignment must NOT round-trip to a
+    // second declaration of `x` (CS0128). The emitter now emits each creation shape into a
+    // fresh temp followed by §ASSIGN. All five collection/array shapes the converter can
+    // produce are covered (#750 review finding 3 — previously only 1-D array was tested).
+    public static IEnumerable<object[]> ReassignmentShapes() => new[]
     {
-        // The converter side of #731: `arr = new int[]{…}` must NOT round-trip to a second
-        // `int[] arr = …` declaration (CS0128). It now emits §ASSIGN via a temp, so the
-        // regenerated C# compiles under Roslyn.
+        new object[] { "array-1d",
+            "int[] v = new int[5];\n        v = new int[] { 10, 20, 30 };" },
+        new object[] { "array-2d",
+            "int[,] v = new int[2, 2];\n        v = new int[,] { { 1, 2 }, { 3, 4 } };" },
+        new object[] { "list",
+            "System.Collections.Generic.List<int> v = new();\n        v = new System.Collections.Generic.List<int> { 1, 2, 3 };" },
+        new object[] { "dictionary",
+            "System.Collections.Generic.Dictionary<string,int> v = new();\n        v = new System.Collections.Generic.Dictionary<string,int> { { \"a\", 1 } };" },
+        new object[] { "hashset",
+            "System.Collections.Generic.HashSet<int> v = new();\n        v = new System.Collections.Generic.HashSet<int> { 1, 2 };" },
+    };
+
+    [Theory]
+    [MemberData(nameof(ReassignmentShapes))]
+    public void ConverterCollectionReassignment_RoundTripsToRoslynCleanCSharp(string name, string body)
+    {
+        var csharp = "public class Test\n{\n    void M()\n    {\n        " + body + "\n    }\n}\n";
+
+        var result = new CSharpToCalorConverter().Convert(csharp);
+        Assert.True(result.Success, $"[{name}] conversion failed");
+        Assert.NotNull(result.CalorSource);
+
+        var compiled = Program.Compile(result.CalorSource!);
+        Assert.False(compiled.Diagnostics.HasErrors,
+            $"[{name}] calor -i rejected converter output:\n" + result.CalorSource);
+
+        var roslynErrors = ExemplarCompileChecker.RoslynErrors(compiled.GeneratedCode);
+        Assert.DoesNotContain(roslynErrors, e => e.StartsWith("CS0128", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void KnownGap_ConverterFlattensBareBlocks_ProducesCalor0258() // #751
+    {
+        // Documented limitation surfaced by #731: the converter flattens standalone `{ }`
+        // block scopes (dropping the braces), so two sibling blocks that each declare `x`
+        // — valid, independent C# scopes — become a same-scope duplicate that Calor0258 now
+        // rejects. Pre-#731 this was a silent downstream CS0128; the root cause is the
+        // converter's block-scope fidelity gap, tracked in #751. Pins the CURRENT behavior
+        // so closing #751 (round-trip stays clean) trips this test to be updated.
         var csharp = """
             public class Test
             {
                 void M()
                 {
-                    int[] arr = new int[5];
-                    arr = new int[] { 10, 20, 30 };
+                    { int x = 1; System.Console.WriteLine(x); }
+                    { int x = 2; System.Console.WriteLine(x); }
                 }
             }
             """;
@@ -96,10 +135,6 @@ public class DuplicateBindingTests
         Assert.NotNull(result.CalorSource);
 
         var compiled = Program.Compile(result.CalorSource!);
-        Assert.False(compiled.Diagnostics.HasErrors,
-            "calor -i rejected converter output:\n" + result.CalorSource);
-
-        var roslynErrors = ExemplarCompileChecker.RoslynErrors(compiled.GeneratedCode);
-        Assert.DoesNotContain(roslynErrors, e => e.StartsWith("CS0128", StringComparison.Ordinal));
+        Assert.Contains(compiled.Diagnostics, d => d.Code == DiagnosticCode.BindDuplicateInScope);
     }
 }
