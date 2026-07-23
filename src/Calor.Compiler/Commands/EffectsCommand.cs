@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
@@ -53,7 +54,16 @@ public static class EffectsCommand
             jsonOption
         };
 
-        command.SetHandler(ExecuteResolve, signatureArgument, projectOption, solutionOption, jsonOption);
+        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+        command.SetHandler((InvocationContext ctx) =>
+        {
+            ctx.ExitCode = ExecuteResolve(
+                ctx.ParseResult.GetValueForArgument(signatureArgument),
+                ctx.ParseResult.GetValueForOption(projectOption),
+                ctx.ParseResult.GetValueForOption(solutionOption),
+                ctx.ParseResult.GetValueForOption(jsonOption));
+        });
 
         return command;
     }
@@ -74,7 +84,14 @@ public static class EffectsCommand
             solutionOption
         };
 
-        command.SetHandler(ExecuteValidate, projectOption, solutionOption);
+        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+        command.SetHandler((InvocationContext ctx) =>
+        {
+            ctx.ExitCode = ExecuteValidate(
+                ctx.ParseResult.GetValueForOption(projectOption),
+                ctx.ParseResult.GetValueForOption(solutionOption));
+        });
 
         return command;
     }
@@ -110,15 +127,27 @@ public static class EffectsCommand
         return command;
     }
 
-    private static void ExecuteResolve(string signature, DirectoryInfo? project, DirectoryInfo? solution, bool json)
+    private static int ExecuteResolve(string signature, DirectoryInfo? project, DirectoryInfo? solution, bool json)
     {
         var (typeName, methodName) = ParseSignature(signature);
         if (string.IsNullOrEmpty(typeName) || string.IsNullOrEmpty(methodName))
         {
+            // Envelope mode: stdout carries exactly one document, always —
+            // including this early exit (envelope schema v1.1 contract).
+            if (json)
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("effects", null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliUsageError,
+                        DiagnosticSeverity.Error,
+                        $"Could not parse signature '{signature}'. Expected format: Type.Method (e.g., 'Console.WriteLine').",
+                        filePath: null,
+                        line: 1,
+                        column: 1)]));
+            }
             Console.Error.WriteLine($"Error: Could not parse signature '{signature}'");
             Console.Error.WriteLine("Expected format: Type.Method (e.g., 'Console.WriteLine' or 'System.IO.File.ReadAllText')");
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
         var loader = new ManifestLoader();
@@ -138,7 +167,7 @@ public static class EffectsCommand
                     : resolution.Effects.Effects.Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value)).ToArray(),
                 source = resolution.Source
             };
-            Console.WriteLine(JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine(EnvelopeWriter.Serialize("effects", output));
         }
         else
         {
@@ -158,9 +187,11 @@ public static class EffectsCommand
                 Console.Error.WriteLine($"  - {error}");
             }
         }
+
+        return 0;
     }
 
-    private static void ExecuteValidate(DirectoryInfo? project, DirectoryInfo? solution)
+    private static int ExecuteValidate(DirectoryInfo? project, DirectoryInfo? solution)
     {
         var loader = new ManifestLoader();
         loader.LoadAll(project?.FullName, solution?.FullName);
@@ -191,13 +222,16 @@ public static class EffectsCommand
             {
                 Console.WriteLine($"  [ERROR] {error}");
             }
-            Environment.ExitCode = 1;
+            return 1;
         }
-        else if (loader.LoadErrors.Count == 0)
+
+        if (loader.LoadErrors.Count == 0)
         {
             Console.WriteLine();
             Console.WriteLine("All manifests are valid.");
         }
+
+        return 0;
     }
 
     private static void ExecuteList(DirectoryInfo? project, DirectoryInfo? solution, string? typeFilter, bool json)
@@ -242,7 +276,7 @@ public static class EffectsCommand
                 defaultEffects = t.DefaultEffects,
                 methodCount = t.MethodCount
             });
-            Console.WriteLine(JsonSerializer.Serialize(output, new JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine(EnvelopeWriter.Serialize("effects", output));
         }
         else
         {
@@ -324,12 +358,33 @@ public static class EffectsCommand
             inputOption, projectOption, solutionOption, outputOption, mergeOption, jsonOption
         };
 
-        command.SetHandler(ExecuteSuggest, inputOption, projectOption, solutionOption, outputOption, mergeOption, jsonOption);
+        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+        command.SetHandler((InvocationContext ctx) =>
+        {
+            ctx.ExitCode = ExecuteSuggest(
+                ctx.ParseResult.GetValueForOption(inputOption) ?? [],
+                ctx.ParseResult.GetValueForOption(projectOption),
+                ctx.ParseResult.GetValueForOption(solutionOption),
+                ctx.ParseResult.GetValueForOption(outputOption),
+                ctx.ParseResult.GetValueForOption(mergeOption),
+                ctx.ParseResult.GetValueForOption(jsonOption));
+        });
 
         return command;
     }
 
-    private static void ExecuteSuggest(
+    /// <summary>
+    /// Envelope mode (--json): stdout carries exactly one document, always —
+    /// including early-exit error paths, which get a CLI-band diagnostic.
+    /// </summary>
+    private static void EmitSuggestErrorEnvelope(string code, string message, string? filePath)
+    {
+        Console.WriteLine(EnvelopeWriter.Serialize("effects", null,
+            [new Diagnostic(code, DiagnosticSeverity.Error, message, filePath, line: 1, column: 1)]));
+    }
+
+    private static int ExecuteSuggest(
         FileInfo[] inputFiles,
         DirectoryInfo? project,
         DirectoryInfo? solution,
@@ -339,9 +394,10 @@ public static class EffectsCommand
     {
         if (merge && json)
         {
+            EmitSuggestErrorEnvelope(DiagnosticCode.CliUsageError,
+                "--merge and --json are mutually exclusive.", filePath: null);
             Console.Error.WriteLine("Error: --merge and --json are mutually exclusive.");
-            Environment.ExitCode = 2;
-            return;
+            return 2;
         }
 
         // Step 1+2: Parse each file and build combined function maps
@@ -353,34 +409,47 @@ public static class EffectsCommand
         {
             if (!inputFile.Exists)
             {
+                if (json)
+                {
+                    EmitSuggestErrorEnvelope(DiagnosticCode.CliInputNotFound,
+                        $"File not found: {inputFile.FullName}", inputFile.FullName);
+                }
                 Console.Error.WriteLine($"Error: File not found: {inputFile.FullName}");
-                Environment.ExitCode = 1;
-                return;
+                return 1;
             }
 
             var source = File.ReadAllText(inputFile.FullName);
             var diagnostics = new DiagnosticBag();
+            diagnostics.SetFilePath(inputFile.FullName);
 
             var lexer = new Lexer(source, diagnostics);
             var tokens = lexer.TokenizeAllForParser();
             if (diagnostics.HasErrors)
             {
+                if (json)
+                {
+                    // The real lexer diagnostics (with their own codes) flow
+                    // into the envelope directly.
+                    Console.WriteLine(EnvelopeWriter.Serialize("effects", null, diagnostics.Errors));
+                }
                 Console.Error.WriteLine($"Error: Failed to lex {inputFile.Name}:");
                 foreach (var diag in diagnostics.Errors)
                     Console.Error.WriteLine($"  {diag.Message}");
-                Environment.ExitCode = 1;
-                return;
+                return 1;
             }
 
             var parser = new Parser(tokens, diagnostics);
             var module = parser.Parse();
             if (diagnostics.HasErrors)
             {
+                if (json)
+                {
+                    Console.WriteLine(EnvelopeWriter.Serialize("effects", null, diagnostics.Errors));
+                }
                 Console.Error.WriteLine($"Error: Failed to parse {inputFile.Name}:");
                 foreach (var diag in diagnostics.Errors)
                     Console.Error.WriteLine($"  {diag.Message}");
-                Environment.ExitCode = 1;
-                return;
+                return 1;
             }
 
             allModules.Add(module);
@@ -422,8 +491,8 @@ public static class EffectsCommand
             if (!json)
                 Console.WriteLine("All external calls are resolved. No supplemental manifest needed.");
             else
-                Console.WriteLine("{\"unresolved\": 0, \"types\": []}");
-            return;
+                Console.WriteLine(EnvelopeWriter.Serialize("effects", new { unresolved = 0, types = Array.Empty<object>() }));
+            return 0;
         }
 
         // Step 5: Build manifest
@@ -440,8 +509,10 @@ public static class EffectsCommand
 
         if (json)
         {
-            Console.WriteLine(manifestJson);
-            return;
+            // Stdout is command output → envelope; the manifest file itself
+            // (written below in non-json mode) stays raw.
+            Console.WriteLine(EnvelopeWriter.Serialize("effects", manifest));
+            return 0;
         }
 
         // Console summary
@@ -507,14 +578,14 @@ public static class EffectsCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Error writing file: {ex.Message}");
-            Environment.ExitCode = 2;
-            return;
+            return 2;
         }
 
         Console.WriteLine();
         Console.WriteLine("Hint: Common effects are cw (console), fs:r/fs:w (file), db:r/db:w (database),");
         Console.WriteLine("      net:r/net:w (network), mut (mutation), rand (random), time (system time).");
         Console.WriteLine("      Use [] for pure methods with no side effects.");
+        return 0;
     }
 
     private static bool IsInternalCall(

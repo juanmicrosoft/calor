@@ -89,6 +89,27 @@ public sealed class ObligationsToolTests
         Assert.True(firstObl.TryGetProperty("function_id", out _));
         Assert.True(firstObl.TryGetProperty("status", out _));
         Assert.True(firstObl.TryGetProperty("description", out _));
+
+        // Envelope schema v1.1: proof_status carries the five-status wire name
+        // (absent while pending/boundary); counterexample_bindings, when present,
+        // is the structured model.
+        var fiveStatus = new[] { "proven", "refuted", "unknown", "timeout", "unsupported" };
+        foreach (var obl in obligations.EnumerateArray())
+        {
+            if (obl.TryGetProperty("proof_status", out var proofStatus))
+            {
+                Assert.Contains(proofStatus.GetString(), fiveStatus);
+            }
+
+            if (obl.TryGetProperty("counterexample_bindings", out var bindings))
+            {
+                foreach (var binding in bindings.EnumerateArray())
+                {
+                    Assert.True(binding.TryGetProperty("name", out _));
+                    Assert.True(binding.TryGetProperty("value", out _));
+                }
+            }
+        }
     }
 
     [Fact]

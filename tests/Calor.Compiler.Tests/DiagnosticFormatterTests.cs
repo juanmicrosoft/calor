@@ -105,7 +105,7 @@ public class DiagnosticFormatterTests
 
         var doc = JsonDocument.Parse(result);
         var version = doc.RootElement.GetProperty("version").GetString();
-        Assert.Equal("1.0", version);
+        Assert.Equal(JsonDiagnosticFormatter.SchemaVersion, version);
     }
 
     [Fact]

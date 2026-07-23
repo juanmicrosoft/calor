@@ -429,7 +429,7 @@ public class ValidateSnippetToolTests
 
         // The error should be on line 2 (relative to snippet), not the wrapped line
         var firstDiag = diagnostics.EnumerateArray().First();
-        var line = firstDiag.GetProperty("line").GetInt32();
+        var line = firstDiag.GetProperty("location").GetProperty("line").GetInt32();
         Assert.Equal(2, line);
     }
 
@@ -773,7 +773,7 @@ public class ValidateSnippetToolTests
 
         Assert.NotEmpty(diagnostics);
         // The error should be at a reasonable column (after §B{y} )
-        var col = diagnostics[0].GetProperty("column").GetInt32();
+        var col = diagnostics[0].GetProperty("location").GetProperty("column").GetInt32();
         Assert.True(col >= 7, $"Expected column >= 7, got {col}");
     }
 
@@ -803,9 +803,9 @@ public class ValidateSnippetToolTests
         Assert.NotEmpty(diagnostics);
         var diag = diagnostics[0];
         // Error should be on line 2 of the snippet
-        Assert.Equal(2, diag.GetProperty("line").GetInt32());
+        Assert.Equal(2, diag.GetProperty("location").GetProperty("line").GetInt32());
         // Column should be reasonable (the STR: starts at column 1)
-        var col = diag.GetProperty("column").GetInt32();
+        var col = diag.GetProperty("location").GetProperty("column").GetInt32();
         Assert.True(col >= 1, $"Expected column >= 1, got {col}");
     }
 
@@ -895,7 +895,7 @@ public class ValidateSnippetToolTests
 
         Assert.NotEmpty(diagnostics);
         // Error should be on line 1 of the snippet (not line 2 which would include surrounding code line)
-        Assert.Equal(1, diagnostics[0].GetProperty("line").GetInt32());
+        Assert.Equal(1, diagnostics[0].GetProperty("location").GetProperty("line").GetInt32());
     }
 
     [Fact]
@@ -982,7 +982,7 @@ public class ValidateSnippetToolTests
         Assert.NotEmpty(diagnostics);
 
         // Column should be at least 9 (where STR: starts, after "§B{val} ")
-        var col = diagnostics[0].GetProperty("column").GetInt32();
+        var col = diagnostics[0].GetProperty("location").GetProperty("column").GetInt32();
         Assert.True(col >= 9, $"Expected column >= 9 for STR: token position, got {col}");
     }
 
@@ -1033,7 +1033,7 @@ public class ValidateSnippetToolTests
         Assert.NotEmpty(diagnostics);
 
         // Error should be on line 101
-        var line = diagnostics[0].GetProperty("line").GetInt32();
+        var line = diagnostics[0].GetProperty("location").GetProperty("line").GetInt32();
         Assert.Equal(101, line);
     }
 

@@ -38,11 +38,25 @@ public enum ContractVerificationStatus
 /// <param name="CounterexampleDescription">Description of counterexample if Disproven, or diagnostic message if Unsupported.</param>
 /// <param name="Warnings">Non-fatal warnings about features that were silently handled differently than expected.</param>
 /// <param name="Duration">Time taken to verify.</param>
+/// <param name="Outcome">The choke-point outcome (five-status vocabulary + structured counterexample). Null only for results reconstructed from pre-outcome cache entries.</param>
 public record ContractVerificationResult(
     ContractVerificationStatus Status,
     string? CounterexampleDescription = null,
     IReadOnlyList<string>? Warnings = null,
-    TimeSpan? Duration = null);
+    TimeSpan? Duration = null,
+    ProofOutcome? Outcome = null)
+{
+    /// <summary>Builds a result whose legacy fields are all derived from the choke-point outcome.</summary>
+    public static ContractVerificationResult FromOutcome(
+        ProofOutcome outcome,
+        IReadOnlyList<string>? Warnings = null,
+        TimeSpan? Duration = null)
+        => new(outcome.ToContractStatus(), outcome.Describe(), Warnings, Duration, outcome);
+
+    /// <summary>The outcome, reconstructed (lossily) from legacy fields when absent.</summary>
+    public ProofOutcome EffectiveOutcome =>
+        Outcome ?? ProofOutcome.FromLegacyContractStatus(Status, CounterexampleDescription);
+}
 
 /// <summary>
 /// Result of verifying all contracts in a function.

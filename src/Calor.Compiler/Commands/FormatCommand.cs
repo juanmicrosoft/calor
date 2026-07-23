@@ -49,6 +49,13 @@ public static class FormatCommand
                          "into a chain-clause body guesses the intended control flow (each guess is reported " +
                          "as a warning). Always review the healed output.");
 
+        // No -f short alias (consistent with lint, where -f means --fix).
+        var formatOption = new Option<string>(
+            aliases: ["--format"],
+            getDefaultValue: () => "text",
+            description: "Output format: text (human-readable) or json (envelope document on stdout). No short alias.");
+        formatOption.FromAmong("text", "json");
+
         var command = new Command("format", "Format Calor source files to canonical style")
         {
             inputArgument,
@@ -56,7 +63,8 @@ public static class FormatCommand
             writeOption,
             diffOption,
             verboseOption,
-            healOption
+            healOption,
+            formatOption
         };
 
         // Return the exit code through the handler (ctx.ExitCode) instead of
@@ -71,13 +79,14 @@ public static class FormatCommand
                 ctx.ParseResult.GetValueForOption(writeOption),
                 ctx.ParseResult.GetValueForOption(diffOption),
                 ctx.ParseResult.GetValueForOption(verboseOption),
-                ctx.ParseResult.GetValueForOption(healOption));
+                ctx.ParseResult.GetValueForOption(healOption),
+                ctx.ParseResult.GetValueForOption(formatOption) ?? "text");
         });
 
         return command;
     }
 
-    private static async Task<int> ExecuteAsync(FileInfo[] files, bool check, bool write, bool diff, bool verbose, bool heal)
+    private static async Task<int> ExecuteAsync(FileInfo[] files, bool check, bool write, bool diff, bool verbose, bool heal, string format)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("format");
@@ -87,6 +96,19 @@ public static class FormatCommand
             telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
         }
         var sw = Stopwatch.StartNew();
+
+        // Envelope output (--format json, schema v1.1, loop plan D1.3): real
+        // Diagnostic objects are aggregated across files into one bag and
+        // serialized once to stdout; ALL human-oriented output goes to stderr
+        // so stdout carries exactly one machine-parseable document.
+        var json = format.Equals("json", StringComparison.OrdinalIgnoreCase);
+        var statusOut = json ? Console.Error : Console.Out;
+        var diagnosticSink = json ? new DiagnosticBag() : null;
+        var fileEntries = json ? new List<FormatFileData>() : null;
+        // The formatted source is embedded in the document only in preview
+        // mode (neither --write nor --check), mirroring what text mode would
+        // have printed to stdout.
+        var embedFormatted = json && !write && !check;
 
         var hasUnformatted = false;
         var totalFiles = 0;
@@ -100,6 +122,18 @@ public static class FormatCommand
 
             if (!file.Exists)
             {
+                diagnosticSink?.Add(new Diagnostic(
+                    DiagnosticCode.FormatFileNotFound,
+                    $"File not found: {file.FullName}",
+                    new TextSpan(0, 0, 1, 1),
+                    DiagnosticSeverity.Error,
+                    file.FullName));
+                fileEntries?.Add(new FormatFileData
+                {
+                    Path = file.FullName,
+                    Changed = false,
+                    Status = "not-found"
+                });
                 Console.Error.WriteLine($"Error: File not found: {file.FullName}");
                 errorFiles++;
                 continue;
@@ -107,6 +141,18 @@ public static class FormatCommand
 
             if (!file.Extension.Equals(".calr", StringComparison.OrdinalIgnoreCase))
             {
+                diagnosticSink?.Add(new Diagnostic(
+                    DiagnosticCode.FormatUnsupportedFileType,
+                    $"Skipping non-Calor file: {file.Name}",
+                    new TextSpan(0, 0, 1, 1),
+                    DiagnosticSeverity.Warning,
+                    file.FullName));
+                fileEntries?.Add(new FormatFileData
+                {
+                    Path = file.FullName,
+                    Changed = false,
+                    Status = "skipped"
+                });
                 Console.Error.WriteLine($"Warning: Skipping non-Calor file: {file.Name}");
                 continue;
             }
@@ -117,8 +163,16 @@ public static class FormatCommand
                     ? await HealFileAsync(file.FullName)
                     : await FormatFileAsync(file.FullName, verbose);
 
+                diagnosticSink?.AddRange(result.Diagnostics);
+
                 if (!result.Success)
                 {
+                    fileEntries?.Add(new FormatFileData
+                    {
+                        Path = file.FullName,
+                        Changed = false,
+                        Status = "error"
+                    });
                     Console.Error.WriteLine($"Error formatting {file.Name}:");
                     foreach (var error in result.Errors)
                     {
@@ -156,34 +210,63 @@ public static class FormatCommand
 
                     if (check)
                     {
-                        Console.WriteLine(heal
+                        statusOut.WriteLine(heal
                             ? $"Would heal: {file.Name} (ambiguousDecisions: {result.Ambiguities.Count})"
                             : $"Would reformat: {file.Name}");
                     }
                     else if (write)
                     {
                         await File.WriteAllTextAsync(file.FullName, result.Formatted);
-                        Console.WriteLine($"{(heal ? "Healed" : "Formatted")}: {file.Name}");
+                        statusOut.WriteLine($"{(heal ? "Healed" : "Formatted")}: {file.Name}");
                         formattedFiles++;
                     }
-                    else
+                    else if (!json)
                     {
-                        // Default: write to stdout
+                        // Default: write to stdout (in JSON mode the formatted
+                        // source is embedded in the document instead).
                         Console.WriteLine(result.Formatted);
                     }
 
                     if (diff)
                     {
-                        ShowDiff(result.Original, result.Formatted, file.Name);
+                        ShowDiff(result.Original, result.Formatted, file.Name, statusOut);
                     }
                 }
                 else if (verbose)
                 {
-                    Console.WriteLine($"Already formatted: {file.Name}");
+                    statusOut.WriteLine($"Already formatted: {file.Name}");
                 }
+
+                fileEntries?.Add(new FormatFileData
+                {
+                    Path = file.FullName,
+                    Changed = !isFormatted,
+                    Status = isFormatted
+                        ? "already-formatted"
+                        : check ? "would-reformat" : heal ? "healed" : "formatted",
+                    Formatted = embedFormatted && !isFormatted ? result.Formatted : null,
+                    Ambiguities = heal
+                        ? result.Ambiguities
+                            .Select(a => new FormatAmbiguityData { Line = a.Line, Message = a.Message })
+                            .ToList()
+                        : null,
+                    ResidualParseErrors = result.ResidualParseErrors
+                });
             }
             catch (Exception ex)
             {
+                diagnosticSink?.Add(new Diagnostic(
+                    DiagnosticCode.FormatProcessingError,
+                    $"Error processing {file.Name}: {ex.Message}",
+                    new TextSpan(0, 0, 1, 1),
+                    DiagnosticSeverity.Error,
+                    file.FullName));
+                fileEntries?.Add(new FormatFileData
+                {
+                    Path = file.FullName,
+                    Changed = false,
+                    Status = "error"
+                });
                 Console.Error.WriteLine($"Error processing {file.Name}: {ex.Message}");
                 errorFiles++;
             }
@@ -192,20 +275,37 @@ public static class FormatCommand
         // Summary
         if (verbose || files.Length > 1)
         {
-            Console.WriteLine();
-            Console.WriteLine($"Processed {totalFiles} file(s)");
+            statusOut.WriteLine();
+            statusOut.WriteLine($"Processed {totalFiles} file(s)");
             if (write)
             {
-                Console.WriteLine($"  Formatted: {formattedFiles}");
+                statusOut.WriteLine($"  Formatted: {formattedFiles}");
             }
             if (errorFiles > 0)
             {
-                Console.WriteLine($"  Errors: {errorFiles}");
+                statusOut.WriteLine($"  Errors: {errorFiles}");
             }
             if (unrepairedFiles > 0)
             {
-                Console.WriteLine($"  Still failing to parse after heal: {unrepairedFiles}");
+                statusOut.WriteLine($"  Still failing to parse after heal: {unrepairedFiles}");
             }
+        }
+
+        // Envelope mode: stdout carries exactly one document, always.
+        if (json)
+        {
+            var data = new FormatData
+            {
+                Files = fileEntries!,
+                Totals = new FormatTotals
+                {
+                    Processed = totalFiles,
+                    Formatted = formattedFiles,
+                    Errors = errorFiles,
+                    StillFailingAfterHeal = unrepairedFiles
+                }
+            };
+            Console.WriteLine(CommandEnvelope.Serialize("format", diagnosticSink!, data));
         }
 
         // Exit code. A heal that leaves (or found and could not touch) parse
@@ -277,6 +377,7 @@ public static class FormatCommand
             Original = source,
             Formatted = healed,
             Errors = new List<string>(),
+            Diagnostics = diagnostics.ToList(),
             Ambiguities = healer.Ambiguities.ToList(),
             ResidualParseErrors = diagnostics.HasErrors
         };
@@ -300,7 +401,8 @@ public static class FormatCommand
                 Success = false,
                 Original = source,
                 Formatted = source,
-                Errors = diagnostics.Errors.Select(e => e.Message).ToList()
+                Errors = diagnostics.Errors.Select(e => e.Message).ToList(),
+                Diagnostics = diagnostics.ToList()
             };
         }
 
@@ -314,7 +416,8 @@ public static class FormatCommand
                 Success = false,
                 Original = source,
                 Formatted = source,
-                Errors = diagnostics.Errors.Select(e => e.Message).ToList()
+                Errors = diagnostics.Errors.Select(e => e.Message).ToList(),
+                Diagnostics = diagnostics.ToList()
             };
         }
 
@@ -327,16 +430,17 @@ public static class FormatCommand
             Success = true,
             Original = source,
             Formatted = formatted,
-            Errors = new List<string>()
+            Errors = new List<string>(),
+            Diagnostics = diagnostics.ToList()
         };
     }
 
-    private static void ShowDiff(string original, string formatted, string fileName)
+    private static void ShowDiff(string original, string formatted, string fileName, TextWriter writer)
     {
-        Console.WriteLine();
-        Console.WriteLine($"--- {fileName} (original)");
-        Console.WriteLine($"+++ {fileName} (formatted)");
-        Console.WriteLine();
+        writer.WriteLine();
+        writer.WriteLine($"--- {fileName} (original)");
+        writer.WriteLine($"+++ {fileName} (formatted)");
+        writer.WriteLine();
 
         var originalLines = original.Split('\n');
         var formattedLines = formatted.Split('\n');
@@ -359,13 +463,13 @@ public static class FormatCommand
                 {
                     if (lastPrintedLine >= 0 && startContext > lastPrintedLine + 1)
                     {
-                        Console.WriteLine("...");
+                        writer.WriteLine("...");
                     }
                     for (var j = startContext; j < i; j++)
                     {
                         if (j < originalLines.Length)
                         {
-                            Console.WriteLine($" {originalLines[j].TrimEnd()}");
+                            writer.WriteLine($" {originalLines[j].TrimEnd()}");
                         }
                     }
                 }
@@ -374,13 +478,13 @@ public static class FormatCommand
                 if (origLine != null)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"-{origLine}");
+                    writer.WriteLine($"-{origLine}");
                     Console.ResetColor();
                 }
                 if (fmtLine != null)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"+{fmtLine}");
+                    writer.WriteLine($"+{fmtLine}");
                     Console.ResetColor();
                 }
 
@@ -388,7 +492,7 @@ public static class FormatCommand
             }
         }
 
-        Console.WriteLine();
+        writer.WriteLine();
     }
 
     private sealed class FormatResult
@@ -398,10 +502,65 @@ public static class FormatCommand
         public required string Formatted { get; init; }
         public required List<string> Errors { get; init; }
 
+        /// <summary>
+        /// The real parse/format diagnostics behind <see cref="Errors"/> (plus
+        /// heal-mode residual parse errors), carried so <c>--format json</c> can
+        /// serialize them through the shared envelope surface.
+        /// </summary>
+        public List<Diagnostic> Diagnostics { get; init; } = new();
+
         /// <summary>Control-flow guesses made by the healer (heal path only).</summary>
         public List<HealAmbiguity> Ambiguities { get; init; } = new();
 
         /// <summary>True when the healed output still fails to parse (heal path only).</summary>
         public bool ResidualParseErrors { get; init; }
+    }
+
+    // ------------------------------------------------------------------
+    // Envelope `data` payload (--format json). Serialized camelCase with
+    // null fields omitted; shape documented in docs/cli/format.md.
+    // ------------------------------------------------------------------
+
+    private sealed class FormatData
+    {
+        public required List<FormatFileData> Files { get; init; }
+        public required FormatTotals Totals { get; init; }
+    }
+
+    private sealed class FormatFileData
+    {
+        public required string Path { get; init; }
+        public bool Changed { get; init; }
+
+        /// <summary>
+        /// formatted | already-formatted | would-reformat | healed | error |
+        /// skipped | not-found.
+        /// </summary>
+        public required string Status { get; init; }
+
+        /// <summary>
+        /// The formatted source; present only in preview mode (neither
+        /// <c>--write</c> nor <c>--check</c>) for files that changed.
+        /// </summary>
+        public string? Formatted { get; init; }
+
+        /// <summary>Heal mode only: control-flow guesses made by the healer.</summary>
+        public List<FormatAmbiguityData>? Ambiguities { get; init; }
+
+        public bool ResidualParseErrors { get; init; }
+    }
+
+    private sealed class FormatAmbiguityData
+    {
+        public int Line { get; init; }
+        public required string Message { get; init; }
+    }
+
+    private sealed class FormatTotals
+    {
+        public int Processed { get; init; }
+        public int Formatted { get; init; }
+        public int Errors { get; init; }
+        public int StillFailingAfterHeal { get; init; }
     }
 }

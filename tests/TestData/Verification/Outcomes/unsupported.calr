@@ -1,0 +1,5 @@
+§M{m1:OutcomeUnsupported}
+  §F{f1:Half:pub} (f64:x) -> f64
+    §Q (> x 0.0)
+    §S (> result 0.0)
+    §R x

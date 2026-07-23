@@ -1,8 +1,8 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Telemetry;
 
 namespace Calor.Compiler.Commands;
@@ -32,12 +32,19 @@ public static class CoverageCommand
             verboseOption
         };
 
-        command.SetHandler(ExecuteAsync, fileArgument, verboseOption);
+        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            ctx.ExitCode = await ExecuteAsync(
+                ctx.ParseResult.GetValueForArgument(fileArgument),
+                ctx.ParseResult.GetValueForOption(verboseOption));
+        });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(FileInfo file, bool verbose)
+    private static async Task<int> ExecuteAsync(FileInfo file, bool verbose)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("coverage");
@@ -53,15 +60,21 @@ public static class CoverageCommand
                 Success = false,
                 Error = "File not found"
             };
-            Console.WriteLine(JsonSerializer.Serialize(errorResult, JsonOptions));
-            Environment.ExitCode = 1;
+            Console.WriteLine(EnvelopeWriter.Serialize("coverage", errorResult,
+                [new Diagnostic(
+                    DiagnosticCode.CliInputNotFound,
+                    DiagnosticSeverity.Error,
+                    $"File not found: {file.FullName}",
+                    file.FullName,
+                    line: 1,
+                    column: 1)]));
             exitCode = 1;
             telemetry?.TrackCommand("coverage", exitCode, new Dictionary<string, string>
             {
                 ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
                 ["error"] = "file_not_found"
             });
-            return;
+            return exitCode;
         }
 
         try
@@ -77,8 +90,8 @@ public static class CoverageCommand
                     Success = false,
                     Error = score.SkipReason ?? "File was skipped"
                 };
-                Console.WriteLine(JsonSerializer.Serialize(skippedResult, JsonOptions));
-                return;
+                Console.WriteLine(EnvelopeWriter.Serialize("coverage", skippedResult));
+                return exitCode;
             }
 
             // Calculate coverage percentage based on unsupported constructs
@@ -120,7 +133,7 @@ public static class CoverageCommand
                     }) : null
             };
 
-            Console.WriteLine(JsonSerializer.Serialize(result, JsonOptions));
+            Console.WriteLine(EnvelopeWriter.Serialize("coverage", result));
         }
         catch (Exception ex)
         {
@@ -130,8 +143,14 @@ public static class CoverageCommand
                 Success = false,
                 Error = ex.Message
             };
-            Console.WriteLine(JsonSerializer.Serialize(errorResult, JsonOptions));
-            Environment.ExitCode = 1;
+            Console.WriteLine(EnvelopeWriter.Serialize("coverage", errorResult,
+                [new Diagnostic(
+                    DiagnosticCode.CliInternalError,
+                    DiagnosticSeverity.Error,
+                    $"Error analyzing {file.Name}: {ex.Message}",
+                    file.FullName,
+                    line: 1,
+                    column: 1)]));
             exitCode = 1;
             telemetry?.TrackException(ex);
         }
@@ -145,14 +164,9 @@ public static class CoverageCommand
                 ["verbose"] = verbose.ToString()
             });
         }
-    }
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
+        return exitCode;
+    }
 
     private sealed class CoverageResult
     {

@@ -61,10 +61,49 @@ calor convert MyService.cs --benchmark
 | `--benchmark` | `-b` | `false` | Include benchmark metrics comparison |
 | `--verbose` | `-v` | `false` | Enable verbose output |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). Use when regenerating `.calr` files intended to parse on v0.6.0 toolchains. By default v0.6.1 elides `§/C` for zero-arg calls. |
+| `--format` | — | `text` | Output format: `text` or `json` (envelope document on stdout) — see [JSON Output](#json-output---format-json). No `-f` short alias |
 
 ---
 
-## Auto-Detected Output Paths
+## JSON Output (`--format json`)
+
+With `--format json` stdout carries exactly one
+[envelope document](/calor/cli/envelope-schema/) — all human-oriented status
+moves to stderr, and a document is emitted on every path (success, failure,
+timeout, crash). Exit codes are unchanged.
+
+```json
+{
+  "version": "1.1",
+  "command": "convert",
+  "diagnostics": [
+    { "code": "Calor1343", "message": "[local-functions] Local functions are not supported…",
+      "severity": "warning",
+      "location": { "file": "/abs/Sample.cs", "line": 12, "column": 5, "length": 0 } }
+  ],
+  "summary": { "total": 1, "errors": 0, "warnings": 1, "info": 0 },
+  "data": {
+    "direction": "csharp-to-calor",
+    "inputPath": "/abs/Sample.cs",
+    "outputPath": "/abs/Sample.calr",
+    "success": true,
+    "unsupportedFeatureCount": 1,
+    "featureCounts": { "local-functions": 1 },
+    "validated": false
+  }
+}
+```
+
+- `diagnostics[]` — conversion issues (`Calor1343`, severity mirrors the
+  issue, message prefixed with the feature name when known), `--validate`
+  parse errors in the generated output (`Calor1344`, warning — the output was
+  still written, with `data.validated` / `data.validationErrorCount` set), and
+  command-level failures (`Calor1345`: input not found, unknown file type,
+  timeout, crash). Converting Calor → C#, compiler diagnostics appear with
+  their own codes.
+- `data.direction` — `csharp-to-calor` | `calor-to-csharp`.
+- `data.benchmark` — present with `--benchmark`: token/line/character counts
+  before and after, reduction percentages, and the advantage ratio.
 
 If `--output` is not specified:
 

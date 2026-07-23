@@ -84,7 +84,8 @@ internal static class CompilationDriver
         Action<FileInfo, CompilationResult>? onCompiled = null,
         DiagnosticBag? diagnosticSink = null,
         DriverCacheSettings? cache = null,
-        Action<FileInfo, string>? onSkipped = null)
+        Action<FileInfo, string>? onSkipped = null,
+        Action<FileInfo, string, ModuleNode>? onAst = null)
     {
         var compiled = new List<FileResult>();
         var skipped = new List<FileInfo>();
@@ -184,6 +185,13 @@ internal static class CompilationDriver
             var sourceBytes = File.ReadAllBytes(file.FullName);
             var source = DecodeSource(sourceBytes);
             var result = Program.Compile(source, file.FullName, options);
+
+            // Fires even for error-bearing files: declaration-ID enrichment of
+            // their diagnostics needs the AST whenever parsing got far enough.
+            if (result.Ast != null)
+            {
+                onAst?.Invoke(file, source, result.Ast);
+            }
 
             if (diagnosticSink != null)
             {

@@ -288,6 +288,7 @@ public class Program
         // move to stderr so stdout stays machine-parseable.
         var structuredOutput = !format.Equals("text", StringComparison.OrdinalIgnoreCase);
         var diagnosticSink = structuredOutput ? new DiagnosticBag() : null;
+        var declarationIds = structuredOutput ? new Ids.DeclarationIdResolver() : null;
         var structuredEmitted = false;
 
         // In structured mode a JSON/SARIF document is ALWAYS emitted to stdout,
@@ -298,7 +299,7 @@ public class Program
             if (diagnosticSink != null && !structuredEmitted)
             {
                 structuredEmitted = true;
-                Console.WriteLine(DiagnosticFormatterFactory.Create(format).Format(diagnosticSink));
+                Console.WriteLine(DiagnosticFormatterFactory.Create(format, declarationIds).Format(diagnosticSink));
             }
             return exitCode;
         }
@@ -456,7 +457,10 @@ public class Program
                 {
                     var statusOut = structuredOutput ? Console.Error : Console.Out;
                     statusOut.WriteLine($"Up-to-date (cached): {outputPath}");
-                });
+                },
+                onAst: declarationIds != null
+                    ? (file, source, ast) => declarationIds.AddFile(file.FullName, source, ast)
+                    : null);
 
             return Finish(driverResult.AnyErrors ? 1 : 0);
         }

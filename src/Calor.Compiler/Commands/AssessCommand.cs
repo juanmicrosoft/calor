@@ -84,14 +84,40 @@ public static class AssessCommand
         var sw = Stopwatch.StartNew();
         var exitCode = 0;
 
+        // Envelope mode: stdout carries exactly one document, always —
+        // including early exits (envelope schema v1.1 contract).
+        var json = format.Equals("json", StringComparison.OrdinalIgnoreCase);
+
         if (!path.Exists)
         {
+            if (json)
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("assess", null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliInputNotFound,
+                        DiagnosticSeverity.Error,
+                        $"Directory not found: {path.FullName}",
+                        path.FullName,
+                        line: 1,
+                        column: 1)]));
+            }
             Console.Error.WriteLine($"Error: Directory not found: {path.FullName}");
             return 2;
         }
 
         if (threshold < 0 || threshold > 100)
         {
+            if (json)
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("assess", null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliUsageError,
+                        DiagnosticSeverity.Error,
+                        "Threshold must be between 0 and 100",
+                        filePath: null,
+                        line: 1,
+                        column: 1)]));
+            }
             Console.Error.WriteLine("Error: Threshold must be between 0 and 100");
             return 2;
         }
@@ -146,6 +172,17 @@ public static class AssessCommand
         }
         catch (Exception ex)
         {
+            if (json)
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("assess", null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliInternalError,
+                        DiagnosticSeverity.Error,
+                        $"Assessment failed: {ex.Message}",
+                        path.FullName,
+                        line: 1,
+                        column: 1)]));
+            }
             Console.Error.WriteLine($"Error: {ex.Message}");
             telemetry?.TrackException(ex);
             exitCode = 2;
@@ -247,7 +284,6 @@ public static class AssessCommand
     {
         var output = new JsonOutput
         {
-            Version = "1.0",
             AnalyzedAt = result.AnalyzedAt,
             RootPath = result.RootPath,
             DurationMs = (int)result.Duration.TotalMilliseconds,
@@ -288,12 +324,33 @@ public static class AssessCommand
                 .ToList()
         };
 
-        return JsonSerializer.Serialize(output, new JsonSerializerOptions
+        // Envelope schema v1.1 (loop plan D1.3): assess emits no source-anchored
+        // diagnostics, so the document carries an empty diagnostics array and the
+        // assessment payload under data.
+        var envelope = new EnvelopeDocument
+        {
+            Version = JsonDiagnosticFormatter.SchemaVersion,
+            Command = "assess",
+            Diagnostics = [],
+            Summary = new EnvelopeSummary(),
+            Data = output
+        };
+
+        return JsonSerializer.Serialize(envelope, new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         });
+    }
+
+    private sealed class EnvelopeDocument
+    {
+        public required string Version { get; init; }
+        public required string Command { get; init; }
+        public required List<EnvelopeDiagnostic> Diagnostics { get; init; }
+        public required EnvelopeSummary Summary { get; init; }
+        public required JsonOutput Data { get; init; }
     }
 
     /// <summary>
@@ -350,7 +407,6 @@ public static class AssessCommand
     // JSON output classes
     private sealed class JsonOutput
     {
-        public required string Version { get; init; }
         public DateTime AnalyzedAt { get; init; }
         public required string RootPath { get; init; }
         public int DurationMs { get; init; }

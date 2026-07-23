@@ -30,15 +30,23 @@ calor feature-check --list --level notsupported
 calor feature-check yield-return
 ```
 
-Output:
+Output is wrapped in the [envelope schema v1.1](/calor/cli/envelope-schema/);
+the feature payload lives under `data`:
+
 ```json
 {
-  "feature": "yield-return",
-  "found": true,
-  "supported": false,
-  "supportLevel": "notsupported",
-  "description": "Yield return (iterator methods) is not supported",
-  "alternative": "Use explicit List<T> construction and return the complete list"
+  "version": "1.1",
+  "command": "feature-check",
+  "diagnostics": [],
+  "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
+  "data": {
+    "feature": "yield-return",
+    "found": true,
+    "supported": false,
+    "supportLevel": "notsupported",
+    "description": "Yield return (iterator methods) is not supported",
+    "alternative": "Use explicit List<T> construction and return the complete list"
+  }
 }
 ```
 
@@ -48,7 +56,8 @@ Output:
 calor feature-check async-await
 ```
 
-Output:
+`data` payload (envelope wrapper elided):
+
 ```json
 {
   "feature": "async-await",
@@ -71,7 +80,8 @@ calor feature-check --list --level notsupported
 calor feature-check some-unknown-feature
 ```
 
-Output:
+`data` payload (envelope wrapper elided):
+
 ```json
 {
   "feature": "some-unknown-feature",

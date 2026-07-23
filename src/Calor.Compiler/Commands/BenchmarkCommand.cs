@@ -1,5 +1,7 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Init;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Telemetry;
@@ -61,12 +63,38 @@ public static class BenchmarkCommand
             quickOption
         };
 
-        command.SetHandler(ExecuteAsync, projectArgument, calorOption, csharpOption, categoryOption, formatOption, outputOption, verboseOption, quickOption);
+        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            ctx.ExitCode = await ExecuteAsync(
+                ctx.ParseResult.GetValueForArgument(projectArgument),
+                ctx.ParseResult.GetValueForOption(calorOption),
+                ctx.ParseResult.GetValueForOption(csharpOption),
+                ctx.ParseResult.GetValueForOption(categoryOption),
+                ctx.ParseResult.GetValueForOption(formatOption) ?? "console",
+                ctx.ParseResult.GetValueForOption(outputOption),
+                ctx.ParseResult.GetValueForOption(verboseOption),
+                ctx.ParseResult.GetValueForOption(quickOption));
+        });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(
+    private static bool IsJson(string format)
+        => format.Equals("json", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Envelope mode (--format json): stdout carries exactly one document,
+    /// always — including error paths, which get a CLI-band diagnostic.
+    /// </summary>
+    private static void EmitErrorEnvelope(string code, string message, string? filePath)
+    {
+        Console.WriteLine(EnvelopeWriter.Serialize("benchmark", null,
+            [new Diagnostic(code, DiagnosticSeverity.Error, message, filePath, line: 1, column: 1)]));
+    }
+
+    private static async Task<int> ExecuteAsync(
         DirectoryInfo? project,
         FileInfo? calorFile,
         FileInfo? csharpFile,
@@ -85,12 +113,17 @@ public static class BenchmarkCommand
             telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
         }
         var sw = Stopwatch.StartNew();
+        var exitCode = 0;
 
         try
         {
             // Validate category if provided
             if (category != null && !BenchmarkIntegration.AllCategories.Contains(category, StringComparer.OrdinalIgnoreCase))
             {
+                if (IsJson(format))
+                {
+                    EmitErrorEnvelope(DiagnosticCode.CliUsageError, $"Invalid category '{category}'", null);
+                }
                 Console.Error.WriteLine($"Error: Invalid category '{category}'");
                 Console.Error.WriteLine();
                 Console.Error.WriteLine("Valid categories:");
@@ -98,8 +131,7 @@ public static class BenchmarkCommand
                 {
                     Console.Error.WriteLine($"  - {cat}");
                 }
-                Environment.ExitCode = 1;
-                return;
+                return exitCode = 1;
             }
 
             if (calorFile != null && csharpFile != null)
@@ -107,12 +139,12 @@ public static class BenchmarkCommand
                 if (quick)
                 {
                     // Legacy quick benchmark
-                    await QuickBenchmarkFilesAsync(calorFile, csharpFile, format, output);
+                    exitCode = await QuickBenchmarkFilesAsync(calorFile, csharpFile, format, output);
                 }
                 else
                 {
                     // Full 7-metric benchmark
-                    await FullBenchmarkFilesAsync(calorFile, csharpFile, category, format, output, verbose);
+                    exitCode = await FullBenchmarkFilesAsync(calorFile, csharpFile, category, format, output, verbose);
                 }
             }
             else if (project != null)
@@ -120,16 +152,21 @@ public static class BenchmarkCommand
                 if (quick)
                 {
                     // Legacy quick project benchmark
-                    await QuickBenchmarkProjectAsync(project, format, output);
+                    exitCode = await QuickBenchmarkProjectAsync(project, format, output);
                 }
                 else
                 {
                     // Full 7-metric project benchmark
-                    await FullBenchmarkProjectAsync(project, category, format, output, verbose);
+                    exitCode = await FullBenchmarkProjectAsync(project, category, format, output, verbose);
                 }
             }
             else
             {
+                if (IsJson(format))
+                {
+                    EmitErrorEnvelope(DiagnosticCode.CliUsageError,
+                        "Provide either --calor and --csharp files, or a project directory.", null);
+                }
                 Console.Error.WriteLine("Error: Provide either --calor and --csharp files, or a project directory.");
                 Console.Error.WriteLine();
                 Console.Error.WriteLine("Examples:");
@@ -139,34 +176,40 @@ public static class BenchmarkCommand
                 Console.Error.WriteLine("  calor benchmark ./MyProject");
                 Console.Error.WriteLine("  calor benchmark ./MyProject --format markdown -o report.md");
                 Console.Error.WriteLine("  calor benchmark --calor file.calr --csharp file.cs --quick  # Token-only");
-                Environment.ExitCode = 1;
+                exitCode = 1;
             }
         }
         catch (Exception ex)
         {
+            if (IsJson(format))
+            {
+                EmitErrorEnvelope(DiagnosticCode.CliInternalError, ex.Message, null);
+            }
             Console.Error.WriteLine($"Error: {ex.Message}");
             if (verbose)
             {
                 Console.Error.WriteLine(ex.StackTrace);
             }
             telemetry?.TrackException(ex);
-            Environment.ExitCode = 1;
+            exitCode = 1;
         }
         finally
         {
             sw.Stop();
-            telemetry?.TrackCommand("benchmark", Environment.ExitCode, new Dictionary<string, string>
+            telemetry?.TrackCommand("benchmark", exitCode, new Dictionary<string, string>
             {
                 ["durationMs"] = sw.ElapsedMilliseconds.ToString()
             });
-            if (Environment.ExitCode != 0)
+            if (exitCode != 0)
             {
                 IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "benchmark", "Benchmark failed");
             }
         }
+
+        return exitCode;
     }
 
-    private static async Task FullBenchmarkFilesAsync(
+    private static async Task<int> FullBenchmarkFilesAsync(
         FileInfo calorFile,
         FileInfo csharpFile,
         string? category,
@@ -176,29 +219,41 @@ public static class BenchmarkCommand
     {
         if (!calorFile.Exists)
         {
+            if (IsJson(format))
+            {
+                EmitErrorEnvelope(DiagnosticCode.CliInputNotFound,
+                    $"Calor file not found: {calorFile.FullName}", calorFile.FullName);
+            }
             Console.Error.WriteLine($"Error: Calor file not found: {calorFile.FullName}");
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
         if (!csharpFile.Exists)
         {
+            if (IsJson(format))
+            {
+                EmitErrorEnvelope(DiagnosticCode.CliInputNotFound,
+                    $"C# file not found: {csharpFile.FullName}", csharpFile.FullName);
+            }
             Console.Error.WriteLine($"Error: C# file not found: {csharpFile.FullName}");
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
+
+        // In envelope mode ALL human-oriented status goes to stderr so stdout
+        // carries exactly one document.
+        var statusOut = IsJson(format) ? Console.Error : Console.Out;
 
         var calorSource = await File.ReadAllTextAsync(calorFile.FullName);
         var csharpSource = await File.ReadAllTextAsync(csharpFile.FullName);
 
         if (verbose)
         {
-            Console.WriteLine($"Running full benchmark: {csharpFile.Name} vs {calorFile.Name}");
+            statusOut.WriteLine($"Running full benchmark: {csharpFile.Name} vs {calorFile.Name}");
             if (category != null)
             {
-                Console.WriteLine($"Filtering by category: {category}");
+                statusOut.WriteLine($"Filtering by category: {category}");
             }
-            Console.WriteLine();
+            statusOut.WriteLine();
         }
 
         var result = await BenchmarkIntegration.RunFullBenchmarkAsync(csharpSource, calorSource, category, verbose);
@@ -206,22 +261,25 @@ public static class BenchmarkCommand
         var outputContent = format.ToLowerInvariant() switch
         {
             "markdown" or "md" => BenchmarkIntegration.GenerateMarkdownReport(result, calorFile.Name, csharpFile.Name),
-            "json" => BenchmarkIntegration.GenerateJsonReport(result),
+            "json" => EnvelopeWriter.SerializeRaw("benchmark", BenchmarkIntegration.GenerateJsonReport(result)),
             _ => BenchmarkIntegration.FormatConsoleOutput(result, calorFile.Name, csharpFile.Name, verbose)
         };
 
         if (output != null)
         {
             await File.WriteAllTextAsync(output.FullName, outputContent);
-            Console.WriteLine($"Results saved to: {output.FullName}");
+            var savedOut = IsJson(format) ? Console.Error : Console.Out;
+            savedOut.WriteLine($"Results saved to: {output.FullName}");
         }
         else
         {
             Console.WriteLine(outputContent);
         }
+
+        return 0;
     }
 
-    private static async Task FullBenchmarkProjectAsync(
+    private static async Task<int> FullBenchmarkProjectAsync(
         DirectoryInfo project,
         string? category,
         string format,
@@ -230,61 +288,91 @@ public static class BenchmarkCommand
     {
         if (!project.Exists)
         {
+            if (IsJson(format))
+            {
+                EmitErrorEnvelope(DiagnosticCode.CliInputNotFound,
+                    $"Project directory not found: {project.FullName}", project.FullName);
+            }
             Console.Error.WriteLine($"Error: Project directory not found: {project.FullName}");
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
-        Console.WriteLine($"Scanning project: {project.FullName}");
+        // In envelope mode ALL human-oriented status goes to stderr so stdout
+        // carries exactly one document.
+        var statusOut = IsJson(format) ? Console.Error : Console.Out;
+
+        statusOut.WriteLine($"Scanning project: {project.FullName}");
         if (category != null)
         {
-            Console.WriteLine($"Filtering by category: {category}");
+            statusOut.WriteLine($"Filtering by category: {category}");
         }
-        Console.WriteLine();
+        statusOut.WriteLine();
 
         var result = await BenchmarkIntegration.RunProjectBenchmarkAsync(project.FullName, category, verbose);
 
         if (result.ProjectResults == null || result.ProjectResults.Count == 0)
         {
-            Console.WriteLine("No paired .calr and .cs files found.");
-            Console.WriteLine("Looking for files with the same base name (e.g., foo.calr and foo.cs)");
-            return;
+            if (IsJson(format))
+            {
+                // Envelope mode: stdout still carries exactly one document.
+                Console.WriteLine(EnvelopeWriter.Serialize("benchmark", null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliInputNotFound,
+                        DiagnosticSeverity.Warning,
+                        "No paired .calr and .cs files found (looking for files with the same base name, e.g. foo.calr and foo.cs)",
+                        project.FullName,
+                        line: 1,
+                        column: 1)]));
+            }
+            statusOut.WriteLine("No paired .calr and .cs files found.");
+            statusOut.WriteLine("Looking for files with the same base name (e.g., foo.calr and foo.cs)");
+            return 0;
         }
 
         var outputContent = format.ToLowerInvariant() switch
         {
             "markdown" or "md" => BenchmarkIntegration.GenerateMarkdownReport(result, project.Name, project.Name),
-            "json" => BenchmarkIntegration.GenerateJsonReport(result),
+            "json" => EnvelopeWriter.SerializeRaw("benchmark", BenchmarkIntegration.GenerateJsonReport(result)),
             _ => BenchmarkIntegration.FormatProjectConsoleOutput(result, project.Name, verbose)
         };
 
         if (output != null)
         {
             await File.WriteAllTextAsync(output.FullName, outputContent);
-            Console.WriteLine($"Results saved to: {output.FullName}");
+            statusOut.WriteLine($"Results saved to: {output.FullName}");
         }
         else
         {
             Console.WriteLine(outputContent);
         }
+
+        return 0;
     }
 
     // ========== Legacy quick benchmark methods ==========
 
-    private static async Task QuickBenchmarkFilesAsync(FileInfo calorFile, FileInfo csharpFile, string format, FileInfo? output)
+    private static async Task<int> QuickBenchmarkFilesAsync(FileInfo calorFile, FileInfo csharpFile, string format, FileInfo? output)
     {
         if (!calorFile.Exists)
         {
+            if (IsJson(format))
+            {
+                EmitErrorEnvelope(DiagnosticCode.CliInputNotFound,
+                    $"Calor file not found: {calorFile.FullName}", calorFile.FullName);
+            }
             Console.Error.WriteLine($"Error: Calor file not found: {calorFile.FullName}");
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
         if (!csharpFile.Exists)
         {
+            if (IsJson(format))
+            {
+                EmitErrorEnvelope(DiagnosticCode.CliInputNotFound,
+                    $"C# file not found: {csharpFile.FullName}", csharpFile.FullName);
+            }
             Console.Error.WriteLine($"Error: C# file not found: {csharpFile.FullName}");
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
         var calorSource = await File.ReadAllTextAsync(calorFile.FullName);
@@ -302,25 +390,36 @@ public static class BenchmarkCommand
         if (output != null)
         {
             await File.WriteAllTextAsync(output.FullName, outputContent);
-            Console.WriteLine($"Results saved to: {output.FullName}");
+            var savedOut = IsJson(format) ? Console.Error : Console.Out;
+            savedOut.WriteLine($"Results saved to: {output.FullName}");
         }
         else
         {
             Console.WriteLine(outputContent);
         }
+
+        return 0;
     }
 
-    private static async Task QuickBenchmarkProjectAsync(DirectoryInfo project, string format, FileInfo? output)
+    private static async Task<int> QuickBenchmarkProjectAsync(DirectoryInfo project, string format, FileInfo? output)
     {
         if (!project.Exists)
         {
+            if (IsJson(format))
+            {
+                EmitErrorEnvelope(DiagnosticCode.CliInputNotFound,
+                    $"Project directory not found: {project.FullName}", project.FullName);
+            }
             Console.Error.WriteLine($"Error: Project directory not found: {project.FullName}");
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
-        Console.WriteLine($"Scanning project (quick mode): {project.FullName}");
-        Console.WriteLine();
+        // In envelope mode ALL human-oriented status goes to stderr so stdout
+        // carries exactly one document.
+        var statusOut = IsJson(format) ? Console.Error : Console.Out;
+
+        statusOut.WriteLine($"Scanning project (quick mode): {project.FullName}");
+        statusOut.WriteLine();
 
         // Find paired files
         var calorFiles = Directory.GetFiles(project.FullName, "*.calr", SearchOption.AllDirectories);
@@ -353,9 +452,21 @@ public static class BenchmarkCommand
 
         if (pairs.Count == 0)
         {
-            Console.WriteLine("No paired .calr and .cs files found.");
-            Console.WriteLine("Looking for files with the same base name (e.g., foo.calr and foo.cs)");
-            return;
+            if (IsJson(format))
+            {
+                // Envelope mode: stdout still carries exactly one document.
+                Console.WriteLine(EnvelopeWriter.Serialize("benchmark", null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliInputNotFound,
+                        DiagnosticSeverity.Warning,
+                        "No paired .calr and .cs files found (looking for files with the same base name, e.g. foo.calr and foo.cs)",
+                        project.FullName,
+                        line: 1,
+                        column: 1)]));
+            }
+            statusOut.WriteLine("No paired .calr and .cs files found.");
+            statusOut.WriteLine("Looking for files with the same base name (e.g., foo.calr and foo.cs)");
+            return 0;
         }
 
         // Calculate summary
@@ -372,12 +483,14 @@ public static class BenchmarkCommand
         if (output != null)
         {
             await File.WriteAllTextAsync(output.FullName, outputContent);
-            Console.WriteLine($"Results saved to: {output.FullName}");
+            statusOut.WriteLine($"Results saved to: {output.FullName}");
         }
         else
         {
             Console.WriteLine(outputContent);
         }
+
+        return 0;
     }
 
     private static string FormatQuickConsole(string calorName, string csName, BenchmarkResult result)
@@ -410,21 +523,24 @@ public static class BenchmarkCommand
     private static string FormatQuickJson(string calorName, string csName, BenchmarkResult result)
     {
         var m = result.Metrics;
-        return $$"""
+        var data = new
+        {
+            mode = "quick",
+            comparison = new
             {
-              "mode": "quick",
-              "comparison": {
-                "csharpFile": "{{csName}}",
-                "calorFile": "{{calorName}}"
-              },
-              "metrics": {
-                "tokens": { "csharp": {{m.OriginalTokens}}, "calor": {{m.OutputTokens}}, "savings": {{m.TokenReduction:F1}} },
-                "lines": { "csharp": {{m.OriginalLines}}, "calor": {{m.OutputLines}}, "savings": {{m.LineReduction:F1}} },
-                "characters": { "csharp": {{m.OriginalCharacters}}, "calor": {{m.OutputCharacters}}, "savings": {{m.CharReduction:F1}} }
-              },
-              "advantageRatio": {{result.AdvantageRatio:F2}}
-            }
-            """;
+                csharpFile = csName,
+                calorFile = calorName
+            },
+            metrics = new
+            {
+                tokens = new { csharp = m.OriginalTokens, calor = m.OutputTokens, savings = Math.Round(m.TokenReduction, 1) },
+                lines = new { csharp = m.OriginalLines, calor = m.OutputLines, savings = Math.Round(m.LineReduction, 1) },
+                characters = new { csharp = m.OriginalCharacters, calor = m.OutputCharacters, savings = Math.Round(m.CharReduction, 1) }
+            },
+            advantageRatio = Math.Round(result.AdvantageRatio, 2)
+        };
+
+        return EnvelopeWriter.Serialize("benchmark", data);
     }
 
     private static string FormatQuickProjectConsole(string projectName, List<(string calor, string cs, FileMetrics metrics)> pairs, BenchmarkSummary summary)
@@ -484,38 +600,31 @@ public static class BenchmarkCommand
 
     private static string FormatQuickProjectJson(string projectName, List<(string calor, string cs, FileMetrics metrics)> pairs, BenchmarkSummary summary)
     {
-        var filesJson = string.Join(",\n    ", pairs.Select(p =>
+        var data = new
         {
-            var advantage = BenchmarkIntegration.CalculateAdvantageRatio(p.metrics);
-            return $$"""
-                {
-                      "calor": "{{Path.GetFileName(p.calor)}}",
-                      "csharp": "{{Path.GetFileName(p.cs)}}",
-                      "csharpTokens": {{p.metrics.OriginalTokens}},
-                      "calorTokens": {{p.metrics.OutputTokens}},
-                      "advantage": {{advantage:F2}}
-                    }
-                """;
-        }));
-
-        return $$"""
+            mode = "quick",
+            project = projectName,
+            fileCount = pairs.Count,
+            summary = new
             {
-              "mode": "quick",
-              "project": "{{projectName}}",
-              "fileCount": {{pairs.Count}},
-              "summary": {
-                "totalCSharpTokens": {{summary.TotalOriginalTokens}},
-                "totalCalorTokens": {{summary.TotalOutputTokens}},
-                "tokenSavings": {{summary.TokenSavingsPercent:F1}},
-                "totalCSharpLines": {{summary.TotalOriginalLines}},
-                "totalCalorLines": {{summary.TotalOutputLines}},
-                "lineSavings": {{summary.LineSavingsPercent:F1}},
-                "overallAdvantage": {{summary.OverallAdvantage:F2}}
-              },
-              "files": [
-                {{filesJson}}
-              ]
-            }
-            """;
+                totalCSharpTokens = summary.TotalOriginalTokens,
+                totalCalorTokens = summary.TotalOutputTokens,
+                tokenSavings = Math.Round(summary.TokenSavingsPercent, 1),
+                totalCSharpLines = summary.TotalOriginalLines,
+                totalCalorLines = summary.TotalOutputLines,
+                lineSavings = Math.Round(summary.LineSavingsPercent, 1),
+                overallAdvantage = Math.Round(summary.OverallAdvantage, 2)
+            },
+            files = pairs.Select(p => new
+            {
+                calor = Path.GetFileName(p.calor),
+                csharp = Path.GetFileName(p.cs),
+                csharpTokens = p.metrics.OriginalTokens,
+                calorTokens = p.metrics.OutputTokens,
+                advantage = Math.Round(BenchmarkIntegration.CalculateAdvantageRatio(p.metrics), 2)
+            }).ToList()
+        };
+
+        return EnvelopeWriter.Serialize("benchmark", data);
     }
 }

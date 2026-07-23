@@ -63,7 +63,7 @@ no streaming form). Human-oriented status stays on stderr, as above.
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1",
   "diagnostics": [
     {
       "code": "Calor0250",
@@ -95,13 +95,21 @@ no streaming form). Human-oriented status stays on stderr, as above.
 
 Field notes:
 
-- `version` — schema version of this document, currently `"1.0"`.
+- `version` — schema version of this document, currently `"1.1"`. The
+  normative schema definition, the `declarationId` and `verification` fields
+  added in 1.1, and the full command/tool denominator live in the
+  [Envelope Schema](/calor/cli/envelope-schema/) document.
 - `diagnostics[]` — one entry per diagnostic, aggregated across all input files.
   - `code` — stable `CalorNNNN` diagnostic code (see the band table below).
   - `severity` — `"error"`, `"warning"`, or `"info"`.
   - `location.file` — may be `null` for diagnostics without a file (e.g. some
     usage errors); `line`/`column` are 1-based; `length` is the span length in
     characters.
+  - `declarationId` — nearest enclosing declaration ID (e.g. `f001`); null
+    when IDs are absent or the position precedes any declaration.
+  - `verification` — contract diagnostics only: choke-point proof outcome with
+    the closed `proven|refuted|unknown|timeout|unsupported` status vocabulary
+    and the structured counterexample model on `refuted`.
   - `suggestion` / `fix` — present only when the compiler attaches a suggested
     fix. `fix.edits[]` are machine-applicable text edits (1-based line/column,
     end-exclusive replace of the region with `newText`).
@@ -165,6 +173,12 @@ pipeline) so they can flow through the structured formats:
 | `Calor1329` | Docs drift: a generated mirror doc (AGENTS.md) is out of sync with its single source (CLAUDE.md) |
 | `Calor1330` | Docs drift: a complete `§M` program in the agent syntax exemplar no longer compiles to C# (Roslyn-semantic-checked, so type errors are caught) |
 | `Calor1331` | Docs drift: the exemplar binds an array-returning BCL call (e.g. `File.ReadAllLines`) to a generic collection type instead of the array form `[T]` |
+| `Calor1340` | Format: input file not found |
+| `Calor1341` | Format: input file is not a `.calr` file (skipped) |
+| `Calor1342` | Format: unexpected error while processing a file |
+| `Calor1343` | Convert: conversion issue (severity mirrors the issue; message prefixed with the feature name, e.g. `[local-functions] …`) |
+| `Calor1344` | Convert: `--validate` found a parse error in the generated output (warning — the output was still written) |
+| `Calor1345` | Convert: command-level failure — input not found, unknown file type, timeout, or crash |
 
 ## Notes on specific commands
 
@@ -174,9 +188,20 @@ pipeline) so they can flow through the structured formats:
   line goes to stderr). There is no per-diagnostic `fixed` marker yet.
 - **`calor assess --format sarif`** uses the same shared SARIF serializer with
   tool name `calor-assess` and per-dimension rule IDs (`Calor-<Dimension>`).
-- **`calor verify --format json`** embeds this schema's `diagnostics[]` array
-  per file (alongside its legacy flat `errors`/`warnings` string arrays), but
-  its top-level document is command-specific.
+- **`calor verify --format json`** emits the envelope
+  (see [Envelope Schema](/calor/cli/envelope-schema/)): top-level
+  `diagnostics[]`/`summary` aggregate the compiler diagnostics across all
+  files (with `declarationId` and `verification` payloads), and the
+  verify-specific report lives under `data` — per-file summaries carrying both
+  the legacy enum counts and the five-status counts, and per-contract entries
+  with `status` (five-status wire name), `legacyStatus` (old enum name, kept
+  for one release), optional `reason`, and a structured `counterexample`.
+  The legacy flat `errors`/`warnings` string arrays are gone.
 - **`calor self-check docs --format json`** emits the unified schema on stdout
   with docs-drift findings (`Calor1320`–`Calor1331`) and exits 1 when drift is
   found (text mode reports the same findings on stderr).
+- **`calor format --format json`** and **`calor convert --format json`** emit
+  the full envelope document (`version`/`command`/`diagnostics`/`summary`/`data`)
+  on stdout; see [calor format](/calor/cli/format/) and
+  [calor convert](/calor/cli/convert/) for their `data` payloads. Neither has a
+  `-f` short alias, consistent with `lint`.

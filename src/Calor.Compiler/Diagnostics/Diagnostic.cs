@@ -292,14 +292,14 @@ public static class DiagnosticCode
     /// </summary>
     public const string SemanticsVersionIncompatible = "Calor0701";
 
-    // Contract verification results (Calor0710-0719 reserved; 0710-0715 assigned)
+    // Contract verification results (Calor0710-0719 reserved; 0710-0718 assigned)
     // — emitted by Verification/ContractVerificationPass. This sub-band is disjoint
     // from the semantics-version codes above: prior to #702, the verification pass
     // reused Calor0700 (Z3 unavailable) and Calor0701 (precondition may be violated),
     // colliding with SemanticsVersionMismatch/Incompatible. All verification results
-    // now live in 0710-0715 so no code number carries two meanings; 0716-0719 are
+    // now live in 0710-0718 so no code number carries two meanings; 0719 is
     // reserved headroom for future verification diagnostics. Agents that filtered on
-    // the old 0700-0705 numbers must switch to 0710-0715 (see CHANGELOG.md).
+    // the old 0700-0705 numbers must switch to 0710-0718 (see CHANGELOG.md).
 
     /// <summary>
     /// Info: static contract verification was skipped because the Z3 SMT solver
@@ -335,6 +335,28 @@ public static class DiagnosticCode
     /// Info (verbose): verification cache statistics. (Renumbered from Calor0705 in #702.)
     /// </summary>
     public const string VerificationCacheStats = "Calor0715";
+
+    /// <summary>
+    /// Info: the solver returned an inconclusive verdict for a contract that was
+    /// not a timeout (too complex, incomplete theory, or solver error). Loop plan
+    /// D1.2: this outcome was previously silent — conflated into "unproven" with
+    /// no diagnostic at all.
+    /// </summary>
+    public const string ContractVerificationInconclusive = "Calor0716";
+
+    /// <summary>
+    /// Info: contract verification hit the solver time budget before reaching a
+    /// verdict. Loop plan D1.2: previously conflated with "too complex" into a
+    /// silent "unproven".
+    /// </summary>
+    public const string ContractVerificationTimeout = "Calor0717";
+
+    /// <summary>
+    /// Info: a contract could not be translated to the solver (unsupported type
+    /// or construct); the runtime check is kept. Loop plan D1.2: previously a
+    /// silent fallback ("a blacklist by accident").
+    /// </summary>
+    public const string ContractVerificationUnsupported = "Calor0718";
 
     // ID errors (Calor0800-0899)
     /// <summary>
@@ -849,6 +871,49 @@ public static class DiagnosticCode
     /// reference lines, which cannot be compiled standalone.
     /// </summary>
     public const string DocDriftArrayBindingTrap = "Calor1331";
+
+    // `calor format` / `calor convert` command diagnostics (Calor1340-1349) —
+    // envelope adoption for the two remaining data-carrying E-class commands
+    // (loop plan D1.3). These flow through `--format json` so agents never
+    // have to scrape stderr for file-resolution or conversion failures.
+
+    /// <summary>
+    /// Error (format): an input file passed to <c>calor format</c> does not exist.
+    /// </summary>
+    public const string FormatFileNotFound = "Calor1340";
+
+    /// <summary>
+    /// Warning (format): an input file passed to <c>calor format</c> is not a
+    /// <c>.calr</c> file; it is skipped (mirrors the text-mode stderr warning).
+    /// </summary>
+    public const string FormatUnsupportedFileType = "Calor1341";
+
+    /// <summary>
+    /// Error (format): an unexpected exception occurred while formatting a file.
+    /// </summary>
+    public const string FormatProcessingError = "Calor1342";
+
+    /// <summary>
+    /// Conversion issue (convert): a <c>ConversionIssue</c> raised during C# → Calor
+    /// conversion (unsupported feature, fallback, degradation). Severity mirrors
+    /// the issue's own severity (error | warning | info); the message is prefixed
+    /// with the feature name when one is known, e.g. <c>[local-functions] …</c>.
+    /// </summary>
+    public const string ConversionIssue = "Calor1343";
+
+    /// <summary>
+    /// Warning (convert): <c>--validate</c> found a parse error in the generated
+    /// Calor output. A warning, not an error — the output file was still written.
+    /// </summary>
+    public const string ConvertValidationError = "Calor1344";
+
+    /// <summary>
+    /// Error (convert): a command-level failure — input file not found, unknown
+    /// input file type (neither <c>.cs</c> nor <c>.calr</c>), conversion timeout,
+    /// or an unhandled crash. Emitted so <c>--format json</c> always produces a
+    /// parseable envelope document, mirroring the root compile command.
+    /// </summary>
+    public const string ConvertCommandError = "Calor1345";
 }
 
 /// <summary>
@@ -861,6 +926,13 @@ public sealed class Diagnostic
     public TextSpan Span { get; }
     public DiagnosticSeverity Severity { get; }
     public string? FilePath { get; }
+
+    /// <summary>
+    /// Verification payload for contract diagnostics (envelope schema v1): the
+    /// choke-point proof outcome, carrying the closed five-status vocabulary and
+    /// the concrete counterexample model when the contract was refuted.
+    /// </summary>
+    public Verification.ProofOutcome? Verification { get; init; }
 
     public Diagnostic(
         string code,

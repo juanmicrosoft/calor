@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Ids;
@@ -40,14 +41,29 @@ public static class IdsCommand
             aliases: ["--verbose", "-v"],
             description: "Show detailed output");
 
+        var formatOption = new Option<string>(
+            aliases: ["--format", "-f"],
+            getDefaultValue: () => "text",
+            description: "Output format: text or json (envelope v1.1)");
+
         var command = new Command("check", "Validate IDs (missing, duplicates, invalid format)")
         {
             pathsArgument,
             allowTestIdsOption,
-            verboseOption
+            verboseOption,
+            formatOption
         };
 
-        command.SetHandler(CheckAsync, pathsArgument, allowTestIdsOption, verboseOption);
+        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            ctx.ExitCode = await CheckAsync(
+                ctx.ParseResult.GetValueForArgument(pathsArgument),
+                ctx.ParseResult.GetValueForOption(allowTestIdsOption),
+                ctx.ParseResult.GetValueForOption(verboseOption),
+                ctx.ParseResult.GetValueForOption(formatOption) ?? "text");
+        });
 
         return command;
     }
@@ -115,26 +131,49 @@ public static class IdsCommand
         return command;
     }
 
-    private static async Task CheckAsync(string[] paths, bool allowTestIds, bool verbose)
+    private static async Task<int> CheckAsync(string[] paths, bool allowTestIds, bool verbose, string format)
     {
+        var json = format.Equals("json", StringComparison.OrdinalIgnoreCase);
         var files = CollectFiles(paths);
         if (files.Count == 0)
         {
+            // Envelope mode: stdout carries exactly one document, always —
+            // including this early exit (envelope schema v1.1 contract).
+            if (json)
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("ids",
+                    new
+                    {
+                        totalIds = 0,
+                        missing = 0,
+                        invalidFormat = 0,
+                        wrongPrefix = 0,
+                        testIds = 0,
+                        duplicateGroups = 0
+                    },
+                    [new Diagnostic(
+                        DiagnosticCode.CliInputNotFound,
+                        DiagnosticSeverity.Error,
+                        "No .calr files found",
+                        filePath: null,
+                        line: 1,
+                        column: 1)]));
+            }
             Console.Error.WriteLine("No .calr files found");
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
-        if (verbose)
+        if (verbose && !json)
         {
             Console.WriteLine($"Checking {files.Count} file(s)...");
         }
 
         var allEntries = new List<IdEntry>();
+        var declarationIds = json ? new DeclarationIdResolver() : null;
 
         foreach (var file in files)
         {
-            var entries = await ScanFileAsync(file, verbose);
+            var entries = await ScanFileAsync(file, verbose, declarationIds);
             if (entries != null)
             {
                 allEntries.AddRange(entries);
@@ -143,11 +182,29 @@ public static class IdsCommand
 
         var result = IdChecker.Check(allEntries, allowTestIds);
 
+        if (json)
+        {
+            var data = new
+            {
+                totalIds = allEntries.Count,
+                missing = result.MissingIds.Count,
+                invalidFormat = result.InvalidFormatIds.Count,
+                wrongPrefix = result.WrongPrefixIds.Count,
+                testIds = result.TestIdsInProduction.Count,
+                duplicateGroups = result.DuplicateGroups.Count
+            };
+            var jsonDiagnostics = IdChecker.GenerateDiagnostics(result)
+                .OrderBy(d => d.FilePath, StringComparer.Ordinal)
+                .ThenBy(d => d.Span.Line)
+                .ToList();
+            Console.WriteLine(EnvelopeWriter.Serialize("ids", data, jsonDiagnostics, declarationIds));
+            return result.IsValid ? 0 : 1;
+        }
+
         if (result.IsValid)
         {
             Console.WriteLine($"All {allEntries.Count} IDs are valid.");
-            Environment.ExitCode = 0;
-            return;
+            return 0;
         }
 
         // Report issues
@@ -171,7 +228,7 @@ public static class IdsCommand
         if (result.DuplicateGroups.Count > 0)
             Console.Error.WriteLine($"  Duplicate groups: {result.DuplicateGroups.Count}");
 
-        Environment.ExitCode = 1;
+        return 1;
     }
 
     private static async Task AssignAsync(string[] paths, bool dryRun, bool fixDuplicates, bool allowTestIds, bool verbose)
@@ -339,7 +396,8 @@ public static class IdsCommand
         return files.Distinct().ToList();
     }
 
-    private static async Task<IReadOnlyList<IdEntry>?> ScanFileAsync(string filePath, bool verbose)
+    private static async Task<IReadOnlyList<IdEntry>?> ScanFileAsync(
+        string filePath, bool verbose, DeclarationIdResolver? declarationIds = null)
     {
         try
         {
@@ -370,6 +428,8 @@ public static class IdsCommand
                 }
                 return null;
             }
+
+            declarationIds?.AddFile(filePath, content, module);
 
             var scanner = new IdScanner();
             return scanner.Scan(module, filePath);

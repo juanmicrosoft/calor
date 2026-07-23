@@ -1,10 +1,14 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Init;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Telemetry;
+using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
 
@@ -12,7 +16,11 @@ namespace Calor.Compiler.Commands;
 
 /// <summary>
 /// CLI command for verifying contracts with Z3 SMT solver.
-/// Outputs verification results in structured formats for AI agents and CI/CD pipelines.
+/// JSON output is the shared diagnostic envelope (schema v1.1,
+/// docs/cli/envelope-schema.md): compiler diagnostics aggregated at the top
+/// level with declarationId + verification payloads, and the verify-specific
+/// per-file/per-contract report under <c>data</c> using the closed five-status
+/// vocabulary (proven|refuted|unknown|timeout|unsupported).
 /// </summary>
 public static class VerifyCommand
 {
@@ -70,12 +78,24 @@ public static class VerifyCommand
             clearCacheOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, formatOption, outputOption, verboseOption, timeoutOption, noCacheOption, clearCacheOption);
+        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            ctx.ExitCode = await ExecuteAsync(
+                ctx.ParseResult.GetValueForArgument(inputArgument),
+                ctx.ParseResult.GetValueForOption(formatOption) ?? "text",
+                ctx.ParseResult.GetValueForOption(outputOption),
+                ctx.ParseResult.GetValueForOption(verboseOption),
+                ctx.ParseResult.GetValueForOption(timeoutOption),
+                ctx.ParseResult.GetValueForOption(noCacheOption),
+                ctx.ParseResult.GetValueForOption(clearCacheOption));
+        });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(
+    private static async Task<int> ExecuteAsync(
         FileInfo[] files,
         string format,
         FileInfo? output,
@@ -94,14 +114,29 @@ public static class VerifyCommand
         var sw = Stopwatch.StartNew();
 
         var results = new List<FileVerificationResult>();
+        // Compiler diagnostics aggregated across all files for the envelope's
+        // top-level diagnostics[]; the resolver maps each diagnostic to its
+        // enclosing declaration ID from the file's parsed AST.
+        var aggregatedDiagnostics = new DiagnosticBag();
+        var declarationIds = new DeclarationIdResolver();
+        // Exit-code semantics (review of #754): 1 when any file is missing, any
+        // compile error occurs, or any contract is REFUTED (disproven); 0 when
+        // every contract is proven or merely unknown/timeout/unsupported —
+        // inconclusive is not failure (runtime checks are kept). Applies to
+        // both text and JSON modes.
         var hasErrors = false;
 
         foreach (var file in files)
         {
             if (!file.Exists)
             {
+                aggregatedDiagnostics.Add(new Diagnostic(
+                    DiagnosticCode.CliInputNotFound,
+                    $"File not found: {file.FullName}",
+                    new TextSpan(0, 0, 1, 1),
+                    DiagnosticSeverity.Error,
+                    file.FullName));
                 Console.Error.WriteLine($"Error: File not found: {file.FullName}");
-                Environment.ExitCode = 1;
                 hasErrors = true;
                 continue;
             }
@@ -114,24 +149,30 @@ public static class VerifyCommand
 
             try
             {
-                var result = await VerifyFileAsync(file, verbose, timeout, noCache, clearCache);
+                var result = await VerifyFileAsync(file, verbose, timeout, noCache, clearCache, declarationIds);
                 results.Add(result);
+                aggregatedDiagnostics.AddRange(result.Diagnostics);
 
-                if (result.HasDisproven)
+                if (result.HasRefuted || result.Diagnostics.HasErrors)
                 {
                     hasErrors = true;
                 }
             }
             catch (Exception ex)
             {
+                aggregatedDiagnostics.Add(new Diagnostic(
+                    DiagnosticCode.CliInternalError,
+                    $"Error processing {file.Name}: {ex.Message}",
+                    new TextSpan(0, 0, 1, 1),
+                    DiagnosticSeverity.Error,
+                    file.FullName));
                 Console.Error.WriteLine($"Error processing {file.Name}: {ex.Message}");
-                Environment.ExitCode = 2;
                 hasErrors = true;
             }
         }
 
         // Format output
-        var formatted = FormatOutput(results, format);
+        var formatted = FormatOutput(results, format, aggregatedDiagnostics, declarationIds);
 
         // Write output
         if (output != null)
@@ -144,16 +185,13 @@ public static class VerifyCommand
             Console.WriteLine(formatted);
         }
 
-        // Set exit code based on results
-        if (hasErrors)
-        {
-            Environment.ExitCode = 1;
-        }
+        // Exit code based on results (returned through ctx.ExitCode).
+        var exitCode = hasErrors ? 1 : 0;
 
         sw.Stop();
         var totalContracts = results.Sum(r => r.Summary.Total);
         var totalProven = results.Sum(r => r.Summary.Proven);
-        telemetry?.TrackCommand("verify", Environment.ExitCode, new Dictionary<string, string>
+        telemetry?.TrackCommand("verify", exitCode, new Dictionary<string, string>
         {
             ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
             ["fileCount"] = files.Length.ToString(),
@@ -161,10 +199,12 @@ public static class VerifyCommand
             ["provenContracts"] = totalProven.ToString()
         });
 
-        if (Environment.ExitCode != 0)
+        if (exitCode != 0)
         {
             IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "verify", "Contract verification found issues");
         }
+
+        return exitCode;
     }
 
     private static async Task<FileVerificationResult> VerifyFileAsync(
@@ -172,7 +212,8 @@ public static class VerifyCommand
         bool verbose,
         int timeout,
         bool noCache,
-        bool clearCache)
+        bool clearCache,
+        DeclarationIdResolver declarationIds)
     {
         var source = await File.ReadAllTextAsync(file.FullName);
         var diagnostics = new DiagnosticBag();
@@ -196,6 +237,14 @@ public static class VerifyCommand
 
         var result = Program.Compile(source, file.FullName, options);
 
+        // Feed the declaration-ID resolver whenever parsing got far enough to
+        // produce an AST — even for error-bearing files, so their diagnostics
+        // still resolve to enclosing declarations.
+        if (result.Ast != null)
+        {
+            declarationIds.AddFile(file.FullName, source, result.Ast);
+        }
+
         var moduleResult = options.VerificationResults;
         var summary = moduleResult?.GetSummary() ?? new VerificationSummary(0, 0, 0, 0, 0);
 
@@ -204,74 +253,145 @@ public static class VerifyCommand
         {
             foreach (var funcResult in moduleResult.Functions)
             {
-                var preconditions = funcResult.PreconditionResults
-                    .Select((r, i) => new ContractOutput(i, "precondition", r.Status.ToString(), r.CounterexampleDescription))
-                    .ToList();
-
-                var postconditions = funcResult.PostconditionResults
-                    .Select((r, i) => new ContractOutput(i, "postcondition", r.Status.ToString(), r.CounterexampleDescription))
-                    .ToList();
+                var contracts = new List<ContractOutput>();
+                contracts.AddRange(funcResult.PreconditionResults
+                    .Select((r, i) => BuildContractOutput("precondition", i, r)));
+                contracts.AddRange(funcResult.PostconditionResults
+                    .Select((r, i) => BuildContractOutput("postcondition", i, r)));
 
                 functions.Add(new FunctionVerificationOutput(
                     funcResult.FunctionId,
                     funcResult.FunctionName,
-                    preconditions,
-                    postconditions));
+                    contracts));
             }
-        }
-
-        // Compiler diagnostics are serialized through the shared
-        // JsonDiagnosticFormatter so the per-diagnostic schema
-        // (file/line/column/severity/code/message + fix edits) is identical to
-        // `calor --format json`. The legacy flat errors/warnings string arrays
-        // are kept for backward compatibility with existing consumers.
-        JsonElement diagnosticsElement;
-        using (var doc = JsonDocument.Parse(new JsonDiagnosticFormatter().Format(result.Diagnostics)))
-        {
-            diagnosticsElement = doc.RootElement.GetProperty("diagnostics").Clone();
         }
 
         return new FileVerificationResult(
             file.Name,
             file.FullName,
-            new SummaryOutput(summary.Proven, summary.Unproven, summary.Disproven, summary.Unsupported, summary.Skipped),
+            summary,
             functions,
-            result.Diagnostics.Errors.Select(d => d.Message).ToList(),
-            result.Diagnostics.Warnings.Select(d => d.Message).ToList(),
-            diagnosticsElement);
+            result.Diagnostics);
     }
 
-    private static string FormatOutput(List<FileVerificationResult> results, string format)
+    private static ContractOutput BuildContractOutput(string type, int index, Verification.Z3.ContractVerificationResult result)
+    {
+        var outcome = result.EffectiveOutcome;
+        return new ContractOutput(
+            type,
+            index,
+            outcome,
+            LegacyStatus: result.Status.ToString(),
+            CounterexampleDescription: result.CounterexampleDescription);
+    }
+
+    private static string FormatOutput(
+        List<FileVerificationResult> results,
+        string format,
+        DiagnosticBag aggregatedDiagnostics,
+        DeclarationIdResolver declarationIds)
     {
         return format.ToLowerInvariant() switch
         {
-            "json" => FormatJson(results),
+            "json" => FormatJson(results, aggregatedDiagnostics, declarationIds),
             _ => FormatText(results)
         };
     }
 
-    private static string FormatJson(List<FileVerificationResult> results)
+    // ------------------------------------------------------------------
+    // JSON: the one envelope (docs/cli/envelope-schema.md)
+    // ------------------------------------------------------------------
+
+    private static string FormatJson(
+        List<FileVerificationResult> results,
+        DiagnosticBag aggregatedDiagnostics,
+        DeclarationIdResolver declarationIds)
     {
-        var output = new JsonOutput
+        var fileOutputs = results.Select(BuildFileJson).ToList();
+
+        var envelope = new EnvelopeOutput
         {
-            Version = "1.0",
-            VerifiedAt = DateTime.UtcNow,
-            Files = results,
-            Summary = new SummaryOutput(
-                results.Sum(r => r.Summary.Proven),
-                results.Sum(r => r.Summary.Unproven),
-                results.Sum(r => r.Summary.Disproven),
-                results.Sum(r => r.Summary.Unsupported),
-                results.Sum(r => r.Summary.Skipped))
+            Version = JsonDiagnosticFormatter.SchemaVersion,
+            Command = "verify",
+            Diagnostics = DiagnosticEnvelope.Build(aggregatedDiagnostics, declarationIds),
+            Summary = DiagnosticEnvelope.Summarize(aggregatedDiagnostics),
+            Data = new VerifyData
+            {
+                VerifiedAt = DateTime.UtcNow,
+                Files = fileOutputs,
+                Summary = new FiveStatusSummary
+                {
+                    Proven = fileOutputs.Sum(f => f.Summary.Proven),
+                    Refuted = fileOutputs.Sum(f => f.Summary.Refuted),
+                    Unknown = fileOutputs.Sum(f => f.Summary.Unknown),
+                    Timeout = fileOutputs.Sum(f => f.Summary.Timeout),
+                    Unsupported = fileOutputs.Sum(f => f.Summary.Unsupported)
+                }
+            }
         };
 
-        return JsonSerializer.Serialize(output, new JsonSerializerOptions
+        return JsonSerializer.Serialize(envelope, new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         });
     }
+
+    private static FileJson BuildFileJson(FileVerificationResult file)
+    {
+        var outcomes = file.Functions
+            .SelectMany(f => f.Contracts)
+            .Select(c => c.Outcome)
+            .ToList();
+
+        return new FileJson
+        {
+            FileName = file.FileName,
+            FilePath = file.FilePath,
+            Summary = new FileSummaryJson
+            {
+                // Legacy enum counts (one release of back-compat).
+                Proven = file.Summary.Proven,
+                Unproven = file.Summary.Unproven,
+                Disproven = file.Summary.Disproven,
+                Unsupported = file.Summary.Unsupported,
+                Skipped = file.Summary.Skipped,
+                // Five-status counts from the choke-point outcome. proven and
+                // unsupported coincide with the legacy columns; refuted/unknown/
+                // timeout replace disproven and the unproven/skipped conflation.
+                Refuted = outcomes.Count(o => o.Status == ProofStatus.Refuted),
+                Unknown = outcomes.Count(o => o.Status == ProofStatus.Unknown),
+                Timeout = outcomes.Count(o => o.Status == ProofStatus.Timeout)
+            },
+            Functions = file.Functions.Select(f => new FunctionJson
+            {
+                FunctionId = f.FunctionId,
+                FunctionName = f.FunctionName,
+                Contracts = f.Contracts.Select(c => new ContractJson
+                {
+                    Type = c.Type,
+                    Index = c.Index,
+                    Status = c.Outcome.StatusName,
+                    LegacyStatus = c.LegacyStatus,
+                    Reason = c.Outcome.Reason,
+                    Counterexample = c.Outcome.Counterexample == null
+                        ? null
+                        : new EnvelopeCounterexample
+                        {
+                            Rendered = c.Outcome.Counterexample.Render(),
+                            Bindings = c.Outcome.Counterexample.Bindings
+                                .Select(b => new EnvelopeBinding { Name = b.Name, Value = b.Value })
+                                .ToList()
+                        }
+                }).ToList()
+            }).ToList()
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Text output (unchanged)
+    // ------------------------------------------------------------------
 
     private static string FormatText(List<FileVerificationResult> results)
     {
@@ -296,45 +416,37 @@ public static class VerifyCommand
                 {
                     sb.AppendLine($"  Function: {func.FunctionName} ({func.FunctionId})");
 
-                    foreach (var pre in func.Preconditions)
+                    foreach (var contract in func.Contracts)
                     {
-                        var status = pre.Status;
+                        var status = contract.LegacyStatus;
                         var marker = status == "Proven" ? "[OK]" : status == "Disproven" ? "[!!]" : "[??]";
-                        sb.AppendLine($"    {marker} Precondition {pre.Index}: {status}");
-                        if (!string.IsNullOrEmpty(pre.CounterExample))
+                        var label = contract.Type == "precondition" ? "Precondition" : "Postcondition";
+                        sb.AppendLine($"    {marker} {label} {contract.Index}: {status}");
+                        if (!string.IsNullOrEmpty(contract.CounterexampleDescription))
                         {
-                            sb.AppendLine($"        Counterexample: {pre.CounterExample}");
-                        }
-                    }
-
-                    foreach (var post in func.Postconditions)
-                    {
-                        var status = post.Status;
-                        var marker = status == "Proven" ? "[OK]" : status == "Disproven" ? "[!!]" : "[??]";
-                        sb.AppendLine($"    {marker} Postcondition {post.Index}: {status}");
-                        if (!string.IsNullOrEmpty(post.CounterExample))
-                        {
-                            sb.AppendLine($"        Counterexample: {post.CounterExample}");
+                            sb.AppendLine($"        Counterexample: {contract.CounterexampleDescription}");
                         }
                     }
                 }
             }
 
-            if (file.Errors.Count > 0)
+            var errors = file.Diagnostics.Errors.Select(d => d.Message).ToList();
+            if (errors.Count > 0)
             {
                 sb.AppendLine();
                 sb.AppendLine("  Errors:");
-                foreach (var error in file.Errors)
+                foreach (var error in errors)
                 {
                     sb.AppendLine($"    - {error}");
                 }
             }
 
-            if (file.Warnings.Count > 0)
+            var warnings = file.Diagnostics.Warnings.Select(d => d.Message).ToList();
+            if (warnings.Count > 0)
             {
                 sb.AppendLine();
                 sb.AppendLine("  Warnings:");
-                foreach (var warning in file.Warnings)
+                foreach (var warning in warnings)
                 {
                     sb.AppendLine($"    - {warning}");
                 }
@@ -370,46 +482,112 @@ public static class VerifyCommand
         return sb.ToString();
     }
 
-    // JSON output types
-    private sealed class JsonOutput
-    {
-        public required string Version { get; init; }
-        public DateTime VerifiedAt { get; init; }
-        public required List<FileVerificationResult> Files { get; init; }
-        public required SummaryOutput Summary { get; init; }
-    }
+    // ------------------------------------------------------------------
+    // Internal per-file model (feeds both text and JSON shapes)
+    // ------------------------------------------------------------------
 
     private sealed record FileVerificationResult(
         string FileName,
         string FilePath,
-        SummaryOutput Summary,
+        VerificationSummary Summary,
         List<FunctionVerificationOutput> Functions,
-        List<string> Errors,
-        List<string> Warnings,
-        JsonElement Diagnostics)
+        DiagnosticBag Diagnostics)
     {
-        public bool HasDisproven => Summary.Disproven > 0;
-    }
-
-    private sealed record SummaryOutput(
-        int Proven,
-        int Unproven,
-        int Disproven,
-        int Unsupported,
-        int Skipped)
-    {
-        public int Total => Proven + Unproven + Disproven + Unsupported + Skipped;
+        /// <summary>
+        /// True when any contract was refuted (disproven) — legacy summary
+        /// column or five-status choke-point outcome. Drives exit code 1;
+        /// unknown/timeout/unsupported do NOT (inconclusive is not failure).
+        /// </summary>
+        public bool HasRefuted =>
+            Summary.Disproven > 0 ||
+            Functions.Any(f => f.Contracts.Any(c => c.Outcome.Status == ProofStatus.Refuted));
     }
 
     private sealed record FunctionVerificationOutput(
         string FunctionId,
         string FunctionName,
-        List<ContractOutput> Preconditions,
-        List<ContractOutput> Postconditions);
+        List<ContractOutput> Contracts);
 
     private sealed record ContractOutput(
-        int Index,
         string Type,
-        string Status,
-        string? CounterExample);
+        int Index,
+        ProofOutcome Outcome,
+        string LegacyStatus,
+        string? CounterexampleDescription);
+
+    // ------------------------------------------------------------------
+    // JSON DTOs (envelope schema v1.1)
+    // ------------------------------------------------------------------
+
+    private sealed class EnvelopeOutput
+    {
+        public required string Version { get; init; }
+        public required string Command { get; init; }
+        public required List<EnvelopeDiagnostic> Diagnostics { get; init; }
+        public required EnvelopeSummary Summary { get; init; }
+        public required VerifyData Data { get; init; }
+    }
+
+    private sealed class VerifyData
+    {
+        public DateTime VerifiedAt { get; init; }
+        public required List<FileJson> Files { get; init; }
+        public required FiveStatusSummary Summary { get; init; }
+    }
+
+    private sealed class FileJson
+    {
+        public required string FileName { get; init; }
+        public required string FilePath { get; init; }
+        public required FileSummaryJson Summary { get; init; }
+        public required List<FunctionJson> Functions { get; init; }
+    }
+
+    private sealed class FileSummaryJson
+    {
+        // Legacy enum counts (Proven/Unproven/Disproven/Unsupported/Skipped) —
+        // kept for one release of back-compat.
+        public int Proven { get; init; }
+        public int Unproven { get; init; }
+        public int Disproven { get; init; }
+        public int Unsupported { get; init; }
+        public int Skipped { get; init; }
+
+        // Five-status counts (envelope vocabulary); proven and unsupported
+        // are shared with the legacy columns above.
+        public int Refuted { get; init; }
+        public int Unknown { get; init; }
+        public int Timeout { get; init; }
+    }
+
+    private sealed class FunctionJson
+    {
+        public required string FunctionId { get; init; }
+        public required string FunctionName { get; init; }
+        public required List<ContractJson> Contracts { get; init; }
+    }
+
+    private sealed class ContractJson
+    {
+        public required string Type { get; init; }
+        public int Index { get; init; }
+
+        /// <summary>Five-status wire name: proven|refuted|unknown|timeout|unsupported.</summary>
+        public required string Status { get; init; }
+
+        /// <summary>Legacy enum name (Proven/Unproven/Disproven/Unsupported/Skipped); kept for one release.</summary>
+        public required string LegacyStatus { get; init; }
+
+        public string? Reason { get; init; }
+        public EnvelopeCounterexample? Counterexample { get; init; }
+    }
+
+    private sealed class FiveStatusSummary
+    {
+        public int Proven { get; init; }
+        public int Refuted { get; init; }
+        public int Unknown { get; init; }
+        public int Timeout { get; init; }
+        public int Unsupported { get; init; }
+    }
 }

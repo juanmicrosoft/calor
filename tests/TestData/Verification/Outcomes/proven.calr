@@ -1,0 +1,5 @@
+§M{m1:OutcomeProven}
+  §F{f1:AtLeastOne:pub} (i32:x) -> i32
+    §Q (> x 0)
+    §S (>= x 1)
+    §R x
