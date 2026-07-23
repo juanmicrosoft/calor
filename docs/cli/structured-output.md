@@ -63,7 +63,7 @@ no streaming form). Human-oriented status stays on stderr, as above.
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1",
   "diagnostics": [
     {
       "code": "Calor0250",
@@ -95,13 +95,21 @@ no streaming form). Human-oriented status stays on stderr, as above.
 
 Field notes:
 
-- `version` — schema version of this document, currently `"1.0"`.
+- `version` — schema version of this document, currently `"1.1"`. The
+  normative schema definition, the `declarationId` and `verification` fields
+  added in 1.1, and the full command/tool denominator live in the
+  [Envelope Schema](/calor/cli/envelope-schema/) document.
 - `diagnostics[]` — one entry per diagnostic, aggregated across all input files.
   - `code` — stable `CalorNNNN` diagnostic code (see the band table below).
   - `severity` — `"error"`, `"warning"`, or `"info"`.
   - `location.file` — may be `null` for diagnostics without a file (e.g. some
     usage errors); `line`/`column` are 1-based; `length` is the span length in
     characters.
+  - `declarationId` — nearest enclosing declaration ID (e.g. `f001`); null
+    when IDs are absent or the position precedes any declaration.
+  - `verification` — contract diagnostics only: choke-point proof outcome with
+    the closed `proven|refuted|unknown|timeout|unsupported` status vocabulary
+    and the structured counterexample model on `refuted`.
   - `suggestion` / `fix` — present only when the compiler attaches a suggested
     fix. `fix.edits[]` are machine-applicable text edits (1-based line/column,
     end-exclusive replace of the region with `newText`).
