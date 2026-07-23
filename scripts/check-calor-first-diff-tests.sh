@@ -51,6 +51,17 @@ rm -rf new-directory
 printf 'class Existing { int Value; }\n' > src/Existing.cs
 expect_success "existing C# maintenance"
 
+# Test-suite C# is exempt (tests are xUnit C# by nature; the Calor-first rule
+# governs product source, not tests).
+mkdir -p tests/Some.Tests
+printf 'public class SomeTests {}\n' > tests/Some.Tests/SomeTests.cs
+expect_success "new C# under tests/"
+# ...but the exemption is scoped to tests/ — product C# is still blocked even
+# when a test .cs is added in the same diff.
+printf 'class ProductType {}\n' > src/ProductType.cs
+expect_failure "product C# not exempted by a sibling test .cs"
+rm -rf tests src/ProductType.cs
+
 # A generated path is permitted only when pre-approved on BASE; its suffix is
 # not trusted by itself.
 printf 'partial class Generated {}\n' > src/Generated.g.cs

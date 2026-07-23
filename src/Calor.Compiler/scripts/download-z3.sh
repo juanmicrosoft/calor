@@ -9,6 +9,18 @@ set -e
 
 Z3_VERSION="4.15.7"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Resilient download: GitHub release fetches occasionally fail on a transient
+# network/TLS error (e.g. curl exit 35), which used to fail the whole build on a
+# flaky connection. Retry transient errors a handful of times with backoff, and
+# fail loudly (-fS) only after they are exhausted. -L follows the release redirect.
+download() {
+    local url="$1" out="$2"
+    curl -fL -sS \
+        --retry 5 --retry-delay 3 --retry-all-errors \
+        --connect-timeout 30 --max-time 600 \
+        -o "$out" "$url"
+}
 RUNTIMES_DIR="$SCRIPT_DIR/../runtimes"
 Z3_DIR="$SCRIPT_DIR/../z3"
 TEMP_DIR="$SCRIPT_DIR/../.z3-temp"
@@ -75,7 +87,7 @@ if [ "$managed_dll_exists" = false ]; then
 
     # Download if not cached
     if [ ! -f "$zip_file" ]; then
-        curl -L -o "$zip_file" "${BASE_URL}/${MANAGED_DLL_ARCHIVE}.zip" 2>/dev/null
+        download "${BASE_URL}/${MANAGED_DLL_ARCHIVE}.zip" "$zip_file"
     fi
 
     # Extract Microsoft.Z3.dll
@@ -109,7 +121,7 @@ for platform in "${PLATFORMS[@]}"; do
 
     # Download if not cached
     if [ ! -f "$zip_file" ]; then
-        curl -L -o "$zip_file" "${BASE_URL}/${archive}.zip" 2>/dev/null
+        download "${BASE_URL}/${archive}.zip" "$zip_file"
     fi
 
     # Extract the library
