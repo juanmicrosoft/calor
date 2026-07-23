@@ -114,4 +114,47 @@ public class LocalShadowingTests
             "      §P x\n" +
             "    §R x\n"));
     }
+
+    [Fact]
+    public void LoopVariableShadowingEnclosingLocal_IsRejected()
+    {
+        // The reverse of the inner-§B case (#743 review finding 4): here the LOOP
+        // variable is the shadower — `int x = 0;` then `for (var x = …)` is CS0136.
+        // Previously accepted (the loop var was seeded into a fresh scope with no
+        // shadowing check), producing broken C#.
+        Assert.True(HasShadow(
+            "§M{m:S}\n" +
+            "  §F{f:Do:pub} () -> i32\n" +
+            "    §B{~x} 0\n" +
+            "    §L{l1:x:0:3:1}\n" +
+            "      §ASSIGN x (+ x 1)\n" +
+            "    §R x\n"));
+    }
+
+    [Fact]
+    public void ForeachVariableShadowingEnclosingLocal_IsRejected()
+    {
+        Assert.True(HasShadow(
+            "§M{m:S}\n" +
+            "  §F{f:Do:pub} (str:path) -> i32\n" +
+            "    §E{fs:r}\n" +
+            "    §B{~x:str} \"a\"\n" +
+            "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §EACH{e1:x} arr\n" +
+            "      §P x\n" +
+            "    §R 0\n"));
+    }
+
+    [Fact]
+    public void NonShadowingLoopVariable_IsAccepted()
+    {
+        // A loop variable whose name is not otherwise in scope is fine.
+        Assert.False(HasShadow(
+            "§M{m:S}\n" +
+            "  §F{f:Do:pub} () -> i32\n" +
+            "    §B{~s} 0\n" +
+            "    §L{l1:i:0:3:1}\n" +
+            "      §ASSIGN s (+ s i)\n" +
+            "    §R s\n"));
+    }
 }

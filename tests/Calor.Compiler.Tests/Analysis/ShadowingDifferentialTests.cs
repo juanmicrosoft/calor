@@ -91,6 +91,23 @@ public class ShadowingDifferentialTests
         // emitting `int x = 0; x = "hi";` (CS0029).
         new object[] { "type-changing-mutable-rebind",
             "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x:i32} 0\n    §B{~x:str} \"hi\"\n    §R 0\n" },
+        // Rebinding a §EACH iteration variable (#738): read-only in C#, so rejected
+        // with Calor0257 instead of emitting `x = "y";` inside the foreach (CS1656).
+        new object[] { "foreach-var-rebind",
+            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §EACH{e1:x} arr\n      §B{~x:str} \"y\"\n    §R 0\n" },
+        // Same defect via §ASSIGN rather than §B (#743 review): a write to a §EACH
+        // iteration variable is CS1656 whichever assignment form spells it (Calor0257).
+        new object[] { "foreach-var-assign",
+            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
+            "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
+            "    §EACH{e1:x} arr\n      §ASSIGN x \"y\"\n    §R 0\n" },
+        // Construct-variable-shaped row (#743 review finding 4): the LOOP variable is
+        // the shadower — `int x = 0;` then `for (var x = …)` is CS0136 (Calor0255).
+        new object[] { "loop-var-shadows-enclosing",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{~x} 0\n" +
+            "    §L{l1:x:0:3:1}\n      §ASSIGN x (+ x 1)\n    §R x\n" },
     };
 
     [Theory]
@@ -125,20 +142,8 @@ public class ShadowingDifferentialTests
         Assert.Contains(roslynErrors, e => e.StartsWith("CS0029", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void KnownGap_ForeachVariableRebind_EmitsCS1656() // #738
-    {
-        // A §EACH iteration variable is not assignable in C#; the pass and emitter now
-        // agree it is in scope (so it's a reassignment), but the reassignment itself is
-        // invalid. The correct fix is a reject diagnostic (#738).
-        var (accepted, roslynErrors) = Compile(
-            "§M{m:S}\n  §F{f:Do:pub} (str:path) -> i32\n    §E{fs:r}\n" +
-            "    §B{arr:[str]} §C{File.ReadAllLines} §A path §/C\n" +
-            "    §EACH{e1:x} arr\n      §B{~x:str} \"y\"\n    §R 0\n");
-
-        Assert.True(accepted);
-        Assert.Contains(roslynErrors, e => e.StartsWith("CS1656", StringComparison.Ordinal));
-    }
+    // #738 (§EACH iteration-variable rebind → CS1656) is FIXED: calor -i now rejects it
+    // with Calor0257, so it moved to RejectedIdioms above ("foreach-var-rebind").
 
     // #733 (type-changing mutable rebind → CS0029) is FIXED: calor -i now rejects it
     // with Calor0256, so it moved to RejectedIdioms above ("type-changing-mutable-rebind").
