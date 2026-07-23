@@ -38,7 +38,22 @@ public sealed class TextDiagnosticFormatter : IDiagnosticFormatter
 /// </summary>
 public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
 {
+    /// <summary>
+    /// Envelope schema version (loop plan D1.1). 1.1 adds per-diagnostic
+    /// <c>declarationId</c> (nearest enclosing declaration ID, null when IDs are
+    /// absent) and <c>verification</c> (choke-point proof outcome with the closed
+    /// proven|refuted|unknown|timeout|unsupported status vocabulary and the
+    /// structured counterexample model on refuted).
+    /// </summary>
+    public const string SchemaVersion = "1.1";
+
     public string ContentType => "application/json";
+
+    /// <summary>
+    /// Optional span→declaration-ID resolver; when set, each diagnostic entry
+    /// carries the ID of its nearest enclosing declaration.
+    /// </summary>
+    public Ids.DeclarationIdResolver? DeclarationIds { get; set; }
 
     private static readonly JsonSerializerOptions s_indentedOptions = new()
     {
@@ -75,29 +90,9 @@ public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
     {
         var output = new DiagnosticOutput
         {
-            Version = "1.0",
-            Diagnostics = diagnostics.Select(d => new DiagnosticEntry
-            {
-                Code = d.Code,
-                Message = d.Message,
-                Severity = d.Severity.ToString().ToLower(),
-                Location = new LocationInfo
-                {
-                    File = d.FilePath,
-                    Line = d.Span.Line,
-                    Column = d.Span.Column,
-                    Length = d.Span.Length
-                },
-                Suggestion = null,
-                Fix = null
-            }).ToList(),
-            Summary = new SummaryInfo
-            {
-                Total = diagnostics.Count(),
-                Errors = diagnostics.Count(d => d.IsError),
-                Warnings = diagnostics.Count(d => d.IsWarning),
-                Info = diagnostics.Count(d => d.Severity == DiagnosticSeverity.Info)
-            }
+            Version = SchemaVersion,
+            Diagnostics = diagnostics.Select(d => DiagnosticEnvelope.Build(d, DeclarationIds)).ToList(),
+            Summary = DiagnosticEnvelope.Summarize(diagnostics)
         };
 
         return JsonSerializer.Serialize(output, _options);
@@ -105,65 +100,11 @@ public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
 
     public string Format(DiagnosticBag diagnostics)
     {
-        // Build lookup from DiagnosticsWithFixes to populate fix info
-        // Include message in key to differentiate between different constructs at same location
-        var fixLookup = diagnostics.DiagnosticsWithFixes
-            .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
-            .ToDictionary(g => g.Key, g => g.First());
-
-        var entries = new List<DiagnosticEntry>();
-        foreach (var d in diagnostics)
-        {
-            var entry = new DiagnosticEntry
-            {
-                Code = d.Code,
-                Message = d.Message,
-                Severity = d.Severity.ToString().ToLower(),
-                Location = new LocationInfo
-                {
-                    File = d.FilePath,
-                    Line = d.Span.Line,
-                    Column = d.Span.Column,
-                    Length = d.Span.Length
-                },
-                Suggestion = null,
-                Fix = null
-            };
-
-            // Check if this diagnostic has an associated fix
-            var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
-            if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
-            {
-                entry.Suggestion = diagnosticWithFix.Fix.Description;
-                entry.Fix = new FixInfo
-                {
-                    Description = diagnosticWithFix.Fix.Description,
-                    Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditInfo
-                    {
-                        FilePath = e.FilePath,
-                        StartLine = e.StartLine,
-                        StartColumn = e.StartColumn,
-                        EndLine = e.EndLine,
-                        EndColumn = e.EndColumn,
-                        NewText = e.NewText
-                    }).ToList()
-                };
-            }
-
-            entries.Add(entry);
-        }
-
         var output = new DiagnosticOutput
         {
-            Version = "1.0",
-            Diagnostics = entries,
-            Summary = new SummaryInfo
-            {
-                Total = diagnostics.Count(),
-                Errors = diagnostics.Count(d => d.IsError),
-                Warnings = diagnostics.Count(d => d.IsWarning),
-                Info = diagnostics.Count(d => d.Severity == DiagnosticSeverity.Info)
-            }
+            Version = SchemaVersion,
+            Diagnostics = DiagnosticEnvelope.Build(diagnostics, DeclarationIds),
+            Summary = DiagnosticEnvelope.Summarize(diagnostics)
         };
 
         return JsonSerializer.Serialize(output, _options);
@@ -172,50 +113,8 @@ public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
     private sealed class DiagnosticOutput
     {
         public required string Version { get; init; }
-        public required List<DiagnosticEntry> Diagnostics { get; init; }
-        public required SummaryInfo Summary { get; init; }
-    }
-
-    private sealed class DiagnosticEntry
-    {
-        public required string Code { get; init; }
-        public required string Message { get; init; }
-        public required string Severity { get; init; }
-        public required LocationInfo Location { get; init; }
-        public string? Suggestion { get; set; }
-        public FixInfo? Fix { get; set; }
-    }
-
-    private sealed class LocationInfo
-    {
-        public string? File { get; init; }
-        public int Line { get; init; }
-        public int Column { get; init; }
-        public int Length { get; init; }
-    }
-
-    private sealed class FixInfo
-    {
-        public required string Description { get; init; }
-        public required List<EditInfo> Edits { get; init; }
-    }
-
-    private sealed class EditInfo
-    {
-        public required string FilePath { get; init; }
-        public int StartLine { get; init; }
-        public int StartColumn { get; init; }
-        public int EndLine { get; init; }
-        public int EndColumn { get; init; }
-        public required string NewText { get; init; }
-    }
-
-    private sealed class SummaryInfo
-    {
-        public int Total { get; init; }
-        public int Errors { get; init; }
-        public int Warnings { get; init; }
-        public int Info { get; init; }
+        public required List<EnvelopeDiagnostic> Diagnostics { get; init; }
+        public required EnvelopeSummary Summary { get; init; }
     }
 }
 
@@ -237,6 +136,47 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
     private readonly string _toolName;
     private readonly Func<string, string>? _ruleDescriptionProvider;
     private readonly Func<string, string>? _ruleHelpUriProvider;
+
+    /// <summary>
+    /// Optional span→declaration-ID resolver; when set, each result's property
+    /// bag carries the ID of its nearest enclosing declaration.
+    /// </summary>
+    public Ids.DeclarationIdResolver? DeclarationIds { get; set; }
+
+    /// <summary>
+    /// Builds the SARIF property bag mirroring the JSON envelope's declarationId
+    /// and verification fields; null when neither applies.
+    /// </summary>
+    private Dictionary<string, object>? BuildProperties(Diagnostic d)
+    {
+        var declarationId = DeclarationIds?.Resolve(d);
+        if (declarationId == null && d.Verification == null)
+            return null;
+
+        var properties = new Dictionary<string, object>();
+        if (declarationId != null)
+            properties["declarationId"] = declarationId;
+
+        if (d.Verification != null)
+        {
+            var verification = new Dictionary<string, object> { ["status"] = d.Verification.StatusName };
+            if (d.Verification.Reason != null)
+                verification["reason"] = d.Verification.Reason;
+            if (d.Verification.Counterexample != null)
+            {
+                verification["counterexample"] = new Dictionary<string, object>
+                {
+                    ["rendered"] = d.Verification.Counterexample.Render(),
+                    ["bindings"] = d.Verification.Counterexample.Bindings
+                        .Select(b => new Dictionary<string, string> { ["name"] = b.Name, ["value"] = b.Value })
+                        .ToList()
+                };
+            }
+            properties["verification"] = verification;
+        }
+
+        return properties;
+    }
 
     /// <summary>
     /// Creates the default SARIF formatter for compiler diagnostics
@@ -313,7 +253,8 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
                                 }
                             }
                         },
-                        Fixes = null // Fix suggestions not yet implemented
+                        Fixes = null, // Fix suggestions not yet implemented
+                        Properties = BuildProperties(d)
                     }).ToList()
                 }
             }
@@ -398,7 +339,8 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
                         }
                     }
                 },
-                Fixes = fixes
+                Fixes = fixes,
+                Properties = BuildProperties(d)
             });
         }
 
@@ -517,6 +459,9 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         public required SarifMessage Message { get; init; }
         public required List<SarifLocation> Locations { get; init; }
         public List<SarifFix>? Fixes { get; init; }
+
+        /// <summary>SARIF property bag: envelope schema v1 declarationId + verification payload.</summary>
+        public Dictionary<string, object>? Properties { get; init; }
     }
 
     private sealed class SarifMessage
@@ -585,5 +530,24 @@ public static class DiagnosticFormatterFactory
             "sarif" => new SarifDiagnosticFormatter(),
             "text" or _ => new TextDiagnosticFormatter()
         };
+    }
+
+    /// <summary>
+    /// Creates a formatter with a span→declaration-ID resolver attached, so JSON
+    /// and SARIF output carry each diagnostic's enclosing declaration ID.
+    /// </summary>
+    public static IDiagnosticFormatter Create(string format, Ids.DeclarationIdResolver? declarationIds)
+    {
+        var formatter = Create(format);
+        switch (formatter)
+        {
+            case JsonDiagnosticFormatter json:
+                json.DeclarationIds = declarationIds;
+                break;
+            case SarifDiagnosticFormatter sarif:
+                sarif.DeclarationIds = declarationIds;
+                break;
+        }
+        return formatter;
     }
 }
