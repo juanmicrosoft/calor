@@ -6,10 +6,14 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// Calor0256 (#733): a mutable §B rebind that re-annotates a variable with a
-/// different type contradicts its declaration. The emitter emits <c>x = value</c>
-/// against the original type, so a mismatched value fails to compile (CS0029/CS0266).
-/// A same-type rebind, or an unannotated rebind (the accumulator idiom), is unaffected.
+/// Calor0256 (#733, #740): a mutable §B rebind whose value is of a primitive category
+/// (string / bool / numeric) that is not implicitly convertible to the variable's
+/// declared type. The emitter emits <c>x = value</c> against the original type, so a
+/// cross-category value fails to compile (CS0029). The rebind's type comes from its
+/// annotation, or is inferred from the value — a literal, a reference to a typed local,
+/// or a call with a known return type (#740). Comparison is by category, so implicit
+/// numeric widening (i32→i64) is never a false positive; a same-type rebind and a
+/// non-inferable value (the accumulator idiom) are unaffected.
 /// </summary>
 public class RebindTypeMismatchTests
 {
@@ -66,6 +70,52 @@ public class RebindTypeMismatchTests
         Assert.Contains("'str'", diag.Message);
         Assert.DoesNotContain("INT", diag.Message);
         Assert.DoesNotContain("STRING", diag.Message);
+    }
+
+    [Fact]
+    public void UnannotatedRebindWithMismatchedCallReturn_IsRejected()
+    {
+        // #740: no annotation, value is a string-returning BCL call — inferred as str,
+        // rebinding an i32 → CS0029.
+        Assert.True(HasMismatch(
+            "§M{m:S}\n  §F{f:Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
+            "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n"));
+    }
+
+    [Fact]
+    public void UnannotatedRebindWithMismatchedReference_IsRejected()
+    {
+        // #740: value is a reference to a str parameter — inferred as str, rebinding i32.
+        Assert.True(HasMismatch(
+            "§M{m:S}\n  §F{f:Do:pub} (str:s) -> i32\n    §B{~x:i32} 0\n    §B{~x} s\n    §R 0\n"));
+    }
+
+    [Fact]
+    public void NumericWideningRebind_IsAccepted()
+    {
+        // Regression guard: `long x = 0; x = 5;` is valid C# (int literal widens to long).
+        // Category comparison must NOT flag it — a bug the earlier exact-equality check had.
+        Assert.False(HasMismatch(
+            "§M{m:S}\n  §F{f:Do:pub} () -> i64\n    §B{~x:i64} 0\n    §B{~x} 5\n    §R x\n"));
+    }
+
+    [Fact]
+    public void NumericReferenceRebind_IsAccepted()
+    {
+        // Two numeric types share a category, so a numeric reference into a numeric local
+        // is never flagged (a narrowing that needs a cast is a conservative miss, not a FP).
+        Assert.False(HasMismatch(
+            "§M{m:S}\n  §F{f:Do:pub} (i64:n) -> i32\n    §B{~x:i32} 0\n    §B{~x} n\n    §R 0\n"));
+    }
+
+    [Fact]
+    public void NonInferableRebind_IsAccepted()
+    {
+        // A value whose type can't be inferred (here a binary expression) is a
+        // conservative miss, never a false positive — the accumulator idiom relies on it.
+        Assert.False(HasMismatch(
+            "§M{m:S}\n  §F{f:Do:pub} (i32:n) -> i32\n    §B{~result} 1\n" +
+            "    §B{~result} (* result n)\n    §R result\n"));
     }
 
     [Fact]
