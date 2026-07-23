@@ -153,6 +153,8 @@ internal static class BuildStateCache
     /// assembly version string when the on-disk location is unavailable
     /// (e.g., single-file publish), so upgrades still invalidate the cache.
     /// </summary>
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("SingleFile", "IL3000",
+        Justification = "Assembly.Location is checked for empty string; falls back to the version string in single-file mode.")]
     public static string ComputeCliCompilerHash()
     {
         var assembly = typeof(BuildStateCache).Assembly;
