@@ -128,7 +128,7 @@ Classes:
 | `lint` | E | **Yes** (`--format json\|sarif`) | |
 | `watch` | E | **Yes** (NDJSON, `--format json`) | one document per rebuild |
 | `self-check` | E | **Yes** (`--format json\|sarif`) | docs-drift findings |
-| `verify` | E | Partial | embeds envelope `diagnostics[]`; wrapper is command-specific and per-contract statuses still use legacy enum names |
+| `verify` | E | **Yes** (`--format json`) | envelope wrapper with `command: "verify"`; per-contract five-status (+`legacyStatus` for one release) and counterexamples under `data` |
 | `assess` | E | **Yes** (`--format json\|sarif`) | JSON wraps the assessment under `data`; SARIF shared |
 | `convert` | E | No (text only) | needs `--format json` |
 | `format` | E | No (text only) | needs `--format json` |
