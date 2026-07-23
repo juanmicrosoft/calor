@@ -674,6 +674,20 @@ public sealed class BindValidationPass
                     "Keep the original type, or use a differently-named binding.");
             }
         }
+        else if (_scopes[^1].ContainsKey(bind.Name))
+        {
+            // Calor0258 — a second §B reusing a name ALREADY declared in the SAME scope
+            // (the innermost). The emitter emits `int x = …; int x = …;` → CS0128. This is
+            // distinct from Calor0255 (shadowing an enclosing scope, CS0136). It is safe to
+            // reject now that the C#→Calor converter emits `arr = new T[]{…}` reassignments
+            // as §ASSIGN rather than a fresh same-name §B creation block (#731).
+            _diagnostics.ReportError(bind.Span, DiagnosticCode.BindDuplicateInScope,
+                $"Binding '{bind.Name}' is already declared in this scope. C# forbids two " +
+                "locals of the same name in one scope (CS0128), so the generated code would " +
+                $"not compile — rename this binding (e.g. '{bind.Name}2'), or use a mutable " +
+                $"rebind ('§B{{~{bind.Name}}}') if a reassignment was intended.");
+            // Keep the existing declaration; don't overwrite its type with the duplicate's.
+        }
         else
         {
             // Calor0255 — a new local that reuses a local/parameter/loop-variable

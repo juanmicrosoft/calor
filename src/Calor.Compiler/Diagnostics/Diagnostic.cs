@@ -203,6 +203,16 @@ public static class DiagnosticCode
     /// </summary>
     public const string BindReassignsIterationVariable = "Calor0257";
 
+    /// <summary>
+    /// Error: two <c>§B</c> declarations reuse the same name in the <em>same</em> scope —
+    /// e.g. <c>§B{x:i32} 1</c> then <c>§B{x:i32} 2</c>. The emitter would emit
+    /// <c>int x = 1; int x = 2;</c> (CS0128 — a local named 'x' is already defined). Rename
+    /// the second binding, or make it a mutable rebind (<c>§B{~x}</c>) if a reassignment was
+    /// intended. Distinct from <c>Calor0255</c> (shadowing an <em>enclosing</em> scope,
+    /// CS0136). (#731)
+    /// </summary>
+    public const string BindDuplicateInScope = "Calor0258";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

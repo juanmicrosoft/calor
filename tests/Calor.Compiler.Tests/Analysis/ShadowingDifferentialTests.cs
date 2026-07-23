@@ -114,6 +114,11 @@ public class ShadowingDifferentialTests
         new object[] { "unannotated-nonliteral-rebind",
             "§M{m:S}\n  §F{f:Do:pub} (str:p) -> i32\n    §E{fs:r}\n" +
             "    §B{~x:i32} 0\n    §B{~x} §C{File.ReadAllText} §A p §/C\n    §R 0\n" },
+        // Same-scope duplicate §B (#731): `int x = 1; int x = 2;` is CS0128, rejected with
+        // Calor0258 instead of exiting 0. (Safe now the converter emits reassignments as
+        // §ASSIGN, not a fresh same-name §B.)
+        new object[] { "same-scope-duplicate",
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i32} 1\n    §B{x:i32} 2\n    §R x\n" },
     };
 
     [Theory]
@@ -141,15 +146,10 @@ public class ShadowingDifferentialTests
     // #733 (type-changing mutable rebind → CS0029) is FIXED: calor -i now rejects it
     // with Calor0256, so it moved to RejectedIdioms above ("type-changing-mutable-rebind").
 
-    [Fact]
-    public void KnownGap_SameScopeDuplicate_EmitsCS0128() // #731
-    {
-        var (accepted, roslynErrors) = Compile(
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i32} 1\n    §B{x:i32} 2\n    §R x\n");
-
-        Assert.True(accepted);
-        Assert.Contains(roslynErrors, e => e.StartsWith("CS0128", StringComparison.Ordinal));
-    }
+    // #731 (same-scope duplicate §B → CS0128) is FIXED: calor -i now rejects it with
+    // Calor0258, so it moved to RejectedIdioms above ("same-scope-duplicate"). This became
+    // safe once the C#→Calor converter stopped emitting `arr = new T[]{…}` reassignments as
+    // a fresh same-name §B creation block (it now emits §ASSIGN via a temp).
 
     [Fact]
     public void KnownGap_DecimalToFloatRebind_EmitsCS0266() // #740 within-Numeric miss
