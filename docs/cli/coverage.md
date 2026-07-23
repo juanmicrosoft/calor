@@ -22,19 +22,27 @@ calor coverage <file.cs> [options]
 calor coverage MyClass.cs
 ```
 
-Output:
+Output is wrapped in the [envelope schema v1.1](/calor/cli/envelope-schema/);
+the coverage payload lives under `data`:
+
 ```json
 {
-  "file": "/path/to/MyClass.cs",
-  "success": true,
-  "coveragePercent": 100,
-  "migrationScore": 45.2,
-  "priority": "medium",
-  "isConvertible": true,
-  "lineCount": 150,
-  "methodCount": 8,
-  "typeCount": 2,
-  "blockers": []
+  "version": "1.1",
+  "command": "coverage",
+  "diagnostics": [],
+  "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
+  "data": {
+    "file": "/path/to/MyClass.cs",
+    "success": true,
+    "coveragePercent": 100,
+    "migrationScore": 45.2,
+    "priority": "medium",
+    "isConvertible": true,
+    "lineCount": 150,
+    "methodCount": 8,
+    "typeCount": 2,
+    "blockers": []
+  }
 }
 ```
 
@@ -44,7 +52,8 @@ Output:
 calor coverage FileWithBlockers.cs
 ```
 
-Output:
+`data` payload (envelope wrapper elided):
+
 ```json
 {
   "file": "/path/to/FileWithBlockers.cs",
@@ -79,7 +88,8 @@ Output:
 calor coverage MyClass.cs --verbose
 ```
 
-Output includes dimension scores:
+The `data` payload includes dimension scores (envelope wrapper elided):
+
 ```json
 {
   "file": "/path/to/MyClass.cs",

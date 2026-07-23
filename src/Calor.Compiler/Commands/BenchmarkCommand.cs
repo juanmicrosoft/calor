@@ -206,7 +206,7 @@ public static class BenchmarkCommand
         var outputContent = format.ToLowerInvariant() switch
         {
             "markdown" or "md" => BenchmarkIntegration.GenerateMarkdownReport(result, calorFile.Name, csharpFile.Name),
-            "json" => BenchmarkIntegration.GenerateJsonReport(result),
+            "json" => EnvelopeWriter.SerializeRaw("benchmark", BenchmarkIntegration.GenerateJsonReport(result)),
             _ => BenchmarkIntegration.FormatConsoleOutput(result, calorFile.Name, csharpFile.Name, verbose)
         };
 
@@ -254,7 +254,7 @@ public static class BenchmarkCommand
         var outputContent = format.ToLowerInvariant() switch
         {
             "markdown" or "md" => BenchmarkIntegration.GenerateMarkdownReport(result, project.Name, project.Name),
-            "json" => BenchmarkIntegration.GenerateJsonReport(result),
+            "json" => EnvelopeWriter.SerializeRaw("benchmark", BenchmarkIntegration.GenerateJsonReport(result)),
             _ => BenchmarkIntegration.FormatProjectConsoleOutput(result, project.Name, verbose)
         };
 
@@ -410,21 +410,24 @@ public static class BenchmarkCommand
     private static string FormatQuickJson(string calorName, string csName, BenchmarkResult result)
     {
         var m = result.Metrics;
-        return $$"""
+        var data = new
+        {
+            mode = "quick",
+            comparison = new
             {
-              "mode": "quick",
-              "comparison": {
-                "csharpFile": "{{csName}}",
-                "calorFile": "{{calorName}}"
-              },
-              "metrics": {
-                "tokens": { "csharp": {{m.OriginalTokens}}, "calor": {{m.OutputTokens}}, "savings": {{m.TokenReduction:F1}} },
-                "lines": { "csharp": {{m.OriginalLines}}, "calor": {{m.OutputLines}}, "savings": {{m.LineReduction:F1}} },
-                "characters": { "csharp": {{m.OriginalCharacters}}, "calor": {{m.OutputCharacters}}, "savings": {{m.CharReduction:F1}} }
-              },
-              "advantageRatio": {{result.AdvantageRatio:F2}}
-            }
-            """;
+                csharpFile = csName,
+                calorFile = calorName
+            },
+            metrics = new
+            {
+                tokens = new { csharp = m.OriginalTokens, calor = m.OutputTokens, savings = Math.Round(m.TokenReduction, 1) },
+                lines = new { csharp = m.OriginalLines, calor = m.OutputLines, savings = Math.Round(m.LineReduction, 1) },
+                characters = new { csharp = m.OriginalCharacters, calor = m.OutputCharacters, savings = Math.Round(m.CharReduction, 1) }
+            },
+            advantageRatio = Math.Round(result.AdvantageRatio, 2)
+        };
+
+        return EnvelopeWriter.Serialize("benchmark", data);
     }
 
     private static string FormatQuickProjectConsole(string projectName, List<(string calor, string cs, FileMetrics metrics)> pairs, BenchmarkSummary summary)
@@ -484,38 +487,31 @@ public static class BenchmarkCommand
 
     private static string FormatQuickProjectJson(string projectName, List<(string calor, string cs, FileMetrics metrics)> pairs, BenchmarkSummary summary)
     {
-        var filesJson = string.Join(",\n    ", pairs.Select(p =>
+        var data = new
         {
-            var advantage = BenchmarkIntegration.CalculateAdvantageRatio(p.metrics);
-            return $$"""
-                {
-                      "calor": "{{Path.GetFileName(p.calor)}}",
-                      "csharp": "{{Path.GetFileName(p.cs)}}",
-                      "csharpTokens": {{p.metrics.OriginalTokens}},
-                      "calorTokens": {{p.metrics.OutputTokens}},
-                      "advantage": {{advantage:F2}}
-                    }
-                """;
-        }));
-
-        return $$"""
+            mode = "quick",
+            project = projectName,
+            fileCount = pairs.Count,
+            summary = new
             {
-              "mode": "quick",
-              "project": "{{projectName}}",
-              "fileCount": {{pairs.Count}},
-              "summary": {
-                "totalCSharpTokens": {{summary.TotalOriginalTokens}},
-                "totalCalorTokens": {{summary.TotalOutputTokens}},
-                "tokenSavings": {{summary.TokenSavingsPercent:F1}},
-                "totalCSharpLines": {{summary.TotalOriginalLines}},
-                "totalCalorLines": {{summary.TotalOutputLines}},
-                "lineSavings": {{summary.LineSavingsPercent:F1}},
-                "overallAdvantage": {{summary.OverallAdvantage:F2}}
-              },
-              "files": [
-                {{filesJson}}
-              ]
-            }
-            """;
+                totalCSharpTokens = summary.TotalOriginalTokens,
+                totalCalorTokens = summary.TotalOutputTokens,
+                tokenSavings = Math.Round(summary.TokenSavingsPercent, 1),
+                totalCSharpLines = summary.TotalOriginalLines,
+                totalCalorLines = summary.TotalOutputLines,
+                lineSavings = Math.Round(summary.LineSavingsPercent, 1),
+                overallAdvantage = Math.Round(summary.OverallAdvantage, 2)
+            },
+            files = pairs.Select(p => new
+            {
+                calor = Path.GetFileName(p.calor),
+                csharp = Path.GetFileName(p.cs),
+                csharpTokens = p.metrics.OriginalTokens,
+                calorTokens = p.metrics.OutputTokens,
+                advantage = Math.Round(BenchmarkIntegration.CalculateAdvantageRatio(p.metrics), 2)
+            }).ToList()
+        };
+
+        return EnvelopeWriter.Serialize("benchmark", data);
     }
 }

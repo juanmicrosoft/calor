@@ -1,8 +1,6 @@
 using System.CommandLine;
 using System.Diagnostics;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Init;
 using Calor.Compiler.Telemetry;
@@ -256,12 +254,7 @@ public static class AnalyzeConvertibilityCommand
             DurationMs = (int)result.Duration.TotalMilliseconds
         };
 
-        return JsonSerializer.Serialize(output, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        });
+        return EnvelopeWriter.Serialize("analyze-convertibility", output);
     }
 
     private static string FormatDirectoryJson(DirectoryConvertibilityResult result)
@@ -299,12 +292,7 @@ public static class AnalyzeConvertibilityCommand
             DurationMs = (int)result.Duration.TotalMilliseconds
         };
 
-        return JsonSerializer.Serialize(output, new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        });
+        return EnvelopeWriter.Serialize("analyze-convertibility", output);
     }
 
     private static string GetStatusLabel(int score) => score switch
