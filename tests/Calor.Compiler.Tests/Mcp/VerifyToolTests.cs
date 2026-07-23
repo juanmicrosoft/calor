@@ -146,5 +146,50 @@ public class VerifyToolTests
         Assert.True(summary.TryGetProperty("disproven", out _));
         Assert.True(summary.TryGetProperty("unsupported", out _));
         Assert.True(summary.TryGetProperty("skipped", out _));
+
+        // Envelope schema v1.1: five-status counts alongside the legacy counts
+        var proofStatusCounts = summary.GetProperty("proofStatusCounts");
+        Assert.True(proofStatusCounts.TryGetProperty("proven", out _));
+        Assert.True(proofStatusCounts.TryGetProperty("refuted", out _));
+        Assert.True(proofStatusCounts.TryGetProperty("unknown", out _));
+        Assert.True(proofStatusCounts.TryGetProperty("timeout", out _));
+        Assert.True(proofStatusCounts.TryGetProperty("unsupported", out _));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PerContract_UsesFiveStatusVocabulary()
+    {
+        var args = JsonDocument.Parse("""
+            {
+                "source": "§M{m001:Test}\n§F{f001:Div:pub}\n§I{i32:a}\n§I{i32:b}\n§O{i32}\n§Q (!= b 0)\n§R (/ a b)\n\n"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+        var json = JsonDocument.Parse(result.Content[0].Text!);
+
+        var fiveStatus = new[] { "proven", "refuted", "unknown", "timeout", "unsupported" };
+        var legacyStatus = new[] { "proven", "unproven", "disproven", "unsupported", "skipped" };
+
+        foreach (var function in json.RootElement.GetProperty("functions").EnumerateArray())
+        {
+            foreach (var contract in function.GetProperty("contracts").EnumerateArray())
+            {
+                Assert.Contains(contract.GetProperty("status").GetString(), fiveStatus);
+                Assert.Contains(contract.GetProperty("legacyStatus").GetString(), legacyStatus);
+
+                // A structured counterexample, when present, carries rendered + bindings
+                if (contract.TryGetProperty("counterexample", out var counterexample))
+                {
+                    Assert.True(counterexample.TryGetProperty("rendered", out _));
+                    Assert.True(counterexample.TryGetProperty("bindings", out var bindings));
+                    foreach (var binding in bindings.EnumerateArray())
+                    {
+                        Assert.True(binding.TryGetProperty("name", out _));
+                        Assert.True(binding.TryGetProperty("value", out _));
+                    }
+                }
+            }
+        }
     }
 }

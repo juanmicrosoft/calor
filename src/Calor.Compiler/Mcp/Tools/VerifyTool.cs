@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
 
@@ -69,6 +70,7 @@ public sealed class VerifyTool : McpToolBase
             var summary = verificationResults?.GetSummary() ?? new VerificationSummary(0, 0, 0, 0, 0);
 
             var functions = new List<FunctionVerificationOutput>();
+            var proofStatusCounts = new ProofStatusCountsOutput();
             if (verificationResults != null)
             {
                 foreach (var funcResult in verificationResults.Functions)
@@ -77,26 +79,12 @@ public sealed class VerifyTool : McpToolBase
 
                     for (var i = 0; i < funcResult.PreconditionResults.Count; i++)
                     {
-                        var r = funcResult.PreconditionResults[i];
-                        contracts.Add(new ContractVerificationOutput
-                        {
-                            Type = "precondition",
-                            Index = i,
-                            Status = r.Status.ToString().ToLowerInvariant(),
-                            Counterexample = r.CounterexampleDescription
-                        });
+                        contracts.Add(BuildContractOutput("precondition", i, funcResult.PreconditionResults[i], proofStatusCounts));
                     }
 
                     for (var i = 0; i < funcResult.PostconditionResults.Count; i++)
                     {
-                        var r = funcResult.PostconditionResults[i];
-                        contracts.Add(new ContractVerificationOutput
-                        {
-                            Type = "postcondition",
-                            Index = i,
-                            Status = r.Status.ToString().ToLowerInvariant(),
-                            Counterexample = r.CounterexampleDescription
-                        });
+                        contracts.Add(BuildContractOutput("postcondition", i, funcResult.PostconditionResults[i], proofStatusCounts));
                     }
 
                     functions.Add(new FunctionVerificationOutput
@@ -118,7 +106,8 @@ public sealed class VerifyTool : McpToolBase
                     Unproven = summary.Unproven,
                     Disproven = summary.Disproven,
                     Unsupported = summary.Unsupported,
-                    Skipped = summary.Skipped
+                    Skipped = summary.Skipped,
+                    ProofStatusCounts = proofStatusCounts
                 },
                 Functions = functions,
                 CompilationErrors = result.Diagnostics.Errors.Select(d => d.Message).ToList()
@@ -130,6 +119,36 @@ public sealed class VerifyTool : McpToolBase
         {
             return Task.FromResult(McpToolResult.Error($"Verification failed: {ex.Message}"));
         }
+    }
+
+    /// <summary>
+    /// Projects one contract result onto the five-status envelope vocabulary
+    /// (proven|refuted|unknown|timeout|unsupported) while keeping the legacy
+    /// enum name, and tallies the five-status counts for the summary.
+    /// </summary>
+    private static ContractVerificationOutput BuildContractOutput(
+        string type, int index, Verification.Z3.ContractVerificationResult r, ProofStatusCountsOutput counts)
+    {
+        var outcome = r.EffectiveOutcome;
+        counts.Increment(outcome.Status);
+
+        return new ContractVerificationOutput
+        {
+            Type = type,
+            Index = index,
+            Status = outcome.StatusName,
+            LegacyStatus = r.Status.ToString().ToLowerInvariant(),
+            Reason = outcome.Reason,
+            Counterexample = outcome.Counterexample == null
+                ? null
+                : new EnvelopeCounterexample
+                {
+                    Rendered = outcome.Counterexample.Render(),
+                    Bindings = outcome.Counterexample.Bindings
+                        .Select(b => new EnvelopeBinding { Name = b.Name, Value = b.Value })
+                        .ToList()
+                }
+        };
     }
 
     private sealed class VerifyToolOutput
@@ -167,6 +186,40 @@ public sealed class VerifyTool : McpToolBase
 
         [JsonPropertyName("skipped")]
         public int Skipped { get; init; }
+
+        /// <summary>Five-status (envelope schema v1.1) counts alongside the legacy counts.</summary>
+        [JsonPropertyName("proofStatusCounts")]
+        public required ProofStatusCountsOutput ProofStatusCounts { get; init; }
+    }
+
+    private sealed class ProofStatusCountsOutput
+    {
+        [JsonPropertyName("proven")]
+        public int Proven { get; private set; }
+
+        [JsonPropertyName("refuted")]
+        public int Refuted { get; private set; }
+
+        [JsonPropertyName("unknown")]
+        public int Unknown { get; private set; }
+
+        [JsonPropertyName("timeout")]
+        public int Timeout { get; private set; }
+
+        [JsonPropertyName("unsupported")]
+        public int Unsupported { get; private set; }
+
+        public void Increment(ProofStatus status)
+        {
+            switch (status)
+            {
+                case ProofStatus.Proven: Proven++; break;
+                case ProofStatus.Refuted: Refuted++; break;
+                case ProofStatus.Timeout: Timeout++; break;
+                case ProofStatus.Unsupported: Unsupported++; break;
+                default: Unknown++; break;
+            }
+        }
     }
 
     private sealed class FunctionVerificationOutput
@@ -189,11 +242,21 @@ public sealed class VerifyTool : McpToolBase
         [JsonPropertyName("index")]
         public int Index { get; init; }
 
+        /// <summary>Five-status wire name: proven|refuted|unknown|timeout|unsupported.</summary>
         [JsonPropertyName("status")]
         public required string Status { get; init; }
 
+        /// <summary>Legacy ContractVerificationStatus name (proven|unproven|disproven|unsupported|skipped).</summary>
+        [JsonPropertyName("legacyStatus")]
+        public required string LegacyStatus { get; init; }
+
+        [JsonPropertyName("reason")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Reason { get; init; }
+
+        /// <summary>Structured counterexample (envelope schema v1.1 shape).</summary>
         [JsonPropertyName("counterexample")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Counterexample { get; init; }
+        public EnvelopeCounterexample? Counterexample { get; init; }
     }
 }

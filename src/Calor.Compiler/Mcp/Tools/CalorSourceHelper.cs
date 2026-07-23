@@ -22,7 +22,7 @@ internal static class CalorSourceHelper
 
         if (diagnostics.HasErrors)
         {
-            return ParseResult.Failed(diagnostics.Errors.Select(e => e.Message).ToList());
+            return ParseResult.Failed(diagnostics.Errors.Select(e => e.Message).ToList(), diagnostics);
         }
 
         var parser = new Parser(tokens, diagnostics);
@@ -30,7 +30,7 @@ internal static class CalorSourceHelper
 
         if (diagnostics.HasErrors)
         {
-            return ParseResult.Failed(diagnostics.Errors.Select(e => e.Message).ToList());
+            return ParseResult.Failed(diagnostics.Errors.Select(e => e.Message).ToList(), diagnostics);
         }
 
         return ParseResult.Success(ast, source);
@@ -131,17 +131,24 @@ internal sealed class ParseResult
     public string? Source { get; }
     public IReadOnlyList<string> Errors { get; }
 
-    private ParseResult(bool success, ModuleNode? ast, string? source, IReadOnlyList<string> errors)
+    /// <summary>
+    /// The diagnostic bag from the lex/parse, when one exists. Lets tools emit
+    /// envelope schema v1.1 entries instead of flattened message strings.
+    /// </summary>
+    public DiagnosticBag? Diagnostics { get; }
+
+    private ParseResult(bool success, ModuleNode? ast, string? source, IReadOnlyList<string> errors, DiagnosticBag? diagnostics)
     {
         IsSuccess = success;
         Ast = ast;
         Source = source;
         Errors = errors;
+        Diagnostics = diagnostics;
     }
 
     public static ParseResult Success(ModuleNode ast, string source)
-        => new(true, ast, source, Array.Empty<string>());
+        => new(true, ast, source, Array.Empty<string>(), null);
 
-    public static ParseResult Failed(IReadOnlyList<string> errors)
-        => new(false, null, null, errors);
+    public static ParseResult Failed(IReadOnlyList<string> errors, DiagnosticBag? diagnostics = null)
+        => new(false, null, null, errors, diagnostics);
 }

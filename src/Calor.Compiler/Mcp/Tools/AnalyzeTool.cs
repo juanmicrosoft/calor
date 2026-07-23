@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Verification.Z3.Cache;
 using Microsoft.CodeAnalysis.CSharp;
@@ -154,16 +156,30 @@ public sealed class AnalyzeTool : McpToolBase
 
             var analysisResult = compileOptions.VerificationAnalysisResult;
 
-            var diagnosticsByCategory = result.Diagnostics
-                .GroupBy(d => CategorizeIssue(d.Code.ToString()))
-                .ToDictionary(g => g.Key, g => g.Select(d => new IssueOutput
+            // Envelope schema v1.1: issues are the shared EnvelopeDiagnostic
+            // entries, grouped by category; a resolver built from the parsed
+            // AST populates declarationId (null when parsing failed).
+            DeclarationIdResolver? declarationIds = null;
+            if (result.Ast != null)
+            {
+                declarationIds = new DeclarationIdResolver();
+                declarationIds.AddFile("mcp-analyze.calr", source, result.Ast);
+            }
+
+            var diagnosticList = result.Diagnostics.ToList();
+            var entries = DiagnosticEnvelope.Build(result.Diagnostics, declarationIds);
+
+            var diagnosticsByCategory = new Dictionary<string, List<EnvelopeDiagnostic>>();
+            for (var i = 0; i < diagnosticList.Count; i++)
+            {
+                var category = CategorizeIssue(diagnosticList[i].Code);
+                if (!diagnosticsByCategory.TryGetValue(category, out var list))
                 {
-                    Code = d.Code.ToString(),
-                    Message = d.Message,
-                    Severity = d.IsError ? "error" : "warning",
-                    Line = d.Span.Line,
-                    Column = d.Span.Column
-                }).ToList());
+                    list = new List<EnvelopeDiagnostic>();
+                    diagnosticsByCategory[category] = list;
+                }
+                list.Add(entries[i]);
+            }
 
             var output = new SecurityOutput
             {
@@ -821,17 +837,18 @@ public sealed class AnalyzeTool : McpToolBase
         [JsonPropertyName("summary")]
         public required AnalysisSummaryOutput Summary { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries, grouped by category.</summary>
         [JsonPropertyName("securityIssues")]
-        public required List<IssueOutput> SecurityIssues { get; init; }
+        public required List<EnvelopeDiagnostic> SecurityIssues { get; init; }
 
         [JsonPropertyName("bugPatterns")]
-        public required List<IssueOutput> BugPatterns { get; init; }
+        public required List<EnvelopeDiagnostic> BugPatterns { get; init; }
 
         [JsonPropertyName("dataflowIssues")]
-        public required List<IssueOutput> DataflowIssues { get; init; }
+        public required List<EnvelopeDiagnostic> DataflowIssues { get; init; }
 
         [JsonPropertyName("otherIssues")]
-        public required List<IssueOutput> OtherIssues { get; init; }
+        public required List<EnvelopeDiagnostic> OtherIssues { get; init; }
     }
 
     private sealed class AnalysisSummaryOutput
@@ -850,24 +867,6 @@ public sealed class AnalyzeTool : McpToolBase
 
         [JsonPropertyName("durationMs")]
         public int DurationMs { get; init; }
-    }
-
-    private sealed class IssueOutput
-    {
-        [JsonPropertyName("code")]
-        public required string Code { get; init; }
-
-        [JsonPropertyName("message")]
-        public required string Message { get; init; }
-
-        [JsonPropertyName("severity")]
-        public required string Severity { get; init; }
-
-        [JsonPropertyName("line")]
-        public int Line { get; init; }
-
-        [JsonPropertyName("column")]
-        public int Column { get; init; }
     }
 
     // ── DTOs: Assess ───────────────────────────────────────────────────
