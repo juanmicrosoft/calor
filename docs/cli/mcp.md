@@ -185,14 +185,17 @@ Type check Calor source code. Returns type errors with precise locations and cat
     {
       "code": "Calor0200",
       "message": "Type mismatch: expected i32, got str",
-      "line": 5,
-      "column": 10,
       "severity": "error",
-      "category": "type_mismatch"
+      "location": { "file": "mcp-typecheck.calr", "line": 5, "column": 10, "length": 3 },
+      "declarationId": "f001"
     }
-  ]
+  ],
+  "categories": ["type_mismatch"]
 }
 ```
+
+`typeErrors[]` entries are [envelope schema v1.1](/calor/cli/envelope-schema/)
+diagnostic entries; `categories[i]` categorizes `typeErrors[i]`.
 
 **Error Categories:** `type_mismatch`, `undefined_reference`, `duplicate_definition`, `invalid_reference`, `other`
 
@@ -238,16 +241,17 @@ Get machine-readable diagnostics from Calor source code. Includes suggestions an
   "warningCount": 0,
   "diagnostics": [
     {
-      "severity": "error",
       "code": "Calor0106",
       "message": "Unknown operator 'cotains'. Did you mean 'contains'?",
-      "line": 1,
-      "column": 40,
+      "severity": "error",
+      "location": { "file": "mcp-input.calr", "line": 1, "column": 40, "length": 7 },
+      "declarationId": "f001",
       "suggestion": "Replace 'cotains' with 'contains'",
       "fix": {
         "description": "Replace 'cotains' with 'contains'",
         "edits": [
           {
+            "filePath": "mcp-input.calr",
             "startLine": 1,
             "startColumn": 40,
             "endLine": 1,
@@ -255,6 +259,29 @@ Get machine-readable diagnostics from Calor source code. Includes suggestions an
             "newText": "contains"
           }
         ]
+      }
+    }
+  ]
+}
+```
+
+`diagnostics[]` entries are [envelope schema v1.1](/calor/cli/envelope-schema/)
+diagnostic entries. Diagnostics with no compiler-provided suggestion may be
+accompanied by a sibling `hints[]` array of common-mistake guidance, keyed by
+`(line, column, code)`:
+
+```json
+{
+  "hints": [
+    {
+      "line": 1,
+      "column": 33,
+      "code": "Calor0200",
+      "commonMistake": {
+        "id": "missing-operators",
+        "title": "Using an undefined function",
+        "suggestion": "…",
+        "correctExample": "…"
       }
     }
   ]

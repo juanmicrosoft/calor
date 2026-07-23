@@ -107,7 +107,7 @@ public sealed class EditPreviewTool : McpToolBase
         {
             compilationResult.OriginalCompiles = originalParse.IsSuccess;
             compilationResult.ModifiedCompiles = modifiedParse.IsSuccess;
-            compilationResult.Errors = modifiedParse.IsSuccess ? new List<string>() : modifiedParse.Errors.ToList();
+            compilationResult.Errors = BuildParseErrorEnvelope(modifiedParse);
         }
 
         // Contract verification
@@ -148,6 +148,33 @@ public sealed class EditPreviewTool : McpToolBase
             OverallVerdict = verdict,
             Recommendations = recommendations
         }));
+    }
+
+    /// <summary>
+    /// Parse errors of the modified source as envelope schema v1.1 entries
+    /// (shared EnvelopeDiagnostic shape). Parsing failed, so there is no AST and
+    /// declarationId is null. Falls back to message-only entries for failures
+    /// that produced no diagnostic bag (e.g. file-not-found).
+    /// </summary>
+    private static List<EnvelopeDiagnostic> BuildParseErrorEnvelope(ParseResult parse)
+    {
+        if (parse.IsSuccess)
+            return new List<EnvelopeDiagnostic>();
+
+        if (parse.Diagnostics != null)
+        {
+            return DiagnosticEnvelope.Build(parse.Diagnostics)
+                .Where(e => e.Severity == "error")
+                .ToList();
+        }
+
+        return parse.Errors.Select(message => new EnvelopeDiagnostic
+        {
+            Code = DiagnosticCode.CliInternalError,
+            Message = message,
+            Severity = "error",
+            Location = new EnvelopeLocation { File = null, Line = 1, Column = 1, Length = 0 }
+        }).ToList();
     }
 
     private static EditSummaryInfo ComputeEditSummary(string original, string modified,
@@ -371,7 +398,8 @@ public sealed class EditPreviewTool : McpToolBase
         [JsonPropertyName("checked")] public bool Checked { get; set; }
         [JsonPropertyName("originalCompiles")] public bool OriginalCompiles { get; set; }
         [JsonPropertyName("modifiedCompiles")] public bool ModifiedCompiles { get; set; }
-        [JsonPropertyName("errors")] public List<string> Errors { get; set; } = new();
+        /// <summary>Envelope schema v1.1 diagnostic entries for parse errors of the modified source.</summary>
+        [JsonPropertyName("errors")] public List<EnvelopeDiagnostic> Errors { get; set; } = new();
     }
 
     private sealed class ContractCheckResult

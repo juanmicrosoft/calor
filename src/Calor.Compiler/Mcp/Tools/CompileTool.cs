@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
 
@@ -232,46 +234,20 @@ public sealed class CompileTool : McpToolBase
                     source = fixedSource;
             }
 
-            // Build fix lookup from diagnostics-with-fixes (same pattern as CheckTool)
-            var fixLookup = result.Diagnostics.DiagnosticsWithFixes
-                .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
-                .ToDictionary(g => g.Key, g => g.First());
+            // Envelope schema v1.1: diagnostics are the shared EnvelopeDiagnostic
+            // entries; a resolver built from the parsed AST populates declarationId.
+            DeclarationIdResolver? declarationIds = null;
+            if (result.Ast != null)
+            {
+                declarationIds = new DeclarationIdResolver();
+                declarationIds.AddFile(filePath, source, result.Ast);
+            }
 
             var output = new CompileToolOutput
             {
                 Success = !result.HasErrors,
                 GeneratedCode = result.HasErrors ? null : result.GeneratedCode,
-                Diagnostics = result.Diagnostics.Select(d =>
-                {
-                    var diagOutput = new DiagnosticOutput
-                    {
-                        Severity = d.IsError ? "error" : "warning",
-                        Code = d.Code.ToString(),
-                        Message = d.Message,
-                        Line = d.Span.Line,
-                        Column = d.Span.Column
-                    };
-
-                    // Attach fix if available
-                    var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
-                    if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
-                    {
-                        diagOutput.Fix = new FixOutput
-                        {
-                            Description = diagnosticWithFix.Fix.Description,
-                            Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditOutput
-                            {
-                                StartLine = e.StartLine,
-                                StartColumn = e.StartColumn,
-                                EndLine = e.EndLine,
-                                EndColumn = e.EndColumn,
-                                NewText = e.NewText
-                            }).ToList()
-                        };
-                    }
-
-                    return diagOutput;
-                }).ToList()
+                Diagnostics = DiagnosticEnvelope.Build(result.Diagnostics, declarationIds)
             };
 
             // Add autoFix results if fixes were applied
@@ -514,8 +490,9 @@ public sealed class CompileTool : McpToolBase
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? GeneratedCode { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("diagnostics")]
-        public required List<DiagnosticOutput> Diagnostics { get; init; }
+        public required List<EnvelopeDiagnostic> Diagnostics { get; init; }
 
         [JsonPropertyName("verificationSummary")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -536,55 +513,6 @@ public sealed class CompileTool : McpToolBase
         [JsonPropertyName("fixesApplied")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<string>? FixesApplied { get; set; }
-    }
-
-    private sealed class DiagnosticOutput
-    {
-        [JsonPropertyName("severity")]
-        public required string Severity { get; init; }
-
-        [JsonPropertyName("code")]
-        public required string Code { get; init; }
-
-        [JsonPropertyName("message")]
-        public required string Message { get; init; }
-
-        [JsonPropertyName("line")]
-        public int Line { get; init; }
-
-        [JsonPropertyName("column")]
-        public int Column { get; init; }
-
-        [JsonPropertyName("fix")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public FixOutput? Fix { get; set; }
-    }
-
-    private sealed class FixOutput
-    {
-        [JsonPropertyName("description")]
-        public required string Description { get; init; }
-
-        [JsonPropertyName("edits")]
-        public required List<EditOutput> Edits { get; init; }
-    }
-
-    private sealed class EditOutput
-    {
-        [JsonPropertyName("startLine")]
-        public int StartLine { get; init; }
-
-        [JsonPropertyName("startColumn")]
-        public int StartColumn { get; init; }
-
-        [JsonPropertyName("endLine")]
-        public int EndLine { get; init; }
-
-        [JsonPropertyName("endColumn")]
-        public int EndColumn { get; init; }
-
-        [JsonPropertyName("newText")]
-        public required string NewText { get; init; }
     }
 
     private sealed class VerificationSummaryOutput

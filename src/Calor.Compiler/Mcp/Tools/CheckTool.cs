@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Init;
 using Calor.Compiler.Parsing;
 
@@ -148,7 +149,7 @@ public sealed class CheckTool : McpToolBase
             };
 
             var result = Program.Compile(source, "mcp-input.calr", compileOptions);
-            var diagnostics = BuildDiagnoseDiagnostics(result);
+            var (diagnostics, hints) = BuildDiagnoseDiagnostics(result, source);
 
             string? fixedSource = null;
             var fixesApplied = 0;
@@ -178,7 +179,7 @@ public sealed class CheckTool : McpToolBase
                             // diagnostics (so coordinates match fixedSource)
                             // and derive success/isError from the recheck.
                             result = recheck;
-                            diagnostics = BuildDiagnoseDiagnostics(recheck);
+                            (diagnostics, hints) = BuildDiagnoseDiagnostics(recheck, candidate);
                         }
                     }
                 }
@@ -190,6 +191,7 @@ public sealed class CheckTool : McpToolBase
                 ErrorCount = diagnostics.Count(d => d.Severity == "error"),
                 WarningCount = diagnostics.Count(d => d.Severity == "warning"),
                 Diagnostics = diagnostics,
+                Hints = hints.Count > 0 ? hints : null,
                 FixedSource = fixedSource,
                 FixesApplied = applyFixes ? fixesApplied : null,
                 Healed = healed ? true : null
@@ -204,51 +206,43 @@ public sealed class CheckTool : McpToolBase
     }
 
     /// <summary>
-    /// Projects a compilation's diagnostics (with any machine-applicable
-    /// fixes and common-mistake hints) into the diagnose response shape.
+    /// Projects a compilation's diagnostics into envelope schema v1.1 entries
+    /// (shared EnvelopeDiagnostic shape, machine-applicable fixes joined by the
+    /// shared builder) plus a sibling hint list carrying common-mistake guidance
+    /// for diagnostics that have no compiler-provided suggestion.
     /// </summary>
-    private static List<DiagnoseDiagnosticOutput> BuildDiagnoseDiagnostics(CompilationResult result)
+    private static (List<EnvelopeDiagnostic> Diagnostics, List<HintOutput> Hints) BuildDiagnoseDiagnostics(
+        CompilationResult result, string source)
     {
-        var fixLookup = result.Diagnostics.DiagnosticsWithFixes
-            .GroupBy(dwf => (dwf.Span.Line, dwf.Span.Column, dwf.Code, dwf.Message))
-            .ToDictionary(g => g.Key, g => g.First());
-
-        return result.Diagnostics.Select(d =>
+        DeclarationIdResolver? declarationIds = null;
+        if (result.Ast != null)
         {
-            var diagOutput = new DiagnoseDiagnosticOutput
-            {
-                Severity = d.IsError ? "error" : "warning",
-                Code = d.Code.ToString(),
-                Message = d.Message,
-                Line = d.Span.Line,
-                Column = d.Span.Column
-            };
+            declarationIds = new DeclarationIdResolver();
+            declarationIds.AddFile("mcp-input.calr", source, result.Ast);
+        }
 
-            var key = (d.Span.Line, d.Span.Column, d.Code, d.Message);
-            if (fixLookup.TryGetValue(key, out var diagnosticWithFix))
+        var entries = DiagnosticEnvelope.Build(result.Diagnostics, declarationIds);
+
+        var hints = new List<HintOutput>();
+        foreach (var entry in entries)
+        {
+            if (entry.Suggestion != null)
+                continue;
+
+            var commonMistake = FindCommonMistake(entry.Message, entry.Code);
+            if (commonMistake != null)
             {
-                diagOutput.Suggestion = diagnosticWithFix.Fix.Description;
-                diagOutput.Fix = new FixOutput
+                hints.Add(new HintOutput
                 {
-                    Description = diagnosticWithFix.Fix.Description,
-                    Edits = diagnosticWithFix.Fix.Edits.Select(e => new EditOutput
-                    {
-                        StartLine = e.StartLine,
-                        StartColumn = e.StartColumn,
-                        EndLine = e.EndLine,
-                        EndColumn = e.EndColumn,
-                        NewText = e.NewText
-                    }).ToList()
-                };
+                    Line = entry.Location.Line,
+                    Column = entry.Location.Column,
+                    Code = entry.Code,
+                    CommonMistake = commonMistake
+                });
             }
+        }
 
-            if (diagOutput.Suggestion == null)
-            {
-                diagOutput.CommonMistake = FindCommonMistake(d.Message, d.Code.ToString());
-            }
-
-            return diagOutput;
-        }).ToList();
+        return (entries, hints);
     }
 
     private static string ApplyFixes(string source, IReadOnlyList<DiagnosticWithFix> diagnosticsWithFixes, out int fixesApplied)
@@ -457,7 +451,7 @@ public sealed class CheckTool : McpToolBase
             return new LintResult
             {
                 ParseSuccess = false,
-                ParseErrors = diagnostics.Errors.Select(e => e.Message).ToList(),
+                ParseErrors = BuildParseErrorEnvelope(diagnostics),
                 Issues = issues,
                 OriginalContent = source,
                 FixedContent = source
@@ -472,7 +466,7 @@ public sealed class CheckTool : McpToolBase
             return new LintResult
             {
                 ParseSuccess = false,
-                ParseErrors = diagnostics.Errors.Select(e => e.Message).ToList(),
+                ParseErrors = BuildParseErrorEnvelope(diagnostics),
                 Issues = issues,
                 OriginalContent = source,
                 FixedContent = source
@@ -485,11 +479,19 @@ public sealed class CheckTool : McpToolBase
         return new LintResult
         {
             ParseSuccess = true,
-            ParseErrors = new List<string>(),
+            ParseErrors = new List<EnvelopeDiagnostic>(),
             Issues = issues,
             OriginalContent = source,
             FixedContent = fixedContent
         };
+    }
+
+    /// <summary>Envelope schema v1.1 entries for a bag's errors (no AST, so declarationId stays null).</summary>
+    private static List<EnvelopeDiagnostic> BuildParseErrorEnvelope(DiagnosticBag diagnostics)
+    {
+        return DiagnosticEnvelope.Build(diagnostics)
+            .Where(e => e.Severity == "error")
+            .ToList();
     }
 
     // ===== Typecheck =====
@@ -514,31 +516,25 @@ public sealed class CheckTool : McpToolBase
 
             var result = Program.Compile(source, filePath, options);
 
-            var typeErrors = new List<TypeErrorOutput>();
-            foreach (var diag in result.Diagnostics)
+            // Envelope schema v1.1 entries plus a parallel categories array
+            // (categories[i] categorizes typeErrors[i]).
+            DeclarationIdResolver? declarationIds = null;
+            if (result.Ast != null)
             {
-                typeErrors.Add(new TypeErrorOutput
-                {
-                    Code = diag.Code,
-                    Message = diag.Message,
-                    Line = diag.Span.Line,
-                    Column = diag.Span.Column,
-                    Severity = diag.Severity switch
-                    {
-                        DiagnosticSeverity.Error => "error",
-                        DiagnosticSeverity.Warning => "warning",
-                        _ => "info"
-                    },
-                    Category = CategorizeError(diag.Code)
-                });
+                declarationIds = new DeclarationIdResolver();
+                declarationIds.AddFile(filePath, source, result.Ast);
             }
+
+            var typeErrors = DiagnosticEnvelope.Build(result.Diagnostics, declarationIds);
+            var categories = result.Diagnostics.Select(d => CategorizeError(d.Code)).ToList();
 
             var output = new TypeCheckOutput
             {
                 Success = !result.HasErrors,
                 ErrorCount = typeErrors.Count(e => e.Severity == "error"),
                 WarningCount = typeErrors.Count(e => e.Severity == "warning"),
-                TypeErrors = typeErrors
+                TypeErrors = typeErrors,
+                Categories = categories
             };
 
             return Task.FromResult(McpToolResult.Json(output, isError: result.HasErrors));
@@ -713,21 +709,31 @@ public sealed class CheckTool : McpToolBase
         return new SnippetContext(location, returnType, parameters, surroundingCode);
     }
 
-    private static List<ValidateDiagnosticOutput> FilterAndAdjustDiagnostics(DiagnosticBag diagnostics, SnippetWrapper wrapper)
+    /// <summary>
+    /// Filters diagnostics to the snippet region and rebases them to
+    /// snippet-relative coordinates, as envelope schema v1.1 entries. The
+    /// wrapped source is synthetic, so location.file and declarationId are null.
+    /// </summary>
+    private static List<EnvelopeDiagnostic> FilterAndAdjustDiagnostics(DiagnosticBag diagnostics, SnippetWrapper wrapper)
     {
-        var result = new List<ValidateDiagnosticOutput>();
+        var result = new List<EnvelopeDiagnostic>();
 
         foreach (var d in diagnostics.Errors.Concat(diagnostics.Warnings))
         {
             if (wrapper.IsInSnippet(d.Span.Line, d.Span.Column))
             {
-                result.Add(new ValidateDiagnosticOutput
+                result.Add(new EnvelopeDiagnostic
                 {
-                    Severity = d.IsError ? "error" : "warning",
                     Code = d.Code,
                     Message = d.Message,
-                    Line = wrapper.AdjustLine(d.Span.Line),
-                    Column = wrapper.AdjustColumn(d.Span.Line, d.Span.Column)
+                    Severity = d.Severity.ToString().ToLowerInvariant(),
+                    Location = new EnvelopeLocation
+                    {
+                        File = null,
+                        Line = wrapper.AdjustLine(d.Span.Line),
+                        Column = wrapper.AdjustColumn(d.Span.Line, d.Span.Column),
+                        Length = d.Span.Length
+                    }
                 });
             }
         }
@@ -750,8 +756,17 @@ public sealed class CheckTool : McpToolBase
         [JsonPropertyName("warningCount")]
         public int WarningCount { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("diagnostics")]
-        public required List<DiagnoseDiagnosticOutput> Diagnostics { get; init; }
+        public required List<EnvelopeDiagnostic> Diagnostics { get; init; }
+
+        /// <summary>
+        /// Common-mistake guidance for diagnostics that carry no compiler
+        /// suggestion, keyed by (line, column, code) of the matching entry.
+        /// </summary>
+        [JsonPropertyName("hints")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<HintOutput>? Hints { get; init; }
 
         [JsonPropertyName("fixedSource")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -773,34 +788,19 @@ public sealed class CheckTool : McpToolBase
         public bool? Healed { get; init; }
     }
 
-    private sealed class DiagnoseDiagnosticOutput
+    private sealed class HintOutput
     {
-        [JsonPropertyName("severity")]
-        public required string Severity { get; init; }
-
-        [JsonPropertyName("code")]
-        public required string Code { get; init; }
-
-        [JsonPropertyName("message")]
-        public required string Message { get; init; }
-
         [JsonPropertyName("line")]
         public int Line { get; init; }
 
         [JsonPropertyName("column")]
         public int Column { get; init; }
 
-        [JsonPropertyName("suggestion")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Suggestion { get; set; }
-
-        [JsonPropertyName("fix")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public FixOutput? Fix { get; set; }
+        [JsonPropertyName("code")]
+        public required string Code { get; init; }
 
         [JsonPropertyName("commonMistake")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public CommonMistakeOutput? CommonMistake { get; set; }
+        public required CommonMistakeOutput CommonMistake { get; init; }
     }
 
     private sealed class CommonMistakeOutput
@@ -818,39 +818,12 @@ public sealed class CheckTool : McpToolBase
         public required string CorrectExample { get; init; }
     }
 
-    private sealed class FixOutput
-    {
-        [JsonPropertyName("description")]
-        public required string Description { get; init; }
-
-        [JsonPropertyName("edits")]
-        public required List<EditOutput> Edits { get; init; }
-    }
-
-    private sealed class EditOutput
-    {
-        [JsonPropertyName("startLine")]
-        public int StartLine { get; init; }
-
-        [JsonPropertyName("startColumn")]
-        public int StartColumn { get; init; }
-
-        [JsonPropertyName("endLine")]
-        public int EndLine { get; init; }
-
-        [JsonPropertyName("endColumn")]
-        public int EndColumn { get; init; }
-
-        [JsonPropertyName("newText")]
-        public required string NewText { get; init; }
-    }
-
     // --- Lint ---
 
     private sealed class LintResult
     {
         public bool ParseSuccess { get; init; }
-        public required List<string> ParseErrors { get; init; }
+        public required List<EnvelopeDiagnostic> ParseErrors { get; init; }
         public required List<LintIssue> Issues { get; init; }
         public required string OriginalContent { get; init; }
         public required string FixedContent { get; init; }
@@ -872,9 +845,10 @@ public sealed class CheckTool : McpToolBase
         [JsonPropertyName("issues")]
         public required List<LintIssueOutput> Issues { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries for parse errors.</summary>
         [JsonPropertyName("parseErrors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<string>? ParseErrors { get; init; }
+        public List<EnvelopeDiagnostic>? ParseErrors { get; init; }
 
         [JsonPropertyName("fixedCode")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -903,29 +877,13 @@ public sealed class CheckTool : McpToolBase
         [JsonPropertyName("warningCount")]
         public int WarningCount { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("typeErrors")]
-        public required List<TypeErrorOutput> TypeErrors { get; init; }
-    }
+        public required List<EnvelopeDiagnostic> TypeErrors { get; init; }
 
-    private sealed class TypeErrorOutput
-    {
-        [JsonPropertyName("code")]
-        public required string Code { get; init; }
-
-        [JsonPropertyName("message")]
-        public required string Message { get; init; }
-
-        [JsonPropertyName("line")]
-        public int Line { get; init; }
-
-        [JsonPropertyName("column")]
-        public int Column { get; init; }
-
-        [JsonPropertyName("severity")]
-        public required string Severity { get; init; }
-
-        [JsonPropertyName("category")]
-        public required string Category { get; init; }
+        /// <summary>Parallel to typeErrors: categories[i] categorizes typeErrors[i].</summary>
+        [JsonPropertyName("categories")]
+        public required List<string> Categories { get; init; }
     }
 
     // --- Validate ---
@@ -941,8 +899,9 @@ public sealed class CheckTool : McpToolBase
         [JsonPropertyName("snippet")]
         public required string Snippet { get; init; }
 
+        /// <summary>Envelope schema v1.1 entries with snippet-relative locations.</summary>
         [JsonPropertyName("diagnostics")]
-        public required List<ValidateDiagnosticOutput> Diagnostics { get; init; }
+        public required List<EnvelopeDiagnostic> Diagnostics { get; init; }
 
         [JsonPropertyName("validationLevel")]
         public required string ValidationLevel { get; init; }
@@ -954,24 +913,6 @@ public sealed class CheckTool : McpToolBase
         [JsonPropertyName("warnings")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public IReadOnlyList<string>? Warnings { get; init; }
-    }
-
-    private sealed class ValidateDiagnosticOutput
-    {
-        [JsonPropertyName("severity")]
-        public required string Severity { get; init; }
-
-        [JsonPropertyName("code")]
-        public required string Code { get; init; }
-
-        [JsonPropertyName("message")]
-        public required string Message { get; init; }
-
-        [JsonPropertyName("line")]
-        public int Line { get; init; }
-
-        [JsonPropertyName("column")]
-        public int Column { get; init; }
     }
 
     private sealed class TokenOutput

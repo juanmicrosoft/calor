@@ -7,7 +7,8 @@ namespace Calor.Compiler.Tests.Mcp;
 /// <summary>
 /// Tests for DiagnoseTool commonMistake enrichment.
 /// When the compiler returns an error that matches a known common mistake pattern,
-/// the diagnostic output should include a commonMistake field with guidance.
+/// the tool output should include a hints[] entry with commonMistake guidance,
+/// keyed by (line, column, code) of the matching envelope diagnostic.
 /// </summary>
 public class DiagnoseToolCommonMistakeTests
 {
@@ -33,12 +34,17 @@ public class DiagnoseToolCommonMistakeTests
         Assert.True(json.GetProperty("errorCount").GetInt32() > 0,
             $"Expected errors for undefined function. Full output: {text}");
 
-        // Look for a diagnostic with commonMistake enrichment
+        // Look for a hints[] entry with commonMistake enrichment
         var foundCommonMistake = false;
-        foreach (var diagnostic in json.GetProperty("diagnostics").EnumerateArray())
+        if (json.TryGetProperty("hints", out var hints))
         {
-            if (diagnostic.TryGetProperty("commonMistake", out var cm))
+            foreach (var hint in hints.EnumerateArray())
             {
+                Assert.True(hint.TryGetProperty("line", out _));
+                Assert.True(hint.TryGetProperty("column", out _));
+                Assert.True(hint.TryGetProperty("code", out _));
+
+                var cm = hint.GetProperty("commonMistake");
                 foundCommonMistake = true;
                 Assert.NotEmpty(cm.GetProperty("id").GetString()!);
                 Assert.NotEmpty(cm.GetProperty("title").GetString()!);
@@ -83,12 +89,9 @@ public class DiagnoseToolCommonMistakeTests
 
         Assert.True(json.GetProperty("success").GetBoolean());
 
-        // No diagnostics, so no commonMistake fields
-        foreach (var diagnostic in json.GetProperty("diagnostics").EnumerateArray())
-        {
-            Assert.False(diagnostic.TryGetProperty("commonMistake", out _),
-                "Valid code should not have commonMistake enrichment");
-        }
+        // No diagnostics, so no hints[] with commonMistake guidance
+        Assert.False(json.TryGetProperty("hints", out _),
+            "Valid code should not have commonMistake hints");
     }
 
     [Fact]
@@ -112,9 +115,22 @@ public class DiagnoseToolCommonMistakeTests
         if (diagnostic.TryGetProperty("suggestion", out _) &&
             diagnostic.TryGetProperty("fix", out _))
         {
-            // The commonMistake should NOT be present when the compiler already has a fix
-            Assert.False(diagnostic.TryGetProperty("commonMistake", out _),
-                "When a compiler fix exists, commonMistake should not be added");
+            // No hint should target this diagnostic when the compiler already has a fix
+            var line = diagnostic.GetProperty("location").GetProperty("line").GetInt32();
+            var column = diagnostic.GetProperty("location").GetProperty("column").GetInt32();
+            var code = diagnostic.GetProperty("code").GetString();
+
+            if (json.TryGetProperty("hints", out var hints))
+            {
+                foreach (var hint in hints.EnumerateArray())
+                {
+                    var matches = hint.GetProperty("line").GetInt32() == line
+                        && hint.GetProperty("column").GetInt32() == column
+                        && hint.GetProperty("code").GetString() == code;
+                    Assert.False(matches,
+                        "When a compiler fix exists, no commonMistake hint should target that diagnostic");
+                }
+            }
         }
     }
 }

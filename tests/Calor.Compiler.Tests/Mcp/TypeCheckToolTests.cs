@@ -151,12 +151,17 @@ public class TypeCheckToolTests
         var typeErrors = json.RootElement.GetProperty("typeErrors");
         Assert.True(typeErrors.GetArrayLength() > 0);
 
+        // Categories are parallel to typeErrors: categories[i] categorizes typeErrors[i]
+        var categories = json.RootElement.GetProperty("categories");
+        Assert.Equal(typeErrors.GetArrayLength(), categories.GetArrayLength());
+
         // Find the undefined reference error
         var hasUndefinedRef = false;
-        foreach (var error in typeErrors.EnumerateArray())
+        for (var i = 0; i < typeErrors.GetArrayLength(); i++)
         {
-            if (error.GetProperty("category").GetString() == "undefined_reference")
+            if (categories[i].GetString() == "undefined_reference")
             {
+                var error = typeErrors[i];
                 hasUndefinedRef = true;
                 Assert.Equal("Calor0200", error.GetProperty("code").GetString());
                 Assert.Contains("undefinedVar", error.GetProperty("message").GetString());
@@ -190,12 +195,15 @@ public class TypeCheckToolTests
         var typeErrors = json.RootElement.GetProperty("typeErrors");
         Assert.True(typeErrors.GetArrayLength() > 0);
 
+        var categories = json.RootElement.GetProperty("categories");
+
         // Find the type mismatch error
         var hasTypeMismatch = false;
-        foreach (var error in typeErrors.EnumerateArray())
+        for (var i = 0; i < typeErrors.GetArrayLength(); i++)
         {
-            if (error.GetProperty("category").GetString() == "type_mismatch")
+            if (categories[i].GetString() == "type_mismatch")
             {
+                var error = typeErrors[i];
                 hasTypeMismatch = true;
                 Assert.Equal("Calor0202", error.GetProperty("code").GetString());
                 // #741: diagnostics surface-spell types, so the message says 'bool', not 'BOOL'.
@@ -226,11 +234,10 @@ public class TypeCheckToolTests
         var errorCount = json.RootElement.GetProperty("errorCount").GetInt32();
         Assert.True(errorCount >= 2, $"Expected at least 2 errors, got {errorCount}");
 
-        var typeErrors = json.RootElement.GetProperty("typeErrors");
         var categories = new HashSet<string>();
-        foreach (var error in typeErrors.EnumerateArray())
+        foreach (var category in json.RootElement.GetProperty("categories").EnumerateArray())
         {
-            categories.Add(error.GetProperty("category").GetString()!);
+            categories.Add(category.GetString()!);
         }
 
         Assert.Contains("type_mismatch", categories);
@@ -257,9 +264,11 @@ public class TypeCheckToolTests
         var typeErrors = json.RootElement.GetProperty("typeErrors");
         Assert.True(typeErrors.GetArrayLength() > 0);
 
+        // Envelope schema v1.1: line/column live under location
         var firstError = typeErrors[0];
-        Assert.True(firstError.TryGetProperty("line", out var line));
-        Assert.True(firstError.TryGetProperty("column", out var column));
+        Assert.True(firstError.TryGetProperty("location", out var location));
+        Assert.True(location.TryGetProperty("line", out var line));
+        Assert.True(location.TryGetProperty("column", out var column));
         Assert.True(line.GetInt32() > 0, "Line should be positive");
         Assert.True(column.GetInt32() >= 0, "Column should be non-negative");
     }

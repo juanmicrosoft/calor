@@ -141,9 +141,15 @@ public sealed class RefineTool : McpToolBase
                     FunctionId = o.FunctionId,
                     Description = o.Description,
                     Status = o.Status.ToString(),
+                    // Five-status wire name (envelope schema v1.1); null while
+                    // Pending and for Boundary obligations (never solver-checked).
+                    ProofStatus = o.Outcome?.StatusName,
                     Line = o.Span.Line,
                     Column = o.Span.Column,
                     Counterexample = o.CounterexampleDescription,
+                    CounterexampleBindings = o.Outcome?.Counterexample?.Bindings
+                        .Select(b => new EnvelopeBinding { Name = b.Name, Value = b.Value })
+                        .ToList(),
                     SuggestedFix = o.SuggestedFix,
                     SolverDurationMs = o.SolverDuration?.TotalMilliseconds
                 }).ToList(),
@@ -640,6 +646,11 @@ public sealed class RefineTool : McpToolBase
         [JsonPropertyName("status")]
         public required string Status { get; init; }
 
+        /// <summary>Five-status wire name (proven|refuted|unknown|timeout|unsupported); null while pending/boundary.</summary>
+        [JsonPropertyName("proof_status")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ProofStatus { get; init; }
+
         [JsonPropertyName("line")]
         public int Line { get; init; }
 
@@ -649,6 +660,11 @@ public sealed class RefineTool : McpToolBase
         [JsonPropertyName("counterexample")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Counterexample { get; init; }
+
+        /// <summary>Structured counterexample bindings from the choke-point outcome.</summary>
+        [JsonPropertyName("counterexample_bindings")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<EnvelopeBinding>? CounterexampleBindings { get; init; }
 
         [JsonPropertyName("suggested_fix")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
