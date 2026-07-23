@@ -148,49 +148,62 @@ calor assess ./src --format json --output assessment.json
 
 ```json
 {
-  "version": "1.0",
-  "analyzedAt": "2025-01-15T10:30:00Z",
-  "rootPath": "/path/to/src",
-  "durationMs": 1234,
+  "version": "1.1",
+  "command": "assess",
+  "diagnostics": [],
   "summary": {
-    "totalFiles": 42,
-    "skippedFiles": 8,
-    "averageScore": 34.2,
-    "priorityBreakdown": {
-      "critical": 2,
-      "high": 8,
-      "medium": 18,
-      "low": 14
-    },
-    "averagesByDimension": {
-      "ContractPotential": 38.1,
-      "EffectPotential": 28.4,
-      "NullSafetyPotential": 35.6,
-      "ErrorHandlingPotential": 45.2,
-      "PatternMatchPotential": 12.3,
-      "ApiComplexityPotential": 22.1,
-      "AsyncPotential": 24.5,
-      "LinqPotential": 15.8
-    }
+    "total": 0,
+    "errors": 0,
+    "warnings": 0,
+    "info": 0
   },
-  "files": [
-    {
-      "path": "Services/PaymentProcessor.cs",
-      "score": 82.3,
-      "priority": "critical",
-      "lineCount": 245,
-      "methodCount": 12,
-      "typeCount": 1,
-      "dimensions": {
-        "ContractPotential": {
-          "score": 88.0,
-          "weight": 0.18,
-          "patternCount": 8,
-          "examples": ["throw new ArgumentNullException(...)", "if (...) throw validation"]
+  "data": {
+    "analyzedAt": "2025-01-15T10:30:00Z",
+    "rootPath": "/path/to/src",
+    "durationMs": 1234,
+    "summary": {
+      "totalFiles": 42,
+      "skippedFiles": 8,
+      "averageScore": 34.2,
+      "priorityBreakdown": {
+        "critical": 2,
+        "high": 8,
+        "medium": 18,
+        "low": 14
+      },
+      "averagesByDimension": {
+        "ContractPotential": 38.1,
+        "EffectPotential": 28.4,
+        "NullSafetyPotential": 35.6,
+        "ErrorHandlingPotential": 45.2,
+        "PatternMatchPotential": 12.3,
+        "ApiComplexityPotential": 22.1,
+        "AsyncPotential": 24.5,
+        "LinqPotential": 15.8
+      }
+    },
+    "files": [
+      {
+        "path": "Services/PaymentProcessor.cs",
+        "score": 82.3,
+        "priority": "critical",
+        "lineCount": 245,
+        "methodCount": 12,
+        "typeCount": 1,
+        "dimensions": {
+          "ContractPotential": {
+            "score": 88.0,
+            "weight": 0.18,
+            "patternCount": 8,
+            "examples": [
+              "throw new ArgumentNullException(...)",
+              "if (...) throw validation"
+            ]
+          }
         }
       }
-    }
-  ]
+    ]
+  }
 }
 ```
 

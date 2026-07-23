@@ -247,7 +247,6 @@ public static class AssessCommand
     {
         var output = new JsonOutput
         {
-            Version = "1.0",
             AnalyzedAt = result.AnalyzedAt,
             RootPath = result.RootPath,
             DurationMs = (int)result.Duration.TotalMilliseconds,
@@ -288,12 +287,33 @@ public static class AssessCommand
                 .ToList()
         };
 
-        return JsonSerializer.Serialize(output, new JsonSerializerOptions
+        // Envelope schema v1.1 (loop plan D1.3): assess emits no source-anchored
+        // diagnostics, so the document carries an empty diagnostics array and the
+        // assessment payload under data.
+        var envelope = new EnvelopeDocument
+        {
+            Version = JsonDiagnosticFormatter.SchemaVersion,
+            Command = "assess",
+            Diagnostics = [],
+            Summary = new EnvelopeSummary(),
+            Data = output
+        };
+
+        return JsonSerializer.Serialize(envelope, new JsonSerializerOptions
         {
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         });
+    }
+
+    private sealed class EnvelopeDocument
+    {
+        public required string Version { get; init; }
+        public required string Command { get; init; }
+        public required List<EnvelopeDiagnostic> Diagnostics { get; init; }
+        public required EnvelopeSummary Summary { get; init; }
+        public required JsonOutput Data { get; init; }
     }
 
     /// <summary>
@@ -350,7 +370,6 @@ public static class AssessCommand
     // JSON output classes
     private sealed class JsonOutput
     {
-        public required string Version { get; init; }
         public DateTime AnalyzedAt { get; init; }
         public required string RootPath { get; init; }
         public int DurationMs { get; init; }
