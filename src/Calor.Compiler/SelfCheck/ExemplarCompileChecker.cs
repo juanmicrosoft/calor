@@ -231,6 +231,8 @@ public static class ExemplarCompileChecker
 
     private static IReadOnlyList<MetadataReference> References() => _references.Value;
 
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("SingleFile", "IL3000",
+        Justification = "Assembly.Location is checked for empty string; the reference is skipped in single-file mode.")]
     private static IReadOnlyList<MetadataReference> BuildReferences()
     {
         var tpa = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? "";
