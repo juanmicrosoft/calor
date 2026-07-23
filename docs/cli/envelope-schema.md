@@ -132,13 +132,13 @@ Classes:
 | `assess` | E | **Yes** (`--format json\|sarif`) | JSON wraps the assessment under `data`; SARIF shared |
 | `convert` | E | No (text only) | needs `--format json` |
 | `format` | E | No (text only) | needs `--format json` |
-| `ids` | E | No | `check` emits `Calor0800`-band diagnostics; `index` is data |
-| `effects` | D | No | `--json` bool, ad-hoc shapes |
-| `benchmark` | D | No | string-interpolated JSON, three shapes |
-| `coverage` | D | No | native JSON, own shape |
-| `feature-check` | D | No | native JSON, own shape |
-| `analyze-convertibility` | D | No | own shape |
-| `fix` | D | No | writes `migration.log.json`; stdout is text |
+| `ids` | E | **Yes** (`check --format json`) | `Calor0800`-band findings as envelope diagnostics with `declarationId`; `index` artifact (`calor.ids.json`) unchanged |
+| `effects` | D | **Yes** (`--json`) | resolve/list/suggest stdout wrapped under `data`; manifest file stays raw |
+| `benchmark` | D | **Yes** (`--format json`) | quick/project/full payloads under `data`; string-interpolated JSON replaced with real serialization |
+| `coverage` | D | **Yes** | `CoverageResult` under `data` |
+| `feature-check` | D | **Yes** | payloads under `data` |
+| `analyze-convertibility` | D | **Yes** | file/directory payloads under `data` |
+| `fix` | D | **Yes** (`--format json`) | operation summary under `data`; `migration.log.json` unchanged |
 | `migrate` | D | No | `--report` file, own report schema |
 | `evaluation` | X | — | internal A/B harness registry; consumed only by the epoch tooling, schema owned by `bench/` |
 | `hook` | X | — | agent-gate responses whose dialect is dictated by the host agent (`--format gemini` etc.) |
