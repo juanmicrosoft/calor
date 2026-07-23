@@ -97,12 +97,18 @@ MCP tools embed the same objects in their result DTOs.
 | `timeout` | The solver hit its time budget | `reason` carries the solver's unknown-reason string |
 | `unsupported` | Not translatable to the solver (unsupported type/construct) | `reason` carries the translation diagnosis |
 
-Every status is assigned at a single choke point —
+Every solver-evidence status is assigned at a single choke point —
 `ProofOutcome.Assign` in `src/Calor.Compiler/Verification/ProofOutcome.cs`
-(loop plan D1.2). The type's constructor is private; the conformance suite
+(loop plan D1.2). The type's constructor is private and the conformance suite
 verifies no construction site exists outside that file, which is what makes
 "no silent cliffs" a stable property rather than an enumeration of known
-fallback sites. Non-proven outcomes are always surfaced as diagnostics:
+fallback sites. **Stated precisely**: two other in-file methods also mint
+statuses — `Rehydrate` (cache/telemetry deserialization) and
+`FromLegacyContractStatus` (pre-outcome cache entries) — both restore a status
+that was originally assigned by `Assign`, carry no solver evidence of their
+own, and are confined to the same reviewed file; the guarantee is
+"single file, three documented entry points", not "the type system makes
+bypass impossible". Non-proven outcomes are always surfaced as diagnostics:
 refuted as warnings (`Calor0711`/`Calor0712`), timeout / unknown / unsupported
 as info (`Calor0717` / `Calor0716` / `Calor0718`).
 

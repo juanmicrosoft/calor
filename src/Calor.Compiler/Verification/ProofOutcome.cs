@@ -166,10 +166,14 @@ public readonly struct ProofEvidence
 
 /// <summary>
 /// The single choke point for verification status assignment (loop plan D1.2). Every
-/// verification outcome in the compiler — contracts, obligations, implication proofs —
+/// solver-evidence outcome in the compiler — contracts, obligations, implication proofs —
 /// is a <see cref="ProofOutcome"/> produced by <see cref="Assign"/>; the constructor is
-/// private so no other code path can mint a status. A conformance test enforces that
-/// <c>new ProofOutcome</c> appears nowhere outside this file.
+/// private and a conformance test enforces that <c>new ProofOutcome</c> appears nowhere
+/// outside this file. Precisely stated, this file has three status-producing entry
+/// points, not one: <see cref="Assign"/> (the only one that maps solver evidence),
+/// plus <see cref="Rehydrate"/> and <see cref="FromLegacyContractStatus"/>, which
+/// restore previously-assigned statuses from persistence and carry no evidence of
+/// their own. Callers must never route fresh solver results through the latter two.
 /// </summary>
 public sealed class ProofOutcome
 {
