@@ -87,6 +87,11 @@ public static class LintCommand
         // move to stderr so stdout stays machine-parseable.
         var structuredOutput = !format.Equals("text", StringComparison.OrdinalIgnoreCase);
         var diagnosticSink = structuredOutput ? new DiagnosticBag() : null;
+        // Span→declaration-ID resolver (envelope schema v1.1): built from each
+        // file's parsed AST so structured diagnostics carry declarationId.
+        // Files that fail to parse simply contribute no entries (their
+        // diagnostics get a null declarationId).
+        var declarationIds = structuredOutput ? new Ids.DeclarationIdResolver() : null;
         var statusOut = structuredOutput ? Console.Error : Console.Out;
 
         var totalFiles = 0;
@@ -131,6 +136,10 @@ public static class LintCommand
             {
                 var result = await LintFileAsync(file.FullName, verbose);
                 diagnosticSink?.AddRange(result.Diagnostics);
+                if (declarationIds != null && result.Ast != null)
+                {
+                    declarationIds.AddFile(file.FullName, result.OriginalContent, result.Ast);
+                }
 
                 if (!result.ParseSuccess)
                 {
@@ -192,7 +201,7 @@ public static class LintCommand
 
         if (diagnosticSink != null)
         {
-            var formatter = DiagnosticFormatterFactory.Create(format);
+            var formatter = DiagnosticFormatterFactory.Create(format, declarationIds);
             Console.WriteLine(formatter.Format(diagnosticSink));
         }
 
@@ -356,7 +365,8 @@ public static class LintCommand
             Issues = issues,
             OriginalContent = source,
             FixedContent = fixedContent,
-            Diagnostics = diagnostics
+            Diagnostics = diagnostics,
+            Ast = ast
         };
     }
 
@@ -368,6 +378,9 @@ public static class LintCommand
         public required string OriginalContent { get; init; }
         public required string FixedContent { get; init; }
         public required DiagnosticBag Diagnostics { get; init; }
+
+        /// <summary>Parsed module when parsing succeeded; feeds declaration-ID resolution.</summary>
+        public Ast.ModuleNode? Ast { get; init; }
     }
 
     private sealed record LintIssue(int Line, string Code, string Message);
