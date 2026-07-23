@@ -267,6 +267,11 @@ internal sealed class WatchSession
         }
 
         var diagnosticSink = _structuredOutput ? new DiagnosticBag() : null;
+        // Per-rebuild span→declaration-ID resolver (envelope schema v1.1): fed
+        // from each freshly compiled file's AST so the rebuild's diagnostics
+        // carry declarationId. Cache-skipped files contribute no diagnostics,
+        // so they need no resolver entries.
+        var declarationIds = _structuredOutput ? new Ids.DeclarationIdResolver() : null;
         var policy = _settings.PermissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict;
 
         CompilationDriver.DriverCacheSettings? cache = null;
@@ -325,7 +330,10 @@ internal sealed class WatchSession
                     {
                         _status.WriteLine($"Up-to-date (cached): {outputPath}");
                     }
-                });
+                },
+                onAst: declarationIds != null
+                    ? (file, source, ast) => declarationIds.AddFile(file.FullName, source, ast)
+                    : null);
 
             summary = new DriverResultSummary(result.Compiled.Count, result.Skipped.Count, result.AnyErrors);
         }
@@ -346,7 +354,7 @@ internal sealed class WatchSession
         // document here would make the concatenated stream unsplittable.
         if (diagnosticSink != null)
         {
-            _output.WriteLine(new JsonDiagnosticFormatter(writeIndented: false).Format(diagnosticSink));
+            _output.WriteLine(new JsonDiagnosticFormatter(writeIndented: false) { DeclarationIds = declarationIds }.Format(diagnosticSink));
             _output.Flush();
         }
 

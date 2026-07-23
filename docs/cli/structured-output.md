@@ -182,9 +182,15 @@ pipeline) so they can flow through the structured formats:
   line goes to stderr). There is no per-diagnostic `fixed` marker yet.
 - **`calor assess --format sarif`** uses the same shared SARIF serializer with
   tool name `calor-assess` and per-dimension rule IDs (`Calor-<Dimension>`).
-- **`calor verify --format json`** embeds this schema's `diagnostics[]` array
-  per file (alongside its legacy flat `errors`/`warnings` string arrays), but
-  its top-level document is command-specific.
+- **`calor verify --format json`** emits the envelope
+  (see [Envelope Schema](/calor/cli/envelope-schema/)): top-level
+  `diagnostics[]`/`summary` aggregate the compiler diagnostics across all
+  files (with `declarationId` and `verification` payloads), and the
+  verify-specific report lives under `data` — per-file summaries carrying both
+  the legacy enum counts and the five-status counts, and per-contract entries
+  with `status` (five-status wire name), `legacyStatus` (old enum name, kept
+  for one release), optional `reason`, and a structured `counterexample`.
+  The legacy flat `errors`/`warnings` string arrays are gone.
 - **`calor self-check docs --format json`** emits the unified schema on stdout
   with docs-drift findings (`Calor1320`–`Calor1331`) and exits 1 when drift is
   found (text mode reports the same findings on stderr).

@@ -73,7 +73,7 @@ public class StructuredOutputTests : IDisposable
         using var doc = JsonDocument.Parse(stdOut);
         var root = doc.RootElement;
 
-        Assert.Equal("1.0", root.GetProperty("version").GetString());
+        Assert.Equal(JsonDiagnosticFormatter.SchemaVersion, root.GetProperty("version").GetString());
 
         var diagnostics = root.GetProperty("diagnostics");
         Assert.True(diagnostics.GetArrayLength() >= 1, $"expected diagnostics, stderr: {stdErr}");
@@ -402,11 +402,12 @@ public class StructuredOutputTests : IDisposable
     }
 
     // ------------------------------------------------------------------
-    // calor verify --format json embeds the unified diagnostic schema
+    // calor verify --format json emits the one envelope (schema v1.1):
+    // top-level diagnostics[]/summary plus the verify payload under data.
     // ------------------------------------------------------------------
 
     [Fact]
-    public void Verify_FormatJson_IncludesUnifiedDiagnosticsArray()
+    public void Verify_FormatJson_EmitsEnvelopeWithVerifyPayloadUnderData()
     {
         var file = WriteGoodFile();
 
@@ -415,14 +416,100 @@ public class StructuredOutputTests : IDisposable
         Assert.True(exitCode == 0, $"expected exit 0, got {exitCode}. stderr: {stdErr}");
 
         using var doc = JsonDocument.Parse(stdOut);
-        var files = doc.RootElement.GetProperty("files");
-        Assert.True(files.GetArrayLength() == 1);
+        var root = doc.RootElement;
 
-        // The new unified diagnostics array coexists with legacy errors/warnings.
+        // Envelope wrapper
+        Assert.Equal(JsonDiagnosticFormatter.SchemaVersion, root.GetProperty("version").GetString());
+        Assert.Equal("verify", root.GetProperty("command").GetString());
+        Assert.Equal(JsonValueKind.Array, root.GetProperty("diagnostics").ValueKind);
+        var summary = root.GetProperty("summary");
+        Assert.Equal(
+            root.GetProperty("diagnostics").GetArrayLength(),
+            summary.GetProperty("total").GetInt32());
+
+        // Verify-specific payload lives under data
+        var data = root.GetProperty("data");
+        Assert.True(data.TryGetProperty("verifiedAt", out _));
+        var files = data.GetProperty("files");
+        Assert.Equal(1, files.GetArrayLength());
+
         var fileEntry = files[0];
-        Assert.Equal(JsonValueKind.Array, fileEntry.GetProperty("diagnostics").ValueKind);
-        Assert.Equal(JsonValueKind.Array, fileEntry.GetProperty("errors").ValueKind);
-        Assert.Equal(JsonValueKind.Array, fileEntry.GetProperty("warnings").ValueKind);
+        Assert.EndsWith("good.calr", fileEntry.GetProperty("fileName").GetString());
+        var fileSummary = fileEntry.GetProperty("summary");
+        // Legacy counts and five-status counts coexist for one release.
+        Assert.True(fileSummary.TryGetProperty("proven", out _));
+        Assert.True(fileSummary.TryGetProperty("disproven", out _));
+        Assert.True(fileSummary.TryGetProperty("refuted", out _));
+        Assert.True(fileSummary.TryGetProperty("unknown", out _));
+        Assert.True(fileSummary.TryGetProperty("timeout", out _));
+
+        // Aggregated five-status summary
+        var dataSummary = data.GetProperty("summary");
+        Assert.True(dataSummary.TryGetProperty("proven", out _));
+        Assert.True(dataSummary.TryGetProperty("refuted", out _));
+        Assert.True(dataSummary.TryGetProperty("unsupported", out _));
+
+        // The legacy flat errors/warnings arrays are gone (v1.1 envelope).
+        Assert.False(fileEntry.TryGetProperty("errors", out _));
+        Assert.False(fileEntry.TryGetProperty("warnings", out _));
+        Assert.False(fileEntry.TryGetProperty("diagnostics", out _));
+    }
+
+    [Fact]
+    public void Verify_FormatJson_RefutedContract_CarriesFiveStatusAndLegacyStatus()
+    {
+        // Postcondition (== result 0) is refutable for Add(1, 1) — Z3 finds a
+        // counterexample when available; without Z3 the status degrades to
+        // unknown/unsupported but never to a name outside the closed vocabulary.
+        var file = Path.Combine(_tempDir, "contract.calr");
+        File.WriteAllText(file, """
+            §M{m001:Contract}
+              §F{f001:Add:pub} (i32:a, i32:b) -> i32
+                §S (== result 0)
+                §R (+ a b)
+            """);
+
+        var (_, stdOut, _) = RunCli("verify", file, "--format", "json");
+
+        using var doc = JsonDocument.Parse(stdOut);
+        var root = doc.RootElement;
+        var functions = root.GetProperty("data").GetProperty("files")[0].GetProperty("functions");
+        Assert.Equal(1, functions.GetArrayLength());
+        Assert.Equal("f001", functions[0].GetProperty("functionId").GetString());
+
+        var contracts = functions[0].GetProperty("contracts");
+        Assert.Equal(1, contracts.GetArrayLength());
+
+        var contract = contracts[0];
+        Assert.Equal("postcondition", contract.GetProperty("type").GetString());
+        Assert.Equal(0, contract.GetProperty("index").GetInt32());
+
+        var status = contract.GetProperty("status").GetString();
+        Assert.Contains(status, new[] { "proven", "refuted", "unknown", "timeout", "unsupported" });
+        Assert.False(string.IsNullOrEmpty(contract.GetProperty("legacyStatus").GetString()));
+
+        if (status == "refuted" && contract.TryGetProperty("counterexample", out var cex))
+        {
+            Assert.False(string.IsNullOrEmpty(cex.GetProperty("rendered").GetString()));
+            Assert.Equal(JsonValueKind.Array, cex.GetProperty("bindings").ValueKind);
+        }
+    }
+
+    [Fact]
+    public void Verify_FormatJson_MissingFile_SurfacesEnvelopeDiagnostic()
+    {
+        var missing = Path.Combine(_tempDir, "gone.calr");
+
+        // Exit code intentionally not asserted: verify sets Environment.ExitCode,
+        // which Main's InvokeAsync return value stomps (pre-existing behavior,
+        // kept identical by the envelope adoption).
+        var (_, stdOut, _) = RunCli("verify", missing, "--format", "json");
+
+        using var doc = JsonDocument.Parse(stdOut);
+        var diagnostics = doc.RootElement.GetProperty("diagnostics");
+        Assert.True(diagnostics.GetArrayLength() >= 1);
+        Assert.Equal(DiagnosticCode.CliInputNotFound, diagnostics[0].GetProperty("code").GetString());
+        Assert.Equal("error", diagnostics[0].GetProperty("severity").GetString());
     }
 
     // ------------------------------------------------------------------
