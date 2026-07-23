@@ -500,10 +500,11 @@ public class StructuredOutputTests : IDisposable
     {
         var missing = Path.Combine(_tempDir, "gone.calr");
 
-        // Exit code intentionally not asserted: verify sets Environment.ExitCode,
-        // which Main's InvokeAsync return value stomps (pre-existing behavior,
-        // kept identical by the envelope adoption).
-        var (_, stdOut, _) = RunCli("verify", missing, "--format", "json");
+        // Missing file exits 1 (review of #754: verify now returns its exit
+        // code through ctx.ExitCode instead of parking it on
+        // Environment.ExitCode, which Main's InvokeAsync return stomped).
+        var (exitCode, stdOut, _) = RunCli("verify", missing, "--format", "json");
+        Assert.Equal(1, exitCode);
 
         using var doc = JsonDocument.Parse(stdOut);
         var diagnostics = doc.RootElement.GetProperty("diagnostics");

@@ -84,14 +84,40 @@ public static class AssessCommand
         var sw = Stopwatch.StartNew();
         var exitCode = 0;
 
+        // Envelope mode: stdout carries exactly one document, always —
+        // including early exits (envelope schema v1.1 contract).
+        var json = format.Equals("json", StringComparison.OrdinalIgnoreCase);
+
         if (!path.Exists)
         {
+            if (json)
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("assess", null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliInputNotFound,
+                        DiagnosticSeverity.Error,
+                        $"Directory not found: {path.FullName}",
+                        path.FullName,
+                        line: 1,
+                        column: 1)]));
+            }
             Console.Error.WriteLine($"Error: Directory not found: {path.FullName}");
             return 2;
         }
 
         if (threshold < 0 || threshold > 100)
         {
+            if (json)
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("assess", null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliUsageError,
+                        DiagnosticSeverity.Error,
+                        "Threshold must be between 0 and 100",
+                        filePath: null,
+                        line: 1,
+                        column: 1)]));
+            }
             Console.Error.WriteLine("Error: Threshold must be between 0 and 100");
             return 2;
         }
@@ -146,6 +172,17 @@ public static class AssessCommand
         }
         catch (Exception ex)
         {
+            if (json)
+            {
+                Console.WriteLine(EnvelopeWriter.Serialize("assess", null,
+                    [new Diagnostic(
+                        DiagnosticCode.CliInternalError,
+                        DiagnosticSeverity.Error,
+                        $"Assessment failed: {ex.Message}",
+                        path.FullName,
+                        line: 1,
+                        column: 1)]));
+            }
             Console.Error.WriteLine($"Error: {ex.Message}");
             telemetry?.TrackException(ex);
             exitCode = 2;

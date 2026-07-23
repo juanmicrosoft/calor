@@ -248,7 +248,11 @@ public class ConvertFormatEnvelopeTests : IDisposable
     {
         var missing = Path.Combine(_tempDir, "nope.cs");
 
-        var (_, stdOut, _) = RunCli("convert", missing, "--format", "json");
+        var (exitCode, stdOut, _) = RunCli("convert", missing, "--format", "json");
+
+        // Review of #754: the error exit code now propagates through
+        // ctx.ExitCode (previously stomped to 0 by Main's InvokeAsync return).
+        Assert.Equal(1, exitCode);
 
         // A document is ALWAYS emitted, even on early-exit error paths.
         var root = ParseAndValidate(stdOut, "convert");
@@ -264,8 +268,9 @@ public class ConvertFormatEnvelopeTests : IDisposable
     {
         var txt = WriteFile("blah.txt", "hello");
 
-        var (_, stdOut, _) = RunCli("convert", txt, "--format", "json");
+        var (exitCode, stdOut, _) = RunCli("convert", txt, "--format", "json");
 
+        Assert.Equal(1, exitCode);
         var root = ParseAndValidate(stdOut, "convert");
         var diag = root.GetProperty("diagnostics")[0];
         Assert.Equal(DiagnosticCode.ConvertCommandError, diag.GetProperty("code").GetString());
@@ -281,8 +286,9 @@ public class ConvertFormatEnvelopeTests : IDisposable
             "  §F{f1:Main:pub} () -> void\n" +
             "    §B{x}\n");
 
-        var (_, stdOut, _) = RunCli("convert", calrFile, "--format", "json");
+        var (exitCode, stdOut, _) = RunCli("convert", calrFile, "--format", "json");
 
+        Assert.Equal(1, exitCode);
         var root = ParseAndValidate(stdOut, "convert");
         var data = root.GetProperty("data");
         Assert.Equal("calor-to-csharp", data.GetProperty("direction").GetString());

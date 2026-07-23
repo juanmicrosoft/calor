@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -77,12 +78,24 @@ public static class VerifyCommand
             clearCacheOption
         };
 
-        command.SetHandler(ExecuteAsync, inputArgument, formatOption, outputOption, verboseOption, timeoutOption, noCacheOption, clearCacheOption);
+        // Exit code returned through ctx.ExitCode: a code parked only on
+        // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+        command.SetHandler(async (InvocationContext ctx) =>
+        {
+            ctx.ExitCode = await ExecuteAsync(
+                ctx.ParseResult.GetValueForArgument(inputArgument),
+                ctx.ParseResult.GetValueForOption(formatOption) ?? "text",
+                ctx.ParseResult.GetValueForOption(outputOption),
+                ctx.ParseResult.GetValueForOption(verboseOption),
+                ctx.ParseResult.GetValueForOption(timeoutOption),
+                ctx.ParseResult.GetValueForOption(noCacheOption),
+                ctx.ParseResult.GetValueForOption(clearCacheOption));
+        });
 
         return command;
     }
 
-    private static async Task ExecuteAsync(
+    private static async Task<int> ExecuteAsync(
         FileInfo[] files,
         string format,
         FileInfo? output,
@@ -106,6 +119,11 @@ public static class VerifyCommand
         // enclosing declaration ID from the file's parsed AST.
         var aggregatedDiagnostics = new DiagnosticBag();
         var declarationIds = new DeclarationIdResolver();
+        // Exit-code semantics (review of #754): 1 when any file is missing, any
+        // compile error occurs, or any contract is REFUTED (disproven); 0 when
+        // every contract is proven or merely unknown/timeout/unsupported —
+        // inconclusive is not failure (runtime checks are kept). Applies to
+        // both text and JSON modes.
         var hasErrors = false;
 
         foreach (var file in files)
@@ -119,7 +137,6 @@ public static class VerifyCommand
                     DiagnosticSeverity.Error,
                     file.FullName));
                 Console.Error.WriteLine($"Error: File not found: {file.FullName}");
-                Environment.ExitCode = 1;
                 hasErrors = true;
                 continue;
             }
@@ -136,7 +153,7 @@ public static class VerifyCommand
                 results.Add(result);
                 aggregatedDiagnostics.AddRange(result.Diagnostics);
 
-                if (result.HasDisproven)
+                if (result.HasRefuted || result.Diagnostics.HasErrors)
                 {
                     hasErrors = true;
                 }
@@ -150,7 +167,6 @@ public static class VerifyCommand
                     DiagnosticSeverity.Error,
                     file.FullName));
                 Console.Error.WriteLine($"Error processing {file.Name}: {ex.Message}");
-                Environment.ExitCode = 2;
                 hasErrors = true;
             }
         }
@@ -169,16 +185,13 @@ public static class VerifyCommand
             Console.WriteLine(formatted);
         }
 
-        // Set exit code based on results
-        if (hasErrors)
-        {
-            Environment.ExitCode = 1;
-        }
+        // Exit code based on results (returned through ctx.ExitCode).
+        var exitCode = hasErrors ? 1 : 0;
 
         sw.Stop();
         var totalContracts = results.Sum(r => r.Summary.Total);
         var totalProven = results.Sum(r => r.Summary.Proven);
-        telemetry?.TrackCommand("verify", Environment.ExitCode, new Dictionary<string, string>
+        telemetry?.TrackCommand("verify", exitCode, new Dictionary<string, string>
         {
             ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
             ["fileCount"] = files.Length.ToString(),
@@ -186,10 +199,12 @@ public static class VerifyCommand
             ["provenContracts"] = totalProven.ToString()
         });
 
-        if (Environment.ExitCode != 0)
+        if (exitCode != 0)
         {
             IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "verify", "Contract verification found issues");
         }
+
+        return exitCode;
     }
 
     private static async Task<FileVerificationResult> VerifyFileAsync(
@@ -478,7 +493,14 @@ public static class VerifyCommand
         List<FunctionVerificationOutput> Functions,
         DiagnosticBag Diagnostics)
     {
-        public bool HasDisproven => Summary.Disproven > 0;
+        /// <summary>
+        /// True when any contract was refuted (disproven) — legacy summary
+        /// column or five-status choke-point outcome. Drives exit code 1;
+        /// unknown/timeout/unsupported do NOT (inconclusive is not failure).
+        /// </summary>
+        public bool HasRefuted =>
+            Summary.Disproven > 0 ||
+            Functions.Any(f => f.Contracts.Any(c => c.Outcome.Status == ProofStatus.Refuted));
     }
 
     private sealed record FunctionVerificationOutput(
