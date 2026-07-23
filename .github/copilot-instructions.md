@@ -1,6 +1,6 @@
 # Calor Compiler — Copilot Instructions
 
-Calor is a DSL designed for AI agents that compiles to C# on .NET 10. The compiler lives in `src/Calor.Compiler/` and is packaged as the `calor` global tool. Version is tracked in `Directory.Build.props` (currently 0.3.5).
+Calor is a DSL designed for AI agents that compiles to C# on .NET 10. The compiler lives in `src/Calor.Compiler/` and is packaged as the `calor` global tool. Version is tracked in `Directory.Build.props` (check there for the current version; do not trust a number written in docs).
 
 ## Build & Test
 
@@ -64,35 +64,52 @@ C# Source → Roslyn Parse → SyntaxTree → RoslynSyntaxVisitor → AST → Ca
 | `Ids/IdScanner.cs` | 330 | IAstVisitor — scans/validates node IDs |
 | `Verification/ExpressionSimplifier.cs` | 1,400 | IAstVisitor\<T\> — simplifies expressions for Z3 |
 | `Analysis/BugPatterns/Patterns/` | dir | Checkers: div-by-zero, null-deref, off-by-one, overflow, index-OOB |
-| `Diagnostics/Diagnostic.cs` | — | All diagnostic codes (Calor0001–Calor0899) |
+| `Diagnostics/Diagnostic.cs` | — | All diagnostic codes (Calor0001–Calor1399) |
 
 All paths relative to `src/Calor.Compiler/`.
 
 ## Calor Syntax Quick Reference
 
+Block structure is **indentation-only** (2 spaces per level, Python-style). **Never
+write structural closer tags** — the main block closers (`§/M`, `§/F`, `§/L`, `§/I`,
+`§/W`, `§/WH`, `§/CL`, `§/MT`, `§/IFACE`, and others) raise a hard error (`Calor0830`);
+a few remaining closer forms are still tolerated by the parser but always optional.
+The only closers you should ever write are `§/C` (call argument lists) and `§/LAM`
+(block lambdas).
+
 ```
-§M{id:Name}              Module (close: §/M)
-§F{id:name:retType:vis}   Function (close: §/F)
-§B{name:type}             Immutable binding
-§B{~name:type}            Mutable binding
-§L{id:var:from:to:step}   For loop (close: §/L)
-§IF{id} (cond) → §R expr  Inline if-return
-§IF{id} (cond) ... §/I    Block if (close: §/I NOT §/IF)
-§EI (cond)                 ElseIf
-§EL                        Else
+§M{id:Name}                Module
+§F{id:name:vis} (T:x) -> R  Function with inline signature
+§B{name:type}              Immutable binding
+§B{~name:type}             Mutable binding
+§L{id:var:from:to:step}    For loop
+§IF{id} (cond)             If (body indented)
+§EI (cond)                  ElseIf (at parent column)
+§EL                         Else (at parent column)
 §C{object.method} §A arg §/C  Method call with argument
+§E{codes}                  Effects (§E{} = pure)
 §Q (expr)                  Precondition
 §S (expr)                  Postcondition
-§INV                       Invariant
+§IV (expr)                 Invariant
+```
+
+Example (current syntax — see `samples/FizzBuzz/fizzbuzz.calr`; fenced
+` ```calor ` blocks starting with `§M` are parse-checked by `calor self-check docs`):
+
+```calor
+§M{m001:FizzBuzz}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §L{for1:i:1:100:1}
+      §IF{if1} (== (% i 15) 0)
+        §P "FizzBuzz"
+      §EI (== (% i 3) 0)
+        §P "Fizz"
+      §EL
+        §P i
 ```
 
 **Typed literals:** `INT:42`, `STR:"hello"`, `BOOL:true`, `FLOAT:3.14`
-
-**Closing tags:**
-- Abbreviated form: `§/I` (not `§/IF`), `§/M`, `§/F`, `§/L`.
-- IDs on closing tags are **optional**. `§/M` and `§/M{m001}` both parse; the parser
-  pairs closers by structural nesting. Drop legacy IDs in bulk with
-  `calor fix --drop-structural-ids <root>`. Legacy closers lint as `Calor0820`.
 
 ## Adding New AST Nodes — Checklist
 
@@ -123,7 +140,7 @@ All paths relative to `src/Calor.Compiler/`.
 - **VariableSymbol.IsParameter** — distinguishes function parameters from locals; used by analysis passes
 - **BoundCallExpression.Target** is a `string` — `NullDereferenceChecker` checks for `.unwrap` suffix
 - **Option\<T\> and Result\<T,E\>** are valid generic types in Calor's type system
-- **Diagnostic codes** — Calor0001–0099 (lexer), 0100–0199 (parser), 0200–0299 (semantic), 0300–0399 (contracts), 0400–0499 (effects), 0500–0599 (patterns), 0600–0699 (API strictness), 0700–0799 (semantics version), 0800–0899 (ID validation)
+- **Diagnostic codes** — Calor0001–0099 (lexer), 0100–0199 (parser), 0200–0299 (semantic), 0300–0399 (contracts), 0400–0499 (effects), 0500–0599 (patterns), 0600–0699 (API strictness), 0700–0799 (semantics version + contract verification results), 0800–0899 (ID validation), 0900–0999 (dataflow/bug patterns/taint), 1000–1099 (codegen/interop), 1100–1199 (refinements/obligations), 1200–1299 (experimental), 1300–1399 (CLI: lint findings and command-level errors)
 
 ## Project Layout
 
@@ -155,6 +172,6 @@ Benchmarks live in `benchmarks/`. When writing or modifying benchmarks, ensure t
 
 ## Dependencies
 
-- **Microsoft.CodeAnalysis.CSharp 4.8.0** — Roslyn, for C# parsing in the migration pipeline
+- **Microsoft.CodeAnalysis.CSharp 5.3.0** — Roslyn, for C# parsing in the migration pipeline (supports C# 14)
 - **System.CommandLine 2.0.0-beta4** — CLI argument parsing
 - **Z3 4.15.7** — SMT solver for contract verification (custom ARM64 build)
