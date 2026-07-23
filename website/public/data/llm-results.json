@@ -76,7 +76,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSEg6UrkgvWLQHZuze\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -88,7 +88,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:07.8894252+00:00"
+          "timestamp": "2026-07-23T19:08:21.4120989+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -100,7 +100,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSQaezTxuXdXeHBrDD\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -112,7 +112,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:10.2175432+00:00"
+          "timestamp": "2026-07-23T19:08:23.6469665+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -210,7 +210,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSaSV82ctXzwx2oU25\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -222,7 +222,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:12.5276974+00:00"
+          "timestamp": "2026-07-23T19:08:25.9231931+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -234,7 +234,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSkQGZwKQmhJkCtDuL\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -246,7 +246,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:14.8791166+00:00"
+          "timestamp": "2026-07-23T19:08:28.1652558+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -362,7 +362,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpSvWjPwPcdNKr6wPxA\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -374,7 +374,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:17.2048074+00:00"
+          "timestamp": "2026-07-23T19:08:30.448398+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -386,7 +386,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpT62y7nUYcYV1CWViw\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -398,7 +398,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:19.4356413+00:00"
+          "timestamp": "2026-07-23T19:08:32.6797553+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -502,7 +502,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTFoqdvm4MV6Hr5TyE\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -514,7 +514,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:21.7216559+00:00"
+          "timestamp": "2026-07-23T19:08:34.9440348+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -526,7 +526,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTRR3GAZMRko1TRnZy\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -538,7 +538,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:23.9685901+00:00"
+          "timestamp": "2026-07-23T19:08:37.1987039+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -627,7 +627,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTbLLvk4F5duSMEsTP\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -639,7 +639,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:26.2894605+00:00"
+          "timestamp": "2026-07-23T19:08:39.4668651+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -651,7 +651,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTkqLs2A4uHKrR6xea\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -663,7 +663,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:28.5363602+00:00"
+          "timestamp": "2026-07-23T19:08:41.6892603+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -766,7 +766,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpTvgfxHfsiKecKDA9G\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -778,7 +778,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:30.8141697+00:00"
+          "timestamp": "2026-07-23T19:08:43.9739158+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -790,7 +790,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpU67DKdjUvBiFXRMGK\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -802,7 +802,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:33.0175505+00:00"
+          "timestamp": "2026-07-23T19:08:46.1990549+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -899,7 +899,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpUFuKd6sDJTdaoKHta\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -911,7 +911,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:35.3057617+00:00"
+          "timestamp": "2026-07-23T19:08:48.4683817+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -923,7 +923,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpURKcYu9WRCAXoK7ap\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -935,7 +935,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:37.5109133+00:00"
+          "timestamp": "2026-07-23T19:08:50.7014599+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1032,7 +1032,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpUbG9s3rphZb8XP9uz\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1044,7 +1044,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:39.8517512+00:00"
+          "timestamp": "2026-07-23T19:08:52.973127+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1056,7 +1056,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpUkoPCw2HauU26gXvu\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1068,7 +1068,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:42.0884972+00:00"
+          "timestamp": "2026-07-23T19:08:55.4018902+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1165,7 +1165,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpUvfiJdd5DH3LzB8on\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1177,7 +1177,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:44.3742753+00:00"
+          "timestamp": "2026-07-23T19:08:57.6606162+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1189,7 +1189,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpV69UDHuQT5mMi41Tf\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1201,7 +1201,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:46.5958424+00:00"
+          "timestamp": "2026-07-23T19:08:59.8903337+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1297,7 +1297,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVFya2U7ypWdVDnoVk\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1309,7 +1309,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:48.8928804+00:00"
+          "timestamp": "2026-07-23T19:09:02.2344176+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1321,7 +1321,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVRUZn2pHQbZgjU1ZQ\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1333,7 +1333,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:51.121684+00:00"
+          "timestamp": "2026-07-23T19:09:04.4924192+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1429,7 +1429,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVbHRFPDu4m6bpyWZt\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1441,7 +1441,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:53.4091904+00:00"
+          "timestamp": "2026-07-23T19:09:06.7798462+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1453,7 +1453,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVkjCXJMDkYn8zLVGR\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1465,7 +1465,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:55.6187152+00:00"
+          "timestamp": "2026-07-23T19:09:08.9980087+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1561,7 +1561,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpVvkx56pdtnxxghPPu\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1573,7 +1573,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:08:57.960734+00:00"
+          "timestamp": "2026-07-23T19:09:11.2868109+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1585,7 +1585,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpW6Fhj6jjHRbx8R2uD\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1597,7 +1597,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:00.1793655+00:00"
+          "timestamp": "2026-07-23T19:09:13.5590983+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1693,7 +1693,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWG15nVWCk4RpFQuBW\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1705,7 +1705,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:02.463376+00:00"
+          "timestamp": "2026-07-23T19:09:15.8147314+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1717,7 +1717,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWRWaKYrf2JZrKuEzm\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1729,7 +1729,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:04.6892817+00:00"
+          "timestamp": "2026-07-23T19:09:18.0360325+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1826,7 +1826,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWbKS8gkxcokBZNAtz\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1838,7 +1838,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:07.0080042+00:00"
+          "timestamp": "2026-07-23T19:09:20.3483195+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1850,7 +1850,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWm9ms93wB8Pm2snEV\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1862,7 +1862,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:09.2906311+00:00"
+          "timestamp": "2026-07-23T19:09:22.5704374+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1959,7 +1959,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpWvvtvRJqUZ5BkLPz6\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1971,7 +1971,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:11.5846357+00:00"
+          "timestamp": "2026-07-23T19:09:24.850665+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -1983,7 +1983,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpX6UNaDCxZGipjymLe\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -1995,7 +1995,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:13.8042185+00:00"
+          "timestamp": "2026-07-23T19:09:27.0961092+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2089,7 +2089,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXGE14VGmvf1AYhsQx\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2101,7 +2101,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:16.0832223+00:00"
+          "timestamp": "2026-07-23T19:09:29.3522445+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2113,7 +2113,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXRoDWxmE75eMAAAek\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2125,7 +2125,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:18.3153925+00:00"
+          "timestamp": "2026-07-23T19:09:31.5731261+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2223,7 +2223,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXc2NopUTu5VcQriio\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2235,7 +2235,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:20.7306074+00:00"
+          "timestamp": "2026-07-23T19:09:33.9248527+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2247,7 +2247,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXmcLVihSBWL5p1RcN\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2259,7 +2259,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:22.9505472+00:00"
+          "timestamp": "2026-07-23T19:09:36.1952731+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2352,7 +2352,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpXwSBTv32M9AH48gf6\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2364,7 +2364,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:25.2492677+00:00"
+          "timestamp": "2026-07-23T19:09:38.569754+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2376,7 +2376,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpY6riYtqx6tBfHZ2EK\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2388,7 +2388,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:27.4682085+00:00"
+          "timestamp": "2026-07-23T19:09:40.8003213+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2481,7 +2481,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYHCZtrbP2TcWvVpTW\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2493,7 +2493,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:29.8810511+00:00"
+          "timestamp": "2026-07-23T19:09:43.0571079+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2505,7 +2505,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYSvTtqvwkPAEWzbWt\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2517,7 +2517,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:32.1433807+00:00"
+          "timestamp": "2026-07-23T19:09:45.4339229+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2610,7 +2610,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYcyTNwezqbqmeXBir\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2622,7 +2622,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:34.5005694+00:00"
+          "timestamp": "2026-07-23T19:09:47.6915679+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2634,7 +2634,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYnYRU2qZyP3M85MyT\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2646,7 +2646,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:36.73922+00:00"
+          "timestamp": "2026-07-23T19:09:49.9195693+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2755,7 +2755,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpYxTE1Tp9x9gVs4diB\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2767,7 +2767,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:39.184796+00:00"
+          "timestamp": "2026-07-23T19:09:52.1814232+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2779,7 +2779,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZ8S15JN72NM1YU37w\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2791,7 +2791,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:41.3921806+00:00"
+          "timestamp": "2026-07-23T19:09:54.4139969+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2884,7 +2884,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZJB8hEaEK7ewCiiYU\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2896,7 +2896,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:43.6945467+00:00"
+          "timestamp": "2026-07-23T19:09:56.6944199+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -2908,7 +2908,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZThsRoX2WZ2syf3sK\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -2920,7 +2920,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:45.8966094+00:00"
+          "timestamp": "2026-07-23T19:09:58.9462302+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3008,7 +3008,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZdTkLCphfCJuvDwhJ\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3020,7 +3020,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:48.1835546+00:00"
+          "timestamp": "2026-07-23T19:10:01.2906884+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3032,7 +3032,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZnx1aWbRgyk8noqD2\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3044,7 +3044,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:50.39739+00:00"
+          "timestamp": "2026-07-23T19:10:03.5299254+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3137,7 +3137,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpZxeupFC2aeVH6bNUz\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3149,7 +3149,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:52.6665684+00:00"
+          "timestamp": "2026-07-23T19:10:05.8027236+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3161,7 +3161,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpa87gSbh5KyYtBQft6\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3173,7 +3173,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:54.9103596+00:00"
+          "timestamp": "2026-07-23T19:10:08.0285437+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3260,7 +3260,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpaJ2VEw64ynTje1EoA\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3272,7 +3272,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:57.2417488+00:00"
+          "timestamp": "2026-07-23T19:10:10.3739265+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3284,7 +3284,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpaTn7hhSihkkQcr9NY\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3296,7 +3296,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:09:59.4875269+00:00"
+          "timestamp": "2026-07-23T19:10:12.6723731+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3389,7 +3389,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpadZEayGGB4qSW9ogd\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3401,7 +3401,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:01.7630444+00:00"
+          "timestamp": "2026-07-23T19:10:14.9842407+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3413,7 +3413,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpao2VfaRQumhQ8B6sT\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3425,7 +3425,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:04.0030991+00:00"
+          "timestamp": "2026-07-23T19:10:17.2593974+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3518,7 +3518,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpayjvbF7Zp9NTZqPm5\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3530,7 +3530,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:06.4891418+00:00"
+          "timestamp": "2026-07-23T19:10:19.5901587+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3542,7 +3542,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbA7kqYRNZHnyn5QWR\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3554,7 +3554,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:08.9829129+00:00"
+          "timestamp": "2026-07-23T19:10:21.9061509+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3647,7 +3647,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbLEDi1t2diEQzzkxq\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3659,7 +3659,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:11.2784037+00:00"
+          "timestamp": "2026-07-23T19:10:24.1778366+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3671,7 +3671,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbVe1SxgPZdbELpDY8\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3683,7 +3683,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:13.4824625+00:00"
+          "timestamp": "2026-07-23T19:10:26.4254401+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3775,7 +3775,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbfSNWREN581XPgK2q\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3787,7 +3787,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:15.7920812+00:00"
+          "timestamp": "2026-07-23T19:10:28.6879348+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3799,7 +3799,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbq6JMtgCfEvjCZvDs\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3811,7 +3811,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:18.0340832+00:00"
+          "timestamp": "2026-07-23T19:10:30.9098984+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3903,7 +3903,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpbzwPM7LmbqrwnQzuP\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3915,7 +3915,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:20.3344039+00:00"
+          "timestamp": "2026-07-23T19:10:33.2035937+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -3927,7 +3927,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcAWMLvpfmxNx5rUSu\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -3939,7 +3939,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:22.5831026+00:00"
+          "timestamp": "2026-07-23T19:10:35.640632+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4031,7 +4031,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcLHy85BRXVWA8tetM\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4043,7 +4043,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:24.874347+00:00"
+          "timestamp": "2026-07-23T19:10:37.8988279+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4055,7 +4055,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcVzcrEdBmv5pPR2cd\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4067,7 +4067,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:27.1300003+00:00"
+          "timestamp": "2026-07-23T19:10:40.1272274+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4154,7 +4154,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcg7phs9YmU8UgFA2T\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4166,7 +4166,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:29.5197221+00:00"
+          "timestamp": "2026-07-23T19:10:42.3899098+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4178,7 +4178,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpcqojhehkPtrQVeAGx\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4190,7 +4190,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:31.7666117+00:00"
+          "timestamp": "2026-07-23T19:10:44.6352593+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4277,7 +4277,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpd1ZNVydMvUuxMVumT\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4289,7 +4289,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:34.0412063+00:00"
+          "timestamp": "2026-07-23T19:10:46.9080678+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4301,7 +4301,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdB2doGBo1bGeCCV9Z\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4313,7 +4313,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:36.3331032+00:00"
+          "timestamp": "2026-07-23T19:10:49.1447668+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4400,7 +4400,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdMB5GpecN5DreFk3S\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4412,7 +4412,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:38.6330436+00:00"
+          "timestamp": "2026-07-23T19:10:51.3954642+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4424,7 +4424,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdWtyDaQUkrdxPJp83\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4436,7 +4436,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:40.9063484+00:00"
+          "timestamp": "2026-07-23T19:10:53.6178663+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4534,7 +4534,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdgdrrACwcVaftgjrH\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4546,7 +4546,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:43.2030771+00:00"
+          "timestamp": "2026-07-23T19:10:55.8665989+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4558,7 +4558,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpdr978mYvwVBYj3B1M\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4570,7 +4570,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:45.4217333+00:00"
+          "timestamp": "2026-07-23T19:10:58.1047424+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4640,7 +4640,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpe1wDPy9bqpjAbzwM2\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4652,7 +4652,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:47.6965101+00:00"
+          "timestamp": "2026-07-23T19:11:00.3769114+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4664,7 +4664,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpeBMzuMEC1fLfYRizE\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4676,7 +4676,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:49.9208493+00:00"
+          "timestamp": "2026-07-23T19:11:02.606391+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4764,7 +4764,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpeMSyTY4ocQuQEWNVh\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4776,7 +4776,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:52.2830199+00:00"
+          "timestamp": "2026-07-23T19:11:04.8878394+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4788,7 +4788,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpeWzTBVUC88xby8Smg\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4800,7 +4800,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:54.5146812+00:00"
+          "timestamp": "2026-07-23T19:11:07.1103944+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4893,7 +4893,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpegjqTEHhbTJnKYRLq\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4905,7 +4905,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:56.7881518+00:00"
+          "timestamp": "2026-07-23T19:11:09.385137+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -4917,7 +4917,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMperFqHrC2sK1ntLoHJ\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -4929,7 +4929,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:10:59.0101151+00:00"
+          "timestamp": "2026-07-23T19:11:11.6408291+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5022,7 +5022,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpf25vezgsRAuEYcaAn\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5034,7 +5034,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:01.3024212+00:00"
+          "timestamp": "2026-07-23T19:11:13.9025804+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5046,7 +5046,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfC5gkRS9yNd8Tqhcu\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5058,7 +5058,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:03.641712+00:00"
+          "timestamp": "2026-07-23T19:11:16.2766509+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5128,7 +5128,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfNfvg4ZX9XxVKmcJs\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5140,7 +5140,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:06.1093248+00:00"
+          "timestamp": "2026-07-23T19:11:18.6081393+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5152,7 +5152,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfYTY32C2CBu7nLDC2\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5164,7 +5164,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:08.4209187+00:00"
+          "timestamp": "2026-07-23T19:11:20.8853684+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5257,7 +5257,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfiEf9UqmYHzB9JiiW\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5269,7 +5269,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:10.6963948+00:00"
+          "timestamp": "2026-07-23T19:11:23.1459615+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5281,7 +5281,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpfsgvpBf4nSkRVvwM3\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5293,7 +5293,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:12.9406604+00:00"
+          "timestamp": "2026-07-23T19:11:25.3666938+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5386,7 +5386,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpg3dibFAcJihXBV8d7\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5398,7 +5398,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:15.2594392+00:00"
+          "timestamp": "2026-07-23T19:11:27.6233129+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5410,7 +5410,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgDJPjc8XPY7RuLReH\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5422,7 +5422,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:17.5200617+00:00"
+          "timestamp": "2026-07-23T19:11:29.8513294+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5515,7 +5515,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgPDwXWxQ1UdpS2RJr\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5527,7 +5527,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:19.829078+00:00"
+          "timestamp": "2026-07-23T19:11:32.1099893+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5539,7 +5539,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgZDTg5CXZ9PhrzpYH\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5551,7 +5551,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:22.1688152+00:00"
+          "timestamp": "2026-07-23T19:11:34.3356605+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5644,7 +5644,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgj3JPyW9zPG7SjxTZ\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5656,7 +5656,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:24.4497277+00:00"
+          "timestamp": "2026-07-23T19:11:36.7202915+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5668,7 +5668,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpgtjU2CcYV7aGRqa4T\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5680,7 +5680,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:26.709994+00:00"
+          "timestamp": "2026-07-23T19:11:38.953506+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5773,7 +5773,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMph4UMMV4X2hy1VNxDE\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5785,7 +5785,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:28.9930686+00:00"
+          "timestamp": "2026-07-23T19:11:41.4340858+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5797,7 +5797,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphDvNfotB8VDdP94nx\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5809,7 +5809,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:31.2028163+00:00"
+          "timestamp": "2026-07-23T19:11:43.6994427+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5912,7 +5912,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphPkiRLPQAWbaq6Pg8\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5924,7 +5924,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:33.5231812+00:00"
+          "timestamp": "2026-07-23T19:11:45.9532688+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -5936,7 +5936,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphZLBJMKWXWjZvuDAF\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -5948,7 +5948,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:35.7375231+00:00"
+          "timestamp": "2026-07-23T19:11:48.2630162+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6041,7 +6041,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphj45NJHZuxBfyvdwD\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6053,7 +6053,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:38.0119892+00:00"
+          "timestamp": "2026-07-23T19:11:50.5253882+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6065,7 +6065,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMphtgWuQjSKVoSghqRW\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6077,7 +6077,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:40.2633789+00:00"
+          "timestamp": "2026-07-23T19:11:52.7444299+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6170,7 +6170,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpi4UNhvtxmWZyN98JZ\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6182,7 +6182,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:42.5583619+00:00"
+          "timestamp": "2026-07-23T19:11:55.012927+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6194,7 +6194,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpiDwPxKm9P98aLAZyb\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6206,7 +6206,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:44.7786451+00:00"
+          "timestamp": "2026-07-23T19:11:57.2362081+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6299,7 +6299,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpiPoiaZxj5MbYrNEkZ\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6311,7 +6311,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:47.0907764+00:00"
+          "timestamp": "2026-07-23T19:11:59.4920539+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6323,7 +6323,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpiZW8PpYEScP1B3rqr\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6335,7 +6335,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:49.4020178+00:00"
+          "timestamp": "2026-07-23T19:12:01.7763003+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6428,7 +6428,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpijWtJ66KgMUPsAbnn\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6440,7 +6440,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:51.6915042+00:00"
+          "timestamp": "2026-07-23T19:12:04.0238728+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6452,7 +6452,7 @@
         "generatedCode": "",
         "compilationSuccess": false,
         "compilationErrors": [
-          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022invalid x-api-key\u0022},\u0022request_id\u0022:\u0022req_011CYMpiuLyaAj7WtBUYDWW4\u0022}"
+          "API error: Unauthorized - {\u0022type\u0022:\u0022error\u0022,\u0022error\u0022:{\u0022type\u0022:\u0022authentication_error\u0022,\u0022message\u0022:\u0022API key is invalid.\u0022},\u0022request_id\u0022:null}"
         ],
         "testResults": [],
         "contractResults": null,
@@ -6464,7 +6464,7 @@
           "cost": 0,
           "durationMs": 0,
           "fromCache": false,
-          "timestamp": "2026-02-21T20:11:54.0021765+00:00"
+          "timestamp": "2026-07-23T19:12:06.2449248+00:00"
         },
         "score": 0,
         "passedTests": 0,
@@ -6522,7 +6522,7 @@
     }
   },
   "totalCost": 0,
-  "timestamp": "2026-02-21T20:08:05.26803+00:00",
+  "timestamp": "2026-07-23T19:08:19.0328757+00:00",
   "provider": "claude",
   "isDryRun": false
 }
