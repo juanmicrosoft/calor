@@ -1,0 +1,5 @@
+§M{m1:OutcomeRefuted}
+  §F{f1:Dec:pub} (i32:x) -> i32
+    §Q (> x 0)
+    §S (> result 10)
+    §R (- x 1)
