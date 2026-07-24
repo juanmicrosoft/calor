@@ -14,7 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-EPOCH=""; RUNS=1; NULL_FLAG=""; PAIR_FILTER=""; EDIT_MECHANISM="raw"
+EPOCH=""; RUNS=1; NULL_FLAG=""; PAIR_FILTER=""; EDIT_MECHANISM="raw"; ARMS="csharp calor"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epoch) EPOCH="$2"; shift 2 ;;
@@ -22,6 +22,7 @@ while [[ $# -gt 0 ]]; do
         --null-agent) NULL_FLAG="--null-agent"; shift ;;
         --pairs) PAIR_FILTER="$2"; shift 2 ;;
         --edit-mechanism) EDIT_MECHANISM="$2"; shift 2 ;;
+        --arms) ARMS="$2"; shift 2 ;;
         *) echo "Unknown arg: $1" >&2; exit 2 ;;
     esac
 done
@@ -51,7 +52,10 @@ for pair_json in "$SCRIPT_DIR"/pairs/*/pair.json; do
     if [[ -n "$PAIR_FILTER" ]] && ! grep -q "$(basename "$pair_dir" | cut -d- -f1-2)" <<< "$PAIR_FILTER"; then
         continue
     fi
-    for arm in csharp calor; do
+    # --arms restricts the arm set (e.g. "calor" for a single-arm variance
+    # epoch like the D4.5 feasibility dry-run — a variance estimate, not a
+    # comparison; default remains both arms for paired epochs)
+    for arm in $ARMS; do
         echo "=== $pair_id / $arm ==="
         "$SCRIPT_DIR/run-pair.sh" --pair "$pair_dir" --arm "$arm" --runs "$RUNS" \
             --edit-mechanism "$EDIT_MECHANISM" \

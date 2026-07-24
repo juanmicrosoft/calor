@@ -1,0 +1,19 @@
+{
+  "pair": "W3-004-sync-folder",
+  "arm": "calor",
+  "run": 5,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 24,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1159,
+  "envelopeValidAll": true,
+  "tokens": {
+    "input": 4687,
+    "output": 16298
+  },
+  "nullAgent": false
+}

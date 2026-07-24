@@ -1,0 +1,159 @@
+{
+  "epoch": "loop-feasibility-dry-002",
+  "runs": 35,
+  "model": "claude-opus-4-8",
+  "perPair": {
+    "N1-001-string-utils": {
+      "itgMean": 1,
+      "itgSD": 0.0,
+      "itgValues": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "tokMean": 7007,
+      "tokSD": 888,
+      "ml3": [
+        0,
+        0
+      ],
+      "cost": 4.65
+    },
+    "N1-002-inventory": {
+      "itgMean": 1,
+      "itgSD": 0.0,
+      "itgValues": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "tokMean": 5299,
+      "tokSD": 1519,
+      "ml3": [
+        0,
+        0
+      ],
+      "cost": 4.11
+    },
+    "N1-003-csv-row": {
+      "itgMean": 1.4,
+      "itgSD": 0.89,
+      "itgValues": [
+        3,
+        1,
+        1,
+        1,
+        1
+      ],
+      "tokMean": 13897,
+      "tokSD": 4528,
+      "ml3": [
+        2,
+        2
+      ],
+      "cost": 8.38
+    },
+    "N1-005-order-pipeline": {
+      "itgMean": 1,
+      "itgSD": 0.0,
+      "itgValues": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "tokMean": 6724,
+      "tokSD": 1016,
+      "ml3": [
+        0,
+        0
+      ],
+      "cost": 3.77
+    },
+    "W1-003-ledger-rules": {
+      "itgMean": 1,
+      "itgSD": 0.0,
+      "itgValues": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "tokMean": 6116,
+      "tokSD": 1661,
+      "ml3": [
+        0,
+        0
+      ],
+      "cost": 2.79
+    },
+    "W2-005-scheduler": {
+      "itgMean": 1.2,
+      "itgSD": 0.45,
+      "itgValues": [
+        1,
+        1,
+        1,
+        1,
+        2
+      ],
+      "tokMean": 16471,
+      "tokSD": 5529,
+      "ml3": [
+        1,
+        1
+      ],
+      "cost": 6.47
+    },
+    "W3-004-sync-folder": {
+      "itgMean": 1,
+      "itgSD": 0.0,
+      "itgValues": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "tokMean": 16652,
+      "tokSD": 2376,
+      "ml3": [
+        0,
+        0
+      ],
+      "cost": 5.1
+    }
+  },
+  "pooled": {
+    "itgMedian": 1,
+    "itgMean": 1.09,
+    "itgFloorFraction": 0.94,
+    "censoredFraction": 0.0,
+    "tokMedian": 7689,
+    "tokMean": 10309,
+    "ml3Events": [
+      3,
+      3
+    ],
+    "totalCost": 35.28
+  },
+  "itgVerdict": "FLOOR-BOUND: median itg = 1; 94% of runs already at the 1-iteration floor. A 15% reduction from 1 is unobservable in an integer metric with a hard floor \u2014 undetectable at ANY N, not merely underpowered.",
+  "tokensPowerCurve": {
+    "0.05": 0.25,
+    "0.1": 0.57,
+    "0.15": 0.83,
+    "0.2": 0.96,
+    "0.25": 0.98,
+    "0.3": 1.0,
+    "0.4": 1.0,
+    "0.5": 1.0
+  },
+  "tokensMDE80": 0.15,
+  "decision": "Pre-stated rule fires: itg MDE > 15% (floor-bound) -> PP-L5 primary measure moves to tokens-to-green. Tokens MDE at 80% power ~= 15% (n=7 pairs x 5 runs); threshold proposal: >= 15% relative reduction in median per-pair tokens-to-green. M-L3: 3/3 events \u2014 below the 20-event floor -> PP-L4 is reported-not-adjudicated at M5."
+}

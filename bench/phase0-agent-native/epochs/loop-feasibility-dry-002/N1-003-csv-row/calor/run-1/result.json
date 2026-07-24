@@ -1,0 +1,19 @@
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1137,
+  "envelopeValidAll": true,
+  "tokens": {
+    "input": 4959,
+    "output": 19077
+  },
+  "nullAgent": false
+}

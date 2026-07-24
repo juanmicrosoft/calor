@@ -1,0 +1,9 @@
+[
+  {
+    "arm": "calor",
+    "runs": 35,
+    "successRate": 1,
+    "meanEscaped": 0,
+    "censoredFraction": 0
+  }
+]

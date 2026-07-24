@@ -1,0 +1,52 @@
+=== N1-001-string-utils / calor ===
+{"pair":"N1-001-string-utils","arm":"calor","run":1,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-001-string-utils","arm":"calor","run":2,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-001-string-utils","arm":"calor","run":3,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-001-string-utils","arm":"calor","run":4,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-001-string-utils","arm":"calor","run":5,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+=== N1-002-inventory / calor ===
+{"pair":"N1-002-inventory","arm":"calor","run":1,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-002-inventory","arm":"calor","run":2,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-002-inventory","arm":"calor","run":3,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-002-inventory","arm":"calor","run":4,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-002-inventory","arm":"calor","run":5,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+=== N1-003-csv-row / calor ===
+{"pair":"N1-003-csv-row","arm":"calor","run":1,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":3,"censored":false}
+{"pair":"N1-003-csv-row","arm":"calor","run":2,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-003-csv-row","arm":"calor","run":3,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-003-csv-row","arm":"calor","run":4,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-003-csv-row","arm":"calor","run":5,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+=== N1-005-order-pipeline / calor ===
+{"pair":"N1-005-order-pipeline","arm":"calor","run":1,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-005-order-pipeline","arm":"calor","run":2,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-005-order-pipeline","arm":"calor","run":3,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-005-order-pipeline","arm":"calor","run":4,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"N1-005-order-pipeline","arm":"calor","run":5,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+=== W1-003-ledger-rules / calor ===
+{"pair":"W1-003-ledger-rules","arm":"calor","run":1,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W1-003-ledger-rules","arm":"calor","run":2,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W1-003-ledger-rules","arm":"calor","run":3,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W1-003-ledger-rules","arm":"calor","run":4,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W1-003-ledger-rules","arm":"calor","run":5,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+=== W2-005-scheduler / calor ===
+{"pair":"W2-005-scheduler","arm":"calor","run":1,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W2-005-scheduler","arm":"calor","run":2,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W2-005-scheduler","arm":"calor","run":3,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W2-005-scheduler","arm":"calor","run":4,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W2-005-scheduler","arm":"calor","run":5,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":2,"censored":false}
+=== W3-004-sync-folder / calor ===
+{"pair":"W3-004-sync-folder","arm":"calor","run":1,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W3-004-sync-folder","arm":"calor","run":2,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W3-004-sync-folder","arm":"calor","run":3,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W3-004-sync-folder","arm":"calor","run":4,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+{"pair":"W3-004-sync-folder","arm":"calor","run":5,"taskSuccess":true,"escapedBugs":0,"iterationsToGreen":1,"censored":false}
+--- rollup ---
+[
+  {
+    "arm": "calor",
+    "runs": 35,
+    "successRate": 1,
+    "meanEscaped": 0,
+    "censoredFraction": 0
+  }
+]

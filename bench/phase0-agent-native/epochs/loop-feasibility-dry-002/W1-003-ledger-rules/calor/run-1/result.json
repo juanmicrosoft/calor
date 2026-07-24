@@ -1,0 +1,19 @@
+{
+  "pair": "W1-003-ledger-rules",
+  "arm": "calor",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 25,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1258,
+  "envelopeValidAll": true,
+  "tokens": {
+    "input": 4824,
+    "output": 8728
+  },
+  "nullAgent": false
+}

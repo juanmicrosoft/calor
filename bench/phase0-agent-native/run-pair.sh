@@ -511,16 +511,22 @@ run_agent() {
     if command -v timeout >/dev/null 2>&1; then timeout_bin="timeout"
     elif command -v gtimeout >/dev/null 2>&1; then timeout_bin="gtimeout"; fi
 
+    # Model pin: CLAUDE_MODEL was previously recorded in pins.json but never
+    # passed to the agent — the pin was documentation, not enforcement. Pass it
+    # explicitly so epoch pins are true.
+    local model_args=()
+    [[ -n "${CLAUDE_MODEL:-}" && "${CLAUDE_MODEL}" != "default" ]] && model_args=(--model "$CLAUDE_MODEL")
+
     local rc=0
     if [[ -n "$timeout_bin" ]]; then
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
             "$timeout_bin" -k 10 "$TIMEOUT_SECS" \
-            claude --print --output-format json --dangerously-skip-permissions \
+            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) || rc=$?
     else
         set -m
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
-            claude --print --output-format json --dangerously-skip-permissions \
+            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
         local agent_pid=$!
         ( sleep "$TIMEOUT_SECS" && kill -9 -- "-$agent_pid" 2>/dev/null ) &

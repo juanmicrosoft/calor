@@ -1,0 +1,114 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Ledger",
+    "file": "Ledger.calr",
+    "line": 5
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "EntryFee",
+    "file": "Ledger.calr",
+    "line": 6
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "IsValidAccount",
+    "file": "Ledger.calr",
+    "line": 20
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "IsValidAmount",
+    "file": "Ledger.calr",
+    "line": 24
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "PostEntry",
+    "file": "Ledger.calr",
+    "line": 28
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "AccountBalance",
+    "file": "Ledger.calr",
+    "line": 40
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "TotalDebited",
+    "file": "Ledger.calr",
+    "line": 57
+  },
+  {
+    "id": "f007",
+    "kind": "Function",
+    "name": "TotalCredited",
+    "file": "Ledger.calr",
+    "line": 71
+  },
+  {
+    "id": "f008",
+    "kind": "Function",
+    "name": "TotalVolume",
+    "file": "Ledger.calr",
+    "line": 85
+  },
+  {
+    "id": "f009",
+    "kind": "Function",
+    "name": "FeesCollected",
+    "file": "Ledger.calr",
+    "line": 96
+  },
+  {
+    "id": "f010",
+    "kind": "Function",
+    "name": "TransferCost",
+    "file": "Ledger.calr",
+    "line": 104
+  },
+  {
+    "id": "f011",
+    "kind": "Function",
+    "name": "CanAfford",
+    "file": "Ledger.calr",
+    "line": 113
+  },
+  {
+    "id": "f012",
+    "kind": "Function",
+    "name": "Transfer",
+    "file": "Ledger.calr",
+    "line": 120
+  },
+  {
+    "id": "f013",
+    "kind": "Function",
+    "name": "BatchPost",
+    "file": "Ledger.calr",
+    "line": 134
+  },
+  {
+    "id": "f015",
+    "kind": "Function",
+    "name": "ReverseEntry",
+    "file": "Ledger.calr",
+    "line": 154
+  },
+  {
+    "id": "f014",
+    "kind": "Function",
+    "name": "BatchTransfer",
+    "file": "Ledger.calr",
+    "line": 168
+  }
+]
