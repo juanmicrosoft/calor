@@ -41,9 +41,13 @@ censors at budget+1; censored fractions are reported per arm.
   are attributed via `edit_target_ids`, so the denominator does not narrow to
   MCP-mediated edits (plan review m5).
 - **M-L2 (first-apply validity)** splits on `edit_mechanism`.
-- **Latency** is agent-visible wall time — it includes the silent held-out run
-  only if the held-out run delays the agent's prompt return (it does, in the
-  current shim design; the shim records the split when it can).
+- **Latency**: `feedback_latency_ms` is stamped when the build + silent
+  held-out run complete, **before** the shim's telemetry bookkeeping (envelope
+  capture, edit-target attribution, ~2–4 s on edited builds, cached
+  otherwise). The agent's true prompt-return time therefore exceeds the
+  recorded value by the bookkeeping cost; comparisons across arms are fair
+  because both arms pay it identically, but absolute latency claims (PP-L1
+  style) must use the recorded value's definition, not wall-clock-to-prompt.
 - `apply_verdict` / `rejected_edit` being reserved-null in the baseline is
   intentional and honest: the baseline (WS1-only build, tag
   `loop-baseline-ws1`) has no apply path, and the schema must be frozen
