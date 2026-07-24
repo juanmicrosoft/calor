@@ -3,7 +3,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Telemetry;
 
@@ -230,15 +232,11 @@ public sealed class ConvertTool : McpToolBase
                 }
             }
 
-            // Post-conversion validation: re-parse the generated Calor to catch invalid output
-            var issues = result.Issues.Select(i => new ConversionIssueOutput
-            {
-                Severity = i.Severity.ToString().ToLowerInvariant(),
-                Message = i.Message,
-                Line = i.Line ?? 0,
-                Column = i.Column ?? 0,
-                Suggestion = i.Suggestion
-            }).ToList();
+            // Post-conversion validation: re-parse the generated Calor to catch invalid output.
+            // Issues are envelope schema v1.1 entries (Calor1343, feature-prefixed).
+            var issues = result.Issues
+                .Select(i => ConversionIssueEnvelope.Build(i, inputPath))
+                .ToList();
 
             var success = result.Success;
             var calorSourceForOutput = result.CalorSource;
@@ -262,48 +260,23 @@ public sealed class ConvertTool : McpToolBase
                             calorSourceForOutput = fixResult.FixedSource;
                             foreach (var fix in fixResult.AppliedFixes)
                             {
-                                issues.Add(new ConversionIssueOutput
-                                {
-                                    Severity = "info",
-                                    Message = $"Auto-fixed: {fix.Description} (rule: {fix.Rule})",
-                                    Line = 0,
-                                    Column = 0,
-                                    Suggestion = null
-                                });
+                                issues.Add(ConversionIssueEnvelope.Message(
+                                    DiagnosticCode.ConversionIssue, "info",
+                                    $"Auto-fixed: {fix.Description} (rule: {fix.Rule})"));
                             }
                         }
                         else
                         {
                             // Auto-fix didn't fully resolve — report original errors
                             success = false;
-                            foreach (var error in parseResult.Errors)
-                            {
-                                issues.Add(new ConversionIssueOutput
-                                {
-                                    Severity = "error",
-                                    Message = $"Generated Calor failed to parse: {error}",
-                                    Line = 0,
-                                    Column = 0,
-                                    Suggestion = "The converter produced invalid Calor syntax. This is a converter bug — please report it."
-                                });
-                            }
+                            issues.AddRange(BuildGeneratedParseErrors(parseResult));
                         }
                     }
                     else
                     {
                         // No fixes applicable — report original errors
                         success = false;
-                        foreach (var error in parseResult.Errors)
-                        {
-                            issues.Add(new ConversionIssueOutput
-                            {
-                                Severity = "error",
-                                Message = $"Generated Calor failed to parse: {error}",
-                                Line = 0,
-                                Column = 0,
-                                Suggestion = "The converter produced invalid Calor syntax. This is a converter bug — please report it."
-                            });
-                        }
+                        issues.AddRange(BuildGeneratedParseErrors(parseResult));
                     }
                 }
             }
@@ -322,14 +295,9 @@ public sealed class ConvertTool : McpToolBase
                 }
                 catch (Exception ex)
                 {
-                    issues.Add(new ConversionIssueOutput
-                    {
-                        Severity = "warning",
-                        Message = $"Failed to write output file: {ex.Message}",
-                        Line = 0,
-                        Column = 0,
-                        Suggestion = null
-                    });
+                    issues.Add(ConversionIssueEnvelope.Message(
+                        DiagnosticCode.ConversionIssue, "warning",
+                        $"Failed to write output file: {ex.Message}", inputPath));
                 }
             }
 
@@ -421,9 +389,9 @@ public sealed class ConvertTool : McpToolBase
 
         try
         {
-            var conversionIssues = new List<ConversionIssueOutput>();
+            var conversionIssues = new List<EnvelopeDiagnostic>();
             var autoFixes = new List<string>();
-            var diagnosticMessages = new List<string>();
+            var diagnosticEntries = new List<EnvelopeDiagnostic>();
             var compatIssues = new List<string>();
 
             // Stage 1: Convert
@@ -443,14 +411,8 @@ public sealed class ConvertTool : McpToolBase
             var converter = new CSharpToCalorConverter(options);
             var convResult = converter.Convert(source);
 
-            conversionIssues.AddRange(convResult.Issues.Select(i => new ConversionIssueOutput
-            {
-                Severity = i.Severity.ToString().ToLowerInvariant(),
-                Message = i.Message,
-                Line = i.Line ?? 0,
-                Column = i.Column ?? 0,
-                Suggestion = i.Suggestion
-            }));
+            conversionIssues.AddRange(convResult.Issues
+                .Select(i => ConversionIssueEnvelope.Build(i, inputPath)));
 
             if (!convResult.Success || string.IsNullOrWhiteSpace(convResult.CalorSource))
             {
@@ -458,7 +420,7 @@ public sealed class ConvertTool : McpToolBase
                 return Task.FromResult(McpToolResult.Json(BuildValidatedOutput(
                     success: false, stage: "conversion",
                     calorSource: convResult.CalorSource, generatedCSharp: null,
-                    conversionIssues, autoFixes, diagnosticMessages, compatIssues,
+                    conversionIssues, autoFixes, diagnosticEntries, compatIssues,
                     convResult.Context.Stats, sw.Elapsed), isError: true));
             }
 
@@ -486,28 +448,22 @@ public sealed class ConvertTool : McpToolBase
                     else
                     {
                         sw.Stop();
-                        foreach (var error in retryParse.Errors)
-                        {
-                            diagnosticMessages.Add($"Parse error (after auto-fix): {error}");
-                        }
+                        diagnosticEntries.AddRange(retryParse.ToEnvelopeDiagnostics());
                         return Task.FromResult(McpToolResult.Json(BuildValidatedOutput(
                             success: false, stage: "parse",
                             calorSource: fixResult.FixedSource, generatedCSharp: null,
-                            conversionIssues, autoFixes, diagnosticMessages, compatIssues,
+                            conversionIssues, autoFixes, diagnosticEntries, compatIssues,
                             convResult.Context.Stats, sw.Elapsed), isError: true));
                     }
                 }
                 else
                 {
                     sw.Stop();
-                    foreach (var error in parseResult.Errors)
-                    {
-                        diagnosticMessages.Add($"Parse error: {error}");
-                    }
+                    diagnosticEntries.AddRange(parseResult.ToEnvelopeDiagnostics());
                     return Task.FromResult(McpToolResult.Json(BuildValidatedOutput(
                         success: false, stage: "parse",
                         calorSource: calorSource, generatedCSharp: null,
-                        conversionIssues, autoFixes, diagnosticMessages, compatIssues,
+                        conversionIssues, autoFixes, diagnosticEntries, compatIssues,
                         convResult.Context.Stats, sw.Elapsed), isError: true));
                 }
             }
@@ -524,14 +480,15 @@ public sealed class ConvertTool : McpToolBase
                 };
                 var compileResult = Program.Compile(calorSource, "validated-output.calr", compileOptions);
 
-                foreach (var diag in compileResult.Diagnostics.Errors)
+                // Real compile diagnostics as envelope entries; a resolver
+                // built from the parsed AST populates declarationId.
+                DeclarationIdResolver? declarationIds = null;
+                if (compileResult.Ast != null)
                 {
-                    diagnosticMessages.Add($"error: {diag.Message}");
+                    declarationIds = new DeclarationIdResolver();
+                    declarationIds.AddFile("validated-output.calr", calorSource, compileResult.Ast);
                 }
-                foreach (var diag in compileResult.Diagnostics.Warnings)
-                {
-                    diagnosticMessages.Add($"warning: {diag.Message}");
-                }
+                diagnosticEntries.AddRange(DiagnosticEnvelope.Build(compileResult.Diagnostics, declarationIds));
 
                 if (compileResult.HasErrors)
                 {
@@ -539,7 +496,7 @@ public sealed class ConvertTool : McpToolBase
                     return Task.FromResult(McpToolResult.Json(BuildValidatedOutput(
                         success: false, stage: "diagnose",
                         calorSource: calorSource, generatedCSharp: compileResult.GeneratedCode,
-                        conversionIssues, autoFixes, diagnosticMessages, compatIssues,
+                        conversionIssues, autoFixes, diagnosticEntries, compatIssues,
                         convResult.Context.Stats, sw.Elapsed), isError: true));
                 }
 
@@ -548,11 +505,13 @@ public sealed class ConvertTool : McpToolBase
             catch (Exception ex)
             {
                 sw.Stop();
-                diagnosticMessages.Add($"Compilation exception: {ex.Message}");
+                diagnosticEntries.Add(ConversionIssueEnvelope.Message(
+                    DiagnosticCode.CliInternalError, "error",
+                    $"Compilation exception: {ex.Message}"));
                 return Task.FromResult(McpToolResult.Json(BuildValidatedOutput(
                     success: false, stage: "compile",
                     calorSource: calorSource, generatedCSharp: null,
-                    conversionIssues, autoFixes, diagnosticMessages, compatIssues,
+                    conversionIssues, autoFixes, diagnosticEntries, compatIssues,
                     convResult.Context.Stats, sw.Elapsed), isError: true));
             }
 
@@ -590,7 +549,7 @@ public sealed class ConvertTool : McpToolBase
                     return Task.FromResult(McpToolResult.Json(BuildValidatedOutput(
                         success: false, stage: "compat",
                         calorSource: calorSource, generatedCSharp: generatedCSharp,
-                        conversionIssues, autoFixes, diagnosticMessages, compatIssues,
+                        conversionIssues, autoFixes, diagnosticEntries, compatIssues,
                         convResult.Context.Stats, sw.Elapsed), isError: true));
                 }
             }
@@ -609,14 +568,9 @@ public sealed class ConvertTool : McpToolBase
                 }
                 catch (Exception ex)
                 {
-                    conversionIssues.Add(new ConversionIssueOutput
-                    {
-                        Severity = "warning",
-                        Message = $"Failed to write output file: {ex.Message}",
-                        Line = 0,
-                        Column = 0,
-                        Suggestion = null
-                    });
+                    conversionIssues.Add(ConversionIssueEnvelope.Message(
+                        DiagnosticCode.ConversionIssue, "warning",
+                        $"Failed to write output file: {ex.Message}", inputPath));
                 }
             }
 
@@ -625,7 +579,7 @@ public sealed class ConvertTool : McpToolBase
             return Task.FromResult(McpToolResult.Json(BuildValidatedOutput(
                 success: true, stage: "complete",
                 calorSource: calorSource, generatedCSharp: generatedCSharp,
-                conversionIssues, autoFixes, diagnosticMessages, compatIssues,
+                conversionIssues, autoFixes, diagnosticEntries, compatIssues,
                 convResult.Context.Stats, sw.Elapsed)));
         }
         catch (Exception ex)
@@ -646,8 +600,8 @@ public sealed class ConvertTool : McpToolBase
 
         var moduleName = GetString(arguments, "moduleName") ?? "RoundTrip";
 
-        var conversionErrors = new List<string>();
-        var compilationErrors = new List<string>();
+        var conversionErrors = new List<EnvelopeDiagnostic>();
+        var compilationErrors = new List<EnvelopeDiagnostic>();
         string? calorSource = null;
         string? roundTrippedCSharp = null;
         var conversionSuccess = false;
@@ -678,15 +632,13 @@ public sealed class ConvertTool : McpToolBase
             }
             else
             {
-                foreach (var issue in result.Issues)
-                {
-                    conversionErrors.Add($"L{issue.Line ?? 0}: {issue.Message}");
-                }
+                conversionErrors.AddRange(result.Issues.Select(i => ConversionIssueEnvelope.Build(i)));
             }
         }
         catch (Exception ex)
         {
-            conversionErrors.Add($"Conversion exception: {ex.Message}");
+            conversionErrors.Add(ConversionIssueEnvelope.Message(
+                DiagnosticCode.CliInternalError, "error", $"Conversion exception: {ex.Message}"));
         }
 
         // Step 2: Compile Calor → C#
@@ -711,15 +663,21 @@ public sealed class ConvertTool : McpToolBase
                 }
                 else
                 {
-                    foreach (var diag in compileResult.Diagnostics.Errors)
+                    DeclarationIdResolver? declarationIds = null;
+                    if (compileResult.Ast != null)
                     {
-                        compilationErrors.Add($"[{diag.Code}] L{diag.Span.Line}: {diag.Message}");
+                        declarationIds = new DeclarationIdResolver();
+                        declarationIds.AddFile("roundtrip.calr", calorSource, compileResult.Ast);
                     }
+                    compilationErrors.AddRange(
+                        DiagnosticEnvelope.Build(compileResult.Diagnostics, declarationIds)
+                            .Where(e => e.Severity == "error"));
                 }
             }
             catch (Exception ex)
             {
-                compilationErrors.Add($"Compilation exception: {ex.Message}");
+                compilationErrors.Add(ConversionIssueEnvelope.Message(
+                    DiagnosticCode.CliInternalError, "error", $"Compilation exception: {ex.Message}"));
             }
         }
 
@@ -840,12 +798,32 @@ public sealed class ConvertTool : McpToolBase
         return Regex.Replace(text, @"\s+", " ").Trim();
     }
 
+    /// <summary>
+    /// Envelope entries for parse failures of the converter's own output: the
+    /// real parser diagnostics (code + location in the generated Calor), with a
+    /// message prefix and converter-bug suggestion preserved from the old shape.
+    /// </summary>
+    private static List<EnvelopeDiagnostic> BuildGeneratedParseErrors(ParseResult parse)
+    {
+        return parse.ToEnvelopeDiagnostics()
+            .Select(e => new EnvelopeDiagnostic
+            {
+                Code = e.Code,
+                Message = $"Generated Calor failed to parse: {e.Message}",
+                Severity = "error",
+                Location = e.Location,
+                DeclarationId = e.DeclarationId,
+                Suggestion = "The converter produced invalid Calor syntax. This is a converter bug — please report it."
+            })
+            .ToList();
+    }
+
     private static ValidatedOutput BuildValidatedOutput(
         bool success, string stage,
         string? calorSource, string? generatedCSharp,
-        List<ConversionIssueOutput> conversionIssues,
+        List<EnvelopeDiagnostic> conversionIssues,
         List<string> autoFixes,
-        List<string> diagnostics,
+        List<EnvelopeDiagnostic> diagnostics,
         List<string> compatIssues,
         ConversionStats stats,
         TimeSpan duration)
@@ -894,8 +872,9 @@ public sealed class ConvertTool : McpToolBase
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? OutputPath { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("issues")]
-        public required List<ConversionIssueOutput> Issues { get; init; }
+        public required List<EnvelopeDiagnostic> Issues { get; init; }
 
         [JsonPropertyName("stats")]
         public required ConversionStatsOutput Stats { get; init; }
@@ -981,14 +960,16 @@ public sealed class ConvertTool : McpToolBase
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? GeneratedCSharp { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("conversionIssues")]
-        public required List<ConversionIssueOutput> ConversionIssues { get; init; }
+        public required List<EnvelopeDiagnostic> ConversionIssues { get; init; }
 
         [JsonPropertyName("autoFixes")]
         public required List<string> AutoFixes { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (parse + compile diagnostics).</summary>
         [JsonPropertyName("diagnostics")]
-        public required List<string> Diagnostics { get; init; }
+        public required List<EnvelopeDiagnostic> Diagnostics { get; init; }
 
         [JsonPropertyName("compatIssues")]
         public required List<string> CompatIssues { get; init; }
@@ -1034,13 +1015,15 @@ public sealed class ConvertTool : McpToolBase
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<LineDifference>? Differences { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (conversion issues, Calor1343).</summary>
         [JsonPropertyName("conversionErrors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<string>? ConversionErrors { get; init; }
+        public List<EnvelopeDiagnostic>? ConversionErrors { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (Calor→C# compile errors).</summary>
         [JsonPropertyName("compilationErrors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<string>? CompilationErrors { get; init; }
+        public List<EnvelopeDiagnostic>? CompilationErrors { get; init; }
     }
 
     private sealed class LineDifference

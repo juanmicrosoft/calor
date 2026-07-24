@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Diagnostics;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -109,7 +110,7 @@ public sealed class NavigateTool : McpToolBase
             return McpToolResult.Json(new GotoDefinitionOutput
             {
                 Found = false,
-                Errors = parseResult.Errors.ToList()
+                Errors = parseResult.ToEnvelopeDiagnostics()
             }, isError: true);
         }
 
@@ -283,7 +284,7 @@ public sealed class NavigateTool : McpToolBase
             return McpToolResult.Json(new FindReferencesOutput
             {
                 Success = false,
-                Errors = parseResult.Errors.ToList()
+                Errors = parseResult.ToEnvelopeDiagnostics()
             }, isError: true);
         }
 
@@ -823,7 +824,7 @@ public sealed class NavigateTool : McpToolBase
             return McpToolResult.Json(new SymbolInfoOutput
             {
                 Found = false,
-                Errors = parseResult.Errors.ToList()
+                Errors = parseResult.ToEnvelopeDiagnostics()
             }, isError: true);
         }
 
@@ -1135,7 +1136,7 @@ public sealed class NavigateTool : McpToolBase
             parseResult = CalorSourceHelper.Parse(source!, filePath);
 
         if (!parseResult.IsSuccess)
-            return McpToolResult.Json(new { success = false, errors = parseResult.Errors.ToList() }, isError: true);
+            return McpToolResult.Json(new { success = false, errors = parseResult.ToEnvelopeDiagnostics() }, isError: true);
 
         var ast = parseResult.Ast!;
         var offset = CalorSourceHelper.GetOffset(parseResult.Source!, line, column);
@@ -1330,7 +1331,8 @@ public sealed class NavigateTool : McpToolBase
         [JsonPropertyName("symbolKind")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? SymbolKind { get; init; }
         [JsonPropertyName("preview")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Preview { get; init; }
         [JsonPropertyName("message")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Message { get; init; }
-        [JsonPropertyName("errors")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<string>? Errors { get; init; }
+        /// <summary>Envelope schema v1.1 diagnostic entries for parse errors.</summary>
+        [JsonPropertyName("errors")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<EnvelopeDiagnostic>? Errors { get; init; }
     }
 
     private sealed class FindReferencesOutput
@@ -1341,7 +1343,8 @@ public sealed class NavigateTool : McpToolBase
         [JsonPropertyName("referenceCount")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int ReferenceCount { get; init; }
         [JsonPropertyName("references")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<ReferenceLocation>? References { get; init; }
         [JsonPropertyName("message")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Message { get; init; }
-        [JsonPropertyName("errors")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<string>? Errors { get; init; }
+        /// <summary>Envelope schema v1.1 diagnostic entries for parse errors.</summary>
+        [JsonPropertyName("errors")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<EnvelopeDiagnostic>? Errors { get; init; }
     }
 
     private sealed class FindReferencesGroupedOutput
@@ -1400,7 +1403,8 @@ public sealed class NavigateTool : McpToolBase
         [JsonPropertyName("memberCount")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int MemberCount { get; init; }
         [JsonPropertyName("enumMembers")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<string>? EnumMembers { get; init; }
         [JsonPropertyName("message")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? Message { get; init; }
-        [JsonPropertyName("errors")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<string>? Errors { get; init; }
+        /// <summary>Envelope schema v1.1 diagnostic entries for parse errors.</summary>
+        [JsonPropertyName("errors")][JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<EnvelopeDiagnostic>? Errors { get; init; }
     }
 
     private sealed class ParameterInfoDto

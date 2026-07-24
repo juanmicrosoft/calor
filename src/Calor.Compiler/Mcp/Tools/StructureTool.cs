@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Diagnostics;
 
 namespace Calor.Compiler.Mcp.Tools;
 
@@ -117,7 +118,7 @@ public sealed class StructureTool : McpToolBase
             return McpToolResult.Json(new DocumentOutlineOutput
             {
                 Success = false,
-                Errors = parseResult.Errors.ToList()
+                Errors = parseResult.ToEnvelopeDiagnostics()
             }, isError: true);
         }
 
@@ -437,7 +438,7 @@ public sealed class StructureTool : McpToolBase
             parseResult = CalorSourceHelper.Parse(source!, filePath);
 
         if (!parseResult.IsSuccess)
-            return McpToolResult.Json(new { success = false, errors = parseResult.Errors.ToList() }, isError: true);
+            return McpToolResult.Json(new { success = false, errors = parseResult.ToEnvelopeDiagnostics() }, isError: true);
 
         var ast = parseResult.Ast!;
         var callGraph = CallGraphAnalysis.Build(ast);
@@ -608,7 +609,7 @@ public sealed class StructureTool : McpToolBase
             parseResult = CalorSourceHelper.Parse(source!, filePath);
 
         if (!parseResult.IsSuccess)
-            return McpToolResult.Json(new { success = false, errors = parseResult.Errors.ToList() }, isError: true);
+            return McpToolResult.Json(new { success = false, errors = parseResult.ToEnvelopeDiagnostics() }, isError: true);
 
         var ast = parseResult.Ast!;
 
@@ -858,9 +859,10 @@ public sealed class StructureTool : McpToolBase
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public OutlineSummary? Summary { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries for parse errors.</summary>
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<string>? Errors { get; init; }
+        public List<EnvelopeDiagnostic>? Errors { get; init; }
     }
 
     private sealed class OutlineSymbol

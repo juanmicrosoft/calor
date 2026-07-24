@@ -100,6 +100,34 @@ public class ConvertToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_Issues_AreEnvelopeDiagnostics()
+    {
+        // Envelope schema v1.1 (loop plan D1.3): conversion issues are
+        // EnvelopeDiagnostic entries with code Calor1343, not flat DTOs.
+        var args = JsonDocument.Parse("""
+            {
+                "source": "public class { invalid syntax"
+            }
+            """).RootElement;
+
+        var result = await _tool.ExecuteAsync(args);
+
+        Assert.True(result.IsError);
+        var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+        var issues = root.GetProperty("issues").EnumerateArray().ToList();
+        Assert.NotEmpty(issues);
+        foreach (var entry in issues)
+        {
+            Assert.Equal("Calor1343", entry.GetProperty("code").GetString());
+            Assert.Contains(entry.GetProperty("severity").GetString(),
+                new[] { "error", "warning", "info" });
+            var location = entry.GetProperty("location");
+            Assert.True(location.GetProperty("line").GetInt32() >= 0);
+            Assert.True(location.GetProperty("column").GetInt32() >= 0);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithMissingSource_ReturnsError()
     {
         var args = JsonDocument.Parse("""{}""").RootElement;

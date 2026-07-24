@@ -366,7 +366,7 @@ Convert C# source code to Calor.
 }
 ```
 
-**Output:** Generated Calor code and conversion statistics.
+**Output:** Generated Calor code and conversion statistics. `issues[]` are envelope schema v1.1 diagnostic entries (`Calor1343`, feature name prefixed) — see [Envelope Schema](/calor/cli/envelope-schema/).
 
 ### calor_convert_validated
 
@@ -384,7 +384,7 @@ Full validated conversion pipeline: convert C# to Calor, auto-fix parse errors, 
 }
 ```
 
-**Output:** Stage-by-stage results (convert, fix, diagnose, compat) with the final Calor code and any issues found at each stage.
+**Output:** Stage-by-stage results (convert, fix, diagnose, compat) with the final Calor code and any issues found at each stage. `conversionIssues[]` and `diagnostics[]` are envelope schema v1.1 diagnostic entries (compile diagnostics carry `declarationId`).
 
 ### calor_analyze_convertibility
 
@@ -443,7 +443,7 @@ Find the definition of a symbol at a given position. Provide either `source` for
 }
 ```
 
-**Output:** Definition location with file path, line, column, symbol name, kind, and source preview.
+**Output:** Definition location with file path, line, column, symbol name, kind, and source preview. On parse failure, `errors[]` are envelope schema v1.1 diagnostic entries.
 
 ### calor_find_references
 
@@ -494,7 +494,7 @@ Get a structured outline of all symbols in a Calor source file. Returns a hierar
 }
 ```
 
-**Output:** Hierarchical symbol tree with name, kind, line, detail, and children. Includes summary counts by symbol type.
+**Output:** Hierarchical symbol tree with name, kind, line, detail, and children. Includes summary counts by symbol type. On parse failure, `errors[]` are envelope schema v1.1 diagnostic entries.
 
 ### calor_find_symbol
 
@@ -713,7 +713,7 @@ Format Calor source code to canonical style.
 }
 ```
 
-**Output:** Formatted code and whether it changed from the original.
+**Output:** Formatted code and whether it changed from the original. On parse failure, `errors[]` are envelope schema v1.1 diagnostic entries built from the real parser diagnostics.
 
 ### calor_syntax_help
 
@@ -770,7 +770,7 @@ Manage Calor declaration IDs. Check for missing, duplicate, or invalid IDs and o
 }
 ```
 
-**Output:** For 'check': ID issues with type, line, kind, name, and message. For 'assign': Modified code and list of assignments.
+**Output:** For 'check': envelope schema v1.1 diagnostic entries (`Calor0800`-band, with `declarationId`) plus `totalIds`/`issueCount` summary counts. For 'assign': Modified code and list of assignments.
 
 ### calor_self_test
 

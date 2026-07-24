@@ -91,4 +91,52 @@ public class BatchConvertToolTests
             Directory.Delete(tempDir, true);
         }
     }
+
+    [Fact]
+    public async Task ExecuteAsync_CompileMode_ErrorsAreEnvelopeDiagnostics()
+    {
+        // Envelope schema v1.1 (loop plan D1.3): per-file compile errors are
+        // the real compiler diagnostics as EnvelopeDiagnostic entries, not
+        // "[Code] Ln: msg" strings.
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-batch-envelope-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            // Structural closer tags are a hard parser error (Calor0830)
+            File.WriteAllText(Path.Combine(tempDir, "Bad.calr"),
+                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"hi\"\n  §/F{f001}\n");
+
+            var args = JsonDocument.Parse($$"""
+                {
+                    "action": "compile",
+                    "projectPath": {{JsonSerializer.Serialize(tempDir)}}
+                }
+                """).RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.True(result.IsError);
+            var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.False(root.GetProperty("success").GetBoolean());
+
+            var file = Assert.Single(root.GetProperty("files").EnumerateArray());
+            Assert.False(file.GetProperty("success").GetBoolean());
+
+            var errors = file.GetProperty("errors").EnumerateArray().ToList();
+            Assert.NotEmpty(errors);
+            foreach (var entry in errors)
+            {
+                Assert.StartsWith("Calor", entry.GetProperty("code").GetString());
+                Assert.Equal("error", entry.GetProperty("severity").GetString());
+                var location = entry.GetProperty("location");
+                Assert.True(location.GetProperty("line").GetInt32() >= 1);
+                Assert.True(location.GetProperty("column").GetInt32() >= 1);
+            }
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
 }

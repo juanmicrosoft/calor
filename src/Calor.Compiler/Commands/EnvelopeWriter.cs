@@ -52,10 +52,14 @@ internal static class EnvelopeWriter
     /// Wraps an already-serialized JSON payload (e.g. a report produced by a
     /// generator that owns its own serialization) under <c>data</c>.
     /// </summary>
-    public static string SerializeRaw(string command, string dataJson)
+    public static string SerializeRaw(
+        string command,
+        string dataJson,
+        IEnumerable<Diagnostic>? diagnostics = null,
+        DeclarationIdResolver? resolver = null)
     {
         using var doc = JsonDocument.Parse(dataJson);
-        return Serialize(command, doc.RootElement.Clone());
+        return Serialize(command, doc.RootElement.Clone(), diagnostics, resolver);
     }
 
     private sealed class Envelope

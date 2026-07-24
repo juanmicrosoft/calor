@@ -2,9 +2,11 @@ using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Init;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Telemetry;
 using Calor.Compiler.Verification.Z3;
 
@@ -94,7 +96,9 @@ public static class MigrateCommand
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
             var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
 
-            await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
+            // Exit code returned through ctx.ExitCode: a code parked only on
+            // Environment.ExitCode is overwritten by Main's InvokeAsync return.
+            ctx.ExitCode = await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
                 reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout,
                 explicitCallClosers);
         });
@@ -102,7 +106,7 @@ public static class MigrateCommand
         return command;
     }
 
-    private static async Task ExecuteAsync(
+    private static async Task<int> ExecuteAsync(
         DirectoryInfo path,
         bool dryRun,
         bool benchmark,
@@ -123,12 +127,12 @@ public static class MigrateCommand
             telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
         }
         var sw = Stopwatch.StartNew();
+        var exitCode = 0;
 
         if (!path.Exists && !File.Exists(path.FullName))
         {
             Console.Error.WriteLine($"Error: Path not found: {path.FullName}");
-            Environment.ExitCode = 1;
-            return;
+            return 1;
         }
 
         var migrationDirection = direction.ToLowerInvariant() switch
@@ -167,7 +171,7 @@ public static class MigrateCommand
             if (plan.ConvertibleFiles == 0 && plan.PartialFiles == 0)
             {
                 Console.WriteLine("No files to migrate.");
-                return;
+                return exitCode;
             }
 
             // ── Phase 2/4: Analyzing migration potential ──
@@ -210,7 +214,7 @@ public static class MigrateCommand
                 Console.WriteLine("Dry run - no files will be modified.");
                 Console.WriteLine();
                 ShowPlanDetails(plan, verbose);
-                return;
+                return exitCode;
             }
 
             // ── Phase 3/4: Converting files ──
@@ -366,15 +370,25 @@ public static class MigrateCommand
                 Console.WriteLine();
             }
 
-            // Save report if requested
+            // Save report if requested. The .json report is wrapped in the
+            // envelope schema v1.1 document ({version, command, diagnostics,
+            // summary, data}); the report shape itself is unchanged under
+            // `data`. The .md report is unchanged.
             if (reportPath != null)
             {
                 var generator = new MigrationReportGenerator(enrichedReport);
-                var format = reportPath.Extension.ToLowerInvariant() == ".json"
-                    ? ReportFormat.Json
-                    : ReportFormat.Markdown;
-
-                await generator.SaveAsync(reportPath.FullName, format);
+                if (reportPath.Extension.ToLowerInvariant() == ".json")
+                {
+                    var envelope = EnvelopeWriter.SerializeRaw(
+                        "migrate",
+                        generator.GenerateJson(),
+                        BuildReportDiagnostics(enrichedReport));
+                    await File.WriteAllTextAsync(reportPath.FullName, envelope);
+                }
+                else
+                {
+                    await generator.SaveAsync(reportPath.FullName, ReportFormat.Markdown);
+                }
                 Console.WriteLine($"Report saved: {reportPath.FullName}");
             }
 
@@ -394,10 +408,10 @@ public static class MigrateCommand
                 }
             }
 
-            // Set exit code based on results
+            // Exit code based on results (returned through ctx.ExitCode)
             if (enrichedReport.Summary.FailedFiles > 0)
             {
-                Environment.ExitCode = 1;
+                exitCode = 1;
             }
         }
         catch (Exception ex)
@@ -408,7 +422,7 @@ public static class MigrateCommand
                 Console.Error.WriteLine(ex.StackTrace);
             }
             telemetry?.TrackException(ex);
-            Environment.ExitCode = 1;
+            exitCode = 1;
         }
         finally
         {
@@ -424,12 +438,46 @@ public static class MigrateCommand
                 telemetryProps["verifyDisproven"] = verificationSummary.Disproven.ToString();
                 telemetryProps["verifyDurationMs"] = verificationSummary.Duration.TotalMilliseconds.ToString("F0");
             }
-            telemetry?.TrackCommand("migrate", Environment.ExitCode, telemetryProps);
-            if (Environment.ExitCode != 0)
+            telemetry?.TrackCommand("migrate", exitCode, telemetryProps);
+            if (exitCode != 0)
             {
                 IssueReporter.PromptForIssue(telemetry?.OperationId ?? "unknown", "migrate", "Migration failed");
             }
         }
+
+        return exitCode;
+    }
+
+    /// <summary>
+    /// Per-file conversion issues as envelope diagnostics (Calor1343, feature
+    /// name prefixed — the same mapping `calor convert --format json` uses),
+    /// so findings never hide inside the report payload.
+    /// </summary>
+    private static List<Diagnostic> BuildReportDiagnostics(MigrationReport report)
+    {
+        var diagnostics = new List<Diagnostic>();
+        foreach (var fileResult in report.FileResults)
+        {
+            foreach (var issue in fileResult.Issues)
+            {
+                var severity = issue.Severity switch
+                {
+                    ConversionIssueSeverity.Error => DiagnosticSeverity.Error,
+                    ConversionIssueSeverity.Warning => DiagnosticSeverity.Warning,
+                    _ => DiagnosticSeverity.Info
+                };
+                var message = issue.Feature != null
+                    ? $"[{issue.Feature}] {issue.Message}"
+                    : issue.Message;
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCode.ConversionIssue,
+                    message,
+                    new TextSpan(0, 0, issue.Line ?? 1, issue.Column ?? 1),
+                    severity,
+                    fileResult.SourcePath));
+            }
+        }
+        return diagnostics;
     }
 
     private static void ShowPlanDetails(MigrationPlan plan, bool verbose)
