@@ -99,3 +99,4 @@ bench/phase0-agent-native/epochs/**/.itercount
 bench/phase0-agent-native/epochs/**/.src_build.txt
 bench/phase0-agent-native/epochs/**/.ho_last.txt
 bench/phase0-agent-native/epochs/**/.ho_final.txt
+bench/phase0-agent-native/epochs/**/heldout/
