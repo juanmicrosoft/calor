@@ -95,8 +95,8 @@ to be filled from a 3-run calibration before any epoch is authorized):
 | Median per-run cost | $1.41 (max observed $1.92) |
 | Runs this epoch (pairs × runs) | 35 (all 7 non-retired pairs × 5 runs) |
 | Projected epoch cost | ~$49 at median, ~$67 at max-observed |
-| Ceiling accepted | pending sign-off (gates doc §6 names $1,500/epoch for Phase-0-style feasibility; projection is ~4% of it) |
-| Model pin | calibration ran on the account default (claude-fable-5 + haiku auxiliary); **pin to be decided at authorization** — the dry-run must use the model that will run the M5 epochs, or its variance estimate doesn't transfer |
+| Ceiling accepted | **authorized 2026-07-24**: full dry-run (35 runs, ~$49–67 projected) under the $1,500 feasibility ceiling |
+| Model pin | **deferred — the launch blocker.** Calibration ran on the account default (claude-fable-5 + haiku auxiliary). The dry-run launches once the pin is chosen; it must match the M5 epochs' model or the variance estimate doesn't transfer. Cost projections re-check trivially at a cheaper pin |
 
 Calibration data: `bench/phase0-agent-native/epochs/loop-calibration-001/`
 (3 live runs, telemetry v2 journals schema-valid, all taskSuccess). Early
