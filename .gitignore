@@ -83,3 +83,7 @@ CLAUDE.md.bak
 # Calor incremental build state (calor --cache / calor watch / MSBuild task)
 .calor-build-state.json
 .claude/worktrees/
+
+# Verification fixture corpora: local verify runs must not commit artifacts
+tests/TestData/Verification/**/.calor/
+tests/TestData/Verification/**/*.g.cs
