@@ -100,12 +100,20 @@ After freezing, this document may be superseded only for a **documented empirica
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
 **Annex version: A-1.0 (frozen 2026-07-24).** This annex is **additive-only
-and observational-only**: nothing here is a gate criterion, and no §1–§7 gate
-references any metric defined here. It carries its own version counter and
+with respect to the main document**: no §1–§7 machine-adjudicable gate
+criterion references any metric defined here, and nothing here alters the
+C#-vs-Calor gate decisions those sections govern. The annex's own proof-point
+thresholds (A.2) ARE adjudicated pass/fail criteria — for the **loop program's
+tooling-investment decisions** (the loop plan's PP-L*), a separate question
+from the language gates. Stated precisely so "observational" is not
+overclaimed (review of #795 item 2). It carries its own version counter and
 revision log; changes to this annex never constitute supersession of the main
 document. Pre-registered per the loop plan's D4.4 discipline: thresholds were
 frozen from the `loop-feasibility-dry-002` variance epoch **before** any
-treatment build exists.
+treatment build exists. **Merge-order dependency**: the governing plan
+(`loop-plan-v0.9.md`, PR #747) must be on main before or with this annex, or
+its §-references dangle and the pre-registration claim is unverifiable from
+the repo (review of #795 item 1).
 
 ### A.1 Instrument metric definitions
 
@@ -143,7 +151,7 @@ pairing, and censoring follow §2 of this document.
 | PP-L2 (machine-actionable failures) | M-E1 = 100 %; M-E2 ≥ 90 %; M-E3 = 100 % | met at WS1 exit (#754/#757); regression = CI failure |
 | PP-L3 (node vs file edits) | **retired unrun** | machine-zone E1 killed H1 (55 % pooled); pre-committed scope gate |
 | PP-L4 (diagnostics steer the agent) | **reported-not-adjudicated** | dry-run found 3 qualifying M-L3 events across 35 runs — floor (20) unreachable at authorable-fixture scale |
-| PP-L5 (loop tooling pays off) | **≥ 15 % relative reduction in median per-pair tokens-to-green**, arm A (`loop-baseline-ws1`) vs arm B (baseline + WS2/WS3 isolation build), simultaneous epoch, ≥ 7 pairs × ≥ 5 runs/arm, §6.1 adjudication | dry-run: iterations-to-green floor-bound (median 1, 94 % at floor → undetectable at any N); tokens MDE at 80 % power ≈ 15 % at the stated N. Pre-registered fallback applied **before** freezing |
+| PP-L5 (loop tooling pays off) | **≥ 15 % relative reduction in median per-pair tokens-to-green**, arm A (`loop-baseline-ws1`) vs arm B (baseline + WS2/WS3 isolation build), simultaneous epoch, ≥ 7 pairs × ≥ 5 runs/arm, §6.1 adjudication | dry-run: iterations-to-green floor-bound (median 1, 94 % at floor → undetectable at any N); tokens MDE at 80 % power ≈ 15 % at the stated N — a **design-stage simulation estimate over only 7 clusters** (400 sims × 200-resample cluster bootstrap), so the MDE itself carries wide uncertainty; if the M5 epoch's realized variance is materially higher, the miss is reported as underpowered rather than adjudicated as a clean miss. Pre-registered fallback applied **before** freezing |
 
 Sub-integer disclosure: the iterations-to-green primary measure was moved to
 tokens-to-green because the dry-run showed it floor-bound — the loop plan's
@@ -155,4 +163,6 @@ freezing — never after") applied as written.
 **A-1.0 (2026-07-24).** Initial freeze. Definitions from loop plan §4;
 thresholds per the `loop-feasibility-dry-002` verdict
 (`bench/phase0-agent-native/epochs/loop-feasibility-dry-002/VERDICT.md`);
-PP-L5 tokens threshold approved by the maintainer 2026-07-24.
+PP-L5 tokens threshold approved by the maintainer 2026-07-24 (recorded in
+the PR #795 conversation; at bus factor 1 this approval is self-asserted —
+disclosed per the main document's §7 convention).
