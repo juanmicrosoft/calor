@@ -254,6 +254,48 @@ public class MigrateToolTests
         }
     }
 
+    [Fact]
+    public async Task ExecuteAsync_CompilePhase_ErrorsAreEnvelopeDiagnostics()
+    {
+        // Envelope schema v1.1 (loop plan D1.3): per-file compile errors are
+        // the real compiler diagnostics as EnvelopeDiagnostic entries, not
+        // "[Code] Ln: msg" strings.
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            // Structural closer tags are a hard parser error (Calor0830)
+            File.WriteAllText(Path.Combine(tempDir, "Bad.calr"),
+                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"hi\"\n  §/F{f001}\n");
+
+            var args = JsonDocument.Parse($$"""{"projectPath": "{{tempDir.Replace("\\", "\\\\")}}", "phase": "compile"}""").RootElement;
+            var result = await _tool.ExecuteAsync(args);
+
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.Equal("compile", json.GetProperty("phase").GetString());
+
+            var file = Assert.Single(json.GetProperty("perFile").EnumerateArray());
+            Assert.Equal("failed", file.GetProperty("status").GetString());
+
+            var errors = file.GetProperty("errors").EnumerateArray().ToList();
+            Assert.NotEmpty(errors);
+            foreach (var entry in errors)
+            {
+                Assert.StartsWith("Calor", entry.GetProperty("code").GetString());
+                Assert.Equal("error", entry.GetProperty("severity").GetString());
+                Assert.True(entry.GetProperty("location").GetProperty("line").GetInt32() >= 1);
+            }
+
+            // Summary categories are keyed by envelope diagnostic code
+            var categories = json.GetProperty("summary").GetProperty("errorCategories");
+            Assert.All(categories.EnumerateObject(), c => Assert.StartsWith("Calor", c.Name));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────
 
     private static string CreateTempDirWithCsFile()
@@ -294,4 +336,36 @@ public class MigrateToolTests
             """);
         return tempDir;
     }
+
+    [Fact]
+    public async Task ExecuteAsync_CompilePhase_BindError_CarriesDeclarationId()
+    {
+        // review of #757 item 2: pin the declarationId capability on the
+        // migrate compile phase — Calor0250 parses to a full AST, so the
+        // entry must resolve to its enclosing function ID.
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-declid-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
+                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §B{x}\n");
+
+            var args = JsonDocument.Parse($$"""{"projectPath": {{JsonSerializer.Serialize(tempDir)}}, "phase": "compile"}""").RootElement;
+            var result = await _tool.ExecuteAsync(args);
+
+            var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            var file = root.GetProperty("perFile").EnumerateArray()
+                .Single(f => f.GetProperty("path").GetString()!.EndsWith("BindError.calr"));
+            var entry = file.GetProperty("errors").EnumerateArray()
+                .Single(e => e.GetProperty("code").GetString() == "Calor0250");
+
+            Assert.Equal("f001", entry.GetProperty("declarationId").GetString());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
 }
+

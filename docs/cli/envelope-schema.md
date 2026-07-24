@@ -145,7 +145,7 @@ Classes:
 | `feature-check` | D | **Yes** | payloads under `data` |
 | `analyze-convertibility` | D | **Yes** | file/directory payloads under `data` |
 | `fix` | D | **Yes** (`--format json`) | operation summary under `data`; `migration.log.json` unchanged |
-| `migrate` | D | No | `--report` file, own report schema |
+| `migrate` | D | **Yes** (`--report *.json`) | report file envelope-wrapped; conversion issues as `Calor1343` diagnostics |
 | `evaluation` | X | — | internal A/B harness registry; consumed only by the epoch tooling, schema owned by `bench/` |
 | `hook` | X | — | agent-gate responses whose dialect is dictated by the host agent (`--format gemini` etc.) |
 | `init` | X | — | scaffolding; human-oriented status only |
@@ -164,19 +164,21 @@ Classes:
 | `calor_refine` | E | **Yes** | `proof_status` + `counterexample_bindings` added (snake_case retained) |
 | `calor_analyze` | E | **Yes** | issue groups are envelope entries with `declarationId` |
 | `calor_edit_preview` | E | **Yes** | `compilationResult.errors` are envelope entries; verdict payload unchanged |
-| `calor_convert` | E | No | conversion issues, flat |
-| `calor_batch` | E | No | per-file error strings |
-| `calor_migrate` | E | No | per-file `[Code] Ln: msg` strings |
-| `calor_navigate` | E | No | parse errors as strings |
-| `calor_structure` | E | No | parse errors as strings |
-| `calor_format` | E | No | ids issues, own shape |
-| `calor_fix` | D | No | applied-fix report |
+| `calor_convert` | E | **Yes** | issues as `Calor1343` envelope entries; validate-mode diagnostics carry `declarationId` |
+| `calor_batch` | E | **Yes** | per-file envelope entries (real compiler diagnostics in compile mode) |
+| `calor_migrate` | E | **Yes** | per-file envelope entries in all phases; `errorCategories` keyed by code |
+| `calor_navigate` | E | **Yes** | parse errors as envelope entries |
+| `calor_structure` | E | **Yes** | parse errors as envelope entries |
+| `calor_format` | E | **Yes** | parser + `Calor0800`-band diagnostics as envelope entries with `declarationId` |
+| `calor_fix` | D | **Yes** (by audit) | applied-fix records only; verified no diagnostic-shaped data hides in the payload |
 | `calor_help` | X | — | documentation lookup; no source-anchored diagnostics |
 | `calor_self_test` | X | — | golden-diff scenarios |
 
-**M-E1 (envelope coverage)** = adopted E+D surfaces / all E+D surfaces. The
-"Envelope adopted?" column is flipped by the WS1 adoption sweep (loop plan
-D1.3); WS1 exits at 100 %.
+**M-E1 (envelope coverage)** = adopted E+D surfaces / all E+D surfaces =
+**29/29 = 100 %** as of the final D1.3 sweep — the WS1 exit criterion is met.
+Any new command or MCP tool must be added to this table (with an envelope
+adoption or a reviewed exemption) before it ships; the conformance suite and
+this table are the drift guards.
 
 ## Versioning rules
 

@@ -367,6 +367,62 @@ public class LspMcpToolsTests
 
     #endregion
 
+    #region Parse Error Envelope Tests
+
+    // Structural closer tags are a hard parser error (Calor0830); envelope
+    // schema v1.1 (loop plan D1.3): parse errors surface as EnvelopeDiagnostic
+    // entries built from the parser's DiagnosticBag, not flat strings.
+    private static readonly string BrokenSource =
+        "\u00a7M{m001:Test}\n  \u00a7F{f001:Foo:pub} () -> void\n    \u00a7P \"hi\"\n  \u00a7/F{f001}\n";
+
+    [Fact]
+    public async Task Navigate_ParseError_ReturnsEnvelopeDiagnostics()
+    {
+        var tool = new NavigateTool();
+        var args = CreateArgs(BrokenSource, line: 2, column: 10, action: "definition");
+
+        var result = await tool.ExecuteAsync(args);
+
+        Assert.True(result.IsError);
+        var output = ParseOutput(result.Content);
+        Assert.False(output.GetProperty("found").GetBoolean());
+
+        var errors = output.GetProperty("errors").EnumerateArray().ToList();
+        Assert.NotEmpty(errors);
+        foreach (var entry in errors)
+        {
+            Assert.StartsWith("Calor", entry.GetProperty("code").GetString());
+            Assert.Equal("error", entry.GetProperty("severity").GetString());
+            var location = entry.GetProperty("location");
+            Assert.True(location.GetProperty("line").GetInt32() >= 1);
+            Assert.True(location.GetProperty("column").GetInt32() >= 1);
+        }
+    }
+
+    [Fact]
+    public async Task StructureOutline_ParseError_ReturnsEnvelopeDiagnostics()
+    {
+        var tool = new StructureTool();
+        var args = CreateOutlineArgs(BrokenSource);
+
+        var result = await tool.ExecuteAsync(args);
+
+        Assert.True(result.IsError);
+        var output = ParseOutput(result.Content);
+        Assert.False(output.GetProperty("success").GetBoolean());
+
+        var errors = output.GetProperty("errors").EnumerateArray().ToList();
+        Assert.NotEmpty(errors);
+        foreach (var entry in errors)
+        {
+            Assert.StartsWith("Calor", entry.GetProperty("code").GetString());
+            Assert.Equal("error", entry.GetProperty("severity").GetString());
+            Assert.True(entry.GetProperty("location").GetProperty("line").GetInt32() >= 1);
+        }
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private static JsonElement CreateArgs(string source, int line, int column, string? action = null)

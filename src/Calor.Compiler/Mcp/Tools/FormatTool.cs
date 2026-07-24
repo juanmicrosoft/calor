@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
 using Calor.Compiler.Ids;
@@ -119,7 +120,8 @@ public sealed class FormatTool : McpToolBase
 
     private static FormatResult FormatSource(string source)
     {
-        // Parse the source
+        // Parse the source; errors are surfaced as envelope schema v1.1
+        // entries built from the real lexer/parser diagnostics.
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath("mcp-input.calr");
 
@@ -133,7 +135,7 @@ public sealed class FormatTool : McpToolBase
                 Success = false,
                 Original = source,
                 Formatted = source,
-                Errors = diagnostics.Errors.Select(e => e.Message).ToList()
+                Errors = BuildErrorEnvelope(diagnostics)
             };
         }
 
@@ -147,7 +149,7 @@ public sealed class FormatTool : McpToolBase
                 Success = false,
                 Original = source,
                 Formatted = source,
-                Errors = diagnostics.Errors.Select(e => e.Message).ToList()
+                Errors = BuildErrorEnvelope(diagnostics)
             };
         }
 
@@ -160,94 +162,47 @@ public sealed class FormatTool : McpToolBase
             Success = true,
             Original = source,
             Formatted = formatted,
-            Errors = new List<string>()
+            Errors = new List<EnvelopeDiagnostic>()
         };
+    }
+
+    private static List<EnvelopeDiagnostic> BuildErrorEnvelope(DiagnosticBag diagnostics)
+    {
+        return DiagnosticEnvelope.Build(diagnostics)
+            .Where(e => e.Severity == "error")
+            .ToList();
     }
 
     private static McpToolResult CheckIds(string source, bool allowTestIds)
     {
-        var entries = ScanSource(source);
-        if (entries == null)
+        var scan = ScanSource(source);
+        if (scan == null)
         {
             return McpToolResult.Error("Failed to parse source code");
         }
 
+        var (entries, module) = scan.Value;
         var result = IdChecker.Check(entries, allowTestIds);
 
-        var issues = new List<IdIssueOutput>();
+        // Real Calor0800-band diagnostics as envelope schema v1.1 entries; a
+        // resolver built from the parsed module populates declarationId
+        // (mirrors the `calor ids check --format json` CLI adoption).
+        var declarationIds = new DeclarationIdResolver();
+        declarationIds.AddFile("mcp-input.calr", source, module);
 
-        foreach (var entry in result.MissingIds)
-        {
-            issues.Add(new IdIssueOutput
-            {
-                Type = "missing",
-                Line = entry.Span.Line,
-                Kind = entry.Kind.ToString(),
-                Name = entry.Name,
-                Message = $"Missing ID for {entry.Kind} '{entry.Name}'"
-            });
-        }
-
-        foreach (var entry in result.InvalidFormatIds)
-        {
-            issues.Add(new IdIssueOutput
-            {
-                Type = "invalid_format",
-                Line = entry.Span.Line,
-                Kind = entry.Kind.ToString(),
-                Name = entry.Name,
-                Id = entry.Id,
-                Message = $"Invalid ID format: '{entry.Id}'"
-            });
-        }
-
-        foreach (var entry in result.WrongPrefixIds)
-        {
-            issues.Add(new IdIssueOutput
-            {
-                Type = "wrong_prefix",
-                Line = entry.Span.Line,
-                Kind = entry.Kind.ToString(),
-                Name = entry.Name,
-                Id = entry.Id,
-                Message = $"Wrong prefix for {entry.Kind}: '{entry.Id}'"
-            });
-        }
-
-        foreach (var entry in result.TestIdsInProduction)
-        {
-            issues.Add(new IdIssueOutput
-            {
-                Type = "test_id",
-                Line = entry.Span.Line,
-                Kind = entry.Kind.ToString(),
-                Name = entry.Name,
-                Id = entry.Id,
-                Message = $"Test ID in production code: '{entry.Id}'"
-            });
-        }
-
-        foreach (var group in result.DuplicateGroups)
-        {
-            foreach (var entry in group.Skip(1)) // First one is the original
-            {
-                issues.Add(new IdIssueOutput
-                {
-                    Type = "duplicate",
-                    Line = entry.Span.Line,
-                    Kind = entry.Kind.ToString(),
-                    Name = entry.Name,
-                    Id = entry.Id,
-                    Message = $"Duplicate ID: '{entry.Id}' (first used at line {group.First().Span.Line})"
-                });
-            }
-        }
+        var issues = IdChecker.GenerateDiagnostics(result)
+            .OrderBy(d => d.Span.Line)
+            .Select(d => DiagnosticEnvelope.Build(d, declarationIds))
+            .ToList();
 
         var output = new IdsCheckOutput
         {
             Success = result.IsValid,
             TotalIds = entries.Count,
-            IssueCount = result.TotalIssues,
+            // Count the emitted entries, not IdChecker.TotalIssues: duplicates
+            // are diagnosed one-per-group but tallied n-1 per group, so the two
+            // numbers diverge on duplicate IDs (review of #757 item 1).
+            IssueCount = issues.Count,
             Issues = issues
         };
 
@@ -260,10 +215,10 @@ public sealed class FormatTool : McpToolBase
 
         if (!fixDuplicates)
         {
-            var entries = ScanSource(source);
-            if (entries != null)
+            var scan = ScanSource(source);
+            if (scan != null)
             {
-                foreach (var entry in entries.Where(e => !string.IsNullOrEmpty(e.Id)))
+                foreach (var entry in scan.Value.Entries.Where(e => !string.IsNullOrEmpty(e.Id)))
                 {
                     if (allowTestIds && entry.IsTestId)
                         continue;
@@ -299,7 +254,7 @@ public sealed class FormatTool : McpToolBase
         return McpToolResult.Json(output);
     }
 
-    private static IReadOnlyList<IdEntry>? ScanSource(string source)
+    private static (IReadOnlyList<IdEntry> Entries, ModuleNode Module)? ScanSource(string source)
     {
         var diagnostics = new DiagnosticBag();
         diagnostics.SetFilePath("mcp-input.calr");
@@ -317,7 +272,7 @@ public sealed class FormatTool : McpToolBase
             return null;
 
         var scanner = new IdScanner();
-        return scanner.Scan(module, "mcp-input.calr");
+        return (scanner.Scan(module, "mcp-input.calr"), module);
     }
 
     // Format output types
@@ -326,7 +281,7 @@ public sealed class FormatTool : McpToolBase
         public bool Success { get; init; }
         public required string Original { get; init; }
         public required string Formatted { get; init; }
-        public required List<string> Errors { get; init; }
+        public required List<EnvelopeDiagnostic> Errors { get; init; }
     }
 
     private sealed class FormatToolOutput
@@ -340,9 +295,10 @@ public sealed class FormatTool : McpToolBase
         [JsonPropertyName("isChanged")]
         public bool IsChanged { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (real parser diagnostics).</summary>
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<string>? Errors { get; init; }
+        public List<EnvelopeDiagnostic>? Errors { get; init; }
     }
 
     // IDs check output types
@@ -357,30 +313,9 @@ public sealed class FormatTool : McpToolBase
         [JsonPropertyName("issueCount")]
         public int IssueCount { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (Calor0800-band, with declarationId).</summary>
         [JsonPropertyName("issues")]
-        public required List<IdIssueOutput> Issues { get; init; }
-    }
-
-    private sealed class IdIssueOutput
-    {
-        [JsonPropertyName("type")]
-        public required string Type { get; init; }
-
-        [JsonPropertyName("line")]
-        public int Line { get; init; }
-
-        [JsonPropertyName("kind")]
-        public required string Kind { get; init; }
-
-        [JsonPropertyName("name")]
-        public required string Name { get; init; }
-
-        [JsonPropertyName("id")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Id { get; init; }
-
-        [JsonPropertyName("message")]
-        public required string Message { get; init; }
+        public required List<EnvelopeDiagnostic> Issues { get; init; }
     }
 
     // IDs assign output types

@@ -1,0 +1,12 @@
+{
+  "version": "1.2",
+  "z3Version": "Z3 4.15.7.0",
+  "status": 0,
+  "counterexampleDescription": null,
+  "proofStatus": "proven",
+  "proofReason": null,
+  "counterexampleBindings": null,
+  "originalDurationMs": 6.2597,
+  "createdAt": "2026-07-23T21:36:50.933905Z",
+  "contractHash": "ba5220d3254d25beee390e3085637f9c9505dfdf63d739a558ac2fa3a9dee5a7"
+}

@@ -1,9 +1,10 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
 using Calor.Compiler.Verification.Z3.Cache;
@@ -127,7 +128,11 @@ public sealed class MigrateTool : McpToolBase
                     Path = relativePath,
                     Status = result.Score >= 50 ? "convertible" : "blocked",
                     Errors = result.Blockers.Count > 0
-                        ? result.Blockers.Select(b => $"{b.Name}: {b.Description} ({b.Count}x)").ToList()
+                        ? result.Blockers
+                            .Select(b => ConversionIssueEnvelope.Message(
+                                DiagnosticCode.ConversionIssue, "error",
+                                $"{b.Name}: {b.Description} ({b.Count}x)", file))
+                            .ToList()
                         : null,
                     Warnings = null,
                     Score = result.Score
@@ -139,7 +144,8 @@ public sealed class MigrateTool : McpToolBase
                 {
                     Path = Path.GetRelativePath(directory, file),
                     Status = "error",
-                    Errors = [ex.Message]
+                    Errors = [ConversionIssueEnvelope.Message(
+                        DiagnosticCode.CliInternalError, "error", ex.Message, file)]
                 });
             }
         }
@@ -177,11 +183,11 @@ public sealed class MigrateTool : McpToolBase
             },
             Errors = f.Issues
                 .Where(i => i.Severity == ConversionIssueSeverity.Error)
-                .Select(i => i.Message)
+                .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
                 .ToList() is { Count: > 0 } errs ? errs : null,
             Warnings = f.Issues
                 .Where(i => i.Severity == ConversionIssueSeverity.Warning)
-                .Select(i => i.Message)
+                .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
                 .ToList() is { Count: > 0 } warns ? warns : null
         }).ToList();
 
@@ -213,14 +219,9 @@ public sealed class MigrateTool : McpToolBase
                 };
 
                 var compileResult = Program.Compile(source, path, compileOptions);
-                var errors = compileResult.Diagnostics
-                    .Where(d => d.IsError)
-                    .Select(d => $"[{d.Code}] L{d.Span.Line}: {d.Message}")
-                    .ToList();
-                var warnings = compileResult.Diagnostics
-                    .Where(d => !d.IsError)
-                    .Select(d => $"[{d.Code}] L{d.Span.Line}: {d.Message}")
-                    .ToList();
+                var entries = BuildCompileEnvelope(compileResult, path, source);
+                var errors = entries.Where(e => e.Severity == "error").ToList();
+                var warnings = entries.Where(e => e.Severity != "error").ToList();
 
                 perFile.Add(new MigrateFileResult
                 {
@@ -236,7 +237,8 @@ public sealed class MigrateTool : McpToolBase
                 {
                     Path = Path.GetRelativePath(directory, path),
                     Status = "error",
-                    Errors = [ex.Message]
+                    Errors = [ConversionIssueEnvelope.Message(
+                        DiagnosticCode.CliInternalError, "error", ex.Message, path)]
                 });
             }
         }
@@ -273,9 +275,7 @@ public sealed class MigrateTool : McpToolBase
                 {
                     Path = Path.GetRelativePath(directory, path),
                     Status = totalFixes > 0 ? "fixed" : "clean",
-                    Warnings = totalFixes > 0
-                        ? [$"{totalFixes} fix(es) applied"]
-                        : null
+                    FixesApplied = totalFixes > 0 ? totalFixes : null
                 });
             }
             catch (Exception ex)
@@ -284,7 +284,8 @@ public sealed class MigrateTool : McpToolBase
                 {
                     Path = Path.GetRelativePath(directory, path),
                     Status = "error",
-                    Errors = [ex.Message]
+                    Errors = [ConversionIssueEnvelope.Message(
+                        DiagnosticCode.CliInternalError, "error", ex.Message, path)]
                 });
             }
         }
@@ -351,11 +352,11 @@ public sealed class MigrateTool : McpToolBase
             var relativePath = Path.GetRelativePath(directory, f.SourcePath);
             var errors = f.Issues
                 .Where(i => i.Severity == ConversionIssueSeverity.Error)
-                .Select(i => i.Message)
+                .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
                 .ToList();
             var warnings = f.Issues
                 .Where(i => i.Severity == ConversionIssueSeverity.Warning)
-                .Select(i => i.Message)
+                .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
                 .ToList();
 
             var existing = allPerFile.GetValueOrDefault(relativePath);
@@ -401,9 +402,8 @@ public sealed class MigrateTool : McpToolBase
                 {
                     var key = sourceKey ?? relativePath;
                     var existing = allPerFile.GetValueOrDefault(key);
-                    var compileErrors = compileResult.Diagnostics
-                        .Where(d => d.IsError)
-                        .Select(d => $"[{d.Code}] L{d.Span.Line}: {d.Message}")
+                    var compileErrors = BuildCompileEnvelope(compileResult, path, source)
+                        .Where(e => e.Severity == "error")
                         .ToList();
 
                     allPerFile[key] = new MigrateFileResult
@@ -440,7 +440,8 @@ public sealed class MigrateTool : McpToolBase
                     Path = existing?.Path ?? key,
                     Status = "compile_error",
                     Score = existing?.Score,
-                    Errors = [ex.Message]
+                    Errors = [ConversionIssueEnvelope.Message(
+                        DiagnosticCode.CliInternalError, "error", ex.Message, path)]
                 };
             }
         }
@@ -497,11 +498,11 @@ public sealed class MigrateTool : McpToolBase
                             Status = recompile.HasErrors ? "fix_incomplete" : "fixed",
                             Score = existing?.Score,
                             Errors = recompile.HasErrors
-                                ? recompile.Diagnostics.Where(d => d.IsError)
-                                    .Select(d => $"[{d.Code}] L{d.Span.Line}: {d.Message}")
+                                ? BuildCompileEnvelope(recompile, path, fixedFinal)
+                                    .Where(e => e.Severity == "error")
                                     .ToList()
                                 : null,
-                            Warnings = [$"{totalFixes} fix(es) applied"]
+                            FixesApplied = totalFixes
                         };
                     }
                 }
@@ -550,6 +551,22 @@ public sealed class MigrateTool : McpToolBase
         return maxFiles > 0 ? files.Take(maxFiles).ToList() : files.ToList();
     }
 
+    /// <summary>
+    /// Real compile diagnostics as envelope schema v1.1 entries; a resolver
+    /// built from the parsed AST populates declarationId.
+    /// </summary>
+    private static List<EnvelopeDiagnostic> BuildCompileEnvelope(
+        CompilationResult compileResult, string filePath, string source)
+    {
+        DeclarationIdResolver? declarationIds = null;
+        if (compileResult.Ast != null)
+        {
+            declarationIds = new DeclarationIdResolver();
+            declarationIds.AddFile(filePath, source, compileResult.Ast);
+        }
+        return DiagnosticEnvelope.Build(compileResult.Diagnostics, declarationIds);
+    }
+
     private static McpToolResult BuildOutput(string phase, List<MigrateFileResult> perFile, int? durationMs = null)
     {
         var successCount = perFile.Count(f =>
@@ -558,15 +575,11 @@ public sealed class MigrateTool : McpToolBase
             f.Status is "failed" or "error" or "blocked" or "convert_failed"
                 or "compile_failed" or "compile_error" or "fix_incomplete" or "assess_failed");
 
-        // Aggregate error categories
+        // Aggregate error categories by envelope diagnostic code
         var errorCategories = perFile
             .Where(f => f.Errors is { Count: > 0 })
             .SelectMany(f => f.Errors!)
-            .GroupBy(e =>
-            {
-                var match = Regex.Match(e, @"^\[([^\]]+)\]");
-                return match.Success ? match.Groups[1].Value : "general";
-            })
+            .GroupBy(e => e.Code)
             .ToDictionary(g => g.Key, g => g.Count());
 
         var topIssues = errorCategories
@@ -628,13 +641,20 @@ public sealed class MigrateTool : McpToolBase
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? Score { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<string>? Errors { get; init; }
+        public List<EnvelopeDiagnostic>? Errors { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("warnings")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<string>? Warnings { get; init; }
+        public List<EnvelopeDiagnostic>? Warnings { get; init; }
+
+        /// <summary>Number of auto-fixes applied (fix / full phases); replaces the old pseudo-warning string.</summary>
+        [JsonPropertyName("fixesApplied")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? FixesApplied { get; init; }
     }
 
     internal sealed class MigrateSummary

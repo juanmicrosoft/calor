@@ -3,7 +3,9 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Ids;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
 using Calor.Compiler.Verification.Z3.Cache;
@@ -258,6 +260,8 @@ public sealed class BatchTool : McpToolBase
                 }
             }
 
+            // Per-file issues are envelope schema v1.1 entries (Calor1343,
+            // feature-prefixed) — the shared EnvelopeDiagnostic shape.
             var fileResults = report.FileResults.Select(f => new ConvertFileResult
             {
                 SourcePath = f.SourcePath,
@@ -269,15 +273,7 @@ public sealed class BatchTool : McpToolBase
                 CsharpBlockCount = CountCsharpBlocks(f.OutputPath),
                 Issues = f.Issues
                     .Where(i => i.Severity is ConversionIssueSeverity.Error or ConversionIssueSeverity.Warning)
-                    .Select(i => new ConvertIssue
-                    {
-                        Severity = i.Severity == ConversionIssueSeverity.Error ? "error" : "warning",
-                        Message = i.Message,
-                        Line = i.Line,
-                        Column = i.Column,
-                        Category = i.Feature,
-                        Suggestion = i.Suggestion
-                    })
+                    .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
                     .ToList()
             }).ToList();
 
@@ -296,23 +292,26 @@ public sealed class BatchTool : McpToolBase
 
             if (summaryMode)
             {
-                var errorCategories = fileResults
-                    .Where(f => f.Issues != null)
-                    .SelectMany(f => f.Issues!)
-                    .Where(i => i.Severity == "error")
-                    .GroupBy(i => i.Category ?? "unknown")
+                var errorCategories = report.FileResults
+                    .SelectMany(f => f.Issues)
+                    .Where(i => i.Severity == ConversionIssueSeverity.Error)
+                    .GroupBy(i => i.Feature ?? "unknown")
                     .Select(g => new { code = g.Key, count = g.Count(), sample = g.First().Message })
                     .OrderByDescending(x => x.count)
                     .Take(10)
                     .ToList();
 
-                var failedFiles = fileResults
-                    .Where(f => f.Status is "failed" or "timedout")
+                var failedFiles = report.FileResults
+                    .Where(f => f.Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut)
                     .Select(f => new
                     {
                         file = f.SourcePath,
-                        errorCount = f.ErrorCount,
-                        topErrors = f.Issues?.Take(3).Select(i => $"{i.Category}: {i.Message}").ToList()
+                        errorCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error),
+                        topErrors = f.Issues
+                            .Where(i => i.Severity is ConversionIssueSeverity.Error or ConversionIssueSeverity.Warning)
+                            .Take(3)
+                            .Select(i => $"{i.Feature ?? "unknown"}: {i.Message}")
+                            .ToList()
                     })
                     .ToList();
 
@@ -615,7 +614,8 @@ public sealed class BatchTool : McpToolBase
                         FilePath = path,
                         Success = false,
                         ErrorCount = 1,
-                        Errors = ["File not found"]
+                        Errors = [ConversionIssueEnvelope.Message(
+                            DiagnosticCode.CliInputNotFound, "error", "File not found", path)]
                     });
                     totalErrors++;
                     IncrementCategory(errorCategories, "file_not_found");
@@ -633,9 +633,16 @@ public sealed class BatchTool : McpToolBase
 
                 var compileResult = Program.Compile(source, path, compileOptions);
 
-                var errors = compileResult.Diagnostics
-                    .Where(d => d.IsError)
-                    .Select(d => $"[{d.Code}] L{d.Span.Line}: {d.Message}")
+                // Real compile diagnostics as envelope entries; a resolver
+                // built from the parsed AST populates declarationId.
+                DeclarationIdResolver? declarationIds = null;
+                if (compileResult.Ast != null)
+                {
+                    declarationIds = new DeclarationIdResolver();
+                    declarationIds.AddFile(path, source, compileResult.Ast);
+                }
+                var errors = DiagnosticEnvelope.Build(compileResult.Diagnostics, declarationIds)
+                    .Where(e => e.Severity == "error")
                     .ToList();
 
                 foreach (var d in compileResult.Diagnostics.Where(d => d.IsError))
@@ -661,7 +668,8 @@ public sealed class BatchTool : McpToolBase
                     FilePath = path,
                     Success = false,
                     ErrorCount = 1,
-                    Errors = [ex.Message]
+                    Errors = [ConversionIssueEnvelope.Message(
+                        DiagnosticCode.CliInternalError, "error", ex.Message, path)]
                 });
                 totalErrors++;
                 IncrementCategory(errorCategories, "exception");
@@ -781,34 +789,10 @@ public sealed class BatchTool : McpToolBase
         [JsonPropertyName("csharpBlockCount")]
         public int CsharpBlockCount { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("issues")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<ConvertIssue>? Issues { get; init; }
-    }
-
-    private sealed class ConvertIssue
-    {
-        [JsonPropertyName("severity")]
-        public required string Severity { get; init; }
-
-        [JsonPropertyName("message")]
-        public required string Message { get; init; }
-
-        [JsonPropertyName("line")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public int? Line { get; init; }
-
-        [JsonPropertyName("column")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public int? Column { get; init; }
-
-        [JsonPropertyName("category")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Category { get; init; }
-
-        [JsonPropertyName("suggestion")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Suggestion { get; init; }
+        public List<EnvelopeDiagnostic>? Issues { get; init; }
     }
 
     #endregion
@@ -929,9 +913,10 @@ public sealed class BatchTool : McpToolBase
         [JsonPropertyName("warningCount")]
         public int WarningCount { get; init; }
 
+        /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public List<string>? Errors { get; init; }
+        public List<EnvelopeDiagnostic>? Errors { get; init; }
     }
 
     #endregion

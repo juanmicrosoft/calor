@@ -151,4 +151,37 @@ internal sealed class ParseResult
 
     public static ParseResult Failed(IReadOnlyList<string> errors, DiagnosticBag? diagnostics = null)
         => new(false, null, null, errors, diagnostics);
+
+    /// <summary>
+    /// Parse errors as envelope schema v1.1 entries (shared EnvelopeDiagnostic
+    /// shape, loop plan D1.3). Parsing failed, so there is no AST and
+    /// declarationId is null. Falls back to message-only entries for failures
+    /// that produced no diagnostic bag (e.g. file-not-found).
+    /// </summary>
+    public List<EnvelopeDiagnostic> ToEnvelopeDiagnostics()
+    {
+        if (IsSuccess)
+            return new List<EnvelopeDiagnostic>();
+
+        if (Diagnostics != null)
+        {
+            return DiagnosticEnvelope.Build(Diagnostics)
+                .Where(e => e.Severity == "error")
+                .ToList();
+        }
+
+        return Errors.Select(message => new EnvelopeDiagnostic
+        {
+            // Message-only failures carry no code; classify the common
+            // missing-input case as CliInputNotFound so it matches the code
+            // other surfaces emit for the same condition (review of #757 item 3),
+            // and everything else as CliInternalError.
+            Code = message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+                ? DiagnosticCode.CliInputNotFound
+                : DiagnosticCode.CliInternalError,
+            Message = message,
+            Severity = "error",
+            Location = new EnvelopeLocation { File = null, Line = 1, Column = 1, Length = 0 }
+        }).ToList();
+    }
 }
