@@ -107,7 +107,22 @@ done
 [[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--out <dir>]" >&2; exit 2; }
 [[ "$ARM" == "calor" || "$ARM" == "csharp" ]] || { echo "--arm must be calor|csharp" >&2; exit 2; }
 case "$EDIT_MECHANISM" in
-    raw|mcp-file) ;;
+    raw) ;;
+    mcp-file)
+        # GATED until a real MCP write path exists (review of #758 item 1):
+        # the harness registers no MCP server and Calor exposes no
+        # file-writing MCP tool (calor_edit_preview is preview-only), so a
+        # live mcp-file run blocks every edit path and can only manufacture
+        # guaranteed-failure data. Allowed under --null-agent so labels /
+        # pins / record plumbing stay testable; unblocks when WS2 D2.4
+        # (transactional file-level apply) ships an MCP write tool and the
+        # harness registers the server.
+        if [[ "$NULL_AGENT" != "1" ]]; then
+            echo "ERROR: --edit-mechanism mcp-file is gated: no MCP file-write tool exists yet (WS2 D2.4); a live run would block all edits and fabricate failure data. Use --null-agent for plumbing tests." >&2
+            exit 2
+        fi
+        echo "WARNING: mcp-file arm is plumbing-only under --null-agent until WS2 D2.4 ships an MCP write path" >&2
+        ;;
     mcp-node)
         # Accepted for forward-compatible labeling only: node-level MCP edit
         # tools are descoped per Call 1/E1, so there is nothing to enforce —
@@ -315,8 +330,28 @@ arm="$ARM"
 ts_iso="\$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 t0=\$(now_ms)
 "$real_dotnet" "\$@"; rc=\$?
+# feedback_latency_ms is stamped HERE — the moment the agent-visible dotnet
+# returns. Everything below (silent src rebuild, held-out suite, envelope
+# capture, id attribution) is harness observation the agent never sees in this
+# invocation's output, and the held-out cost is arm-asymmetric (the calor arm
+# build drives the full Calor.Tasks pipeline) — including it would bias the
+# latency comparison (review of #758 item 2; CLAUDE.md benchmark-fairness).
+lat=\$(( \$(now_ms) - t0 )); [[ \$lat -lt 0 ]] && lat=0
 case "\${1:-}" in
   build|test|run)
+    # Serialize the telemetry section: .lasthash/.itercount are read-modify-
+    # write and journal.jsonl is appended — concurrent dotnet invocations
+    # would corrupt iteration ordinals (review of #758 minor 2). mkdir is the
+    # portable atomic lock; on timeout we proceed unlocked (degrades to the
+    # pre-lock behavior rather than deadlocking the agent).
+    lock_tries=0
+    while ! mkdir "$ws_out/.telemetry.lock" 2>/dev/null; do
+      lock_tries=\$((lock_tries+1))
+      [[ \$lock_tries -gt 1200 ]] && break
+      sleep 0.05
+    done
+    trap 'rmdir "$ws_out/.telemetry.lock" 2>/dev/null || true' EXIT
+
     # bin/obj are excluded: generated outputs (e.g. the calor arm's obj/calor/
     # *.g.cs) would otherwise flip the hash on the first build and journal a
     # phantom edited:true iteration with zero agent edits
@@ -354,13 +389,6 @@ case "\${1:-}" in
         ho_pass=\$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
       fi
     fi
-
-    # feedback_latency_ms is stamped HERE: the envelope capture and id
-    # attribution below are harness bookkeeping run after the agent-visible
-    # portion, so they are excluded from the loop-latency measure (schema doc
-    # "the shim records the split when it can"; D4.2 keeps them off the
-    # latency-critical path by construction).
-    lat=\$(( \$(now_ms) - t0 )); [[ \$lat -lt 0 ]] && lat=0
 
     edit_ids="[]"; diags="[]"; dtrunc=false; env_valid=null
 
@@ -472,18 +500,36 @@ run_agent() {
         return 0
     fi
 
-    # Portable timeout: coreutils timeout/gtimeout when present, else a bash
-    # watchdog (macOS ships neither by default — 42 runs learned this once)
-    ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
-        claude --print --output-format json --dangerously-skip-permissions \
-        "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
-    local agent_pid=$!
-    ( sleep "$TIMEOUT_SECS" && kill -9 "$agent_pid" 2>/dev/null ) &
-    local watchdog_pid=$!
+    # Portable timeout with a spend guarantee: prefer coreutils timeout/gtimeout
+    # (kills the claude process itself, -k grace for cleanup). The bash-watchdog
+    # fallback must kill the PROCESS GROUP: agent_pid is the subshell, and
+    # SIGKILL on it alone leaves the claude child reparented to init and still
+    # consuming API budget past TIMEOUT_SECS (review of #758 item 3). Job
+    # control (set -m) makes the backgrounded subshell a group leader so
+    # kill -- -$agent_pid reaches every descendant.
+    local timeout_bin=""
+    if command -v timeout >/dev/null 2>&1; then timeout_bin="timeout"
+    elif command -v gtimeout >/dev/null 2>&1; then timeout_bin="gtimeout"; fi
+
     local rc=0
-    wait "$agent_pid" 2>/dev/null || rc=$?
-    kill "$watchdog_pid" 2>/dev/null || true
-    wait "$watchdog_pid" 2>/dev/null || true
+    if [[ -n "$timeout_bin" ]]; then
+        ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
+            "$timeout_bin" -k 10 "$TIMEOUT_SECS" \
+            claude --print --output-format json --dangerously-skip-permissions \
+            "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) || rc=$?
+    else
+        set -m
+        ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
+            claude --print --output-format json --dangerously-skip-permissions \
+            "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
+        local agent_pid=$!
+        ( sleep "$TIMEOUT_SECS" && kill -9 -- "-$agent_pid" 2>/dev/null ) &
+        local watchdog_pid=$!
+        wait "$agent_pid" 2>/dev/null || rc=$?
+        kill -9 -- "-$watchdog_pid" 2>/dev/null || true
+        wait "$watchdog_pid" 2>/dev/null || true
+        set +m
+    fi
     AGENT_RC=$rc
     if [[ $rc -ne 0 ]]; then echo "agent exit: $rc" >> "$ws_out/agent.err"; fi
 }

@@ -29,7 +29,7 @@ censors at budget+1; censored fractions are reported per arm.
 | `src_tree_hash` | string | content hash of the src tree at this invocation; doubles as the **snapshot reference** — when snapshotting is enabled the tree is archived under `snapshots/<hash>/` for reject-replay (D4.6) |
 | `edit_mechanism` | `"raw"` \| `"mcp-file"` \| `"mcp-node"` \| `"unknown"` | how the edit since the last invocation was made. In the baseline harness (no MCP loop) all edits are `raw`; populated from the arm constraint when one is active, else `unknown` if attribution is impossible |
 | `edit_target_ids` | string[] | declaration IDs whose content changed since the previous invocation (raw-file node attribution: per-file `calor ids index` diff + changed-file mapping). Empty when no `.calr` changed or IDs absent |
-| `diagnostics` | array of `{code, declarationId?}` | compiler diagnostics of this invocation's build, from the envelope (`--format json`); truncated at 50 entries with `diagnostics_truncated: true` |
+| `diagnostics` | array of `{code, declarationId?}` | compiler diagnostics of this invocation's build, from the envelope (`--format json`); truncated at 50 entries with `diagnostics_truncated: true`. Codes are usually `CalorNNNN` but the schema admits any compiler-style code (e.g. Roslyn `CS####` via convert/roundtrip paths) |
 | `envelope_valid` | bool \| null | whether the build's JSON output validated against envelope schema v1.1; null when the arm doesn't produce envelopes (C# arm) |
 | `apply_verdict` | string \| null | reserved for the WS2 transactional apply path (`applied` \| `rejected`); null in the baseline harness, which has no apply/reject mechanism |
 | `rejected_edit` | object \| null | reserved (D4.6 replay): `{snapshotRef, payloadPath}` for a rejected edit archived under `rejects/`; null in the baseline harness |
@@ -41,13 +41,15 @@ censors at budget+1; censored fractions are reported per arm.
   are attributed via `edit_target_ids`, so the denominator does not narrow to
   MCP-mediated edits (plan review m5).
 - **M-L2 (first-apply validity)** splits on `edit_mechanism`.
-- **Latency**: `feedback_latency_ms` is stamped when the build + silent
-  held-out run complete, **before** the shim's telemetry bookkeeping (envelope
-  capture, edit-target attribution, ~2–4 s on edited builds, cached
-  otherwise). The agent's true prompt-return time therefore exceeds the
-  recorded value by the bookkeeping cost; comparisons across arms are fair
-  because both arms pay it identically, but absolute latency claims (PP-L1
-  style) must use the recorded value's definition, not wall-clock-to-prompt.
+- **Latency**: `feedback_latency_ms` is stamped the moment the agent-visible
+  `dotnet` invocation returns — **before** the silent held-out build/test and
+  before all telemetry bookkeeping. This is deliberate (review of #758 item
+  2): the held-out cost is arm-asymmetric (the calor arm's build drives the
+  full Calor.Tasks pipeline while the C# arm runs plain csc), so including it
+  would bias any cross-arm latency comparison. The recorded value is exactly
+  the loop latency the agent experiences from its own command. The agent's
+  total wall time between prompts still includes the harness's silent
+  observation; that cost is not part of this metric by definition.
 - `apply_verdict` / `rejected_edit` being reserved-null in the baseline is
   intentional and honest: the baseline (WS1-only build, tag
   `loop-baseline-ws1`) has no apply path, and the schema must be frozen

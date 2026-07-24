@@ -33,7 +33,7 @@
         "required": ["code"],
         "additionalProperties": false,
         "properties": {
-          "code": { "type": "string", "pattern": "^Calor[0-9]{4}$" },
+          "code": { "type": "string", "pattern": "^[A-Z][A-Za-z]*[0-9]{3,5}$" },
           "declarationId": { "type": "string", "minLength": 1 }
         }
       }

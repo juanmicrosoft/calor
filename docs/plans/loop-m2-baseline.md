@@ -33,9 +33,13 @@ Consequences that were **pre-committed** in the loop plan (§2 scope gate,
   navigation-only) is adopted at zero measurement cost.
 - M3's calendar box shrinks accordingly (the 6–8 wk sizing was dominated by
   D2.1–D2.3; D2.1 project sessions are still required for D2.4 and WS3).
-- The D4.2 arm-constraint capability loses its PP-L3 consumer; it is kept
-  (cheaply) because the mcp-file-vs-raw split remains observationally useful
-  and M-L2 splits on edit mechanism.
+- The D4.2 arm-constraint capability loses its PP-L3 consumer. The
+  `mcp-file` arm is **gated to `--null-agent` plumbing tests** until WS2 D2.4
+  ships an actual MCP file-write tool and the harness registers the server —
+  today no MCP server is registered and no file-writing MCP tool exists, so
+  a live constrained run would block every edit path and manufacture
+  guaranteed-failure data (review of #758 item 1). The M-L2
+  split on edit mechanism becomes measurable when D2.4 lands.
 
 Call 1's remaining half is the **D4.5 feasibility dry-run** (below): whether
 the PP-L4/PP-L5 `[P]` thresholds are decidable at authorized spend. Call 1
