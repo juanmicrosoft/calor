@@ -1,0 +1,19 @@
+{
+  "pair": "N1-001-string-utils",
+  "arm": "calor",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 11,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1909,
+  "envelopeValidAll": true,
+  "tokens": {
+    "input": 5364,
+    "output": 7721
+  },
+  "nullAgent": false
+}

@@ -87,3 +87,15 @@ CLAUDE.md.bak
 # Verification fixture corpora: local verify runs must not commit artifacts
 tests/TestData/Verification/**/.calor/
 tests/TestData/Verification/**/*.g.cs
+
+# Harness run-internal state must not be committed with epoch results
+bench/phase0-agent-native/epochs/**/.envelope-src/
+bench/phase0-agent-native/epochs/**/.envelope-meta.json
+bench/phase0-agent-native/epochs/**/.envelope.err
+bench/phase0-agent-native/epochs/**/.prev-src/
+bench/phase0-agent-native/epochs/**/.shim/
+bench/phase0-agent-native/epochs/**/.lasthash
+bench/phase0-agent-native/epochs/**/.itercount
+bench/phase0-agent-native/epochs/**/.src_build.txt
+bench/phase0-agent-native/epochs/**/.ho_last.txt
+bench/phase0-agent-native/epochs/**/.ho_final.txt
