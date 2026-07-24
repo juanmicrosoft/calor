@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://calor-lang.org/schemas/loop-telemetry-2.json",
+  "title": "Calor loop telemetry record v2 (loop plan D4.1)",
+  "description": "One JSONL record per harness-observed build|test|run invocation in an agent-task run. See loop-telemetry-schema.md for semantics.",
+  "type": "object",
+  "required": ["schema", "ts", "pair", "arm", "run", "cmd", "exit", "edited", "feedback_latency_ms", "heldout_pass", "heldout_fail", "src_tree_hash", "edit_mechanism"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "loop-telemetry/2" },
+    "ts": { "type": "string", "format": "date-time" },
+    "pair": { "type": "string", "minLength": 1 },
+    "arm": { "type": "string", "minLength": 1 },
+    "run": { "type": "integer", "minimum": 1 },
+    "iteration": { "type": ["integer", "null"], "minimum": 1 },
+    "cmd": { "enum": ["build", "test", "run"] },
+    "exit": { "type": "integer" },
+    "edited": { "type": "boolean" },
+    "feedback_latency_ms": { "type": "integer", "minimum": 0 },
+    "heldout_pass": { "type": "integer", "minimum": 0 },
+    "heldout_fail": { "type": "integer", "minimum": 0 },
+    "src_tree_hash": { "type": "string", "minLength": 8 },
+    "edit_mechanism": { "enum": ["raw", "mcp-file", "mcp-node", "unknown"] },
+    "edit_target_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "diagnostics": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["code"],
+        "additionalProperties": false,
+        "properties": {
+          "code": { "type": "string", "pattern": "^Calor[0-9]{4}$" },
+          "declarationId": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "diagnostics_truncated": { "type": "boolean" },
+    "envelope_valid": { "type": ["boolean", "null"] },
+    "apply_verdict": { "enum": ["applied", "rejected", null] },
+    "rejected_edit": {
+      "type": ["object", "null"],
+      "required": ["snapshotRef", "payloadPath"],
+      "additionalProperties": false,
+      "properties": {
+        "snapshotRef": { "type": "string", "minLength": 8 },
+        "payloadPath": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
