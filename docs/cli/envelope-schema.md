@@ -171,11 +171,15 @@ Classes:
 | `calor_structure` | E | **Yes** | parse errors as envelope entries |
 | `calor_format` | E | **Yes** | parser + `Calor0800`-band diagnostics as envelope entries with `declarationId` |
 | `calor_fix` | D | **Yes** (by audit) | applied-fix records only; verified no diagnostic-shaped data hides in the payload |
+| `calor_session_open` | E | **Yes** | per-file parse errors as envelope entries under `diagnostics[]` (loop plan WS2 D2.1) |
+| `calor_session_close` | X | — | session lifecycle only; no source-anchored diagnostics |
+| `calor_file_write` | E | **Yes** | check-set errors as envelope entries (`compilationResult.errors`, same shape as `calor_edit_preview`); apply verdict + heal payload alongside (loop plan WS2 D2.4/D2.5) |
 | `calor_help` | X | — | documentation lookup; no source-anchored diagnostics |
 | `calor_self_test` | X | — | golden-diff scenarios |
 
 **M-E1 (envelope coverage)** = adopted E+D surfaces / all E+D surfaces =
-**29/29 = 100 %** as of the final D1.3 sweep — the WS1 exit criterion is met.
+**31/31 = 100 %** (29 at the final D1.3 sweep, +`calor_session_open` and
+`calor_file_write` from loop plan M3/WS2) — the WS1 exit criterion is met.
 Any new command or MCP tool must be added to this table (with an envelope
 adoption or a reviewed exemption) before it ships; the conformance suite and
 this table are the drift guards.
