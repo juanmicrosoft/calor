@@ -122,8 +122,11 @@ public class ConvertToolTests
             Assert.Contains(entry.GetProperty("severity").GetString(),
                 new[] { "error", "warning", "info" });
             var location = entry.GetProperty("location");
-            Assert.True(location.GetProperty("line").GetInt32() >= 0);
-            Assert.True(location.GetProperty("column").GetInt32() >= 0);
+            // Real Roslyn positions are 1-based; >= 1 would catch a garbage
+            // or defaulted position where >= 0 was trivially true (review of
+            // #757 item 2).
+            Assert.True(location.GetProperty("line").GetInt32() >= 1);
+            Assert.True(location.GetProperty("column").GetInt32() >= 1);
         }
     }
 

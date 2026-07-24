@@ -139,4 +139,40 @@ public class BatchConvertToolTests
             Directory.Delete(tempDir, true);
         }
     }
+
+    [Fact]
+    public async Task ExecuteAsync_CompileMode_BindError_CarriesDeclarationId()
+    {
+        // review of #757 item 2: pin the declarationId capability — a bind
+        // error (Calor0250) parses to a full AST, so the entry must resolve
+        // to its enclosing function ID.
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-batch-declid-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
+                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §B{x}\n");
+
+            var args = JsonDocument.Parse($$"""
+                {
+                    "action": "compile",
+                    "projectPath": {{JsonSerializer.Serialize(tempDir)}}
+                }
+                """).RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+            var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            var file = Assert.Single(root.GetProperty("files").EnumerateArray());
+            var entry = file.GetProperty("errors").EnumerateArray()
+                .Single(e => e.GetProperty("code").GetString() == "Calor0250");
+
+            Assert.Equal("f001", entry.GetProperty("declarationId").GetString());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
 }
+

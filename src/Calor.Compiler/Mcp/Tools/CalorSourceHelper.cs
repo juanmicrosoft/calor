@@ -172,7 +172,13 @@ internal sealed class ParseResult
 
         return Errors.Select(message => new EnvelopeDiagnostic
         {
-            Code = DiagnosticCode.CliInternalError,
+            // Message-only failures carry no code; classify the common
+            // missing-input case as CliInputNotFound so it matches the code
+            // other surfaces emit for the same condition (review of #757 item 3),
+            // and everything else as CliInternalError.
+            Code = message.Contains("not found", StringComparison.OrdinalIgnoreCase)
+                ? DiagnosticCode.CliInputNotFound
+                : DiagnosticCode.CliInternalError,
             Message = message,
             Severity = "error",
             Location = new EnvelopeLocation { File = null, Line = 1, Column = 1, Length = 0 }

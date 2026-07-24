@@ -104,4 +104,20 @@ public class FormatToolTests
         Assert.True(output.GetProperty("success").GetBoolean());
         Assert.True(output.TryGetProperty("modifiedCode", out _));
     }
+
+    [Fact]
+    public async Task CheckIds_DuplicateIds_IssueCountMatchesIssuesArray()
+    {
+        // review of #757 item 1: duplicates are diagnosed one-per-group but
+        // IdChecker tallies n-1 per group; issueCount must equal the emitted
+        // entries, not the tally. Three functions sharing f1 = one group entry.
+        var source = "§M{m1:Test}\n  §F{f1:A:pub} () -> void\n    §P \"a\"\n  §F{f1:B:pub} () -> void\n    §P \"b\"\n  §F{f1:C:pub} () -> void\n    §P \"c\"\n";
+        var result = await _tool.ExecuteAsync(CreateArgs(source, action: "ids", idsAction: "check"));
+
+        var output = ParseOutput(result);
+        var issues = output.GetProperty("issues").EnumerateArray().ToList();
+        Assert.NotEmpty(issues);
+        Assert.Equal(issues.Count, output.GetProperty("issueCount").GetInt32());
+    }
 }
+

@@ -336,4 +336,36 @@ public class MigrateToolTests
             """);
         return tempDir;
     }
+
+    [Fact]
+    public async Task ExecuteAsync_CompilePhase_BindError_CarriesDeclarationId()
+    {
+        // review of #757 item 2: pin the declarationId capability on the
+        // migrate compile phase — Calor0250 parses to a full AST, so the
+        // entry must resolve to its enclosing function ID.
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-declid-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tempDir, "BindError.calr"),
+                "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §B{x}\n");
+
+            var args = JsonDocument.Parse($$"""{"projectPath": {{JsonSerializer.Serialize(tempDir)}}, "phase": "compile"}""").RootElement;
+            var result = await _tool.ExecuteAsync(args);
+
+            var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            var file = root.GetProperty("perFile").EnumerateArray()
+                .Single(f => f.GetProperty("path").GetString()!.EndsWith("BindError.calr"));
+            var entry = file.GetProperty("errors").EnumerateArray()
+                .Single(e => e.GetProperty("code").GetString() == "Calor0250");
+
+            Assert.Equal("f001", entry.GetProperty("declarationId").GetString());
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
 }
+

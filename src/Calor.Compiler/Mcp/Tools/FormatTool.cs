@@ -199,7 +199,10 @@ public sealed class FormatTool : McpToolBase
         {
             Success = result.IsValid,
             TotalIds = entries.Count,
-            IssueCount = result.TotalIssues,
+            // Count the emitted entries, not IdChecker.TotalIssues: duplicates
+            // are diagnosed one-per-group but tallied n-1 per group, so the two
+            // numbers diverge on duplicate IDs (review of #757 item 1).
+            IssueCount = issues.Count,
             Issues = issues
         };
 
