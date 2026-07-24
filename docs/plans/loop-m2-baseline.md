@@ -41,10 +41,14 @@ Consequences that were **pre-committed** in the loop plan (§2 scope gate,
   guaranteed-failure data (review of #758 item 1). The M-L2
   split on edit mechanism becomes measurable when D2.4 lands.
 
-Call 1's remaining half is the **D4.5 feasibility dry-run** (below): whether
-the PP-L4/PP-L5 `[P]` thresholds are decidable at authorized spend. Call 1
-closes when the dry-run numbers are in and the thresholds are frozen via the
-gates-doc annex (D4.4).
+**Call 1 CLOSED (2026-07-24).** Both halves adjudicated: (a) E1's H1-killed
+verdict → WS2 descope (above); (b) the `loop-feasibility-dry-002` epoch
+answered decidability and the thresholds are frozen in the gates doc's
+**Annex A** (D4.4): PP-L5 = ≥ 15 % tokens-to-green (itg floor-bound,
+demoted to observational), PP-L4 reported-not-adjudicated (3 events vs the
+20-event floor), PP-L3 retired unrun. Maintainer approved the tokens
+threshold 2026-07-24. M2 is complete; next is M3 (descoped WS2: D2.1
+sessions, D2.4 file-level transactional apply, D2.5 write-path robustness).
 
 ## D4.1 / D4.2 — telemetry schema and harness integration
 

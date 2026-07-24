@@ -94,3 +94,65 @@ After freezing, this document may be superseded only for a **documented empirica
 ## 8. Revision log
 
 **v1 → v2 (2026-07-02, adversarial review: 45% as written → est. 85% after fixes).** All findings accepted: §6.1 decision rule added (C1); equivalence band made interval-based with leave-one-out mean (C2); neutral-regression gate made within-epoch, resolving the §0.1 self-contradiction (C3); parity-kill made decidable via the two-condition conjunction, with all-metrics-every-epoch collection and sign convention (C4); median-ratio defined as paired per-pair ratios + non-inferiority companion + censoring cap (M5); quarantine made one-sided high-only, reported with/without, every epoch (M6); 40% pool-share cap (M7); iteration budget pinned as schema constant, timeout rule added (M8); invalid/crash/flake handling added (M9); `.g.cs` metric operationalized — write-block pinned in §1, error-identity normalization, runtime-frame condition (M10); iteration/declared-done/silent-test-execution defined (M11); integer arithmetic stated (m12); non-degeneracy scoped per-category (m13); variance upper-bound rule (m14); tokens marked recorded-not-gated (m15).
+
+---
+
+## Annex A — Instrument metrics (loop plan v0.9, D4.4)
+
+**Annex version: A-1.0 (frozen 2026-07-24).** This annex is **additive-only
+and observational-only**: nothing here is a gate criterion, and no §1–§7 gate
+references any metric defined here. It carries its own version counter and
+revision log; changes to this annex never constitute supersession of the main
+document. Pre-registered per the loop plan's D4.4 discipline: thresholds were
+frozen from the `loop-feasibility-dry-002` variance epoch **before** any
+treatment build exists.
+
+### A.1 Instrument metric definitions
+
+Telemetry source: `loop-telemetry/2` records (normative schema:
+`bench/phase0-agent-native/loop-telemetry-schema.md`). Iteration semantics,
+pairing, and censoring follow §2 of this document.
+
+- **M-E1 envelope coverage** — % of the envelope-schema denominator
+  (`docs/cli/envelope-schema.md` tables) emitting schema v1.1. Measured in CI
+  by the conformance suite. Status: 100 % as of #757 (WS1 exit).
+- **M-E2 counterexample attach rate** — over the D1.5 outcome corpus: % of
+  `refuted` scalar obligations whose envelope carries a concrete model.
+- **M-E3 cliff visibility** — over the D1.5 corpus: % of obligations
+  reporting one of the five proof statuses; the choke-point bypass test is
+  the structural guarantee.
+- **M-L1 feedback latency** — `feedback_latency_ms` P50/P99: wall time from
+  agent-visible invocation start to agent-visible completion, explicitly
+  excluding the harness's silent held-out observation and telemetry
+  bookkeeping (arm-fairness; see schema doc).
+- **M-L2 first-apply validity** — % of edited iterations whose build exits 0,
+  split by `edit_mechanism`.
+- **M-L3 diagnostic actionability** — of failing edited iterations whose
+  envelope named ≥1 `declarationId`, % where the next edited iteration's
+  `edit_target_ids` intersects the named set. **Adjudication floor: 20
+  qualifying events per epoch**; below it, reported-not-adjudicated.
+- **M-L5 tokens-to-green** — per-run agent output tokens (`agent.json`
+  `usage.output_tokens`); per-pair means, then median of paired per-pair
+  ratios per §2. Iterations-to-green remains **recorded, observational**.
+
+### A.2 Frozen instrument proof-point thresholds
+
+| Proof point | Threshold (frozen) | Basis |
+|:---|:---|:---|
+| PP-L1 (warm latency) | P50 ≤ 300 ms, P99 ≤ 1 s on the D3.3 fixture | unchanged from the loop plan; toolchain metric, not epoch-dependent |
+| PP-L2 (machine-actionable failures) | M-E1 = 100 %; M-E2 ≥ 90 %; M-E3 = 100 % | met at WS1 exit (#754/#757); regression = CI failure |
+| PP-L3 (node vs file edits) | **retired unrun** | machine-zone E1 killed H1 (55 % pooled); pre-committed scope gate |
+| PP-L4 (diagnostics steer the agent) | **reported-not-adjudicated** | dry-run found 3 qualifying M-L3 events across 35 runs — floor (20) unreachable at authorable-fixture scale |
+| PP-L5 (loop tooling pays off) | **≥ 15 % relative reduction in median per-pair tokens-to-green**, arm A (`loop-baseline-ws1`) vs arm B (baseline + WS2/WS3 isolation build), simultaneous epoch, ≥ 7 pairs × ≥ 5 runs/arm, §6.1 adjudication | dry-run: iterations-to-green floor-bound (median 1, 94 % at floor → undetectable at any N); tokens MDE at 80 % power ≈ 15 % at the stated N. Pre-registered fallback applied **before** freezing |
+
+Sub-integer disclosure: the iterations-to-green primary measure was moved to
+tokens-to-green because the dry-run showed it floor-bound — the loop plan's
+D4.5 rule ("the dry-run may move a threshold, the task count, or N before
+freezing — never after") applied as written.
+
+### A.3 Annex revision log
+
+**A-1.0 (2026-07-24).** Initial freeze. Definitions from loop plan §4;
+thresholds per the `loop-feasibility-dry-002` verdict
+(`bench/phase0-agent-native/epochs/loop-feasibility-dry-002/VERDICT.md`);
+PP-L5 tokens threshold approved by the maintainer 2026-07-24.
