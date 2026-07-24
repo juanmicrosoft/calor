@@ -91,12 +91,19 @@ to be filled from a 3-run calibration before any epoch is authorized):
 
 | Item | Value |
 |:-----|:------|
-| Calibration trials (cheap/medium/expensive) | $__ / $__ / $__ |
-| Median per-run cost | $__ |
-| Runs this epoch (pairs × runs) | ≥ 25 |
-| Projected epoch cost | $__ |
-| Ceiling accepted | $__ (gates doc §6 names $1,500/epoch for Phase-0-style feasibility) |
-| Model pin | __ |
+| Calibration trials (cheap/medium/expensive) | $1.92 (N1-001, 23 turns, itg 2) / $1.25 (N1-005, 16 turns, itg 1) / $1.41 (W2-005, 11 turns, itg 1) |
+| Median per-run cost | $1.41 (max observed $1.92) |
+| Runs this epoch (pairs × runs) | 35 (all 7 non-retired pairs × 5 runs) |
+| Projected epoch cost | ~$49 at median, ~$67 at max-observed |
+| Ceiling accepted | pending sign-off (gates doc §6 names $1,500/epoch for Phase-0-style feasibility; projection is ~4% of it) |
+| Model pin | calibration ran on the account default (claude-fable-5 + haiku auxiliary); **pin to be decided at authorization** — the dry-run must use the model that will run the M5 epochs, or its variance estimate doesn't transfer |
+
+Calibration data: `bench/phase0-agent-native/epochs/loop-calibration-001/`
+(3 live runs, telemetry v2 journals schema-valid, all taskSuccess). Early
+signal for the detectability question: observed iterations-to-green were
+2 / 1 / 1 — a median near 1–2 makes the 15 % itg threshold even less
+decidable than the 2–4 assumption anticipated, so the tokens-to-green
+fallback in the decision rules is the likely path.
 
 No epoch is run until these numbers are entered and authorized — the plan
 requires numbers before M2 kickoff of any spend, and this document is the
