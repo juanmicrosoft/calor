@@ -217,7 +217,9 @@ internal sealed class SessionFileState
 
     public static SessionFileState FromContent(string path, string source, string hash, FileInfo info)
         => new(path, source, hash, info.LastWriteTimeUtc, info.Length,
-            CalorSourceHelper.Parse(source, path));
+            // Tolerant parse (D2.5): a broken file still contributes its
+            // best-effort AST to project-wide checks and error attribution.
+            CalorSourceHelper.ParseTolerant(source, path));
 
     public static string HashContent(string source)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));

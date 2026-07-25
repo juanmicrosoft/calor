@@ -175,10 +175,15 @@ public sealed class FileWriteTool : McpToolBase
         var finalContent = heal ? healer.Heal(content) : content;
         var healApplied = heal && !string.Equals(finalContent, content, StringComparison.Ordinal);
 
+        // Tolerant parses (D2.5): a failed parse still carries a best-effort
+        // AST, so reject envelopes attribute errors to their enclosing
+        // declaration and the edit summary survives a broken side. Verdict
+        // logic keys off IsSuccess and is unaffected — a partial AST never
+        // upgrades a breaking edit.
         var originalParse = originalSource.Length > 0
-            ? CalorSourceHelper.Parse(originalSource, canonicalPath)
+            ? CalorSourceHelper.ParseTolerant(originalSource, canonicalPath)
             : null;
-        var modifiedParse = CalorSourceHelper.Parse(finalContent, canonicalPath);
+        var modifiedParse = CalorSourceHelper.ParseTolerant(finalContent, canonicalPath);
 
         var compilationResult = new EditPreviewTool.CompilationCheckResult { Checked = runCompile };
         if (runCompile)
@@ -294,16 +299,19 @@ public sealed class FileWriteTool : McpToolBase
 
             if (removedFunctions.Count > 0)
             {
-                // Parsed files are checked against real call targets; files
-                // that do not parse fall back to whole-word text so a broken
-                // neighbor cannot hide a dangling call entirely.
-                if (file.Parse.IsSuccess)
+                // Files are checked against real call targets whenever an AST
+                // exists — tolerant parsing (D2.5) gives broken neighbors a
+                // best-effort AST too, so a string-literal mention in a broken
+                // file does not veto the write. Only a file with no AST at
+                // all falls back to whole-word text.
+                if (file.Parse.Ast != null)
                 {
-                    var callTargets = EditPreviewTool.CollectCallTargets(file.Parse.Ast!);
+                    var callTargets = EditPreviewTool.CollectCallTargets(file.Parse.Ast);
+                    var qualifier = file.Parse.IsSuccess ? "" : " (file has parse errors)";
                     foreach (var name in removedFunctions.Where(callTargets.Contains))
                     {
                         result.DanglingReferences.Add(
-                            $"Function '{name}' was removed but is still called in {relative}");
+                            $"Function '{name}' was removed but is still called in {relative}{qualifier}");
                     }
                 }
                 else
