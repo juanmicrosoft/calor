@@ -87,6 +87,7 @@ public static class DiagnosticCode
     /// the column of the nearest preceding <c>§IF</c>.
     /// </summary>
     public const string MisalignedElseClause = "Calor0117";
+    public const string ExpressionNestingTooDeep = "Calor0118";
 
     // Call-elision diagnostics (Calor0150-0159) — RFC v0.6 call-closer-elision
 

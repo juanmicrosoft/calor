@@ -26,7 +26,20 @@ internal static class CalorSourceHelper
         }
 
         var parser = new Parser(tokens, diagnostics);
-        var ast = parser.Parse();
+        ModuleNode ast;
+        try
+        {
+            ast = parser.Parse();
+        }
+        catch (InsufficientExecutionStackException)
+        {
+            // The parser's stack backstop fired before its deterministic
+            // depth cap (tighter-stack environments) — fail cleanly.
+            return ParseResult.Failed(new List<string>
+            {
+                "Source is too deeply nested to parse safely"
+            }, diagnostics);
+        }
 
         if (diagnostics.HasErrors)
         {

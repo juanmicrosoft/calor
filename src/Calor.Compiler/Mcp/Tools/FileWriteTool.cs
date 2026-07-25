@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Diagnostics;
@@ -30,9 +29,16 @@ public sealed class FileWriteTool : McpToolBase
     private readonly ProjectSessionManager _sessions;
     private readonly string _defaultWriteRoot;
 
-    // One gate per canonical path, process-wide: check→apply must not
-    // interleave for the same file across concurrent tool calls.
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> PathGates = new(StringComparer.Ordinal);
+    // Striped path gates, process-wide: check→apply must not interleave for
+    // the same file across concurrent tool calls. A fixed stripe array stays
+    // bounded no matter how many distinct paths are written (a per-path
+    // dictionary would grow forever); two paths sharing a stripe merely
+    // serialize, which is harmless.
+    private static readonly SemaphoreSlim[] PathGates =
+        Enumerable.Range(0, 64).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
+
+    private static SemaphoreSlim GateFor(string canonicalPath)
+        => PathGates[(canonicalPath.GetHashCode(StringComparison.Ordinal) & int.MaxValue) % PathGates.Length];
 
     internal FileWriteTool(ProjectSessionManager sessions, string? defaultWriteRoot = null)
     {
@@ -147,7 +153,7 @@ public sealed class FileWriteTool : McpToolBase
                 "open a session over the target directory with calor_session_open, or write within the working directory");
         }
 
-        var gate = PathGates.GetOrAdd(canonicalPath, _ => new SemaphoreSlim(1, 1));
+        var gate = GateFor(canonicalPath);
         await gate.WaitAsync(cancellationToken);
         try
         {
@@ -164,7 +170,11 @@ public sealed class FileWriteTool : McpToolBase
     {
         var (runCompile, runContracts, runEffects, runReferences) = ParseCheckSelection(arguments);
 
-        var originalSource = File.Exists(canonicalPath)
+        // Zero-length entries are never opened: FIFOs stat as size 0 and a
+        // blocking read on one would hang the call (and the stripe gate).
+        var originalInfo = new FileInfo(canonicalPath);
+        var fileExistedAtRead = originalInfo.Exists;
+        var originalSource = fileExistedAtRead && originalInfo.Length > 0
             ? await File.ReadAllTextAsync(canonicalPath, cancellationToken)
             : "";
 
@@ -224,15 +234,23 @@ public sealed class FileWriteTool : McpToolBase
         if (applied)
         {
             // Revalidate before the rename: the checks above ran against
-            // originalSource, and an external writer may have changed the
-            // file since it was read (the per-path gate only serializes
-            // in-process callers).
-            if (File.Exists(canonicalPath))
+            // originalSource, and an external writer may have changed —
+            // or created — the file since it was read (the path gate only
+            // serializes in-process callers).
+            var currentInfo = new FileInfo(canonicalPath);
+            if (fileExistedAtRead)
             {
-                var current = await File.ReadAllTextAsync(canonicalPath, cancellationToken);
+                var current = currentInfo is { Exists: true, Length: > 0 }
+                    ? await File.ReadAllTextAsync(canonicalPath, cancellationToken)
+                    : "";
                 if (!string.Equals(current, originalSource, StringComparison.Ordinal))
                     return McpToolResult.Error(
                         "File changed on disk while the edit was being checked — re-read it and retry");
+            }
+            else if (currentInfo.Exists)
+            {
+                return McpToolResult.Error(
+                    "File was created on disk while the edit was being checked — re-read it and retry");
             }
 
             await WriteAtomicAsync(canonicalPath, finalContent, cancellationToken);
@@ -253,7 +271,7 @@ public sealed class FileWriteTool : McpToolBase
             Applied = applied,
             Verdict = verdict,
             Path = canonicalPath,
-            Created = applied && originalSource.Length == 0,
+            Created = applied && !fileExistedAtRead,
             HealApplied = healApplied,
             HealNotes = healer.Ambiguities
                 .Select(a => $"line {a.Line}: {a.Message}")

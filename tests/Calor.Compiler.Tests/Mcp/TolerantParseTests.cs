@@ -213,6 +213,102 @@ public sealed class TolerantParseTests : IDisposable
         Assert.True(payload.GetProperty("applied").GetBoolean());
     }
 
+    // ── Adversarial inputs: crash and hang resistance ───────────────────
+
+    [Fact]
+    public void ParseTolerant_DeeplyNestedExpression_ReportsDepthCapInsteadOfCrashing()
+    {
+        // 50k-deep nested prefix expression, well under the 512 KB source
+        // cap. Without the parser's depth guard this is an uncatchable
+        // StackOverflowException that aborts the whole process.
+        var nested = string.Concat(Enumerable.Repeat("(+ ", 50_000))
+                     + "INT:1 INT:2"
+                     + new string(')', 50_000);
+        var source = "§M{m020:Deep}\n  §F{f070:deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
+
+        var result = CalorSourceHelper.ParseTolerant(source, "deep.calr");
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, e => e.Contains("nesting exceeds the maximum depth"));
+    }
+
+    [Fact]
+    public void StrictParse_DeeplyNestedExpression_FailsGracefully()
+    {
+        var nested = string.Concat(Enumerable.Repeat("(+ ", 50_000))
+                     + "INT:1 INT:2"
+                     + new string(')', 50_000);
+        var source = "§M{m021:Deep}\n  §F{f071:deep:pub}\n    §O{i32}\n    §R " + nested + "\n";
+
+        var result = CalorSourceHelper.Parse(source, "deep-strict.calr");
+
+        Assert.False(result.IsSuccess);
+        Assert.NotEmpty(result.Errors);
+    }
+
+    [Fact]
+    public void ParseTolerant_DeeplyNestedStatements_DoesNotCrashProcess()
+    {
+        // Deep §IF nesting recurses through the statement parser, outside
+        // the expression depth counter — the stack backstop must turn an
+        // imminent overflow into a catchable failure, never a process abort.
+        var builder = new System.Text.StringBuilder("§M{m022:DeepIf}\n  §F{f072:deep:pub}\n    §O{void}\n");
+        var indent = "    ";
+        for (var i = 0; i < 4000; i++)
+        {
+            builder.Append(indent).Append("§IF{if").Append(i).Append("} (== INT:1 INT:1)\n");
+            indent += "  ";
+        }
+        builder.Append(indent).Append("§B{x:i32} INT:1\n");
+
+        var result = CalorSourceHelper.ParseTolerant(builder.ToString(), "deep-if.calr");
+
+        // Any non-crashing outcome is acceptable; the process surviving IS
+        // the assertion.
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task SessionOpen_FifoNamedCalr_DoesNotHang()
+    {
+        if (OperatingSystem.IsWindows()) return; // no FIFOs on Windows
+
+        WriteFile("math.calr", MathSource);
+        var fifoPath = Path.Combine(_root, "pipe.calr");
+        var mkfifo = System.Diagnostics.Process.Start("mkfifo", fifoPath)!;
+        mkfifo.WaitForExit();
+        Assert.Equal(0, mkfifo.ExitCode);
+
+        // A blocking read on the FIFO would hang forever; the zero-length
+        // stat gate must keep the open from ever happening.
+        var result = await OpenTool.ExecuteAsync(Args(new { directory = _root }))
+            .WaitAsync(TimeSpan.FromSeconds(30));
+        var payload = Payload(result);
+
+        Assert.Equal(2, payload.GetProperty("fileCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task FileWrite_TargetIsFifo_DoesNotHang()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var fifoPath = Path.Combine(_root, "pipe.calr");
+        var mkfifo = System.Diagnostics.Process.Start("mkfifo", fifoPath)!;
+        mkfifo.WaitForExit();
+        Assert.Equal(0, mkfifo.ExitCode);
+
+        var result = await WriteTool
+            .ExecuteAsync(Args(new { path = fifoPath, content = MathSource }))
+            .WaitAsync(TimeSpan.FromSeconds(30));
+        var payload = Payload(result);
+
+        // Reads treat the FIFO as empty; the atomic rename replaces it with
+        // a regular file without ever opening it.
+        Assert.True(payload.GetProperty("applied").GetBoolean());
+        Assert.Equal(MathSource, File.ReadAllText(fifoPath));
+    }
+
     [Fact]
     public async Task SessionOpen_BrokenFile_DiagnosticsCarryDeclarationId()
     {

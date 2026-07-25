@@ -1323,6 +1323,11 @@ public sealed class Parser
 
     private StatementNode? ParseStatement()
     {
+        // Statement nesting (deep §IF chains etc.) recurses outside the
+        // expression depth counter — convert an imminent stack overflow into
+        // a catchable exception rather than a process abort.
+        System.Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack();
+
         if (Check(TokenKind.Call))
         {
             return ParseCallStatement();
@@ -1825,7 +1830,75 @@ public sealed class Parser
             or TokenKind.At;
     }
 
+    // Deterministic guard against stack exhaustion on adversarially nested
+    // expressions: StackOverflowException is uncatchable in .NET, so without
+    // a cap a sub-512 KB input of nested parens aborts the whole process
+    // (SIGABRT) from any surface that parses untrusted source. Each nesting
+    // level costs ~4 frames (ParseLispExpression → Core → ParseLispArgument
+    // → ParseParenExpressionOrInlineLambda) whose Debug-build frames are
+    // large (~3 KB+ per level measured in Debug); 128 keeps the worst case
+    // comfortably inside a 1 MB thread-pool stack while remaining far beyond
+    // real code, machine-generated prefix chains included.
+    // EnsureSufficientExecutionStack backstops environments with tighter
+    // stacks.
+    private const int MaxExpressionDepth = 128;
+    private int _expressionDepth;
+
     private ExpressionNode ParseExpression()
+    {
+        if (_expressionDepth >= MaxExpressionDepth)
+            return SkipTooDeepExpression();
+
+        // Backstop for recursion the expression counter doesn't see (deeply
+        // nested statements, mixed forms): converts an imminent overflow
+        // into a catchable InsufficientExecutionStackException.
+        System.Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack();
+
+        _expressionDepth++;
+        try
+        {
+            return ParseExpressionCore();
+        }
+        finally
+        {
+            _expressionDepth--;
+        }
+    }
+
+    /// <summary>
+    /// Depth-cap recovery: report once, swallow the rest of the
+    /// sub-expression (tokens until this nesting level's brackets balance,
+    /// leaving the enclosing closer for the caller), return a dummy value.
+    /// The frames above the cap unwind normally against the remaining
+    /// closers.
+    /// </summary>
+    private ExpressionNode SkipTooDeepExpression()
+    {
+        var span = Current.Span;
+        _diagnostics.ReportError(span, DiagnosticCode.ExpressionNestingTooDeep,
+            $"Expression nesting exceeds the maximum depth of {MaxExpressionDepth}; the remainder of the expression was skipped");
+
+        var depth = 0;
+        while (!IsAtEnd)
+        {
+            var kind = Current.Kind;
+            if (kind is TokenKind.OpenParen or TokenKind.OpenBrace or TokenKind.OpenBracket)
+            {
+                depth++;
+            }
+            else if (kind is TokenKind.CloseParen or TokenKind.CloseBrace or TokenKind.CloseBracket)
+            {
+                if (depth == 0)
+                    break;
+                depth--;
+            }
+            Advance();
+        }
+
+        return new IntLiteralNode(span, 0);
+    }
+
+    private ExpressionNode ParseExpressionCore()
     {
         var expr = Current.Kind switch
         {
@@ -2161,6 +2234,27 @@ public sealed class Parser
     /// And implication: (-> antecedent consequent)
     /// </summary>
     private ExpressionNode ParseLispExpression()
+    {
+        // Every paren-nesting cycle passes through here (including the
+        // ParseLispArgument → ParseParenExpressionOrInlineLambda path that
+        // bypasses ParseExpression), so this is the depth guard's anchor.
+        if (_expressionDepth >= MaxExpressionDepth)
+            return SkipTooDeepExpression();
+
+        System.Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack();
+
+        _expressionDepth++;
+        try
+        {
+            return ParseLispExpressionCore();
+        }
+        finally
+        {
+            _expressionDepth--;
+        }
+    }
+
+    private ExpressionNode ParseLispExpressionCore()
     {
         var startToken = Expect(TokenKind.OpenParen);
 
