@@ -9,12 +9,17 @@ namespace Calor.Compiler.Tests.Mcp;
 /// <summary>
 /// Tests for the project-session tools (calor_session_open/close, loop plan
 /// WS2 D2.1) and the transactional file write tool (calor_file_write, D2.4)
-/// with auto-heal (D2.5).
+/// with auto-heal (D2.5) and canonical-path write confinement.
 /// </summary>
 public sealed class SessionAndFileWriteToolTests : IDisposable
 {
     private readonly string _root;
     private readonly ProjectSessionManager _manager = new();
+
+    // Both tools are rooted at the test directory: confinement is relative
+    // to the server root (the working directory in production).
+    private SessionOpenTool OpenTool => new(_manager, _root);
+    private FileWriteTool WriteTool => new(_manager, _root);
 
     private const string MathSource = """
         §M{m001:MathModule}
@@ -41,6 +46,16 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
           §F{f010:describe:pub}
             §O{str}
             §R STR:"standalone module"
+        """;
+
+    /// <summary>A module with a real call site targeting `add` by name.</summary>
+    private const string CallerSource = """
+        §M{m003:CallerModule}
+          §F{f020:callsAdd:pub}
+            §I{i32:x}
+            §O{i32}
+            §B{total:i32} §C{add} §A x §A INT:1 §/C
+            §R total
         """;
 
     public SessionAndFileWriteToolTests()
@@ -71,7 +86,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
 
     private async Task<string> OpenSessionAsync()
     {
-        var result = await new SessionOpenTool(_manager).ExecuteAsync(Args(new { directory = _root }));
+        var result = await OpenTool.ExecuteAsync(Args(new { directory = _root }));
         return Payload(result).GetProperty("sessionId").GetString()!;
     }
 
@@ -83,7 +98,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         WriteFile("math.calr", MathSource);
         WriteFile("other.calr", OtherSource);
 
-        var result = await new SessionOpenTool(_manager).ExecuteAsync(Args(new { directory = _root }));
+        var result = await OpenTool.ExecuteAsync(Args(new { directory = _root }));
         var payload = Payload(result);
 
         Assert.True(payload.GetProperty("success").GetBoolean());
@@ -98,7 +113,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     {
         WriteFile("broken.calr", "§M{m001:Broken}\n  §F{f001:bad:pub\n");
 
-        var payload = Payload(await new SessionOpenTool(_manager).ExecuteAsync(Args(new { directory = _root })));
+        var payload = Payload(await OpenTool.ExecuteAsync(Args(new { directory = _root })));
 
         Assert.Equal(1, payload.GetProperty("parseErrorFileCount").GetInt32());
         var diagnostics = payload.GetProperty("diagnostics").EnumerateArray().ToList();
@@ -109,10 +124,38 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     [Fact]
     public async Task SessionOpen_MissingDirectory_ReturnsError()
     {
-        var result = await new SessionOpenTool(_manager)
+        var result = await OpenTool
             .ExecuteAsync(Args(new { directory = Path.Combine(_root, "does-not-exist") }));
 
         Assert.True(result.IsError);
+    }
+
+    [Fact]
+    public async Task SessionOpen_OutsideServerRoot_ReturnsError()
+    {
+        var outside = Directory.CreateDirectory(
+            Path.Combine(Path.GetTempPath(), $"calor-outside-root-{Guid.NewGuid():N}")).FullName;
+        try
+        {
+            var result = await OpenTool.ExecuteAsync(Args(new { directory = outside }));
+            Assert.True(result.IsError);
+        }
+        finally
+        {
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SessionOpen_OversizeFile_ReportedAsParseError()
+    {
+        WriteFile("math.calr", MathSource);
+        WriteFile("huge.calr", new string('x', 600 * 1024));
+
+        var payload = Payload(await OpenTool.ExecuteAsync(Args(new { directory = _root })));
+
+        Assert.Equal(2, payload.GetProperty("fileCount").GetInt32());
+        Assert.Equal(1, payload.GetProperty("parseErrorFileCount").GetInt32());
     }
 
     [Fact]
@@ -136,7 +179,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     {
         var path = WriteFile("math.calr", MathSource);
 
-        var payload = Payload(await new FileWriteTool(_manager)
+        var payload = Payload(await WriteTool
             .ExecuteAsync(Args(new { path, content = MathSourceWithoutAdd })));
 
         Assert.True(payload.GetProperty("applied").GetBoolean());
@@ -150,7 +193,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     {
         var path = WriteFile("math.calr", MathSource);
 
-        var payload = Payload(await new FileWriteTool(_manager)
+        var payload = Payload(await WriteTool
             .ExecuteAsync(Args(new { path, content = "§M{m001:Broken}\n  §F{f001:bad:pub\n" })));
 
         Assert.False(payload.GetProperty("applied").GetBoolean());
@@ -164,7 +207,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     {
         var path = Path.Combine(_root, "fresh.calr");
 
-        var payload = Payload(await new FileWriteTool(_manager)
+        var payload = Payload(await WriteTool
             .ExecuteAsync(Args(new { path, content = OtherSource })));
 
         Assert.True(payload.GetProperty("applied").GetBoolean());
@@ -175,7 +218,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     [Fact]
     public async Task FileWrite_NonCalrPath_ReturnsError()
     {
-        var result = await new FileWriteTool(_manager)
+        var result = await WriteTool
             .ExecuteAsync(Args(new { path = Path.Combine(_root, "notes.txt"), content = "hello" }));
 
         Assert.True(result.IsError);
@@ -201,7 +244,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
             """;
         var path = WriteFile("math.calr", withContract);
 
-        var payload = Payload(await new FileWriteTool(_manager)
+        var payload = Payload(await WriteTool
             .ExecuteAsync(Args(new { path, content = withoutContract })));
 
         Assert.True(payload.GetProperty("applied").GetBoolean());
@@ -209,14 +252,72 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         Assert.NotEmpty(payload.GetProperty("contractVerification").GetProperty("issues").EnumerateArray());
     }
 
+    // ── calor_file_write: write confinement ─────────────────────────────
+
+    [Fact]
+    public async Task FileWrite_NoSession_OutsideWriteRoot_ReturnsError()
+    {
+        var outside = Path.Combine(Path.GetTempPath(), $"calor-noconfine-{Guid.NewGuid():N}", "escape.calr");
+
+        var result = await WriteTool.ExecuteAsync(Args(new { path = outside, content = OtherSource }));
+
+        Assert.True(result.IsError);
+        Assert.False(File.Exists(outside));
+        Assert.False(Directory.Exists(Path.GetDirectoryName(outside)!));
+    }
+
+    [Fact]
+    public async Task FileWrite_SymlinkedSubdirectoryEscape_ReturnsError()
+    {
+        if (OperatingSystem.IsWindows()) return; // symlink creation needs elevation on Windows
+
+        var outside = Directory.CreateDirectory(
+            Path.Combine(Path.GetTempPath(), $"calor-symlink-target-{Guid.NewGuid():N}")).FullName;
+        try
+        {
+            Directory.CreateSymbolicLink(Path.Combine(_root, "link"), outside);
+
+            // Lexically inside the root; physically outside via the symlink.
+            var result = await WriteTool.ExecuteAsync(Args(new
+            {
+                path = Path.Combine(_root, "link", "escape.calr"),
+                content = OtherSource
+            }));
+
+            Assert.True(result.IsError);
+            Assert.False(File.Exists(Path.Combine(outside, "escape.calr")));
+        }
+        finally
+        {
+            Directory.Delete(outside, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task FileWrite_PreservesUnixFileMode()
+    {
+        if (OperatingSystem.IsWindows()) return;
+
+        var path = WriteFile("math.calr", MathSource);
+        var restricted = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        File.SetUnixFileMode(path, restricted);
+
+        var payload = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path, content = MathSourceWithoutAdd })));
+
+        Assert.True(payload.GetProperty("applied").GetBoolean());
+        Assert.Equal(restricted, File.GetUnixFileMode(path));
+    }
+
     // ── calor_file_write: auto-heal (D2.5) ──────────────────────────────
 
     [Fact]
-    public async Task FileWrite_HealsForbiddenClosersBeforeChecking()
+    public async Task FileWrite_HealsForbiddenClosers_AndCapsVerdictAtWarnings()
     {
         var path = WriteFile("math.calr", MathSource);
         // §/F and §/M are hard errors (Calor0830) — the healer must strip
-        // them so the write survives instead of rejecting.
+        // them so the write survives instead of rejecting. Healing is not
+        // semantics-preserving, so the verdict must not stay plain "safe".
         const string withClosers = """
             §M{m001:MathModule}
               §F{f002:multiply:pub}
@@ -227,11 +328,12 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
             §/M
             """;
 
-        var payload = Payload(await new FileWriteTool(_manager)
+        var payload = Payload(await WriteTool
             .ExecuteAsync(Args(new { path, content = withClosers })));
 
         Assert.True(payload.GetProperty("applied").GetBoolean());
         Assert.True(payload.GetProperty("healApplied").GetBoolean());
+        Assert.Equal("safe_with_warnings", payload.GetProperty("verdict").GetString());
         var written = payload.GetProperty("writtenContent").GetString()!;
         Assert.DoesNotContain("§/F", written);
         Assert.Equal(written, File.ReadAllText(path));
@@ -250,7 +352,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
               §/F
             """;
 
-        var payload = Payload(await new FileWriteTool(_manager)
+        var payload = Payload(await WriteTool
             .ExecuteAsync(Args(new { path, content = withClosers, heal = false })));
 
         Assert.False(payload.GetProperty("applied").GetBoolean());
@@ -265,7 +367,7 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     {
         var path = WriteFile("math.calr", MathSource);
 
-        var result = await new FileWriteTool(_manager)
+        var result = await WriteTool
             .ExecuteAsync(Args(new { path, content = MathSource, sessionId = "cs-nope" }));
 
         Assert.True(result.IsError);
@@ -278,35 +380,50 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         var sessionId = await OpenSessionAsync();
         var outside = Path.Combine(Path.GetTempPath(), $"outside-{Guid.NewGuid():N}.calr");
 
-        var result = await new FileWriteTool(_manager)
+        var result = await WriteTool
             .ExecuteAsync(Args(new { path = outside, content = MathSource, sessionId }));
 
         Assert.True(result.IsError);
     }
 
     [Fact]
-    public async Task FileWrite_RemovingSymbolReferencedByOtherFile_RejectsAsBreaking()
+    public async Task FileWrite_RemovingCalledFunction_RejectsAsBreaking()
     {
         var mathPath = WriteFile("math.calr", MathSource);
-        // The reference check uses symbol-id containment, matching the
-        // in-file heuristic: this file mentions f001.
-        WriteFile("caller.calr", """
-            §M{m003:CallerModule}
-              §F{f020:label:pub}
-                §O{str}
-                §R STR:"wraps f001"
-            """);
+        WriteFile("caller.calr", CallerSource); // real call site: §C{add}
         var sessionId = await OpenSessionAsync();
 
-        var payload = Payload(await new FileWriteTool(_manager)
+        var payload = Payload(await WriteTool
             .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
 
         Assert.False(payload.GetProperty("applied").GetBoolean());
         Assert.Equal("breaking", payload.GetProperty("verdict").GetString());
         var dangling = payload.GetProperty("referenceIntegrity").GetProperty("danglingReferences")
             .EnumerateArray().Select(e => e.GetString()).ToList();
-        Assert.Contains(dangling, d => d!.Contains("f001") && d.Contains("caller.calr"));
+        Assert.Contains(dangling, d => d!.Contains("'add'") && d.Contains("caller.calr"));
         Assert.Equal(MathSource, File.ReadAllText(mathPath));
+    }
+
+    [Fact]
+    public async Task FileWrite_StringMentionOfRemovedFunction_DoesNotBlock()
+    {
+        // The reference check matches call targets, not raw text: a file that
+        // merely mentions the removed function's name inside a string literal
+        // must not veto the write.
+        var mathPath = WriteFile("math.calr", MathSource);
+        WriteFile("prose.calr", """
+            §M{m004:ProseModule}
+              §F{f030:label:pub}
+                §O{str}
+                §R STR:"documentation mentions add and f001 in prose"
+            """);
+        var sessionId = await OpenSessionAsync();
+
+        var payload = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
+
+        Assert.True(payload.GetProperty("applied").GetBoolean());
+        Assert.Equal("safe", payload.GetProperty("verdict").GetString());
     }
 
     [Fact]
@@ -316,19 +433,16 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         var otherPath = WriteFile("other.calr", OtherSource);
         var sessionId = await OpenSessionAsync();
 
-        // Change other.calr behind the session's back so it now references
-        // f001. Dirty-state invalidation must pick this up on the next call.
-        File.WriteAllText(otherPath, """
-            §M{m002:OtherModule}
-              §F{f010:describe:pub}
-                §O{str}
-                §R STR:"now mentions f001"
-            """);
-        // The stat gate is mtime/size — force a distinct mtime in case the
-        // filesystem's timestamp granularity makes the two writes identical.
+        // Change other.calr behind the session's back so it now really calls
+        // add. Dirty-state invalidation must pick this up on the next call.
+        File.WriteAllText(otherPath, CallerSource);
+        // The invalidation gate is a stat check: force a distinct mtime so
+        // this test is deterministic across filesystems with coarse
+        // timestamp granularity. (A same-size edit that also preserves the
+        // stat is a documented non-detection — BuildStateCache semantics.)
         File.SetLastWriteTimeUtc(otherPath, DateTime.UtcNow.AddSeconds(5));
 
-        var payload = Payload(await new FileWriteTool(_manager)
+        var payload = Payload(await WriteTool
             .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
 
         Assert.False(payload.GetProperty("applied").GetBoolean());
@@ -342,14 +456,14 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         WriteFile("other.calr", OtherSource);
         var sessionId = await OpenSessionAsync();
 
-        // First write removes f001, which nothing references, so it applies.
-        var first = Payload(await new FileWriteTool(_manager)
+        // First write removes add, which nothing calls, so it applies.
+        var first = Payload(await WriteTool
             .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
         Assert.True(first.GetProperty("applied").GetBoolean());
 
         // A second identical write must see the session's updated state:
         // original now equals the new content, so the edit is a no-op and safe.
-        var second = Payload(await new FileWriteTool(_manager)
+        var second = Payload(await WriteTool
             .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
         Assert.True(second.GetProperty("applied").GetBoolean());
         Assert.Equal("safe", second.GetProperty("verdict").GetString());

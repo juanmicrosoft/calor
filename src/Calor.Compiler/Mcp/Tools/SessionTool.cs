@@ -10,13 +10,19 @@ namespace Calor.Compiler.Mcp.Tools;
 /// (loop plan WS2 D2.1). The session holds parse state for every .calr file
 /// under the root and keeps it fresh via stat-on-access invalidation; pass
 /// the returned sessionId to calor_file_write to widen its reference checks
-/// to the whole project.
+/// to the whole project. Session roots are confined to the server's working
+/// directory: a session is also a write-confinement boundary.
 /// </summary>
 public sealed class SessionOpenTool : McpToolBase
 {
     private readonly ProjectSessionManager _sessions;
+    private readonly string _serverRoot;
 
-    internal SessionOpenTool(ProjectSessionManager sessions) => _sessions = sessions;
+    internal SessionOpenTool(ProjectSessionManager sessions, string? serverRoot = null)
+    {
+        _sessions = sessions;
+        _serverRoot = CanonicalPath.Resolve(serverRoot ?? Environment.CurrentDirectory);
+    }
 
     public override string Name => "calor_session_open";
 
@@ -42,31 +48,46 @@ public sealed class SessionOpenTool : McpToolBase
 
     public override Task<McpToolResult> ExecuteAsync(JsonElement? arguments, CancellationToken cancellationToken = default)
     {
+        try
+        {
+            return Task.FromResult(ExecuteCore(arguments));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // The whole flow touches the filesystem (canonicalization
+            // included — an invalid path throws in Path.GetFullPath):
+            // failures surface as tool errors, not protocol crashes.
+            return Task.FromResult(McpToolResult.Error($"calor_session_open failed: {ex.Message}"));
+        }
+    }
+
+    private McpToolResult ExecuteCore(JsonElement? arguments)
+    {
         var directory = GetString(arguments, "directory");
         if (string.IsNullOrEmpty(directory))
-            return Task.FromResult(McpToolResult.Error("'directory' is required"));
+            return McpToolResult.Error("'directory' is required");
 
         var pathError = ValidatePath(directory, "directory");
         if (pathError != null)
-            return Task.FromResult(pathError);
+            return pathError;
 
         if (!Directory.Exists(directory))
-            return Task.FromResult(McpToolResult.Error($"Directory not found: {directory}"));
+            return McpToolResult.Error($"Directory not found: {directory}");
 
-        ProjectSession session;
-        try
-        {
-            session = _sessions.Open(directory);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Task.FromResult(McpToolResult.Error(ex.Message));
-        }
+        // A session confers write access to its root (calor_file_write), so
+        // session roots are confined, after symlink resolution, to the
+        // directory the server was started in.
+        var canonicalRoot = CanonicalPath.Resolve(directory);
+        if (!CanonicalPath.IsUnder(canonicalRoot, _serverRoot))
+            return McpToolResult.Error(
+                $"Directory is outside the server's root '{_serverRoot}' — start the MCP server in (an ancestor of) the project directory");
+
+        var session = _sessions.Open(canonicalRoot);
 
         var files = session.SnapshotFiles().OrderBy(f => f.Path, StringComparer.Ordinal).ToList();
         var diagnostics = files.SelectMany(f => f.Parse.ToEnvelopeDiagnostics()).ToList();
 
-        return Task.FromResult(McpToolResult.Json(new SessionOpenOutput
+        return McpToolResult.Json(new SessionOpenOutput
         {
             Success = true,
             SessionId = session.Id,
@@ -79,7 +100,7 @@ public sealed class SessionOpenTool : McpToolBase
                 Parses = f.Parse.IsSuccess
             }).ToList(),
             Diagnostics = diagnostics
-        }));
+        });
     }
 
     private sealed class SessionOpenOutput
