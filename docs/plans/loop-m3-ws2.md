@@ -33,11 +33,23 @@ format would be unpriced scope. Revisit trigger: WS3 D3.3 (10k-line fixture)
 or v0.10 multi-project needs.
 
 **Dirty-state invalidation is stat-on-access, not a watcher.** Each tool call
-that touches session state re-stats its files (mtime/size gate, then SHA-256
-content hash — the `BuildStateCache.IsFileUpToDate` two-level pattern) and
-reparses only changed files. A filesystem watcher adds lifecycle complexity a
-single-client stdio server does not need. Revisit trigger: WS3 D3.1 warm-state
-latency work, where re-stat cost appears in M-L1.
+that touches session state re-stats its files (mtime/size gate; SHA-256 hash
+to suppress reparses of touched-but-unchanged files — the
+`BuildStateCache.IsFileUpToDate` pattern) and reparses only changed files. A
+filesystem watcher adds lifecycle complexity a single-client stdio server
+does not need. Stated limitation (BuildStateCache semantics): an edit that
+preserves both mtime and size is not detected until the stat next changes.
+Revisit trigger: WS3 D3.1 warm-state latency work, where re-stat cost appears
+in M-L1.
+
+**Write confinement is canonical-path containment.** Every `calor_file_write`
+must land, after symlink resolution, under the session root — or under the
+server's working directory when no session is given; session roots are
+themselves confined under the server's working directory, since a session
+confers write access. Writes to the same file are serialized in-process and
+on-disk content is revalidated against what was checked before the rename;
+races with *external* writers on the final rename remain (only OS file locks
+would close them) and are accepted for a single-client stdio server.
 
 **Sessions are optional on the write path.** `calor_file_write` works without
 a session (checks scoped to the single file, original = current disk content);
@@ -75,5 +87,10 @@ If PR 3 needs a new file, its allowlist entry rides in PR 2.
 - Warm/incremental rebind (WS3 D3.1) — sessions here cache parse state only;
   perf is out of scope until M4.
 - Node-addressed anything (retired with PP-L3).
-- MCP write access for non-`.calr` files — the write tool refuses paths
-  outside the session/allowed extension, matching the harness hook's boundary.
+- MCP write access for non-`.calr` files — the write tool refuses them, and
+  confines every write per the canonical-path decision in §2, matching the
+  harness hook's boundary.
+- Binding in the check set — the write-path checks are parse-level (plus
+  contracts/effects/reference heuristics); running the binder project-wide at
+  check time is WS3 warm-state territory. M-L2 ("parse + bind") is measured
+  by the harness on the resulting build, not inferred from the tool verdict.

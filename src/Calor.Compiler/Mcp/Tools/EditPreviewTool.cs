@@ -150,7 +150,7 @@ public sealed class EditPreviewTool : McpToolBase
         }));
     }
 
-    private static EditSummaryInfo ComputeEditSummary(string original, string modified,
+    internal static EditSummaryInfo ComputeEditSummary(string original, string modified,
         ParseResult originalParse, ParseResult modifiedParse)
     {
         var origLines = original.Split('\n');
@@ -186,7 +186,7 @@ public sealed class EditPreviewTool : McpToolBase
         };
     }
 
-    private static HashSet<string> CollectSymbolIds(ModuleNode ast)
+    internal static HashSet<string> CollectSymbolIds(ModuleNode ast)
     {
         var ids = new HashSet<string>();
         foreach (var func in ast.Functions) ids.Add(func.Id);
@@ -200,7 +200,7 @@ public sealed class EditPreviewTool : McpToolBase
         return ids;
     }
 
-    private static void CheckContracts(ParseResult originalParse, ParseResult modifiedParse, ContractCheckResult result)
+    internal static void CheckContracts(ParseResult originalParse, ParseResult modifiedParse, ContractCheckResult result)
     {
         if (!originalParse.IsSuccess || !modifiedParse.IsSuccess) return;
 
@@ -264,7 +264,7 @@ public sealed class EditPreviewTool : McpToolBase
         return result;
     }
 
-    private static void CheckEffects(ParseResult modifiedParse, EffectCheckResult result)
+    internal static void CheckEffects(ParseResult modifiedParse, EffectCheckResult result)
     {
         if (!modifiedParse.IsSuccess) return;
 
@@ -281,30 +281,68 @@ public sealed class EditPreviewTool : McpToolBase
         result.HasViolations = result.EffectViolations.Count > 0;
     }
 
-    private static void CheckReferences(ParseResult originalParse, ParseResult modifiedParse, ReferenceCheckResult result)
+    internal static void CheckReferences(ParseResult originalParse, ParseResult modifiedParse, ReferenceCheckResult result)
     {
-        var origIds = CollectSymbolIds(originalParse.Ast!);
-        var modIds = CollectSymbolIds(modifiedParse.Ast!);
-
-        // Check for symbols referenced in modified code that were removed
-        var removedSymbols = origIds.Except(modIds).ToList();
-        if (removedSymbols.Count > 0)
+        // Functions are checked against actual call targets in the modified
+        // AST — declarations are referenced by NAME at call sites (§C{add}),
+        // not by declaration id (f001), so an id-substring scan would both
+        // miss real dangling calls and flag ids that only appear in strings.
+        var removedFunctions = CollectFunctionNames(originalParse.Ast!)
+            .Except(CollectFunctionNames(modifiedParse.Ast!))
+            .ToList();
+        if (removedFunctions.Count > 0)
         {
-            // Check if any remaining code references removed symbols
-            var modSource = modifiedParse.Source!;
-            foreach (var symbol in removedSymbols)
+            var callTargets = CollectCallTargets(modifiedParse.Ast!);
+            foreach (var name in removedFunctions)
             {
-                if (modSource.Contains(symbol))
+                if (callTargets.Contains(name))
                 {
-                    result.DanglingReferences.Add($"Symbol '{symbol}' was removed but is still referenced");
+                    result.DanglingReferences.Add($"Function '{name}' was removed but is still called");
                 }
+            }
+        }
+
+        // Types have no call-graph equivalent; use a whole-word text match
+        // (still a heuristic, but bounded — no substring hits inside longer
+        // identifiers).
+        var removedTypes = CollectTypeNames(originalParse.Ast!)
+            .Except(CollectTypeNames(modifiedParse.Ast!))
+            .ToList();
+        foreach (var name in removedTypes)
+        {
+            if (ContainsWholeWord(modifiedParse.Source!, name))
+            {
+                result.DanglingReferences.Add($"Type '{name}' was removed but is still referenced");
             }
         }
 
         result.HasDanglingReferences = result.DanglingReferences.Count > 0;
     }
 
-    private static string DetermineVerdict(CompilationCheckResult compile, ContractCheckResult contracts,
+    /// <summary>Top-level function names — what call sites actually reference.</summary>
+    internal static HashSet<string> CollectFunctionNames(ModuleNode ast)
+        => ast.Functions.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>Class, interface, and enum names.</summary>
+    internal static HashSet<string> CollectTypeNames(ModuleNode ast)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var cls in ast.Classes) names.Add(cls.Name);
+        foreach (var iface in ast.Interfaces) names.Add(iface.Name);
+        foreach (var enumDef in ast.Enums) names.Add(enumDef.Name);
+        return names;
+    }
+
+    /// <summary>Every call-target name in the module, as written at the call sites.</summary>
+    internal static HashSet<string> CollectCallTargets(ModuleNode ast)
+        => Analysis.CallGraphAnalysis.Build(ast).ForwardGraph.Values
+            .SelectMany(calls => calls.Select(c => c.Callee))
+            .ToHashSet(StringComparer.Ordinal);
+
+    internal static bool ContainsWholeWord(string source, string word)
+        => Regex.IsMatch(source, $@"\b{Regex.Escape(word)}\b");
+
+    internal static string DetermineVerdict(CompilationCheckResult compile, ContractCheckResult contracts,
         EffectCheckResult effects, ReferenceCheckResult references)
     {
         if (compile.Checked && !compile.ModifiedCompiles)
@@ -322,7 +360,7 @@ public sealed class EditPreviewTool : McpToolBase
         return "safe";
     }
 
-    private static List<string> GenerateRecommendations(CompilationCheckResult compile, ContractCheckResult contracts,
+    internal static List<string> GenerateRecommendations(CompilationCheckResult compile, ContractCheckResult contracts,
         EffectCheckResult effects, ReferenceCheckResult references)
     {
         var recs = new List<string>();
@@ -357,7 +395,7 @@ public sealed class EditPreviewTool : McpToolBase
         [JsonPropertyName("recommendations")] public List<string> Recommendations { get; init; } = new();
     }
 
-    private sealed class EditSummaryInfo
+    internal sealed class EditSummaryInfo
     {
         [JsonPropertyName("linesAdded")] public int LinesAdded { get; init; }
         [JsonPropertyName("linesRemoved")] public int LinesRemoved { get; init; }
@@ -366,7 +404,7 @@ public sealed class EditPreviewTool : McpToolBase
         [JsonPropertyName("symbolsRemoved")] public List<string> SymbolsRemoved { get; init; } = new();
     }
 
-    private sealed class CompilationCheckResult
+    internal sealed class CompilationCheckResult
     {
         [JsonPropertyName("checked")] public bool Checked { get; set; }
         [JsonPropertyName("originalCompiles")] public bool OriginalCompiles { get; set; }
@@ -375,7 +413,7 @@ public sealed class EditPreviewTool : McpToolBase
         [JsonPropertyName("errors")] public List<EnvelopeDiagnostic> Errors { get; set; } = new();
     }
 
-    private sealed class ContractCheckResult
+    internal sealed class ContractCheckResult
     {
         [JsonPropertyName("checked")] public bool Checked { get; set; }
         [JsonPropertyName("originalContractCount")] public int OriginalContractCount { get; set; }
@@ -383,14 +421,14 @@ public sealed class EditPreviewTool : McpToolBase
         [JsonPropertyName("issues")] public List<string> Issues { get; set; } = new();
     }
 
-    private sealed class EffectCheckResult
+    internal sealed class EffectCheckResult
     {
         [JsonPropertyName("checked")] public bool Checked { get; set; }
         [JsonPropertyName("hasViolations")] public bool HasViolations { get; set; }
         [JsonPropertyName("effectViolations")] public List<string> EffectViolations { get; set; } = new();
     }
 
-    private sealed class ReferenceCheckResult
+    internal sealed class ReferenceCheckResult
     {
         [JsonPropertyName("checked")] public bool Checked { get; set; }
         [JsonPropertyName("hasDanglingReferences")] public bool HasDanglingReferences { get; set; }
