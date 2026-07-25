@@ -99,7 +99,8 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.0 (frozen 2026-07-24).** This annex is **additive-only
+**Annex version: A-1.1 (thresholds frozen at A-1.0, 2026-07-24; additive
+clarification A-1.1, 2026-07-25).** This annex is **additive-only
 with respect to the main document**: no §1–§7 machine-adjudicable gate
 criterion references any metric defined here, and nothing here alters the
 C#-vs-Calor gate decisions those sections govern. The annex's own proof-point
@@ -134,7 +135,13 @@ pairing, and censoring follow §2 of this document.
   excluding the harness's silent held-out observation and telemetry
   bookkeeping (arm-fairness; see schema doc).
 - **M-L2 first-apply validity** — % of edited iterations whose build exits 0,
-  split by `edit_mechanism`.
+  split by `edit_mechanism`. **Heal accounting (A-1.1)**: on the `mcp-file`
+  mechanism the per-attempt stream (`mcp-writes.jsonl`, schema doc) is the
+  source, and `calor_file_write` auto-heals before checking — so
+  `applied/attempts` is first-apply-**after-autoheal** validity, crediting
+  the tool for slips it repaired. The stream journals `healApplied` per
+  record and the run summary carries `appliedUnhealed`; cross-mechanism
+  comparisons against raw arms must report both forms.
 - **M-L3 diagnostic actionability** — of failing edited iterations whose
   envelope named ≥1 `declarationId`, % where the next edited iteration's
   `edit_target_ids` intersects the named set. **Adjudication floor: 20
@@ -159,6 +166,12 @@ D4.5 rule ("the dry-run may move a threshold, the task count, or N before
 freezing — never after") applied as written.
 
 ### A.3 Annex revision log
+
+**A-1.1 (2026-07-25).** Additive clarification, no threshold changes: M-L2's
+`mcp-file` sourcing (per-attempt `mcp-writes.jsonl` stream, M3 PR 4) and its
+heal accounting — `applied/attempts` is first-apply-after-autoheal validity;
+`appliedUnhealed` is the strict form; both reported in cross-mechanism
+comparisons (review of #799).
 
 **A-1.0 (2026-07-24).** Initial freeze. Definitions from loop plan §4;
 thresholds per the `loop-feasibility-dry-002` verdict

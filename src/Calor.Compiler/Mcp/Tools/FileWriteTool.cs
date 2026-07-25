@@ -44,6 +44,13 @@ public sealed class FileWriteTool : McpToolBase
     private readonly string? _rejectDir;
     private static readonly object WriteLogSync = new();
 
+    // Reject payloads carry full file content (≤512 KB each); cap the archive
+    // so a reject-spamming run cannot grow it without bound. Records keep
+    // flowing to the write log past the cap — only the payload is dropped
+    // (Annex A adjudicates M-L4 at ≥20 rejects, far below this).
+    private const int MaxRejectArchives = 200;
+    private static int _rejectsArchived;
+
     internal FileWriteTool(ProjectSessionManager sessions, string? defaultWriteRoot = null,
         string? writeLogPath = null, string? rejectDir = null)
     {
@@ -395,7 +402,7 @@ public sealed class FileWriteTool : McpToolBase
         try
         {
             string? rejectPayloadPath = null;
-            if (!applied && _rejectDir != null)
+            if (!applied && _rejectDir != null && Interlocked.Increment(ref _rejectsArchived) <= MaxRejectArchives)
             {
                 Directory.CreateDirectory(_rejectDir);
                 rejectPayloadPath = System.IO.Path.Combine(_rejectDir,

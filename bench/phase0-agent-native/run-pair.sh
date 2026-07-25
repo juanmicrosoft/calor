@@ -294,21 +294,19 @@ EOF
     # no-session write-confinement root — is the task tree itself. Write
     # telemetry (M-L2) and reject payloads (M-L4/D4.6) land in the run's out
     # dir via the env the server is started with.
+    # Built with jq (not a heredoc) so paths are JSON-escaped, and the write
+    # root is pinned via --root rather than trusting the client to spawn the
+    # server with a particular CWD (review of #799 item 1): a wrong implicit
+    # root would silently reject every task-tree write and fabricate the
+    # guaranteed-failure data the old gate existed to prevent.
     if [[ "$ARM" == "calor" && "$EDIT_MECHANISM" == "mcp-file" && $NULL_AGENT -eq 0 ]]; then
-        cat > "$ws_out/mcp-config.json" <<EOF
-{
-  "mcpServers": {
-    "calor": {
-      "command": "dotnet",
-      "args": ["$CALOR_CLI_DLL", "mcp", "--stdio"],
-      "env": {
-        "CALOR_MCP_WRITE_LOG": "$ws_out/mcp-writes.jsonl",
-        "CALOR_MCP_REJECT_DIR": "$ws_out/rejects"
-      }
-    }
-  }
-}
-EOF
+        jq -n --arg dll "$CALOR_CLI_DLL" --arg root "$ws/src" \
+              --arg log "$ws_out/mcp-writes.jsonl" --arg rej "$ws_out/rejects" \
+            '{mcpServers: {calor: {
+                command: "dotnet",
+                args: [$dll, "mcp", "--stdio", "--root", $root],
+                env: {CALOR_MCP_WRITE_LOG: $log, CALOR_MCP_REJECT_DIR: $rej}}}}' \
+            > "$ws_out/mcp-config.json"
     fi
 
     # Baseline src-tree hash (mirrors the shim's computation): without it the
@@ -636,8 +634,12 @@ extract_metrics() {
     # without the MCP write path (raw arms, older builds).
     local mcp_writes
     if [[ -s "$ws_out/mcp-writes.jsonl" ]]; then
+        # appliedUnhealed nets auto-heal out of M-L2: applied counts writes
+        # the tool healed first, so applied/attempts is first-apply-AFTER-
+        # AUTOHEAL validity; appliedUnhealed/attempts is the strict form.
         mcp_writes=$(jq -s '{attempts: length,
                              applied: [.[] | select(.applied)] | length,
+                             appliedUnhealed: [.[] | select(.applied and (.healApplied | not))] | length,
                              rejected: [.[] | select(.applied | not)] | length,
                              healed: [.[] | select(.healApplied)] | length}' \
                      "$ws_out/mcp-writes.jsonl")
