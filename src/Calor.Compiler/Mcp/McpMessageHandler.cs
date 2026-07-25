@@ -31,7 +31,7 @@ public sealed class McpMessageHandler
             : Math.Max(512L * 1024L * 1024L, (long)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes * 0.5));
     private CancellationToken _serverCancellation;
 
-    public McpMessageHandler(bool verbose = false, TextWriter? log = null)
+    public McpMessageHandler(bool verbose = false, TextWriter? log = null, string? rootDirectory = null)
     {
         _verbose = verbose;
         _log = log;
@@ -61,9 +61,13 @@ public sealed class McpMessageHandler
         RegisterTool(new FormatTool());
 
         // ── Project sessions & transactional writes (loop plan WS2 D2.1/D2.4)
-        RegisterTool(new SessionOpenTool(_projectSessions));
+        // rootDirectory pins the write-confinement root explicitly (mcp
+        // --root); when null the tools fall back to the server process CWD —
+        // which depends on how the MCP client spawned us, so harnesses
+        // should always pin it.
+        RegisterTool(new SessionOpenTool(_projectSessions, rootDirectory));
         RegisterTool(new SessionCloseTool(_projectSessions));
-        RegisterTool(new FileWriteTool(_projectSessions));
+        RegisterTool(new FileWriteTool(_projectSessions, rootDirectory));
 
         // ── Refinement types & obligations ──────────────────
         RegisterTool(new RefineTool());

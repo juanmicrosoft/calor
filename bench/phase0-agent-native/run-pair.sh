@@ -109,19 +109,19 @@ done
 case "$EDIT_MECHANISM" in
     raw) ;;
     mcp-file)
-        # GATED until a real MCP write path exists (review of #758 item 1):
-        # the harness registers no MCP server and Calor exposes no
-        # file-writing MCP tool (calor_edit_preview is preview-only), so a
-        # live mcp-file run blocks every edit path and can only manufacture
-        # guaranteed-failure data. Allowed under --null-agent so labels /
-        # pins / record plumbing stay testable; unblocks when WS2 D2.4
-        # (transactional file-level apply) ships an MCP write tool and the
-        # harness registers the server.
-        if [[ "$NULL_AGENT" != "1" ]]; then
-            echo "ERROR: --edit-mechanism mcp-file is gated: no MCP file-write tool exists yet (WS2 D2.4); a live run would block all edits and fabricate failure data. Use --null-agent for plumbing tests." >&2
+        # UNGATED (loop plan M3 PR 4): WS2 D2.4 shipped the transactional MCP
+        # write path (calor_file_write, #797) with write-path robustness
+        # (#798), and the harness now registers the calor MCP server for this
+        # arm (see the mcp-config block in prep and the --mcp-config args on
+        # the claude invocation). Enforcement stays two-sided: the PreToolUse
+        # hook blocks raw Edit/Write on .calr, and the prompt states the
+        # constraint. Live runs are calor-arm only — the C# arm has no .calr
+        # surface to constrain. calor.dll presence is checked after CLI
+        # resolution below.
+        if [[ "$NULL_AGENT" != "1" && "$ARM" != "calor" ]]; then
+            echo "ERROR: --edit-mechanism mcp-file applies to the calor arm only (the C# arm has no .calr edit surface)" >&2
             exit 2
         fi
-        echo "WARNING: mcp-file arm is plumbing-only under --null-agent until WS2 D2.4 ships an MCP write path" >&2
         ;;
     mcp-node)
         # Accepted for forward-compatible labeling only: node-level MCP edit
@@ -178,6 +178,13 @@ for cli_cfg in Release Debug; do
 done
 if [[ "$ARM" == "calor" && -z "$CALOR_CLI_DLL" ]]; then
     echo "WARNING: calor.dll not found (build src/Calor.Compiler first); calor-arm records will carry envelope_valid=null and empty edit_target_ids" >&2
+fi
+# A live mcp-file arm cannot run without the MCP server binary: the hook
+# blocks raw .calr edits, so a missing server would strand the agent with no
+# edit path at all and fabricate guaranteed-failure data.
+if [[ "$EDIT_MECHANISM" == "mcp-file" && $NULL_AGENT -eq 0 && -z "$CALOR_CLI_DLL" ]]; then
+    echo "ERROR: --edit-mechanism mcp-file needs calor.dll to register the MCP server (build src/Calor.Compiler -c Release first)" >&2
+    exit 2
 fi
 
 # ---------------------------------------------------------------------------
@@ -278,6 +285,28 @@ EOF
   }
 }
 EOF
+    fi
+
+    # MCP server registration for the live mcp-file arm (loop plan M3 PR 4):
+    # exactly one server, passed via --mcp-config + --strict-mcp-config so
+    # user-level MCP config cannot bleed into the arm. claude runs from
+    # $ws/src, so the server's working directory — calor_file_write's
+    # no-session write-confinement root — is the task tree itself. Write
+    # telemetry (M-L2) and reject payloads (M-L4/D4.6) land in the run's out
+    # dir via the env the server is started with.
+    # Built with jq (not a heredoc) so paths are JSON-escaped, and the write
+    # root is pinned via --root rather than trusting the client to spawn the
+    # server with a particular CWD (review of #799 item 1): a wrong implicit
+    # root would silently reject every task-tree write and fabricate the
+    # guaranteed-failure data the old gate existed to prevent.
+    if [[ "$ARM" == "calor" && "$EDIT_MECHANISM" == "mcp-file" && $NULL_AGENT -eq 0 ]]; then
+        jq -n --arg dll "$CALOR_CLI_DLL" --arg root "$ws/src" \
+              --arg log "$ws_out/mcp-writes.jsonl" --arg rej "$ws_out/rejects" \
+            '{mcpServers: {calor: {
+                command: "dotnet",
+                args: [$dll, "mcp", "--stdio", "--root", $root],
+                env: {CALOR_MCP_WRITE_LOG: $log, CALOR_MCP_REJECT_DIR: $rej}}}}' \
+            > "$ws_out/mcp-config.json"
     fi
 
     # Baseline src-tree hash (mirrors the shim's computation): without it the
@@ -517,16 +546,22 @@ run_agent() {
     local model_args=()
     [[ -n "${CLAUDE_MODEL:-}" && "${CLAUDE_MODEL}" != "default" ]] && model_args=(--model "$CLAUDE_MODEL")
 
+    # MCP registration args (written by prep for the live mcp-file arm only):
+    # --strict-mcp-config keeps the arm hermetic — the agent sees exactly the
+    # calor server, never user-level MCP config.
+    local mcp_args=()
+    [[ -f "$ws_out/mcp-config.json" ]] && mcp_args=(--mcp-config "$ws_out/mcp-config.json" --strict-mcp-config)
+
     local rc=0
     if [[ -n "$timeout_bin" ]]; then
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
             "$timeout_bin" -k 10 "$TIMEOUT_SECS" \
-            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" \
+            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" "${mcp_args[@]}" \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) || rc=$?
     else
         set -m
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
-            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" \
+            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" "${mcp_args[@]}" \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
         local agent_pid=$!
         ( sleep "$TIMEOUT_SECS" && kill -9 -- "-$agent_pid" 2>/dev/null ) &
@@ -593,6 +628,25 @@ extract_metrics() {
         envelope_valid_all=null
     fi
 
+    # M-L2 per-attempt stream (loop plan M3 PR 4): calor_file_write journals
+    # one record per attempt into mcp-writes.jsonl; applied/attempts is
+    # first-apply validity for the mcp-file mechanism. null when the arm ran
+    # without the MCP write path (raw arms, older builds).
+    local mcp_writes
+    if [[ -s "$ws_out/mcp-writes.jsonl" ]]; then
+        # appliedUnhealed nets auto-heal out of M-L2: applied counts writes
+        # the tool healed first, so applied/attempts is first-apply-AFTER-
+        # AUTOHEAL validity; appliedUnhealed/attempts is the strict form.
+        mcp_writes=$(jq -s '{attempts: length,
+                             applied: [.[] | select(.applied)] | length,
+                             appliedUnhealed: [.[] | select(.applied and (.healApplied | not))] | length,
+                             rejected: [.[] | select(.applied | not)] | length,
+                             healed: [.[] | select(.healApplied)] | length}' \
+                     "$ws_out/mcp-writes.jsonl")
+    else
+        mcp_writes=null
+    fi
+
     jq -n \
         --arg pair "$PAIR_ID" --arg arm "$ARM_LABEL" --argjson run "$run_idx" \
         --argjson success "$([[ $final_fail -eq 0 ]] && echo true || echo false)" \
@@ -602,11 +656,13 @@ extract_metrics() {
         --argjson tin "$tokens_in" --argjson tout "$tokens_out" \
         --argjson null_agent "$NULL_AGENT" \
         --argjson mean_lat "$mean_lat" --argjson env_all "$envelope_valid_all" \
+        --argjson mcp_writes "$mcp_writes" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:$success,
           escapedBugs:$escaped, heldoutPassed:$passed,
           iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
           invalid:false,
           meanFeedbackLatencyMs:$mean_lat, envelopeValidAll:$env_all,
+          mcpWrites:$mcp_writes,
           tokens:{input:$tin, output:$tout}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"

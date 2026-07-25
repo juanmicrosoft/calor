@@ -469,6 +469,56 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         Assert.Equal("safe", second.GetProperty("verdict").GetString());
     }
 
+    // ── Write telemetry (M-L2 / M-L4 stream) ────────────────────────────
+
+    [Fact]
+    public async Task FileWrite_LogsAppliedAttempt_WhenLogConfigured()
+    {
+        var path = WriteFile("math.calr", MathSource);
+        var logPath = Path.Combine(_root, "mcp-writes.jsonl");
+        var tool = new FileWriteTool(_manager, _root, writeLogPath: logPath);
+
+        var payload = Payload(await tool.ExecuteAsync(Args(new { path, content = MathSourceWithoutAdd })));
+        Assert.True(payload.GetProperty("applied").GetBoolean());
+
+        var records = File.ReadAllLines(logPath).Select(l => JsonDocument.Parse(l).RootElement).ToList();
+        Assert.Single(records);
+        Assert.Equal("mcp-write/1", records[0].GetProperty("schema").GetString());
+        Assert.True(records[0].GetProperty("applied").GetBoolean());
+        Assert.Equal("safe", records[0].GetProperty("verdict").GetString());
+    }
+
+    [Fact]
+    public async Task FileWrite_LogsRejectAndArchivesPayload()
+    {
+        var path = WriteFile("math.calr", MathSource);
+        var logPath = Path.Combine(_root, "mcp-writes.jsonl");
+        var rejectDir = Path.Combine(_root, "rejects");
+        var tool = new FileWriteTool(_manager, _root, writeLogPath: logPath, rejectDir: rejectDir);
+        const string broken = "§M{m001:Broken}\n  §F{f001:bad:pub\n";
+
+        var payload = Payload(await tool.ExecuteAsync(Args(new { path, content = broken, heal = false })));
+        Assert.False(payload.GetProperty("applied").GetBoolean());
+
+        var record = JsonDocument.Parse(File.ReadAllLines(logPath).Single()).RootElement;
+        Assert.False(record.GetProperty("applied").GetBoolean());
+        Assert.Equal("breaking", record.GetProperty("verdict").GetString());
+        var rejectPayloadPath = record.GetProperty("rejectPayload").GetString();
+        Assert.NotNull(rejectPayloadPath);
+        var archived = JsonDocument.Parse(File.ReadAllText(rejectPayloadPath!)).RootElement;
+        Assert.Equal(broken, archived.GetProperty("rejectedContent").GetString());
+    }
+
+    [Fact]
+    public async Task FileWrite_NoLogConfigured_WritesNoTelemetry()
+    {
+        var path = WriteFile("math.calr", MathSource);
+
+        Payload(await WriteTool.ExecuteAsync(Args(new { path, content = MathSourceWithoutAdd })));
+
+        Assert.False(File.Exists(Path.Combine(_root, "mcp-writes.jsonl")));
+    }
+
     // ── Registration ────────────────────────────────────────────────────
 
     [Fact]

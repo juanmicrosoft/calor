@@ -55,6 +55,40 @@ censors at budget+1; censored fractions are reported per arm.
   `loop-baseline-ws1`) has no apply path, and the schema must be frozen
   **before** the treatment build exists so both arms emit identical shapes.
 
+## Companion stream: `mcp-writes.jsonl` (mcp-write/1)
+
+Live `mcp-file` arms register the calor MCP server (M3 PR 4), and
+`calor_file_write` journals **one record per write attempt** into
+`mcp-writes.jsonl` in the run's out dir (env `CALOR_MCP_WRITE_LOG`, set in the
+server registration). This is M-L2's per-attempt stream for the mcp-file
+mechanism — the journal's per-iteration `apply_verdict` remains reserved-null;
+per-attempt granularity lives here instead, because one iteration can contain
+several write attempts and the shim cannot observe MCP traffic.
+
+| Field | Type | Notes |
+|:------|:-----|:------|
+| `schema` | `"mcp-write/1"` | discriminator |
+| `ts` | string (ISO-8601 UTC) | attempt time |
+| `path` | string | canonical target path |
+| `verdict` | `"safe"` \| `"safe_with_warnings"` \| `"breaking"` | check-set verdict |
+| `applied` | bool | whether the atomic apply ran (`verdict != "breaking"`) |
+| `healApplied` | bool | auto-heal changed the content before checking (D2.5) |
+| `created` | bool | the write created the file |
+| `rejectPayload` | string \| null | path of the archived rejected-edit payload (`rejects/`, env `CALOR_MCP_REJECT_DIR`) — D4.6 replay input for M-L4 |
+
+Notes: revalidation races (file changed on disk mid-check → retry error) are
+not journaled — they carry no verdict information. Reject payload archiving
+caps at 200 per server process (records keep flowing past the cap with
+`rejectPayload: null`; Annex A adjudicates M-L4 at ≥20). `extract_metrics`
+aggregates the stream into `result.json` as
+`mcpWrites: {attempts, applied, appliedUnhealed, rejected, healed}` (null
+when the stream is absent). **M-L2(mcp-file)** = `applied / attempts`, which
+is first-apply-**after-autoheal** validity because the tool heals before
+checking; `appliedUnhealed / attempts` is the strict form — report both in
+cross-mechanism comparisons (Annex A A-1.1). **M-L4** consumes the
+`rejectPayload` archives; below 20 rejects per epoch it stays reported-only
+(Annex A).
+
 ## Compatibility
 
 `extract_metrics` in `run-pair.sh` computes `iterations`, `iterationsToGreen`,
