@@ -28,7 +28,8 @@ internal sealed class ProjectSession
         // Skipping reparse points keeps enumeration from following symlink
         // cycles and from pulling in files outside the root; symlinked .calr
         // entries inside the root are deliberately not part of a session.
-        AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.Hidden | FileAttributes.System,
+        // Device entries are skipped for the same do-not-open reason.
+        AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.Hidden | FileAttributes.System | FileAttributes.Device,
     };
 
     private readonly Dictionary<string, SessionFileState> _files = new(StringComparer.Ordinal);
@@ -110,7 +111,8 @@ internal sealed class ProjectSession
 
                     // Stat changed — hash to decide whether the content did
                     // (a touch without an edit must not trigger a reparse).
-                    var source = File.ReadAllText(path);
+                    // Zero-length entries are never opened (see Load).
+                    var source = info.Length == 0 ? "" : File.ReadAllText(path);
                     var hash = SessionFileState.HashContent(source);
                     if (hash == state.ContentHash)
                     {
@@ -211,13 +213,18 @@ internal sealed class SessionFileState
                 }));
         }
 
-        var source = File.ReadAllText(path);
+        // Never open zero-length entries: FIFOs and other special files stat
+        // as size 0, and a blocking read on a FIFO would hang the server
+        // forever. A genuinely empty regular file reads as "" anyway.
+        var source = info.Length == 0 ? "" : File.ReadAllText(path);
         return FromContent(path, source, HashContent(source), info);
     }
 
     public static SessionFileState FromContent(string path, string source, string hash, FileInfo info)
         => new(path, source, hash, info.LastWriteTimeUtc, info.Length,
-            CalorSourceHelper.Parse(source, path));
+            // Tolerant parse (D2.5): a broken file still contributes its
+            // best-effort AST to project-wide checks and error attribution.
+            CalorSourceHelper.ParseTolerant(source, path));
 
     public static string HashContent(string source)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(source)));

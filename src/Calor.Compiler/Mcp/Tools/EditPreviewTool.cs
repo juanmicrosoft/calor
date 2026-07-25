@@ -167,10 +167,12 @@ public sealed class EditPreviewTool : McpToolBase
         var symbolsAdded = new List<string>();
         var symbolsRemoved = new List<string>();
 
-        if (originalParse.IsSuccess && modifiedParse.IsSuccess)
+        // Partial ASTs are good enough for a surface-level symbol diff — a
+        // declaration the recovery elided just shows up as removed.
+        if (originalParse.Ast != null && modifiedParse.Ast != null)
         {
-            var origIds = CollectSymbolIds(originalParse.Ast!);
-            var modIds = CollectSymbolIds(modifiedParse.Ast!);
+            var origIds = CollectSymbolIds(originalParse.Ast);
+            var modIds = CollectSymbolIds(modifiedParse.Ast);
 
             symbolsAdded = modIds.Except(origIds).ToList();
             symbolsRemoved = origIds.Except(modIds).ToList();

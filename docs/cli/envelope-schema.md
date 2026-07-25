@@ -171,9 +171,9 @@ Classes:
 | `calor_structure` | E | **Yes** | parse errors as envelope entries |
 | `calor_format` | E | **Yes** | parser + `Calor0800`-band diagnostics as envelope entries with `declarationId` |
 | `calor_fix` | D | **Yes** (by audit) | applied-fix records only; verified no diagnostic-shaped data hides in the payload |
-| `calor_session_open` | E | **Yes** | per-file parse errors as envelope entries under `diagnostics[]` (loop plan WS2 D2.1) |
+| `calor_session_open` | E | **Yes** | per-file parse errors as envelope entries under `diagnostics[]`, with `declarationId` attributed via tolerant-parse partial ASTs (loop plan WS2 D2.1/D2.5) |
 | `calor_session_close` | X | — | session lifecycle only; no source-anchored diagnostics |
-| `calor_file_write` | E | **Yes** | check-set errors as envelope entries (`compilationResult.errors`, same shape as `calor_edit_preview`); apply verdict + heal payload alongside (loop plan WS2 D2.4/D2.5) |
+| `calor_file_write` | E | **Yes** | check-set errors as envelope entries (`compilationResult.errors`, same shape as `calor_edit_preview`), with `declarationId` on parse errors via tolerant-parse partial ASTs; apply verdict + heal payload alongside (loop plan WS2 D2.4/D2.5) |
 | `calor_help` | X | — | documentation lookup; no source-anchored diagnostics |
 | `calor_self_test` | X | — | golden-diff scenarios |
 
