@@ -40,10 +40,22 @@ public sealed class FileWriteTool : McpToolBase
     private static SemaphoreSlim GateFor(string canonicalPath)
         => PathGates[(canonicalPath.GetHashCode(StringComparison.Ordinal) & int.MaxValue) % PathGates.Length];
 
-    internal FileWriteTool(ProjectSessionManager sessions, string? defaultWriteRoot = null)
+    private readonly string? _writeLogPath;
+    private readonly string? _rejectDir;
+    private static readonly object WriteLogSync = new();
+
+    internal FileWriteTool(ProjectSessionManager sessions, string? defaultWriteRoot = null,
+        string? writeLogPath = null, string? rejectDir = null)
     {
         _sessions = sessions;
         _defaultWriteRoot = CanonicalPath.Resolve(defaultWriteRoot ?? Environment.CurrentDirectory);
+
+        // Loop telemetry (plan D4.1/D4.6): the harness sets these env vars in
+        // the MCP server registration so every write attempt is journaled
+        // (M-L2 first-apply validity) and every reject's payload is archived
+        // for the reject-replay harness (M-L4). Absent → no logging.
+        _writeLogPath = writeLogPath ?? Environment.GetEnvironmentVariable("CALOR_MCP_WRITE_LOG");
+        _rejectDir = rejectDir ?? Environment.GetEnvironmentVariable("CALOR_MCP_REJECT_DIR");
     }
 
     public override string Name => "calor_file_write";
@@ -165,7 +177,7 @@ public sealed class FileWriteTool : McpToolBase
         }
     }
 
-    private static async Task<McpToolResult> CheckAndApplyAsync(string canonicalPath, string content,
+    private async Task<McpToolResult> CheckAndApplyAsync(string canonicalPath, string content,
         ProjectSession? session, JsonElement? arguments, CancellationToken cancellationToken)
     {
         var (runCompile, runContracts, runEffects, runReferences) = ParseCheckSelection(arguments);
@@ -265,6 +277,9 @@ public sealed class FileWriteTool : McpToolBase
         if (healApplied)
             recommendations.Insert(0, "Content was auto-healed — review writtenContent; healing is not guaranteed semantics-preserving");
 
+        LogWriteAttempt(canonicalPath, verdict, applied, healApplied,
+            created: applied && !fileExistedAtRead, finalContent);
+
         return McpToolResult.Json(new FileWriteOutput
         {
             Success = true,
@@ -362,6 +377,59 @@ public sealed class FileWriteTool : McpToolBase
                 requested.Contains("contracts"),
                 requested.Contains("effects"),
                 requested.Contains("references"));
+    }
+
+    /// <summary>
+    /// Appends one JSONL record per write attempt to the harness-configured
+    /// log (M-L2's per-attempt stream), archiving rejected content for
+    /// reject-replay (M-L4/D4.6). Telemetry must never fail the write path —
+    /// all IO errors are swallowed. Revalidation races (retry errors) are
+    /// deliberately not logged: they carry no verdict information.
+    /// </summary>
+    private void LogWriteAttempt(string path, string verdict, bool applied, bool healApplied,
+        bool created, string content)
+    {
+        if (_writeLogPath == null)
+            return;
+
+        try
+        {
+            string? rejectPayloadPath = null;
+            if (!applied && _rejectDir != null)
+            {
+                Directory.CreateDirectory(_rejectDir);
+                rejectPayloadPath = System.IO.Path.Combine(_rejectDir,
+                    $"{DateTime.UtcNow:yyyyMMddTHHmmssfff}Z-{Guid.NewGuid().ToString("N")[..8]}.json");
+                File.WriteAllText(rejectPayloadPath, JsonSerializer.Serialize(new
+                {
+                    ts = DateTime.UtcNow.ToString("o"),
+                    path,
+                    verdict,
+                    rejectedContent = content
+                }, McpJsonOptions.Default));
+            }
+
+            var record = JsonSerializer.Serialize(new
+            {
+                schema = "mcp-write/1",
+                ts = DateTime.UtcNow.ToString("o"),
+                path,
+                verdict,
+                applied,
+                healApplied,
+                created,
+                rejectPayload = rejectPayloadPath
+            }, McpJsonOptions.Default);
+
+            lock (WriteLogSync)
+            {
+                File.AppendAllText(_writeLogPath, record + Environment.NewLine);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Swallowed by design; see summary.
+        }
     }
 
     /// <summary>
