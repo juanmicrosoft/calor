@@ -66,10 +66,9 @@ def generate(seed):
         for mod in range(1, MODULES_PER_LAYER + 1):
             ks = []
             for idx in range(1, FUNCS_PER_MODULE + 1):
-                calc = layer == LAYERS or rng.random() < CALC_FRACTION
-                # L3 keeps a few flow fns as rename targets: force ~40% flow.
-                if layer == LAYERS:
-                    calc = rng.random() < CALC_FRACTION
+                # One RNG draw per function, every layer — the split applies
+                # uniformly (leaf-layer flow functions just have no callees).
+                calc = rng.random() < CALC_FRACTION
                 ks.append("calc" if calc else "flow")
                 if calc:
                     calc_fns.append((layer, mod, idx))
@@ -211,7 +210,9 @@ against these bytes in git, never against a regenerator's output.
   of the compiler (Directory.Build.props), or when the syntax the generator
   emits is deprecated. Regeneration is a reviewed PR that re-runs
   `corpus-stats.py`, updates this README's numbers, and re-baselines any
-  published M-L1 result.
+  published M-L1 result. Byte-determinism rests on CPython's `random`
+  stream; a Python-version change that drifts the bytes shows up as a diff
+  in the regeneration PR and is handled as a re-baseline, not an error.
 - **Sample count:** every P50/P99 measurement uses the full committed edit
   script — {n_edits} timed edits ({n_safe} safe, {n_breaking} breaking), ≥ the
   plan's 200 minimum. The breaking minority is deliberate: rejects are part
@@ -221,14 +222,21 @@ against these bytes in git, never against a regenerator's output.
 
 | Metric | Corpus p50 | Corpus p90 | Fixture | Note |
 |---|---|---|---|---|
-| lines per module file | {c_lines_p50:.0f} | {c_lines_p90:.0f} | ~{f_lines_per_file:.0f} | sized near p90 so ~10k lines stays ≤ {n_files} files (session cap 2000) |
+| lines per module file | {c_lines_p50:.0f} | {c_lines_p90:.0f} | ~{f_lines_per_file:.0f} | sized between corpus p75 and p90 — larger-than-median files keep ~10k lines at ~{n_files} files rather than the ~360 that p50 sizing would need |
 | functions per module | {c_fpm_p50:.0f} | {c_fpm_p90:.0f} | {funcs_per_module} | p90 |
 | contract markers per function | {c_cd_p50:.1f} | {c_cd_p90:.1f} | {f_contract_density:.1f} | corpus is bimodal (p50 0, p90 3); fixture sits between, via ~{calc_pct:.0f}% calc functions carrying 2–3 markers |
 | effect markers per function | {c_ed_p50:.1f} | {c_ed_p90:.1f} | 1.0 | corpus constant |
-| calls per function | {c_cpf_p50:.1f} | {c_cpf_p90:.1f} | {f_calls_density:.2f} | between p50 and p90 |
+| calls per function | {c_cpf_p50:.1f} | {c_cpf_p90:.1f} | {f_calls_density:.2f} | {calls_note} |
 | cross-module ref depth | 0 | 0 | 3 | **deliberate deviation, recorded**: the corpus contains no multi-module project at all, while D3.3 mandates one — depth 3 (Main→L1→L2→L3) is the minimum that exercises the session's project-wide reference checks with real fan-in |
 
 Corpus numbers from `../corpus-stats.py` (snapshot in `../corpus-stats.json`).
+
+**Corpus-scope deviation, recorded:** the parent plan says "sample/test
+corpus"; the stats corpus here is `samples/` + bench pair fixtures (43
+files) and deliberately excludes `tests/TestData` (~289 `.calr`, dominated
+by golden files and deliberately broken parser fixtures that would skew
+every density toward pathological shapes). The bench pairs are the code
+agents actually work on. Consequence: n = 43 makes the p90s coarse.
 
 ## Contract forms (constraint recorded 2026-07-27)
 
@@ -294,6 +302,20 @@ def main():
 
     stats = json.loads((HERE / "corpus-stats.json").read_text(encoding="utf-8"))
     m = {row["metric"]: row for row in stats["metrics"]}
+
+    # The note must state where the fixture actually lands, not a hoped-for
+    # band — computed so a regeneration can never emit a false claim.
+    calls_density = total_calls / total_funcs
+    cpf = m["calls_per_function"]
+    if calls_density < cpf["p50"]:
+        calls_note = (f"below corpus p50 ({cpf['p50']:.2f}) but above p25 "
+                      f"({cpf['p25']:.2f}): the {CALC_FRACTION * 100:.0f}% calc split "
+                      "trades call density for contract density")
+    elif calls_density <= cpf["p90"]:
+        calls_note = "between p50 and p90"
+    else:
+        calls_note = f"above corpus p90 ({cpf['p90']:.2f})"
+
     readme = README.format(
         seed=args.seed,
         n_edits=len(edits),
@@ -313,7 +335,8 @@ def main():
         c_ed_p90=m["effect_markers_per_function"]["p90"],
         c_cpf_p50=m["calls_per_function"]["p50"],
         c_cpf_p90=m["calls_per_function"]["p90"],
-        f_calls_density=total_calls / total_funcs,
+        f_calls_density=calls_density,
+        calls_note=calls_note,
         calc_pct=CALC_FRACTION * 100,
         total_lines=total_lines,
         n_files=len(files),

@@ -12,7 +12,9 @@ against these bytes in git, never against a regenerator's output.
   of the compiler (Directory.Build.props), or when the syntax the generator
   emits is deprecated. Regeneration is a reviewed PR that re-runs
   `corpus-stats.py`, updates this README's numbers, and re-baselines any
-  published M-L1 result.
+  published M-L1 result. Byte-determinism rests on CPython's `random`
+  stream; a Python-version change that drifts the bytes shows up as a diff
+  in the regeneration PR and is handled as a re-baseline, not an error.
 - **Sample count:** every P50/P99 measurement uses the full committed edit
   script — 230 timed edits (200 safe, 30 breaking), ≥ the
   plan's 200 minimum. The breaking minority is deliberate: rejects are part
@@ -22,14 +24,21 @@ against these bytes in git, never against a regenerator's output.
 
 | Metric | Corpus p50 | Corpus p90 | Fixture | Note |
 |---|---|---|---|---|
-| lines per module file | 28 | 145 | ~97 | sized near p90 so ~10k lines stays ≤ 106 files (session cap 2000) |
+| lines per module file | 28 | 145 | ~97 | sized between corpus p75 and p90 — larger-than-median files keep ~10k lines at ~106 files rather than the ~360 that p50 sizing would need |
 | functions per module | 3 | 13 | 13 | p90 |
 | contract markers per function | 0.0 | 3.0 | 1.5 | corpus is bimodal (p50 0, p90 3); fixture sits between, via ~60% calc functions carrying 2–3 markers |
 | effect markers per function | 1.0 | 1.0 | 1.0 | corpus constant |
-| calls per function | 0.6 | 3.4 | 0.41 | between p50 and p90 |
+| calls per function | 0.5 | 3.4 | 0.41 | below corpus p50 (0.50) but above p25 (0.00): the 60% calc split trades call density for contract density |
 | cross-module ref depth | 0 | 0 | 3 | **deliberate deviation, recorded**: the corpus contains no multi-module project at all, while D3.3 mandates one — depth 3 (Main→L1→L2→L3) is the minimum that exercises the session's project-wide reference checks with real fan-in |
 
 Corpus numbers from `../corpus-stats.py` (snapshot in `../corpus-stats.json`).
+
+**Corpus-scope deviation, recorded:** the parent plan says "sample/test
+corpus"; the stats corpus here is `samples/` + bench pair fixtures (43
+files) and deliberately excludes `tests/TestData` (~289 `.calr`, dominated
+by golden files and deliberately broken parser fixtures that would skew
+every density toward pathological shapes). The bench pairs are the code
+agents actually work on. Consequence: n = 43 makes the p90s coarse.
 
 ## Contract forms (constraint recorded 2026-07-27)
 

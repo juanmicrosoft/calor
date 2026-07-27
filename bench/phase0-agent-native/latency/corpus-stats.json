@@ -1,7 +1,7 @@
 {
   "roots": [
-    "/Users/juanrivera/sources/repos/juanmicrosoft/calor/samples",
-    "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs"
+    "samples",
+    "bench/phase0-agent-native/pairs"
   ],
   "files": 43,
   "projects": 41,
@@ -46,7 +46,7 @@
       "metric": "calls_per_function",
       "n": 43,
       "p25": 0.0,
-      "p50": 0.5714285714285714,
+      "p50": 0.5,
       "p75": 1.0,
       "p90": 3.3927272727272726,
       "max": 19.0

@@ -31,7 +31,9 @@ REPO = Path(__file__).resolve().parents[3]
 DEFAULT_ROOTS = [REPO / "samples", REPO / "bench" / "phase0-agent-native" / "pairs"]
 
 MODULE_RE = re.compile(r"^\s*§M\{[^:}]+:([A-Za-z0-9_]+)")
-FUNC_RE = re.compile(r"^\s*§F\{[^:}]+:([A-Za-z0-9_]+)(?::([a-z]+))?\}")
+# Function names may carry a generic suffix (§F{f001:Identity<T>:pub});
+# the base name is what call sites reference.
+FUNC_RE = re.compile(r"^\s*§F\{[^:}]+:([A-Za-z0-9_]+)(?:<[^>]*>)?(?::([a-z]+))?\}")
 CONTRACT_RE = re.compile(r"^\s*§(Q|S|IV)\b")
 EFFECT_RE = re.compile(r"^\s*§E\{")
 CALL_RE = re.compile(r"§C\{([A-Za-z0-9_.]+)\}")
@@ -56,7 +58,8 @@ def scan_file(path):
     for line in text.splitlines():
         m = MODULE_RE.match(line)
         if m:
-            current = {"name": m.group(1), "functions": [], "public": [], "calls": []}
+            current = {"name": m.group(1), "functions": [], "public": [],
+                       "calls": [], "call_targets": []}
             modules.append(current)
             continue
         if current is None:
@@ -66,7 +69,17 @@ def scan_file(path):
             current["functions"].append(f.group(1))
             if (f.group(2) or "pub") == "pub":
                 current["public"].append(f.group(1))
-        current["calls"].extend(c.split(".")[0] for c in CALL_RE.findall(line))
+        # `calls` counts one entry per call site (the density metric);
+        # `call_targets` holds name candidates for the depth graph — a
+        # dotted target (obj.method / Module.fn) contributes both its first
+        # and last components, so a module-qualified cross-module call
+        # still produces a depth edge when the function-name lookup hits.
+        for c in CALL_RE.findall(line):
+            parts = c.split(".")
+            current["calls"].append(parts[0])
+            current["call_targets"].append(parts[0])
+            if len(parts) > 1:
+                current["call_targets"].append(parts[-1])
     return {
         "path": path,
         "lines": len(lines),
@@ -114,7 +127,7 @@ def project_depth(files):
     for f in files:
         for m in f["modules"]:
             own = set(m["functions"])
-            for target in m["calls"]:
+            for target in m["call_targets"]:
                 target_mod = defined.get(target)
                 if target_mod and target_mod != m["name"] and target not in own:
                     edges.setdefault(m["name"], set()).add(target_mod)
@@ -165,7 +178,10 @@ def main():
         }
 
     stats = {
-        "roots": [str(r) for r in roots],
+        # Repo-relative so the committed snapshot is machine-independent;
+        # roots outside the repo (explicit args) stay absolute.
+        "roots": [str(r.relative_to(REPO)) if r.is_relative_to(REPO) else str(r)
+                  for r in roots],
         "files": len(files),
         "projects": len(by_dir),
         "metrics": [
