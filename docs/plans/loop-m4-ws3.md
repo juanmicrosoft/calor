@@ -31,18 +31,26 @@ no workspace to "keep alive," and introducing one would be unpriced new
 infrastructure with no consumer. (b) The Call 1 descope dropped D2.2/D2.3 —
 the node-addressed tools that would have consumed warm bound state; the
 shipped check set (parse + contracts/effects heuristics + call-graph
-references) never binds. Decision: D3.1 = warm *derived* state on the
-session's parse cache — per-file `EffectSummary` and call-target index —
-no binder state, no Roslyn. Revisit trigger: the PP-L1 miss path itself
+references) never binds. (c) "Reuse effect summaries" is already delivered
+where summaries are consumed: `BuildStateCache` 2.0 persists per-module
+`EffectSummary` and the driver's warm path (CLI + `watch`) reuses them for
+cross-module enforcement; the session path has no effect-summary consumer,
+and computing them warm would be dead state. Decision: D3.1 = warm
+*derived* state on the session's parse cache — reuse of the session's
+hash-verified cached parse for the original side of write-path checks
+(today `CheckAndApplyAsync` re-parses the on-disk file the session already
+holds parsed) and a per-file call-target index for the project-reference
+walk — no binder state, no Roslyn, no session-side effect summaries.
+Revisit trigger: the PP-L1 miss path itself
 (plan §5: "only if the ceiling is Roslyn emit does a backend conversation
 reopen") — if P99 misses and profiling shows the ceiling is downstream
 `.g.cs` compilation, that conversation reopens with data.
 
 **Warm derived state is keyed to the parse cache — no second invalidation
-scheme.** `EffectSummary` and the call-target index are computed when a
-file's parse state is (re)computed and stored on `SessionFileState`; they
-are invalidated exactly when parse state is invalidated (the existing
-stat+hash gate). No new invalidation semantics, no watcher (the M3 decision
+scheme.** The call-target index is computed lazily from a file's parse
+state and stored on `SessionFileState`; it is invalidated exactly when
+parse state is invalidated (the existing stat+hash gate), and cached-parse
+reuse is hash-verified against the just-read on-disk content. No new invalidation semantics, no watcher (the M3 decision
 stands; M-L1 will price the per-call re-stat cost, which was M3's stated
 revisit trigger — the trigger is answered by measurement, not redesign).
 
@@ -92,15 +100,14 @@ workspace in scope. Re-boxed at **2–3 wk**.
 
 ## 3. Slicing (each PR merges green on its own)
 
-1. **PR 1 (this PR):** kickoff record + one `.calor-csharp-allowlist` entry
-   (`Mcp/Sessions/SessionWarmState.cs`) so PR 2 may factor warm derived
-   state into its own file — the guard requires the entry on main at the
-   merge base; if PR 2 keeps the state inside `ProjectSession.cs` the entry
-   goes unused and is pruned at M4 close.
-2. **PR 2 — D3.1:** per-file `EffectSummary` (via `EffectSummaryBuilder`)
-   and call-target index computed at (re)parse on `SessionFileState`;
-   `FileWriteTool`/`EditPreviewTool` project-reference checks consume the
-   cache; cold/warm parity tests; unit tests for invalidation coupling.
+1. **PR 1 (this PR):** kickoff record. No allowlist entries: D3.1 lands
+   inside the existing session/tool files, the fixture and measurement
+   scripts are Python/bash, and instrumentation edits existing files — M4
+   plans no new C# product source.
+2. **PR 2 — D3.1:** lazy per-file call-target index on `SessionFileState`
+   (invalidated with parse state); write-path original parse reuses the
+   session's hash-verified cached parse; `CheckProjectReferences` consumes
+   the index; cold/warm parity tests; invalidation-coupling tests.
 3. **PR 3 — D3.2:** stopwatch spanning `CheckAndApplyAsync` →
    `mcp-write/2` with `latency_ms` (+ phase breakdown: refresh, check,
    apply); machine JSON Schema for the mcp-write record (closing the gap
