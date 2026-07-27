@@ -57,9 +57,13 @@ for pair_json in "$SCRIPT_DIR"/pairs/*/pair.json; do
     # comparison; default remains both arms for paired epochs)
     for arm in $ARMS; do
         echo "=== $pair_id / $arm ==="
+        # --unbuffered: when the driver's stdout is a log file, block
+        # buffering otherwise holds per-run result lines inside jq for the
+        # whole epoch (ws2-exit-e2e-001 debugging: stderr INVALID lines
+        # appeared while every result line sat invisible in the buffer).
         "$SCRIPT_DIR/run-pair.sh" --pair "$pair_dir" --arm "$arm" --runs "$RUNS" \
             --edit-mechanism "$EDIT_MECHANISM" \
-            $NULL_FLAG --out "$OUT" | jq -c '{pair,arm,run,taskSuccess,escapedBugs,iterationsToGreen,censored}'
+            $NULL_FLAG --out "$OUT" | jq -c --unbuffered '{pair,arm,run,taskSuccess,escapedBugs,iterationsToGreen,censored}'
     done
 done
 

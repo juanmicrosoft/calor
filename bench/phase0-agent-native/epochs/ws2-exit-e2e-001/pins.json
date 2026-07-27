@@ -1,0 +1,10 @@
+{
+  "compilerCommit": "ef99e66deffa4c59d1aed15bd3c62682d10cdf4d",
+  "suiteDirtyFiles": 1,
+  "agentVersion": "2.1.211 (Claude Code)",
+  "modelPin": "claude-opus-4-8",
+  "startedAt": "2026-07-26T22:55:49Z",
+  "mode": "live",
+  "editMechanism": "mcp-file",
+  "telemetrySchema": "loop-telemetry/2"
+}

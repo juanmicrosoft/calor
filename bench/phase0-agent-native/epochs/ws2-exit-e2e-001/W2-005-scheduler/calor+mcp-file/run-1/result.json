@@ -1,0 +1,26 @@
+{
+  "pair": "W2-005-scheduler",
+  "arm": "calor+mcp-file",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 27,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 2746,
+  "envelopeValidAll": true,
+  "mcpWrites": {
+    "attempts": 1,
+    "applied": 1,
+    "appliedUnhealed": 1,
+    "rejected": 0,
+    "healed": 0
+  },
+  "tokens": {
+    "input": 19,
+    "output": 10952
+  },
+  "nullAgent": false
+}

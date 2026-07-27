@@ -1,6 +1,14 @@
 # M3 Kickoff — WS2 Verified Mutation Loop (Descoped)
 
-**Status:** Active (kickoff 2026-07-24)
+**Status: COMPLETE (2026-07-27).** All four slices merged (#796 kickoff+allowlist,
+#797 D2.1+D2.4, #798 D2.5, #799 harness+gate) plus the watchdog hardening
+(#800), and the exit criterion is met:
+`bench/phase0-agent-native/epochs/ws2-exit-e2e-001/VERDICT.md` — 5/5 valid
+runs exclusively through MCP, M-L2(mcp-file) = 100 % (heal-adjusted and
+strict forms identical), multi-edit substantiated by 4–5 declaration changes
+per transactional write on W3-004, M-L4 reported-only at 0 rejects.
+
+**Kickoff record (2026-07-24):**
 **Parent:** `loop-plan-v0.9.md` §2 WS2, §3 M3 · **Scope authority:** Call 1 record (`loop-m2-baseline.md`), Annex A freeze (#795)
 
 ## 1. Scope as descoped by Call 1

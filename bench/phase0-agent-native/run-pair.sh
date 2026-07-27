@@ -150,6 +150,8 @@ fi
 PAIR_DIR="$(cd "$PAIR_DIR" && pwd)"
 PAIR_ID="$(jq -r .id "$PAIR_DIR/pair.json")"
 TIMEOUT_SECS="$(jq -r '.timeoutSeconds // 600' "$PAIR_DIR/pair.json")"
+# Test hook: lets watchdog behavior be exercised without a 10+ minute wait.
+[[ -n "${CALOR_P0_TIMEOUT_OVERRIDE:-}" ]] && TIMEOUT_SECS="$CALOR_P0_TIMEOUT_OVERRIDE"
 
 # Escaped-bugs sentinel for non-compiling / never-tested states: the pair's
 # actual held-out test count ([Fact] + [InlineData] cases), not a magic 999
@@ -299,6 +301,9 @@ EOF
     # server with a particular CWD (review of #799 item 1): a wrong implicit
     # root would silently reject every task-tree write and fabricate the
     # guaranteed-failure data the old gate existed to prevent.
+    # NB: --root also puts the workspace path in the server's ARGV, which is
+    # what lets kill_agent_tree's pattern escalation reach an orphaned server
+    # (pkill -f matches command lines, not env) — do not move it to env-only.
     if [[ "$ARM" == "calor" && "$EDIT_MECHANISM" == "mcp-file" && $NULL_AGENT -eq 0 ]]; then
         jq -n --arg dll "$CALOR_CLI_DLL" --arg root "$ws/src" \
               --arg log "$ws_out/mcp-writes.jsonl" --arg rej "$ws_out/rejects" \
@@ -501,6 +506,46 @@ EOF
 # ---------------------------------------------------------------------------
 # Agent invocation (or null-agent reference-solution application)
 # ---------------------------------------------------------------------------
+# Kill an agent process and everything under it, with verification.
+# $1 = root pid (the agent subshell, a process-group leader under set -m);
+# $2 = the run's workspace dir — a mktemp path unique to this run;
+# $3 (optional) = the run's out dir, equally unique.
+# The pattern escalation matches ARGV, not env (pkill/pgrep -f semantics —
+# review of #800 item 1): it reaches the MCP server only because the server
+# registration passes the workspace root on the command line
+# (`mcp --stdio --root $ws/src` — see the jq config block), and reaches the
+# shim wrapper via its $ws_out/.shim path. If either stops being
+# argv-visible, this fallback silently loses that process — keep them
+# coupled.
+kill_agent_tree() {
+    local root="$1" ws_path="$2" out_path="${3:-}"
+    # Collect descendants BEFORE killing: killing the root first would
+    # reparent children to init and lose them.
+    local all="" frontier="$root" next p depth
+    for depth in 1 2 3 4 5 6; do
+        next=""
+        for p in $frontier; do
+            next+=" $(pgrep -P "$p" 2>/dev/null || true)"
+        done
+        next="$(echo "$next" | tr -s ' ' | sed 's/^ //')"
+        [[ -z "$next" ]] && break
+        all+=" $next"
+        frontier="$next"
+    done
+
+    kill -9 -- "-$root" 2>/dev/null || echo "watchdog: pgid kill for -$root failed" >&2
+    # shellcheck disable=SC2086 — pid lists are intentionally word-split
+    kill -9 $root $all 2>/dev/null || true
+
+    sleep 1
+    if kill -0 "$root" 2>/dev/null || pgrep -f "$ws_path" >/dev/null 2>&1 \
+        || { [[ -n "$out_path" ]] && pgrep -f "$out_path" >/dev/null 2>&1; }; then
+        echo "watchdog: survivors detected after tree kill; pattern-killing processes matching $ws_path" >&2
+        pkill -9 -f "$ws_path" 2>/dev/null || true
+        [[ -n "$out_path" ]] && pkill -9 -f "$out_path" 2>/dev/null || true
+    fi
+}
+
 run_agent() {
     local ws="$1" ws_out="$2" shim_dir="$3"
     AGENT_RC=0
@@ -559,16 +604,30 @@ run_agent() {
             claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" "${mcp_args[@]}" \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) || rc=$?
     else
+        # Bash-watchdog fallback, hardened after ws2-exit-e2e-001 run 1: the
+        # previous one-shot `sleep && kill -9 -- -pgid 2>/dev/null` provably
+        # failed to land there (the agent ran 105 minutes against a 900 s
+        # budget during an API incident) and its silenced stderr left no
+        # evidence why. This version polls a deadline in the parent (no
+        # separate watchdog process to lose), collects the agent's descendant
+        # tree BEFORE killing (a dead root reparents children), kills group +
+        # tree, then VERIFIES death and escalates to a workspace-scoped
+        # pattern kill — logging every step to stderr.
         set -m
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
             claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" "${mcp_args[@]}" \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
         local agent_pid=$!
-        ( sleep "$TIMEOUT_SECS" && kill -9 -- "-$agent_pid" 2>/dev/null ) &
-        local watchdog_pid=$!
+        local deadline=$(( SECONDS + TIMEOUT_SECS ))
+        while kill -0 "$agent_pid" 2>/dev/null; do
+            if (( SECONDS >= deadline )); then
+                echo "watchdog: agent exceeded ${TIMEOUT_SECS}s; killing pid $agent_pid and descendants" >&2
+                kill_agent_tree "$agent_pid" "$ws" "$ws_out"
+                break
+            fi
+            sleep 5
+        done
         wait "$agent_pid" 2>/dev/null || rc=$?
-        kill -9 -- "-$watchdog_pid" 2>/dev/null || true
-        wait "$watchdog_pid" 2>/dev/null || true
         set +m
     fi
     AGENT_RC=$rc
