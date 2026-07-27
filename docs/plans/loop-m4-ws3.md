@@ -78,10 +78,13 @@ v0.10 alongside binding-in-the-check-set, restating the M3 non-goal). M-L1
 measures the check set as shipped in M3.
 
 **PP-L1 adjudicates on the MCP write path; `watch` is instrumented and
-reported.** M-L1's boundary must be stated before measurement. MCP:
-tool-call receipt → envelope serialized (the whole
-`CheckAndApplyAsync` body: session refresh, path gate, heal, parse, check
-set, atomic apply). `watch`: rebuild start → envelope written — which
+reported.** M-L1's boundary must be stated before measurement; the
+normative statement lives in `bench/phase0-agent-native/`
+`loop-telemetry-schema.md` (mcp-write/2 `latencyMs`). Summary — MCP:
+tool-handler receipt → verdict journaled (session refresh, path gate, heal,
+parse, check set, atomic apply; protocol parse and result-envelope
+serialization sit outside the clock, µs-to-low-ms against a 300 ms gate).
+`watch`: rebuild start → envelope written — which
 excludes the debounce window (default 200 ms), a *configured delay*, not
 feedback cost; the debounce setting is recorded alongside any reported
 number. Rationale for adjudicating on MCP only: it is the loop mechanism
