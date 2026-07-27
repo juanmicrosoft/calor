@@ -84,6 +84,17 @@ is_test_source() {
   [[ "$1" == tests/* ]]
 }
 
+is_bench_source() {
+  # Benchmark fixtures and harness support are likewise not product source:
+  # the two-arm benchmark pairs are DEFINITIONALLY half C# (every pair ships a
+  # csharp/ arm, shims, and test suites — that is the comparison being run),
+  # and the ~700 pre-existing bench/**/*.cs were only ever passing via the
+  # exists_in_base grandfather. Exempt the tree structurally (loop plan M4b,
+  # WS5 probe pairs; review of #808 finding 1) so authoring a new pair never
+  # needs an allowlist entry. Nothing under bench/ ships in the product.
+  [[ "$1" == bench/* ]]
+}
+
 violations=()
 for path in "${changed[@]}"; do
   [[ "$path" == *.cs ]] || continue
@@ -91,6 +102,7 @@ for path in "${changed[@]}"; do
   # New paths must be Calor or be pre-approved on the protected base branch.
   exists_in_base "$path" && continue
   is_test_source "$path" && continue
+  is_bench_source "$path" && continue
   is_base_allowlisted "$path" && continue
   [[ -f "$path" ]] || continue
   violations+=("$path")
