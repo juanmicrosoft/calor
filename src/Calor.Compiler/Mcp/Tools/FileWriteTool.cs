@@ -367,7 +367,14 @@ public sealed class FileWriteTool : McpToolBase
 
         foreach (var file in session.SnapshotFiles())
         {
-            if (string.Equals(file.Path, editedPath, StringComparison.Ordinal))
+            // Case-insensitive platforms: a case-variant of the edited path
+            // addresses the same file — without the platform-aware compare,
+            // the edited file's own stale session entry would be treated as
+            // a neighbor and veto its own edit as "breaking".
+            var selfComparison = OperatingSystem.IsLinux()
+                ? StringComparison.Ordinal
+                : StringComparison.OrdinalIgnoreCase;
+            if (string.Equals(file.Path, editedPath, selfComparison))
                 continue;
 
             var relative = Path.GetRelativePath(session.RootDirectory, file.Path);
