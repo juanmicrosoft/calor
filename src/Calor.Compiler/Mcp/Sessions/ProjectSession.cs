@@ -109,6 +109,18 @@ internal sealed class ProjectSession
                     if (info.LastWriteTimeUtc == state.LastWriteUtc && info.Length == state.FileSize)
                         continue;
 
+                    // A file that grew past the cap since open must go
+                    // through the same oversize guard as Load — "a session
+                    // refuses to load what a tool refuses to accept" holds
+                    // across the file's whole session lifetime, not just
+                    // at open.
+                    if (info.Length > SessionFileState.MaxFileBytes)
+                    {
+                        _files[path] = SessionFileState.Load(path);
+                        reparsed++;
+                        continue;
+                    }
+
                     // Stat changed — hash to decide whether the content did
                     // (a touch without an edit must not trigger a reparse).
                     // Zero-length entries are never opened (see Load).
@@ -163,20 +175,41 @@ internal sealed class ProjectSession
     /// The session's state for <paramref name="absolutePath"/>, or null when
     /// the file is not part of the session. Lets the write path reuse the
     /// cached parse instead of re-parsing on-disk content the session
-    /// already holds (WS3 D3.1).
+    /// already holds (WS3 D3.1). On case-insensitive platforms an exact
+    /// (Ordinal) miss falls back to a case-insensitive scan — a client that
+    /// writes `Math.calr` against an enumerated `math.calr` addresses the
+    /// same file there, and without the fallback the warm cache would be
+    /// silently defeated on every call. Callers hash-verify content before
+    /// reuse, so even a wrong-entry match (case-variant files on a
+    /// case-sensitive volume mounted on such a platform) can only fall
+    /// back cold, never serve a wrong parse.
     /// </summary>
     public SessionFileState? TryGetFile(string absolutePath)
     {
         var path = Path.GetFullPath(absolutePath);
         lock (_sync)
         {
-            return _files.TryGetValue(path, out var state) ? state : null;
+            if (_files.TryGetValue(path, out var state))
+                return state;
+            if (!OperatingSystem.IsLinux())
+            {
+                foreach (var (key, value) in _files)
+                {
+                    if (string.Equals(key, path, StringComparison.OrdinalIgnoreCase))
+                        return value;
+                }
+            }
+            return null;
         }
     }
 
     /// <summary>
     /// Records the result of an applied write, so subsequent checks in this
-    /// session see the new content without re-reading the file.
+    /// session see the new content without re-reading the file. A
+    /// case-variant of an existing key replaces that entry rather than
+    /// inserting a duplicate (same platform rule as <see cref="TryGetFile"/>
+    /// — a duplicate would make the file its own phantom neighbor in
+    /// project-wide checks).
     /// </summary>
     public void UpdateFile(string absolutePath, string source, ParseResult parse)
     {
@@ -184,6 +217,14 @@ internal sealed class ProjectSession
         var info = new FileInfo(path);
         lock (_sync)
         {
+            if (!_files.ContainsKey(path) && !OperatingSystem.IsLinux())
+            {
+                var variant = _files.Keys.FirstOrDefault(
+                    k => string.Equals(k, path, StringComparison.OrdinalIgnoreCase));
+                if (variant != null)
+                    path = variant;
+            }
+
             _files[path] = new SessionFileState(path, source, SessionFileState.HashContent(source),
                 info.LastWriteTimeUtc, info.Length, parse);
         }

@@ -492,6 +492,73 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     }
 
     [Fact]
+    public async Task WarmOriginalParse_HitsAcrossPathCasing_OnCaseInsensitivePlatforms()
+    {
+        // A client may address `math.calr` as `MATH.calr` on macOS/Windows;
+        // the warm cache must not be silently defeated by the casing. The
+        // canonical path here is computed exactly the way the integrated
+        // write path computes it, so a normalization regression in
+        // CheckAndApplyAsync's inputs fails this test.
+        if (OperatingSystem.IsLinux())
+            return;
+
+        WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+
+        var upperCased = Path.Combine(_root, "MATH.calr");
+        var canonical = CanonicalPath.Resolve(upperCased);
+        var cached = session.TryGetFile(canonical);
+        Assert.NotNull(cached);
+
+        var warm = FileWriteTool.WarmOriginalParse(session, canonical, MathSource);
+        Assert.Same(cached!.Parse, warm);
+    }
+
+    [Fact]
+    public async Task WarmOriginalParse_ReusesHealedWriteState()
+    {
+        // A healed write stores the healed content + its parse in the
+        // session. The next write's original side reads the healed bytes
+        // from disk, so the hash must match the stored state and reuse it.
+        var path = WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+
+        var withCloser = MathSourceWithoutAdd + "\n§/M\n";
+        var payload = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path, content = withCloser, sessionId })));
+        Assert.True(payload.GetProperty("applied").GetBoolean());
+        Assert.True(payload.GetProperty("healApplied").GetBoolean());
+
+        var canonical = CanonicalPath.Resolve(path);
+        var onDisk = File.ReadAllText(path);
+        var cached = session.TryGetFile(canonical)!;
+        Assert.Same(cached.Parse, FileWriteTool.WarmOriginalParse(session, canonical, onDisk));
+    }
+
+    [Fact]
+    public async Task Refresh_FileGrownPastCap_BecomesOversizeStub()
+    {
+        // "A session refuses to load what a tool refuses to accept" must
+        // hold for the file's whole session lifetime: a file that grows
+        // past 512 KB after open goes through the same oversize guard as
+        // Load instead of being read and indexed in full.
+        var path = WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+
+        File.WriteAllText(path, new string('x', 600 * 1024));
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(5));
+        session.Refresh();
+
+        var state = session.TryGetFile(CanonicalPath.Resolve(path))!;
+        Assert.Equal("", state.Source);
+        Assert.False(state.Parse.IsSuccess);
+        Assert.StartsWith("oversize:", state.ContentHash, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SessionFileState_CallTargets_ComputedOncePerParseState()
     {
         var callerPath = WriteFile("caller.calr", CallerSource);
