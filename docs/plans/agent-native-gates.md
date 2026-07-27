@@ -109,9 +109,12 @@ tooling-investment decisions** (the loop plan's PP-L*), a separate question
 from the language gates. Stated precisely so "observational" is not
 overclaimed (review of #795 item 2). It carries its own version counter and
 revision log; changes to this annex never constitute supersession of the main
-document. Pre-registered per the loop plan's D4.4 discipline: thresholds were
-frozen from the `loop-feasibility-dry-002` variance epoch **before** any
-treatment build exists. **Merge-order dependency**: the governing plan
+document. Pre-registered per the loop plan's D4.4 discipline: thresholds through
+A-1.1 were frozen from the `loop-feasibility-dry-002` variance epoch
+**before** any treatment build exists; the A-1.2 PP-W1 row froze by the
+feasibility-by-determinism argument recorded in its Basis column (a
+disclosed D4.5 deviation — supersession entry in `loop-plan-v0.9.md` §10),
+before the probe epoch runs. **Merge-order dependency**: the governing plan
 (`loop-plan-v0.9.md`, PR #747) must be on main before or with this annex, or
 its §-references dangle and the pre-registration claim is unverifiable from
 the repo (review of #795 item 1).
@@ -149,6 +152,24 @@ pairing, and censoring follow §2 of this document.
 - **M-L5 tokens-to-green** — per-run agent output tokens (`agent.json`
   `usage.output_tokens`); per-pair means, then median of paired per-pair
   ratios per §2. Iterations-to-green remains **recorded, observational**.
+- **M-W1 defect catch rate (A-1.2)** — per arm: the fraction of the D5.1
+  injected defects **absent at declared-done**, each defect adjudicated by
+  its dedicated held-out probe test (fails iff the defect is present) and
+  aggregated by per-defect majority across exactly 3 runs/arm/pair.
+  **Telemetry source is NOT `loop-telemetry/2`**: the per-run signal is the
+  `defect {id, class, probeTest, caught, smokeTampered}` object in the
+  run's `result.json` (run-pair.sh D5.1 support). Semantics, frozen with
+  the row: the probe test lives in its own project compiled against the
+  **starting** public surface, so `caught` measures the defect and not
+  task completion (an agent that fixes the defect without finishing the
+  feature still scores a catch); `caught` requires the probe to have run
+  and passed against the declared-done build; a non-compiling final state
+  counts as not-caught, consistent with §2's all-failing rule; a slot
+  still invalid after §0.2's retry cap contributes **not-caught** for its
+  run (task failure ⇒ the defect was not shown absent); a run with
+  `smokeTampered: true` (the arm-shared smoke suite was modified) is
+  invalid for M-W1 and re-run per §0.2. PP-W1 consumes the Calor − C#
+  delta of this rate.
 
 ### A.2 Frozen instrument proof-point thresholds
 
@@ -159,7 +180,7 @@ pairing, and censoring follow §2 of this document.
 | PP-L3 (node vs file edits) | **retired unrun** | machine-zone E1 killed H1 (55 % pooled); pre-committed scope gate |
 | PP-L4 (diagnostics steer the agent) | **reported-not-adjudicated** | dry-run found 3 qualifying M-L3 events across 35 runs — floor (20) unreachable at authorable-fixture scale |
 | PP-L5 (loop tooling pays off) | **≥ 15 % relative reduction in median per-pair tokens-to-green**, arm A (`loop-baseline-ws1`) vs arm B (baseline + WS2/WS3 isolation build), simultaneous epoch, ≥ 7 pairs × ≥ 5 runs/arm, §6.1 adjudication | dry-run: iterations-to-green floor-bound (median 1, 94 % at floor → undetectable at any N); tokens MDE at 80 % power ≈ 15 % at the stated N — a **design-stage simulation estimate over only 7 clusters** (400 sims × 200-resample cluster bootstrap), so the MDE itself carries wide uncertainty; if the M5 epoch's realized variance is materially higher, the miss is reported as underpowered rather than adjudicated as a clean miss. Pre-registered fallback applied **before** freezing |
-| PP-W1 (enforcement catches seeded defects, A-1.2) | **M-W1 delta (Calor − C#) ≥ 3/9 defects** on the D5.1 set (N = 9: three per class W5-A/B/C), per-defect majority across ≥ 3 runs/arm/pair, catch = defect **absent at declared-done** per its held-out probe test; **zero-vs-zero (both arms catch 0/9) = the pre-committed Call 2 kill signal** (loop plan §6.2) | feasibility by determinism, replacing a D4.5 dry-run (a priced decision, `loop-m4b-ws5.md` §2): W5-A/C catches are deterministic build blocks (`Calor0410`), so run variance affects only fix-behavior — absorbed by the at-declared-done measure + per-defect majority; W5-B (runtime contract guard on arm-shared smoke-test inputs) carries bounded nondeterminism, absorbed at 3 runs. **Scope guards, frozen with the threshold:** the delegate-invocation and override/dispatch effect-laundering holes are excluded and listed (strategy §1.1; pinned by `DelegateInvocation_*` enforcement tests) — a defect requiring them disqualifies its fixture; the static-verify catch channel is excluded until #807 (unconstrained-`result` refutations) is fixed — W5-B catches via the Debug-mode runtime guard only, and W5-B contracts are postcondition-only (a `Proven` precondition elides its guard, #755). Measures detection capability, not organic incidence; no overlap with machine-zone §7 (human spec-diff review, dogfood corpus, human baseline) |
+| PP-W1 (enforcement catches seeded defects, A-1.2) | **M-W1 delta (Calor − C#) ≥ 3/9 defects** on the D5.1 set (N = 9; class definitions frozen here: **W5-A** = undeclared side effect via a named static manifest-covered call inside a pure-declared function; **W5-B** = violated scalar `§S` postcondition caught by the Debug runtime guard on arm-shared smoke-test inputs; **W5-C** = effect laundered through a covered **intra-module** call chain where the caller's declaration is violated and every callee's is honest). Catch = defect **absent at declared-done** per its held-out probe test, aggregated per defect by majority across **exactly 3** runs/arm/pair (odd by construction — no tie rule needed). **Adjudication is the raw aggregated count — no §6.1 significance test** (9 binary clusters would be degenerate under bootstrap). **Zero-vs-zero, precisely: both arms catch 0/9 after majority aggregation = the pre-committed Call 2 kill signal** (loop plan §6.2). A negative delta (C# catches more) is a clean miss and thesis-adverse — reported with the same prominence as a kill. **Decidability fallback, pre-registered:** if per-defect run outcomes are not unanimous for ≥ 7 of 9 defects in either arm, PP-W1 is **reported, not adjudicated** (the PP-L4 pattern) | feasibility by determinism, replacing a D4.5 dry-run — a recorded deviation from the loop plan's letter (supersession entry in `loop-plan-v0.9.md` §10; rationale in `loop-m4b-ws5.md` §2). Honest scope of the argument: it covers the *surfacing* channel (W5-A/C are deterministic `Calor0410` build blocks; W5-B's guard throws deterministically on the smoke inputs), **not** agent fix-behavior, which is what "absent at declared-done" also depends on — the unanimity fallback in the threshold column is the guard against that residual. **Scope guards, frozen with the threshold:** the delegate-invocation and override/dispatch effect-laundering holes are excluded and listed (strategy §1.1; pinned by `DelegateInvocation_*` enforcement tests) — a defect requiring them disqualifies its fixture; the static-verify catch channel is excluded until #807 (unconstrained-`result` refutations) is fixed — W5-B catches via the Debug-mode runtime guard only, and W5-B contracts are postcondition-only (a `Proven` precondition elides its guard, #755). Measures detection capability, not organic incidence; no overlap with machine-zone §7 (spec-diff review detection on the dogfood module, §12-amended to absolute detection of externally-authored blinded injections — different subject, corpus, and comparator) |
 
 Sub-integer disclosure: the iterations-to-green primary measure was moved to
 tokens-to-green because the dry-run showed it floor-bound — the loop plan's
@@ -168,16 +189,25 @@ freezing — never after") applied as written.
 
 ### A.3 Annex revision log
 
-**A-1.2 (2026-07-27).** Additive: registers **M-W1** (defect catch rate —
-per arm, fraction of D5.1 injected defects absent at declared-done per
-their held-out probe tests, per-defect majority across runs) and the
-**PP-W1** frozen threshold row in A.2, before any probe fixture exists or
-any probe epoch runs (loop plan D4.4 discipline; WS5/M4b, kickoff
-`docs/plans/loop-m4b-ws5.md`). Also records PP-W1's scope guards (excluded
-enforcement holes, the #807-until-fixed exclusion of the static-verify
-catch channel, W5-B postcondition-only constraint per #755) and the
-feasibility-by-determinism argument standing in for a D4.5 dry-run. No
-existing metric or threshold is altered.
+**A-1.2 (2026-07-27).** Additive: registers **M-W1** (A.1) and the
+**PP-W1** frozen threshold row in A.2 (WS5/M4b, kickoff
+`docs/plans/loop-m4b-ws5.md`). Honest timing: the registration froze
+**before the probe epoch runs**, but fixture authoring was concurrent —
+the D5.1 pair set was being built on a sibling branch while this row was
+written, and one class definition (W5-C) was re-priced from an
+authoring-time discovery (#809: cross-module emission gap) BEFORE this
+row's class definitions froze; the class definitions are therefore inlined
+in the A.2 row itself rather than referenced from the mutable kickoff
+table. What remains results-blind, and is the property this registration
+protects: the threshold, the adjudication rule, the scope guards, and the
+decidability fallback were all fixed with zero live agent runs observed.
+Also records the scope guards (excluded enforcement holes, the
+#807-until-fixed exclusion of the static-verify channel, W5-B
+postcondition-only per #755) and the feasibility-by-determinism argument
+standing in for a D4.5 dry-run (supersession entry in
+`loop-plan-v0.9.md` §10). No existing metric or threshold is altered;
+pre-existing blanket prose ("frozen from dry-002") is qualified rather
+than falsified.
 
 **A-1.1 (2026-07-25).** Additive clarification, no threshold changes: M-L2's
 `mcp-file` sourcing (per-attempt `mcp-writes.jsonl` stream, M3 PR 4) and its

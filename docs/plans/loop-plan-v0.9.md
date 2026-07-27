@@ -223,6 +223,21 @@ The text-vs-structured-edit question has one governing registration: **machine-z
 
 ## 10. Revision log
 
+**v2.1 amendment (2026-07-27, M4b kickoff)** — **D4.5 supersession for
+PP-W1, recorded here because the letter of §5 ("frozen via D4.5") is not
+met**: PP-W1's threshold froze at gates-doc Annex A-1.2 on a
+feasibility-by-determinism argument instead of a dry-run epoch (rationale
+and the argument's stated limit — it covers the *surfacing* channel's
+determinism, not agent fix-behavior — in `loop-m4b-ws5.md` §2). Guard
+adopted in place of the dry-run: a pre-registered decidability fallback in
+the A-1.2 row — if per-defect run outcomes are not unanimous for at least
+7 of 9 defects in either arm, PP-W1 is **reported, not adjudicated** (the
+PP-L4 pattern). Precedent honestly acknowledged: both prior dry-runs moved
+their registered measure (PP-L4's event floor, PP-L5's floor-bound
+iterations), which is exactly the risk this fallback bounds. Approved by
+the maintainer via the M4b kickoff PR (#808); at bus factor 1 this
+approval is self-asserted, as with the A-1.0 freeze.
+
 **Draft v2 (2026-07-23)** — adversarial review round 1 (independent agent; verdict on v1: 55 %). Dispositions:
 
 - **C1 (accepted)**: §1 falsely claimed `AssessCommand` carried a private SARIF model; fixed by `b162480` 8 days before the audit date. §1 corrected, `b162480` credited as delivered WS1 scope, anchor-verification rule added.
