@@ -1,0 +1,94 @@
+§M{m323:L3M23}
+
+  §F{f001:l3m23_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 56)
+
+  §F{f002:l3m23_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 3)
+    §S (>= x 4)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if02} (> acc 25005)
+      §R (+ acc 25005)
+    §EL
+      §R (+ (* acc 2) 25005)
+
+  §F{f003:l3m23_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 1)
+    §Q (>= y 0)
+    §S (>= x 0)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if03} (> acc 25012)
+      §R (+ acc 25012)
+    §EL
+      §R (+ (* acc 2) 25012)
+
+  §F{f004:l3m23_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 49)
+
+  §F{f005:l3m23_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 82)
+
+  §F{f006:l3m23_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 44)
+
+  §F{f007:l3m23_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 6)
+    §S (>= x 7)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if07} (> acc 25019)
+      §R (+ acc 25019)
+    §EL
+      §R (+ (* acc 2) 25019)
+
+  §F{f008:l3m23_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 43)
+
+  §F{f009:l3m23_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 31)
+
+  §F{f010:l3m23_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 87)
+
+  §F{f011:l3m23_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 8)
+    §Q (>= y 0)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if11} (> acc 25026)
+      §R (+ acc 25026)
+    §EL
+      §R (+ (* acc 2) 25026)
+
+  §F{f012:l3m23_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 5)
+    §Q (>= y 0)
+    §S (>= x 3)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if12} (> acc 25033)
+      §R (+ acc 25033)
+    §EL
+      §R (+ (* acc 2) 25033)
+
+  §F{f013:l3m23_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 2)

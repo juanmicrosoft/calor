@@ -1,0 +1,120 @@
+§M{m109:L1M09}
+
+  §F{f001:l1m09_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 6)
+    §S (>= x 7)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if01} (> acc 20483)
+      §R (+ acc 20483)
+    §EL
+      §R (+ (* acc 2) 20483)
+
+  §F{f002:l1m09_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if02} (> acc 20490)
+      §R (+ acc 20490)
+    §EL
+      §R (+ (* acc 2) 20490)
+
+  §F{f003:l1m09_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m31_fn06} §A x §A INT:75 §/C
+    §R (+ v1 y)
+
+  §F{f004:l1m09_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 5)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if04} (> acc 20497)
+      §R (+ acc 20497)
+    §EL
+      §R (+ (* acc 2) 20497)
+
+  §F{f005:l1m09_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if05} (> acc 20504)
+      §R (+ acc 20504)
+    §EL
+      §R (+ (* acc 2) 20504)
+
+  §F{f006:l1m09_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 1)
+    §Q (>= y 0)
+    §S (>= x 0)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if06} (> acc 20511)
+      §R (+ acc 20511)
+    §EL
+      §R (+ (* acc 2) 20511)
+
+  §F{f007:l1m09_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 7)
+    §S (>= x 8)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if07} (> acc 20518)
+      §R (+ acc 20518)
+    §EL
+      §R (+ (* acc 2) 20518)
+
+  §F{f008:l1m09_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 3)
+    §S (>= x 4)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if08} (> acc 20525)
+      §R (+ acc 20525)
+    §EL
+      §R (+ (* acc 2) 20525)
+
+  §F{f009:l1m09_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 7)
+    §S (>= x 8)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if09} (> acc 20532)
+      §R (+ acc 20532)
+    §EL
+      §R (+ (* acc 2) 20532)
+
+  §F{f010:l1m09_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m16_fn04} §A x §A INT:38 §/C
+    §B{v2:i32} §C{l2m18_fn09} §A x §A INT:6 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{f011:l1m09_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 5)
+    §Q (>= y 0)
+    §S (>= x 3)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if11} (> acc 20539)
+      §R (+ acc 20539)
+    §EL
+      §R (+ (* acc 2) 20539)
+
+  §F{f012:l1m09_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 7)
+    §S (>= x 8)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if12} (> acc 20546)
+      §R (+ acc 20546)
+    §EL
+      §R (+ (* acc 2) 20546)
+
+  §F{f013:l1m09_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m17_fn09} §A x §A INT:69 §/C
+    §B{v2:i32} §C{l2m05_fn13} §A x §A INT:22 §/C
+    §R (+ (+ v1 v2) y)

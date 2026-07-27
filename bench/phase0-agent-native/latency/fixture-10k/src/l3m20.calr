@@ -1,0 +1,113 @@
+§M{m320:L3M20}
+
+  §F{f001:l3m20_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 6)
+    §S (>= x 7)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if01} (> acc 24809)
+      §R (+ acc 24809)
+    §EL
+      §R (+ (* acc 2) 24809)
+
+  §F{f002:l3m20_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 86)
+
+  §F{f003:l3m20_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 38)
+
+  §F{f004:l3m20_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 6)
+    §Q (>= y 0)
+    §S (>= x 4)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if04} (> acc 24816)
+      §R (+ acc 24816)
+    §EL
+      §R (+ (* acc 2) 24816)
+
+  §F{f005:l3m20_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 4)
+    §Q (>= y 0)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if05} (> acc 24823)
+      §R (+ acc 24823)
+    §EL
+      §R (+ (* acc 2) 24823)
+
+  §F{f006:l3m20_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 4)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if06} (> acc 24830)
+      §R (+ acc 24830)
+    §EL
+      §R (+ (* acc 2) 24830)
+
+  §F{f007:l3m20_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if07} (> acc 24837)
+      §R (+ acc 24837)
+    §EL
+      §R (+ (* acc 2) 24837)
+
+  §F{f008:l3m20_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if08} (> acc 24844)
+      §R (+ acc 24844)
+    §EL
+      §R (+ (* acc 2) 24844)
+
+  §F{f009:l3m20_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if09} (> acc 24851)
+      §R (+ acc 24851)
+    §EL
+      §R (+ (* acc 2) 24851)
+
+  §F{f010:l3m20_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 49)
+
+  §F{f011:l3m20_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 5)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if11} (> acc 24858)
+      §R (+ acc 24858)
+    §EL
+      §R (+ (* acc 2) 24858)
+
+  §F{f012:l3m20_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 30)
+
+  §F{f013:l3m20_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 6)
+    §S (>= x 7)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if13} (> acc 24865)
+      §R (+ acc 24865)
+    §EL
+      §R (+ (* acc 2) 24865)

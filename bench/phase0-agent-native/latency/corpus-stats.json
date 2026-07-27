@@ -1,0 +1,64 @@
+{
+  "roots": [
+    "/Users/juanrivera/sources/repos/juanmicrosoft/calor/samples",
+    "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs"
+  ],
+  "files": 43,
+  "projects": 41,
+  "metrics": [
+    {
+      "metric": "lines_per_module_file",
+      "n": 43,
+      "p25": 12.0,
+      "p50": 28.0,
+      "p75": 50.0,
+      "p90": 145.19999999999993,
+      "max": 205
+    },
+    {
+      "metric": "functions_per_module",
+      "n": 43,
+      "p25": 1.0,
+      "p50": 3.0,
+      "p75": 5.0,
+      "p90": 13.0,
+      "max": 16
+    },
+    {
+      "metric": "contract_markers_per_function",
+      "n": 43,
+      "p25": 0.0,
+      "p50": 0.0,
+      "p75": 2.0,
+      "p90": 3.0,
+      "max": 3.8461538461538463
+    },
+    {
+      "metric": "effect_markers_per_function",
+      "n": 43,
+      "p25": 1.0,
+      "p50": 1.0,
+      "p75": 1.0,
+      "p90": 1.0,
+      "max": 1.0
+    },
+    {
+      "metric": "calls_per_function",
+      "n": 43,
+      "p25": 0.0,
+      "p50": 0.5714285714285714,
+      "p75": 1.0,
+      "p90": 3.3927272727272726,
+      "max": 19.0
+    },
+    {
+      "metric": "cross_module_ref_depth_per_project",
+      "n": 41,
+      "p25": 0.0,
+      "p50": 0.0,
+      "p75": 0.0,
+      "p90": 0.0,
+      "max": 0
+    }
+  ]
+}
