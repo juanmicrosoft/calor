@@ -109,6 +109,18 @@ internal sealed class ProjectSession
                     if (info.LastWriteTimeUtc == state.LastWriteUtc && info.Length == state.FileSize)
                         continue;
 
+                    // A file that grew past the cap since open must go
+                    // through the same oversize guard as Load — "a session
+                    // refuses to load what a tool refuses to accept" holds
+                    // across the file's whole session lifetime, not just
+                    // at open.
+                    if (info.Length > SessionFileState.MaxFileBytes)
+                    {
+                        _files[path] = SessionFileState.Load(path);
+                        reparsed++;
+                        continue;
+                    }
+
                     // Stat changed — hash to decide whether the content did
                     // (a touch without an edit must not trigger a reparse).
                     // Zero-length entries are never opened (see Load).
@@ -160,8 +172,54 @@ internal sealed class ProjectSession
     }
 
     /// <summary>
+    /// The session's state for <paramref name="absolutePath"/>, or null when
+    /// the file is not part of the session. Lets the write path reuse the
+    /// cached parse instead of re-parsing on-disk content the session
+    /// already holds (WS3 D3.1). On case-insensitive platforms an exact
+    /// (Ordinal) miss falls back to a case-insensitive scan — a client that
+    /// writes `Math.calr` against an enumerated `math.calr` addresses the
+    /// same file there, and without the fallback the warm cache would be
+    /// silently defeated on every call. Callers hash-verify content before
+    /// reuse, so even a wrong-entry match (case-variant files on a
+    /// case-sensitive volume mounted on such a platform) can only fall
+    /// back cold, never serve a wrong parse.
+    /// The platform rule is a per-OS proxy for a per-volume property:
+    /// `!IsLinux()` treats macOS/Windows (and other non-Linux OSes) as
+    /// case-insensitive even though case-sensitive volumes can be mounted
+    /// there — the read path is hash-guarded against that, the write-path
+    /// consumers carry their own guards where the proxy is load-bearing.
+    /// </summary>
+    public SessionFileState? TryGetFile(string absolutePath)
+    {
+        var path = Path.GetFullPath(absolutePath);
+        lock (_sync)
+        {
+            if (_files.TryGetValue(path, out var state))
+                return state;
+            if (!OperatingSystem.IsLinux())
+            {
+                foreach (var (key, value) in _files)
+                {
+                    if (string.Equals(key, path, StringComparison.OrdinalIgnoreCase))
+                        return value;
+                }
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Records the result of an applied write, so subsequent checks in this
-    /// session see the new content without re-reading the file.
+    /// session see the new content without re-reading the file. A
+    /// case-variant of an existing key replaces that entry rather than
+    /// inserting a duplicate (same platform rule as <see cref="TryGetFile"/>
+    /// — a duplicate would make the file its own phantom neighbor in
+    /// project-wide checks) — but only after confirming the two names are
+    /// the same directory entry: on a case-sensitive volume mounted on a
+    /// case-insensitive OS they can be genuinely different files, and
+    /// reusing the key would clobber a different neighbor's state. The
+    /// identity check is whether the directory holds an entry under this
+    /// exact name — a distinct file does, a same-file case-variant does not.
     /// </summary>
     public void UpdateFile(string absolutePath, string source, ParseResult parse)
     {
@@ -169,9 +227,49 @@ internal sealed class ProjectSession
         var info = new FileInfo(path);
         lock (_sync)
         {
+            if (!_files.ContainsKey(path) && !OperatingSystem.IsLinux())
+            {
+                var variant = _files.Keys.FirstOrDefault(
+                    k => string.Equals(k, path, StringComparison.OrdinalIgnoreCase));
+                if (variant != null && !DirectoryHasExactEntry(path))
+                    path = variant;
+            }
+
             _files[path] = new SessionFileState(path, source, SessionFileState.HashContent(source),
                 info.LastWriteTimeUtc, info.Length, parse);
         }
+    }
+
+    /// <summary>
+    /// True when the parent directory holds an entry whose name equals
+    /// <paramref name="absolutePath"/>'s file name exactly (Ordinal). On a
+    /// case-insensitive filesystem a write through a differently-cased name
+    /// lands on the existing entry, so no exact-name entry appears; on a
+    /// case-sensitive volume a distinct file with the exact name does.
+    /// </summary>
+    private static bool DirectoryHasExactEntry(string absolutePath)
+    {
+        var directory = Path.GetDirectoryName(absolutePath);
+        var name = Path.GetFileName(absolutePath);
+        if (directory == null)
+            return false;
+
+        try
+        {
+            foreach (var entry in Directory.EnumerateFiles(directory))
+            {
+                if (string.Equals(Path.GetFileName(entry), name, StringComparison.Ordinal))
+                    return true;
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+
+        return false;
     }
 
     public readonly record struct RefreshResult(int Reparsed, int Added, int Removed);
@@ -183,12 +281,25 @@ internal sealed class SessionFileState
     /// <summary>Matches McpToolBase.MaxSourceLength — a session refuses to load what a tool refuses to accept.</summary>
     internal const long MaxFileBytes = 512 * 1024;
 
+    private static readonly IReadOnlySet<string> NoTargets = new HashSet<string>();
+
+    private readonly Lazy<IReadOnlySet<string>> _callTargets;
+
     public string Path { get; }
     public string Source { get; }
     public string ContentHash { get; }
     public DateTime LastWriteUtc { get; set; }
     public long FileSize { get; set; }
     public ParseResult Parse { get; }
+
+    /// <summary>
+    /// Warm call-target index over <see cref="Parse"/> (WS3 D3.1): computed
+    /// at most once per parse state, so repeated project-reference checks do
+    /// not re-walk this file's AST. A new state (reparse or applied write)
+    /// gets a fresh lazy — the index can never outlive the AST it was
+    /// derived from. Empty when the file has no AST.
+    /// </summary>
+    public IReadOnlySet<string> CallTargets => _callTargets.Value;
 
     public SessionFileState(string path, string source, string contentHash,
         DateTime lastWriteUtc, long fileSize, ParseResult parse)
@@ -199,6 +310,9 @@ internal sealed class SessionFileState
         LastWriteUtc = lastWriteUtc;
         FileSize = fileSize;
         Parse = parse;
+        _callTargets = new Lazy<IReadOnlySet<string>>(
+            () => parse.Ast == null ? NoTargets : EditPreviewTool.CollectCallTargets(parse.Ast),
+            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public static SessionFileState Load(string path)

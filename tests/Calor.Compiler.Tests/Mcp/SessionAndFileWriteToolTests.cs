@@ -469,6 +469,173 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         Assert.Equal("safe", second.GetProperty("verdict").GetString());
     }
 
+    // ── Warm derived session state (WS3 D3.1) ───────────────────────────
+
+    [Fact]
+    public async Task WarmOriginalParse_ReusesCachedParse_WhenHashMatches()
+    {
+        var mathPath = WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+        var canonical = CanonicalPath.Resolve(mathPath);
+        var cached = session.TryGetFile(canonical);
+        Assert.NotNull(cached);
+
+        var warm = FileWriteTool.WarmOriginalParse(session, canonical, MathSource);
+        Assert.Same(cached!.Parse, warm);
+
+        // Content mismatch (the stat-preserving-edit scenario): must fall
+        // back to a cold parse, never serve the stale cached AST.
+        var cold = FileWriteTool.WarmOriginalParse(session, canonical, MathSourceWithoutAdd);
+        Assert.NotSame(cached.Parse, cold);
+        Assert.True(cold.IsSuccess);
+    }
+
+    [Fact]
+    public async Task WarmOriginalParse_HitsAcrossPathCasing_OnCaseInsensitivePlatforms()
+    {
+        // A client may address `math.calr` as `MATH.calr` on macOS/Windows;
+        // the warm cache must not be silently defeated by the casing. The
+        // canonical path here is computed exactly the way the integrated
+        // write path computes it, so a normalization regression in
+        // CheckAndApplyAsync's inputs fails this test.
+        if (OperatingSystem.IsLinux())
+            return;
+
+        WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+
+        var upperCased = Path.Combine(_root, "MATH.calr");
+        var canonical = CanonicalPath.Resolve(upperCased);
+        var cached = session.TryGetFile(canonical);
+        Assert.NotNull(cached);
+
+        var warm = FileWriteTool.WarmOriginalParse(session, canonical, MathSource);
+        Assert.Same(cached!.Parse, warm);
+    }
+
+    [Fact]
+    public async Task WarmOriginalParse_ReusesHealedWriteState()
+    {
+        // A healed write stores the healed content + its parse in the
+        // session. The next write's original side reads the healed bytes
+        // from disk, so the hash must match the stored state and reuse it.
+        var path = WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+
+        var withCloser = MathSourceWithoutAdd + "\n§/M\n";
+        var payload = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path, content = withCloser, sessionId })));
+        Assert.True(payload.GetProperty("applied").GetBoolean());
+        Assert.True(payload.GetProperty("healApplied").GetBoolean());
+
+        var canonical = CanonicalPath.Resolve(path);
+        var onDisk = File.ReadAllText(path);
+        var cached = session.TryGetFile(canonical)!;
+        Assert.Same(cached.Parse, FileWriteTool.WarmOriginalParse(session, canonical, onDisk));
+    }
+
+    [Fact]
+    public async Task UpdateFile_CaseVariantOfExistingEntry_ReplacesInsteadOfDuplicating()
+    {
+        // Writing through a differently-cased name on a case-insensitive
+        // filesystem must replace the enumerated entry, not insert a
+        // phantom duplicate that project-wide checks would treat as a
+        // neighbor. (The distinct-file guard for case-sensitive volumes is
+        // exercised via DirectoryHasExactEntry: here the directory has no
+        // exact "MATH.calr" entry, so the variant key is reused.)
+        if (OperatingSystem.IsLinux())
+            return;
+
+        var mathPath = WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+        var countBefore = session.SnapshotFiles().Count;
+
+        // The write path always hands UpdateFile the canonical
+        // (symlink-resolved) path; mirror that here.
+        var upperCased = CanonicalPath.Resolve(Path.Combine(_root, "MATH.calr"));
+        session.UpdateFile(upperCased, MathSourceWithoutAdd,
+            CalorSourceHelper.ParseTolerant(MathSourceWithoutAdd, upperCased));
+
+        Assert.Equal(countBefore, session.SnapshotFiles().Count);
+        var state = session.TryGetFile(CanonicalPath.Resolve(mathPath))!;
+        Assert.Equal(MathSourceWithoutAdd, state.Source);
+    }
+
+    [Fact]
+    public async Task Refresh_FileGrownPastCap_BecomesOversizeStub()
+    {
+        // "A session refuses to load what a tool refuses to accept" must
+        // hold for the file's whole session lifetime: a file that grows
+        // past 512 KB after open goes through the same oversize guard as
+        // Load instead of being read and indexed in full.
+        var path = WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+
+        File.WriteAllText(path, new string('x', 600 * 1024));
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(5));
+        session.Refresh();
+
+        var state = session.TryGetFile(CanonicalPath.Resolve(path))!;
+        Assert.Equal("", state.Source);
+        Assert.False(state.Parse.IsSuccess);
+        Assert.StartsWith("oversize:", state.ContentHash, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SessionFileState_CallTargets_ComputedOncePerParseState()
+    {
+        var callerPath = WriteFile("caller.calr", CallerSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+        var canonical = CanonicalPath.Resolve(callerPath);
+
+        var state = session.TryGetFile(canonical)!;
+        Assert.Contains("add", state.CallTargets);
+        Assert.Same(state.CallTargets, state.CallTargets);
+
+        // A reparse (stat + content change) must produce a fresh index from
+        // the new AST — the warm index never outlives its parse state.
+        File.WriteAllText(callerPath, OtherSource);
+        File.SetLastWriteTimeUtc(callerPath, DateTime.UtcNow.AddSeconds(5));
+        session.Refresh();
+
+        var reparsed = session.TryGetFile(canonical)!;
+        Assert.NotSame(state, reparsed);
+        Assert.DoesNotContain("add", reparsed.CallTargets);
+    }
+
+    [Fact]
+    public async Task FileWrite_WarmProjectReferenceCheck_KeepsVerdictParityAcrossCalls()
+    {
+        // The project-reference walk consumes the warm call-target index: a
+        // repeated breaking write must keep rejecting (index reused across
+        // calls), and once the caller changes behind the session's back the
+        // same write must apply (index invalidated with its parse state).
+        var mathPath = WriteFile("math.calr", MathSource);
+        var callerPath = WriteFile("caller.calr", CallerSource);
+        var sessionId = await OpenSessionAsync();
+
+        var first = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
+        var second = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
+        Assert.Equal("breaking", first.GetProperty("verdict").GetString());
+        Assert.Equal("breaking", second.GetProperty("verdict").GetString());
+
+        File.WriteAllText(callerPath, OtherSource);
+        File.SetLastWriteTimeUtc(callerPath, DateTime.UtcNow.AddSeconds(5));
+
+        var third = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
+        Assert.True(third.GetProperty("applied").GetBoolean());
+        Assert.Equal("safe", third.GetProperty("verdict").GetString());
+    }
+
     // ── Write telemetry (M-L2 / M-L4 stream) ────────────────────────────
 
     [Fact]
