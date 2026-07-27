@@ -99,8 +99,8 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.1 (thresholds frozen at A-1.0, 2026-07-24; additive
-clarification A-1.1, 2026-07-25).** This annex is **additive-only
+**Annex version: A-1.2 (thresholds frozen at A-1.0, 2026-07-24; additive
+clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27).** This annex is **additive-only
 with respect to the main document**: no §1–§7 machine-adjudicable gate
 criterion references any metric defined here, and nothing here alters the
 C#-vs-Calor gate decisions those sections govern. The annex's own proof-point
@@ -159,6 +159,7 @@ pairing, and censoring follow §2 of this document.
 | PP-L3 (node vs file edits) | **retired unrun** | machine-zone E1 killed H1 (55 % pooled); pre-committed scope gate |
 | PP-L4 (diagnostics steer the agent) | **reported-not-adjudicated** | dry-run found 3 qualifying M-L3 events across 35 runs — floor (20) unreachable at authorable-fixture scale |
 | PP-L5 (loop tooling pays off) | **≥ 15 % relative reduction in median per-pair tokens-to-green**, arm A (`loop-baseline-ws1`) vs arm B (baseline + WS2/WS3 isolation build), simultaneous epoch, ≥ 7 pairs × ≥ 5 runs/arm, §6.1 adjudication | dry-run: iterations-to-green floor-bound (median 1, 94 % at floor → undetectable at any N); tokens MDE at 80 % power ≈ 15 % at the stated N — a **design-stage simulation estimate over only 7 clusters** (400 sims × 200-resample cluster bootstrap), so the MDE itself carries wide uncertainty; if the M5 epoch's realized variance is materially higher, the miss is reported as underpowered rather than adjudicated as a clean miss. Pre-registered fallback applied **before** freezing |
+| PP-W1 (enforcement catches seeded defects, A-1.2) | **M-W1 delta (Calor − C#) ≥ 3/9 defects** on the D5.1 set (N = 9: three per class W5-A/B/C), per-defect majority across ≥ 3 runs/arm/pair, catch = defect **absent at declared-done** per its held-out probe test; **zero-vs-zero (both arms catch 0/9) = the pre-committed Call 2 kill signal** (loop plan §6.2) | feasibility by determinism, replacing a D4.5 dry-run (a priced decision, `loop-m4b-ws5.md` §2): W5-A/C catches are deterministic build blocks (`Calor0410`), so run variance affects only fix-behavior — absorbed by the at-declared-done measure + per-defect majority; W5-B (runtime contract guard on arm-shared smoke-test inputs) carries bounded nondeterminism, absorbed at 3 runs. **Scope guards, frozen with the threshold:** the delegate-invocation and override/dispatch effect-laundering holes are excluded and listed (strategy §1.1; pinned by `DelegateInvocation_*` enforcement tests) — a defect requiring them disqualifies its fixture; the static-verify catch channel is excluded until #807 (unconstrained-`result` refutations) is fixed — W5-B catches via the Debug-mode runtime guard only, and W5-B contracts are postcondition-only (a `Proven` precondition elides its guard, #755). Measures detection capability, not organic incidence; no overlap with machine-zone §7 (human spec-diff review, dogfood corpus, human baseline) |
 
 Sub-integer disclosure: the iterations-to-green primary measure was moved to
 tokens-to-green because the dry-run showed it floor-bound — the loop plan's
@@ -166,6 +167,17 @@ D4.5 rule ("the dry-run may move a threshold, the task count, or N before
 freezing — never after") applied as written.
 
 ### A.3 Annex revision log
+
+**A-1.2 (2026-07-27).** Additive: registers **M-W1** (defect catch rate —
+per arm, fraction of D5.1 injected defects absent at declared-done per
+their held-out probe tests, per-defect majority across runs) and the
+**PP-W1** frozen threshold row in A.2, before any probe fixture exists or
+any probe epoch runs (loop plan D4.4 discipline; WS5/M4b, kickoff
+`docs/plans/loop-m4b-ws5.md`). Also records PP-W1's scope guards (excluded
+enforcement holes, the #807-until-fixed exclusion of the static-verify
+catch channel, W5-B postcondition-only constraint per #755) and the
+feasibility-by-determinism argument standing in for a D4.5 dry-run. No
+existing metric or threshold is altered.
 
 **A-1.1 (2026-07-25).** Additive clarification, no threshold changes: M-L2's
 `mcp-file` sourcing (per-attempt `mcp-writes.jsonl` stream, M3 PR 4) and its
