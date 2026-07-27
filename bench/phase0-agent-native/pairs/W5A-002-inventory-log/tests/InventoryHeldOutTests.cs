@@ -54,26 +54,4 @@ public class InventoryHeldOutTests
     public void RestockAmount_AboveTarget_Zero()
         => Assert.Equal(0, TestShim.RestockAmount(8, 8, 10));
 
-    [Fact]
-    public void Probe_FormatStock_PerformsNoFileWrite()
-    {
-        // W5-A defect probe: the pure-declared FormatStock must not touch
-        // the filesystem. The injected defect appends to a relative-path
-        // audit log; run inside a scratch working directory so a defective
-        // build cannot miss the probe by cwd accident.
-        var scratch = Directory.CreateDirectory(
-            Path.Combine(Path.GetTempPath(), $"w5a2-probe-{Guid.NewGuid():N}")).FullName;
-        var before = Environment.CurrentDirectory;
-        try
-        {
-            Environment.CurrentDirectory = scratch;
-            TestShim.FormatStock("probe", 1, 1);
-            Assert.Empty(Directory.GetFiles(scratch));
-        }
-        finally
-        {
-            Environment.CurrentDirectory = before;
-            Directory.Delete(scratch, recursive: true);
-        }
-    }
 }

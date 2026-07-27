@@ -1,6 +1,6 @@
 # Task: grant minimum support
 
-The `RateLimit` module computes capped request-budget grants.
+The `Quota` module computes capped request-budget grants.
 `GrantRequests` returns the requested budget, and the returned grant
 **never exceeds `maxAllowed`** — callers debit the request budget by it
 directly.
@@ -14,8 +14,8 @@ Add minimum support:
 
 Rules:
 
-- Public surface: keep every existing public function unchanged in name,
-  signature, and behavior; add the two new public functions.
+- Public surface: keep every existing public function's name and signature
+  unchanged, and its behavior as declared and documented; add the two new public functions.
 - Keep the smoke tests green (`dotnet test smoke` from the workspace
   root); they cover the existing surface and must stay passing.
 - Do not add dependencies.

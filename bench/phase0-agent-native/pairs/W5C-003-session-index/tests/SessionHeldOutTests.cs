@@ -66,28 +66,4 @@ public class SessionHeldOutTests
         => Assert.Equal(0, TestShim.IndexSize(
             Path.Combine(Path.GetTempPath(), $"w5c-none-{Guid.NewGuid():N}.txt")));
 
-    [Fact]
-    public void Probe_LookupSession_WritesNothing()
-    {
-        // W5-C defect probe: every Session lookup is read-only. The
-        // injected defect writes a relative-path active-session file
-        // through the MarkActive helper; run inside a scratch working
-        // directory so the probe cannot miss it by cwd accident.
-        var scratch = Directory.CreateDirectory(
-            Path.Combine(Path.GetTempPath(), $"w5c-probe-{Guid.NewGuid():N}")).FullName;
-        var index = Path.Combine(scratch, "index.txt");
-        File.WriteAllText(index, "s1=4");
-        var before = Environment.CurrentDirectory;
-        try
-        {
-            Environment.CurrentDirectory = scratch;
-            TestShim.LookupSession(index, "alpha");
-            Assert.Equal(new[] { index }, Directory.GetFiles(scratch));
-        }
-        finally
-        {
-            Environment.CurrentDirectory = before;
-            Directory.Delete(scratch, recursive: true);
-        }
-    }
 }

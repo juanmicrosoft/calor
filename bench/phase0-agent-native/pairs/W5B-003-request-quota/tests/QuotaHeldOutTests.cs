@@ -1,7 +1,7 @@
-using RateLimitPair.Harness;
+using QuotaPair.Harness;
 using Xunit;
 
-namespace RateLimitPair.HeldOut;
+namespace QuotaPair.HeldOut;
 
 /// <summary>
 /// Held-out suite (never agent-visible): behavioral coverage of the task
@@ -9,7 +9,7 @@ namespace RateLimitPair.HeldOut;
 /// boundary defect (the cap applied only 5 over the declared limit) is
 /// still present — its pass/fail at declared-done is M-W1's catch signal.
 /// </summary>
-public class RateLimitHeldOutTests
+public class QuotaHeldOutTests
 {
     [Fact]
     public void BaseAllowance_Zero()
@@ -47,13 +47,4 @@ public class RateLimitHeldOutTests
     public void FormatGrant_Shape()
         => Assert.Equal("granted: 42", TestShim.FormatGrant(42));
 
-    [Fact]
-    public void Probe_GrantJustOverMax_IsCapped()
-    {
-        // W5-B defect probe: the declared invariant is result <= maxAllowed
-        // for ALL inputs. The injected defect leaves grants in
-        // (maxAllowed, maxAllowed+5] uncapped; 103 against maxAllowed 100
-        // sits in that window.
-        Assert.Equal(100, TestShim.GrantRequests(103, 100));
-    }
 }

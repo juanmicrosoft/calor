@@ -1,4 +1,4 @@
-§M{m001:RateLimit}
+§M{m001:Quota}
   §F{f001:BaseAllowance:pub} (i32:tier) -> i32
     §E{}
     §R (* tier 5)
@@ -10,7 +10,7 @@
   §F{f003:GrantRequests:pub} (i32:requested, i32:maxAllowed) -> i32
     §E{}
     §S (<= result maxAllowed)
-    §IF{if1} (> requested (+ maxAllowed 5))
+    §IF{if1} (> requested maxAllowed)
       §R maxAllowed
     §R requested
 
@@ -20,3 +20,14 @@
     §B{bonus:i32} §C{BurstBonus} §A priority §/C
     §B{requested:i32} (+ allowance bonus)
     §R §C{GrantRequests} §A requested §A maxAllowed §/C
+
+  §F{f005:GrantWithMinimum:pub} (i32:requested, i32:maxAllowed, i32:minGrant) -> i32
+    §E{}
+    §B{capped:i32} §C{GrantRequests} §A requested §A maxAllowed §/C
+    §IF{if2} (< capped minGrant)
+      §R minGrant
+    §R capped
+
+  §F{f006:FormatGrant:pub} (i32:amount) -> str
+    §E{}
+    §R (+ "granted: " §C{amount.ToString} §/C)

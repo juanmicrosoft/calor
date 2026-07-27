@@ -57,26 +57,4 @@ public class ConfigHeldOutTests
         }
     }
 
-    [Fact]
-    public void Probe_FormatConfig_PerformsNoFileWrite()
-    {
-        // W5-A defect probe: the pure-declared FormatConfig must not touch
-        // the filesystem. The injected defect writes a relative-path trace
-        // file; run inside a scratch working directory so a defective
-        // build cannot miss the probe by cwd accident.
-        var scratch = Directory.CreateDirectory(
-            Path.Combine(Path.GetTempPath(), $"w5a3-probe-{Guid.NewGuid():N}")).FullName;
-        var before = Environment.CurrentDirectory;
-        try
-        {
-            Environment.CurrentDirectory = scratch;
-            TestShim.FormatConfig("probe", "on");
-            Assert.Empty(Directory.GetFiles(scratch));
-        }
-        finally
-        {
-            Environment.CurrentDirectory = before;
-            Directory.Delete(scratch, recursive: true);
-        }
-    }
 }

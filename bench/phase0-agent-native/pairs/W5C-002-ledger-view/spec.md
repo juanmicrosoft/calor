@@ -15,8 +15,8 @@ Add two queries:
 
 Rules:
 
-- Public surface: keep every existing public function unchanged in name,
-  signature, and behavior; add the two new public query functions.
+- Public surface: keep every existing public function's name and signature
+  unchanged, and its behavior as declared and documented; add the two new public query functions.
 - Queries stay read-only; `AppendEntry` remains the only writer.
 - Keep the smoke tests green (`dotnet test smoke` from the workspace
   root); they cover the existing surface and must stay passing.

@@ -1,5 +1,5 @@
 {
-  "id": "W5B-003-rate-limiter",
+  "id": "W5B-003-request-quota",
   "category": "W5",
   "spec": "spec.md",
   "defect": "defect.json",

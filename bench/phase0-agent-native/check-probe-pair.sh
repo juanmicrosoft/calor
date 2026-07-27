@@ -25,6 +25,9 @@
 # Exit 0 = every pair accepted; 1 = any check failed.
 # ============================================================================
 set -euo pipefail
+# Pin test-runner output to English: the acceptance greps (`Passed:`,
+# `ContractViolationException`) are locale-sensitive.
+export DOTNET_CLI_UI_LANGUAGE=en
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -103,7 +106,9 @@ run_suite() {
     local t
     t="$(mktemp -d "${TMPDIR:-/tmp}/w5-suite-XXXXXX")"
     cp "$pair_dir/$suite_dir"/*.cs "$t/"
-    if [[ "$suite_dir" == "smoke" ]]; then
+    # smoke and the probe both compile against the STARTING surface via
+    # SmokeShim; the held-out suite uses the full-surface TestShim.
+    if [[ "$suite_dir" == "smoke" || "$suite_dir" == "tests/probe" ]]; then
         cp "$pair_dir/smoke/shims/SmokeShim.$arm.cs" "$t/SmokeShim.cs"
     else
         cp "$pair_dir/tests/shims/TestShim.$arm.cs" "$t/TestShim.cs"
@@ -125,18 +130,21 @@ check_pair() {
     class="$(jq -r '.class' "$pair_dir/defect.json")"
     say "── $pair_id ($class)"
 
-    local scratch
+    local scratch fails_before=$fail
     scratch="$(mktemp -d "${TMPDIR:-/tmp}/w5-check-XXXXXX")"
 
     # ---- calor STARTER fixture ------------------------------------------
+    # Compile a COPY: the CLI writes .g.cs next to its inputs, and an
+    # in-place compile both strands artifacts on interrupt and races
+    # concurrent runs on the same pair (review of #810 nit b).
+    mkdir -p "$scratch/calor-src"
+    cp "$pair_dir"/calor/*.calr "$scratch/calor-src/"
     local calr_files=() f
     while IFS= read -r f; do calr_files+=(-i "$f"); done \
-        < <(find "$pair_dir/calor" -name '*.calr' | sort)
+        < <(find "$scratch/calor-src" -name '*.calr' | sort)
     local starter_log="$scratch/calor-starter.log" starter_rc=0
     dotnet "$CALOR_DLL" "${calr_files[@]}" --enforce-effects \
         > "$starter_log" 2>&1 || starter_rc=$?
-    # CLI writes .g.cs next to inputs on success; never keep them.
-    find "$pair_dir/calor" -name '*.g.cs' -delete 2>/dev/null || true
 
     case "$class" in
       W5-A|W5-C)
@@ -179,6 +187,13 @@ check_pair() {
         else
             bad "$pair_id: C# starter FAILS the smoke suite — smoke must not directly assert the defect"
         fi
+        # fails-iff-present, presence side: the probe must FAIL against the
+        # defective starter build (review of #810 finding 8's restructure).
+        if run_suite "$pair_dir" "$wsc" "$scratch/cs-probe.log" csharp tests/probe; then
+            bad "$pair_id: probe PASSED against the defective C# starter — it does not detect the defect"
+        else
+            say "  ok: probe fails against the defective C# starter"
+        fi
     fi
     rm -rf "$wsc"
 
@@ -190,9 +205,14 @@ check_pair() {
             bad "$pair_id: $arm reference does not build"
         else
             if run_suite "$pair_dir" "$wsr" "$scratch/ref-$arm-ho.log" "$arm" tests; then
-                say "  ok: $arm reference passes held-out (incl. probe)"
+                say "  ok: $arm reference passes held-out"
             else
                 bad "$pair_id: $arm reference FAILS held-out (see $scratch/ref-$arm-ho.log)"
+            fi
+            if run_suite "$pair_dir" "$wsr" "$scratch/ref-$arm-probe.log" "$arm" tests/probe; then
+                say "  ok: $arm reference passes the defect probe"
+            else
+                bad "$pair_id: $arm reference FAILS the defect probe"
             fi
             if run_suite "$pair_dir" "$wsr" "$scratch/ref-$arm-smoke.log" "$arm" smoke; then
                 say "  ok: $arm reference passes smoke"
@@ -203,7 +223,13 @@ check_pair() {
         rm -rf "$wsr"
     done
 
-    rm -rf "$scratch"
+    # Keep the scratch dir when this pair failed a check — the FAIL messages
+    # reference logs inside it (review of #810 nit a).
+    if [[ $fail -eq $fails_before ]]; then
+        rm -rf "$scratch"
+    else
+        say "  (logs kept in $scratch)"
+    fi
 }
 
 [[ $# -ge 1 ]] || { echo "Usage: check-probe-pair.sh <pair-dir> [...]" >&2; exit 2; }

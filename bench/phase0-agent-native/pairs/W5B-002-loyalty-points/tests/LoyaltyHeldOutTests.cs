@@ -47,13 +47,4 @@ public class LoyaltyHeldOutTests
     public void FormatAward_Shape()
         => Assert.Equal("points: 42", TestShim.FormatAward(42));
 
-    [Fact]
-    public void Probe_AwardJustBelowFloor_GetsFloor()
-    {
-        // W5-B defect probe: the declared invariant is result >= minPoints
-        // for ALL inputs. The injected defect leaves awards in
-        // [minPoints-10, minPoints) unfloored; 20+5 against floor 30 sits
-        // in that window.
-        Assert.Equal(30, TestShim.AwardWithFloor(20, 5, 30));
-    }
 }

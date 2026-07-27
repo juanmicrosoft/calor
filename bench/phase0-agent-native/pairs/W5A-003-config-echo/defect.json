@@ -5,7 +5,7 @@
   "description": "FormatConfig is declared pure (calor: §E{}; csharp: doc comment 'Pure: no side effects') but echoes the formatted entry to a relative-path trace file via a named static call (File.WriteAllText -> fs:w per the bcl-io manifest).",
   "coveredPath": "named static BCL call inside a first-order function body — EffectEnforcementPass manifest resolution; no delegates, no dispatch (the excluded holes are not involved)",
   "calorCatchChannel": "build-blocking Calor0410 with call chain (FormatConfig -> File.WriteAllText), fires on the agent's first build",
-  "probeTest": "ConfigPair.HeldOut.ConfigHeldOutTests.Probe_FormatConfig_PerformsNoFileWrite",
+  "probeTest": "ConfigPair.Probe.ProbeTests.Probe_FormatConfig_PerformsNoFileWrite",
   "acceptance": {
     "calorFixtureBlocksAtBuild": true,
     "csharpFixtureBuildsGreen": true,

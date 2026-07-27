@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace RateLimitPair.Smoke;
+namespace QuotaPair.Smoke;
 
 /// <summary>
 /// Arm-shared, agent-visible smoke suite — identical in both arms and
@@ -10,7 +10,7 @@ namespace RateLimitPair.Smoke;
 /// probe's question is whether each arm's toolchain surfaces the declared
 /// cap invariant that this test deliberately does not assert.
 /// </summary>
-public class RateLimitSmokeTests
+public class QuotaSmokeTests
 {
     [Fact]
     public void BaseAllowance_FivePerTier()

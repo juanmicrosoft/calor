@@ -66,28 +66,4 @@ public class CatalogHeldOutTests
         => Assert.Equal(0, TestShim.CatalogSize(
             Path.Combine(Path.GetTempPath(), $"w5c-none-{Guid.NewGuid():N}.txt")));
 
-    [Fact]
-    public void Probe_LoadSummary_WritesNothing()
-    {
-        // W5-C defect probe: Catalog is read-only end to end. The injected
-        // defect writes a relative-path cache file through the Store
-        // module; run inside a scratch working directory so the probe
-        // cannot miss it by cwd accident.
-        var scratch = Directory.CreateDirectory(
-            Path.Combine(Path.GetTempPath(), $"w5c-probe-{Guid.NewGuid():N}")).FullName;
-        var snapshot = Path.Combine(scratch, "snapshot.txt");
-        File.WriteAllText(snapshot, "x=1");
-        var before = Environment.CurrentDirectory;
-        try
-        {
-            Environment.CurrentDirectory = scratch;
-            TestShim.LoadSummary(snapshot);
-            Assert.Equal(new[] { snapshot }, Directory.GetFiles(scratch));
-        }
-        finally
-        {
-            Environment.CurrentDirectory = before;
-            Directory.Delete(scratch, recursive: true);
-        }
-    }
 }

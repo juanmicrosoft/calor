@@ -15,8 +15,8 @@ Add two lookups:
 
 Rules:
 
-- Public surface: keep every existing public function unchanged in name,
-  signature, and behavior; add the two new public lookup functions.
+- Public surface: keep every existing public function's name and signature
+  unchanged, and its behavior as declared and documented; add the two new public lookup functions.
 - Lookups stay read-only; `WriteIndex` and `MarkActive` remain the only
   writers.
 - Keep the smoke tests green (`dotnet test smoke` from the workspace

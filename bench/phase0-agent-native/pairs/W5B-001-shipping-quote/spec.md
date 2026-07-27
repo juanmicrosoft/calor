@@ -13,8 +13,8 @@ Add floor support:
 
 Rules:
 
-- Public surface: keep every existing public function unchanged in name,
-  signature, and behavior; add the two new public functions.
+- Public surface: keep every existing public function's name and signature
+  unchanged, and its behavior as declared and documented; add the two new public functions.
 - Keep the smoke tests green (`dotnet test smoke` from the workspace
   root); they cover the existing surface and must stay passing.
 - Do not add dependencies.

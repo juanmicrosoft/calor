@@ -1,7 +1,7 @@
-namespace RateLimit;
+namespace Quota;
 
 /// <summary>Request budget calculator. All functions are pure.</summary>
-public static class RateLimitModule
+public static class QuotaModule
 {
     /// <summary>Base allowance: 5 requests per tier level.</summary>
     public static int BaseAllowance(int tier) => tier * 5;

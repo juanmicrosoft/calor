@@ -47,12 +47,4 @@ public class QuoteHeldOutTests
     public void FormatQuote_Shape()
         => Assert.Equal("quote: 42", TestShim.FormatQuote(42));
 
-    [Fact]
-    public void Probe_QuoteJustOverCap_IsCapped()
-    {
-        // W5-B defect probe: the declared invariant is result <= cap for
-        // ALL inputs. The injected defect leaves quotes in (cap, cap+10]
-        // uncapped; 90+15 against cap 100 sits in that window.
-        Assert.Equal(100, TestShim.QuoteWithSurcharge(90, 15, 100));
-    }
 }

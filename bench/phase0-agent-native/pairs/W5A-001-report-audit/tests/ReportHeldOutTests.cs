@@ -53,26 +53,4 @@ public class ReportHeldOutTests
         }
     }
 
-    [Fact]
-    public void Probe_FormatSummary_PerformsNoFileWrite()
-    {
-        // W5-A defect probe: the pure-declared FormatSummary must not touch
-        // the filesystem. The injected defect appends to a relative-path
-        // audit log; run inside a scratch working directory so a defective
-        // build cannot miss the probe by cwd accident.
-        var scratch = Directory.CreateDirectory(
-            Path.Combine(Path.GetTempPath(), $"w5a-probe-{Guid.NewGuid():N}")).FullName;
-        var before = Environment.CurrentDirectory;
-        try
-        {
-            Environment.CurrentDirectory = scratch;
-            TestShim.FormatSummary("probe", 1);
-            Assert.Empty(Directory.GetFiles(scratch));
-        }
-        finally
-        {
-            Environment.CurrentDirectory = before;
-            Directory.Delete(scratch, recursive: true);
-        }
-    }
 }
