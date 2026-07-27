@@ -1,13 +1,16 @@
 # M4 Kickoff — WS3 Warm Feedback
 
-**Status: exit criterion MET (2026-07-27), pending merges.** PP-L1 measured
+**Status: exit criterion measured PASS (2026-07-27); publication and close
+pending merges.** PP-L1 measured
 on the D3.3 fixture per `bench/phase0-agent-native/latency/ml1-001/VERDICT.md`
 (PR #805): MCP write path (adjudicating) **P50 2 ms / P99 9 ms** vs
 thresholds 300 ms / 1 s — **PASS**; watch rebuild (reported) P50 27 ms /
-P99 32 ms excluding the recorded 200 ms debounce. Result published in the
-CHANGELOG [Unreleased] notes. Per plan §5, PP-L1's pass permanently retires
-the direct-to-IL backend proposal. M4 closes when #802 (D3.1), #803 (D3.2),
-#804 (D3.3), and #805 (M-L1 run) merge.
+P99 32 ms excluding the recorded 200 ms debounce. The release-notes entry
+sits in CHANGELOG [Unreleased] on #805 — the exit criterion's publication
+clause is satisfied when it merges and ships in the v0.9 notes, not before.
+Per plan §5, PP-L1's pass permanently retires the direct-to-IL backend
+proposal. M4 closes when #802 (D3.1), #803 (D3.2), #804 (D3.3), and #805
+(M-L1 run) merge.
 
 **Kickoff record (2026-07-27):**
 **Parent:** `loop-plan-v0.9.md` §2 WS3, §3 M4 · **Depends on:** D2.1 (merged,
@@ -18,7 +21,7 @@ the direct-to-IL backend proposal. M4 closes when #802 (D3.1), #803 (D3.2),
 
 | Deliverable | Content | Status at kickoff |
 |---|---|---|
-| **D3.1** Warm project state | Sessions reuse `BuildStateCache` semantics in memory: reparse only dirtied files, reuse effect summaries across tool calls | Parse state is already warm (#797: stat-on-access + hash gate, changed-files-only reparse). Nothing else is: `CheckProjectReferences` rebuilds a `CallGraphAnalysis` over every neighbor's AST on every write/preview call, and no effect summary is ever computed on the session path |
+| **D3.1** Warm project state | Sessions reuse `BuildStateCache` semantics in memory: reparse only dirtied files, reuse effect summaries across tool calls | Parse state is already warm (#797: stat-on-access + hash gate, changed-files-only reparse). Nothing else is: every write re-reads and re-parses the on-disk original the session already holds parsed, and `CheckProjectReferences` rebuilds a `CallGraphAnalysis` over every neighbor's AST on each session write that removes a declaration (`calor_edit_preview` has no project-wide check). On a safe-edit-heavy workload the dominant recurring cost is the original-side re-parse; the neighbor walk is the removal-edit tail. No effect summary is ever computed on the session path |
 | **D3.2** Latency instrumentation | Every MCP check/apply and `watch` rebuild logs edit→envelope wall time into the loop telemetry stream | No wall time is stamped anywhere. `mcp-write/1` (FileWriteTool journaling, #799) is the natural carrier on the MCP side; `watch` emits its NDJSON envelope at the end of `Rebuild` with no timing. `mcp-write/1` also has no machine JSON Schema yet (only `loop-telemetry/2` does) |
 | **D3.3** Latency fixture with governance | Pinned ~10k-line multi-module generated Calor project; content criteria (contract density, effect-declaration density, cross-module reference depth) matched to current sample/test corpus percentiles and recorded in the fixture README; an owner; a regeneration policy; a stated sample count (≥200 timed edits per measurement) | Nothing exists. Closest precedent is `tests/Calor.Performance.Tests/SyntheticCodeGenerator.cs` (single-module, no contract/effect density). No corpus-percentile machinery exists |
 
@@ -34,8 +37,10 @@ shipped loop actually computes.** The parent D3.1 text ("reparse/rebind only
 dirtied files … keep the Roslyn workspace alive for in-memory emit") was
 written before Call 1. Two facts have since changed under it. (a) The compile
 pipeline emits C# *text* (`CSharpEmitter`); no Roslyn compilation object
-exists in the driver, `watch`, or MCP path — Roslyn appears only in ancillary
-tools (self-check exemplar compile, migration, evaluation metrics). There is
+exists in the driver, `watch`, or MCP path — Roslyn compilations are
+constructed only in ancillary tools (self-check exemplar compile, migration,
+evaluation metrics; `calor_analyze`'s interop-minimize action does a Roslyn
+*parse*, but no compilation/workspace object exists to keep warm). There is
 no workspace to "keep alive," and introducing one would be unpriced new
 infrastructure with no consumer. (b) The Call 1 descope dropped D2.2/D2.3 —
 the node-addressed tools that would have consumed warm bound state; the
@@ -88,7 +93,7 @@ instrumentation; both get reported in the release notes.
 **Fixture is a directory session; the `.calorproj` revisit trigger fires and
 is declined.** M3 deferred the project-file question to "WS3 D3.3 or v0.10
 multi-project needs." Evaluated: the fixture is a single directory tree of
-generated modules (~10k lines across ~25–40 files — well under the
+generated modules (~10k lines across ~100 files; 106 as built — well under the
 session's 2000-file/512 KB-per-file caps), opened as a directory session
 like every other consumer. No manifest semantics are needed to measure
 latency. Trigger re-arms for v0.10.
@@ -124,7 +129,11 @@ workspace in scope. Re-boxed at **2–3 wk**.
    NDJSON envelope stream; `extract_metrics`/`validate-telemetry` and
    telemetry-doc updates.
 4. **PR 4 — D3.3:** corpus-stats script (densities + reference depth over
-   `samples/` + test corpus, percentiles recorded), seeded fixture
+   `samples/` + bench pair fixtures, percentiles recorded — an accepted
+   deviation from the parent's "sample/test corpus" wording: the test-tree
+   `.calr` corpus is dominated by golden files and deliberately broken
+   parser fixtures, while the bench pairs are the code agents actually work
+   on; recorded in the fixture README), seeded fixture
    generator, committed fixture + README (content criteria vs corpus
    percentiles, owner, regeneration policy: regenerate + re-baseline on
    minor version bumps, sample count), committed edit script.
