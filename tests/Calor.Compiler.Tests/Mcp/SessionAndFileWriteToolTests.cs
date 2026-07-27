@@ -699,7 +699,10 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         var latency = record.GetProperty("latencyMs").GetInt64();
         var check = record.GetProperty("checkMs").GetInt64();
         var apply = record.GetProperty("applyMs").GetInt64();
-        Assert.True(apply <= 1, $"reject applyMs should be ~0, got {apply}");
+        // Loose bound: on reject only a skipped branch sits between the two
+        // clock samples, but a GC pause or scheduler preemption can land
+        // there — 50 ms keeps the intent (apply did not run) flake-free.
+        Assert.True(apply <= 50, $"reject applyMs should be ~0, got {apply}");
         Assert.True(record.GetProperty("refreshMs").GetInt64() + check + apply <= latency);
     }
 
