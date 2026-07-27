@@ -22,3 +22,9 @@ src/Calor.Compiler/Mcp/Sessions/ProjectSession.cs
 src/Calor.Compiler/Mcp/Sessions/ProjectSessionManager.cs
 src/Calor.Compiler/Mcp/Tools/SessionTool.cs
 src/Calor.Compiler/Mcp/Tools/FileWriteTool.cs
+
+# M4 kickoff (loop plan v0.9 WS3 — docs/plans/loop-m4-ws3.md §3) — warm
+# derived session state (per-file effect summaries + call-target index over
+# parser internals). Same compiler-internal rationale as the M3 entries.
+# Pruned at M4 close if PR 2 keeps the state inside ProjectSession.cs.
+src/Calor.Compiler/Mcp/Sessions/SessionWarmState.cs
