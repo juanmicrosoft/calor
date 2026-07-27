@@ -29,14 +29,14 @@
   "parity": {
     "csharpDeclCount": 7,
     "calorDeclCount": 7,
-    "csharpComplexity": 10,
-    "calorComplexity": 10,
-    "notes": "WS5 probe pair (loop plan D5.1, class W5-B). Counted on the reference solutions: 1 module/static class + 6 functions; complexity 1 per function + 1 per branch: QuoteWithSurcharge 2, QuoteWithFloor 2, others 1 = 10 per arm. Starting fixtures are the identical 4-function module in both arms, both carrying the injected boundary defect. Probe pairs are never gate-eligible: they exist to measure M-W1/PP-W1 (gates doc Annex A-1.2), not the language gates.",
+    "csharpComplexity": 8,
+    "calorComplexity": 8,
+    "notes": "WS5 probe pair (loop plan D5.1, class W5-B). Convention: decls = 1 module/static class + functions; complexity = 1 per function + 1 per conditional branch. Reference: 1 + 6 functions; QuoteWithSurcharge 2, QuoteWithFloor 2, four others 1 = complexity 8. Starting fixtures: identical 4-function module in both arms, both carrying the injected boundary defect (QuoteWithSurcharge 2 + three others = 5). Probe pairs are never gate-eligible: they measure M-W1/PP-W1 (gates doc Annex A-1.2), not the language gates.",
     "startingFixture": {
       "csharpDeclCount": 5,
       "calorDeclCount": 5,
-      "csharpComplexity": 6,
-      "calorComplexity": 6
+      "csharpComplexity": 5,
+      "calorComplexity": 5
     }
   },
   "wedgeWhitelistCheck": "One contract: §S (<= result cap) on QuoteWithSurcharge — scalar i32 comparison against a parameter, inside the Z3-modeled forms whitelist. Per Annex A-1.2 the probe's catch channel is the Debug-mode RUNTIME guard, not static verification (#807 refutes result-referencing postconditions spuriously; not build-blocking). No preconditions (a Proven precondition elides its guard, #755). All code is pure and first-order: no effects, no delegates, no dispatch.",

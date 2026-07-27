@@ -29,14 +29,14 @@
   "parity": {
     "csharpDeclCount": 9,
     "calorDeclCount": 9,
-    "csharpComplexity": 12,
-    "calorComplexity": 12,
-    "notes": "WS5 probe pair (loop plan D5.1, class W5-C). Counted on the reference solutions: 1 module/static class + 8 functions; complexity 1 per function + 1 per branch: ReadSnapshot 2, HasCatalog 2, others 1 = 12 per arm. Starting fixtures are the identical single-module six-function project in both arms, both carrying the injected defect. Probe pairs are never gate-eligible: they exist to measure M-W1/PP-W1 (gates doc Annex A-1.2), not the language gates.",
+    "csharpComplexity": 9,
+    "calorComplexity": 9,
+    "notes": "WS5 probe pair (loop plan D5.1, class W5-C). Convention: decls = 1 module/static class + functions; complexity = 1 per function + 1 per conditional branch. Reference: 1 + 8 functions; ReadSnapshot 2, seven others 1 = complexity 9. Starting fixtures: identical single-module six-function project in both arms, both carrying the injected defect (ReadSnapshot 2 + five others = 7). Probe pairs are never gate-eligible: they measure M-W1/PP-W1 (gates doc Annex A-1.2), not the language gates.",
     "startingFixture": {
       "csharpDeclCount": 7,
       "calorDeclCount": 7,
-      "csharpComplexity": 10,
-      "calorComplexity": 10
+      "csharpComplexity": 7,
+      "calorComplexity": 7
     }
   },
   "wedgeWhitelistCheck": "No contracts (W5-C probes the effect-laundering boundary, not the prover). Effect boundaries are bcl-io manifest-covered: File.WriteAllText -> fs:w; File.Exists / File.ReadAllText -> fs:r. The laundering edge is a bare-name first-order intra-module call chain (LoadSummary -> SaveSnapshot -> File.WriteAllText) - EffectEnforcementPass's covered path per Annex A-1.2's scope guards; no delegates, no lambdas, no dispatch. The callee's own fs:w declaration is honest; the violated declaration is the caller's.",

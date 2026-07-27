@@ -1,0 +1,14 @@
+{
+  "id": "W5C-003",
+  "class": "W5-C",
+  "claim": "effect laundered through a covered call chain of length three (caller's declaration violated; intermediate and writer honest)",
+  "description": "LookupSession is declared read-only (calor: §E{fs:r}; csharp: doc comment 'read-only ... never writes') but calls the MarkActive helper — whose own §E{fs:w} declaration is honest — which in turn calls WriteIndex (also honestly §E{fs:w}), so the write capability is laundered through the covered call chain LookupSession → MarkActive → WriteIndex → File.WriteAllText. The violated declaration is the TOP-LEVEL CALLER's; every intermediate declares its effect truthfully (distinguishing W5-C from W5-A, where the defective function's own declaration is wrong).",
+  "coveredPath": "bare-name first-order call chain of length three inside one module - EffectEnforcementPass interprocedural SCC propagation; no delegates, no dispatch (the excluded holes are not involved). Cross-module laundering is architecturally identical but blocked by a pre-existing emitter gap (cross-module calls emit unqualified C#) - see the kickoff amendment",
+  "calorCatchChannel": "build-blocking Calor0410 with the full laundering chain (LookupSession -> MarkActive -> WriteIndex -> File.WriteAllText), fires on the agent's first build",
+  "probeTest": "SessionPair.HeldOut.SessionHeldOutTests.Probe_LookupSession_WritesNothing",
+  "acceptance": {
+    "calorFixtureBlocksAtBuild": true,
+    "csharpFixtureBuildsGreen": true,
+    "referencesPassHeldOut": true
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "id": "W5A-001-report-audit",
+  "id": "W5A-002-inventory-log",
   "category": "W5",
   "spec": "spec.md",
   "defect": "defect.json",
@@ -29,14 +29,14 @@
   "parity": {
     "csharpDeclCount": 7,
     "calorDeclCount": 7,
-    "csharpComplexity": 6,
-    "calorComplexity": 6,
-    "notes": "WS5 probe pair (loop plan D5.1, class W5-A). Convention: decls = 1 module/static class + functions; complexity = 1 per function + 1 per conditional branch. Reference: 1 + 6 functions, all straight-line = complexity 6. Starting fixtures: identical 4-function module in both arms, both carrying the injected defect (complexity 4). Probe pairs are never gate-eligible: they measure M-W1/PP-W1 (gates doc Annex A-1.2), not the language gates.",
+    "csharpComplexity": 8,
+    "calorComplexity": 8,
+    "notes": "WS5 probe pair (loop plan D5.1, class W5-A). Counted on the reference solutions: 1 module/static class + 6 functions; 1 per decl + 1 per branch: RestockAmount 2, others straight-line = 8 per arm. Starting fixtures are the identical 4-function module in both arms, both carrying the injected defect. Probe pairs are never gate-eligible: they exist to measure M-W1/PP-W1 (gates doc Annex A-1.2), not the language gates.",
     "startingFixture": {
       "csharpDeclCount": 5,
       "calorDeclCount": 5,
-      "csharpComplexity": 4,
-      "calorComplexity": 4
+      "csharpComplexity": 5,
+      "calorComplexity": 5
     }
   },
   "wedgeWhitelistCheck": "No contracts (W5-A probes the effect boundary, not the prover). All effect boundaries are bcl-io manifest-covered: File.AppendAllText / File.WriteAllText -> fs:w. All code is first-order: no delegates, no lambdas, no LINQ, no dispatch — the injected defect sits on a covered path per Annex A-1.2's scope guards.",

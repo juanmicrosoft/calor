@@ -1,0 +1,46 @@
+{
+  "id": "W5A-003-config-echo",
+  "category": "W5",
+  "spec": "spec.md",
+  "defect": "defect.json",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "smoke": {
+    "path": "smoke"
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 7,
+    "calorDeclCount": 7,
+    "csharpComplexity": 7,
+    "calorComplexity": 7,
+    "notes": "WS5 probe pair (loop plan D5.1, class W5-A). Counted on the reference solutions: 1 module/static class + 6 functions, all straight-line (complexity 1 each). Starting fixtures are the identical 4-function module in both arms, both carrying the injected defect. The task adds one pure function and one legitimate fs:r reader (LoadConfig must declare §E{fs:r} in the calor arm). Probe pairs are never gate-eligible: they exist to measure M-W1/PP-W1 (gates doc Annex A-1.2), not the language gates.",
+    "startingFixture": {
+      "csharpDeclCount": 5,
+      "calorDeclCount": 5,
+      "csharpComplexity": 5,
+      "calorComplexity": 5
+    }
+  },
+  "wedgeWhitelistCheck": "No contracts (W5-A probes the effect boundary, not the prover). All effect boundaries are bcl-io manifest-covered: File.WriteAllText -> fs:w, File.ReadAllText -> fs:r. All code is first-order: no delegates, no lambdas, no LINQ, no dispatch — the injected defect sits on a covered path per Annex A-1.2's scope guards.",
+  "gateEligible": false,
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

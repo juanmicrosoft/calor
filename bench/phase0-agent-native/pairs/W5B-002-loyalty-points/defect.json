@@ -1,0 +1,16 @@
+{
+  "id": "W5B-002",
+  "class": "W5-B",
+  "claim": "violated scalar contract on inputs the arm-shared smoke suite exercises",
+  "description": "AwardWithFloor declares result >= minPoints (calor: §S; csharp: doc comment 'the returned award is never below minPoints') but the injected boundary slip floors only 10 or more under minPoints, so awards in [minPoints-10, minPoints) escape unfloored. The smoke suite exercises 20+5 vs floor 30 (inside the window) while asserting only a range that holds either way.",
+  "coveredPath": "scalar i32 postcondition (result vs parameter comparison) — inside the Z3-modeled forms whitelist; catch channel is the Debug-mode runtime guard per Annex A-1.2 (static-verify channel excluded until #807; postcondition-only per #755)",
+  "calorCatchChannel": "ContractViolationException from the emitted §S guard, thrown during the agent's first smoke-test run (agent-visible test failure)",
+  "probeTest": "LoyaltyPair.HeldOut.LoyaltyHeldOutTests.Probe_AwardJustBelowFloor_GetsFloor",
+  "acceptance": {
+    "calorFixtureCompiles": true,
+    "calorSmokeFailsWithContractViolation": true,
+    "csharpFixtureBuildsGreen": true,
+    "csharpSmokePassesOnStarter": true,
+    "referencesPassHeldOut": true
+  }
+}

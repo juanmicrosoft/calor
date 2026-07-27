@@ -1,0 +1,20 @@
+§M{m001:Config}
+  §F{f001:FormatEntry:pub} (str:key, str:val) -> str
+    §E{}
+    §R (+ key (+ "=" val))
+
+  §F{f002:QuoteValue:pub} (str:val) -> str
+    §E{}
+    §R (+ "'" (+ val "'"))
+
+  §F{f003:FormatConfig:pub} (str:key, str:val) -> str
+    §E{}
+    §B{quoted:str} §C{QuoteValue} §A val §/C
+    §B{line:str} §C{FormatEntry} §A key §A quoted §/C
+    §C{File.WriteAllText} §A "config-trace.txt" §A line §/C
+    §R line
+
+  §F{f004:SaveConfig:pub} (str:path, str:key, str:val) -> void
+    §E{fs:w}
+    §B{line:str} §C{FormatConfig} §A key §A val §/C
+    §C{File.WriteAllText} §A path §A line §/C
