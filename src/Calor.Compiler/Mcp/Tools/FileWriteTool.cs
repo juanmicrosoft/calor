@@ -370,7 +370,11 @@ public sealed class FileWriteTool : McpToolBase
             // Case-insensitive platforms: a case-variant of the edited path
             // addresses the same file — without the platform-aware compare,
             // the edited file's own stale session entry would be treated as
-            // a neighbor and veto its own edit as "breaking".
+            // a neighbor and veto its own edit as "breaking". Accepted
+            // residual (the platform rule is a per-OS proxy for a per-volume
+            // property): on a case-sensitive volume mounted on a non-Linux
+            // OS, a genuinely distinct case-variant twin of the edited file
+            // is exempted from this best-effort veto.
             var selfComparison = OperatingSystem.IsLinux()
                 ? StringComparison.Ordinal
                 : StringComparison.OrdinalIgnoreCase;

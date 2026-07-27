@@ -183,6 +183,11 @@ internal sealed class ProjectSession
     /// reuse, so even a wrong-entry match (case-variant files on a
     /// case-sensitive volume mounted on such a platform) can only fall
     /// back cold, never serve a wrong parse.
+    /// The platform rule is a per-OS proxy for a per-volume property:
+    /// `!IsLinux()` treats macOS/Windows (and other non-Linux OSes) as
+    /// case-insensitive even though case-sensitive volumes can be mounted
+    /// there — the read path is hash-guarded against that, the write-path
+    /// consumers carry their own guards where the proxy is load-bearing.
     /// </summary>
     public SessionFileState? TryGetFile(string absolutePath)
     {
@@ -209,7 +214,12 @@ internal sealed class ProjectSession
     /// case-variant of an existing key replaces that entry rather than
     /// inserting a duplicate (same platform rule as <see cref="TryGetFile"/>
     /// — a duplicate would make the file its own phantom neighbor in
-    /// project-wide checks).
+    /// project-wide checks) — but only after confirming the two names are
+    /// the same directory entry: on a case-sensitive volume mounted on a
+    /// case-insensitive OS they can be genuinely different files, and
+    /// reusing the key would clobber a different neighbor's state. The
+    /// identity check is whether the directory holds an entry under this
+    /// exact name — a distinct file does, a same-file case-variant does not.
     /// </summary>
     public void UpdateFile(string absolutePath, string source, ParseResult parse)
     {
@@ -221,13 +231,45 @@ internal sealed class ProjectSession
             {
                 var variant = _files.Keys.FirstOrDefault(
                     k => string.Equals(k, path, StringComparison.OrdinalIgnoreCase));
-                if (variant != null)
+                if (variant != null && !DirectoryHasExactEntry(path))
                     path = variant;
             }
 
             _files[path] = new SessionFileState(path, source, SessionFileState.HashContent(source),
                 info.LastWriteTimeUtc, info.Length, parse);
         }
+    }
+
+    /// <summary>
+    /// True when the parent directory holds an entry whose name equals
+    /// <paramref name="absolutePath"/>'s file name exactly (Ordinal). On a
+    /// case-insensitive filesystem a write through a differently-cased name
+    /// lands on the existing entry, so no exact-name entry appears; on a
+    /// case-sensitive volume a distinct file with the exact name does.
+    /// </summary>
+    private static bool DirectoryHasExactEntry(string absolutePath)
+    {
+        var directory = Path.GetDirectoryName(absolutePath);
+        var name = Path.GetFileName(absolutePath);
+        if (directory == null)
+            return false;
+
+        try
+        {
+            foreach (var entry in Directory.EnumerateFiles(directory))
+            {
+                if (string.Equals(Path.GetFileName(entry), name, StringComparison.Ordinal))
+                    return true;
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+
+        return false;
     }
 
     public readonly record struct RefreshResult(int Reparsed, int Added, int Removed);
