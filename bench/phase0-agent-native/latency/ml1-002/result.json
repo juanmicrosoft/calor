@@ -1,0 +1,2339 @@
+{
+  "commit": "d3e823f304a6a1a98fcbd02a9b7bb8567b4f8fc5",
+  "treeHash": "0276792f6c5972295fcef424ac158045c5a642b2",
+  "dotnetSdk": "10.0.302",
+  "calorDll": "../../../src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editScript": "edits/edit-script.jsonl",
+  "mcp": {
+    "surface": "mcp",
+    "edits": 230,
+    "sessionOpenMs": 112,
+    "p50_ms": 2.0,
+    "p90_ms": 3.0,
+    "p99_ms": 8.84,
+    "max_ms": 23,
+    "meanRttOverheadMs": 0.8,
+    "rows": [
+      {
+        "seq": 1,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 30,
+        "latency_ms": 23,
+        "refresh_ms": 1,
+        "check_ms": 18,
+        "apply_ms": 2
+      },
+      {
+        "seq": 2,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 7,
+        "latency_ms": 6,
+        "refresh_ms": 0,
+        "check_ms": 5,
+        "apply_ms": 1
+      },
+      {
+        "seq": 3,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 4,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 5,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 6,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 11,
+        "latency_ms": 10,
+        "refresh_ms": 0,
+        "check_ms": 9,
+        "apply_ms": 1
+      },
+      {
+        "seq": 7,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 8,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 9,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 10,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 17,
+        "latency_ms": 16,
+        "refresh_ms": 0,
+        "check_ms": 16,
+        "apply_ms": 0
+      },
+      {
+        "seq": 11,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 12,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 13,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 14,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 15,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 16,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 17,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 18,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 19,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 20,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 21,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 22,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 23,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 24,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 25,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 26,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 27,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 28,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 29,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 30,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 31,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 32,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 33,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 1
+      },
+      {
+        "seq": 34,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 35,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 36,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 37,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 1
+      },
+      {
+        "seq": 38,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 39,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 40,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 41,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 42,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 43,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 44,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 45,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 46,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 47,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 48,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 49,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 1
+      },
+      {
+        "seq": 50,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 51,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 52,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 2,
+        "latency_ms": 1,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 0
+      },
+      {
+        "seq": 53,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 5,
+        "latency_ms": 5,
+        "refresh_ms": 3,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 54,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 55,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 56,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 2,
+        "latency_ms": 1,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 0
+      },
+      {
+        "seq": 57,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 58,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 59,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 60,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 61,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 62,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 63,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 64,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 65,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 66,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 67,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 68,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 69,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 70,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 71,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 72,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 73,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 74,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 75,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 76,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 1
+      },
+      {
+        "seq": 77,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 78,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 79,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 80,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 81,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 82,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 83,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 84,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 85,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 86,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 87,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 88,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 1
+      },
+      {
+        "seq": 89,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 90,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 91,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 92,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 93,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 94,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 95,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 2,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 96,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 5,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 97,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 98,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 99,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 100,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 7,
+        "latency_ms": 6,
+        "refresh_ms": 0,
+        "check_ms": 5,
+        "apply_ms": 1
+      },
+      {
+        "seq": 101,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 102,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 103,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 104,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 105,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 106,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 107,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 108,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 1
+      },
+      {
+        "seq": 109,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 110,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 111,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 112,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 113,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 114,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 115,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 116,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 117,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 118,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 119,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 120,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 1,
+        "check_ms": 1,
+        "apply_ms": 1
+      },
+      {
+        "seq": 121,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 122,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 123,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 124,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 125,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 126,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 127,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 128,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 129,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 130,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 131,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 132,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 133,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 134,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 135,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 136,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 137,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 138,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 139,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 140,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 141,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 142,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 143,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 144,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 145,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 146,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 147,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 148,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 149,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 150,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 151,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 6,
+        "latency_ms": 5,
+        "refresh_ms": 0,
+        "check_ms": 5,
+        "apply_ms": 0
+      },
+      {
+        "seq": 152,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 153,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 154,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 155,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 156,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 157,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 158,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 159,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 160,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 161,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 162,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 163,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 164,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 165,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 166,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 167,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 5,
+        "latency_ms": 4,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 1
+      },
+      {
+        "seq": 168,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 169,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 170,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 171,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 172,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 173,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 174,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 175,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 176,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 177,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 178,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 179,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 180,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 181,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 182,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 183,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 184,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 185,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 186,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 187,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 188,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 189,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 190,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 191,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 192,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 193,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 194,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 195,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 1,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 196,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 197,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 198,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 1
+      },
+      {
+        "seq": 199,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 200,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 201,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 202,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 203,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 1,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 204,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 205,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 206,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 1
+      },
+      {
+        "seq": 207,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 208,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 209,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 210,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 211,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 212,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 213,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 214,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 7,
+        "latency_ms": 6,
+        "refresh_ms": 0,
+        "check_ms": 5,
+        "apply_ms": 1
+      },
+      {
+        "seq": 215,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 6,
+        "latency_ms": 5,
+        "refresh_ms": 1,
+        "check_ms": 4,
+        "apply_ms": 0
+      },
+      {
+        "seq": 216,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 217,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 218,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 4,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 1
+      },
+      {
+        "seq": 219,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 220,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 221,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 222,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 223,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 224,
+        "kind": "breaking",
+        "applied": false,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 225,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 226,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      },
+      {
+        "seq": 227,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 228,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 229,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 3,
+        "latency_ms": 2,
+        "refresh_ms": 0,
+        "check_ms": 2,
+        "apply_ms": 0
+      },
+      {
+        "seq": 230,
+        "kind": "safe",
+        "applied": true,
+        "rtt_ms": 4,
+        "latency_ms": 3,
+        "refresh_ms": 0,
+        "check_ms": 3,
+        "apply_ms": 0
+      }
+    ]
+  },
+  "watch": {
+    "surface": "watch",
+    "edits": 200,
+    "initialCompileMs": 382,
+    "debounceMs": 200,
+    "p50_ms": 27.0,
+    "p90_ms": 30.0,
+    "p99_ms": 33.0,
+    "max_ms": 33,
+    "anyErrors": false
+  },
+  "ppL1": {
+    "thresholds": {
+      "p50_ms": 300,
+      "p99_ms": 1000
+    },
+    "p50Pass": true,
+    "p99Pass": true,
+    "verdict": "PASS"
+  }
+}
