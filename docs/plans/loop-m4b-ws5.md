@@ -101,17 +101,23 @@ declaration is the caller's, the intermediate's declaration is honest, and
 working C#. Revisit trigger: #809 fixed → a cross-module W5-C variant may
 be added.
 
-**No paid feasibility dry-run — a variance argument replaces it, and that
-is a priced decision.** D4.5's rule is that a [P] threshold must be shown
-decidable before it freezes. W5-A/C catches are *deterministic build
-failures* (the compiler either blocks or it doesn't — run-to-run agent
-variance affects only whether the agent then fixes the defect, which is
-why "absent at declared-done" is the measure and majority-across-runs the
-aggregation). W5-B depends on the agent running the smoke tests at least
-once — bounded nondeterminism, absorbed by 3 runs/arm/pair with
-per-defect majority. With N = 9 defects the threshold below is decidable
-at trivial spend; a dedicated variance epoch would cost more than the
-probe itself. Registered in Annex A-1.2 with this argument.
+**No paid feasibility dry-run — a variance argument replaces it, and
+that is a recorded deviation from D4.5's letter.** D4.5's rule is that a
+[P] threshold must be shown decidable by a dry-run before it freezes; the
+supersession is recorded in the loop plan's §10 revision log, not
+self-authorized here. The argument's honest scope: W5-A/C catches are
+*deterministic build failures* and W5-B's guard throws deterministically
+on the smoke inputs — determinism of the **surfacing channel**. The
+registered measure ("absent at declared-done") additionally depends on
+**agent fix-behavior**, which is as nondeterministic as anything a
+dry-run measures — majority-of-3 absorbs noise, not systematic behavior
+(an agent policy of never running smoke tests would zero W5-B across all
+runs). The guard adopted in place of a dry-run is the **pre-registered
+decidability fallback** in the A-1.2 row: if per-defect run outcomes are
+not unanimous for ≥ 7 of 9 defects in either arm, PP-W1 is reported, not
+adjudicated (the PP-L4 pattern). A dedicated variance epoch would cost
+more than the probe itself; this fallback bounds the same risk the prior
+dry-runs caught (PP-L4's event floor, PP-L5's floor-bound iterations).
 
 **Probe scale and spend.** 9 pairs (one defect each) × 2 arms × 3 runs =
 54 agent runs, iteration budget 10, pinned model per gates-doc
@@ -119,7 +125,10 @@ conventions. Estimated well under the gates-doc $1,500/epoch ceiling
 (WS2-exit-scale runs suggest low hundreds). The concrete figure is
 entered via the `phase-2-spend-authorisation.md` process and the epoch
 **does not run until the user authorizes the spend** — same discipline as
-`ws2-exit-e2e-001`.
+`ws2-exit-e2e-001`. (Letter-vs-practice note: plan §3 wanted all four
+epochs' numbers entered before M2 kickoff; no wedge-probe figure was —
+the figure enters now, before the epoch, matching how M2 actually used
+the authorization doc as conventions/template.)
 
 **Box confirmation:** parent's 2–3 wk stands. The probe epoch itself is
 days; the box is dominated by fixture authorship + acceptance checks.
@@ -129,10 +138,14 @@ days; the box is dominated by fixture authorship + acceptance checks.
 1. **PR 1 (this PR):** kickoff record + gates-doc **Annex A-1.2** —
    additive registration of M-W1 and PP-W1's frozen threshold, the
    excluded-holes list, the #807 channel exclusion, and the
-   feasibility-by-determinism argument. No allowlist entries (fixtures
-   are `.calr`/`.cs` under `bench/`; harness work is bash/python).
+   feasibility-by-determinism argument — plus a **calor-first-guard
+   structural exemption for `bench/`** (review of #808 finding 1: the
+   guard exempted only `tests/`, so every probe pair's C# arm — which is
+   definitionally C# — tripped it; the ~700 pre-existing `bench/**/*.cs`
+   passed only via the grandfather clause). The exemption must be on main
+   at PR 2's merge base, which is exactly this PR's job.
 2. **PR 2 — D5.1:** the 9 probe pairs under
-   `bench/phase0-agent-native/pairs/W5-*` (pristine-plus-defect starter
+   `bench/phase0-agent-native/pairs/W5?-*` (pristine-plus-defect starter
    fixtures both arms, arm-shared smoke tests, per-defect held-out probe
    tests, `defect.json` manifest naming the class/covered path/probe
    test), plus harness support: per-test held-out outcome extraction (the
@@ -153,7 +166,8 @@ days; the box is dominated by fixture authorship + acceptance checks.
 - Organic-incidence claims (`real-scale-benchmark-design.md` territory).
 - The delegate/dispatch holes — excluded and listed, not probed.
 - Static-verify-based catching (excluded until #807; revisit trigger).
-- Human-review detection (machine-zone §7's red-team gate measures
-  spec-diff review as a human-review replacement on the dogfood module —
-  different subject, corpus, and comparator; no registration overlap).
+- Review-process detection (machine-zone §7's red-team gate, as amended
+  by §12: absolute spec-diff detection of externally-authored blinded
+  injections on the dogfood module — different subject, corpus, and
+  comparator; no registration overlap).
 - PP-W1 adjudication inside M4b — measurement here, Call 2 at M5.
