@@ -40,7 +40,7 @@ and listed.** Three classes, three defects each (N = 9):
 |---|---|---|
 | **W5-A** undeclared side effect | a `§E{}`-declared (pure) function gains an effectful *named static* call | build-blocking `Calor0410` with call chain (`EffectEnforcementPass`) |
 | **W5-B** violated scalar contract | off-by-one/boundary slip making a declared `§S` false on inputs the arm-shared smoke test exercises | **Debug-mode runtime guard** (`ContractViolationException`) thrown during any build+test the agent runs |
-| **W5-C** laundered effect via covered chain | a transitively-called function (bare-name, cross-module) gains an effect its public caller's `§E` forbids | build-blocking `Calor0410` "via cross-module call" (`CrossModuleEffectEnforcementPass`) |
+| **W5-C** laundered effect via covered chain | a public caller declared `§E{fs:r}` reaches a write through a covered call chain whose intermediate declares its own effect *honestly* — the violated declaration is the caller's (distinguishing W5-C from W5-A, where the defective function's own declaration is wrong) | build-blocking `Calor0410` with the full chain (`EffectEnforcementPass` interprocedural SCC propagation) |
 
 **Excluded paths (the documented holes — the probe measures the claim as
 stated, not the gaps):** delegate-typed invocations (assumed pure by
@@ -85,9 +85,21 @@ whatever tests the agent writes) is free to catch it.
 project.** The plan's "Calor module inside a C# solution" is satisfied by
 the established pattern — a `Microsoft.NET.Sdk` C# project consuming
 `.calr` sources via `Calor.Tasks`/SDK targets, with the held-out project
-referencing the emitted assembly. W5 pairs use multi-module fixtures
-(needed by W5-C's cross-module chain) under the same template; no new
-project-system work.
+referencing the emitted assembly. No new project-system work.
+
+**W5-C is intra-module laundering, not cross-module — a constraint
+discovered at fixture-authoring time and priced here.** Cross-module
+laundering is architecturally identical for enforcement
+(`CrossModuleEffectEnforcementPass` catches it, verified), but a
+pre-existing emitter gap (#809: cross-module calls emit unqualified C#, so
+a multi-module project's defect-FREE reference can never link under
+MSBuild/csc — and the qualified spelling is `Unknown:*` under the strict
+policy) means no cross-module fixture can ship a working reference
+solution. The intra-module chain exercises the same claim — the violated
+declaration is the caller's, the intermediate's declaration is honest, and
+`EffectEnforcementPass` reports the full chain — on a path that emits
+working C#. Revisit trigger: #809 fixed → a cross-module W5-C variant may
+be added.
 
 **No paid feasibility dry-run — a variance argument replaces it, and that
 is a priced decision.** D4.5's rule is that a [P] threshold must be shown
