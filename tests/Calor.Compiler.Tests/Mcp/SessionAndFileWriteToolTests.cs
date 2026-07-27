@@ -628,10 +628,20 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
 
         // Latency fields (WS3 D3.2): total plus the phase breakdown, all
         // non-negative; refresh is 0 here because the write ran sessionless.
-        Assert.True(records[0].GetProperty("latencyMs").GetInt64() >= 0);
-        Assert.Equal(0, records[0].GetProperty("refreshMs").GetInt64());
-        Assert.True(records[0].GetProperty("checkMs").GetInt64() >= 0);
-        Assert.True(records[0].GetProperty("applyMs").GetInt64() >= 0);
+        // The phases are disjoint segments of one monotonic clock sampled
+        // last, so their sum can never exceed the total — this deterministic
+        // invariant pins the marks' ordering and point-of-sample (a swapped
+        // or pre-sampled implementation fails it).
+        var latency = records[0].GetProperty("latencyMs").GetInt64();
+        var refresh = records[0].GetProperty("refreshMs").GetInt64();
+        var check = records[0].GetProperty("checkMs").GetInt64();
+        var apply = records[0].GetProperty("applyMs").GetInt64();
+        Assert.True(latency >= 0);
+        Assert.Equal(0, refresh);
+        Assert.True(check >= 0);
+        Assert.True(apply >= 0);
+        Assert.True(refresh + check + apply <= latency,
+            $"phase sum {refresh}+{check}+{apply} exceeds latencyMs {latency}");
     }
 
     [Fact]
@@ -647,12 +657,22 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         Assert.False(payload.GetProperty("applied").GetBoolean());
 
         var record = JsonDocument.Parse(File.ReadAllLines(logPath).Single()).RootElement;
+        Assert.Equal("mcp-write/2", record.GetProperty("schema").GetString());
         Assert.False(record.GetProperty("applied").GetBoolean());
         Assert.Equal("breaking", record.GetProperty("verdict").GetString());
         var rejectPayloadPath = record.GetProperty("rejectPayload").GetString();
         Assert.NotNull(rejectPayloadPath);
         var archived = JsonDocument.Parse(File.ReadAllText(rejectPayloadPath!)).RootElement;
         Assert.Equal(broken, archived.GetProperty("rejectedContent").GetString());
+
+        // Reject-path latency record (WS3 D3.2): the apply block is skipped
+        // entirely, so applyMs measures nothing but the skipped branch;
+        // the phase-sum invariant holds on rejects too.
+        var latency = record.GetProperty("latencyMs").GetInt64();
+        var check = record.GetProperty("checkMs").GetInt64();
+        var apply = record.GetProperty("applyMs").GetInt64();
+        Assert.True(apply <= 1, $"reject applyMs should be ~0, got {apply}");
+        Assert.True(record.GetProperty("refreshMs").GetInt64() + check + apply <= latency);
     }
 
     [Fact]

@@ -75,13 +75,15 @@ several write attempts and the shim cannot observe MCP traffic.
 | `healApplied` | bool | auto-heal changed the content before checking (D2.5) |
 | `created` | bool | the write created the file |
 | `rejectPayload` | string \| null | path of the archived rejected-edit payload (`rejects/`, env `CALOR_MCP_REJECT_DIR`) — D4.6 replay input for M-L4. **Absent when null** — the MCP serializer drops null fields |
-| `latencyMs` | int | **M-L1's adjudicating measurement** (WS3 D3.2): edit→envelope wall time, tool-call receipt → verdict record — covers session refresh, per-path gate wait, heal, parse, check set, and atomic apply |
+| `latencyMs` | int | **M-L1's adjudicating measurement** (WS3 D3.2): wall time from tool-call receipt (tool handler entry, after protocol parse) to the verdict being journaled — covers session refresh, per-path gate wait, heal, parse, check set, and atomic apply. **Outside the clock, stated once here as the normative boundary:** protocol-layer request parsing, result-envelope serialization after the verdict, and reject-payload archiving. All excluded segments are microsecond-to-low-ms scale against a 300 ms P50 gate |
 | `refreshMs` | int | phase: session stat-on-access refresh (0 without a session) |
 | `checkMs` | int | phase: read + heal + parse + check set through verdict |
 | `applyMs` | int | phase: revalidate + atomic write (0 on reject) |
 
 Machine-validatable schema: `mcp-write.schema.json` (accepts both `/1` and
-`/2`; the latency fields are always emitted by `/2` writers).
+`/2`; the four latency fields are **required** on `/2` and forbidden on
+`/1`, so a writer regression that stops emitting the adjudicating number
+fails validation instead of sailing through).
 
 Notes: revalidation races (file changed on disk mid-check → retry error) are
 not journaled — they carry no verdict information. Reject payload archiving
@@ -107,12 +109,12 @@ MCP write path, the loop mechanism the harness constrains arms to).
 |:------|:-----|:------|
 | `schema` | `"watch-rebuild/1"` | discriminator |
 | `ts` | string (ISO-8601 UTC) | rebuild completion time |
-| `rebuild` | int | 1-based rebuild ordinal (1 = initial compile) |
+| `rebuild` | int | 1-based monotonic rebuild counter. **Logged ordinals may have gaps**: a rebuild that finds no sources consumes an ordinal but writes no record, so the first record is not guaranteed to be `rebuild: 1` |
 | `initial` | bool | initial compile vs change-triggered rebuild |
 | `compiled` | int | files compiled this rebuild |
 | `skipped` | int | files served from the incremental cache |
 | `anyErrors` | bool | rebuild had errors |
-| `latencyMs` | int | rebuild start → NDJSON envelope written. **Excludes the debounce window by definition** — debounce is a configured delay, not feedback cost |
+| `latencyMs` | int | rebuild start → NDJSON envelope written under `--format json`. Under `--format text` no envelope exists and the boundary is rebuild start → compile end — M-L1 measurement runs use `--format json`. **Excludes the debounce window by definition** — debounce is a configured delay, not feedback cost |
 | `debounceMs` | int | the configured debounce, recorded alongside so reported numbers carry their config |
 
 A rebuild that finds no sources emits no envelope and no record. Machine

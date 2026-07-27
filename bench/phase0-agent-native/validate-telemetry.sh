@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# validate-telemetry.sh <journal.jsonl> [more.jsonl ...]
+# validate-telemetry.sh [--expect <discriminator>] <journal.jsonl> [more.jsonl ...]
 #
 # Validates every line of the given telemetry file(s), dispatching on each
 # record's "schema" discriminator (loop plan D4.1/D4.2; latency streams per
@@ -9,11 +9,17 @@
 #   mcp-write/1 | mcp-write/2   -> mcp-write.schema.json
 #   watch-rebuild/1             -> watch-rebuild.schema.json
 #
+# --expect <discriminator> additionally asserts stream purity: every record
+# must carry exactly that discriminator (restores the old tool's "v2-only
+# journal" guarantee — a misrouted record type in a single-stream file is
+# an error, not a valid line).
+#
 # Strategy (no new dependencies assumed):
 #   1. python3 + jsonschema installed  -> full JSON Schema validation
 #   2. python3 only                    -> hand-rolled check: full field
 #      semantics for loop-telemetry/2; generic required/allowed/type/enum
-#      checks derived from the schema file for the flat record types
+#      checks (including const-discriminated if/then/else conditionals)
+#      derived from the schema file for the flat record types
 #   3. no python3                      -> clear failure message, exit 3
 #
 # Records with no "schema" field (v1) or an unknown discriminator are
@@ -23,7 +29,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-[[ $# -ge 1 ]] || { echo "Usage: validate-telemetry.sh <journal.jsonl> [more.jsonl ...]" >&2; exit 2; }
+EXPECT=""
+if [[ "${1:-}" == "--expect" ]]; then
+    [[ $# -ge 2 ]] || { echo "--expect needs a discriminator" >&2; exit 2; }
+    EXPECT="$2"
+    shift 2
+fi
+
+[[ $# -ge 1 ]] || { echo "Usage: validate-telemetry.sh [--expect <discriminator>] <journal.jsonl> [more.jsonl ...]" >&2; exit 2; }
 for s in loop-telemetry.schema.json mcp-write.schema.json watch-rebuild.schema.json; do
     [[ -f "$SCRIPT_DIR/$s" ]] || { echo "Schema not found: $SCRIPT_DIR/$s" >&2; exit 2; }
 done
@@ -37,13 +50,14 @@ if ! command -v python3 >/dev/null 2>&1; then
     exit 3
 fi
 
-python3 - "$SCRIPT_DIR" "$@" <<'PYEOF'
+python3 - "$SCRIPT_DIR" "$EXPECT" "$@" <<'PYEOF'
 import json
 import re
 import sys
 
 script_dir = sys.argv[1]
-files = sys.argv[2:]
+expect = sys.argv[2] or None
+files = sys.argv[3:]
 
 
 def load(name):
@@ -71,17 +85,46 @@ except ImportError:
     MECH_ENUM = {"raw", "mcp-file", "mcp-node", "unknown"}
     VERDICT_ENUM = {"applied", "rejected", None}
 
+    def _is_integer(v):
+        # JSON Schema semantics: an integer-valued float satisfies
+        # "integer" (draft 2020-12) — the fallback must agree with the
+        # jsonschema path so a file cannot pass on one machine and fail
+        # on another.
+        if isinstance(v, bool):
+            return False
+        return isinstance(v, int) or (isinstance(v, float) and v.is_integer())
+
     def check_generic(record, schema):
         """Required/allowed/type/enum checks for flat record schemas
-        (mcp-write, watch-rebuild) derived from the schema document."""
+        (mcp-write, watch-rebuild) derived from the schema document,
+        including const-discriminated if/then/else conditionals."""
         errs = []
         allowed = set(schema["properties"].keys())
-        for k in schema["required"]:
+        required = list(schema["required"])
+        forbidden = set()
+
+        # if/then/else limited to the shape our schemas use: `if` matching
+        # a const on one property; `then` adding required fields; `else`
+        # forbidding fields via `"field": false`.
+        cond = schema.get("if")
+        if cond:
+            matches = all(
+                record.get(k) == spec.get("const")
+                for k, spec in cond.get("properties", {}).items())
+            branch = schema.get("then") if matches else schema.get("else")
+            if branch:
+                required += branch.get("required", [])
+                forbidden |= {k for k, spec in branch.get("properties", {}).items()
+                              if spec is False}
+
+        for k in required:
             if k not in record:
                 errs.append(f"missing required field: {k}")
         for k in record:
             if k not in allowed:
                 errs.append(f"unexpected field (additionalProperties=false): {k}")
+            elif k in forbidden:
+                errs.append(f"field not allowed for this schema version: {k}")
         if errs:
             return errs
         for k, v in record.items():
@@ -95,7 +138,7 @@ except ImportError:
                 types = types if isinstance(types, list) else [types]
                 ok = any(
                     (t == "string" and isinstance(v, str))
-                    or (t == "integer" and isinstance(v, int) and not isinstance(v, bool))
+                    or (t == "integer" and _is_integer(v))
                     or (t == "boolean" and isinstance(v, bool))
                     or (t == "null" and v is None)
                     for t in types)
@@ -104,7 +147,7 @@ except ImportError:
                     continue
             if isinstance(v, str) and "minLength" in spec and len(v) < spec["minLength"]:
                 errs.append(f"{k} shorter than minLength {spec['minLength']}")
-            if isinstance(v, int) and not isinstance(v, bool) and "minimum" in spec and v < spec["minimum"]:
+            if _is_integer(v) and "minimum" in spec and v < spec["minimum"]:
                 errs.append(f"{k} below minimum {spec['minimum']}")
         return errs
 
@@ -204,6 +247,10 @@ for path in files:
             if discriminator not in SCHEMAS:
                 bad += 1
                 print(f"{path}:{lineno}: unknown or missing schema discriminator: {discriminator!r}")
+                continue
+            if expect is not None and discriminator != expect:
+                bad += 1
+                print(f"{path}:{lineno}: stream purity: expected {expect!r}, got {discriminator!r}")
                 continue
             errors = check(record, discriminator)
             if errors:

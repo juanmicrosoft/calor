@@ -144,7 +144,9 @@ internal sealed class WatchSession
     private bool _clearCachePending;
     private int _rebuildCount;
     private readonly string? _rebuildLogPath;
-    private readonly object _rebuildLogSync = new();
+    // Process-wide, matching FileWriteTool.WriteLogSync: two sessions in
+    // one process pointed at the same log must not interleave appends.
+    private static readonly object RebuildLogSync = new();
 
     /// <summary>Raised after every rebuild (including the initial compile). Test hook.</summary>
     internal event Action<RebuildResult>? RebuildCompleted;
@@ -413,7 +415,7 @@ internal sealed class WatchSession
                 debounceMs = _settings.DebounceMs
             });
 
-            lock (_rebuildLogSync)
+            lock (RebuildLogSync)
             {
                 File.AppendAllText(_rebuildLogPath, record + Environment.NewLine);
             }
