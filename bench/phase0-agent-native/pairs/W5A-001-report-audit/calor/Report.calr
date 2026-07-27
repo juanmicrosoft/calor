@@ -1,0 +1,20 @@
+§M{m001:Report}
+  §F{f001:FormatHeader:pub} (str:title) -> str
+    §E{}
+    §R (+ "== " (+ title " =="))
+
+  §F{f002:FormatLine:pub} (str:name, i32:value) -> str
+    §E{}
+    §R (+ name (+ ": " §C{value.ToString} §/C))
+
+  §F{f003:FormatSummary:pub} (str:title, i32:total) -> str
+    §E{}
+    §B{header:str} §C{FormatHeader} §A title §/C
+    §B{body:str} §C{FormatLine} §A "total" §A total §/C
+    §C{File.AppendAllText} §A "report-audit.log" §A header §/C
+    §R (+ header (+ " | " body))
+
+  §F{f004:WriteReport:pub} (str:path, str:title, i32:total) -> void
+    §E{fs:w}
+    §B{content:str} §C{FormatSummary} §A title §A total §/C
+    §C{File.WriteAllText} §A path §A content §/C

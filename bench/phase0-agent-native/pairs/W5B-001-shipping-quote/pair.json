@@ -1,0 +1,46 @@
+{
+  "id": "W5B-001-shipping-quote",
+  "category": "W5",
+  "spec": "spec.md",
+  "defect": "defect.json",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "smoke": {
+    "path": "smoke"
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 7,
+    "calorDeclCount": 7,
+    "csharpComplexity": 10,
+    "calorComplexity": 10,
+    "notes": "WS5 probe pair (loop plan D5.1, class W5-B). Counted on the reference solutions: 1 module/static class + 6 functions; complexity 1 per function + 1 per branch: QuoteWithSurcharge 2, QuoteWithFloor 2, others 1 = 10 per arm. Starting fixtures are the identical 4-function module in both arms, both carrying the injected boundary defect. Probe pairs are never gate-eligible: they exist to measure M-W1/PP-W1 (gates doc Annex A-1.2), not the language gates.",
+    "startingFixture": {
+      "csharpDeclCount": 5,
+      "calorDeclCount": 5,
+      "csharpComplexity": 6,
+      "calorComplexity": 6
+    }
+  },
+  "wedgeWhitelistCheck": "One contract: §S (<= result cap) on QuoteWithSurcharge — scalar i32 comparison against a parameter, inside the Z3-modeled forms whitelist. Per Annex A-1.2 the probe's catch channel is the Debug-mode RUNTIME guard, not static verification (#807 refutes result-referencing postconditions spuriously; not build-blocking). No preconditions (a Proven precondition elides its guard, #755). All code is pure and first-order: no effects, no delegates, no dispatch.",
+  "gateEligible": false,
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

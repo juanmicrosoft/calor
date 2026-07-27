@@ -1,0 +1,46 @@
+{
+  "id": "W5C-001-catalog-cache",
+  "category": "W5",
+  "spec": "spec.md",
+  "defect": "defect.json",
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "heldOut": true
+  },
+  "smoke": {
+    "path": "smoke"
+  },
+  "arms": {
+    "csharp": {
+      "fixture": "csharp",
+      "toolkit": "full"
+    },
+    "calor": {
+      "fixture": "calor",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "parity": {
+    "csharpDeclCount": 9,
+    "calorDeclCount": 9,
+    "csharpComplexity": 12,
+    "calorComplexity": 12,
+    "notes": "WS5 probe pair (loop plan D5.1, class W5-C). Counted on the reference solutions: 1 module/static class + 8 functions; complexity 1 per function + 1 per branch: ReadSnapshot 2, HasCatalog 2, others 1 = 12 per arm. Starting fixtures are the identical single-module six-function project in both arms, both carrying the injected defect. Probe pairs are never gate-eligible: they exist to measure M-W1/PP-W1 (gates doc Annex A-1.2), not the language gates.",
+    "startingFixture": {
+      "csharpDeclCount": 7,
+      "calorDeclCount": 7,
+      "csharpComplexity": 10,
+      "calorComplexity": 10
+    }
+  },
+  "wedgeWhitelistCheck": "No contracts (W5-C probes the effect-laundering boundary, not the prover). Effect boundaries are bcl-io manifest-covered: File.WriteAllText -> fs:w; File.Exists / File.ReadAllText -> fs:r. The laundering edge is a bare-name first-order intra-module call chain (LoadSummary -> SaveSnapshot -> File.WriteAllText) - EffectEnforcementPass's covered path per Annex A-1.2's scope guards; no delegates, no lambdas, no dispatch. The callee's own fs:w declaration is honest; the violated declaration is the caller's.",
+  "gateEligible": false,
+  "iterationBudget": 10,
+  "timeoutSeconds": 600
+}

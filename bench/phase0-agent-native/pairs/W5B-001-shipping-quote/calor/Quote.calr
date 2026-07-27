@@ -1,0 +1,22 @@
+§M{m001:Quote}
+  §F{f001:BaseFee:pub} (i32:weight) -> i32
+    §E{}
+    §R (* weight 3)
+
+  §F{f002:DistanceFee:pub} (i32:distance) -> i32
+    §E{}
+    §R (* distance 2)
+
+  §F{f003:QuoteWithSurcharge:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
+    §E{}
+    §S (<= result cap)
+    §B{total:i32} (+ baseAmount surcharge)
+    §IF{if1} (> total (+ cap 10))
+      §R cap
+    §R total
+
+  §F{f004:QuoteTotal:pub} (i32:weight, i32:distance, i32:cap) -> i32
+    §E{}
+    §B{baseAmount:i32} §C{BaseFee} §A weight §/C
+    §B{extra:i32} §C{DistanceFee} §A distance §/C
+    §R §C{QuoteWithSurcharge} §A baseAmount §A extra §A cap §/C

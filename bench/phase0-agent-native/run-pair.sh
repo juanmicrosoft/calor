@@ -259,6 +259,39 @@ EOF
 </Project>
 EOF
 
+    # WS5 probe pairs (loop plan D5.1): arm-shared, agent-visible smoke
+    # suite, materialized next to src with its own starting-surface shim so
+    # it compiles against the starter fixture from iteration zero. Same
+    # suite bytes in both arms — the probe's fairness requirement.
+    if [[ -d "$PAIR_DIR/smoke" ]]; then
+        mkdir -p "$ws/smoke"
+        cp "$PAIR_DIR"/smoke/*.cs "$ws/smoke/" 2>/dev/null || true
+        cp "$PAIR_DIR/smoke/shims/SmokeShim.$ARM.cs" "$ws/smoke/SmokeShim.cs"
+        cat > "$ws/smoke/Smoke.csproj" <<EOF
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Src">
+      <HintPath>$ws/src/bin/Debug/net10.0/Src.dll</HintPath>
+    </Reference>
+    <Reference Include="Calor.Runtime" Condition="Exists('$ws/src/bin/Debug/net10.0/Calor.Runtime.dll')">
+      <HintPath>$ws/src/bin/Debug/net10.0/Calor.Runtime.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
+EOF
+    fi
+
     # .g.cs write-block for the calor arm (gates doc §1) via Claude hook config.
     # With --edit-mechanism mcp-file the same PreToolUse hook additionally
     # blocks direct Edit/Write on .calr files, steering the agent to the calor
@@ -673,6 +706,38 @@ extract_metrics() {
         tokens_out=$(jq -r '.usage.output_tokens // 0' "$ws_out/agent.json")
     fi
 
+    # WS5 defect probe (loop plan D5.1, Annex A-1.2 M-W1): pass/fail of the
+    # per-defect held-out probe test at declared-done. caught=true iff the
+    # probe test passes against the final state; a non-compiling final
+    # state counts as not-caught (consistent with the all-failing held-out
+    # rule). Runs as its own filtered dotnet-test so the per-test outcome
+    # is crisp — the aggregate stream only carries counts. null for pairs
+    # without a defect manifest.
+    local defect=null
+    if [[ -f "$PAIR_DIR/defect.json" ]]; then
+        local probe_test defect_caught=false
+        probe_test=$(jq -r '.probeTest' "$PAIR_DIR/defect.json")
+        if [[ $final_fail -eq 0 ]]; then
+            defect_caught=true
+        else
+            # caught=true requires the probe test to have RUN and PASSED:
+            # exit code alone is unreliable (a filter matching zero tests,
+            # or a failed heldout build, can still exit 0), so demand the
+            # explicit "Passed: 1" summary line.
+            CALOR_P0_SHIM_OFF=1 dotnet test "$ws_out/heldout/HeldOut.csproj" \
+                --filter "FullyQualifiedName=$probe_test" --nologo \
+                > "$ws_out/.probe_final.txt" 2>&1 || true
+            if grep -qE 'Passed:[[:space:]]+1\b' "$ws_out/.probe_final.txt" \
+               && ! grep -qE 'Failed:[[:space:]]+[1-9]' "$ws_out/.probe_final.txt"; then
+                defect_caught=true
+            fi
+        fi
+        defect=$(jq -n --arg id "$(jq -r '.id' "$PAIR_DIR/defect.json")" \
+                       --arg class "$(jq -r '.class' "$PAIR_DIR/defect.json")" \
+                       --arg test "$probe_test" --argjson caught "$defect_caught" \
+                       '{id:$id, class:$class, probeTest:$test, caught:$caught}')
+    fi
+
     # v2 telemetry surfacing (loop plan D4.2): mean agent-visible feedback
     # latency over the run's v2 records, and — calor arm only — whether every
     # record's build produced a valid envelope. null when no v2 records exist
@@ -716,12 +781,13 @@ extract_metrics() {
         --argjson null_agent "$NULL_AGENT" \
         --argjson mean_lat "$mean_lat" --argjson env_all "$envelope_valid_all" \
         --argjson mcp_writes "$mcp_writes" \
+        --argjson defect "$defect" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:$success,
           escapedBugs:$escaped, heldoutPassed:$passed,
           iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
           invalid:false,
           meanFeedbackLatencyMs:$mean_lat, envelopeValidAll:$env_all,
-          mcpWrites:$mcp_writes,
+          mcpWrites:$mcp_writes, defect:$defect,
           tokens:{input:$tin, output:$tout}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
@@ -741,7 +807,7 @@ write_invalid_result() {
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
           escapedBugs:$escaped, heldoutPassed:0,
           iterations:0, iterationsToGreen:$itg, censored:true,
-          invalid:true,
+          invalid:true, defect:null,
           tokens:{input:0, output:0}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
