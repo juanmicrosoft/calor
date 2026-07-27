@@ -1,0 +1,3 @@
+2026-07-26T23:30:21Z attempt=0 agent_rc=1: agent output matches error marker: "api error"
+2026-07-26T23:51:13Z attempt=1 agent_rc=137: agent.json missing or empty
+2026-07-27T00:01:15Z attempt=2 agent_rc=137: agent.json missing or empty

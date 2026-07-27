@@ -1,0 +1,9 @@
+[
+  {
+    "arm": "calor+mcp-file",
+    "runs": 6,
+    "successRate": 0.8333333333333334,
+    "meanEscaped": 4,
+    "censoredFraction": 0.16666666666666666
+  }
+]

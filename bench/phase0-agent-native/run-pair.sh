@@ -301,6 +301,9 @@ EOF
     # server with a particular CWD (review of #799 item 1): a wrong implicit
     # root would silently reject every task-tree write and fabricate the
     # guaranteed-failure data the old gate existed to prevent.
+    # NB: --root also puts the workspace path in the server's ARGV, which is
+    # what lets kill_agent_tree's pattern escalation reach an orphaned server
+    # (pkill -f matches command lines, not env) — do not move it to env-only.
     if [[ "$ARM" == "calor" && "$EDIT_MECHANISM" == "mcp-file" && $NULL_AGENT -eq 0 ]]; then
         jq -n --arg dll "$CALOR_CLI_DLL" --arg root "$ws/src" \
               --arg log "$ws_out/mcp-writes.jsonl" --arg rej "$ws_out/rejects" \
@@ -505,11 +508,17 @@ EOF
 # ---------------------------------------------------------------------------
 # Kill an agent process and everything under it, with verification.
 # $1 = root pid (the agent subshell, a process-group leader under set -m);
-# $2 = the run's workspace dir — a mktemp path unique to this run, so a
-# pattern kill scoped to it can only hit this run's processes (claude, the
-# MCP server whose --root/args embed it, shim children).
+# $2 = the run's workspace dir — a mktemp path unique to this run;
+# $3 (optional) = the run's out dir, equally unique.
+# The pattern escalation matches ARGV, not env (pkill/pgrep -f semantics —
+# review of #800 item 1): it reaches the MCP server only because the server
+# registration passes the workspace root on the command line
+# (`mcp --stdio --root $ws/src` — see the jq config block), and reaches the
+# shim wrapper via its $ws_out/.shim path. If either stops being
+# argv-visible, this fallback silently loses that process — keep them
+# coupled.
 kill_agent_tree() {
-    local root="$1" ws_path="$2"
+    local root="$1" ws_path="$2" out_path="${3:-}"
     # Collect descendants BEFORE killing: killing the root first would
     # reparent children to init and lose them.
     local all="" frontier="$root" next p depth
@@ -529,9 +538,11 @@ kill_agent_tree() {
     kill -9 $root $all 2>/dev/null || true
 
     sleep 1
-    if kill -0 "$root" 2>/dev/null || pgrep -f "$ws_path" >/dev/null 2>&1; then
+    if kill -0 "$root" 2>/dev/null || pgrep -f "$ws_path" >/dev/null 2>&1 \
+        || { [[ -n "$out_path" ]] && pgrep -f "$out_path" >/dev/null 2>&1; }; then
         echo "watchdog: survivors detected after tree kill; pattern-killing processes matching $ws_path" >&2
         pkill -9 -f "$ws_path" 2>/dev/null || true
+        [[ -n "$out_path" ]] && pkill -9 -f "$out_path" 2>/dev/null || true
     fi
 }
 
@@ -611,7 +622,7 @@ run_agent() {
         while kill -0 "$agent_pid" 2>/dev/null; do
             if (( SECONDS >= deadline )); then
                 echo "watchdog: agent exceeded ${TIMEOUT_SECS}s; killing pid $agent_pid and descendants" >&2
-                kill_agent_tree "$agent_pid" "$ws"
+                kill_agent_tree "$agent_pid" "$ws" "$ws_out"
                 break
             fi
             sleep 5
