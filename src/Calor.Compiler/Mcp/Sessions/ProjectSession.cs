@@ -160,6 +160,21 @@ internal sealed class ProjectSession
     }
 
     /// <summary>
+    /// The session's state for <paramref name="absolutePath"/>, or null when
+    /// the file is not part of the session. Lets the write path reuse the
+    /// cached parse instead of re-parsing on-disk content the session
+    /// already holds (WS3 D3.1).
+    /// </summary>
+    public SessionFileState? TryGetFile(string absolutePath)
+    {
+        var path = Path.GetFullPath(absolutePath);
+        lock (_sync)
+        {
+            return _files.TryGetValue(path, out var state) ? state : null;
+        }
+    }
+
+    /// <summary>
     /// Records the result of an applied write, so subsequent checks in this
     /// session see the new content without re-reading the file.
     /// </summary>
@@ -183,12 +198,25 @@ internal sealed class SessionFileState
     /// <summary>Matches McpToolBase.MaxSourceLength — a session refuses to load what a tool refuses to accept.</summary>
     internal const long MaxFileBytes = 512 * 1024;
 
+    private static readonly IReadOnlySet<string> NoTargets = new HashSet<string>();
+
+    private readonly Lazy<IReadOnlySet<string>> _callTargets;
+
     public string Path { get; }
     public string Source { get; }
     public string ContentHash { get; }
     public DateTime LastWriteUtc { get; set; }
     public long FileSize { get; set; }
     public ParseResult Parse { get; }
+
+    /// <summary>
+    /// Warm call-target index over <see cref="Parse"/> (WS3 D3.1): computed
+    /// at most once per parse state, so repeated project-reference checks do
+    /// not re-walk this file's AST. A new state (reparse or applied write)
+    /// gets a fresh lazy — the index can never outlive the AST it was
+    /// derived from. Empty when the file has no AST.
+    /// </summary>
+    public IReadOnlySet<string> CallTargets => _callTargets.Value;
 
     public SessionFileState(string path, string source, string contentHash,
         DateTime lastWriteUtc, long fileSize, ParseResult parse)
@@ -199,6 +227,9 @@ internal sealed class SessionFileState
         LastWriteUtc = lastWriteUtc;
         FileSize = fileSize;
         Parse = parse;
+        _callTargets = new Lazy<IReadOnlySet<string>>(
+            () => parse.Ast == null ? NoTargets : EditPreviewTool.CollectCallTargets(parse.Ast),
+            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public static SessionFileState Load(string path)

@@ -469,6 +469,78 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
         Assert.Equal("safe", second.GetProperty("verdict").GetString());
     }
 
+    // ── Warm derived session state (WS3 D3.1) ───────────────────────────
+
+    [Fact]
+    public async Task WarmOriginalParse_ReusesCachedParse_WhenHashMatches()
+    {
+        var mathPath = WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+        var canonical = CanonicalPath.Resolve(mathPath);
+        var cached = session.TryGetFile(canonical);
+        Assert.NotNull(cached);
+
+        var warm = FileWriteTool.WarmOriginalParse(session, canonical, MathSource);
+        Assert.Same(cached!.Parse, warm);
+
+        // Content mismatch (the stat-preserving-edit scenario): must fall
+        // back to a cold parse, never serve the stale cached AST.
+        var cold = FileWriteTool.WarmOriginalParse(session, canonical, MathSourceWithoutAdd);
+        Assert.NotSame(cached.Parse, cold);
+        Assert.True(cold.IsSuccess);
+    }
+
+    [Fact]
+    public async Task SessionFileState_CallTargets_ComputedOncePerParseState()
+    {
+        var callerPath = WriteFile("caller.calr", CallerSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+        var canonical = CanonicalPath.Resolve(callerPath);
+
+        var state = session.TryGetFile(canonical)!;
+        Assert.Contains("add", state.CallTargets);
+        Assert.Same(state.CallTargets, state.CallTargets);
+
+        // A reparse (stat + content change) must produce a fresh index from
+        // the new AST — the warm index never outlives its parse state.
+        File.WriteAllText(callerPath, OtherSource);
+        File.SetLastWriteTimeUtc(callerPath, DateTime.UtcNow.AddSeconds(5));
+        session.Refresh();
+
+        var reparsed = session.TryGetFile(canonical)!;
+        Assert.NotSame(state, reparsed);
+        Assert.DoesNotContain("add", reparsed.CallTargets);
+    }
+
+    [Fact]
+    public async Task FileWrite_WarmProjectReferenceCheck_KeepsVerdictParityAcrossCalls()
+    {
+        // The project-reference walk consumes the warm call-target index: a
+        // repeated breaking write must keep rejecting (index reused across
+        // calls), and once the caller changes behind the session's back the
+        // same write must apply (index invalidated with its parse state).
+        var mathPath = WriteFile("math.calr", MathSource);
+        var callerPath = WriteFile("caller.calr", CallerSource);
+        var sessionId = await OpenSessionAsync();
+
+        var first = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
+        var second = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
+        Assert.Equal("breaking", first.GetProperty("verdict").GetString());
+        Assert.Equal("breaking", second.GetProperty("verdict").GetString());
+
+        File.WriteAllText(callerPath, OtherSource);
+        File.SetLastWriteTimeUtc(callerPath, DateTime.UtcNow.AddSeconds(5));
+
+        var third = Payload(await WriteTool
+            .ExecuteAsync(Args(new { path = mathPath, content = MathSourceWithoutAdd, sessionId })));
+        Assert.True(third.GetProperty("applied").GetBoolean());
+        Assert.Equal("safe", third.GetProperty("verdict").GetString());
+    }
+
     // ── Write telemetry (M-L2 / M-L4 stream) ────────────────────────────
 
     [Fact]

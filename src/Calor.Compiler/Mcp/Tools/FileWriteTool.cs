@@ -210,7 +210,7 @@ public sealed class FileWriteTool : McpToolBase
         // logic keys off IsSuccess and is unaffected — a partial AST never
         // upgrades a breaking edit.
         var originalParse = originalSource.Length > 0
-            ? CalorSourceHelper.ParseTolerant(originalSource, canonicalPath)
+            ? WarmOriginalParse(session, canonicalPath, originalSource)
             : null;
         var modifiedParse = CalorSourceHelper.ParseTolerant(finalContent, canonicalPath);
 
@@ -309,6 +309,23 @@ public sealed class FileWriteTool : McpToolBase
     }
 
     /// <summary>
+    /// Warm-path original parse (WS3 D3.1): when the session already holds
+    /// this file with identical content — hash-verified against the bytes
+    /// just read, so a stat-preserving edit cannot slip a stale AST in —
+    /// the cached ParseResult is reused instead of re-parsing. Falls back
+    /// to a cold tolerant parse. Verdict-neutral either way: the cached
+    /// result came from the same ParseTolerant over the same bytes.
+    /// </summary>
+    internal static ParseResult WarmOriginalParse(ProjectSession? session, string canonicalPath, string originalSource)
+    {
+        var cached = session?.TryGetFile(canonicalPath);
+        if (cached != null && cached.ContentHash == SessionFileState.HashContent(originalSource))
+            return cached.Parse;
+
+        return CalorSourceHelper.ParseTolerant(originalSource, canonicalPath);
+    }
+
+    /// <summary>
     /// Project-wide half of the reference check (D2.1 + D2.4): declarations
     /// this edit removes must not still be referenced by other files in the
     /// session. Functions are matched against actual call targets in each
@@ -343,10 +360,11 @@ public sealed class FileWriteTool : McpToolBase
                 // exists — tolerant parsing (D2.5) gives broken neighbors a
                 // best-effort AST too, so a string-literal mention in a broken
                 // file does not veto the write. Only a file with no AST at
-                // all falls back to whole-word text.
+                // all falls back to whole-word text. The index is the
+                // session's warm per-file cache (WS3 D3.1), not a fresh walk.
                 if (file.Parse.Ast != null)
                 {
-                    var callTargets = EditPreviewTool.CollectCallTargets(file.Parse.Ast);
+                    var callTargets = file.CallTargets;
                     var qualifier = file.Parse.IsSuccess ? "" : " (file has parse errors)";
                     foreach (var name in removedFunctions.Where(callTargets.Contains))
                     {
