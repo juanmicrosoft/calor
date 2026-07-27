@@ -1,0 +1,97 @@
+§M{m304:L3M04}
+
+  §F{f001:l3m04_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 40)
+
+  §F{f002:l3m04_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 5)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if02} (> acc 23948)
+      §R (+ acc 23948)
+    §EL
+      §R (+ (* acc 2) 23948)
+
+  §F{f003:l3m04_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 5)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if03} (> acc 23955)
+      §R (+ acc 23955)
+    §EL
+      §R (+ (* acc 2) 23955)
+
+  §F{f004:l3m04_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 28)
+
+  §F{f005:l3m04_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 5)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if05} (> acc 23962)
+      §R (+ acc 23962)
+    §EL
+      §R (+ (* acc 2) 23962)
+
+  §F{f006:l3m04_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if06} (> acc 23969)
+      §R (+ acc 23969)
+    §EL
+      §R (+ (* acc 2) 23969)
+
+  §F{f007:l3m04_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 18)
+
+  §F{f008:l3m04_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 8)
+
+  §F{f009:l3m04_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 7)
+    §S (>= x 8)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if09} (> acc 23976)
+      §R (+ acc 23976)
+    §EL
+      §R (+ (* acc 2) 23976)
+
+  §F{f010:l3m04_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 62)
+
+  §F{f011:l3m04_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 47)
+
+  §F{f012:l3m04_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 69)
+
+  §F{f013:l3m04_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 5)
+    §Q (>= y 0)
+    §S (>= x 3)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if13} (> acc 23983)
+      §R (+ acc 23983)
+    §EL
+      §R (+ (* acc 2) 23983)

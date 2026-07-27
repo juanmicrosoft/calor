@@ -1,0 +1,4 @@
+# Measurement byproducts — the committed fixture is .calr sources only.
+*.g.cs
+.calor-build-state.json
+.calor/

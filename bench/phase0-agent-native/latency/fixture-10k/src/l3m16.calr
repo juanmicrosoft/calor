@@ -1,0 +1,94 @@
+§M{m316:L3M16}
+
+  §F{f001:l3m16_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 27)
+
+  §F{f002:l3m16_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 8)
+    §Q (>= y 0)
+    §S (>= x 6)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if02} (> acc 24585)
+      §R (+ acc 24585)
+    §EL
+      §R (+ (* acc 2) 24585)
+
+  §F{f003:l3m16_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 23)
+
+  §F{f004:l3m16_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 16)
+
+  §F{f005:l3m16_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 3)
+    §S (>= x 4)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if05} (> acc 24592)
+      §R (+ acc 24592)
+    §EL
+      §R (+ (* acc 2) 24592)
+
+  §F{f006:l3m16_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if06} (> acc 24599)
+      §R (+ acc 24599)
+    §EL
+      §R (+ (* acc 2) 24599)
+
+  §F{f007:l3m16_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 76)
+
+  §F{f008:l3m16_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 43)
+
+  §F{f009:l3m16_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 45)
+
+  §F{f010:l3m16_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 27)
+
+  §F{f011:l3m16_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 4)
+    §Q (>= y 0)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if11} (> acc 24606)
+      §R (+ acc 24606)
+    §EL
+      §R (+ (* acc 2) 24606)
+
+  §F{f012:l3m16_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 45)
+
+  §F{f013:l3m16_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 3)
+    §Q (>= y 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if13} (> acc 24613)
+      §R (+ acc 24613)
+    §EL
+      §R (+ (* acc 2) 24613)

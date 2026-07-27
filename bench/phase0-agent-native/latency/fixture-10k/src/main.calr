@@ -1,0 +1,16 @@
+§M{m001:Main}
+
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §B{r1:i32} §C{l1m01_fn09} §A INT:3 §A INT:1 §/C
+    §B{r2:i32} §C{l1m25_fn10} §A INT:6 §A INT:2 §/C
+    §B{r3:i32} §C{l1m18_fn10} §A INT:9 §A INT:3 §/C
+    §B{r4:i32} §C{l1m21_fn02} §A INT:12 §A INT:4 §/C
+    §B{r5:i32} §C{l1m28_fn10} §A INT:15 §A INT:5 §/C
+    §B{r6:i32} §C{l1m05_fn13} §A INT:18 §A INT:6 §/C
+    §P r1
+    §P r2
+    §P r3
+    §P r4
+    §P r5
+    §P r6

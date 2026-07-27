@@ -1,0 +1,99 @@
+§M{m329:L3M29}
+
+  §F{f001:l3m29_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 88)
+
+  §F{f002:l3m29_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 5)
+
+  §F{f003:l3m29_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 17)
+
+  §F{f004:l3m29_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 34)
+
+  §F{f005:l3m29_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if05} (> acc 25313)
+      §R (+ acc 25313)
+    §EL
+      §R (+ (* acc 2) 25313)
+
+  §F{f006:l3m29_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 4)
+    §Q (>= y 0)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if06} (> acc 25320)
+      §R (+ acc 25320)
+    §EL
+      §R (+ (* acc 2) 25320)
+
+  §F{f007:l3m29_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 60)
+
+  §F{f008:l3m29_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if08} (> acc 25327)
+      §R (+ acc 25327)
+    §EL
+      §R (+ (* acc 2) 25327)
+
+  §F{f009:l3m29_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 44)
+
+  §F{f010:l3m29_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 70)
+
+  §F{f011:l3m29_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 6)
+    §S (>= x 7)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if11} (> acc 25334)
+      §R (+ acc 25334)
+    §EL
+      §R (+ (* acc 2) 25334)
+
+  §F{f012:l3m29_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 1)
+    §Q (>= y 0)
+    §S (>= x 0)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if12} (> acc 25341)
+      §R (+ acc 25341)
+    §EL
+      §R (+ (* acc 2) 25341)
+
+  §F{f013:l3m29_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 3)
+    §Q (>= y 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if13} (> acc 25348)
+      §R (+ acc 25348)
+    §EL
+      §R (+ (* acc 2) 25348)

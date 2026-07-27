@@ -1,0 +1,102 @@
+§M{m121:L1M21}
+
+  §F{f001:l1m21_fn01:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 7)
+    §Q (>= y 0)
+    §S (>= x 5)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if01} (> acc 21113)
+      §R (+ acc 21113)
+    §EL
+      §R (+ (* acc 2) 21113)
+
+  §F{f002:l1m21_fn02:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m08_fn03} §A x §A INT:11 §/C
+    §R (+ v1 y)
+
+  §F{f003:l1m21_fn03:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 5)
+    §Q (>= y 0)
+    §S (>= x 3)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if03} (> acc 21120)
+      §R (+ acc 21120)
+    §EL
+      §R (+ (* acc 2) 21120)
+
+  §F{f004:l1m21_fn04:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if04} (> acc 21127)
+      §R (+ acc 21127)
+    §EL
+      §R (+ (* acc 2) 21127)
+
+  §F{f005:l1m21_fn05:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m16_fn09} §A x §A INT:55 §/C
+    §B{v2:i32} §C{l2m20_fn02} §A x §A INT:36 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{f006:l1m21_fn06:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if06} (> acc 21134)
+      §R (+ acc 21134)
+    §EL
+      §R (+ (* acc 2) 21134)
+
+  §F{f007:l1m21_fn07:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= x 5)
+    §Q (>= y 0)
+    §S (>= x 3)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if07} (> acc 21141)
+      §R (+ acc 21141)
+    §EL
+      §R (+ (* acc 2) 21141)
+
+  §F{f008:l1m21_fn08:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m33_fn09} §A x §A INT:86 §/C
+    §R (+ v1 y)
+
+  §F{f009:l1m21_fn09:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m22_fn10} §A x §A INT:23 §/C
+    §R (+ v1 y)
+
+  §F{f010:l1m21_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m20_fn02} §A x §A INT:85 §/C
+    §B{v2:i32} §C{l2m24_fn01} §A x §A INT:74 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{f011:l1m21_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m28_fn02} §A x §A INT:6 §/C
+    §R (+ v1 y)
+
+  §F{f012:l1m21_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 3) y)
+    §IF{if12} (> acc 21148)
+      §R (+ acc 21148)
+    §EL
+      §R (+ (* acc 2) 21148)
+
+  §F{f013:l1m21_fn13:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m12_fn08} §A x §A INT:64 §/C
+    §B{v2:i32} §C{l2m25_fn13} §A x §A INT:27 §/C
+    §R (+ (+ v1 v2) y)
