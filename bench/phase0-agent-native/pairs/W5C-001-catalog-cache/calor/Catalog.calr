@@ -1,0 +1,31 @@
+§M{m001:Catalog}
+  §F{f001:SnapshotLine:pub} (str:name, i32:count) -> str
+    §E{}
+    §R (+ name (+ "=" §C{count.ToString} §/C))
+
+  §F{f002:SaveSnapshot:pub} (str:path, str:name, i32:count) -> void
+    §E{fs:w}
+    §B{line:str} §C{SnapshotLine} §A name §A count §/C
+    §C{File.WriteAllText} §A path §A line §/C
+
+  §F{f003:ReadSnapshot:pub} (str:path) -> str
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if1} (! exists)
+      §R ""
+    §R §C{File.ReadAllText} §A path §/C
+
+  §F{f004:SummaryOf:pub} (str:content) -> str
+    §E{}
+    §R (+ "catalog[" (+ §C{content.Length.ToString} §/C "]"))
+
+  §F{f005:LoadSummary:pub} (str:path) -> str
+    §E{fs:r}
+    §B{content:str} §C{ReadSnapshot} §A path §/C
+    §C{SaveSnapshot} §A "catalog-cache.txt" §A "summary" §A 1 §/C
+    §R §C{SummaryOf} §A content §/C
+
+  §F{f006:HasCatalog:pub} (str:path) -> bool
+    §E{fs:r}
+    §B{content:str} §C{ReadSnapshot} §A path §/C
+    §R (> (len content) 0)

@@ -1,0 +1,16 @@
+{
+  "id": "W5B-003",
+  "class": "W5-B",
+  "claim": "violated scalar contract on inputs the arm-shared smoke suite exercises",
+  "description": "GrantRequests declares result <= maxAllowed (calor: §S; csharp: doc comment 'the returned grant never exceeds maxAllowed') but the injected boundary slip caps only past maxAllowed+5, so grants in (maxAllowed, maxAllowed+5] escape uncapped — the over-grant window. The smoke suite exercises 103 vs maxAllowed 100 (inside the window) while asserting only a range that holds either way.",
+  "coveredPath": "scalar i32 postcondition (result vs parameter comparison) — inside the Z3-modeled forms whitelist; catch channel is the Debug-mode runtime guard per Annex A-1.2 (static-verify channel excluded until #807; postcondition-only per #755)",
+  "calorCatchChannel": "ContractViolationException from the emitted §S guard, thrown during the agent's first smoke-test run (agent-visible test failure)",
+  "probeTest": "QuotaPair.Probe.ProbeTests.Probe_GrantJustOverMax_IsCapped",
+  "acceptance": {
+    "calorFixtureCompiles": true,
+    "calorSmokeFailsWithContractViolation": true,
+    "csharpFixtureBuildsGreen": true,
+    "csharpSmokePassesOnStarter": true,
+    "referencesPassHeldOut": true
+  }
+}

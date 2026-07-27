@@ -1,0 +1,14 @@
+{
+  "id": "W5A-001",
+  "class": "W5-A",
+  "claim": "undeclared side effect on an enforcement-covered path",
+  "description": "FormatSummary is declared pure (calor: §E{}; csharp: doc comment 'Pure: no side effects') but appends to a relative-path audit log via a named static call (File.AppendAllText -> fs:w per the bcl-io manifest).",
+  "coveredPath": "named static BCL call inside a first-order function body — EffectEnforcementPass manifest resolution; no delegates, no dispatch (the excluded holes are not involved)",
+  "calorCatchChannel": "build-blocking Calor0410 with call chain (FormatSummary -> File.AppendAllText), fires on the agent's first build",
+  "probeTest": "ReportPair.Probe.ProbeTests.Probe_FormatSummary_PerformsNoFileWrite",
+  "acceptance": {
+    "calorFixtureBlocksAtBuild": true,
+    "csharpFixtureBuildsGreen": true,
+    "referencesPassHeldOut": true
+  }
+}

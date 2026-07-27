@@ -1,0 +1,32 @@
+§M{m001:Ledger}
+  §F{f001:EntryLine:pub} (str:label, i32:amount) -> str
+    §E{}
+    §R (+ label (+ "=" §C{amount.ToString} §/C))
+
+  §F{f002:AppendEntry:pub} (str:path, str:label, i32:amount) -> void
+    §E{fs:w}
+    §B{line:str} §C{EntryLine} §A label §A amount §/C
+    §B{record:str} (+ line ";")
+    §C{File.AppendAllText} §A path §A record §/C
+
+  §F{f003:ReadLedger:pub} (str:path) -> str
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if1} (! exists)
+      §R ""
+    §R §C{File.ReadAllText} §A path §/C
+
+  §F{f004:ReportOf:pub} (str:content) -> str
+    §E{}
+    §R (+ "ledger[" (+ §C{content.Length.ToString} §/C "]"))
+
+  §F{f005:BalanceReport:pub} (str:path) -> str
+    §E{fs:r}
+    §B{content:str} §C{ReadLedger} §A path §/C
+    §C{AppendEntry} §A "ledger-views.txt" §A "view" §A 1 §/C
+    §R §C{ReportOf} §A content §/C
+
+  §F{f006:HasEntries:pub} (str:path) -> bool
+    §E{fs:r}
+    §B{content:str} §C{ReadLedger} §A path §/C
+    §R (> (len content) 0)

@@ -259,18 +259,99 @@ EOF
 </Project>
 EOF
 
+    # WS5 probe pairs (loop plan D5.1): arm-shared, agent-visible smoke
+    # suite, materialized next to src with its own starting-surface shim so
+    # it compiles against the starter fixture from iteration zero. Same
+    # suite bytes in both arms — the probe's fairness requirement.
+    if [[ -d "$PAIR_DIR/smoke" ]]; then
+        mkdir -p "$ws/smoke"
+        cp "$PAIR_DIR"/smoke/*.cs "$ws/smoke/" 2>/dev/null || true
+        cp "$PAIR_DIR/smoke/shims/SmokeShim.$ARM.cs" "$ws/smoke/SmokeShim.cs"
+        cat > "$ws/smoke/Smoke.csproj" <<EOF
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Src">
+      <HintPath>$ws/src/bin/Debug/net10.0/Src.dll</HintPath>
+    </Reference>
+    <Reference Include="Calor.Runtime" Condition="Exists('$ws/src/bin/Debug/net10.0/Calor.Runtime.dll')">
+      <HintPath>$ws/src/bin/Debug/net10.0/Calor.Runtime.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
+EOF
+        # Integrity baseline: "arm-shared, not agent-editable" is enforced by
+        # (a) the PreToolUse hook below and (b) this hash, re-checked at
+        # extract time and surfaced as smokeTampered (review of #810
+        # finding 4) — the hook covers the primary agent tools, the hash
+        # catches everything else (shell edits, deletion).
+        find "$ws/smoke" -type f -name '*.cs' -exec shasum {} + | shasum | cut -d' ' -f1 \
+            > "$ws_out/.smokehash"
+    fi
+
+    # WS5 probe project (review of #810 findings 1+8): the defect probe test
+    # compiles against the STARTING public surface (it exercises the
+    # defective function, which exists from iteration zero) with its own
+    # csproj — decoupled from the held-out project, whose full-surface shim
+    # cannot compile until the task's new functions exist. This makes
+    # "caught" measure the defect, not task completion.
+    if [[ -d "$PAIR_DIR/tests/probe" ]]; then
+        mkdir -p "$ws_out/probe"
+        cp "$PAIR_DIR"/tests/probe/*.cs "$ws_out/probe/"
+        cp "$PAIR_DIR/smoke/shims/SmokeShim.$ARM.cs" "$ws_out/probe/SmokeShim.cs"
+        sed "s|__WS__|$ws|g" > "$ws_out/probe/Probe.csproj" <<'PROBEPROJ'
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Src"><HintPath>__WS__/src/bin/Debug/net10.0/Src.dll</HintPath></Reference>
+    <Reference Include="Calor.Runtime" Condition="Exists('__WS__/src/bin/Debug/net10.0/Calor.Runtime.dll')">
+      <HintPath>__WS__/src/bin/Debug/net10.0/Calor.Runtime.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
+PROBEPROJ
+    fi
+
     # .g.cs write-block for the calor arm (gates doc §1) via Claude hook config.
     # With --edit-mechanism mcp-file the same PreToolUse hook additionally
     # blocks direct Edit/Write on .calr files, steering the agent to the calor
     # MCP file tools (arm-constraint enforcement, loop plan D4.2). mcp-node is
     # descoped (Call 1/E1) and gets no enforcement; raw is the no-op default.
-    if [[ "$ARM" == "calor" && $NULL_AGENT -eq 0 ]]; then
+    # Probe pairs additionally block edits under the arm-shared smoke suite
+    # in BOTH arms — "fixed, not agent-editable" must be enforced, not
+    # asserted (review of #810 finding 4); the .smokehash re-check at
+    # extract time backstops non-hook edit paths.
+    if [[ ($NULL_AGENT -eq 0) && ( "$ARM" == "calor" || -d "$PAIR_DIR/smoke" ) ]]; then
         mkdir -p "$ws/.claude"
         local calr_block=""
         if [[ "$EDIT_MECHANISM" == "mcp-file" ]]; then
             # NB: this fragment is spliced into a JSON string value below, so
             # the shell double-quotes around \$f must land JSON-escaped (\")
             calr_block="grep -q '\\\\.calr$' <<<\\\"\$f\\\" && { echo 'BLOCKED: this arm requires the calor MCP file tools for .calr edits (edit-mechanism: mcp-file); direct Edit/Write on .calr files is disabled' >&2; exit 2; }; "
+        fi
+        local smoke_block=""
+        if [[ -d "$PAIR_DIR/smoke" ]]; then
+            smoke_block="grep -q '/smoke/' <<<\\\"\$f\\\" && { echo 'BLOCKED: the smoke suite is harness-provided and arm-shared; it is not agent-editable' >&2; exit 2; }; "
         fi
         cat > "$ws/.claude/settings.json" <<EOF
 {
@@ -280,7 +361,7 @@ EOF
         "matcher": "Write|Edit",
         "hooks": [
           { "type": "command",
-            "command": "f=\$(jq -r '.tool_input.file_path // empty'); grep -q '\\\\.g\\\\.cs$' <<<\"\$f\" && { echo 'BLOCKED: .g.cs files are generated; edit the .calr source' >&2; exit 2; }; ${calr_block}exit 0" }
+            "command": "f=\$(jq -r '.tool_input.file_path // empty'); grep -q '\\\\.g\\\\.cs$' <<<\"\$f\" && { echo 'BLOCKED: .g.cs files are generated; edit the .calr source' >&2; exit 2; }; ${calr_block}${smoke_block}exit 0" }
         ]
       }
     ]
@@ -550,7 +631,16 @@ run_agent() {
     local ws="$1" ws_out="$2" shim_dir="$3"
     AGENT_RC=0
     local prompt
-    prompt="You are working in $ws/src. Read $ws/spec.md and complete the task it describes — implementing missing operations and/or modifying existing behavior as specified — in the existing source files, following the conventions already present. The iteration budget is $ITERATION_BUDGET build/test cycles. Build with 'dotnet build' from $ws/src to check your work. Do not create test files; do not modify the project file. Stop when the spec is fully satisfied and the project builds cleanly (the starter already builds, so a clean build alone does not mean you are done)."
+    local test_rule="Do not create test files; do not modify the project file."
+    if [[ -f "$PAIR_DIR/defect.json" ]]; then
+        # WS5 probe pairs (loop plan D5.1): the C# arm's registered toolkit
+        # includes agent-generated tests (strategy §0), and the probe's
+        # fairness story depends on not foreclosing them (review of #810
+        # finding 3). Scratch tests are permitted in both arms and are not
+        # graded; only the project sources under src/ are.
+        test_rule="You may write your own scratch tests anywhere under the workspace (they are not graded; only the sources in src/ are). Do not modify the project file or the provided smoke tests under the smoke directory."
+    fi
+    prompt="You are working in $ws/src. Read $ws/spec.md and complete the task it describes — implementing missing operations and/or modifying existing behavior as specified — in the existing source files, following the conventions already present. The iteration budget is $ITERATION_BUDGET build/test cycles. Build with 'dotnet build' from $ws/src to check your work. $test_rule Stop when the spec is fully satisfied and the project builds cleanly (the starter already builds, so a clean build alone does not mean you are done)."
     if [[ -n "$EXEMPLAR_FILE" ]]; then
         prompt+=$'\n\n'"$(cat "$EXEMPLAR_FILE")"
     fi
@@ -643,8 +733,9 @@ extract_metrics() {
     touch "$journal"
 
     # Final silent held-out run = declared-done state (non-compiling = all fail)
-    local final_pass=0 final_fail=$HELDOUT_TEST_COUNT
+    local final_pass=0 final_fail=$HELDOUT_TEST_COUNT final_build_ok=0
     if CALOR_P0_SHIM_OFF=1 dotnet build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_final.txt" 2>&1; then
+        final_build_ok=1
         if CALOR_P0_SHIM_OFF=1 dotnet test "$ws_out/heldout/HeldOut.csproj" --nologo -v q > "$ws_out/.ho_final.txt" 2>&1; then
             final_fail=0
             final_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_final.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
@@ -671,6 +762,49 @@ extract_metrics() {
     if [[ -f "$ws_out/agent.json" ]] && jq -e '.usage' "$ws_out/agent.json" >/dev/null 2>&1; then
         tokens_in=$(jq -r '.usage.input_tokens // 0' "$ws_out/agent.json")
         tokens_out=$(jq -r '.usage.output_tokens // 0' "$ws_out/agent.json")
+    fi
+
+    # WS5 defect probe (loop plan D5.1, Annex A-1.2 M-W1): pass/fail of the
+    # per-defect held-out probe test at declared-done. caught=true iff the
+    # probe test passes against the final state; a non-compiling final
+    # state counts as not-caught (consistent with the all-failing held-out
+    # rule). Runs as its own filtered dotnet-test so the per-test outcome
+    # is crisp — the aggregate stream only carries counts. null for pairs
+    # without a defect manifest.
+    local defect=null
+    if [[ -f "$PAIR_DIR/defect.json" ]]; then
+        local probe_test defect_caught=false smoke_tampered=false
+        probe_test=$(jq -r '.probeTest' "$PAIR_DIR/defect.json")
+        # caught is adjudicated by the dedicated probe PROJECT (compiles
+        # against the starting surface — decoupled from task completion,
+        # review of #810 finding 8) and ONLY when the final build succeeded:
+        # without that gate the probe would run against a stale Src.dll from
+        # an earlier silent build and could report a false catch on a
+        # non-compiling final state (review of #810 finding 1, demonstrated).
+        # caught=true demands the probe test to have RUN and PASSED — the
+        # explicit "Passed: 1" summary line — because exit codes are
+        # unreliable (zero-match filters and failed builds can exit 0).
+        if [[ $final_build_ok -eq 1 && -d "$ws_out/probe" ]]; then
+            CALOR_P0_SHIM_OFF=1 DOTNET_CLI_UI_LANGUAGE=en dotnet test \
+                "$ws_out/probe/Probe.csproj" --nologo \
+                > "$ws_out/.probe_final.txt" 2>&1 || true
+            if grep -qE 'Passed:[[:space:]]+1\b' "$ws_out/.probe_final.txt" \
+               && ! grep -qE 'Failed:[[:space:]]+[1-9]' "$ws_out/.probe_final.txt"; then
+                defect_caught=true
+            fi
+        fi
+        # Smoke-suite integrity re-check (review of #810 finding 4): the
+        # hook blocks agent-tool edits; this catches shell edits/deletions.
+        if [[ -f "$ws_out/.smokehash" ]]; then
+            local smoke_now
+            smoke_now=$(find "$ws/smoke" -type f -name '*.cs' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
+            [[ "$smoke_now" == "$(cat "$ws_out/.smokehash")" ]] || smoke_tampered=true
+        fi
+        defect=$(jq -n --arg id "$(jq -r '.id' "$PAIR_DIR/defect.json")" \
+                       --arg class "$(jq -r '.class' "$PAIR_DIR/defect.json")" \
+                       --arg test "$probe_test" --argjson caught "$defect_caught" \
+                       --argjson tampered "$smoke_tampered" \
+                       '{id:$id, class:$class, probeTest:$test, caught:$caught, smokeTampered:$tampered}')
     fi
 
     # v2 telemetry surfacing (loop plan D4.2): mean agent-visible feedback
@@ -716,12 +850,13 @@ extract_metrics() {
         --argjson null_agent "$NULL_AGENT" \
         --argjson mean_lat "$mean_lat" --argjson env_all "$envelope_valid_all" \
         --argjson mcp_writes "$mcp_writes" \
+        --argjson defect "$defect" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:$success,
           escapedBugs:$escaped, heldoutPassed:$passed,
           iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
           invalid:false,
           meanFeedbackLatencyMs:$mean_lat, envelopeValidAll:$env_all,
-          mcpWrites:$mcp_writes,
+          mcpWrites:$mcp_writes, defect:$defect,
           tokens:{input:$tin, output:$tout}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
@@ -741,7 +876,7 @@ write_invalid_result() {
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
           escapedBugs:$escaped, heldoutPassed:0,
           iterations:0, iterationsToGreen:$itg, censored:true,
-          invalid:true,
+          invalid:true, defect:null,
           tokens:{input:0, output:0}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
