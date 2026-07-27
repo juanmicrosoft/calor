@@ -538,6 +538,34 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateFile_CaseVariantOfExistingEntry_ReplacesInsteadOfDuplicating()
+    {
+        // Writing through a differently-cased name on a case-insensitive
+        // filesystem must replace the enumerated entry, not insert a
+        // phantom duplicate that project-wide checks would treat as a
+        // neighbor. (The distinct-file guard for case-sensitive volumes is
+        // exercised via DirectoryHasExactEntry: here the directory has no
+        // exact "MATH.calr" entry, so the variant key is reused.)
+        if (OperatingSystem.IsLinux())
+            return;
+
+        var mathPath = WriteFile("math.calr", MathSource);
+        var sessionId = await OpenSessionAsync();
+        var session = _manager.Get(sessionId)!;
+        var countBefore = session.SnapshotFiles().Count;
+
+        // The write path always hands UpdateFile the canonical
+        // (symlink-resolved) path; mirror that here.
+        var upperCased = CanonicalPath.Resolve(Path.Combine(_root, "MATH.calr"));
+        session.UpdateFile(upperCased, MathSourceWithoutAdd,
+            CalorSourceHelper.ParseTolerant(MathSourceWithoutAdd, upperCased));
+
+        Assert.Equal(countBefore, session.SnapshotFiles().Count);
+        var state = session.TryGetFile(CanonicalPath.Resolve(mathPath))!;
+        Assert.Equal(MathSourceWithoutAdd, state.Source);
+    }
+
+    [Fact]
     public async Task Refresh_FileGrownPastCap_BecomesOversizeStub()
     {
         // "A session refuses to load what a tool refuses to accept" must
