@@ -157,11 +157,19 @@ pairing, and censoring follow §2 of this document.
   its dedicated held-out probe test (fails iff the defect is present) and
   aggregated by per-defect majority across exactly 3 runs/arm/pair.
   **Telemetry source is NOT `loop-telemetry/2`**: the per-run signal is the
-  `defect {id, class, probeTest, caught}` object in the run's
-  `result.json` (run-pair.sh D5.1 support; caught requires the probe test
-  to have run and passed against the declared-done state; a non-compiling
-  final state counts as not-caught, consistent with §2's all-failing
-  rule). PP-W1 consumes the Calor − C# delta of this rate.
+  `defect {id, class, probeTest, caught, smokeTampered}` object in the
+  run's `result.json` (run-pair.sh D5.1 support). Semantics, frozen with
+  the row: the probe test lives in its own project compiled against the
+  **starting** public surface, so `caught` measures the defect and not
+  task completion (an agent that fixes the defect without finishing the
+  feature still scores a catch); `caught` requires the probe to have run
+  and passed against the declared-done build; a non-compiling final state
+  counts as not-caught, consistent with §2's all-failing rule; a slot
+  still invalid after §0.2's retry cap contributes **not-caught** for its
+  run (task failure ⇒ the defect was not shown absent); a run with
+  `smokeTampered: true` (the arm-shared smoke suite was modified) is
+  invalid for M-W1 and re-run per §0.2. PP-W1 consumes the Calor − C#
+  delta of this rate.
 
 ### A.2 Frozen instrument proof-point thresholds
 
