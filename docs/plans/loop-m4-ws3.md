@@ -1,5 +1,14 @@
 # M4 Kickoff — WS3 Warm Feedback
 
+**Status: exit criterion MET (2026-07-27), pending merges.** PP-L1 measured
+on the D3.3 fixture per `bench/phase0-agent-native/latency/ml1-001/VERDICT.md`
+(PR #805): MCP write path (adjudicating) **P50 2 ms / P99 9 ms** vs
+thresholds 300 ms / 1 s — **PASS**; watch rebuild (reported) P50 27 ms /
+P99 32 ms excluding the recorded 200 ms debounce. Result published in the
+CHANGELOG [Unreleased] notes. Per plan §5, PP-L1's pass permanently retires
+the direct-to-IL backend proposal. M4 closes when #802 (D3.1), #803 (D3.2),
+#804 (D3.3), and #805 (M-L1 run) merge.
+
 **Kickoff record (2026-07-27):**
 **Parent:** `loop-plan-v0.9.md` §2 WS3, §3 M4 · **Depends on:** D2.1 (merged,
 #797) · **Prior milestone:** M3 complete (`loop-m3-ws2.md`, WS2 exit epoch
