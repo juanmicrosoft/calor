@@ -1,4 +1,8 @@
-# M-L1 run ml1-001 — PP-L1 verdict: PASS
+# M-L1 run ml1-001 — PP-L1 verdict: PASS (pre-merge record; superseded by ml1-002)
+
+**The re-run policy below has been fulfilled:** `../ml1-002/` is the
+adjudicating record, run on merged main after all review-fix commits; it
+agrees with this run within 1 ms on every percentile.
 
 **Date:** 2026-07-27 · **Commit:** c94b51be (loop-m4-ws3 integration branch:
 D3.1 #802 + D3.2 #803 + D3.3 #804 + driver) · **Build:** Release calor.dll ·

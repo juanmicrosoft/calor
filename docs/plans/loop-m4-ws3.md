@@ -1,16 +1,17 @@
 # M4 Kickoff — WS3 Warm Feedback
 
-**Status: exit criterion measured PASS (2026-07-27); publication and close
-pending merges.** PP-L1 measured
-on the D3.3 fixture per `bench/phase0-agent-native/latency/ml1-001/VERDICT.md`
-(PR #805): MCP write path (adjudicating) **P50 2 ms / P99 9 ms** vs
-thresholds 300 ms / 1 s — **PASS**; watch rebuild (reported) P50 27 ms /
-P99 32 ms excluding the recorded 200 ms debounce. The release-notes entry
-sits in CHANGELOG [Unreleased] on #805 — the exit criterion's publication
-clause is satisfied when it merges and ships in the v0.9 notes, not before.
-Per plan §5, PP-L1's pass permanently retires the direct-to-IL backend
-proposal. M4 closes when #802 (D3.1), #803 (D3.2), #804 (D3.3), and #805
-(M-L1 run) merge.
+**Status: COMPLETE (2026-07-27).** All slices merged — #801 kickoff, #802
+D3.1, #806 D3.2 (successor to #803, auto-closed by GitHub on its stacked
+base's deletion), #804 D3.3, #805 M-L1 (this PR closes M4) — each through
+two adversarial review rounds with all findings resolved. Exit criterion
+met on the adjudicating record
+`bench/phase0-agent-native/latency/ml1-002/VERDICT.md`, run on **merged
+main**: MCP write path **P50 2 ms / P99 8.84 ms** vs thresholds
+300 ms / 1 s — **PP-L1 PASS**; watch rebuild (reported) P50 27 ms /
+P99 33 ms excluding the recorded 200 ms debounce (ml1-001 is the agreeing
+pre-merge record). The release-notes entry is in CHANGELOG [Unreleased];
+its publication clause completes when it ships in the v0.9 notes. Per plan
+§5, PP-L1's pass permanently retires the direct-to-IL backend proposal.
 
 **Kickoff record (2026-07-27):**
 **Parent:** `loop-plan-v0.9.md` §2 WS3, §3 M4 · **Depends on:** D2.1 (merged,
