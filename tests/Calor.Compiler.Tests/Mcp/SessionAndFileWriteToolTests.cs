@@ -555,9 +555,16 @@ public sealed class SessionAndFileWriteToolTests : IDisposable
 
         var records = File.ReadAllLines(logPath).Select(l => JsonDocument.Parse(l).RootElement).ToList();
         Assert.Single(records);
-        Assert.Equal("mcp-write/1", records[0].GetProperty("schema").GetString());
+        Assert.Equal("mcp-write/2", records[0].GetProperty("schema").GetString());
         Assert.True(records[0].GetProperty("applied").GetBoolean());
         Assert.Equal("safe", records[0].GetProperty("verdict").GetString());
+
+        // Latency fields (WS3 D3.2): total plus the phase breakdown, all
+        // non-negative; refresh is 0 here because the write ran sessionless.
+        Assert.True(records[0].GetProperty("latencyMs").GetInt64() >= 0);
+        Assert.Equal(0, records[0].GetProperty("refreshMs").GetInt64());
+        Assert.True(records[0].GetProperty("checkMs").GetInt64() >= 0);
+        Assert.True(records[0].GetProperty("applyMs").GetInt64() >= 0);
     }
 
     [Fact]

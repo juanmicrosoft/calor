@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Diagnostics;
@@ -130,6 +131,12 @@ public sealed class FileWriteTool : McpToolBase
 
     private async Task<McpToolResult> ExecuteCoreAsync(JsonElement? arguments, CancellationToken cancellationToken)
     {
+        // Edit→envelope wall time (WS3 D3.2 / M-L1): the clock starts at
+        // tool-call receipt and covers refresh, gate wait, heal, parse,
+        // check set, and atomic apply — everything between the agent's
+        // write request and the verdict it gets back.
+        var timer = Stopwatch.StartNew();
+
         var path = GetString(arguments, "path");
         var content = GetString(arguments, "content");
 
@@ -155,6 +162,7 @@ public sealed class FileWriteTool : McpToolBase
             return McpToolResult.Error("calor_file_write only writes .calr files");
 
         ProjectSession? session = null;
+        long refreshMs = 0;
         var sessionId = GetString(arguments, "sessionId");
         if (!string.IsNullOrEmpty(sessionId))
         {
@@ -163,7 +171,9 @@ public sealed class FileWriteTool : McpToolBase
                 return McpToolResult.Error($"Unknown sessionId '{sessionId}' — open one with calor_session_open");
             if (!CanonicalPath.IsUnder(canonicalPath, session.RootDirectory))
                 return McpToolResult.Error($"Path is outside the session root '{session.RootDirectory}'");
+            var beforeRefresh = timer.ElapsedMilliseconds;
             session.Refresh();
+            refreshMs = timer.ElapsedMilliseconds - beforeRefresh;
         }
         else if (!CanonicalPath.IsUnder(canonicalPath, _defaultWriteRoot))
         {
@@ -176,7 +186,7 @@ public sealed class FileWriteTool : McpToolBase
         await gate.WaitAsync(cancellationToken);
         try
         {
-            return await CheckAndApplyAsync(canonicalPath, content, session, arguments, cancellationToken);
+            return await CheckAndApplyAsync(canonicalPath, content, session, arguments, timer, refreshMs, cancellationToken);
         }
         finally
         {
@@ -185,9 +195,11 @@ public sealed class FileWriteTool : McpToolBase
     }
 
     private async Task<McpToolResult> CheckAndApplyAsync(string canonicalPath, string content,
-        ProjectSession? session, JsonElement? arguments, CancellationToken cancellationToken)
+        ProjectSession? session, JsonElement? arguments, Stopwatch timer, long refreshMs,
+        CancellationToken cancellationToken)
     {
         var (runCompile, runContracts, runEffects, runReferences) = ParseCheckSelection(arguments);
+        var checkStartMs = timer.ElapsedMilliseconds;
 
         // Zero-length entries are never opened: FIFOs stat as size 0 and a
         // blocking read on one would hang the call (and the stripe gate).
@@ -249,6 +261,8 @@ public sealed class FileWriteTool : McpToolBase
             verdict = "safe_with_warnings";
 
         var applied = verdict != "breaking";
+        var checkMs = timer.ElapsedMilliseconds - checkStartMs;
+        var applyStartMs = timer.ElapsedMilliseconds;
 
         if (applied)
         {
@@ -276,6 +290,8 @@ public sealed class FileWriteTool : McpToolBase
             session?.UpdateFile(canonicalPath, finalContent, modifiedParse);
         }
 
+        var applyMs = timer.ElapsedMilliseconds - applyStartMs;
+
         var editSummary = originalParse != null
             ? EditPreviewTool.ComputeEditSummary(originalSource, finalContent, originalParse, modifiedParse)
             : null;
@@ -285,7 +301,9 @@ public sealed class FileWriteTool : McpToolBase
             recommendations.Insert(0, "Content was auto-healed — review writtenContent; healing is not guaranteed semantics-preserving");
 
         LogWriteAttempt(canonicalPath, verdict, applied, healApplied,
-            created: applied && !fileExistedAtRead, finalContent);
+            created: applied && !fileExistedAtRead, finalContent,
+            latencyMs: timer.ElapsedMilliseconds, refreshMs: refreshMs,
+            checkMs: checkMs, applyMs: applyMs);
 
         return McpToolResult.Json(new FileWriteOutput
         {
@@ -407,12 +425,14 @@ public sealed class FileWriteTool : McpToolBase
     /// <summary>
     /// Appends one JSONL record per write attempt to the harness-configured
     /// log (M-L2's per-attempt stream), archiving rejected content for
-    /// reject-replay (M-L4/D4.6). Telemetry must never fail the write path —
-    /// all IO errors are swallowed. Revalidation races (retry errors) are
-    /// deliberately not logged: they carry no verdict information.
+    /// reject-replay (M-L4/D4.6). mcp-write/2 adds the edit→envelope wall
+    /// time and its phase breakdown (WS3 D3.2 / M-L1). Telemetry must never
+    /// fail the write path — all IO errors are swallowed. Revalidation races
+    /// (retry errors) are deliberately not logged: they carry no verdict
+    /// information.
     /// </summary>
     private void LogWriteAttempt(string path, string verdict, bool applied, bool healApplied,
-        bool created, string content)
+        bool created, string content, long latencyMs, long refreshMs, long checkMs, long applyMs)
     {
         if (_writeLogPath == null)
             return;
@@ -436,14 +456,18 @@ public sealed class FileWriteTool : McpToolBase
 
             var record = JsonSerializer.Serialize(new
             {
-                schema = "mcp-write/1",
+                schema = "mcp-write/2",
                 ts = DateTime.UtcNow.ToString("o"),
                 path,
                 verdict,
                 applied,
                 healApplied,
                 created,
-                rejectPayload = rejectPayloadPath
+                rejectPayload = rejectPayloadPath,
+                latencyMs,
+                refreshMs,
+                checkMs,
+                applyMs
             }, McpJsonOptions.Default);
 
             lock (WriteLogSync)

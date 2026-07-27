@@ -1,6 +1,8 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 using System.Threading.Channels;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
@@ -130,7 +132,7 @@ internal sealed class WatchSession
         string ContractMode,
         int DebounceMs);
 
-    internal sealed record RebuildResult(int Compiled, int Skipped, bool AnyErrors);
+    internal sealed record RebuildResult(int Compiled, int Skipped, bool AnyErrors, long ElapsedMs);
 
     private readonly IReadOnlyList<string> _paths;
     private readonly WatchSettings _settings;
@@ -141,11 +143,14 @@ internal sealed class WatchSession
     private string? _stateDirectory;
     private bool _clearCachePending;
     private int _rebuildCount;
+    private readonly string? _rebuildLogPath;
+    private readonly object _rebuildLogSync = new();
 
     /// <summary>Raised after every rebuild (including the initial compile). Test hook.</summary>
     internal event Action<RebuildResult>? RebuildCompleted;
 
-    internal WatchSession(IReadOnlyList<string> paths, WatchSettings settings, TextWriter output, TextWriter status)
+    internal WatchSession(IReadOnlyList<string> paths, WatchSettings settings, TextWriter output, TextWriter status,
+        string? rebuildLogPath = null)
     {
         _paths = paths;
         _settings = settings;
@@ -153,6 +158,11 @@ internal sealed class WatchSession
         _status = status;
         _structuredOutput = !settings.Format.Equals("text", StringComparison.OrdinalIgnoreCase);
         _clearCachePending = settings.ClearCache;
+
+        // Loop telemetry (WS3 D3.2 / M-L1): when the harness sets this env
+        // var, every rebuild appends one watch-rebuild/1 JSONL record with
+        // its edit→envelope wall time. Absent → no logging.
+        _rebuildLogPath = rebuildLogPath ?? Environment.GetEnvironmentVariable("CALOR_WATCH_REBUILD_LOG");
     }
 
     /// <summary>Test hook: feeds a change event as if the file-system watcher had raised it.</summary>
@@ -257,12 +267,18 @@ internal sealed class WatchSession
     /// </summary>
     private void Rebuild(bool initial)
     {
+        // Edit→envelope wall time (WS3 D3.2 / M-L1): rebuild start to the
+        // envelope's write — the debounce window is a configured delay, not
+        // feedback cost, and is deliberately outside this clock (it is
+        // recorded alongside in the telemetry record instead).
+        var timer = Stopwatch.StartNew();
         var rebuildNumber = ++_rebuildCount;
         var sources = ResolveSources();
         if (sources.Count == 0)
         {
+            // No sources → no envelope; nothing to time or journal.
             _status.WriteLine("No .calr files found; waiting for changes...");
-            RebuildCompleted?.Invoke(new RebuildResult(0, 0, AnyErrors: false));
+            RebuildCompleted?.Invoke(new RebuildResult(0, 0, AnyErrors: false, timer.ElapsedMilliseconds));
             return;
         }
 
@@ -358,12 +374,54 @@ internal sealed class WatchSession
             _output.Flush();
         }
 
+        var elapsedMs = timer.ElapsedMilliseconds;
         var label = initial ? "Initial compile" : $"Rebuild #{rebuildNumber - 1}";
         _status.WriteLine(
             $"{label}: {summary.Compiled} compiled, {summary.Skipped} up-to-date" +
-            (summary.AnyErrors ? " — FAILED" : " — ok"));
+            (summary.AnyErrors ? " — FAILED" : " — ok") + $" ({elapsedMs} ms)");
 
-        RebuildCompleted?.Invoke(new RebuildResult(summary.Compiled, summary.Skipped, summary.AnyErrors));
+        LogRebuild(rebuildNumber, initial, summary, elapsedMs);
+        RebuildCompleted?.Invoke(new RebuildResult(summary.Compiled, summary.Skipped, summary.AnyErrors, elapsedMs));
+    }
+
+    /// <summary>
+    /// Appends one watch-rebuild/1 JSONL record per rebuild to the
+    /// harness-configured log (WS3 D3.2): edit→envelope wall time with the
+    /// configured debounce recorded alongside, since the wall time excludes
+    /// it by definition. Telemetry must never fail the watch loop — all IO
+    /// errors are swallowed, mirroring the mcp-write stream.
+    /// </summary>
+    private void LogRebuild(int rebuildNumber, bool initial, DriverResultSummary summary, long elapsedMs)
+    {
+        if (_rebuildLogPath == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var record = JsonSerializer.Serialize(new
+            {
+                schema = "watch-rebuild/1",
+                ts = DateTime.UtcNow.ToString("o"),
+                rebuild = rebuildNumber,
+                initial,
+                compiled = summary.Compiled,
+                skipped = summary.Skipped,
+                anyErrors = summary.AnyErrors,
+                latencyMs = elapsedMs,
+                debounceMs = _settings.DebounceMs
+            });
+
+            lock (_rebuildLogSync)
+            {
+                File.AppendAllText(_rebuildLogPath, record + Environment.NewLine);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Swallowed by design; see summary.
+        }
     }
 
     private readonly record struct DriverResultSummary(int Compiled, int Skipped, bool AnyErrors);
