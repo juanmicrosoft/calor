@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "calor-loop-watch-rebuild",
+  "title": "Calor watch rebuild record (watch-rebuild/1)",
+  "description": "One record per `calor watch` rebuild (loop plan WS3 D3.2). latencyMs is rebuild-start to envelope-written wall time; the configured debounce window is excluded by definition and recorded alongside as debounceMs.",
+  "type": "object",
+  "required": ["schema", "ts", "rebuild", "initial", "compiled", "skipped", "anyErrors", "latencyMs", "debounceMs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "watch-rebuild/1" },
+    "ts": { "type": "string", "minLength": 20 },
+    "rebuild": { "type": "integer", "minimum": 1 },
+    "initial": { "type": "boolean" },
+    "compiled": { "type": "integer", "minimum": 0 },
+    "skipped": { "type": "integer", "minimum": 0 },
+    "anyErrors": { "type": "boolean" },
+    "latencyMs": { "type": "integer", "minimum": 0 },
+    "debounceMs": { "type": "integer", "minimum": 0 }
+  }
+}

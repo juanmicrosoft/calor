@@ -1,26 +1,45 @@
 #!/usr/bin/env bash
 # ============================================================================
-# validate-telemetry.sh <journal.jsonl> [more.jsonl ...]
+# validate-telemetry.sh [--expect <discriminator>] <journal.jsonl> [more.jsonl ...]
 #
-# Validates every line of the given journal file(s) against the normative
-# loop-telemetry/2 schema (loop-telemetry.schema.json, loop plan D4.1/D4.2).
+# Validates every line of the given telemetry file(s), dispatching on each
+# record's "schema" discriminator (loop plan D4.1/D4.2; latency streams per
+# WS3 D3.2):
+#   loop-telemetry/2            -> loop-telemetry.schema.json
+#   mcp-write/1 | mcp-write/2   -> mcp-write.schema.json
+#   watch-rebuild/1             -> watch-rebuild.schema.json
+#
+# --expect <discriminator> additionally asserts stream purity: every record
+# must carry exactly that discriminator (restores the old tool's "v2-only
+# journal" guarantee — a misrouted record type in a single-stream file is
+# an error, not a valid line).
 #
 # Strategy (no new dependencies assumed):
 #   1. python3 + jsonschema installed  -> full JSON Schema validation
-#   2. python3 only                    -> hand-rolled check of required
-#      fields, enums, types, and the additionalProperties allowlist
+#   2. python3 only                    -> hand-rolled check: full field
+#      semantics for loop-telemetry/2; generic required/allowed/type/enum
+#      checks (including const-discriminated if/then/else conditionals)
+#      derived from the schema file for the flat record types
 #   3. no python3                      -> clear failure message, exit 3
 #
-# v1 records (no "schema" field) are rejected: this tool asserts a v2-only
-# journal. Exit 0 = all lines valid; 1 = at least one invalid line.
+# Records with no "schema" field (v1) or an unknown discriminator are
+# rejected. Exit 0 = all lines valid; 1 = at least one invalid line.
 # ============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCHEMA="$SCRIPT_DIR/loop-telemetry.schema.json"
 
-[[ $# -ge 1 ]] || { echo "Usage: validate-telemetry.sh <journal.jsonl> [more.jsonl ...]" >&2; exit 2; }
-[[ -f "$SCHEMA" ]] || { echo "Schema not found: $SCHEMA" >&2; exit 2; }
+EXPECT=""
+if [[ "${1:-}" == "--expect" ]]; then
+    [[ $# -ge 2 ]] || { echo "--expect needs a discriminator" >&2; exit 2; }
+    EXPECT="$2"
+    shift 2
+fi
+
+[[ $# -ge 1 ]] || { echo "Usage: validate-telemetry.sh [--expect <discriminator>] <journal.jsonl> [more.jsonl ...]" >&2; exit 2; }
+for s in loop-telemetry.schema.json mcp-write.schema.json watch-rebuild.schema.json; do
+    [[ -f "$SCRIPT_DIR/$s" ]] || { echo "Schema not found: $SCRIPT_DIR/$s" >&2; exit 2; }
+done
 for f in "$@"; do
     [[ -f "$f" ]] || { echo "No such file: $f" >&2; exit 2; }
 done
@@ -31,45 +50,117 @@ if ! command -v python3 >/dev/null 2>&1; then
     exit 3
 fi
 
-python3 - "$SCHEMA" "$@" <<'PYEOF'
+python3 - "$SCRIPT_DIR" "$EXPECT" "$@" <<'PYEOF'
 import json
+import re
 import sys
 
-schema_path = sys.argv[1]
-files = sys.argv[2:]
+script_dir = sys.argv[1]
+expect = sys.argv[2] or None
+files = sys.argv[3:]
 
-with open(schema_path, "r", encoding="utf-8") as f:
-    schema = json.load(f)
+
+def load(name):
+    with open(f"{script_dir}/{name}", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+SCHEMAS = {
+    "loop-telemetry/2": load("loop-telemetry.schema.json"),
+    "mcp-write/1": load("mcp-write.schema.json"),
+    "mcp-write/2": load("mcp-write.schema.json"),
+    "watch-rebuild/1": load("watch-rebuild.schema.json"),
+}
 
 try:
     import jsonschema  # type: ignore
-    validator = jsonschema.Draft202012Validator(schema)
+    validators = {k: jsonschema.Draft202012Validator(v) for k, v in SCHEMAS.items()}
     mode = "jsonschema (full schema validation)"
 
-    def check(record):
-        return [e.message for e in validator.iter_errors(record)]
+    def check(record, discriminator):
+        return [e.message for e in validators[discriminator].iter_errors(record)]
 except ImportError:
     mode = "hand-rolled (python3 stdlib; install 'jsonschema' for full validation)"
-    ALLOWED = set(schema["properties"].keys())
-    REQUIRED = schema["required"]
     CMD_ENUM = {"build", "test", "run"}
     MECH_ENUM = {"raw", "mcp-file", "mcp-node", "unknown"}
     VERDICT_ENUM = {"applied", "rejected", None}
 
-    def check(record):  # noqa: C901 - deliberately exhaustive
+    def _is_integer(v):
+        # JSON Schema semantics: an integer-valued float satisfies
+        # "integer" (draft 2020-12) — the fallback must agree with the
+        # jsonschema path so a file cannot pass on one machine and fail
+        # on another.
+        if isinstance(v, bool):
+            return False
+        return isinstance(v, int) or (isinstance(v, float) and v.is_integer())
+
+    def check_generic(record, schema):
+        """Required/allowed/type/enum checks for flat record schemas
+        (mcp-write, watch-rebuild) derived from the schema document,
+        including const-discriminated if/then/else conditionals."""
         errs = []
-        if not isinstance(record, dict):
-            return ["record is not a JSON object"]
-        for k in REQUIRED:
+        allowed = set(schema["properties"].keys())
+        required = list(schema["required"])
+        forbidden = set()
+
+        # if/then/else limited to the shape our schemas use: `if` matching
+        # a const on one property; `then` adding required fields; `else`
+        # forbidding fields via `"field": false`.
+        cond = schema.get("if")
+        if cond:
+            matches = all(
+                record.get(k) == spec.get("const")
+                for k, spec in cond.get("properties", {}).items())
+            branch = schema.get("then") if matches else schema.get("else")
+            if branch:
+                required += branch.get("required", [])
+                forbidden |= {k for k, spec in branch.get("properties", {}).items()
+                              if spec is False}
+
+        for k in required:
             if k not in record:
                 errs.append(f"missing required field: {k}")
         for k in record:
-            if k not in ALLOWED:
+            if k not in allowed:
+                errs.append(f"unexpected field (additionalProperties=false): {k}")
+            elif k in forbidden:
+                errs.append(f"field not allowed for this schema version: {k}")
+        if errs:
+            return errs
+        for k, v in record.items():
+            spec = schema["properties"][k]
+            if "const" in spec and v != spec["const"]:
+                errs.append(f"{k} must be {spec['const']!r}, got {v!r}")
+            if "enum" in spec and v not in spec["enum"]:
+                errs.append(f"{k} must be one of {spec['enum']}, got {v!r}")
+            types = spec.get("type")
+            if types is not None:
+                types = types if isinstance(types, list) else [types]
+                ok = any(
+                    (t == "string" and isinstance(v, str))
+                    or (t == "integer" and _is_integer(v))
+                    or (t == "boolean" and isinstance(v, bool))
+                    or (t == "null" and v is None)
+                    for t in types)
+                if not ok:
+                    errs.append(f"{k} must have type {types}, got {type(v).__name__}")
+                    continue
+            if isinstance(v, str) and "minLength" in spec and len(v) < spec["minLength"]:
+                errs.append(f"{k} shorter than minLength {spec['minLength']}")
+            if _is_integer(v) and "minimum" in spec and v < spec["minimum"]:
+                errs.append(f"{k} below minimum {spec['minimum']}")
+        return errs
+
+    def check_loop_telemetry(record, schema):  # noqa: C901 - deliberately exhaustive
+        errs = []
+        for k in schema["required"]:
+            if k not in record:
+                errs.append(f"missing required field: {k}")
+        for k in record:
+            if k not in set(schema["properties"].keys()):
                 errs.append(f"unexpected field (additionalProperties=false): {k}")
         if errs:
             return errs
-        if record["schema"] != "loop-telemetry/2":
-            errs.append(f"schema must be loop-telemetry/2, got {record['schema']!r}")
         for k in ("ts", "pair", "arm", "src_tree_hash"):
             if not isinstance(record[k], str) or not record[k]:
                 errs.append(f"{k} must be a non-empty string")
@@ -107,7 +198,6 @@ except ImportError:
                         or set(d) - {"code", "declarationId"}):
                     errs.append(f"bad diagnostics entry: {d!r}")
                     continue
-                import re
                 if not re.fullmatch(r"Calor[0-9]{4}", d["code"]):
                     errs.append(f"diagnostic code does not match ^Calor[0-9]{{4}}$: {d['code']!r}")
                 if "declarationId" in d and (not isinstance(d["declarationId"], str) or not d["declarationId"]):
@@ -128,6 +218,12 @@ except ImportError:
                 errs.append("rejected_edit must be null or {snapshotRef(>=8 chars), payloadPath}")
         return errs
 
+    def check(record, discriminator):
+        schema = SCHEMAS[discriminator]
+        if discriminator == "loop-telemetry/2":
+            return check_loop_telemetry(record, schema)
+        return check_generic(record, schema)
+
 total = 0
 bad = 0
 for path in files:
@@ -143,7 +239,20 @@ for path in files:
                 bad += 1
                 print(f"{path}:{lineno}: not valid JSON: {e}")
                 continue
-            errors = check(record)
+            if not isinstance(record, dict):
+                bad += 1
+                print(f"{path}:{lineno}: record is not a JSON object")
+                continue
+            discriminator = record.get("schema")
+            if discriminator not in SCHEMAS:
+                bad += 1
+                print(f"{path}:{lineno}: unknown or missing schema discriminator: {discriminator!r}")
+                continue
+            if expect is not None and discriminator != expect:
+                bad += 1
+                print(f"{path}:{lineno}: stream purity: expected {expect!r}, got {discriminator!r}")
+                continue
+            errors = check(record, discriminator)
             if errors:
                 bad += 1
                 for err in errors:

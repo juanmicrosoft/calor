@@ -55,7 +55,7 @@ censors at budget+1; censored fractions are reported per arm.
   `loop-baseline-ws1`) has no apply path, and the schema must be frozen
   **before** the treatment build exists so both arms emit identical shapes.
 
-## Companion stream: `mcp-writes.jsonl` (mcp-write/1)
+## Companion stream: `mcp-writes.jsonl` (mcp-write/2)
 
 Live `mcp-file` arms register the calor MCP server (M3 PR 4), and
 `calor_file_write` journals **one record per write attempt** into
@@ -67,14 +67,23 @@ several write attempts and the shim cannot observe MCP traffic.
 
 | Field | Type | Notes |
 |:------|:-----|:------|
-| `schema` | `"mcp-write/1"` | discriminator |
+| `schema` | `"mcp-write/2"` | discriminator; archived M3-era records are `"mcp-write/1"` (identical minus the four latency fields) |
 | `ts` | string (ISO-8601 UTC) | attempt time |
 | `path` | string | canonical target path |
 | `verdict` | `"safe"` \| `"safe_with_warnings"` \| `"breaking"` | check-set verdict |
 | `applied` | bool | whether the atomic apply ran (`verdict != "breaking"`) |
 | `healApplied` | bool | auto-heal changed the content before checking (D2.5) |
 | `created` | bool | the write created the file |
-| `rejectPayload` | string \| null | path of the archived rejected-edit payload (`rejects/`, env `CALOR_MCP_REJECT_DIR`) — D4.6 replay input for M-L4 |
+| `rejectPayload` | string \| null | path of the archived rejected-edit payload (`rejects/`, env `CALOR_MCP_REJECT_DIR`) — D4.6 replay input for M-L4. **Absent when null** — the MCP serializer drops null fields |
+| `latencyMs` | int | **M-L1's adjudicating measurement** (WS3 D3.2): wall time from tool-call receipt (tool handler entry, after protocol parse) to the verdict being journaled — covers session refresh, per-path gate wait, heal, parse, check set, and atomic apply. **Outside the clock, stated once here as the normative boundary:** protocol-layer request parsing, result-envelope serialization after the verdict, and reject-payload archiving. All excluded segments are microsecond-to-low-ms scale against a 300 ms P50 gate |
+| `refreshMs` | int | phase: session stat-on-access refresh (0 without a session) |
+| `checkMs` | int | phase: read + heal + parse + check set through verdict |
+| `applyMs` | int | phase: revalidate + atomic write (0 on reject) |
+
+Machine-validatable schema: `mcp-write.schema.json` (accepts both `/1` and
+`/2`; the four latency fields are **required** on `/2` and forbidden on
+`/1`, so a writer regression that stops emitting the adjudicating number
+fails validation instead of sailing through).
 
 Notes: revalidation races (file changed on disk mid-check → retry error) are
 not journaled — they carry no verdict information. Reject payload archiving
@@ -89,9 +98,35 @@ cross-mechanism comparisons (Annex A A-1.1). **M-L4** consumes the
 `rejectPayload` archives; below 20 rejects per epoch it stays reported-only
 (Annex A).
 
+## Companion stream: watch rebuilds (watch-rebuild/1)
+
+`calor watch` appends **one record per rebuild** to the file named by env
+`CALOR_WATCH_REBUILD_LOG` (WS3 D3.2). This is the reported-not-adjudicating
+latency surface for PP-L1 (the M4 kickoff decision: M-L1 adjudicates on the
+MCP write path, the loop mechanism the harness constrains arms to).
+
+| Field | Type | Notes |
+|:------|:-----|:------|
+| `schema` | `"watch-rebuild/1"` | discriminator |
+| `ts` | string (ISO-8601 UTC) | rebuild completion time |
+| `rebuild` | int | 1-based monotonic rebuild counter. **Logged ordinals may have gaps**: a rebuild that finds no sources consumes an ordinal but writes no record, so the first record is not guaranteed to be `rebuild: 1` |
+| `initial` | bool | initial compile vs change-triggered rebuild |
+| `compiled` | int | files compiled this rebuild |
+| `skipped` | int | files served from the incremental cache |
+| `anyErrors` | bool | rebuild had errors |
+| `latencyMs` | int | rebuild start → NDJSON envelope written under `--format json`. Under `--format text` no envelope exists and the boundary is rebuild start → compile end — M-L1 measurement runs use `--format json`. **Excludes the debounce window by definition** — debounce is a configured delay, not feedback cost |
+| `debounceMs` | int | the configured debounce, recorded alongside so reported numbers carry their config |
+
+A rebuild that finds no sources emits no envelope and no record. Machine
+schema: `watch-rebuild.schema.json`.
+
 ## Compatibility
 
 `extract_metrics` in `run-pair.sh` computes `iterations`, `iterationsToGreen`,
 `censored`, and `escapedBugs` from the same fields as v1 (`edited`,
 `heldout_fail`) — v2 is additive. Epoch `pins.json` gains
 `telemetrySchema: "loop-telemetry/2"` so mixed-schema epochs are detectable.
+The `mcp-write/1 → /2` bump is likewise additive: `extract_metrics` does not
+filter on the discriminator, so its `mcpWrites` aggregation is unaffected.
+`validate-telemetry.sh` dispatches every record on its `schema` field to the
+matching schema file and rejects unknown discriminators.

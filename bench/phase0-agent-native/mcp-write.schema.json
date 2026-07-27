@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "calor-loop-mcp-write",
+  "title": "Calor MCP write-attempt record (mcp-write/1, mcp-write/2)",
+  "description": "One record per calor_file_write attempt (loop plan D4.1/WS2; latency fields per WS3 D3.2). mcp-write/2 REQUIRES the four latency fields — latencyMs is PP-L1's adjudicating measurement, so a writer that stops emitting it must fail validation; archived /1 records must not carry them. rejectPayload is dropped entirely when null (the MCP serializer omits null fields), so it is optional here.",
+  "type": "object",
+  "required": ["schema", "ts", "path", "verdict", "applied", "healApplied", "created"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "enum": ["mcp-write/1", "mcp-write/2"] },
+    "ts": { "type": "string", "minLength": 20 },
+    "path": { "type": "string", "minLength": 1 },
+    "verdict": { "enum": ["safe", "safe_with_warnings", "breaking"] },
+    "applied": { "type": "boolean" },
+    "healApplied": { "type": "boolean" },
+    "created": { "type": "boolean" },
+    "rejectPayload": { "type": ["string", "null"] },
+    "latencyMs": { "type": "integer", "minimum": 0 },
+    "refreshMs": { "type": "integer", "minimum": 0 },
+    "checkMs": { "type": "integer", "minimum": 0 },
+    "applyMs": { "type": "integer", "minimum": 0 }
+  },
+  "if": { "properties": { "schema": { "const": "mcp-write/2" } } },
+  "then": { "required": ["latencyMs", "refreshMs", "checkMs", "applyMs"] },
+  "else": {
+    "properties": {
+      "latencyMs": false,
+      "refreshMs": false,
+      "checkMs": false,
+      "applyMs": false
+    }
+  }
+}
