@@ -294,8 +294,12 @@ EOF
         # (a) the PreToolUse hook below and (b) this hash, re-checked at
         # extract time and surfaced as smokeTampered (review of #810
         # finding 4) — the hook covers the primary agent tools, the hash
-        # catches everything else (shell edits, deletion).
-        find "$ws/smoke" -type f -name '*.cs' -exec shasum {} + | shasum | cut -d' ' -f1 \
+        # catches everything else (shell edits, deletion). obj/ and bin/ are
+        # excluded: the hash covers smoke SOURCE only — building Smoke.csproj
+        # emits obj/**/*.g.cs (GlobalUsings/AssemblyInfo), which would land in
+        # the re-check but not this pre-build baseline and spuriously flag
+        # smokeTampered on every arm that compiles smoke (ws5-probe-001).
+        find "$ws/smoke" -type f -name '*.cs' -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + | shasum | cut -d' ' -f1 \
             > "$ws_out/.smokehash"
     fi
 
@@ -795,9 +799,11 @@ extract_metrics() {
         fi
         # Smoke-suite integrity re-check (review of #810 finding 4): the
         # hook blocks agent-tool edits; this catches shell edits/deletions.
+        # Mirrors the materialize baseline exactly — obj/ and bin/ excluded so
+        # build-generated *.g.cs don't spuriously trip smokeTampered.
         if [[ -f "$ws_out/.smokehash" ]]; then
             local smoke_now
-            smoke_now=$(find "$ws/smoke" -type f -name '*.cs' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
+            smoke_now=$(find "$ws/smoke" -type f -name '*.cs' -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
             [[ "$smoke_now" == "$(cat "$ws_out/.smokehash")" ]] || smoke_tampered=true
         fi
         defect=$(jq -n --arg id "$(jq -r '.id' "$PAIR_DIR/defect.json")" \
