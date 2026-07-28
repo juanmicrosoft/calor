@@ -299,6 +299,10 @@ EOF
         # emits obj/**/*.g.cs (GlobalUsings/AssemblyInfo), which would land in
         # the re-check but not this pre-build baseline and spuriously flag
         # smokeTampered on every arm that compiles smoke (ws5-probe-001).
+        # Excluding obj/bin does not open a tamper hole: the .NET SDK's
+        # DefaultItemExcludes drops obj/ and bin/ from the Compile glob, so a
+        # .cs planted there never enters the smoke assembly; the real smoke
+        # source lives outside obj/bin and is still hashed.
         find "$ws/smoke" -type f -name '*.cs' -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + | shasum | cut -d' ' -f1 \
             > "$ws_out/.smokehash"
     fi

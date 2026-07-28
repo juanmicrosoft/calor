@@ -87,12 +87,16 @@ agent noticed the defect without the compiler forcing it, so no delta.
   excluding `obj/`/`bin/` at both find sites (`run-pair.sh`), preserving genuine
   tamper detection. Verified: null-agent still clean, and the previously-failing
   W5A-001/calor cell now reports `smokeTampered:false`.
-- **Final run: 54/54 valid, zero cap-exhaustions.** Four transient API blips
-  (all calor arm — longer runs, more exposure) were absorbed by the invalid-run
-  retry cap; no slot's majority was affected. An earlier full attempt was
-  aborted after a sustained Anthropic API incident capped 2 calor slots; it was
-  discarded and the epoch re-run cleanly once the API recovered (status
-  operational + a clean live probe).
+- **Final run: 54/54 valid, zero cap-exhaustions.** Six failed attempts across
+  four slots (three calor: W5B-003/run-2, W5C-001/run-2, W5C-002/run-1; one
+  csharp: W5C-003/run-3) were absorbed by the invalid-run retry cap — no slot
+  exhausted it, so no defect's majority was affected. Most were transient
+  API-error markers; the exception is W5C-001/calor/run-2, whose two attempts
+  both ended in a watchdog SIGKILL (`rc=137`). Failures skewed toward the calor
+  arm (its longer runs give more error-window exposure) but were not exclusive
+  to it. An earlier *full* attempt was aborted after a sustained Anthropic API
+  incident cap-exhausted 2 calor slots; it was discarded and the epoch re-run
+  cleanly once the API recovered (status operational + a clean live probe).
 - `smokeTampered:false` and `invalid:false` on all 54 recorded runs.
 
 ## Disposition
