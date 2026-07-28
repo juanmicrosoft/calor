@@ -26,7 +26,20 @@ internal static class CalorSourceHelper
         }
 
         var parser = new Parser(tokens, diagnostics);
-        var ast = parser.Parse();
+        ModuleNode ast;
+        try
+        {
+            ast = parser.Parse();
+        }
+        catch (InsufficientExecutionStackException)
+        {
+            // The parser's stack backstop fired before its deterministic
+            // depth cap (tighter-stack environments) — fail cleanly.
+            return ParseResult.Failed(new List<string>
+            {
+                "Source is too deeply nested to parse safely"
+            }, diagnostics);
+        }
 
         if (diagnostics.HasErrors)
         {
@@ -34,6 +47,52 @@ internal static class CalorSourceHelper
         }
 
         return ParseResult.Success(ast, source);
+    }
+
+    /// <summary>
+    /// Fault-tolerant parse (loop plan WS2 D2.5): always returns the parser's
+    /// best-effort AST alongside the diagnostics instead of discarding it on
+    /// the first error. The recursive-descent parser has localized recovery
+    /// (synchronization points, dummy-value insertion), so a near-miss file
+    /// typically yields a tree with the broken region elided and every other
+    /// declaration intact — enough to attribute errors to their enclosing
+    /// declaration and to keep project-wide checks seeing the file's surface.
+    /// A partial result is never a compile pass: <see cref="ParseResult.IsSuccess"/>
+    /// stays false, and verdict logic must not treat a partial AST as valid.
+    /// </summary>
+    public static ParseResult ParseTolerant(string source, string? filePath = null)
+    {
+        var diagnostics = new DiagnosticBag();
+        var effectivePath = filePath ?? "mcp-input.calr";
+        diagnostics.SetFilePath(effectivePath);
+
+        try
+        {
+            var lexer = new Lexer(source, diagnostics);
+            var tokens = lexer.TokenizeAllForParser();
+
+            // Unlike the strict path, lexer errors do not stop the parse:
+            // the token stream that was produced is usually still walkable.
+            var parser = new Parser(tokens, diagnostics);
+            var ast = parser.Parse();
+
+            if (!diagnostics.HasErrors)
+                return ParseResult.Success(ast, source);
+
+            return ParseResult.Partial(ast, source,
+                diagnostics.Errors.Select(e => e.Message).ToList(), diagnostics, effectivePath);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Recovery gave up somewhere unrecoverable — tolerant parsing
+            // must degrade to a plain failure, never throw.
+            if (!diagnostics.HasErrors)
+            {
+                return ParseResult.Failed(new List<string> { $"Parse failed: {ex.Message}" });
+            }
+
+            return ParseResult.Failed(diagnostics.Errors.Select(e => e.Message).ToList(), diagnostics);
+        }
     }
 
     /// <summary>
@@ -137,13 +196,26 @@ internal sealed class ParseResult
     /// </summary>
     public DiagnosticBag? Diagnostics { get; }
 
-    private ParseResult(bool success, ModuleNode? ast, string? source, IReadOnlyList<string> errors, DiagnosticBag? diagnostics)
+    /// <summary>File path the source was parsed as, when known (used for declaration-id attribution).</summary>
+    public string? FilePath { get; }
+
+    /// <summary>
+    /// True when the parse failed but a best-effort AST is available
+    /// (<see cref="CalorSourceHelper.ParseTolerant"/>). A partial AST is for
+    /// diagnostics enrichment and surface-level scanning only — never treat
+    /// it as a compile pass.
+    /// </summary>
+    public bool IsPartial => !IsSuccess && Ast != null;
+
+    private ParseResult(bool success, ModuleNode? ast, string? source, IReadOnlyList<string> errors,
+        DiagnosticBag? diagnostics, string? filePath = null)
     {
         IsSuccess = success;
         Ast = ast;
         Source = source;
         Errors = errors;
         Diagnostics = diagnostics;
+        FilePath = filePath;
     }
 
     public static ParseResult Success(ModuleNode ast, string source)
@@ -151,6 +223,10 @@ internal sealed class ParseResult
 
     public static ParseResult Failed(IReadOnlyList<string> errors, DiagnosticBag? diagnostics = null)
         => new(false, null, null, errors, diagnostics);
+
+    public static ParseResult Partial(ModuleNode ast, string source, IReadOnlyList<string> errors,
+        DiagnosticBag diagnostics, string filePath)
+        => new(false, ast, source, errors, diagnostics, filePath);
 
     /// <summary>
     /// Parse errors as envelope schema v1.1 entries (shared EnvelopeDiagnostic
@@ -165,7 +241,17 @@ internal sealed class ParseResult
 
         if (Diagnostics != null)
         {
-            return DiagnosticEnvelope.Build(Diagnostics)
+            // A partial AST lets parse errors carry declarationId — the
+            // enclosing declaration resolved by span containment (D2.5): the
+            // agent learns WHICH function is broken, not just where.
+            Ids.DeclarationIdResolver? resolver = null;
+            if (Ast != null && Source != null)
+            {
+                resolver = new Ids.DeclarationIdResolver();
+                resolver.AddFile(FilePath ?? "mcp-input.calr", Source, Ast);
+            }
+
+            return DiagnosticEnvelope.Build(Diagnostics, resolver)
                 .Where(e => e.Severity == "error")
                 .ToList();
         }

@@ -15,6 +15,7 @@ public sealed class McpMessageHandler
     private static readonly TimeSpan DefaultToolTimeout = TimeSpan.FromSeconds(60);
 
     private readonly Dictionary<string, IMcpTool> _tools;
+    private readonly Sessions.ProjectSessionManager _projectSessions = new();
     private readonly Dictionary<string, McpResource> _resources;
     private readonly Dictionary<string, McpPrompt> _prompts;
     private readonly bool _verbose;
@@ -30,7 +31,7 @@ public sealed class McpMessageHandler
             : Math.Max(512L * 1024L * 1024L, (long)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes * 0.5));
     private CancellationToken _serverCancellation;
 
-    public McpMessageHandler(bool verbose = false, TextWriter? log = null)
+    public McpMessageHandler(bool verbose = false, TextWriter? log = null, string? rootDirectory = null)
     {
         _verbose = verbose;
         _log = log;
@@ -58,6 +59,15 @@ public sealed class McpMessageHandler
         // ── Edit support & formatting ───────────────────────
         RegisterTool(new EditPreviewTool());
         RegisterTool(new FormatTool());
+
+        // ── Project sessions & transactional writes (loop plan WS2 D2.1/D2.4)
+        // rootDirectory pins the write-confinement root explicitly (mcp
+        // --root); when null the tools fall back to the server process CWD —
+        // which depends on how the MCP client spawned us, so harnesses
+        // should always pin it.
+        RegisterTool(new SessionOpenTool(_projectSessions, rootDirectory));
+        RegisterTool(new SessionCloseTool(_projectSessions));
+        RegisterTool(new FileWriteTool(_projectSessions, rootDirectory));
 
         // ── Refinement types & obligations ──────────────────
         RegisterTool(new RefineTool());
@@ -766,6 +776,11 @@ public sealed class McpMessageHandler
         - Effects: §E{cw,db:w,net:rw}
 
         WORKFLOW: Read calor://primer at session start. Use calor_help for unfamiliar syntax. Use calor_verify for contract checking.
+
+        EDITING .calr FILES: Prefer calor_file_write — it auto-heals indentation slips, checks the
+        edit (compile, contracts, effects, references), and applies atomically or rejects breaking
+        edits with diagnostics. For multi-file projects, calor_session_open first and pass the
+        sessionId so checks see the whole project; calor_session_close when done.
         """;
 
     // ── Test helpers (for McpRegistryValidationTests) ──────────────

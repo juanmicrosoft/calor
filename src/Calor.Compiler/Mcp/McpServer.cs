@@ -28,13 +28,14 @@ public sealed class McpServer
     /// Creates an MCP server with a TextReader for input.
     /// Prefer this constructor when a blocking TextReader is available (e.g., Console.In).
     /// </summary>
-    public McpServer(TextReader reader, Stream output, bool verbose = false, TextWriter? log = null)
+    public McpServer(TextReader reader, Stream output, bool verbose = false, TextWriter? log = null,
+        string? rootDirectory = null)
     {
         _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         _output = output ?? throw new ArgumentNullException(nameof(output));
         _verbose = verbose;
         _log = log;
-        _handler = new McpMessageHandler(verbose, log);
+        _handler = new McpMessageHandler(verbose, log, rootDirectory);
     }
 
     /// <summary>
@@ -42,7 +43,7 @@ public sealed class McpServer
     /// Uses Console.In which properly blocks when no data is available,
     /// unlike raw Console.OpenStandardInput() which can spin on empty reads.
     /// </summary>
-    public static McpServer CreateStdio(bool verbose = false)
+    public static McpServer CreateStdio(bool verbose = false, string? rootDirectory = null)
     {
         // Ensure UTF-8 encoding for stdin/stdout to handle § and other non-ASCII correctly
         Console.InputEncoding = Encoding.UTF8;
@@ -50,7 +51,7 @@ public sealed class McpServer
 
         var output = Console.OpenStandardOutput();
         var log = verbose ? Console.Error : null;
-        return new McpServer(Console.In, output, verbose, log);
+        return new McpServer(Console.In, output, verbose, log, rootDirectory);
     }
 
     /// <summary>
