@@ -90,6 +90,7 @@ ITERATION_BUDGET=10
 TIMEOUT_SECS=600
 EXEMPLAR_FILE=""
 EDIT_MECHANISM="raw"
+CALOR_DLL_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -100,11 +101,12 @@ while [[ $# -gt 0 ]]; do
         --null-agent) NULL_AGENT=1; shift ;;
         --exemplar) EXEMPLAR_FILE="$2"; shift 2 ;;
         --edit-mechanism) EDIT_MECHANISM="$2"; shift 2 ;;
+        --calor-dll) CALOR_DLL_OVERRIDE="$2"; shift 2 ;;
         *) echo "Unknown arg: $1" >&2; exit 2 ;;
     esac
 done
 
-[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--out <dir>]" >&2; exit 2; }
+[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--out <dir>]" >&2; exit 2; }
 [[ "$ARM" == "calor" || "$ARM" == "csharp" ]] || { echo "--arm must be calor|csharp" >&2; exit 2; }
 case "$EDIT_MECHANISM" in
     raw) ;;
@@ -172,12 +174,38 @@ OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 # ---------------------------------------------------------------------------
 TELEMETRY_HELPERS="$SCRIPT_DIR/telemetry-helpers.py"
 CALOR_CLI_DLL=""
-for cli_cfg in Release Debug; do
-    if [[ -f "$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll" ]]; then
-        CALOR_CLI_DLL="$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll"
-        break
+if [[ -n "$CALOR_DLL_OVERRIDE" ]]; then
+    # Per-arm build-pin (loop plan M5). Pins the calor CLI / MCP-server /
+    # envelope build: the dll that drives envelope generation, `ids index`,
+    # and (for mcp-file arms) the calor MCP write server. It does NOT repoint
+    # the arm's own `dotnet build` — the CalorArm csproj template binds
+    # Calor.Tasks / Calor.Sdk / Calor.Runtime and the emitter to __REPO_ROOT__
+    # (the current checkout). For the M5 A/B this is exactly correct: WS2/WS3's
+    # src/ delta lives entirely in the MCP / session / envelope / parse-tolerant
+    # surface this pin governs and touches NONE of Calor.Tasks/Sdk/Runtime or
+    # CodeGen (verified empty diff loop-baseline-ws1..main), so both arms
+    # compile identically and the whole arm-A-vs-arm-B delta is captured by the
+    # pin. A workstream that changed codegen/Calor.Tasks would instead require
+    # a per-arm checkout, not just --calor-dll. When unset, auto-detect the
+    # current checkout's build (Release preferred).
+    [[ -f "$CALOR_DLL_OVERRIDE" ]] || { echo "ERROR: --calor-dll path not found: $CALOR_DLL_OVERRIDE" >&2; exit 2; }
+    CALOR_CLI_DLL="$(cd "$(dirname "$CALOR_DLL_OVERRIDE")" && pwd -P)/$(basename "$CALOR_DLL_OVERRIDE")"
+    # Reject a path that exists but is not a runnable calor CLI: a live mcp-file
+    # arm would otherwise register `dotnet <bogus> mcp` (a server that never
+    # starts), strand the agent behind the .calr edit hook, and fabricate
+    # guaranteed-failure data — the hazard the mcp-file gate below guards.
+    if ! dotnet "$CALOR_CLI_DLL" --help >/dev/null 2>&1; then
+        echo "ERROR: --calor-dll is not a runnable calor CLI (dotnet '$CALOR_CLI_DLL' --help failed)" >&2
+        exit 2
     fi
-done
+else
+    for cli_cfg in Release Debug; do
+        if [[ -f "$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll" ]]; then
+            CALOR_CLI_DLL="$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll"
+            break
+        fi
+    done
+fi
 if [[ "$ARM" == "calor" && -z "$CALOR_CLI_DLL" ]]; then
     echo "WARNING: calor.dll not found (build src/Calor.Compiler first); calor-arm records will carry envelope_valid=null and empty edit_target_ids" >&2
 fi
@@ -861,12 +889,14 @@ extract_metrics() {
         --argjson mean_lat "$mean_lat" --argjson env_all "$envelope_valid_all" \
         --argjson mcp_writes "$mcp_writes" \
         --argjson defect "$defect" \
+        --arg calor_dll "$CALOR_CLI_DLL" --arg edit_mech "$EDIT_MECHANISM" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:$success,
           escapedBugs:$escaped, heldoutPassed:$passed,
           iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
           invalid:false,
           meanFeedbackLatencyMs:$mean_lat, envelopeValidAll:$env_all,
           mcpWrites:$mcp_writes, defect:$defect,
+          calorDll:$calor_dll, editMechanism:$edit_mech,
           tokens:{input:$tin, output:$tout}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
