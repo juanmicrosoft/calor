@@ -1,0 +1,27 @@
+{
+  "pair": "W5B-001-shipping-quote",
+  "arm": "calor",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 9,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1182,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5B-001",
+    "class": "W5-B",
+    "probeTest": "QuotePair.Probe.ProbeTests.Probe_QuoteJustOverCap_IsCapped",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "tokens": {
+    "input": 34,
+    "output": 9802
+  },
+  "nullAgent": false
+}

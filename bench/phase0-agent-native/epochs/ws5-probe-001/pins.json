@@ -1,0 +1,22 @@
+{
+  "compilerCommit": "5f3fd8392cb80779f8bcae3ec698d08c8ac0d744",
+  "suiteDirtyFiles": 4,
+  "agentVersion": "2.1.212 (Claude Code)",
+  "modelPin": "claude-opus-4-8",
+  "startedAt": "2026-07-28T14:09:13Z",
+  "mode": "live",
+  "editMechanism": "raw",
+  "telemetrySchema": "loop-telemetry/2",
+  "epochId": "ws5-probe-001",
+  "suite": [
+    "W5A-001",
+    "W5A-002",
+    "W5A-003",
+    "W5B-001",
+    "W5B-002",
+    "W5B-003",
+    "W5C-001",
+    "W5C-002",
+    "W5C-003"
+  ]
+}

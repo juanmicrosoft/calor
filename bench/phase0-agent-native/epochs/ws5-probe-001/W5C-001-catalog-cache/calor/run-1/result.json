@@ -1,0 +1,27 @@
+{
+  "pair": "W5C-001-catalog-cache",
+  "arm": "calor",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 6,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1157,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5C-001",
+    "class": "W5-C",
+    "probeTest": "CatalogPair.Probe.ProbeTests.Probe_LoadSummary_WritesNothing",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "tokens": {
+    "input": 28,
+    "output": 9145
+  },
+  "nullAgent": false
+}

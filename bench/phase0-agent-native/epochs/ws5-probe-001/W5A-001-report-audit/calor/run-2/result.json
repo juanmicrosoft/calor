@@ -1,0 +1,27 @@
+{
+  "pair": "W5A-001-report-audit",
+  "arm": "calor",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 5,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1130,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5A-001",
+    "class": "W5-A",
+    "probeTest": "ReportPair.Probe.ProbeTests.Probe_FormatSummary_PerformsNoFileWrite",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "tokens": {
+    "input": 20,
+    "output": 7193
+  },
+  "nullAgent": false
+}

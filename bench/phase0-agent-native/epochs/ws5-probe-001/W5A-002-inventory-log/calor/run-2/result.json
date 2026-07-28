@@ -1,0 +1,27 @@
+{
+  "pair": "W5A-002-inventory-log",
+  "arm": "calor",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 8,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1116,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5A-002",
+    "class": "W5-A",
+    "probeTest": "InventoryPair.Probe.ProbeTests.Probe_FormatStock_PerformsNoFileWrite",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "tokens": {
+    "input": 38,
+    "output": 12038
+  },
+  "nullAgent": false
+}
