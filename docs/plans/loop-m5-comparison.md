@@ -27,8 +27,11 @@ undetectable at any N), which is exactly why the primary measure moved to
 tokens-to-green.
 
 **§6.1 adjudication:** cluster bootstrap over pairs (runs nested within pairs),
-**one-sided**, α = 0.05, on the paired per-pair ratios against the 0.85
-threshold constant (= 15 % reduction). "Significant" always means this rule,
+**one-sided**, α = 0.05, on the paired per-pair ratios against the threshold
+constant (gates §6.1). The gates doc states the threshold only as "≥ 15 %
+reduction"; **operationalized**, that is a paired arm-B/arm-A ratio ≤ **0.85**
+(= 1 − 0.15) — the numeric constant and the B/A orientation are our
+operationalization here, not frozen text. "Significant" always means this rule,
 never eyeballing.
 
 ## 2. Arm design (attribution — loop plan §10 C2, the hard rule)
@@ -47,12 +50,21 @@ The delta must be attributable to **WS2 + WS3 and nothing else**. Both arms run
   only as an optional, separately-labelled product-claim arm — not the
   attribution arm, and not part of this adjudication.
 
-Arm-B isolation recipe (to be built + verified in the follow-up, §6): base
-`4f235cdc` + WS2 (`#796`→`#800`) + WS3 (`#801`,`#802`,`#804`,`#805`,`#806`),
-**excluding** M2 telemetry-only (#758), M4b/WS5 (#808/#810), and any unrelated
-main changes. Exact cherry-pick/merge set and conflict resolution are the
-first engineering step; the build must compile clean in Release before it can
-run.
+Arm-B isolation recipe (to be built + verified in the follow-up, §6). What arm
+B's **`calor.dll`** needs is the WS2+WS3 **compiler/runtime source** delta on
+top of `4f235cdc` — principally the WS2 write path + fault-tolerant parse mode
+(`#797`, `#798`) and the WS3 warm derived state + edit→envelope instrumentation
+(`#802`, `#806`). Everything non-compiler stays at current main per §4: the
+docs kickoffs (`#796`, `#801`), the harness changes (`#799`, `#800`), the
+latency test fixture (`#804`), and the measurement/verdict records (`#805`) do
+**not** enter the arm-B build and are not part of the attribution delta.
+**Excluded entirely:** all M2 measurement commits — `#758`, `#794`, and the
+`loop-feasibility-dry-002` epoch record (M2 is three commits, not one) — plus
+M4b/WS5 (`#808`/`#810`) and any unrelated main changes. The exact
+cherry-pick/merge set and conflict resolution are the first engineering step
+(§6 step 1); the build must compile clean in Release before it can run, and
+the isolation must be verified by diffing arm B's `src/` against `4f235cdc` to
+confirm only the WS2/WS3 compiler delta is present.
 
 ## 3. Pairs and N
 
@@ -67,9 +79,10 @@ run.
 
 ## 4. Required harness capability (does not exist yet)
 
-`run-pair.sh` today loads `calor.dll` from a single fixed path
-(`src/Calor.Compiler/bin/$cfg/net10.0/calor.dll`, line ~176) — the current
-checkout's build. M5 needs each arm pinned to a **different** build:
+`run-pair.sh` today loads `calor.dll` from the current checkout's build
+(`src/Calor.Compiler/bin/$cfg/net10.0/calor.dll`, Release-preferred with
+Debug-fallback, line ~176) via `CALOR_CLI_DLL` — with **no per-arm build-pin**
+option. M5 needs each arm pinned to a **different** build:
 
 - Add a per-arm **build-pin** (e.g. `--calor-dll <path>` / `--arm-build`) that
   sets `CALOR_CLI_DLL` (envelope generation) and, for arm B, the `calor mcp`
