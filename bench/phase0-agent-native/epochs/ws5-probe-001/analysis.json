@@ -1,0 +1,297 @@
+{
+  "epochId": "ws5-probe-001",
+  "metric": "M-W1 (defect catch rate)",
+  "ppInput": "PP-W1 (Calor - C# delta)",
+  "adjudication": "DEFERRED to Call 2 (M5) per Annex A-1.2; this epoch produces the measurement only",
+  "perArmMW1": {
+    "csharp": {
+      "caught": 4,
+      "denominator": 9
+    },
+    "calor": {
+      "caught": 9,
+      "denominator": 9
+    }
+  },
+  "ppW1Delta": 5,
+  "ppW1Threshold": 3,
+  "unanimity": {
+    "csharp": {
+      "unanimousDefects": 7,
+      "denominator": 9
+    },
+    "calor": {
+      "unanimousDefects": 9,
+      "denominator": 9
+    }
+  },
+  "decidabilityFallbackTriggered": false,
+  "decidabilityRule": ">=7/9 unanimous in BOTH arms required to adjudicate (else reported-not-adjudicated)",
+  "runLevelCatch": {
+    "csharp": {
+      "caught": 14,
+      "runs": 27
+    },
+    "calor": {
+      "caught": 27,
+      "runs": 27
+    }
+  },
+  "meanIterationsToGreen": {
+    "csharp": 1.0,
+    "calor": 1.63
+  },
+  "tokens": {
+    "csharp": {
+      "input": 321,
+      "output": 69545
+    },
+    "calor": {
+      "input": 812,
+      "output": 247304
+    }
+  },
+  "spendUSD": {
+    "csharp": 1.7402,
+    "calor": 6.1867,
+    "total": 7.9269,
+    "model": "claude-opus-4-8",
+    "rates": "$5/$25 per 1M in/out"
+  },
+  "totalTokens": {
+    "input": 1133,
+    "output": 316849
+  },
+  "catchChannel": {
+    "W5-A": "Calor0410 effect build-block (8/9 calor runs carry the diagnostic in telemetry)",
+    "W5-B": "ContractViolationException from emitted \u00a7S guard, thrown in agent's first smoke run",
+    "W5-C": "Calor0410 effect-laundering chain (intra-module; 8/9 calor runs)"
+  },
+  "perDefect": [
+    {
+      "id": "W5A-001",
+      "name": "report-audit",
+      "class": "W5-A (declared-pure effect / Calor0410 build-block)",
+      "csharp": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      },
+      "calor": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      }
+    },
+    {
+      "id": "W5A-002",
+      "name": "inventory-log",
+      "class": "W5-A (declared-pure effect / Calor0410 build-block)",
+      "csharp": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      },
+      "calor": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      }
+    },
+    {
+      "id": "W5A-003",
+      "name": "config-echo",
+      "class": "W5-A (declared-pure effect / Calor0410 build-block)",
+      "csharp": {
+        "votes": [
+          false,
+          false,
+          false
+        ],
+        "caughtRuns": 0,
+        "majorityCaught": false,
+        "unanimous": true
+      },
+      "calor": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      }
+    },
+    {
+      "id": "W5B-001",
+      "name": "shipping-quote",
+      "class": "W5-B (scalar postcondition / ContractViolationException runtime guard)",
+      "csharp": {
+        "votes": [
+          false,
+          true,
+          false
+        ],
+        "caughtRuns": 1,
+        "majorityCaught": false,
+        "unanimous": false
+      },
+      "calor": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      }
+    },
+    {
+      "id": "W5B-002",
+      "name": "loyalty-points",
+      "class": "W5-B (scalar postcondition / ContractViolationException runtime guard)",
+      "csharp": {
+        "votes": [
+          false,
+          false,
+          false
+        ],
+        "caughtRuns": 0,
+        "majorityCaught": false,
+        "unanimous": true
+      },
+      "calor": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      }
+    },
+    {
+      "id": "W5B-003",
+      "name": "request-quota",
+      "class": "W5-B (scalar postcondition / ContractViolationException runtime guard)",
+      "csharp": {
+        "votes": [
+          false,
+          false,
+          false
+        ],
+        "caughtRuns": 0,
+        "majorityCaught": false,
+        "unanimous": true
+      },
+      "calor": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      }
+    },
+    {
+      "id": "W5C-001",
+      "name": "catalog-cache",
+      "class": "W5-C (intra-module effect laundering chain / Calor0410)",
+      "csharp": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      },
+      "calor": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      }
+    },
+    {
+      "id": "W5C-002",
+      "name": "ledger-view",
+      "class": "W5-C (intra-module effect laundering chain / Calor0410)",
+      "csharp": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      },
+      "calor": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      }
+    },
+    {
+      "id": "W5C-003",
+      "name": "session-index",
+      "class": "W5-C (intra-module effect laundering chain / Calor0410)",
+      "csharp": {
+        "votes": [
+          false,
+          true,
+          false
+        ],
+        "caughtRuns": 1,
+        "majorityCaught": false,
+        "unanimous": false
+      },
+      "calor": {
+        "votes": [
+          true,
+          true,
+          true
+        ],
+        "caughtRuns": 3,
+        "majorityCaught": true,
+        "unanimous": true
+      }
+    }
+  ]
+}

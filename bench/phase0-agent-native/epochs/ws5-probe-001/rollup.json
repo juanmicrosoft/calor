@@ -1,0 +1,16 @@
+[
+  {
+    "arm": "calor",
+    "runs": 27,
+    "successRate": 1,
+    "meanEscaped": 0,
+    "censoredFraction": 0
+  },
+  {
+    "arm": "csharp",
+    "runs": 27,
+    "successRate": 1,
+    "meanEscaped": 0,
+    "censoredFraction": 0
+  }
+]

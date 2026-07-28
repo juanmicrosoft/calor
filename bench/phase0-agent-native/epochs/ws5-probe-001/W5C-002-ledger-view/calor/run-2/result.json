@@ -1,0 +1,27 @@
+{
+  "pair": "W5C-002-ledger-view",
+  "arm": "calor",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 6,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1220,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5C-002",
+    "class": "W5-C",
+    "probeTest": "LedgerPair.Probe.ProbeTests.Probe_BalanceReport_WritesNothing",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "tokens": {
+    "input": 26,
+    "output": 9511
+  },
+  "nullAgent": false
+}

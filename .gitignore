@@ -100,3 +100,7 @@ bench/phase0-agent-native/epochs/**/.src_build.txt
 bench/phase0-agent-native/epochs/**/.ho_last.txt
 bench/phase0-agent-native/epochs/**/.ho_final.txt
 bench/phase0-agent-native/epochs/**/heldout/
+# WS5 probe-project run-internals (analogs of heldout/ + .ho_final.txt + .lasthash)
+bench/phase0-agent-native/epochs/**/probe/
+bench/phase0-agent-native/epochs/**/.probe_final.txt
+bench/phase0-agent-native/epochs/**/.smokehash

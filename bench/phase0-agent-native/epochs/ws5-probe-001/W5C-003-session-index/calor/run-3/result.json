@@ -1,0 +1,27 @@
+{
+  "pair": "W5C-003-session-index",
+  "arm": "calor",
+  "run": 3,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 6,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1153,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5C-003",
+    "class": "W5-C",
+    "probeTest": "SessionPair.Probe.ProbeTests.Probe_LookupSession_WritesNothing",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "tokens": {
+    "input": 19,
+    "output": 7997
+  },
+  "nullAgent": false
+}

@@ -1,0 +1,27 @@
+{
+  "pair": "W5A-003-config-echo",
+  "arm": "csharp",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 6,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 973,
+  "envelopeValidAll": null,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5A-003",
+    "class": "W5-A",
+    "probeTest": "ConfigPair.Probe.ProbeTests.Probe_FormatConfig_PerformsNoFileWrite",
+    "caught": false,
+    "smokeTampered": false
+  },
+  "tokens": {
+    "input": 11,
+    "output": 2268
+  },
+  "nullAgent": false
+}

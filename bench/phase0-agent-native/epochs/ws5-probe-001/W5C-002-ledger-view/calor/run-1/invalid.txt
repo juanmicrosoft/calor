@@ -1,0 +1,2 @@
+2026-07-28T16:23:38Z attempt=0 agent_rc=1: agent output matches error marker: "api error"
+2026-07-28T16:24:44Z attempt=1 agent_rc=1: agent output matches error marker: "api error"

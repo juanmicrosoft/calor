@@ -1,0 +1,27 @@
+{
+  "pair": "W5B-003-request-quota",
+  "arm": "calor",
+  "run": 3,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 9,
+  "iterations": 2,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1114,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5B-003",
+    "class": "W5-B",
+    "probeTest": "QuotaPair.Probe.ProbeTests.Probe_GrantJustOverMax_IsCapped",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "tokens": {
+    "input": 44,
+    "output": 9327
+  },
+  "nullAgent": false
+}
