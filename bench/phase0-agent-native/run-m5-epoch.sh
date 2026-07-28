@@ -130,7 +130,7 @@ run_arm() {  # <pair_dir> <mechanism> <dll>
     "$SCRIPT_DIR/run-pair.sh" --pair "$pair_dir" --arm calor \
         --edit-mechanism "$mech" --calor-dll "$dll" --runs "$RUNS" \
         $NULL_FLAG --out "$OUT" \
-        | jq -c --unbuffered '{pair,arm,run,taskSuccess,iterationsToGreen,editMechanism,calorDll:(.calorDll|split("/")|.[-4:]|join("/")),tokensOut:.tokens.output,censored,invalid}'
+        | jq -c --unbuffered '{pair,arm,run,taskSuccess,iterationsToGreen,editMechanism,calorDll:((.calorDll // "")|split("/")|.[-4:]|join("/")),tokensOut:(.tokens.output // 0),censored,invalid}'
 }
 
 for pid in "${PAIRS[@]}"; do

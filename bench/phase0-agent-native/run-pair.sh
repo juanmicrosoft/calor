@@ -913,10 +913,12 @@ write_invalid_result() {
         --argjson itg "$((ITERATION_BUDGET + 1))" \
         --argjson escaped "$HELDOUT_TEST_COUNT" \
         --argjson null_agent "$NULL_AGENT" \
+        --arg calor_dll "$CALOR_CLI_DLL" --arg edit_mech "$EDIT_MECHANISM" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
           escapedBugs:$escaped, heldoutPassed:0,
           iterations:0, iterationsToGreen:$itg, censored:true,
           invalid:true, defect:null,
+          calorDll:$calor_dll, editMechanism:$edit_mech,
           tokens:{input:0, output:0}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
