@@ -90,6 +90,7 @@ ITERATION_BUDGET=10
 TIMEOUT_SECS=600
 EXEMPLAR_FILE=""
 EDIT_MECHANISM="raw"
+CALOR_DLL_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -100,11 +101,12 @@ while [[ $# -gt 0 ]]; do
         --null-agent) NULL_AGENT=1; shift ;;
         --exemplar) EXEMPLAR_FILE="$2"; shift 2 ;;
         --edit-mechanism) EDIT_MECHANISM="$2"; shift 2 ;;
+        --calor-dll) CALOR_DLL_OVERRIDE="$2"; shift 2 ;;
         *) echo "Unknown arg: $1" >&2; exit 2 ;;
     esac
 done
 
-[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--out <dir>]" >&2; exit 2; }
+[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--out <dir>]" >&2; exit 2; }
 [[ "$ARM" == "calor" || "$ARM" == "csharp" ]] || { echo "--arm must be calor|csharp" >&2; exit 2; }
 case "$EDIT_MECHANISM" in
     raw) ;;
@@ -172,12 +174,23 @@ OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 # ---------------------------------------------------------------------------
 TELEMETRY_HELPERS="$SCRIPT_DIR/telemetry-helpers.py"
 CALOR_CLI_DLL=""
-for cli_cfg in Release Debug; do
-    if [[ -f "$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll" ]]; then
-        CALOR_CLI_DLL="$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll"
-        break
-    fi
-done
+if [[ -n "$CALOR_DLL_OVERRIDE" ]]; then
+    # Per-arm build-pin (loop plan M5): pin the calor CLI/MCP-server build
+    # explicitly so an A/B epoch runs two compiler builds against identical
+    # tasks/pins/fixtures (arm A = loop-baseline-ws1; arm B = baseline +
+    # WS2/WS3 isolation). The pinned dll drives envelope generation, `ids
+    # index`, and — for mcp-file arms — the calor MCP write server. When
+    # unset, auto-detect the current checkout's build (Release preferred).
+    [[ -f "$CALOR_DLL_OVERRIDE" ]] || { echo "ERROR: --calor-dll path not found: $CALOR_DLL_OVERRIDE" >&2; exit 2; }
+    CALOR_CLI_DLL="$(cd "$(dirname "$CALOR_DLL_OVERRIDE")" && pwd -P)/$(basename "$CALOR_DLL_OVERRIDE")"
+else
+    for cli_cfg in Release Debug; do
+        if [[ -f "$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll" ]]; then
+            CALOR_CLI_DLL="$REPO_ROOT/src/Calor.Compiler/bin/$cli_cfg/net10.0/calor.dll"
+            break
+        fi
+    done
+fi
 if [[ "$ARM" == "calor" && -z "$CALOR_CLI_DLL" ]]; then
     echo "WARNING: calor.dll not found (build src/Calor.Compiler first); calor-arm records will carry envelope_valid=null and empty edit_target_ids" >&2
 fi
