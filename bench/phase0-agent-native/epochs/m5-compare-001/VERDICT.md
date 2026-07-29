@@ -55,8 +55,11 @@ decisively.
 ## Effort / cost
 
 - Tokens (valid runs): arm A 514,475 out / arm B 400,309 out; input 2,854 total.
-  Mean iterations-to-green: arm A 1.37, arm B 1.32 — both near the floor, which
-  is why the primary measure is tokens-to-green, not iterations (loop plan §4).
+  Mean iterations-to-green (valid runs): arm A 1.06, arm B 1.02 — both near the
+  floor, which is why the primary measure is tokens-to-green, not iterations
+  (loop plan §4). (Invalid-inclusive it is 1.37 / 1.32, inflated by the four
+  N1-005 cap-exhausted runs recorded at the budget ceiling; those feed no
+  adjudicated quantity.)
 - Spend: **≈ $22.88** (`claude-opus-4-8` @ $5/$25 per 1M) — far under the
   $1,500/epoch ceiling.
 
