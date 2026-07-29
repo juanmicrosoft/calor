@@ -68,8 +68,9 @@ public sealed class VerificationCacheEntry
 
     /// <summary>
     /// Named assumption set for Assumed outcomes (guarantees plan D-G2.1). Additive
-    /// within format 1.3: no pre-existing 1.3 entry can hold an Assumed status, so
-    /// a missing field (older writer) never mispresents a real assumption set.
+    /// within the current format: no pre-existing entry can hold an Assumed status
+    /// (the status shipped with this field), so a missing field (older writer)
+    /// never mispresents a real assumption set.
     /// </summary>
     public List<string>? ProofAssumptions { get; set; }
 

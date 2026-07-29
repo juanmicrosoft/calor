@@ -562,7 +562,7 @@ public static class VerifyCommand
         public int Unsupported { get; init; }
         public int Skipped { get; init; }
 
-        // Five-status counts (envelope vocabulary); proven and unsupported
+        // Choke-point status counts (schema 2.0 seven-status vocabulary); proven and unsupported
         // are shared with the legacy columns above.
         public int Refuted { get; init; }
         public int Assumed { get; init; }
