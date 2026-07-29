@@ -22,7 +22,7 @@ namespace Calor.Compiler.Tests;
 public static class EnvelopeSchemaValidator
 {
     internal static readonly string[] Severities = ["error", "warning", "info"];
-    internal static readonly string[] ProofStatusNames = ["proven", "refuted", "unknown", "timeout", "unsupported"];
+    internal static readonly string[] ProofStatusNames = ["proven", "refuted", "assumed", "unknown", "timeout", "unsupported", "unavailable"];
 
     /// <summary>Validates a top-level envelope document (schema v1.1).</summary>
     public static void ValidateEnvelopeDocument(JsonElement root)
@@ -190,10 +190,14 @@ public class EnvelopeConformanceTests
     }
 
     [Fact]
-    public void ProofStatus_VocabularyIsClosedAtFive()
+    public void ProofStatus_VocabularyIsClosedAtSeven()
     {
+        // The closed vocabulary is a governance pin: growing it is a MAJOR envelope
+        // bump (1.x closed at five; 2.0 closed at seven — assumed + unavailable,
+        // guarantees plan D-G2.1/D-G2.2). This assertion exists to force that
+        // conversation, not to be silently edited alongside an enum change.
         var values = Enum.GetValues<ProofStatus>();
-        Assert.Equal(5, values.Length);
+        Assert.Equal(7, values.Length);
 
         var wireNames = values
             .Select(v => ProofOutcome.Rehydrate(v.ToString().ToLowerInvariant(), null, null).StatusName)

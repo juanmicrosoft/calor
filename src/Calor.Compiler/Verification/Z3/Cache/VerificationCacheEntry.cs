@@ -67,6 +67,13 @@ public sealed class VerificationCacheEntry
     public bool ProofVacuous { get; set; }
 
     /// <summary>
+    /// Named assumption set for Assumed outcomes (guarantees plan D-G2.1). Additive
+    /// within format 1.3: no pre-existing 1.3 entry can hold an Assumed status, so
+    /// a missing field (older writer) never mispresents a real assumption set.
+    /// </summary>
+    public List<string>? ProofAssumptions { get; set; }
+
+    /// <summary>
     /// Original verification duration in milliseconds.
     /// </summary>
     public double OriginalDurationMs { get; set; }
@@ -87,7 +94,7 @@ public sealed class VerificationCacheEntry
     public ContractVerificationResult ToResult()
     {
         var outcome = ProofStatus != null
-            ? Verification.ProofOutcome.Rehydrate(ProofStatus, CounterexampleBindings, ProofReason, ProofVacuous)
+            ? Verification.ProofOutcome.Rehydrate(ProofStatus, CounterexampleBindings, ProofReason, ProofVacuous, ProofAssumptions)
             : null;
 
         return new ContractVerificationResult(
@@ -115,6 +122,7 @@ public sealed class VerificationCacheEntry
             ProofStatus = result.Outcome?.StatusName,
             ProofReason = result.Outcome?.Reason,
             ProofVacuous = result.Outcome?.IsVacuous ?? false,
+            ProofAssumptions = result.Outcome is { Assumptions.Count: > 0 } o ? o.Assumptions.ToList() : null,
             CounterexampleBindings = result.Outcome?.Counterexample?.Bindings.ToList(),
             OriginalDurationMs = result.Duration?.TotalMilliseconds ?? 0,
             CreatedAt = DateTime.UtcNow,

@@ -240,15 +240,40 @@ public class OutcomeCorpusTests
     // ------------------------------------------------------------------
 
     [Fact]
-    public void SolverUnavailableEvidence_AssignsUnknown()
+    public void SolverUnavailableEvidence_AssignsUnavailable()
     {
+        // D-G2.2: "no solver" is its own status, split from "solver gave up".
         var outcome = ProofOutcome.Assign(
             ProofEvidence.SolverUnavailable("Z3 native library not found"));
 
-        Assert.Equal(ProofStatus.Unknown, outcome.Status);
-        Assert.Equal("unknown", outcome.StatusName);
+        Assert.Equal(ProofStatus.Unavailable, outcome.Status);
+        Assert.Equal("unavailable", outcome.StatusName);
         Assert.Null(outcome.Counterexample);
         Assert.Contains("not found", outcome.Reason);
+    }
+
+    [Fact]
+    public void AssumedProofEvidence_AssignsAssumedWithSortedAssumptions()
+    {
+        // D-G2.1: assumed carries its named assumption set, canonically sorted;
+        // it is not Proven and maps to no legacy Proven-equivalent.
+        var outcome = ProofOutcome.Assign(ProofEvidence.AssumedProof(
+            "proof conditional on undischarged assumptions",
+            ["zeta-assumption", "alpha-assumption"]));
+
+        Assert.Equal(ProofStatus.Assumed, outcome.Status);
+        Assert.Equal("assumed", outcome.StatusName);
+        Assert.Equal(["alpha-assumption", "zeta-assumption"], outcome.Assumptions);
+        Assert.Equal(Calor.Compiler.Verification.Z3.ContractVerificationStatus.Unproven, outcome.ToContractStatus());
+    }
+
+    [Fact]
+    public void RehydratedAssumed_RestoresAssumptions()
+    {
+        var outcome = ProofOutcome.Rehydrate("assumed", null, "conditional", assumptions: ["a1"]);
+
+        Assert.Equal(ProofStatus.Assumed, outcome.Status);
+        Assert.Equal(["a1"], outcome.Assumptions);
     }
 
     [Fact]

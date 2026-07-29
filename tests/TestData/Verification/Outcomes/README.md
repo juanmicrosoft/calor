@@ -22,11 +22,13 @@ CI corpus instead of "whatever the build happens to verify". Exercised by
 `unknown` (inconclusive, not a timeout) cannot be deterministically produced
 from a committed `.calr` file: on quantifier-free bit-vector/nonlinear
 problems Z3 keeps searching until the time budget rather than answering
-UNKNOWN, and the other `unknown` producers (solver error, solver unavailable)
-are environmental, not expressible in source. The corpus therefore covers
-`unknown` at **evidence level**: `OutcomeCorpusTests` drives
-`ProofOutcome.Assign` directly with solver-unavailable/solver-error evidence
-and asserts the status and its envelope wire name. If a reliably-UNKNOWN
+UNKNOWN, and the remaining `unknown` producer (solver error) is
+environmental, not expressible in source. The same holds for `unavailable`
+(no solver present — split from `unknown` at schema 2.0, guarantees plan
+D-G2.2). The corpus therefore covers both at **evidence level**:
+`OutcomeCorpusTests` drives `ProofOutcome.Assign` directly with
+solver-unavailable/solver-error evidence and asserts the status and its
+envelope wire name. If a reliably-UNKNOWN
 source form is ever found, add it here and drop this note.
 
 ## Governance

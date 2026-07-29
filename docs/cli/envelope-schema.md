@@ -6,7 +6,7 @@ nav_order: 16
 permalink: /cli/envelope-schema/
 ---
 
-# Diagnostic Envelope Schema v1.1 (loop plan D1.1)
+# Diagnostic Envelope Schema v2.0 (loop plan D1.1; guarantees plan D-G2.4)
 
 This document is the normative definition of the **one envelope** every Calor
 surface emits for machine consumers, and the **enumerated denominator** of
@@ -25,7 +25,7 @@ contract, NDJSON streaming, SARIF mapping, and exit codes.
 
 ```json
 {
-  "version": "1.1",
+  "version": "2.0",
   "command": "verify",
   "diagnostics": [ /* diagnostic entries, possibly empty */ ],
   "summary": { "total": 1, "errors": 0, "warnings": 1, "info": 0 },
@@ -33,7 +33,7 @@ contract, NDJSON streaming, SARIF mapping, and exit codes.
 }
 ```
 
-- `version` — envelope schema version, currently `"1.1"`. Consumers must
+- `version` — envelope schema version, currently `"2.0"`. Consumers must
   tolerate unknown additive fields within a major version.
 - `command` — the producing surface (optional; emitted by data-carrying
   commands so a stream of documents is self-describing).
@@ -80,22 +80,24 @@ MCP tools embed the same objects in their result DTOs.
   absent** — IDs stay optional per language policy — or when the position falls
   outside every ID-bearing declaration (e.g. lexer errors before any AST
   exists).
-- `verification` — present only on contract diagnostics (`Calor0710`–`Calor0718`
-  band). `status` is the **closed five-status vocabulary**; see below.
+- `verification` — present only on contract diagnostics (`Calor0710`–`Calor0721`
+  band). `status` is the **closed seven-status vocabulary**; see below.
 - `suggestion` / `fix` — machine-applicable fix hint when one exists;
   `fix.edits[]` are 1-based, end-exclusive text edits.
 
-## Verification payload and the five-status vocabulary
+## Verification payload and the seven-status vocabulary
 
 `verification.status` is one of exactly:
 
 | Status | Meaning | Payload guarantees |
 |:-------|:--------|:-------------------|
-| `proven` | The obligation holds; runtime check may be elided | — |
+| `proven` | The obligation holds; runtime check may be elided **unless `vacuous` is true** | optional `vacuous: true` — the precondition set is unsatisfiable, the proof says nothing about the body, and the runtime check is kept (`Calor0719`) |
 | `refuted` | Proven violable | `counterexample` present whenever the solver produced a model (model-less refutations, e.g. an unsatisfiable precondition, carry `reason` instead) |
-| `unknown` | Inconclusive, **not** a timeout (too complex, incomplete theory, solver error, solver unavailable) | `reason` carries the solver's own explanation when available |
+| `assumed` | Holds **conditionally** on a named assumption set the solver did not discharge (exceptional-path totality, callee summaries). Never aggregates into `proven`; never elides runtime checks | `assumptions` — non-empty, sorted list of the named assumptions the proof is conditional on |
+| `unknown` | Inconclusive, **not** a timeout (too complex, incomplete theory, solver error) | `reason` carries the solver's own explanation when available |
 | `timeout` | The solver hit its time budget | `reason` carries the solver's unknown-reason string |
 | `unsupported` | Not translatable to the solver (unsupported type/construct) | `reason` carries the translation diagnosis |
+| `unavailable` | No solver was available to attempt the obligation (Z3 missing or disabled) — split from `unknown`: "no solver" and "solver gave up" are different facts with different remedies | `reason` states why |
 
 Every solver-evidence status is assigned at a single choke point —
 `ProofOutcome.Assign` in `src/Calor.Compiler/Verification/ProofOutcome.cs`
@@ -190,10 +192,20 @@ this table are the drift guards.
   reject unknown fields.
 - Removing or renaming a field, or changing a field's type, bumps the major
   version and requires a migration note in `CHANGELOG.md`.
-- The five-status vocabulary is **closed**: adding a status is a major bump.
+- The status vocabulary is **closed**: adding a status is a major bump. (This
+  is why 1.1 → 2.0: the vocabulary grew from five to seven statuses.)
 
 ## Change log
 
+- **2.0** (guarantees plan D-G2.4) — verification status vocabulary grew to
+  seven: `assumed` (conditional proof with a named `assumptions` list) and
+  `unavailable` (no solver present, split from `unknown`). `verification`
+  payload gains optional `vacuous` (on proven) and `assumptions` (on assumed).
+  Major bump because the status vocabulary is closed — consumers switching
+  exhaustively on the five 1.x statuses must add the two new arms (a 1.x
+  consumer that treated unrecognized statuses as "inconclusive, check kept"
+  remains correct by accident, but the contract is now seven). Migration note
+  in `CHANGELOG.md`.
 - **1.1** — added `declarationId`, `verification` (five-status choke-point
   payload), optional top-level `command` and `data`. First version governed by
   this document.

@@ -220,6 +220,28 @@ public sealed class ContractVerificationPass
                 }
                 break;
 
+            case ProofStatus.Assumed:
+                _diagnostics.ReportVerification(
+                    span,
+                    DiagnosticCode.ContractVerificationAssumed,
+                    $"{kind} in function '{function.Name}' holds conditionally on assumptions: " +
+                        string.Join("; ", outcome.Assumptions) +
+                        ". Runtime check kept.",
+                    DiagnosticSeverity.Info,
+                    outcome);
+                break;
+
+            case ProofStatus.Unavailable:
+                _diagnostics.ReportVerification(
+                    span,
+                    DiagnosticCode.ContractVerificationUnavailable,
+                    $"{kind} verification unavailable in function '{function.Name}'" +
+                        (outcome.Reason is { Length: > 0 } unavailWhy ? $" ({unavailWhy})" : "") +
+                        ". Runtime check kept.",
+                    DiagnosticSeverity.Info,
+                    outcome);
+                break;
+
             case ProofStatus.Timeout:
                 _diagnostics.ReportVerification(
                     span,
