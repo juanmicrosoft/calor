@@ -41,6 +41,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string _currentModuleName = "";
     private HashSet<string> _currentModuleFunctionNames = new(StringComparer.Ordinal);
     private HashSet<string> _currentClassMemberNames = new(StringComparer.Ordinal);
+    private readonly Stack<(HashSet<string> Members, bool Suppress)> _classMemberScopes = new();
+    private bool _suppressCrossModuleQualification;
 
     /// <summary>
     /// Bare public function name → defining module name, for qualifying
@@ -721,6 +723,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string QualifyCrossModuleTarget(string target)
     {
         if (CrossModuleFunctionModules == null
+            || _suppressCrossModuleQualification
             || target.Length == 0
             || target.Contains('.')
             || target.Contains('<')
@@ -2431,11 +2434,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentClassName = name;
         // Bare-name calls inside a class resolve to the class's OWN members first;
         // cross-module qualification must never override them (#823 review C1 —
-        // mis-qualifying a sibling method call silently ran another module's code).
+        // mis-qualifying a sibling method call silently ran another module's
+        // code). Nested classes push/pop so the outer class's set survives
+        // (#823 re-review NEW-1). Classes with a base type suppress
+        // qualification entirely: INHERITED members are not enumerable here
+        // (the base may be C#), and mis-qualifying one silently runs another
+        // module's code (#823 re-review NEW-2) — under-qualification (CS0103)
+        // is the acceptable failure direction, silent wrong code is not.
+        _classMemberScopes.Push((_currentClassMemberNames, _suppressCrossModuleQualification));
         _currentClassMemberNames = node.Methods.Select(m => m.Name)
             .Concat(node.Fields.Select(f => f.Name))
             .Concat(node.Properties.Select(pr => pr.Name))
             .ToHashSet(StringComparer.Ordinal);
+        _suppressCrossModuleQualification = !string.IsNullOrEmpty(node.BaseClass);
 
         // Emit fields
         foreach (var field in node.Fields)
@@ -2521,7 +2532,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         _currentClassName = null;
-        _currentClassMemberNames = new HashSet<string>(StringComparer.Ordinal);
+        (_currentClassMemberNames, _suppressCrossModuleQualification) = _classMemberScopes.Pop();
 
         Dedent();
         AppendLine("}");
