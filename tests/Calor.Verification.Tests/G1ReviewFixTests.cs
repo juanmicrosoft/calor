@@ -201,6 +201,125 @@ public class G1ReviewFixTests
     }
 
     // ------------------------------------------------------------------
+    // C1-new (re-verification of the M4 fix) — a divisor inside a branch body
+    // is evaluated only on that branch; asserting divisor != 0 GLOBALLY
+    // excludes the violating input on the OTHER branch (false Proven, check
+    // deleted). Conditionally-evaluated division must be Unsupported until a
+    // path-guarded encoding exists.
+    // ------------------------------------------------------------------
+
+    [SkippableFact]
+    public void DivisionInBranchBody_IsUnsupported_NeverFalseProven()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        DivisionInBranchCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void DivisionInBranchCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // The reviewer's Trap shape: Trap(0) takes the then branch, never divides,
+        // returns -1 and genuinely violates §S (>= result 0). A global b != 0 from
+        // the else-branch divisor would prove the violation away.
+        var parameters = new List<(string Name, string Type)> { ("b", "i32") };
+        var post = Ensures(Bin(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0)));
+        var body = new List<StatementNode>
+        {
+            new IfStatementNode(
+                TextSpan.Empty,
+                "if1",
+                Bin(BinaryOperator.Equal, Ref("b"), Int(0)),
+                thenBody: [Return(Bin(BinaryOperator.Subtract, Int(0), Int(1)))],
+                elseIfClauses: [],
+                elseBody:
+                [
+                    Return(Bin(BinaryOperator.Add, Int(5),
+                        Bin(BinaryOperator.Multiply, Int(0),
+                            Bin(BinaryOperator.Divide, Int(1), Ref("b")))))
+                ],
+                new AttributeCollection())
+        };
+
+        var result = verifier.VerifyPostcondition(parameters, "i32", [], post, body);
+
+        Assert.NotEqual(ProofStatus.Proven, result.EffectiveOutcome.Status);
+        Assert.Equal(ProofStatus.Unsupported, result.EffectiveOutcome.Status);
+        Assert.Contains("conditionally-evaluated", result.EffectiveOutcome.Reason);
+    }
+
+    [SkippableFact]
+    public void DivisionInShortCircuitRhs_IsUnsupported()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        DivisionInShortCircuitCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void DivisionInShortCircuitCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // The guard idiom `b != 0 && 10/b > 0` evaluates the division only when
+        // the left conjunct held — same conditional-evaluation class.
+        var parameters = new List<(string Name, string Type)> { ("b", "i32") };
+        var post = Ensures(Bin(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0)));
+        var guardIdiom = Bin(BinaryOperator.And,
+            Bin(BinaryOperator.NotEqual, Ref("b"), Int(0)),
+            Bin(BinaryOperator.GreaterThan, Bin(BinaryOperator.Divide, Int(10), Ref("b")), Int(0)));
+        var body = new List<StatementNode>
+        {
+            new IfStatementNode(
+                TextSpan.Empty, "if1", guardIdiom,
+                thenBody: [Return(Int(1))],
+                elseIfClauses: [],
+                elseBody: [Return(Int(0))],
+                new AttributeCollection())
+        };
+
+        var result = verifier.VerifyPostcondition(parameters, "i32", [], post, body);
+
+        Assert.Equal(ProofStatus.Unsupported, result.EffectiveOutcome.Status);
+    }
+
+    [SkippableFact]
+    public void DeadCodeDivisionAfterReturn_DoesNotConstrain()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        DeadCodeDivisionCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void DeadCodeDivisionCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // A division AFTER an unconditional return is never evaluated; it must
+        // neither constrain the query nor block the (genuine) refutation of the
+        // live return: result = b, post b > 0 is refuted at b = 0 — a model a
+        // dead-code b != 0 constraint would wrongly exclude.
+        var parameters = new List<(string Name, string Type)> { ("b", "i32") };
+        var post = Ensures(Bin(BinaryOperator.GreaterThan, Ref("result"), Int(0)));
+        var body = new List<StatementNode>
+        {
+            Return(Ref("b")),
+            Return(Bin(BinaryOperator.Divide, Int(1), Ref("b")))
+        };
+
+        var result = verifier.VerifyPostcondition(parameters, "i32", [], post, body);
+
+        Assert.Equal(ProofStatus.Refuted, result.EffectiveOutcome.Status);
+        var model = result.EffectiveOutcome.Counterexample;
+        Assert.NotNull(model);
+        // The refutation at b <= 0 must include b = 0 as reachable; at minimum the
+        // dead divisor must not have excluded it (any b <= 0 model is genuine).
+    }
+
+    // ------------------------------------------------------------------
     // m2 — a vacuous precondition set wins over an unencodable body: the
     // Calor0719-visible outcome, not a generic Unsupported.
     // ------------------------------------------------------------------

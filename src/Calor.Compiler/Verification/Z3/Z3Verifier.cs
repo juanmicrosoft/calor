@@ -470,11 +470,20 @@ public static class FunctionBodyEncoder
     }
 
     /// <summary>
-    /// Collects divisor-nonzero side conditions for every division/modulo in the body's
+    /// Collects divisor-nonzero side conditions for division/modulo in the body's
     /// encodable expressions (G1 review M4): Z3 totalizes x/0, so without these a
     /// refutation model may exercise a divisor of zero — a path that throws at runtime
-    /// and never evaluates the postcondition. Returns a failure reason when a divisor
-    /// cannot be translated or is not a bit-vector.
+    /// and never evaluates the postcondition. SOUNDNESS RULE (G1 re-verification
+    /// C1-new): a bare `divisor != 0` assumption is only valid for a divisor that is
+    /// evaluated on EVERY normal-return execution — a divisor inside a branch body,
+    /// an elseif condition, a statement after branching, the right operand of a
+    /// short-circuiting &amp;&amp;/||, or a conditional-expression arm is evaluated only on
+    /// some paths, and asserting it globally excludes violating inputs on the OTHER
+    /// paths (a false Proven that deletes the runtime check). Conditionally-evaluated
+    /// division therefore reports a failure and the obligation becomes Unsupported —
+    /// until a path-guarded encoding (guard =&gt; divisor != 0) lands with D-G2.5.
+    /// Collection stops at the first return in a statement list: dead code must not
+    /// constrain the query either.
     /// </summary>
     public static (IReadOnlyList<BoolExpr> Constraints, string? Failure) CollectDivisorNonZeroConstraints(
         ContractTranslator translator,
@@ -482,7 +491,7 @@ public static class FunctionBodyEncoder
         IReadOnlyList<StatementNode> statements)
     {
         var constraints = new List<BoolExpr>();
-        var failure = CollectDivisorsFromStatements(translator, ctx, statements, constraints);
+        var failure = CollectDivisorsFromStatements(translator, ctx, statements, constraints, conditional: false);
         return (constraints, failure);
     }
 
@@ -490,41 +499,54 @@ public static class FunctionBodyEncoder
         ContractTranslator translator,
         Context ctx,
         IReadOnlyList<StatementNode> statements,
-        List<BoolExpr> constraints)
+        List<BoolExpr> constraints,
+        bool conditional)
     {
         foreach (var stmt in statements)
         {
             switch (stmt)
             {
-                case ReturnStatementNode ret when ret.Expression != null:
-                    var retFailure = CollectDivisorsFromExpression(translator, ctx, ret.Expression, constraints);
-                    if (retFailure != null)
-                        return retFailure;
-                    break;
+                case ReturnStatementNode ret:
+                    if (ret.Expression != null)
+                    {
+                        var retFailure = CollectDivisorsFromExpression(translator, ctx, ret.Expression, constraints, conditional);
+                        if (retFailure != null)
+                            return retFailure;
+                    }
+                    // Everything after a return is dead code — it is never evaluated
+                    // and must not contribute constraints.
+                    return null;
 
                 case IfStatementNode ifStmt:
-                    var condFailure = CollectDivisorsFromExpression(translator, ctx, ifStmt.Condition, constraints);
+                {
+                    // The if's own condition is evaluated whenever this statement is
+                    // reached; branch bodies, elseif conditions (evaluated only when
+                    // prior conditions were false), the else body, and every statement
+                    // AFTER the if (reached only via fall-through) are conditional.
+                    var condFailure = CollectDivisorsFromExpression(translator, ctx, ifStmt.Condition, constraints, conditional);
                     if (condFailure != null)
                         return condFailure;
-                    var thenFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ThenBody, constraints);
+                    var thenFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ThenBody, constraints, conditional: true);
                     if (thenFailure != null)
                         return thenFailure;
                     foreach (var clause in ifStmt.ElseIfClauses)
                     {
-                        var clauseCondFailure = CollectDivisorsFromExpression(translator, ctx, clause.Condition, constraints);
+                        var clauseCondFailure = CollectDivisorsFromExpression(translator, ctx, clause.Condition, constraints, conditional: true);
                         if (clauseCondFailure != null)
                             return clauseCondFailure;
-                        var clauseFailure = CollectDivisorsFromStatements(translator, ctx, clause.Body, constraints);
+                        var clauseFailure = CollectDivisorsFromStatements(translator, ctx, clause.Body, constraints, conditional: true);
                         if (clauseFailure != null)
                             return clauseFailure;
                     }
                     if (ifStmt.ElseBody != null)
                     {
-                        var elseFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ElseBody, constraints);
+                        var elseFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ElseBody, constraints, conditional: true);
                         if (elseFailure != null)
                             return elseFailure;
                     }
+                    conditional = true;
                     break;
+                }
             }
         }
         return null;
@@ -534,20 +556,31 @@ public static class FunctionBodyEncoder
         ContractTranslator translator,
         Context ctx,
         ExpressionNode expr,
-        List<BoolExpr> constraints)
+        List<BoolExpr> constraints,
+        bool conditional)
     {
         switch (expr)
         {
             case BinaryOperationNode b:
             {
-                var leftFailure = CollectDivisorsFromExpression(translator, ctx, b.Left, constraints);
+                // Short-circuit operators: the right operand is evaluated only when
+                // the left didn't decide the result — conditional territory.
+                var rightConditional = conditional
+                    || b.Operator is BinaryOperator.And or BinaryOperator.Or;
+
+                var leftFailure = CollectDivisorsFromExpression(translator, ctx, b.Left, constraints, conditional);
                 if (leftFailure != null)
                     return leftFailure;
-                var rightFailure = CollectDivisorsFromExpression(translator, ctx, b.Right, constraints);
+                var rightFailure = CollectDivisorsFromExpression(translator, ctx, b.Right, constraints, rightConditional);
                 if (rightFailure != null)
                     return rightFailure;
                 if (b.Operator is BinaryOperator.Divide or BinaryOperator.Modulo)
                 {
+                    if (conditional)
+                    {
+                        return "the body contains division/modulo in a conditionally-evaluated position, "
+                            + "which is not yet modeled for exception-path soundness (a path-guarded encoding is planned)";
+                    }
                     if (translator.Translate(b.Right) is not BitVecExpr divisor)
                         return "a division/modulo divisor could not be modeled for the non-zero side condition";
                     constraints.Add(ctx.MkNot(ctx.MkEq(divisor, ctx.MkBV(0, divisor.SortSize))));
@@ -555,23 +588,23 @@ public static class FunctionBodyEncoder
                 return null;
             }
             case UnaryOperationNode u:
-                return CollectDivisorsFromExpression(translator, ctx, u.Operand, constraints);
+                return CollectDivisorsFromExpression(translator, ctx, u.Operand, constraints, conditional);
             case ConditionalExpressionNode c:
-                return CollectDivisorsFromExpression(translator, ctx, c.Condition, constraints)
-                    ?? CollectDivisorsFromExpression(translator, ctx, c.WhenTrue, constraints)
-                    ?? CollectDivisorsFromExpression(translator, ctx, c.WhenFalse, constraints);
+                return CollectDivisorsFromExpression(translator, ctx, c.Condition, constraints, conditional)
+                    ?? CollectDivisorsFromExpression(translator, ctx, c.WhenTrue, constraints, conditional: true)
+                    ?? CollectDivisorsFromExpression(translator, ctx, c.WhenFalse, constraints, conditional: true);
             case ArrayAccessNode a:
-                return CollectDivisorsFromExpression(translator, ctx, a.Array, constraints)
-                    ?? CollectDivisorsFromExpression(translator, ctx, a.Index, constraints);
+                return CollectDivisorsFromExpression(translator, ctx, a.Array, constraints, conditional)
+                    ?? CollectDivisorsFromExpression(translator, ctx, a.Index, constraints, conditional);
             case ArrayLengthNode al:
-                return CollectDivisorsFromExpression(translator, ctx, al.Array, constraints);
+                return CollectDivisorsFromExpression(translator, ctx, al.Array, constraints, conditional);
             case FieldAccessNode fa:
-                return CollectDivisorsFromExpression(translator, ctx, fa.Target, constraints);
+                return CollectDivisorsFromExpression(translator, ctx, fa.Target, constraints, conditional);
             case StringOperationNode sop:
             {
                 foreach (var arg in sop.Arguments)
                 {
-                    var failure = CollectDivisorsFromExpression(translator, ctx, arg, constraints);
+                    var failure = CollectDivisorsFromExpression(translator, ctx, arg, constraints, conditional);
                     if (failure != null)
                         return failure;
                 }
