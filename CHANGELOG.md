@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-29
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads, 32.0%)
+- **Categories**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x (Calor)
+  - ErrorDetection: 1.49x (Calor, large effect d≈1.2)
+  - TokenEconomics: 1.42x (Calor)
+  - RefactoringStability: 1.38x (Calor, large effect d≈7.1)
+  - EditPrecision: 1.36x (Calor, large effect d≈4.9)
+  - InformationDensity: 0.98x (C#, medium effect)
+- **Benchmarks Evaluated**: 217 (Calor compiles 217/217, C# 216/217)
+
+### Measured (the Loop program, v0.9's centerpiece)
+- **PP-L5 HIT — the WS2+WS3 agent loop tooling reduces convergence cost ~35%.** One simultaneous A/B comparison epoch (`m5-compare-001`, 130 runs, pinned model): median paired tokens-to-green ratio 0.6465 (arm B = MCP transactional writes + warm sessions vs arm A = WS1-only baseline), one-sided 95% CI excluding zero effect, all 9 warm pairs improved. PP-L6 (science-integrity guard) passed; PP-L1 (warm feedback P50 2 ms / P99 9 ms edit→envelope) published under Added below.
+- **PP-W1 HIT — enforcement catches seeded defects the C# toolkit misses.** Injected-defect probe epoch (`ws5-probe-001`, 9 defect pairs × both arms): Calor 9/9 vs C# 4/9 (Δ+5), concentrated in the runtime-contract channel (`§Q`/`§S` guards) plus effect build-blocks. Full records under `bench/phase0-agent-native/epochs/`.
+
 ### Added
 - **Warm-feedback latency measured and published (loop plan WS3/M4, PP-L1: PASS).** On the pinned 10k-line multi-module latency fixture (`bench/phase0-agent-native/latency/`, 106 files, 230 committed timed edits), the MCP transactional write path (`calor_file_write`, warm session) measures **P50 2 ms / P99 9 ms** edit→envelope — against PP-L1 thresholds of 300 ms / 1 s. `calor watch` incremental rebuilds on the same fixture measure P50 27 ms / P99 32 ms (excluding the configured 200 ms debounce, recorded alongside); cold session open and cold watch compile of all 106 files are ~110 ms and ~390 ms. Full run record: `bench/phase0-agent-native/latency/ml1-002/` (adjudicating, run on merged main; `ml1-001/` is the agreeing pre-merge record). Instrumentation shipped with this release: `mcp-write/2` telemetry records carry `latencyMs` with a refresh/check/apply phase breakdown, and `calor watch` journals `watch-rebuild/1` records to `CALOR_WATCH_REBUILD_LOG` and prints per-rebuild wall time.
 
