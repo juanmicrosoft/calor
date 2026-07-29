@@ -126,4 +126,184 @@ public class CliMultiFileTests : IDisposable
         Assert.NotEqual(0, exit);
         Assert.Contains("--output is only supported when compiling a single file", stdOut + stdErr);
     }
+
+
+    // ------------------------------------------------------------------
+    // G3 (#809): cross-module calls must emit QUALIFIED C# that links under
+    // csc — bare-name emission was CS0103 in every multi-module build.
+    // ------------------------------------------------------------------
+
+    private (string StorePath, string CatalogPath) WriteCrossModuleCallPair()
+    {
+        var storePath = Path.Combine(_tempDir, "store.calr");
+        var catalogPath = Path.Combine(_tempDir, "catalog.calr");
+        File.WriteAllText(storePath, """
+            §M{m001:Store}
+              §F{f001:SaveSnapshot:pub} (str:path, str:name) -> void
+                §E{fs:w}
+                §C{File.WriteAllText} §A path §A name §/C
+            """);
+        File.WriteAllText(catalogPath, """
+            §M{m002:Catalog}
+              §F{f001:Ping:pub} (str:path) -> void
+                §E{fs:w}
+                §C{SaveSnapshot} §A path §A "x" §/C
+            """);
+        return (storePath, catalogPath);
+    }
+
+    [Fact]
+    public void MultiFile_CrossModuleCall_EmitsQualifiedTarget()
+    {
+        var (storePath, catalogPath) = WriteCrossModuleCallPair();
+
+        var (exit, stdOut, stdErr) = RunCli("--input", storePath, "--input", catalogPath, "--enforce-effects");
+
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+        var emitted = File.ReadAllText(Path.Combine(_tempDir, "catalog.g.cs"));
+        Assert.Contains("global::Store.StoreModule.SaveSnapshot(path, \"x\");", emitted);
+    }
+
+    [Fact]
+    public void MultiFile_CrossModuleCall_OutputsCompileUnderRoslyn()
+    {
+        var (storePath, catalogPath) = WriteCrossModuleCallPair();
+
+        var (exit, stdOut, stdErr) = RunCli("--input", storePath, "--input", catalogPath, "--enforce-effects");
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+
+        // The #809 exit criterion: both emitted files must COMPILE AND LINK
+        // together under Roslyn (the front-end succeeding is not enough).
+        var storeCs = File.ReadAllText(Path.Combine(_tempDir, "store.g.cs"));
+        var catalogCs = File.ReadAllText(Path.Combine(_tempDir, "catalog.g.cs"));
+
+        var trees = new[]
+        {
+            // The MSBuild integration compiles with ImplicitUsings; mirror the
+            // common set here so BCL names (File, Console) resolve.
+            Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                "global using System; global using System.IO;"),
+            Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(storeCs),
+            Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(catalogCs)
+        };
+        var references = new[]
+        {
+            Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+            Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
+            Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(System.IO.File).Assembly.Location),
+            Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(Path.Combine(
+                Path.GetDirectoryName(typeof(object).Assembly.Location)!, "System.Runtime.dll")),
+        };
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+            "XModTest",
+            trees,
+            references,
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+
+        var errors = compilation.GetDiagnostics()
+            .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+            // Calor.Runtime using is emitted but not referenced in this minimal compilation
+            .Where(d => !d.GetMessage().Contains("'Calor'"))
+            .ToArray();
+        Assert.True(errors.Length == 0,
+            "emitted C# fails to link: " + string.Join("; ", errors.Select(e => e.ToString())));
+    }
+
+    [Fact]
+    public void MultiFile_AmbiguousBareName_StaysUnqualified()
+    {
+        // Two modules export the same name: qualification must NOT guess —
+        // the bare emission is kept (mirroring effect resolution's
+        // skip-ambiguous rule), and csc's CS0103 remains the honest failure.
+        var aPath = Path.Combine(_tempDir, "a.calr");
+        var bPath = Path.Combine(_tempDir, "b.calr");
+        var cPath = Path.Combine(_tempDir, "c.calr");
+        File.WriteAllText(aPath, """
+            §M{m001:Alpha}
+              §F{f001:Emit:pub} () -> void
+                §E{cw}
+                §P "alpha"
+            """);
+        File.WriteAllText(bPath, """
+            §M{m002:Beta}
+              §F{f001:Emit:pub} () -> void
+                §E{cw}
+                §P "beta"
+            """);
+        File.WriteAllText(cPath, """
+            §M{m003:Caller}
+              §F{f001:Run:pub} () -> void
+                §E{cw}
+                §C{Emit}
+                §/C
+            """);
+
+        RunCli("--input", aPath, "--input", bPath, "--input", cPath);
+
+        var emitted = File.ReadAllText(Path.Combine(_tempDir, "c.g.cs"));
+        Assert.Contains("Emit();", emitted);
+        Assert.DoesNotContain("global::Alpha", emitted);
+        Assert.DoesNotContain("global::Beta", emitted);
+    }
+
+    [Fact]
+    public void MultiFile_SelfModuleCall_StaysUnqualified()
+    {
+        var aPath = Path.Combine(_tempDir, "self.calr");
+        var bPath = Path.Combine(_tempDir, "other.calr");
+        File.WriteAllText(aPath, """
+            §M{m001:SelfMod}
+              §F{f001:Helper:pub} () -> void
+                §E{cw}
+                §P "hi"
+              §F{f002:Run:pub} () -> void
+                §E{cw}
+                §C{Helper}
+                §/C
+            """);
+        File.WriteAllText(bPath, """
+            §M{m002:OtherMod}
+              §F{f001:Unrelated:pub} () -> void
+                §E{}
+            """);
+
+        var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+
+        var emitted = File.ReadAllText(Path.Combine(_tempDir, "self.g.cs"));
+        Assert.Contains("Helper();", emitted);
+        Assert.DoesNotContain("global::SelfMod", emitted);
+    }
+
+    [Fact]
+    public void MultiFile_CrossModuleCall_WithContracts_VerifiesAndLinks()
+    {
+        // D-G4.2 seed: contracts and effects on the same cross-module chain —
+        // the multi-module surface the Guarantees fixtures build on.
+        var mathPath = Path.Combine(_tempDir, "math.calr");
+        var appPath = Path.Combine(_tempDir, "app.calr");
+        File.WriteAllText(mathPath, """
+            §M{m001:MathMod}
+              §F{f001:Clamp:pub} (i32:x) -> i32
+                §Q (>= x (- 0 1000))
+                §S (>= result 0)
+                §IF{if1} (< x 0)
+                  §R 0
+                §EL
+                  §R x
+            """);
+        File.WriteAllText(appPath, """
+            §M{m002:AppMod}
+              §F{f001:Use:pub} (i32:v) -> void
+                §C{Clamp} §A v §/C
+            """);
+
+        var (exit, stdOut, stdErr) = RunCli(
+            "--input", mathPath, "--input", appPath, "--verify");
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+
+        var emitted = File.ReadAllText(Path.Combine(_tempDir, "app.g.cs"));
+        Assert.Contains("global::MathMod.MathModModule.Clamp(", emitted);
+    }
 }

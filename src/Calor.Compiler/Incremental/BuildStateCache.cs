@@ -19,7 +19,16 @@ internal sealed partial class BuildStateJsonContext : JsonSerializerContext { }
 internal sealed class BuildState
 {
     // Bump when cache schema changes (e.g., added EffectSummary in 2.0).
-    public string FormatVersion { get; set; } = "2.0";
+    public string FormatVersion { get; set; } = "2.1";
+
+    /// <summary>
+    /// Fingerprint of the cross-module function map the outputs were emitted
+    /// under (G3/#809): emission qualifies cross-module calls from this map, so
+    /// a changed map (module added/removed/renamed, ambiguity introduced) must
+    /// invalidate every warm skip — a cached .g.cs may carry stale
+    /// qualification. Null/empty when single-module.
+    /// </summary>
+    public string? CrossModuleMapHash { get; set; }
     public string CompilerHash { get; set; } = "";
     public string OptionsHash { get; set; } = "";
     public string ManifestHash { get; set; } = "";
@@ -53,7 +62,10 @@ internal sealed class BuildFileEntry
 
 internal static class BuildStateCache
 {
-    private const string FormatVersion = "2.0";
+    // 2.1: cross-module call qualification (G3/#809) — outputs emitted before
+    // the qualifier existed carry bare cross-module calls and must not be
+    // trusted by warm builds; the bump invalidates them once.
+    private const string FormatVersion = "2.1";
     private const string CacheFileName = ".calor-build-state.json";
     private const int MaxRetries = 3;
     private const int BaseRetryDelayMs = 50;

@@ -136,6 +136,32 @@ internal static class CompilationDriver
             };
         }
 
+        // --- Cross-module call qualification map (G3/#809): a light pre-parse of
+        // every input collects each module's public function names so the emitter
+        // can qualify bare-name cross-module calls (they otherwise emit verbatim
+        // and fail csc with CS0103). Unambiguous names only — a name defined in
+        // two modules is dropped, matching cross-module effect resolution's
+        // skip-ambiguous rule so emission and enforcement agree. Warm-skip
+        // validity depends on this map: its hash participates in global
+        // invalidation below.
+        IReadOnlyDictionary<string, string>? crossModuleMap = null;
+        string? crossModuleMapHash = null;
+        if (sources.Count > 1)
+        {
+            crossModuleMap = BuildCrossModuleFunctionMap(sources);
+            crossModuleMapHash = ComputeCrossModuleMapHash(crossModuleMap);
+            if (newState != null)
+            {
+                newState.CrossModuleMapHash = crossModuleMapHash;
+            }
+            if (priorFiles != null && priorState?.CrossModuleMapHash != crossModuleMapHash)
+            {
+                // Map changed (module added/removed/renamed or ambiguity introduced):
+                // every cached output may carry stale qualification — full re-emit.
+                priorFiles = null;
+            }
+        }
+
         foreach (var file in sources)
         {
             // --- Warm path: skip unchanged files, reusing the cached effect summary ---
@@ -172,6 +198,7 @@ internal static class CompilationDriver
             }
 
             var options = optionsFactory(file);
+            options.CrossModuleFunctionModules = crossModuleMap;
             if (options.Verbose)
             {
                 (options.StatusWriter ?? Console.Out).WriteLine($"Compiling: {file.FullName}");
@@ -287,6 +314,70 @@ internal static class CompilationDriver
         }
 
         return new DriverResult(compiled, anyErrors, skipped);
+    }
+
+    /// <summary>
+    /// Pre-parses every input for its module name and public function names,
+    /// producing the bare-name → module map used for cross-module call
+    /// qualification (G3/#809). Files that fail to parse contribute nothing
+    /// (they fail properly in the main compile loop); ambiguous names are
+    /// dropped entirely.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> BuildCrossModuleFunctionMap(
+        IReadOnlyList<FileInfo> sources)
+    {
+        var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var file in sources)
+        {
+            try
+            {
+                var text = File.ReadAllText(file.FullName);
+                var diagnostics = new Diagnostics.DiagnosticBag();
+                var lexer = new Parsing.Lexer(text, diagnostics);
+                var parser = new Parsing.Parser(lexer.TokenizeAllForParser(), diagnostics);
+                var module = parser.Parse();
+                if (module == null || string.IsNullOrEmpty(module.Name) || module.Name == "_global")
+                {
+                    continue;
+                }
+                foreach (var fn in module.Functions)
+                {
+                    if (fn.Visibility != Ast.Visibility.Public)
+                    {
+                        continue;
+                    }
+                    if (!byName.TryGetValue(fn.Name, out var modules))
+                    {
+                        byName[fn.Name] = modules = new List<string>();
+                    }
+                    if (!modules.Contains(module.Name))
+                    {
+                        modules.Add(module.Name);
+                    }
+                }
+            }
+            catch (IOException)
+            {
+            }
+        }
+
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (name, modules) in byName)
+        {
+            if (modules.Count == 1)
+            {
+                map[name] = modules[0];
+            }
+        }
+        return map;
+    }
+
+    private static string ComputeCrossModuleMapHash(IReadOnlyDictionary<string, string> map)
+    {
+        var canonical = string.Join(";", map.OrderBy(kv => kv.Key, StringComparer.Ordinal)
+            .Select(kv => $"{kv.Key}={kv.Value}"));
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical));
+        return Convert.ToHexString(bytes);
     }
 
     /// <summary>

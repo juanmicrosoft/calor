@@ -566,7 +566,7 @@ public class CompileCalorIntegrationTests : IDisposable
         // After this build, the cache should be v2.0 and the file should have a summary.
         var loaded = BuildStateCache.Load(_outputDir);
         Assert.NotNull(loaded);
-        Assert.Equal("2.0", loaded.FormatVersion);
+        Assert.Equal("2.1", loaded.FormatVersion);
         var entry = Assert.Single(loaded.Files).Value;
         Assert.NotNull(entry.EffectSummary);
         Assert.Equal("TestModule", entry.EffectSummary!.ModuleName);

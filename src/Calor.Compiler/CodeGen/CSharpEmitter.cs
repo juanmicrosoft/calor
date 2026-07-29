@@ -38,6 +38,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private readonly StringBuilder _builder = new();
     private int _indentLevel;
     private string? _currentClassName;
+    private string _currentModuleName = "";
+    private HashSet<string> _currentModuleFunctionNames = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Bare public function name → defining module name, for qualifying
+    /// cross-module calls at emission (G3/#809). Without qualification a
+    /// bare-name call into another module emits as-is and fails csc with
+    /// CS0103 (each module emits into its own namespace/static class). Only
+    /// unambiguous names appear here; ambiguous bare names stay bare (and are
+    /// likewise skipped by cross-module effect resolution). Null for
+    /// single-module compiles.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? CrossModuleFunctionModules { get; set; }
     private string? _currentFunctionId;
     private string? _currentFilePath;
     private string _currentNamespace = "";
@@ -279,6 +292,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
         var namespaceName = isGlobalNamespace ? "" : SanitizeNamespace(node.Name);
         _currentNamespace = namespaceName;
+        _currentModuleName = node.Name;
+        _currentModuleFunctionNames = node.Functions.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
 
         // Emit module-level extended metadata as file-level comments
         if (node.Context != null)
@@ -691,9 +706,39 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return result;
     }
 
+    /// <summary>
+    /// Qualifies a bare-name call target that resolves to another module's public
+    /// function (G3/#809): `SaveSnapshot` → `global::Store.StoreModule.SaveSnapshot`,
+    /// mirroring the module emission naming (namespace = sanitized module name,
+    /// class = sanitized last segment + "Module"). Self-module names, dotted or
+    /// generic targets, and names absent from the map pass through untouched.
+    /// Known limit (recorded): a local delegate variable shadowing another
+    /// module's public function name would be mis-qualified — the emitter does
+    /// not track local scopes; the binder rejects most such shadowing shapes.
+    /// </summary>
+    private string QualifyCrossModuleTarget(string target)
+    {
+        if (CrossModuleFunctionModules == null
+            || target.Length == 0
+            || target.Contains('.')
+            || target.Contains('<')
+            || _currentModuleFunctionNames.Contains(target)
+            || !CrossModuleFunctionModules.TryGetValue(target, out var calleeModule)
+            || calleeModule == _currentModuleName)
+        {
+            return target;
+        }
+
+        var calleeNamespace = SanitizeNamespace(calleeModule);
+        var calleeClass = SanitizeIdentifier(calleeModule.Contains('.')
+            ? calleeModule.Split('.').Last()
+            : calleeModule) + "Module";
+        return $"global::{calleeNamespace}.{calleeClass}.{target}";
+    }
+
     public string Visit(CallStatementNode node)
     {
-        var target = node.Target;
+        var target = QualifyCrossModuleTarget(node.Target);
         var argStrings = new List<string>();
         for (int i = 0; i < node.Arguments.Count; i++)
         {
@@ -2840,6 +2885,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // A leading dot (e.g., §C{.Method}) means implicit this — prepend "this"
         if (target.StartsWith("."))
             target = "this" + target;
+        else
+            target = QualifyCrossModuleTarget(target);
 
         // Append explicit generic type arguments: target<T1, T2>(args)
         if (node.TypeArguments is { Count: > 0 })
