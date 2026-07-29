@@ -15,8 +15,14 @@ public sealed class VerificationCacheEntry
     /// postcondition keys (D-G1.1) — the bump invalidates every pre-G1 entry,
     /// which is required: old entries were keyed without the function body and
     /// may hold result-unbound verdicts.
+    /// 1.4: signed-modulo translation fixed (bvsmod → bvsrem, C# remainder
+    /// semantics) — the bump evicts every pre-fix entry, which is required:
+    /// a warm cache holding a bvsmod-based Proven verdict would keep eliding
+    /// a runtime guard the fixed verifier refutes (G1 re-verification C-cache).
+    /// Translation-semantics changes MUST bump this version: the Z3-binary
+    /// check does not cover our own translation layer.
     /// </summary>
-    public const string CurrentFormatVersion = "1.3";
+    public const string CurrentFormatVersion = "1.4";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.

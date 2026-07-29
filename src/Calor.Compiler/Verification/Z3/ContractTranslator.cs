@@ -363,8 +363,11 @@ public sealed class ContractTranslator
             // Division and modulo need signed/unsigned variants
             BinaryOperator.Divide when left is BitVecExpr ld && right is BitVecExpr rd
                 => ApplyDivModOp(ld, rd, _ctx.MkBVSDiv, _ctx.MkBVUDiv),
+            // C#'s % is REMAINDER (result takes the dividend's sign) = Z3 bvsrem —
+            // NOT bvsmod (divisor's sign). Using bvsmod let `a % -3` "prove"
+            // result <= 0 while runtime returns +1 (G1 re-verification M-new).
             BinaryOperator.Modulo when left is BitVecExpr lmod && right is BitVecExpr rmod
-                => ApplyDivModOp(lmod, rmod, _ctx.MkBVSMod, _ctx.MkBVURem),
+                => ApplyDivModOp(lmod, rmod, _ctx.MkBVSRem, _ctx.MkBVURem),
 
             // Comparison operations (return BoolExpr) - need signed/unsigned variants
             BinaryOperator.Equal => MkEqNormalized(left, right),
