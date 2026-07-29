@@ -10,6 +10,25 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-29
+
+The Loop release: the agent edit–feedback cycle is now a first-class, measured product surface — one machine-readable envelope across every CLI command and MCP tool, a transactional MCP write path with warm project sessions, and millisecond-scale edit feedback. Measured on paired A/B epochs: the new loop tooling cuts agent tokens-to-green ~35%, and Calor's enforcement caught 9/9 seeded defects where the C# toolkit caught 4/9.
+
+### Added
+- **Transactional MCP write path with project sessions.** `calor_session_open`/`calor_session_close` hold parsed project state; `calor_file_write` runs heal → check → atomic-apply-or-reject with the full diagnostic envelope on reject, project-wide reference checking, and write confinement under a pinned root (`calor mcp --root`).
+- **Fault-tolerant parse mode.** Broken files produce partial ASTs plus diagnostics (never a compile pass), so sessions keep working context across syntax errors; parser depth guards prevent runaway nesting from killing the process.
+- **Warm feedback.** Sessions reuse parse/bind state and a lazy call-target index; MCP edit→envelope latency measures P50 2 ms / P99 9 ms on a pinned 10k-line fixture, with `calor watch` incremental rebuilds at P50 27 ms. Telemetry streams (`mcp-write/2`, `watch-rebuild/1`) journal per-edit latency breakdowns.
+- **Verification-outcome honesty.** All verification outcomes route through a single five-status choke point (`proven | refuted | unknown | timeout | unsupported`); refuted contracts carry concrete counterexample models; a committed fixture corpus pins every status in CI.
+
+### Changed
+- **One envelope everywhere.** Every diagnostic-producing CLI command and MCP tool emits the shared envelope schema v1.1 (diagnostic code, span, enclosing declaration ID, severity, fix hint, verification payload) — 100% coverage over the enumerated surface, enforced by CI conformance tests. See [CLI envelope schema](/docs/cli/envelope-schema/).
+- **`calor verify` exits 1 on refuted contracts** (missing files and compile errors too); proven/inconclusive outcomes keep exit 0.
+
+### Fixed
+- **CLI exit codes propagate on error paths** across `verify`, `convert`, `coverage`, `benchmark`, `migrate`, and the `effects` subcommands (previously stomped to 0 by the invocation pipeline).
+- **JSON mode always emits exactly one envelope document**, including on error paths, with CLI-band diagnostics (`Calor1310`–`1312`).
+- **Counterexample rendering filters internal solver variables** across all producers.
+
 ## [0.8.0] - 2026-07-23
 
 The correctness-hardening release: every exit-0-then-broken-`dotnet build` hole in the binding/rebind/shadowing family is now caught at `calor -i` with a clear diagnostic, plus a systemic pass to keep every diagnostic agent-friendly.
