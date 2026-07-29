@@ -293,14 +293,13 @@ public static class DiagnosticCode
     /// </summary>
     public const string SemanticsVersionIncompatible = "Calor0701";
 
-    // Contract verification results (Calor0710-0719 reserved; 0710-0718 assigned)
+    // Contract verification results (Calor0710-0719 reserved; 0710-0719 assigned)
     // — emitted by Verification/ContractVerificationPass. This sub-band is disjoint
     // from the semantics-version codes above: prior to #702, the verification pass
     // reused Calor0700 (Z3 unavailable) and Calor0701 (precondition may be violated),
     // colliding with SemanticsVersionMismatch/Incompatible. All verification results
-    // now live in 0710-0718 so no code number carries two meanings; 0719 is
-    // reserved headroom for future verification diagnostics. Agents that filtered on
-    // the old 0700-0705 numbers must switch to 0710-0718 (see CHANGELOG.md).
+    // now live in 0710-0719 so no code number carries two meanings. Agents that
+    // filtered on the old 0700-0705 numbers must switch to 0710-0719 (see CHANGELOG.md).
 
     /// <summary>
     /// Info: static contract verification was skipped because the Z3 SMT solver
@@ -358,6 +357,14 @@ public static class DiagnosticCode
     /// silent fallback ("a blacklist by accident").
     /// </summary>
     public const string ContractVerificationUnsupported = "Calor0718";
+
+    /// <summary>
+    /// Warning: a contract holds vacuously — the function's precondition set is
+    /// unsatisfiable, so no valid call exists and the "proof" says nothing about
+    /// the body. Guarantees plan D-G1.3: a vacuous proof is loud and never elides
+    /// the runtime check.
+    /// </summary>
+    public const string VacuousPrecondition = "Calor0719";
 
     // ID errors (Calor0800-0899)
     /// <summary>

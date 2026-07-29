@@ -1,10 +1,12 @@
 §M{m001:ProvenContracts}
   §F{f001:Square:pub} (i32:x) -> i32
     §Q (>= x 0)
+    §Q (<= x 46340)
     §S (>= result 0)
     §R (* x x)
 
   §F{f002:AbsoluteValue:pub} (i32:x) -> i32
+    §Q (>= x (- 0 2147483647))
     §S (>= result 0)
     §IF{if001} (< x 0)
       §R (- 0 x)
@@ -22,6 +24,8 @@
   §F{f004:AddPositive:pub} (i32:a, i32:b) -> i32
     §Q (> a 0)
     §Q (> b 0)
+    §Q (<= a 1073741823)
+    §Q (<= b 1073741823)
     §S (> result a)
     §S (> result b)
     §R (+ a b)
@@ -29,4 +33,3 @@
   §F{f005:Identity:pub} (i32:x) -> i32
     §S (== result x)
     §R x
-

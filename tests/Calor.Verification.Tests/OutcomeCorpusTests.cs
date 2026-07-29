@@ -125,9 +125,15 @@ public class OutcomeCorpusTests
             DiagnosticCode.PostconditionProven,
             DiagnosticCode.ContractVerificationInconclusive,
             DiagnosticCode.ContractVerificationTimeout,
-            DiagnosticCode.ContractVerificationUnsupported
+            DiagnosticCode.ContractVerificationUnsupported,
+            DiagnosticCode.VacuousPrecondition
         ];
-        string[] fixtures = ["proven.calr", "refuted-with-model.calr", "unsupported.calr", "timeout.calr"];
+        string[] fixtures =
+        [
+            "proven.calr", "refuted-with-model.calr", "unsupported.calr", "timeout.calr",
+            "proven-with-result.calr", "refuted-overflow.calr", "unsupported-body.calr",
+            "vacuous-precondition.calr"
+        ];
 
         foreach (var fixture in fixtures)
         {
@@ -137,6 +143,95 @@ public class OutcomeCorpusTests
             Assert.NotEmpty(contractDiags);
             Assert.All(contractDiags, d => Assert.NotNull(d.Verification));
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Guarantees plan WS-G1 fixtures (D-G1.4): result binding, honest
+    // refutation, never-refute-free-result, and vacuity.
+    // ------------------------------------------------------------------
+
+    [SkippableFact]
+    public void ProvenWithResultFixture_ResultBoundPostconditionsProve()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // The #807 regression pin, proving direction: result-referencing
+        // postconditions over encodable bodies (single-return, if/else,
+        // elseif chains) are Proven — not refuted against a free result.
+        var result = CompileFixture("proven-with-result.calr", verbose: true);
+
+        Assert.Empty(ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.PostconditionMayBeViolated));
+
+        var proven = ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.PostconditionProven)
+            .ToList();
+        Assert.Equal(4, proven.Count);
+        Assert.All(proven, d => Assert.Equal(ProofStatus.Proven, d.Verification!.Status));
+        Assert.All(proven, d => Assert.False(d.Verification!.IsVacuous));
+    }
+
+    [SkippableFact]
+    public void RefutedOverflowFixture_CarriesGenuineModels()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // Honest refutations: with result bound to the body, the only remaining
+        // counterexamples are genuine two's-complement overflows, and each must
+        // carry a concrete model (M-E2).
+        var result = CompileFixture("refuted-overflow.calr");
+
+        var refuted = ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.PostconditionMayBeViolated)
+            .ToList();
+        Assert.Equal(2, refuted.Count);
+        Assert.All(refuted, d =>
+        {
+            Assert.Equal(ProofStatus.Refuted, d.Verification!.Status);
+            var model = d.Verification.Counterexample;
+            Assert.NotNull(model);
+            Assert.Contains(model.Bindings, b => b.Name == "result");
+        });
+    }
+
+    [SkippableFact]
+    public void UnsupportedBodyFixture_NeverRefutesAgainstFreeResult()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // The #807 regression pin, refuting direction: a result-referencing
+        // postcondition over a body outside the encodable surface must be
+        // Unsupported — never Refuted with a fabricated model.
+        var result = CompileFixture("unsupported-body.calr");
+
+        Assert.Empty(ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.PostconditionMayBeViolated));
+
+        var unsupported = ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.ContractVerificationUnsupported)
+            .ToList();
+        Assert.NotEmpty(unsupported);
+        Assert.All(unsupported, d =>
+        {
+            Assert.Equal(ProofStatus.Unsupported, d.Verification!.Status);
+            Assert.Contains("result", d.Verification.Reason);
+        });
+    }
+
+    [SkippableFact]
+    public void VacuousPreconditionFixture_ProvenVacuousAndLoud()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // D-G1.3: a jointly-unsatisfiable precondition set makes the
+        // postcondition Proven(vacuous) — flagged, warned, never elidable.
+        var result = CompileFixture("vacuous-precondition.calr");
+
+        var vacuous = ContractDiagnostics(result)
+            .Single(d => d.Code == DiagnosticCode.VacuousPrecondition);
+        Assert.Equal(ProofStatus.Proven, vacuous.Verification!.Status);
+        Assert.True(vacuous.Verification.IsVacuous);
+        Assert.Equal(DiagnosticSeverity.Warning, vacuous.Severity);
     }
 
     // ------------------------------------------------------------------
@@ -177,5 +272,27 @@ public class OutcomeCorpusTests
         Assert.Equal(ProofStatus.Refuted, outcome.Status);
         Assert.NotNull(outcome.Counterexample);
         Assert.Equal("Counterexample: x=1", outcome.Counterexample.Render());
+    }
+
+    [Fact]
+    public void RehydratedVacuousProven_KeepsVacuousFlag()
+    {
+        // D-G1.3: the vacuous flag must survive persistence — a rehydrated
+        // vacuous proof must still never elide runtime checks.
+        var outcome = ProofOutcome.Rehydrate("proven", null, "vacuous set", isVacuous: true);
+
+        Assert.Equal(ProofStatus.Proven, outcome.Status);
+        Assert.True(outcome.IsVacuous);
+    }
+
+    [Fact]
+    public void VacuousProofEvidence_AssignsProvenVacuous()
+    {
+        var outcome = ProofOutcome.Assign(ProofEvidence.VacuousProof("unsat preconditions"));
+
+        Assert.Equal(ProofStatus.Proven, outcome.Status);
+        Assert.True(outcome.IsVacuous);
+        Assert.Null(outcome.Counterexample);
+        Assert.Contains("unsat", outcome.Reason);
     }
 }

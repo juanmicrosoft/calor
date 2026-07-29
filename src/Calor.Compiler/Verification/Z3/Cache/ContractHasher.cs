@@ -28,13 +28,17 @@ public sealed class ContractHasher
 
     /// <summary>
     /// Computes a hash key for a postcondition.
-    /// Format: POST:{params}:{output}:PRECS:{prec_hashes}::POST:{post_hash}
+    /// Format: POST:{params}:{output}:PRECS:{prec_hashes}::POST:{post_hash}[::BODY:{body}]
+    /// The body component is included exactly when the postcondition references
+    /// <c>result</c> — the verifier binds <c>result</c> to the body in that case
+    /// (guarantees plan D-G1.1), so a body edit must invalidate the cached proof.
     /// </summary>
     public string HashPostcondition(
         IReadOnlyList<(string Name, string TypeName)> parameters,
         string? outputType,
         IReadOnlyList<RequiresNode> preconditions,
-        EnsuresNode postcondition)
+        EnsuresNode postcondition,
+        IReadOnlyList<StatementNode>? body = null)
     {
         var sb = new StringBuilder();
         sb.Append("POST:");
@@ -53,7 +57,64 @@ public sealed class ContractHasher
         sb.Append("::POST:");
         AppendExpression(sb, postcondition.Condition);
 
+        if (body != null && FunctionBodyEncoder.ReferencesResult(postcondition.Condition))
+        {
+            sb.Append("::BODY:");
+            AppendStatements(sb, body);
+        }
+
         return ComputeSha256Hash(sb.ToString());
+    }
+
+    /// <summary>
+    /// Serializes a statement list for hashing. Return and if/elseif/else statements —
+    /// the encodable surface — serialize structurally with their expressions; any other
+    /// statement kind serializes as an opaque marker with its node type, which is
+    /// collision-safe because such bodies always verify as Unsupported regardless of
+    /// their content.
+    /// </summary>
+    private void AppendStatements(StringBuilder sb, IReadOnlyList<StatementNode> statements)
+    {
+        foreach (var stmt in statements)
+        {
+            switch (stmt)
+            {
+                case ReturnStatementNode ret:
+                    sb.Append("R(");
+                    if (ret.Expression != null)
+                        AppendExpression(sb, ret.Expression);
+                    sb.Append(')');
+                    break;
+
+                case IfStatementNode ifStmt:
+                    sb.Append("IF(");
+                    AppendExpression(sb, ifStmt.Condition);
+                    sb.Append("){");
+                    AppendStatements(sb, ifStmt.ThenBody);
+                    sb.Append('}');
+                    foreach (var clause in ifStmt.ElseIfClauses)
+                    {
+                        sb.Append("EI(");
+                        AppendExpression(sb, clause.Condition);
+                        sb.Append("){");
+                        AppendStatements(sb, clause.Body);
+                        sb.Append('}');
+                    }
+                    if (ifStmt.ElseBody != null)
+                    {
+                        sb.Append("EL{");
+                        AppendStatements(sb, ifStmt.ElseBody);
+                        sb.Append('}');
+                    }
+                    break;
+
+                default:
+                    sb.Append("OPAQUE:");
+                    sb.Append(stmt.GetType().Name);
+                    break;
+            }
+            sb.Append(';');
+        }
     }
 
     /// <summary>

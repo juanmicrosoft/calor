@@ -1,0 +1,8 @@
+§M{m1:OutcomeUnsupportedBody}
+  §F{f1:SumTo:pub} (i32:n) -> i32
+    §Q (> n 0)
+    §S (>= result 0)
+    §B{~total:i32} 0
+    §L{l1:i:1:n:1}
+      §B{~total:i32} (+ total i)
+    §R total
