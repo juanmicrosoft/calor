@@ -1,0 +1,23 @@
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor",
+  "run": 5,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1057,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": null,
+  "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/cf791636-d712-4c3a-981b-86260d88ee6a/scratchpad/arm-a-worktree/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "raw",
+  "tokens": {
+    "input": 53,
+    "output": 15139
+  },
+  "nullAgent": false
+}

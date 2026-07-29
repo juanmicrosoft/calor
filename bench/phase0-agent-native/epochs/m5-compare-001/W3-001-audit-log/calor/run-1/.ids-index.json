@@ -1,0 +1,30 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "AuditLog",
+    "file": "AuditLog.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "Append",
+    "file": "AuditLog.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "CountEntries",
+    "file": "AuditLog.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "LastEntry",
+    "file": "AuditLog.calr",
+    "line": 14
+  }
+]

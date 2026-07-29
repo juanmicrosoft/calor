@@ -1,0 +1,121 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "OrderPipeline",
+    "file": "OrderPipeline.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "IsValidOrder",
+    "file": "OrderPipeline.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "TierDiscountBps",
+    "file": "OrderPipeline.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "Subtotal",
+    "file": "OrderPipeline.calr",
+    "line": 16
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "DiscountAmount",
+    "file": "OrderPipeline.calr",
+    "line": 20
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "TaxAmount",
+    "file": "OrderPipeline.calr",
+    "line": 25
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "OrderTotal",
+    "file": "OrderPipeline.calr",
+    "line": 29
+  },
+  {
+    "id": "f007",
+    "kind": "Function",
+    "name": "CanTransition",
+    "file": "OrderPipeline.calr",
+    "line": 40
+  },
+  {
+    "id": "f008",
+    "kind": "Function",
+    "name": "ApplyTransition",
+    "file": "OrderPipeline.calr",
+    "line": 54
+  },
+  {
+    "id": "f009",
+    "kind": "Function",
+    "name": "RecordOrder",
+    "file": "OrderPipeline.calr",
+    "line": 61
+  },
+  {
+    "id": "f010",
+    "kind": "Function",
+    "name": "CustomerTotal",
+    "file": "OrderPipeline.calr",
+    "line": 68
+  },
+  {
+    "id": "f011",
+    "kind": "Function",
+    "name": "GrandTotal",
+    "file": "OrderPipeline.calr",
+    "line": 74
+  },
+  {
+    "id": "f012",
+    "kind": "Function",
+    "name": "ActiveCustomers",
+    "file": "OrderPipeline.calr",
+    "line": 81
+  },
+  {
+    "id": "f013",
+    "kind": "Function",
+    "name": "ProcessOrder",
+    "file": "OrderPipeline.calr",
+    "line": 88
+  },
+  {
+    "id": "f014",
+    "kind": "Function",
+    "name": "RefundAmount",
+    "file": "OrderPipeline.calr",
+    "line": 98
+  },
+  {
+    "id": "f015",
+    "kind": "Function",
+    "name": "RecordRefund",
+    "file": "OrderPipeline.calr",
+    "line": 104
+  },
+  {
+    "id": "f016",
+    "kind": "Function",
+    "name": "ProcessReturn",
+    "file": "OrderPipeline.calr",
+    "line": 114
+  }
+]

@@ -1,0 +1,107 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "FolderSync",
+    "file": "FolderSync.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "EntryName",
+    "file": "FolderSync.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "EntryStamp",
+    "file": "FolderSync.calr",
+    "line": 9
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "FormatEntry",
+    "file": "FolderSync.calr",
+    "line": 17
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "IndexHas",
+    "file": "FolderSync.calr",
+    "line": 21
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "IndexStamp",
+    "file": "FolderSync.calr",
+    "line": 34
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "WriteIndexEntry",
+    "file": "FolderSync.calr",
+    "line": 47
+  },
+  {
+    "id": "f007",
+    "kind": "Function",
+    "name": "RemoveIndexEntry",
+    "file": "FolderSync.calr",
+    "line": 69
+  },
+  {
+    "id": "f008",
+    "kind": "Function",
+    "name": "CopyNewer",
+    "file": "FolderSync.calr",
+    "line": 83
+  },
+  {
+    "id": "f009",
+    "kind": "Function",
+    "name": "PruneOrphans",
+    "file": "FolderSync.calr",
+    "line": 99
+  },
+  {
+    "id": "f010",
+    "kind": "Function",
+    "name": "DryRunReport",
+    "file": "FolderSync.calr",
+    "line": 114
+  },
+  {
+    "id": "f011",
+    "kind": "Function",
+    "name": "Sync",
+    "file": "FolderSync.calr",
+    "line": 136
+  },
+  {
+    "id": "f012",
+    "kind": "Function",
+    "name": "RecordDelete",
+    "file": "FolderSync.calr",
+    "line": 142
+  },
+  {
+    "id": "f013",
+    "kind": "Function",
+    "name": "SyncTwoWay",
+    "file": "FolderSync.calr",
+    "line": 149
+  },
+  {
+    "id": "f014",
+    "kind": "Function",
+    "name": "SyncWithPolicy",
+    "file": "FolderSync.calr",
+    "line": 198
+  }
+]

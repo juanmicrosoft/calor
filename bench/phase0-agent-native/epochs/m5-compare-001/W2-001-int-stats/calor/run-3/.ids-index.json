@@ -1,0 +1,44 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Stats",
+    "file": "Stats.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "Min",
+    "file": "Stats.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "Max",
+    "file": "Stats.calr",
+    "line": 14
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "Sum",
+    "file": "Stats.calr",
+    "line": 26
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "Mean",
+    "file": "Stats.calr",
+    "line": 36
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "Clamp",
+    "file": "Stats.calr",
+    "line": 47
+  }
+]

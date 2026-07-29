@@ -1,0 +1,51 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "KvJournal",
+    "file": "KvJournal.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "Set",
+    "file": "KvJournal.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "KeyOf",
+    "file": "KvJournal.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "ValueOf",
+    "file": "KvJournal.calr",
+    "line": 13
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "Get",
+    "file": "KvJournal.calr",
+    "line": 20
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "CountKeys",
+    "file": "KvJournal.calr",
+    "line": 33
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "Compact",
+    "file": "KvJournal.calr",
+    "line": 47
+  }
+]

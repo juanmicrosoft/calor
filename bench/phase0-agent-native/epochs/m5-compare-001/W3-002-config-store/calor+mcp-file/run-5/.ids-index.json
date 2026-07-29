@@ -1,0 +1,30 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "ConfigStore",
+    "file": "ConfigStore.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "Get",
+    "file": "ConfigStore.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "Has",
+    "file": "ConfigStore.calr",
+    "line": 15
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "Set",
+    "file": "ConfigStore.calr",
+    "line": 28
+  }
+]

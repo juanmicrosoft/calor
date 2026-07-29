@@ -1,0 +1,92 @@
+{
+  "epochId": "m5-compare-001",
+  "kind": "m5-comparison",
+  "armA": {
+    "label": "calor",
+    "role": "baseline (WS1-only)",
+    "commit": "4f235cdc498dd7498b41b901d472a6649aaaded3",
+    "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/cf791636-d712-4c3a-981b-86260d88ee6a/scratchpad/arm-a-worktree/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "editMechanism": "raw"
+  },
+  "armB": {
+    "label": "calor+mcp-file",
+    "role": "baseline + WS2/WS3 isolation",
+    "commit": "73e2519af40534fae953759406bb53e4e7b259aa",
+    "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "editMechanism": "mcp-file"
+  },
+  "boot": 2000,
+  "alpha": 0.05,
+  "ppL5": {
+    "metric": "tokens-to-green",
+    "threshold": 0.85,
+    "medianPairedRatio_BoverA": 0.6465248702059957,
+    "nPairs": 9,
+    "oneSided95UpperBound": 0.7957006892024943,
+    "pMedian_ge_1.0": 0.0,
+    "meetsThreshold": true,
+    "excludesZeroEffect": true,
+    "decidable": true,
+    "hit": true,
+    "perPair": [
+      {
+        "pair": "W2-001",
+        "ratio": 0.6139
+      },
+      {
+        "pair": "W2-002",
+        "ratio": 0.6465
+      },
+      {
+        "pair": "W2-003",
+        "ratio": 0.684
+      },
+      {
+        "pair": "W2-004",
+        "ratio": 0.6251
+      },
+      {
+        "pair": "W2-005",
+        "ratio": 0.9273
+      },
+      {
+        "pair": "W3-001",
+        "ratio": 0.5504
+      },
+      {
+        "pair": "W3-002",
+        "ratio": 0.6252
+      },
+      {
+        "pair": "W3-003",
+        "ratio": 0.6744
+      },
+      {
+        "pair": "W3-004",
+        "ratio": 0.8713
+      }
+    ],
+    "censoredFrac": {
+      "armA": 0.0,
+      "armB": 0.0,
+      "diffWithin5pp": true
+    },
+    "rule": "gates \u00a76.1: hit iff point<=0.85 AND one-sided 95% CI excludes ratio 1.0; !decidable if <2 warm pairs or censored-diff>5pp"
+  },
+  "ppL6": {
+    "metric": "neutral iterations-to-green parity (no significant regression)",
+    "medianPairedRatio_BoverA": 1.0,
+    "nPairs": 4,
+    "oneSided95LowerBound": 0.8888888888888888,
+    "pMedian_le_1.0": 0.9785,
+    "significantRegression": false,
+    "pass": true,
+    "censoredFrac": {
+      "armA": 0.1,
+      "armB": 0.1,
+      "cap40_ok": true,
+      "diffWithin5pp": true
+    },
+    "note": "release blocker; config invariance also enforced per-run by run-pair.sh check_pins"
+  }
+}

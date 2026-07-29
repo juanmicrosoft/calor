@@ -1,0 +1,29 @@
+{
+  "pair": "W3-001-audit-log",
+  "arm": "calor+mcp-file",
+  "run": 3,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 6,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1073,
+  "envelopeValidAll": true,
+  "mcpWrites": {
+    "attempts": 1,
+    "applied": 1,
+    "appliedUnhealed": 1,
+    "rejected": 0,
+    "healed": 0
+  },
+  "defect": null,
+  "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "mcp-file",
+  "tokens": {
+    "input": 13,
+    "output": 2988
+  },
+  "nullAgent": false
+}
