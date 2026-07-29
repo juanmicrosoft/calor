@@ -157,7 +157,7 @@ public class VerifyToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_PerContract_UsesFiveStatusVocabulary()
+    public async Task ExecuteAsync_PerContract_UsesClosedStatusVocabulary()
     {
         var args = JsonDocument.Parse("""
             {
@@ -168,14 +168,14 @@ public class VerifyToolTests
         var result = await _tool.ExecuteAsync(args);
         var json = JsonDocument.Parse(result.Content[0].Text!);
 
-        var fiveStatus = new[] { "proven", "refuted", "unknown", "timeout", "unsupported" };
+        var statusVocabulary = new[] { "proven", "refuted", "assumed", "unknown", "timeout", "unsupported", "unavailable" };
         var legacyStatus = new[] { "proven", "unproven", "disproven", "unsupported", "skipped" };
 
         foreach (var function in json.RootElement.GetProperty("functions").EnumerateArray())
         {
             foreach (var contract in function.GetProperty("contracts").EnumerateArray())
             {
-                Assert.Contains(contract.GetProperty("status").GetString(), fiveStatus);
+                Assert.Contains(contract.GetProperty("status").GetString(), statusVocabulary);
                 Assert.Contains(contract.GetProperty("legacyStatus").GetString(), legacyStatus);
 
                 // A structured counterexample, when present, carries rendered + bindings

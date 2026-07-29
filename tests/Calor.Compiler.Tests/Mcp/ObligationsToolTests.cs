@@ -93,12 +93,12 @@ public sealed class ObligationsToolTests
         // Envelope schema v1.1: proof_status carries the five-status wire name
         // (absent while pending/boundary); counterexample_bindings, when present,
         // is the structured model.
-        var fiveStatus = new[] { "proven", "refuted", "unknown", "timeout", "unsupported" };
+        var statusVocabulary = new[] { "proven", "refuted", "assumed", "unknown", "timeout", "unsupported", "unavailable" };
         foreach (var obl in obligations.EnumerateArray())
         {
             if (obl.TryGetProperty("proof_status", out var proofStatus))
             {
-                Assert.Contains(proofStatus.GetString(), fiveStatus);
+                Assert.Contains(proofStatus.GetString(), statusVocabulary);
             }
 
             if (obl.TryGetProperty("counterexample_bindings", out var bindings))
