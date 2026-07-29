@@ -1,0 +1,23 @@
+{
+  "version": "1.1",
+  "diagnostics": [
+    {
+      "code": "Calor0332",
+      "message": "integer constant folded",
+      "severity": "info",
+      "location": {
+        "file": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/m5-compare-001/W2-002-parity-encoder/calor\u002Bmcp-file/run-2/.envelope-src/ParityEncoder.calr",
+        "line": 34,
+        "column": 19,
+        "length": 7
+      },
+      "declarationId": "f004"
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 0,
+    "info": 1
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "pair": "W2-002-parity-encoder",
+  "arm": "calor+mcp-file",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 21,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1093,
+  "envelopeValidAll": true,
+  "mcpWrites": {
+    "attempts": 1,
+    "applied": 1,
+    "appliedUnhealed": 1,
+    "rejected": 0,
+    "healed": 0
+  },
+  "defect": null,
+  "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "mcp-file",
+  "tokens": {
+    "input": 15,
+    "output": 4119
+  },
+  "nullAgent": false
+}

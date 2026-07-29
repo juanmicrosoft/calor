@@ -1,0 +1,29 @@
+{
+  "pair": "W3-003-kv-journal",
+  "arm": "calor+mcp-file",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 17,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1119,
+  "envelopeValidAll": true,
+  "mcpWrites": {
+    "attempts": 1,
+    "applied": 1,
+    "appliedUnhealed": 1,
+    "rejected": 0,
+    "healed": 0
+  },
+  "defect": null,
+  "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "mcp-file",
+  "tokens": {
+    "input": 15,
+    "output": 5375
+  },
+  "nullAgent": false
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "WindowStats",
+    "file": "WindowStats.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "WindowSum",
+    "file": "WindowStats.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "WindowMin",
+    "file": "WindowStats.calr",
+    "line": 14
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "MaxWindowSum",
+    "file": "WindowStats.calr",
+    "line": 27
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "CountAbove",
+    "file": "WindowStats.calr",
+    "line": 41
+  }
+]

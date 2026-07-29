@@ -1,0 +1,29 @@
+{
+  "pair": "N1-005-order-pipeline",
+  "arm": "calor+mcp-file",
+  "run": 5,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 25,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1085,
+  "envelopeValidAll": true,
+  "mcpWrites": {
+    "attempts": 1,
+    "applied": 1,
+    "appliedUnhealed": 1,
+    "rejected": 0,
+    "healed": 0
+  },
+  "defect": null,
+  "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "mcp-file",
+  "tokens": {
+    "input": 19,
+    "output": 5745
+  },
+  "nullAgent": false
+}

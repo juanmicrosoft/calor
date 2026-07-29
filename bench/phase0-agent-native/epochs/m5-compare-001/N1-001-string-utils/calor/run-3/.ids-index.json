@@ -1,0 +1,30 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "TextUtils",
+    "file": "TextUtils.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "Slugify",
+    "file": "TextUtils.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "Truncate",
+    "file": "TextUtils.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "WordCount",
+    "file": "TextUtils.calr",
+    "line": 14
+  }
+]

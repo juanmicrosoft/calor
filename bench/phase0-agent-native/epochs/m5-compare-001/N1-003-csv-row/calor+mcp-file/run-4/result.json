@@ -1,0 +1,29 @@
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor+mcp-file",
+  "run": 4,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1047,
+  "envelopeValidAll": true,
+  "mcpWrites": {
+    "attempts": 2,
+    "applied": 2,
+    "appliedUnhealed": 2,
+    "rejected": 0,
+    "healed": 0
+  },
+  "defect": null,
+  "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "mcp-file",
+  "tokens": {
+    "input": 22,
+    "output": 9152
+  },
+  "nullAgent": false
+}

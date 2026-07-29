@@ -1,0 +1,20 @@
+{
+  "pair": "N1-005-order-pipeline",
+  "arm": "calor",
+  "run": 4,
+  "taskSuccess": false,
+  "escapedBugs": 25,
+  "heldoutPassed": 0,
+  "iterations": 0,
+  "iterationsToGreen": 11,
+  "censored": true,
+  "invalid": true,
+  "defect": null,
+  "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/cf791636-d712-4c3a-981b-86260d88ee6a/scratchpad/arm-a-worktree/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "raw",
+  "tokens": {
+    "input": 0,
+    "output": 0
+  },
+  "nullAgent": false
+}

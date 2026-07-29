@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "calor": {
+      "command": "dotnet",
+      "args": [
+        "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+        "mcp",
+        "--stdio",
+        "--root",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/p0-W3-003-kv-journal-calor-8axDvo/src"
+      ],
+      "env": {
+        "CALOR_MCP_WRITE_LOG": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/m5-compare-001/W3-003-kv-journal/calor+mcp-file/run-2/mcp-writes.jsonl",
+        "CALOR_MCP_REJECT_DIR": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/m5-compare-001/W3-003-kv-journal/calor+mcp-file/run-2/rejects"
+      }
+    }
+  }
+}

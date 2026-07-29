@@ -1,0 +1,3 @@
+2026-07-29T06:11:08Z attempt=0 agent_rc=137: agent.json missing or empty
+2026-07-29T06:26:54Z attempt=1 agent_rc=137: agent.json missing or empty
+2026-07-29T06:43:50Z attempt=2 agent_rc=137: agent.json missing or empty

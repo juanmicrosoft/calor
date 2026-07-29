@@ -1,0 +1,100 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Scheduler",
+    "file": "Scheduler.calr",
+    "line": 7
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "IsValidInterval",
+    "file": "Scheduler.calr",
+    "line": 8
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "Overlaps",
+    "file": "Scheduler.calr",
+    "line": 12
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "ConflictIndex",
+    "file": "Scheduler.calr",
+    "line": 16
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "HasConflict",
+    "file": "Scheduler.calr",
+    "line": 34
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "AddBooking",
+    "file": "Scheduler.calr",
+    "line": 43
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "Cancel",
+    "file": "Scheduler.calr",
+    "line": 63
+  },
+  {
+    "id": "f007",
+    "kind": "Function",
+    "name": "NextFreeStart",
+    "file": "Scheduler.calr",
+    "line": 74
+  },
+  {
+    "id": "f008",
+    "kind": "Function",
+    "name": "ActiveCount",
+    "file": "Scheduler.calr",
+    "line": 91
+  },
+  {
+    "id": "f009",
+    "kind": "Function",
+    "name": "OverlapLength",
+    "file": "Scheduler.calr",
+    "line": 104
+  },
+  {
+    "id": "f010",
+    "kind": "Function",
+    "name": "BusyTime",
+    "file": "Scheduler.calr",
+    "line": 117
+  },
+  {
+    "id": "f011",
+    "kind": "Function",
+    "name": "UtilizationPercent",
+    "file": "Scheduler.calr",
+    "line": 134
+  },
+  {
+    "id": "f012",
+    "kind": "Function",
+    "name": "PriorityAt",
+    "file": "Scheduler.calr",
+    "line": 145
+  },
+  {
+    "id": "f013",
+    "kind": "Function",
+    "name": "AddWithPreemption",
+    "file": "Scheduler.calr",
+    "line": 162
+  }
+]
