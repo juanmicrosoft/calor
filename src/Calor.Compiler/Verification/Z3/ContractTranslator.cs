@@ -1565,8 +1565,12 @@ public sealed class ContractTranslator
     {
         if (node.Array is ReferenceNode baseRef
             && _variables.TryGetValue(baseRef.Name, out var baseVar)
-            && !baseVar.Type.Contains('['))
+            && !baseVar.Type.Contains('[')
+            && !baseVar.Type.StartsWith("array<", StringComparison.Ordinal))
         {
+            // Auto-declared arrays are typed "array<T>" (no bracket) — exempt them
+            // so an index-typing diagnosis can fire instead (#822 re-verification
+            // m-new-1).
             return $"Array access on '{baseRef.Name}', which has non-array type '{baseVar.Type}'";
         }
 
