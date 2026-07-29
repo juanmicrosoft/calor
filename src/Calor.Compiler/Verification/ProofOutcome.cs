@@ -95,7 +95,8 @@ public readonly struct ProofEvidence
         SolverVerdict,
         SolverError,
         Unsupported,
-        SolverUnavailable
+        SolverUnavailable,
+        VacuousProof
     }
 
     internal EvidenceKind Kind { get; private init; }
@@ -151,6 +152,18 @@ public readonly struct ProofEvidence
         Detail = reason
     };
 
+    /// <summary>
+    /// Captures a vacuous proof: the assumption set (e.g. the precondition set of a
+    /// postcondition obligation) is itself unsatisfiable, so the obligation holds only
+    /// because no valid call exists. Maps to Proven with <see cref="ProofOutcome.IsVacuous"/>
+    /// set — a vacuous proof never justifies eliding the runtime check.
+    /// </summary>
+    public static ProofEvidence VacuousProof(string reason) => new()
+    {
+        Kind = EvidenceKind.VacuousProof,
+        Detail = reason
+    };
+
     private static string? SafeReasonUnknown(Solver solver)
     {
         try
@@ -185,11 +198,20 @@ public sealed class ProofOutcome
     /// <summary>Human-readable detail: unsupported-construct diagnosis, solver error, unknown-reason, or model-less refutation note.</summary>
     public string? Reason { get; }
 
-    private ProofOutcome(ProofStatus status, Counterexample? counterexample, string? reason)
+    /// <summary>
+    /// True when <see cref="Status"/> is <see cref="ProofStatus.Proven"/> but the proof is
+    /// vacuous — the obligation's assumption set is unsatisfiable, so it holds only because
+    /// no valid call exists. A vacuous proof never justifies eliding the runtime check
+    /// (guarantees plan D-G1.3; strategy §5.1).
+    /// </summary>
+    public bool IsVacuous { get; }
+
+    private ProofOutcome(ProofStatus status, Counterexample? counterexample, string? reason, bool isVacuous = false)
     {
         Status = status;
         Counterexample = counterexample;
         Reason = reason;
+        IsVacuous = isVacuous;
     }
 
     /// <summary>
@@ -204,6 +226,9 @@ public sealed class ProofOutcome
         {
             case ProofEvidence.EvidenceKind.Unsupported:
                 return new ProofOutcome(ProofStatus.Unsupported, null, evidence.Detail);
+
+            case ProofEvidence.EvidenceKind.VacuousProof:
+                return new ProofOutcome(ProofStatus.Proven, null, evidence.Detail, isVacuous: true);
 
             case ProofEvidence.EvidenceKind.SolverError:
             case ProofEvidence.EvidenceKind.SolverUnavailable:
@@ -293,7 +318,8 @@ public sealed class ProofOutcome
     public static ProofOutcome Rehydrate(
         string statusName,
         IReadOnlyList<CounterexampleBinding>? counterexampleBindings,
-        string? reason)
+        string? reason,
+        bool isVacuous = false)
     {
         var status = statusName?.ToLowerInvariant() switch
         {
@@ -308,7 +334,7 @@ public sealed class ProofOutcome
             ? new Counterexample(counterexampleBindings)
             : null;
 
-        return new ProofOutcome(status, counterexample, reason);
+        return new ProofOutcome(status, counterexample, reason, isVacuous && status == ProofStatus.Proven);
     }
 
     /// <summary>

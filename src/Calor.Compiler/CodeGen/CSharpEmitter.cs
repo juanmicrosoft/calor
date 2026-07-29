@@ -47,7 +47,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private readonly Verification.Obligations.ObligationTracker? _obligationTracker;
 
     // Track current indices for contract emission
-    private int _currentPreconditionIndex;
     private int _currentPostconditionIndex;
 
     // Track declared variables in current function scope for reassignment detection
@@ -480,7 +479,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _currentFunctionId = node.Id;
 
         // Reset contract indices for this function
-        _currentPreconditionIndex = 0;
         _currentPostconditionIndex = 0;
 
         // Clear declared variables tracking for new function scope
@@ -1455,7 +1453,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         // Track current function ID for contract emission
         _currentFunctionId = method.Id;
-        _currentPreconditionIndex = 0;
         _currentPostconditionIndex = 0;
 
         // Emit extended metadata as documentation comments
@@ -1774,7 +1771,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Off mode: no contract checks
         if (_contractMode == EmitContractMode.Off)
         {
-            _currentPreconditionIndex++;
             return ""; // No check emitted
         }
 
@@ -1782,15 +1778,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var condition = node.Condition.Accept(this);
         var functionId = _currentFunctionId ?? "unknown";
 
-        // Check verification status if available
-        var verificationStatus = GetPreconditionVerificationStatus();
-        _currentPreconditionIndex++;
-
-        // Proven preconditions: emit comment instead of runtime check
-        if (verificationStatus == ContractVerificationStatus.Proven)
-        {
-            return $"// PROVEN: Precondition always satisfiable: {condition}";
-        }
+        // Precondition guards are NEVER elided on verification results (#755, guarantees
+        // plan D-G1.2): the verifier's precondition "Proven" is a satisfiability result
+        // (∃ an input meeting it), not validity (∀ inputs meet it) — a caller can still
+        // violate the precondition, so the runtime check is the contract. Only a genuine
+        // ∀-proof could justify elision, and preconditions have none by construction.
 
         // Release mode: lean exception
         if (_contractMode == EmitContractMode.Release)
@@ -1830,11 +1822,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var functionId = _currentFunctionId ?? "unknown";
 
         // Check verification status if available
-        var verificationStatus = GetPostconditionVerificationStatus();
+        var verificationResult = GetPostconditionVerificationResult();
         _currentPostconditionIndex++;
 
-        // Proven postconditions: emit comment instead of runtime check
-        if (verificationStatus == ContractVerificationStatus.Proven)
+        // Proven postconditions elide the runtime check — a postcondition Proven is a
+        // genuine ∀-proof (UNSAT on negation). A VACUOUS proof does not qualify
+        // (guarantees plan D-G1.3): it holds only because the precondition set is
+        // unsatisfiable, so the check is kept.
+        if (verificationResult is { Status: ContractVerificationStatus.Proven }
+            && !verificationResult.EffectiveOutcome.IsVacuous)
         {
             return $"// PROVEN: Postcondition statically verified: {condition}";
         }
@@ -1904,19 +1900,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
     }
 
-    private ContractVerificationStatus? GetPreconditionVerificationStatus()
-    {
-        if (_verificationResults == null || _currentFunctionId == null)
-            return null;
-
-        var funcResult = _verificationResults.GetFunctionResult(_currentFunctionId);
-        if (funcResult == null || _currentPreconditionIndex >= funcResult.PreconditionResults.Count)
-            return null;
-
-        return funcResult.PreconditionResults[_currentPreconditionIndex].Status;
-    }
-
-    private ContractVerificationStatus? GetPostconditionVerificationStatus()
+    private Verification.Z3.ContractVerificationResult? GetPostconditionVerificationResult()
     {
         if (_verificationResults == null || _currentFunctionId == null)
             return null;
@@ -1925,7 +1909,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (funcResult == null || _currentPostconditionIndex >= funcResult.PostconditionResults.Count)
             return null;
 
-        return funcResult.PostconditionResults[_currentPostconditionIndex].Status;
+        return funcResult.PostconditionResults[_currentPostconditionIndex];
     }
 
     // Phase 6: Arrays and Collections

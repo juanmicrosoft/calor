@@ -9,7 +9,11 @@ CI corpus instead of "whatever the build happens to verify". Exercised by
 | Fixture | Expected status | Diagnostic | Mechanism |
 |:--------|:----------------|:-----------|:----------|
 | `proven.calr` | `proven` | `Calor0713` (verbose) | `x > 0 ⇒ x ≥ 1` over i32 — postcondition implied by the precondition |
-| `refuted-with-model.calr` | `refuted` + concrete model | `Calor0712` | `result` unconstrained by the (unencoded) body, so `¬(result > 10)` is satisfiable; Z3 model attached as structured bindings |
+| `refuted-with-model.calr` | `refuted` + concrete model | `Calor0712` | genuinely refutable with `result` bound to the body (`result = x-1`, refuted at `x=1`); Z3 model attached as structured bindings. (Before guarantees plan D-G1.1 this fixture "worked" for the wrong reason — `result` was unconstrained, #807) |
+| `proven-with-result.calr` | `proven` ×4 | `Calor0713` (verbose) | result-referencing postconditions over encodable bodies: single-`§R` (`Identity`), `§IF`/`§EL` (`Max`), `§EI` chain (`Clamp`) — the #807 spurious-refutation class, pinned as proving |
+| `refuted-overflow.calr` | `refuted` ×2 + concrete models | `Calor0712` | honest overflow refutations under two's-complement semantics: `x*x` wraps negative, `a+b` wraps below `a` — the class #807 explicitly excludes as correct behavior |
+| `unsupported-body.calr` | `unsupported` | `Calor0718` | result-referencing postcondition over a body outside the encodable surface (binding + loop): reported `unsupported`, NEVER refuted against a free `result` (the #807 regression pin) |
+| `vacuous-precondition.calr` | `proven` (vacuous) | `Calor0719` warning | jointly-unsatisfiable `§Q` set (`x>10 ∧ x<5`): postcondition is Proven with the vacuous flag, the runtime check is kept, and the vacuity is loud (guarantees plan D-G1.3) |
 | `unsupported.calr` | `unsupported` | `Calor0718` | `f64` contracts cannot map to bit-vector theory (`ContractTranslator.DiagnoseUnsupportedType`) |
 | `timeout.calr` | `timeout` | `Calor0717` | quartic bit-vector equation, verified with a 1 ms solver budget by the test |
 

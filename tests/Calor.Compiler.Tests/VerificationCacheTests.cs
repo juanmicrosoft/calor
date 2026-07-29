@@ -179,6 +179,69 @@ public class VerificationCacheTests : IDisposable
     }
 
     [Fact]
+    public void HashPostcondition_ResultReferencing_IncludesBody()
+    {
+        // Guarantees plan D-G1.1: the verifier binds `result` to the body, so a
+        // body edit must produce a different key — a stale result-bound proof
+        // must never be served for an edited body.
+        var hasher = new ContractHasher();
+        var parameters = new List<(string Name, string TypeName)> { ("x", "i32") };
+
+        var post = new EnsuresNode(
+            EmptySpan,
+            new BinaryOperationNode(EmptySpan, BinaryOperator.GreaterOrEqual,
+                new ReferenceNode(EmptySpan, "result"),
+                new IntLiteralNode(EmptySpan, 0)),
+            null,
+            new AttributeCollection());
+
+        var bodyReturnX = new List<StatementNode>
+        {
+            new ReturnStatementNode(EmptySpan, new ReferenceNode(EmptySpan, "x"))
+        };
+        var bodyReturnZero = new List<StatementNode>
+        {
+            new ReturnStatementNode(EmptySpan, new IntLiteralNode(EmptySpan, 0))
+        };
+
+        var hash1 = hasher.HashPostcondition(parameters, "i32", Array.Empty<RequiresNode>(), post, bodyReturnX);
+        var hash2 = hasher.HashPostcondition(parameters, "i32", Array.Empty<RequiresNode>(), post, bodyReturnZero);
+
+        Assert.NotEqual(hash1, hash2);
+    }
+
+    [Fact]
+    public void HashPostcondition_NoResultReference_BodyIndependent()
+    {
+        // A postcondition that never mentions `result` is body-independent —
+        // its key must not churn on body edits (cache efficiency, not soundness).
+        var hasher = new ContractHasher();
+        var parameters = new List<(string Name, string TypeName)> { ("x", "i32") };
+
+        var post = new EnsuresNode(
+            EmptySpan,
+            new BinaryOperationNode(EmptySpan, BinaryOperator.GreaterOrEqual,
+                new ReferenceNode(EmptySpan, "x"),
+                new IntLiteralNode(EmptySpan, 1)),
+            null,
+            new AttributeCollection());
+
+        var bodyReturnX = new List<StatementNode>
+        {
+            new ReturnStatementNode(EmptySpan, new ReferenceNode(EmptySpan, "x"))
+        };
+        var bodyReturnZero = new List<StatementNode>
+        {
+            new ReturnStatementNode(EmptySpan, new IntLiteralNode(EmptySpan, 0))
+        };
+
+        var hash1 = hasher.HashPostcondition(parameters, "i32", Array.Empty<RequiresNode>(), post, bodyReturnX);
+        var hash2 = hasher.HashPostcondition(parameters, "i32", Array.Empty<RequiresNode>(), post, bodyReturnZero);
+
+        Assert.Equal(hash1, hash2);
+    }
+
+    [Fact]
     public void Hash_AllExpressionNodeTypes()
     {
         var hasher = new ContractHasher();

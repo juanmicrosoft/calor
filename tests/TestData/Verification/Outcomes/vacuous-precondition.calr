@@ -1,0 +1,6 @@
+§M{m1:OutcomeVacuous}
+  §F{f1:Impossible:pub} (i32:x) -> i32
+    §Q (> x 10)
+    §Q (< x 5)
+    §S (== result x)
+    §R x

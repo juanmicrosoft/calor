@@ -1,0 +1,11 @@
+§M{m1:OutcomeRefutedOverflow}
+  §F{f1:Square:pub} (i32:x) -> i32
+    §Q (>= x 0)
+    §S (>= result 0)
+    §R (* x x)
+
+  §F{f2:AddPositive:pub} (i32:a, i32:b) -> i32
+    §Q (> a 0)
+    §Q (> b 0)
+    §S (> result a)
+    §R (+ a b)

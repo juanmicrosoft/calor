@@ -424,7 +424,10 @@ public static class VerifyCommand
                         sb.AppendLine($"    {marker} {label} {contract.Index}: {status}");
                         if (!string.IsNullOrEmpty(contract.CounterexampleDescription))
                         {
-                            sb.AppendLine($"        Counterexample: {contract.CounterexampleDescription}");
+                            // Only a refutation's description is a counterexample; other
+                            // statuses carry a reason (unsupported diagnosis, vacuity note).
+                            var descLabel = status == "Disproven" ? "Counterexample" : "Note";
+                            sb.AppendLine($"        {descLabel}: {contract.CounterexampleDescription}");
                         }
                     }
                 }

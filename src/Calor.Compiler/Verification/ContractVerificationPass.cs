@@ -123,8 +123,9 @@ public sealed class ContractVerificationPass
         var postconditionResults = new List<ContractVerificationResult>();
         foreach (var post in function.Postconditions)
         {
-            // Try cache first
-            if (cache.TryGetPostconditionResult(parameters, outputType, function.Preconditions, post, out var cached))
+            // Try cache first (the key covers the body when the postcondition references
+            // `result` — a body edit must never reuse a stale result-bound proof)
+            if (cache.TryGetPostconditionResult(parameters, outputType, function.Preconditions, post, function.Body, out var cached))
             {
                 postconditionResults.Add(cached!);
                 continue;
@@ -135,8 +136,9 @@ public sealed class ContractVerificationPass
                 parameters,
                 outputType,
                 function.Preconditions,
-                post);
-            cache.CachePostconditionResult(parameters, outputType, function.Preconditions, post, result);
+                post,
+                function.Body);
+            cache.CachePostconditionResult(parameters, outputType, function.Preconditions, post, function.Body, result);
             postconditionResults.Add(result);
         }
 
@@ -195,7 +197,19 @@ public sealed class ContractVerificationPass
                 break;
 
             case ProofStatus.Proven:
-                if (!isPrecondition && _options.Verbose)
+                if (outcome.IsVacuous)
+                {
+                    // Vacuous proof: the precondition set is unsatisfiable, so the
+                    // postcondition holds only because no valid call exists. Loud by
+                    // design (guarantees plan D-G1.3) — and never treated as elidable.
+                    _diagnostics.ReportVerification(
+                        span,
+                        DiagnosticCode.VacuousPrecondition,
+                        $"{kind} in function '{function.Name}' holds vacuously: the precondition set is unsatisfiable, so no valid call exists. Runtime check kept.",
+                        DiagnosticSeverity.Warning,
+                        outcome);
+                }
+                else if (!isPrecondition && _options.Verbose)
                 {
                     _diagnostics.ReportVerification(
                         span,

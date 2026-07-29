@@ -72,6 +72,7 @@ public sealed class VerificationCache : IDisposable
         string? outputType,
         IReadOnlyList<RequiresNode> preconditions,
         EnsuresNode postcondition,
+        IReadOnlyList<StatementNode>? body,
         out ContractVerificationResult? result)
     {
         result = null;
@@ -79,7 +80,7 @@ public sealed class VerificationCache : IDisposable
         if (!_options.Enabled)
             return false;
 
-        var hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition);
+        var hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition, body);
         return TryGetCachedResult(hash, out result);
     }
 
@@ -111,6 +112,7 @@ public sealed class VerificationCache : IDisposable
         string? outputType,
         IReadOnlyList<RequiresNode> preconditions,
         EnsuresNode postcondition,
+        IReadOnlyList<StatementNode>? body,
         ContractVerificationResult result)
     {
         if (!_options.Enabled)
@@ -121,7 +123,7 @@ public sealed class VerificationCache : IDisposable
             result.Status == ContractVerificationStatus.Skipped)
             return;
 
-        var hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition);
+        var hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition, body);
         CacheResult(hash, result);
     }
 

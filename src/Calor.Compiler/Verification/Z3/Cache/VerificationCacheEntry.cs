@@ -11,8 +11,12 @@ public sealed class VerificationCacheEntry
     /// 1.2: added choke-point proof outcome fields (ProofStatus, ProofReason,
     /// CounterexampleBindings) so cache hits keep the five-status vocabulary
     /// and structured counterexamples (loop plan D1.2).
+    /// 1.3: added ProofVacuous (guarantees plan D-G1.3) and body-aware
+    /// postcondition keys (D-G1.1) — the bump invalidates every pre-G1 entry,
+    /// which is required: old entries were keyed without the function body and
+    /// may hold result-unbound verdicts.
     /// </summary>
-    public const string CurrentFormatVersion = "1.2";
+    public const string CurrentFormatVersion = "1.3";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.
@@ -51,6 +55,12 @@ public sealed class VerificationCacheEntry
     public List<Verification.CounterexampleBinding>? CounterexampleBindings { get; set; }
 
     /// <summary>
+    /// True when the proof is vacuous (unsatisfiable precondition set). Must survive
+    /// the cache round-trip: a rehydrated vacuous proof must still never elide checks.
+    /// </summary>
+    public bool ProofVacuous { get; set; }
+
+    /// <summary>
     /// Original verification duration in milliseconds.
     /// </summary>
     public double OriginalDurationMs { get; set; }
@@ -71,7 +81,7 @@ public sealed class VerificationCacheEntry
     public ContractVerificationResult ToResult()
     {
         var outcome = ProofStatus != null
-            ? Verification.ProofOutcome.Rehydrate(ProofStatus, CounterexampleBindings, ProofReason)
+            ? Verification.ProofOutcome.Rehydrate(ProofStatus, CounterexampleBindings, ProofReason, ProofVacuous)
             : null;
 
         return new ContractVerificationResult(
@@ -98,6 +108,7 @@ public sealed class VerificationCacheEntry
             CounterexampleDescription = result.CounterexampleDescription,
             ProofStatus = result.Outcome?.StatusName,
             ProofReason = result.Outcome?.Reason,
+            ProofVacuous = result.Outcome?.IsVacuous ?? false,
             CounterexampleBindings = result.Outcome?.Counterexample?.Bindings.ToList(),
             OriginalDurationMs = result.Duration?.TotalMilliseconds ?? 0,
             CreatedAt = DateTime.UtcNow,
