@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **`assumed` goes live: division-carrying proofs are now conditional, not silently strengthened (guarantees plan D-G2.5 — the seven-status vocabulary's first `assumed` producer).** A result-referencing postcondition proof over a body containing `/` or `%` was reached under divisor-nonzero side conditions; it now reports **`assumed`** with the canonical assumption `exceptional-paths:division …` (envelope `assumptions` list, `Calor0720` info diagnostic) instead of plain `proven`. Behavior change: such proofs **no longer elide the runtime postcondition check** — `assumed` never elides, per the frozen D-G2.2 rule. Refutations under the same side conditions stay `refuted` (their models are genuine non-throwing executions). Corpus fixture `assumed-division.calr` pins the shape end-to-end (status, assumption, kept guard, wire payload).
+
+### Changed
+- **Bug-pattern checker translator refuses unsigned types instead of half-modeling them (guarantees plan D-G2.3, first installment).** The second translator applies signed operators throughout; declaring `u8`–`u64`/`byte`–`ulong` variables produced checker verdicts under wrong semantics. Unsigned declarations now route to the checker's no-verdict path; `docs/verification-modeled-forms.md` §5 updated.
+
 ### Breaking
 - **Envelope schema 2.0: the verification status vocabulary grows from five to seven (guarantees plan D-G2.1/D-G2.2/D-G2.4).** New statuses: **`assumed`** — the obligation holds *conditionally* on a named assumption set the solver did not discharge (payload gains a sorted `assumptions` list; assumed never aggregates into proven, never elides runtime checks, and maps to no legacy Proven-equivalent anywhere downstream) — and **`unavailable`** — no solver was present (Z3 missing/disabled), split from `unknown` ("no solver" and "solver gave up" are different facts with different remedies). The `verification` payload also gains optional `vacuous: true` on vacuous proofs. **Migration:** consumers switching exhaustively on the five 1.x statuses must add the `assumed` and `unavailable` arms; a consumer that treats unrecognized statuses as "inconclusive, runtime check kept" remains behaviorally correct. Major bump per the schema's own rule that the status vocabulary is closed. New diagnostics: `Calor0720` (contract holds on assumptions), `Calor0721` (verification unavailable); solver-unavailable outcomes previously surfaced as `unknown`.
 

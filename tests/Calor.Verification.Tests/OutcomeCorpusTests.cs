@@ -126,13 +126,14 @@ public class OutcomeCorpusTests
             DiagnosticCode.ContractVerificationInconclusive,
             DiagnosticCode.ContractVerificationTimeout,
             DiagnosticCode.ContractVerificationUnsupported,
-            DiagnosticCode.VacuousPrecondition
+            DiagnosticCode.VacuousPrecondition,
+            DiagnosticCode.ContractVerificationAssumed
         ];
         string[] fixtures =
         [
             "proven.calr", "refuted-with-model.calr", "unsupported.calr", "timeout.calr",
             "proven-with-result.calr", "refuted-overflow.calr", "unsupported-body.calr",
-            "vacuous-precondition.calr"
+            "vacuous-precondition.calr", "assumed-division.calr"
         ];
 
         foreach (var fixture in fixtures)
@@ -216,6 +217,29 @@ public class OutcomeCorpusTests
             Assert.Equal(ProofStatus.Unsupported, d.Verification!.Status);
             Assert.Contains("result", d.Verification.Reason);
         });
+    }
+
+    [SkippableFact]
+    public void AssumedDivisionFixture_AssumedWithNamedAssumption()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // D-G2.5: Assumed's first producer — a division-carrying proof reports
+        // `assumed` with the canonical exceptional-paths assumption, warns via
+        // Calor0720, and never elides the runtime check.
+        var result = CompileFixture("assumed-division.calr");
+
+        var assumed = ContractDiagnostics(result)
+            .Single(d => d.Code == DiagnosticCode.ContractVerificationAssumed);
+        Assert.Equal(ProofStatus.Assumed, assumed.Verification!.Status);
+        Assert.Contains(Z3Verifier.ExceptionalPathDivisionAssumption, assumed.Verification.Assumptions);
+
+        Assert.Empty(ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.PostconditionMayBeViolated));
+
+        // Assumed never elides: the ensures guard must be in the generated C#.
+        Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
+        Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
     }
 
     [SkippableFact]

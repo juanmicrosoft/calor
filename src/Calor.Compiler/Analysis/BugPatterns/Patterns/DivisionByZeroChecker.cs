@@ -685,10 +685,12 @@ internal sealed class BoundExpressionTranslator
             "i16" or "short" => _ctx.MkBVConst(name, 16),
             "i32" or "int" => _ctx.MkBVConst(name, 32),
             "i64" or "long" => _ctx.MkBVConst(name, 64),
-            "u8" or "byte" => _ctx.MkBVConst(name, 8),
-            "u16" or "ushort" => _ctx.MkBVConst(name, 16),
-            "u32" or "uint" => _ctx.MkBVConst(name, 32),
-            "u64" or "ulong" => _ctx.MkBVConst(name, 64),
+            // Unsigned types are REFUSED, not half-modeled (guarantees plan D-G2.3;
+            // modeled-forms §5): this translator applies signed operators throughout
+            // (bvsdiv/bvsrem/bvslt...), so declaring an unsigned variable produced
+            // checker verdicts under the wrong semantics (e.g. "byte can be
+            // negative"). Refusal routes to the checker's honest no-verdict path.
+            "u8" or "byte" or "u16" or "ushort" or "u32" or "uint" or "u64" or "ulong" => null,
             "bool" => _ctx.MkBoolConst(name),
             _ => null
         };

@@ -83,7 +83,7 @@ Division, modulo, comparisons, and right-shift are signedness-aware (`ShouldUseU
 
 - **Adds:** math functions via ITE — `abs`, `min`, `max`, `clamp`, `sign` (both `math.x` and bare names).
 - **Removes vs the primary:** strings, arrays, field access, quantifiers, implication, conditional, self-ref, bitwise/shift operators, all type aliases (`System.*`, `intNN`), width normalization.
-- **Signed-only everywhere** — unsigned types are mis-modeled by its comparisons and div/mod.
+- **Signed-only everywhere** — unsigned types are **refused at declaration** (checker reports no verdict rather than a signed-semantics one; guarantees plan D-G2.3). Its `%` uses `bvsrem` (C# remainder semantics), matching the primary translator since the G1 fixes.
 
 Do not assume checker findings and contract proofs share a model; they don't.
 

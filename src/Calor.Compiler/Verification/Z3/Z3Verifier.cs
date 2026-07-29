@@ -19,6 +19,14 @@ namespace Calor.Compiler.Verification.Z3;
 /// </remarks>
 public sealed class Z3Verifier : IDisposable
 {
+    /// <summary>
+    /// The canonical assumption-set entry for proofs conditional on exceptional-path
+    /// division semantics (guarantees plan D-G2.5; strategy 2b item 6). Content-stable:
+    /// this exact string is what envelopes carry and assumption-set hashing keys on.
+    /// </summary>
+    public const string ExceptionalPathDivisionAssumption =
+        "exceptional-paths:division — every division/modulo divisor on a verified path is nonzero; a zero divisor throws before §S is evaluated (normal-return semantics)";
+
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
     private bool _disposed;
@@ -309,6 +317,24 @@ public sealed class Z3Verifier : IDisposable
 
             var status = solver.Check();
             var warnings = translator.Warnings.Count > 0 ? translator.Warnings.ToList() : null;
+
+            // D-G2.5 (Assumed's first producer): a proof reached under divisor-nonzero
+            // side conditions is conditional on §S's normal-return semantics — paths
+            // where a divisor is zero throw before the postcondition is evaluated and
+            // are unverified. Surface that as `assumed` with the named assumption
+            // instead of a silent strengthening: Assumed never elides the runtime
+            // check and never aggregates into proven. A refutation under the same
+            // side conditions needs no assumption — its model is a genuine
+            // non-throwing execution.
+            if (status == Status.UNSATISFIABLE && pathConditions.Count > 0)
+            {
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.AssumedProof(
+                        "Proof is conditional on §S normal-return semantics: the body divides, and paths with a zero divisor throw before the postcondition is evaluated. Runtime check kept.",
+                        [ExceptionalPathDivisionAssumption])),
+                    warnings,
+                    sw.Elapsed);
+            }
 
             return ContractVerificationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
