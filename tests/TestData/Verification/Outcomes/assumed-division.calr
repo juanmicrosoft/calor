@@ -1,5 +1,5 @@
 §M{m1:OutcomeAssumed}
-  §F{f1:Half:pub} (i32:a, i32:b) -> i32
+  §F{f1:Ratio:pub} (i32:a, i32:b) -> i32
     §Q (>= a 0)
     §S (>= result (- 0 a))
     §R (/ a b)

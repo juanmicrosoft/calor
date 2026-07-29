@@ -76,6 +76,7 @@ Division, modulo, comparisons, and right-shift are signedness-aware (`ShouldUseU
 | D5 | Contract `§S` holds **only on normal return**; exceptional paths unverified (strategy 2b item 6) | Exception-heavy code has weaker guarantees than the word "Proven" suggests |
 | D6 | Arrays first seen at an access site default to **i32 elements** (`:544–551`) | Element-width mismatch possible |
 | D7 | User-type fields default to **i32** without a registry (`:1185`) | Field-width/signedness mismatch possible |
+| D8 | **Contract-expression division/modulo is totalized** — `/` and `%` inside `§Q`/`§S` translate to `bvsdiv`/`bvsrem` with no divisor-nonzero side conditions | A proof may rely on `x/0 = -1` while the emitted runtime check would throw `DivideByZeroException` evaluating the same expression; distinct from *body* division, which the D-G2.5 `assumed` producer covers. Route through the same producer or `unsupported` in a later slice |
 
 ## 5. The second translator (bug-pattern checkers) — differences
 
