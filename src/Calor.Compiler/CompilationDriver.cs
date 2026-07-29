@@ -150,16 +150,19 @@ internal static class CompilationDriver
         {
             crossModuleMap = BuildCrossModuleFunctionMap(sources);
             crossModuleMapHash = ComputeCrossModuleMapHash(crossModuleMap);
-            if (newState != null)
-            {
-                newState.CrossModuleMapHash = crossModuleMapHash;
-            }
-            if (priorFiles != null && priorState?.CrossModuleMapHash != crossModuleMapHash)
-            {
-                // Map changed (module added/removed/renamed or ambiguity introduced):
-                // every cached output may carry stale qualification — full re-emit.
-                priorFiles = null;
-            }
+        }
+        if (newState != null)
+        {
+            newState.CrossModuleMapHash = crossModuleMapHash;
+        }
+        // Compared UNCONDITIONALLY (#823 review m1): a single-file rebuild of a
+        // formerly-multi project (hash → null) must also invalidate — its cached
+        // output may carry qualification against modules no longer in the build.
+        if (priorFiles != null && priorState?.CrossModuleMapHash != crossModuleMapHash)
+        {
+            // Map changed (module added/removed/renamed or ambiguity introduced):
+            // every cached output may carry stale qualification — full re-emit.
+            priorFiles = null;
         }
 
         foreach (var file in sources)
@@ -323,7 +326,7 @@ internal static class CompilationDriver
     /// (they fail properly in the main compile loop); ambiguous names are
     /// dropped entirely.
     /// </summary>
-    private static IReadOnlyDictionary<string, string> BuildCrossModuleFunctionMap(
+    internal static IReadOnlyDictionary<string, string> BuildCrossModuleFunctionMap(
         IReadOnlyList<FileInfo> sources)
     {
         var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
@@ -342,7 +345,11 @@ internal static class CompilationDriver
                 }
                 foreach (var fn in module.Functions)
                 {
-                    if (fn.Visibility != Ast.Visibility.Public)
+                    // Match CrossModuleEffectRegistry's surface exactly (public AND
+                    // internal — #823 review M1): enforcement resolves internal
+                    // cross-module calls, so emission must qualify them too, or the
+                    // front-end passes and csc fails (the exact #809 shape).
+                    if (fn.Visibility is not (Ast.Visibility.Public or Ast.Visibility.Internal))
                     {
                         continue;
                     }
@@ -372,7 +379,7 @@ internal static class CompilationDriver
         return map;
     }
 
-    private static string ComputeCrossModuleMapHash(IReadOnlyDictionary<string, string> map)
+    internal static string ComputeCrossModuleMapHash(IReadOnlyDictionary<string, string> map)
     {
         var canonical = string.Join(";", map.OrderBy(kv => kv.Key, StringComparer.Ordinal)
             .Select(kv => $"{kv.Key}={kv.Value}"));

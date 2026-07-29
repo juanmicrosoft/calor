@@ -40,6 +40,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string? _currentClassName;
     private string _currentModuleName = "";
     private HashSet<string> _currentModuleFunctionNames = new(StringComparer.Ordinal);
+    private HashSet<string> _currentClassMemberNames = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Bare public function name → defining module name, for qualifying
@@ -712,9 +713,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// mirroring the module emission naming (namespace = sanitized module name,
     /// class = sanitized last segment + "Module"). Self-module names, dotted or
     /// generic targets, and names absent from the map pass through untouched.
-    /// Known limit (recorded): a local delegate variable shadowing another
-    /// module's public function name would be mis-qualified — the emitter does
-    /// not track local scopes; the binder rejects most such shadowing shapes.
+    /// Skip order matters (#823 review C1/C2): locals and parameters in scope
+    /// (the emitter tracks them in _declScopes), the enclosing class's own
+    /// members, and the module's own functions all shadow other modules'
+    /// names — qualifying past any of them silently runs the wrong code.
     /// </summary>
     private string QualifyCrossModuleTarget(string target)
     {
@@ -722,6 +724,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             || target.Length == 0
             || target.Contains('.')
             || target.Contains('<')
+            || IsVarDeclaredInScope(target)
+            || _currentClassMemberNames.Contains(target)
             || _currentModuleFunctionNames.Contains(target)
             || !CrossModuleFunctionModules.TryGetValue(target, out var calleeModule)
             || calleeModule == _currentModuleName)
@@ -2425,6 +2429,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         // Set current class name for constructor emission
         _currentClassName = name;
+        // Bare-name calls inside a class resolve to the class's OWN members first;
+        // cross-module qualification must never override them (#823 review C1 —
+        // mis-qualifying a sibling method call silently ran another module's code).
+        _currentClassMemberNames = node.Methods.Select(m => m.Name)
+            .Concat(node.Fields.Select(f => f.Name))
+            .Concat(node.Properties.Select(pr => pr.Name))
+            .ToHashSet(StringComparer.Ordinal);
 
         // Emit fields
         foreach (var field in node.Fields)
@@ -2510,6 +2521,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         _currentClassName = null;
+        _currentClassMemberNames = new HashSet<string>(StringComparer.Ordinal);
 
         Dedent();
         AppendLine("}");

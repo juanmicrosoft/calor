@@ -306,4 +306,99 @@ public class CliMultiFileTests : IDisposable
         var emitted = File.ReadAllText(Path.Combine(_tempDir, "app.g.cs"));
         Assert.Contains("global::MathMod.MathModModule.Clamp(", emitted);
     }
+
+
+    [Fact]
+    public void MultiFile_ClassSiblingMethodCall_IsNotMisqualified()
+    {
+        // #823 review C1: a class method calling a SIBLING method bare must not
+        // be rewritten to another module's same-named public function — that
+        // compiled cleanly and silently ran the wrong code.
+        var aPath = Path.Combine(_tempDir, "alpha.calr");
+        var bPath = Path.Combine(_tempDir, "beta.calr");
+        File.WriteAllText(aPath, """
+            §M{m001:Alpha}
+              §CL{c001:Keeper:pub}
+                §MT{t001:Save:pub} () -> void
+                  §E{cw}
+                  §P "keeper-save"
+                §MT{t002:Other:pub} () -> void
+                  §E{cw}
+                  §C{Save}
+                  §/C
+            """);
+        File.WriteAllText(bPath, """
+            §M{m002:Beta}
+              §F{f001:Save:pub} () -> void
+                §E{cw}
+                §P "beta-save"
+            """);
+
+        var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+
+        var emitted = File.ReadAllText(Path.Combine(_tempDir, "alpha.g.cs"));
+        Assert.DoesNotContain("global::Beta", emitted);
+    }
+
+    [Fact]
+    public void MultiFile_DelegateParameterCall_IsNotMisqualified()
+    {
+        // #823 review C2: a parameter (or local) holding a delegate, invoked by
+        // name, must win over another module's same-named public function.
+        // (Known pre-existing twin on the ENFORCEMENT side: the cross-module
+        // registry also resolves the shadowed bare name to Lib.Notify and
+        // charges its effects — hence the §E{cw} below. Same on main;
+        // out of #823's emission scope, noted in the PR.)
+        var aPath = Path.Combine(_tempDir, "caller.calr");
+        var bPath = Path.Combine(_tempDir, "lib.calr");
+        File.WriteAllText(aPath, """
+            §M{m001:CallerMod}
+              §F{f001:Run:pub} (Func<i32,i32>:Notify) -> void
+                §E{cw}
+                §C{Notify} §A INT:42 §/C
+            """);
+        File.WriteAllText(bPath, """
+            §M{m002:Lib}
+              §F{f001:Notify:pub} (i32:x) -> void
+                §E{cw}
+                §P x
+            """);
+
+        var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+
+        var emitted = File.ReadAllText(Path.Combine(_tempDir, "caller.g.cs"));
+        Assert.Contains("Notify(42);", emitted);
+        Assert.DoesNotContain("global::Lib", emitted);
+    }
+
+    [Fact]
+    public void MultiFile_InternalCrossModuleFunction_IsQualified()
+    {
+        // #823 review M1: enforcement resolves INTERNAL cross-module functions
+        // too; emission must qualify them or the front-end passes and csc fails
+        // (the exact #809 shape). The emitted callee is internal static in the
+        // same assembly, so the qualified call is legal C#.
+        var storePath = Path.Combine(_tempDir, "istore.calr");
+        var catalogPath = Path.Combine(_tempDir, "icatalog.calr");
+        File.WriteAllText(storePath, """
+            §M{m001:IStore}
+              §F{f001:Stash:int} (str:path) -> void
+                §E{fs:w}
+                §C{File.WriteAllText} §A path §A "x" §/C
+            """);
+        File.WriteAllText(catalogPath, """
+            §M{m002:ICatalog}
+              §F{f001:Ping:pub} (str:path) -> void
+                §E{fs:w}
+                §C{Stash} §A path §/C
+            """);
+
+        var (exit, stdOut, stdErr) = RunCli("--input", storePath, "--input", catalogPath);
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+
+        var emitted = File.ReadAllText(Path.Combine(_tempDir, "icatalog.g.cs"));
+        Assert.Contains("global::IStore.IStoreModule.Stash(path);", emitted);
+    }
 }

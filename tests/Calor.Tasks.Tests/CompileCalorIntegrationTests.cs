@@ -117,10 +117,12 @@ public class CompileCalorIntegrationTests : IDisposable
         var engine2 = (TestBuildEngine)task2.BuildEngine;
         Assert.Contains(engine2.Messages, m => m.Contains("skipping"));
 
-        // Edit one file
+        // Edit one file — body-only: renaming a PUBLIC function changes the
+        // cross-module qualification map and (soundly, conservatively)
+        // invalidates every skip; that behavior is pinned separately in
+        // EditRenamingPublicFunction_InvalidatesAllSkips (G3/#809).
         Thread.Sleep(50); // ensure mtime changes
-        File.WriteAllText(src1, ValidCalorSource.Replace("Add", "Sum")
-            .Replace("m001", "m001").Replace("f001", "f001"));
+        File.WriteAllText(src1, ValidCalorSource.Replace("(+ a b)", "(- a b)"));
 
         // Third build — only edited file compiles
         var task3 = CreateTask(src1, src2);
@@ -618,5 +620,30 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.True(task.Execute());
         var engine = (TestBuildEngine)task.BuildEngine;
         Assert.Empty(engine.Errors);
+    }
+
+    [Fact]
+    public void EditRenamingPublicFunction_InvalidatesAllSkips()
+    {
+        // G3/#809: the cross-module map fingerprint participates in warm-skip
+        // validity. Renaming a public function changes the map, and EVERY file
+        // must re-emit — a cached output may carry stale qualification against
+        // the old name set. Conservative by design.
+        var src1 = CreateSourceFile("Foo.calr", ValidCalorSource);
+        var src2 = CreateSourceFile("Bar.calr", ValidCalorSource.Replace("TestModule", "BarModule")
+            .Replace("m001", "m002").Replace("f001", "f002"));
+
+        var task1 = CreateTask(src1, src2);
+        Assert.True(task1.Execute());
+
+        Thread.Sleep(50);
+        File.WriteAllText(src1, ValidCalorSource.Replace("Add", "Sum"));
+
+        var task2 = CreateTask(src1, src2);
+        Assert.True(task2.Execute());
+        var engine2 = (TestBuildEngine)task2.BuildEngine;
+        var msgs = string.Join("\n", engine2.Messages);
+        // Both files compile; nothing skips.
+        Assert.DoesNotContain("skipping", msgs);
     }
 }

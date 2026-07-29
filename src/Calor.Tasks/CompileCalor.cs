@@ -206,6 +206,30 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 pathComparer);
         }
 
+        // Cross-module call qualification map (G3/#809, #823 review M2): MSBuild is
+        // the surface where csc actually consumes the outputs, so it needs the same
+        // map the CLI driver builds. Warm-skip validity: a changed map invalidates
+        // every skip (a cached .g.cs may carry stale qualification).
+        IReadOnlyDictionary<string, string>? crossModuleMap = null;
+        string? crossModuleMapHash = null;
+        if (SourceFiles.Length > 1)
+        {
+            var sourceFileInfos = SourceFiles
+                .Select(sf =>
+                {
+                    var path = sf.GetMetadata("FullPath");
+                    return new FileInfo(string.IsNullOrEmpty(path) ? sf.ItemSpec : path);
+                })
+                .ToList();
+            crossModuleMap = Calor.Compiler.CompilationDriver.BuildCrossModuleFunctionMap(sourceFileInfos);
+            crossModuleMapHash = Calor.Compiler.CompilationDriver.ComputeCrossModuleMapHash(crossModuleMap);
+        }
+        newState.CrossModuleMapHash = crossModuleMapHash;
+        if (priorFiles != null && priorCache?.CrossModuleMapHash != crossModuleMapHash)
+        {
+            priorFiles = null;
+        }
+
         // 4. Process each source file
         foreach (var sourceFile in SourceFiles)
         {
@@ -302,6 +326,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     EnableILAnalysis = EnableILAnalysis,
                     ExperimentalFlags = Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags)
                 };
+                compileOptions.CrossModuleFunctionModules = crossModuleMap;
                 var result = Program.Compile(source, inputPath, compileOptions);
 
                 if (result.HasErrors)
