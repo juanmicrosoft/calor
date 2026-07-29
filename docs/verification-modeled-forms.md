@@ -76,6 +76,7 @@ Division, modulo, comparisons, and right-shift are signedness-aware (`ShouldUseU
 | D5 | Contract `§S` holds **only on normal return**; exceptional paths unverified (strategy 2b item 6) | Exception-heavy code has weaker guarantees than the word "Proven" suggests |
 | D6 | Arrays first seen at an access site default to **i32 elements** (`:544–551`) | Element-width mismatch possible |
 | D7 | User-type fields default to **i32** without a registry (`:1185`) | Field-width/signedness mismatch possible |
+| D8 | **Contract-expression division/modulo is totalized** — `/` and `%` inside `§Q`/`§S` translate to `bvsdiv`/`bvsrem` with no divisor-nonzero side conditions | A proof may rely on `x/0 = -1` while the emitted runtime check would throw `DivideByZeroException` evaluating the same expression; distinct from *body* division, which the D-G2.5 `assumed` producer covers. Route through the same producer or `unsupported` in a later slice |
 
 ## 5. The second translator (bug-pattern checkers) — differences
 
@@ -83,7 +84,7 @@ Division, modulo, comparisons, and right-shift are signedness-aware (`ShouldUseU
 
 - **Adds:** math functions via ITE — `abs`, `min`, `max`, `clamp`, `sign` (both `math.x` and bare names).
 - **Removes vs the primary:** strings, arrays, field access, quantifiers, implication, conditional, self-ref, bitwise/shift operators, all type aliases (`System.*`, `intNN`), width normalization.
-- **Signed-only everywhere** — unsigned types are mis-modeled by its comparisons and div/mod.
+- **Signed-only everywhere** — unsigned types are **refused at declaration** (checker reports no verdict rather than a signed-semantics one; guarantees plan D-G2.3). Its `%` uses `bvsrem` (C# remainder semantics), matching the primary translator since the G1 fixes.
 
 Do not assume checker findings and contract proofs share a model; they don't.
 

@@ -167,7 +167,11 @@ public class G1ReviewFixTests
 
         var result = verifier.VerifyPostcondition(parameters, "i32", [pre], post, body);
 
-        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+        // D-G2.5: a proof under divisor-nonzero side conditions is ASSUMED —
+        // conditional on normal-return semantics — never plain Proven.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(result.EffectiveOutcome.Assumptions,
+            a => a.StartsWith("exceptional-paths:division", StringComparison.Ordinal));
         Assert.False(result.EffectiveOutcome.IsVacuous);
     }
 
@@ -367,8 +371,9 @@ public class G1ReviewFixTests
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
 
-        // The dual: with remainder semantics, a > 0 ⊨ a % -3 >= 0 IS a genuine
-        // proof (result in {0, 1, 2}); bvsmod would have refuted it spuriously.
+        // The dual: with remainder semantics, a > 0 ⊨ a % -3 >= 0 holds
+        // (result in {0, 1, 2}); bvsmod would have refuted it spuriously.
+        // As a modulo-carrying proof it reports Assumed (D-G2.5), not Proven.
         var parameters = new List<(string Name, string Type)> { ("a", "i32") };
         var pre = Requires(Bin(BinaryOperator.GreaterThan, Ref("a"), Int(0)));
         var post = Ensures(Bin(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0)));
@@ -379,7 +384,8 @@ public class G1ReviewFixTests
 
         var result = verifier.VerifyPostcondition(parameters, "i32", [pre], post, body);
 
-        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.NotEmpty(result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]
@@ -408,7 +414,7 @@ public class G1ReviewFixTests
 
         var result = verifier.VerifyPostcondition(parameters, "i32", [pre], post, body);
 
-        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
     }
 
     // ------------------------------------------------------------------

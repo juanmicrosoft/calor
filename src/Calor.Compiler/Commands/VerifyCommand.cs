@@ -381,6 +381,7 @@ public static class VerifyCommand
                     Status = c.Outcome.StatusName,
                     LegacyStatus = c.LegacyStatus,
                     Reason = c.Outcome.Reason,
+                    Assumptions = c.Outcome.Assumptions.Count > 0 ? c.Outcome.Assumptions.ToList() : null,
                     Counterexample = c.Outcome.Counterexample == null
                         ? null
                         : new EnvelopeCounterexample
@@ -583,13 +584,17 @@ public static class VerifyCommand
         public required string Type { get; init; }
         public int Index { get; init; }
 
-        /// <summary>Five-status wire name: proven|refuted|unknown|timeout|unsupported.</summary>
+        /// <summary>Choke-point wire name (schema 2.0 seven-status vocabulary).</summary>
         public required string Status { get; init; }
 
         /// <summary>Legacy enum name (Proven/Unproven/Disproven/Unsupported/Skipped); kept for one release.</summary>
         public required string LegacyStatus { get; init; }
 
         public string? Reason { get; init; }
+
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? Assumptions { get; init; }
+
         public EnvelopeCounterexample? Counterexample { get; init; }
     }
 

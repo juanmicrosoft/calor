@@ -21,8 +21,14 @@ public sealed class VerificationCacheEntry
     /// a runtime guard the fixed verifier refutes (G1 re-verification C-cache).
     /// Translation-semantics changes MUST bump this version: the Z3-binary
     /// check does not cover our own translation layer.
+    /// 1.5: division-carrying proofs report Assumed instead of Proven
+    /// (D-G2.5) — the bump evicts pre-producer entries, which is required: a
+    /// warm cache holding a plain-Proven verdict for a division body would
+    /// keep eliding the runtime guard the Assumed verdict deliberately keeps
+    /// (confirmed live by the slice-2 review). Verdict-SEMANTICS changes bump
+    /// this version too, same rule as translation-semantics changes.
     /// </summary>
-    public const string CurrentFormatVersion = "1.4";
+    public const string CurrentFormatVersion = "1.5";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.

@@ -174,6 +174,86 @@ public class BugPatternTests
         Assert.False(diagnostics.HasErrors);
     }
 
+    [SkippableFact]
+    public void DivisionByZero_UnsignedDivisor_Z3Refused_NoVerdict()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // Guarantees plan D-G2.3 (first installment): the checker's translator
+        // refuses unsigned types rather than half-modeling them with signed
+        // operators. Consequence, pinned deliberately: the previously-emitted
+        // (and in this shape CORRECT) unguarded-unsigned-divisor warning is
+        // gone — the old signed modeling could equally suppress true warnings
+        // via wrong path conditions, so honest no-verdict wins (CHANGELOG'd).
+        var source = @"
+§M{m001:Test}
+  §F{f001:Divide:pub}
+      §I{u32:x}
+      §I{u32:y}
+      §O{u32}
+      §R (/ x y)";
+
+        var func = GetFunction(source, out var parseDiag);
+        Assert.False(parseDiag.HasErrors);
+
+        var diagnostics = new DiagnosticBag();
+        var checker = new DivisionByZeroChecker(Z3Options);
+        checker.Check(func, diagnostics);
+
+        // No verdict = no warning/error. (An info-severity "inconclusive" note
+        // is emitted and acceptable — it is honest about why there's no verdict.)
+        Assert.DoesNotContain(diagnostics.Warnings, d => d.Code == DiagnosticCode.DivisionByZero);
+        Assert.DoesNotContain(diagnostics.Errors, d => d.Code == DiagnosticCode.DivisionByZero);
+    }
+
+    [SkippableFact]
+    public void DivisionByZero_SignedDivisor_Z3StillWarns()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // The signed path is untouched by the unsigned refusal: an unguarded
+        // signed variable divisor still warns under the Z3 path.
+        var source = @"
+§M{m001:Test}
+  §F{f001:Divide:pub}
+      §I{i32:x}
+      §I{i32:y}
+      §O{i32}
+      §R (/ x y)";
+
+        var func = GetFunction(source, out var parseDiag);
+        Assert.False(parseDiag.HasErrors);
+
+        var diagnostics = new DiagnosticBag();
+        var checker = new DivisionByZeroChecker(Z3Options);
+        checker.Check(func, diagnostics);
+
+        Assert.Contains(diagnostics.Warnings, d => d.Code == DiagnosticCode.DivisionByZero);
+    }
+
+    [Fact]
+    public void DivisionByZero_UnsignedLiteralZeroDivisor_StillErrors()
+    {
+        // The literal-zero path is pre-solver and type-agnostic: refusal of
+        // unsigned VARIABLES must not lose the hard error on a literal 0.
+        var source = @"
+§M{m001:Test}
+  §F{f001:Divide:pub}
+      §I{u32:x}
+      §O{u32}
+      §R (/ x INT:0)";
+
+        var func = GetFunction(source, out var parseDiag);
+        Assert.False(parseDiag.HasErrors);
+
+        var diagnostics = new DiagnosticBag();
+        var checker = new DivisionByZeroChecker(DefaultOptions);
+        checker.Check(func, diagnostics);
+
+        Assert.True(diagnostics.HasErrors);
+        Assert.Contains(diagnostics.Errors, d => d.Code == DiagnosticCode.DivisionByZero);
+    }
+
     [Fact]
     public void DivisionByZero_InNestedExpression_Detected()
     {
