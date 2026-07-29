@@ -320,6 +320,98 @@ public class G1ReviewFixTests
     }
 
     // ------------------------------------------------------------------
+    // M-new (re-verification round 2) — C#'s % is REMAINDER (dividend's sign,
+    // Z3 bvsrem), not modulo (divisor's sign, bvsmod). The bvsmod translation
+    // let `a % -3` under a > 0 "prove" result <= 0 while runtime returns +1 —
+    // a deleted check on violating code.
+    // ------------------------------------------------------------------
+
+    [SkippableFact]
+    public void ModuloNegativeDivisor_RefutesDividendSignPostcondition()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ModuloRefutedCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ModuloRefutedCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // a > 0 ⊨ a % -3 takes a's sign: in {0, 1, 2}. `result <= 0` is
+        // genuinely violable (M(7) = 1) — under bvsmod it was falsely Proven.
+        var parameters = new List<(string Name, string Type)> { ("a", "i32") };
+        var pre = Requires(Bin(BinaryOperator.GreaterThan, Ref("a"), Int(0)));
+        var post = Ensures(Bin(BinaryOperator.LessOrEqual, Ref("result"), Int(0)));
+        var body = new List<StatementNode>
+        {
+            Return(Bin(BinaryOperator.Modulo, Ref("a"), Bin(BinaryOperator.Subtract, Int(0), Int(3))))
+        };
+
+        var result = verifier.VerifyPostcondition(parameters, "i32", [pre], post, body);
+
+        Assert.Equal(ProofStatus.Refuted, result.EffectiveOutcome.Status);
+    }
+
+    [SkippableFact]
+    public void ModuloNegativeDivisor_ProvesNonNegativeForPositiveDividend()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ModuloProvenCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ModuloProvenCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // The dual: with remainder semantics, a > 0 ⊨ a % -3 >= 0 IS a genuine
+        // proof (result in {0, 1, 2}); bvsmod would have refuted it spuriously.
+        var parameters = new List<(string Name, string Type)> { ("a", "i32") };
+        var pre = Requires(Bin(BinaryOperator.GreaterThan, Ref("a"), Int(0)));
+        var post = Ensures(Bin(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0)));
+        var body = new List<StatementNode>
+        {
+            Return(Bin(BinaryOperator.Modulo, Ref("a"), Bin(BinaryOperator.Subtract, Int(0), Int(3))))
+        };
+
+        var result = verifier.VerifyPostcondition(parameters, "i32", [pre], post, body);
+
+        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+    }
+
+    [SkippableFact]
+    public void ModuloVariableDivisor_NonNegativeDividend_Proves()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ModuloVariableDivisorCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ModuloVariableDivisorCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // The reviewer's p7 spurious-refutation shape: a >= 0 ⊨ a % b >= 0 under
+        // remainder semantics (any nonzero b) — bvsmod fabricated a counterexample
+        // (a % -11 "= -8") that C# runtime contradicts (= +3).
+        var parameters = new List<(string Name, string Type)> { ("a", "i32"), ("b", "i32") };
+        var pre = Requires(Bin(BinaryOperator.GreaterOrEqual, Ref("a"), Int(0)));
+        var post = Ensures(Bin(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0)));
+        var body = new List<StatementNode>
+        {
+            Return(Bin(BinaryOperator.Modulo, Ref("a"), Ref("b")))
+        };
+
+        var result = verifier.VerifyPostcondition(parameters, "i32", [pre], post, body);
+
+        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+    }
+
+    // ------------------------------------------------------------------
     // m2 — a vacuous precondition set wins over an unencodable body: the
     // Calor0719-visible outcome, not a generic Unsupported.
     // ------------------------------------------------------------------

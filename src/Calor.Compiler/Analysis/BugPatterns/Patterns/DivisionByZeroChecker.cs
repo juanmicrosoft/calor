@@ -638,8 +638,10 @@ internal sealed class BoundExpressionTranslator
                 => _ctx.MkBVMul(lm, rm),
             BinaryOperator.Divide when left is BitVecExpr ld && right is BitVecExpr rd
                 => _ctx.MkBVSDiv(ld, rd),
+            // C#'s % is remainder (dividend's sign) = bvsrem, not bvsmod — same
+            // divergence fixed in ContractTranslator (G1 re-verification M-new).
             BinaryOperator.Modulo when left is BitVecExpr lmod && right is BitVecExpr rmod
-                => _ctx.MkBVSMod(lmod, rmod),
+                => _ctx.MkBVSRem(lmod, rmod),
             BinaryOperator.Equal
                 => _ctx.MkEq(left, right),
             BinaryOperator.NotEqual
