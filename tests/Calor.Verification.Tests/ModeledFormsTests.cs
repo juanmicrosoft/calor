@@ -128,6 +128,109 @@ public class ModeledFormsTests
     }
 
     [SkippableFact]
+    public void AliasTypedQuantifierBoundVariable_StillProves()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        AliasBoundVarCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void AliasBoundVarCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // #822 review M1: the whitelist must match the translator's surface —
+        // alias spellings (Int32) normalize and translate; a hand-narrowed set
+        // regressed them from Proven to Unsupported.
+        var exists = new ExistsExpressionNode(
+            TextSpan.Empty,
+            [new QuantifierVariableNode(TextSpan.Empty, "k", "Int32")],
+            Bin(BinaryOperator.Equal, Ref("k"), Int(0)));
+        var post = new EnsuresNode(TextSpan.Empty, exists, null, new AttributeCollection());
+
+        var result = verifier.VerifyPostcondition([], null, [], post);
+
+        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+    }
+
+    [Fact]
+    public void UserTypedQuantifierBoundVariable_IsWhitelisted()
+    {
+        // Match-the-translator policy: unknown types become uninterpreted sorts,
+        // so the whitelist accepts them; only floating-point types are refused.
+        var overUserType = new ForallExpressionNode(
+            TextSpan.Empty,
+            [new QuantifierVariableNode(TextSpan.Empty, "o", "Order")],
+            Bin(BinaryOperator.Equal, Int(1), Int(1)));
+        Assert.True(ModeledForms.TryValidate(overUserType, out _));
+
+        var overFloat = new ForallExpressionNode(
+            TextSpan.Empty,
+            [new QuantifierVariableNode(TextSpan.Empty, "f", "f64")],
+            Bin(BinaryOperator.Equal, Int(1), Int(1)));
+        Assert.False(ModeledForms.TryValidate(overFloat, out var why));
+        Assert.Contains("floating-point", why);
+    }
+
+    [SkippableFact]
+    public void UnmodeledOperandTyping_IsNotLabeledDrift()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        TypingNotDriftCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void TypingNotDriftCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // #822 review C1: string ordering is a routine unmodeled typing — it must
+        // report as such with a real diagnosis, never as "whitelist drift".
+        var parameters = new List<(string Name, string Type)> { ("s", "str") };
+        var pre = new RequiresNode(
+            TextSpan.Empty,
+            Bin(BinaryOperator.LessThan, Ref("s"), new StringLiteralNode(TextSpan.Empty, "b")),
+            null,
+            new AttributeCollection());
+
+        var result = verifier.VerifyPrecondition(parameters, pre);
+
+        Assert.Equal(ProofStatus.Unsupported, result.EffectiveOutcome.Status);
+        Assert.DoesNotContain("drift", result.EffectiveOutcome.Reason);
+        Assert.Contains("typing is not modeled", result.EffectiveOutcome.Reason);
+        Assert.Contains("Comparison operator", result.EffectiveOutcome.Reason);
+    }
+
+    [SkippableFact]
+    public void ScalarFieldAccess_IsUnsupportedNotACrash()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ScalarFieldAccessCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ScalarFieldAccessCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // #822 review M3: field access on a scalar raised an uncaught Z3Exception
+        // and killed the whole file's verification; it must be unsupported.
+        var parameters = new List<(string Name, string Type)> { ("x", "i32") };
+        var pre = new RequiresNode(
+            TextSpan.Empty,
+            Bin(BinaryOperator.GreaterThan, new FieldAccessNode(TextSpan.Empty, Ref("x"), "Foo"), Int(0)),
+            null,
+            new AttributeCollection());
+
+        var result = verifier.VerifyPrecondition(parameters, pre);
+
+        Assert.Equal(ProofStatus.Unsupported, result.EffectiveOutcome.Status);
+    }
+
+    [SkippableFact]
     public void Verifier_GatesOutOfWhitelistContract_AsUnsupportedWithReason()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");

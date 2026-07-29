@@ -101,6 +101,11 @@ byte-checked by `ModeledFormsTests.Doc_GeneratedAppendix_MatchesCodeWhitelist` �
 when the whitelist changes, regenerate this block from the test's failure
 output.
 
+**Scope:** the whitelist gates the `§Q`/`§S` contract path in `Z3Verifier`.
+The obligation solver, implication prover, and guard discovery instantiate
+the translator directly and remain ungated (their fallback behavior is
+unchanged); extending the gate to those paths is future work.
+
 <!-- BEGIN GENERATED WHITELIST (ModeledForms.RenderWhitelist) — do not edit by hand -->
 ```
 scalar-types: i8, i16, i32, i64, u8, u16, u32, u64, bool, str
@@ -109,6 +114,6 @@ expression-kinds: IntLiteralNode, BoolLiteralNode, StringLiteralNode, ReferenceN
 binary-operators: Add, Subtract, Multiply, Divide, Modulo, Equal, NotEqual, LessThan, LessOrEqual, GreaterThan, GreaterOrEqual, And, Or, BitwiseAnd, BitwiseOr, BitwiseXor, LeftShift, RightShift
 unary-operators: Not, Negate
 string-operations: Length, Contains, StartsWith, EndsWith, Equals, IsNullOrEmpty, IndexOf, Substring, SubstringFrom, Concat, Replace
-quantifier-bound-variable-types: declarable scalar types (integers, bool, str)
+quantifier-bound-variable-types: any declarable type except floating-point (unmodeled types become uninterpreted sorts)
 ```
 <!-- END GENERATED WHITELIST -->

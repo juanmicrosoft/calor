@@ -27,8 +27,12 @@ public sealed class VerificationCacheEntry
     /// keep eliding the runtime guard the Assumed verdict deliberately keeps
     /// (confirmed live by the slice-2 review). Verdict-SEMANTICS changes bump
     /// this version too, same rule as translation-semantics changes.
+    /// 1.6: the positive modeled-forms whitelist (D-G2.3) tightens some
+    /// previously-provable forms to unsupported (e.g. float-typed quantifier
+    /// bound variables) — the bump evicts pre-gate entries so a stale Proven
+    /// cannot bypass the gate and keep eliding checks (#822 review C2).
     /// </summary>
-    public const string CurrentFormatVersion = "1.5";
+    public const string CurrentFormatVersion = "1.6";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.

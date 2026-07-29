@@ -1446,6 +1446,10 @@ public sealed class ContractTranslator
             BinaryOperator.LeftShift or BinaryOperator.RightShift when left is not BitVecExpr || right is not BitVecExpr
                 => $"Bitwise operator '{node.Operator}' requires integer operands, but got {left.GetType().Name} and {right.GetType().Name}",
 
+            BinaryOperator.LessThan or BinaryOperator.LessOrEqual or
+            BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual when left is not BitVecExpr || right is not BitVecExpr
+                => $"Comparison operator '{node.Operator}' requires integer operands, but got {left.GetType().Name} and {right.GetType().Name} (string ordering is not modeled)",
+
             _ => null
         };
     }
@@ -1497,34 +1501,47 @@ public sealed class ContractTranslator
 
     private string? DiagnoseForall(ForallExpressionNode node)
     {
-        foreach (var bv in node.BoundVariables)
+        // Register bound variables in a scope before diagnosing the body —
+        // otherwise the quantifier's own variable is misreported as unknown
+        // (#822 review M2).
+        PushScope();
+        try
         {
-            var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
-            if (z3Var == null)
-                return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in forall expression";
+            foreach (var bv in node.BoundVariables)
+            {
+                var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
+                if (z3Var == null)
+                    return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in forall expression";
+                _variables[bv.Name] = (z3Var, bv.TypeName);
+            }
+
+            return DiagnoseNode(node.Body);
         }
-
-        var bodyDiag = DiagnoseNode(node.Body);
-        if (bodyDiag != null)
-            return bodyDiag;
-
-        return null;
+        finally
+        {
+            PopScope();
+        }
     }
 
     private string? DiagnoseExists(ExistsExpressionNode node)
     {
-        foreach (var bv in node.BoundVariables)
+        PushScope();
+        try
         {
-            var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
-            if (z3Var == null)
-                return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in exists expression";
+            foreach (var bv in node.BoundVariables)
+            {
+                var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
+                if (z3Var == null)
+                    return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in exists expression";
+                _variables[bv.Name] = (z3Var, bv.TypeName);
+            }
+
+            return DiagnoseNode(node.Body);
         }
-
-        var bodyDiag = DiagnoseNode(node.Body);
-        if (bodyDiag != null)
-            return bodyDiag;
-
-        return null;
+        finally
+        {
+            PopScope();
+        }
     }
 
     private string? DiagnoseImplication(ImplicationExpressionNode node)
@@ -1546,6 +1563,13 @@ public sealed class ContractTranslator
 
     private string? DiagnoseArrayAccess(ArrayAccessNode node)
     {
+        if (node.Array is ReferenceNode baseRef
+            && _variables.TryGetValue(baseRef.Name, out var baseVar)
+            && !baseVar.Type.Contains('['))
+        {
+            return $"Array access on '{baseRef.Name}', which has non-array type '{baseVar.Type}'";
+        }
+
         if (node.Array is not ReferenceNode)
         {
             var arrayType = node.Array.GetType().Name;
@@ -1667,14 +1691,15 @@ public static class ModeledForms
         nameof(FieldAccessNode), nameof(StringOperationNode), nameof(SelfRefNode)
     ];
 
-    private static readonly HashSet<string> s_quantifierBoundTypes = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> s_floatTypeSpellings = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Same declarable-scalar surface as parameters (CreateVariableForType):
-        // integers, bool, and string. (ContractVerifier's integer-only WARNING
-        // is about runtime-check iteration, not the solver surface.)
-        "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64",
-        "int", "long", "short", "byte", "uint", "ulong", "ushort", "sbyte",
-        "bool", "str", "string"
+        // The ONLY bound-variable types the translator refuses are floating-point
+        // (CreateVariableForType returns null for them); every other type is
+        // declarable — modeled scalars directly, unknown types as uninterpreted
+        // sorts. The whitelist matches the translator EXACTLY (a hand-narrowed
+        // set regressed alias spellings and user types — #822 review M1); any
+        // deliberate tightening must be its own recorded change.
+        "f32", "f64", "float", "double", "single", "system.single", "system.double"
     };
 
     /// <summary>
@@ -1715,9 +1740,9 @@ public static class ModeledForms
             case ForallExpressionNode f:
                 foreach (var bv in f.BoundVariables)
                 {
-                    if (!s_quantifierBoundTypes.Contains(bv.TypeName))
+                    if (s_floatTypeSpellings.Contains(bv.TypeName))
                     {
-                        offending = $"quantifier bound variable of type '{bv.TypeName}'";
+                        offending = $"quantifier bound variable of floating-point type '{bv.TypeName}'";
                         return false;
                     }
                 }
@@ -1726,9 +1751,9 @@ public static class ModeledForms
             case ExistsExpressionNode e:
                 foreach (var bv in e.BoundVariables)
                 {
-                    if (!s_quantifierBoundTypes.Contains(bv.TypeName))
+                    if (s_floatTypeSpellings.Contains(bv.TypeName))
                     {
-                        offending = $"quantifier bound variable of type '{bv.TypeName}'";
+                        offending = $"quantifier bound variable of floating-point type '{bv.TypeName}'";
                         return false;
                     }
                 }
@@ -1786,7 +1811,7 @@ public static class ModeledForms
         sb.Append("binary-operators: ").Append(string.Join(", ", Operators)).Append('\n');
         sb.Append("unary-operators: ").Append(string.Join(", ", UnaryOperators)).Append('\n');
         sb.Append("string-operations: ").Append(string.Join(", ", StringOperations)).Append('\n');
-        sb.Append("quantifier-bound-variable-types: declarable scalar types (integers, bool, str)\n");
+        sb.Append("quantifier-bound-variable-types: any declarable type except floating-point (unmodeled types become uninterpreted sorts)\n");
         return sb.ToString();
     }
 }
