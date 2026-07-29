@@ -1612,3 +1612,181 @@ public sealed class ContractTranslator
         };
     }
 }
+
+/// <summary>
+/// The positive modeled-forms whitelist (guarantees plan D-G2.3): the single
+/// in-code enumeration of what the contract prover models. `TryValidate` is the
+/// gate — <see cref="Z3Verifier"/> runs it before translation, so anything
+/// outside the whitelist is `unsupported` BY CONSTRUCTION rather than by
+/// whichever translator branch happens to return null ("a blacklist by
+/// accident", strategy §1.2). `RenderWhitelist` is the canonical enumeration a
+/// conformance test compares against the generated appendix in
+/// docs/verification-modeled-forms.md — the document no longer carries the only
+/// enumeration. Keep this class and the translator in lockstep: a
+/// whitelist-accepted form that fails to translate is surfaced as whitelist
+/// DRIFT in the outcome reason and pinned by ModeledFormsTests.
+/// </summary>
+public static class ModeledForms
+{
+    /// <summary>Scalar types modeled as solver variables (canonical spellings; aliases normalize).</summary>
+    public static readonly IReadOnlyList<string> ScalarTypes =
+        ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "bool", "str"];
+
+    /// <summary>Binary operators the translator models (bit-vector/bool/string semantics per the doc).</summary>
+    public static readonly IReadOnlyList<BinaryOperator> Operators =
+    [
+        BinaryOperator.Add, BinaryOperator.Subtract, BinaryOperator.Multiply,
+        BinaryOperator.Divide, BinaryOperator.Modulo,
+        BinaryOperator.Equal, BinaryOperator.NotEqual,
+        BinaryOperator.LessThan, BinaryOperator.LessOrEqual,
+        BinaryOperator.GreaterThan, BinaryOperator.GreaterOrEqual,
+        BinaryOperator.And, BinaryOperator.Or,
+        BinaryOperator.BitwiseAnd, BinaryOperator.BitwiseOr, BinaryOperator.BitwiseXor,
+        BinaryOperator.LeftShift, BinaryOperator.RightShift
+    ];
+
+    /// <summary>Unary operators the translator models.</summary>
+    public static readonly IReadOnlyList<UnaryOperator> UnaryOperators =
+        [UnaryOperator.Not, UnaryOperator.Negate];
+
+    /// <summary>String operations modeled via Z3's string theory.</summary>
+    public static readonly IReadOnlyList<StringOp> StringOperations =
+    [
+        StringOp.Length, StringOp.Contains, StringOp.StartsWith, StringOp.EndsWith,
+        StringOp.Equals, StringOp.IsNullOrEmpty, StringOp.IndexOf, StringOp.Substring,
+        StringOp.SubstringFrom, StringOp.Concat, StringOp.Replace
+    ];
+
+    /// <summary>Expression node kinds the whitelist accepts (children validated recursively).</summary>
+    public static readonly IReadOnlyList<string> ExpressionKinds =
+    [
+        nameof(IntLiteralNode), nameof(BoolLiteralNode), nameof(StringLiteralNode),
+        nameof(ReferenceNode), nameof(BinaryOperationNode), nameof(UnaryOperationNode),
+        nameof(ConditionalExpressionNode), nameof(ForallExpressionNode), nameof(ExistsExpressionNode),
+        nameof(ImplicationExpressionNode), nameof(ArrayAccessNode), nameof(ArrayLengthNode),
+        nameof(FieldAccessNode), nameof(StringOperationNode), nameof(SelfRefNode)
+    ];
+
+    private static readonly HashSet<string> s_quantifierBoundTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Same declarable-scalar surface as parameters (CreateVariableForType):
+        // integers, bool, and string. (ContractVerifier's integer-only WARNING
+        // is about runtime-check iteration, not the solver surface.)
+        "i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64",
+        "int", "long", "short", "byte", "uint", "ulong", "ushort", "sbyte",
+        "bool", "str", "string"
+    };
+
+    /// <summary>
+    /// Validates that the expression tree lies entirely inside the modeled
+    /// surface. On failure, <paramref name="offending"/> names the first
+    /// out-of-whitelist construct in human terms. Purely syntactic: name
+    /// resolution, typing, and declarability are the translator's concern.
+    /// </summary>
+    public static bool TryValidate(ExpressionNode expr, out string? offending)
+    {
+        switch (expr)
+        {
+            case IntLiteralNode or BoolLiteralNode or StringLiteralNode or ReferenceNode or SelfRefNode:
+                offending = null;
+                return true;
+
+            case BinaryOperationNode b:
+                if (!Operators.Contains(b.Operator))
+                {
+                    offending = $"binary operator '{b.Operator}'";
+                    return false;
+                }
+                return TryValidate(b.Left, out offending) && TryValidate(b.Right, out offending);
+
+            case UnaryOperationNode u:
+                if (!UnaryOperators.Contains(u.Operator))
+                {
+                    offending = $"unary operator '{u.Operator}'";
+                    return false;
+                }
+                return TryValidate(u.Operand, out offending);
+
+            case ConditionalExpressionNode c:
+                return TryValidate(c.Condition, out offending)
+                    && TryValidate(c.WhenTrue, out offending)
+                    && TryValidate(c.WhenFalse, out offending);
+
+            case ForallExpressionNode f:
+                foreach (var bv in f.BoundVariables)
+                {
+                    if (!s_quantifierBoundTypes.Contains(bv.TypeName))
+                    {
+                        offending = $"quantifier bound variable of type '{bv.TypeName}'";
+                        return false;
+                    }
+                }
+                return TryValidate(f.Body, out offending);
+
+            case ExistsExpressionNode e:
+                foreach (var bv in e.BoundVariables)
+                {
+                    if (!s_quantifierBoundTypes.Contains(bv.TypeName))
+                    {
+                        offending = $"quantifier bound variable of type '{bv.TypeName}'";
+                        return false;
+                    }
+                }
+                return TryValidate(e.Body, out offending);
+
+            case ImplicationExpressionNode i:
+                return TryValidate(i.Antecedent, out offending) && TryValidate(i.Consequent, out offending);
+
+            case ArrayAccessNode a:
+                return TryValidate(a.Array, out offending) && TryValidate(a.Index, out offending);
+
+            case ArrayLengthNode al:
+                return TryValidate(al.Array, out offending);
+
+            case FieldAccessNode fa:
+                return TryValidate(fa.Target, out offending);
+
+            case StringOperationNode sop:
+                if (!StringOperations.Contains(sop.Operation))
+                {
+                    offending = $"string operation '{sop.Operation}'";
+                    return false;
+                }
+                foreach (var arg in sop.Arguments)
+                {
+                    if (!TryValidate(arg, out offending))
+                        return false;
+                }
+                offending = null;
+                return true;
+
+            default:
+                offending = expr switch
+                {
+                    FloatLiteralNode => "floating-point literal",
+                    CallExpressionNode => "function call",
+                    _ => $"expression kind '{expr.GetType().Name}'"
+                };
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Canonical, deterministic rendering of the whitelist — the source of the
+    /// generated appendix in docs/verification-modeled-forms.md (conformance-
+    /// checked by ModeledFormsTests; regenerate the doc block from this output
+    /// when the whitelist changes).
+    /// </summary>
+    public static string RenderWhitelist()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("scalar-types: ").Append(string.Join(", ", ScalarTypes)).Append('\n');
+        sb.Append("array-element-types: i8, i16, i32, i64, u8, u16, u32, u64 (with synthetic $length)\n");
+        sb.Append("expression-kinds: ").Append(string.Join(", ", ExpressionKinds)).Append('\n');
+        sb.Append("binary-operators: ").Append(string.Join(", ", Operators)).Append('\n');
+        sb.Append("unary-operators: ").Append(string.Join(", ", UnaryOperators)).Append('\n');
+        sb.Append("string-operations: ").Append(string.Join(", ", StringOperations)).Append('\n');
+        sb.Append("quantifier-bound-variable-types: declarable scalar types (integers, bool, str)\n");
+        return sb.ToString();
+    }
+}

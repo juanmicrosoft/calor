@@ -62,15 +62,33 @@ public sealed class Z3Verifier : IDisposable
             }
         }
 
+        // Positive-whitelist gate (guarantees plan D-G2.3): unsupported is decided by
+        // ModeledForms, not by whichever translator branch happens to return null.
+        if (!ModeledForms.TryValidate(precondition.Condition, out var preOffending))
+        {
+            // Compose the legacy translator diagnosis (which names constructs and
+            // suggests remedies) into the whitelist framing.
+            var preDetail = translator.DiagnoseBoolExprFailure(precondition.Condition)
+                ?? translator.DiagnoseTranslationFailure(precondition.Condition)
+                ?? $"{preOffending} is not supported";
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    $"Contract uses a form outside the modeled whitelist ({preOffending}): {preDetail}")),
+                Duration: sw.Elapsed);
+        }
+
         // Translate the precondition
         var preconditionExpr = translator.TranslateBoolExpr(precondition.Condition);
         if (preconditionExpr == null)
         {
+            // Whitelist-accepted but untranslatable = whitelist/translator DRIFT —
+            // still unsupported (check kept), but loudly attributed so it gets fixed.
             var diagnostic = translator.DiagnoseBoolExprFailure(precondition.Condition)
                 ?? translator.DiagnoseTranslationFailure(precondition.Condition)
                 ?? "Unknown translation failure in precondition";
             return ContractVerificationResult.FromOutcome(
-                ProofOutcome.Assign(ProofEvidence.Unsupported(diagnostic)),
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    $"whitelist drift — whitelist-accepted form failed to translate: {diagnostic}")),
                 Duration: sw.Elapsed);
         }
 
@@ -165,6 +183,22 @@ public sealed class Z3Verifier : IDisposable
             }
         }
 
+        // Positive-whitelist gate over every contract expression in this obligation
+        // (guarantees plan D-G2.3).
+        foreach (var contractExpr in preconditions.Select(p => p.Condition).Append(postcondition.Condition))
+        {
+            if (!ModeledForms.TryValidate(contractExpr, out var gateOffending))
+            {
+                var gateDetail = translator.DiagnoseBoolExprFailure(contractExpr)
+                    ?? translator.DiagnoseTranslationFailure(contractExpr)
+                    ?? $"{gateOffending} is not supported";
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        $"Contract uses a form outside the modeled whitelist ({gateOffending}): {gateDetail}")),
+                    Duration: sw.Elapsed);
+            }
+        }
+
         // Translate preconditions
         var preconditionExprs = new List<BoolExpr>();
         foreach (var pre in preconditions)
@@ -176,7 +210,8 @@ public sealed class Z3Verifier : IDisposable
                     ?? translator.DiagnoseTranslationFailure(pre.Condition)
                     ?? "Unknown translation failure in precondition";
                 return ContractVerificationResult.FromOutcome(
-                    ProofOutcome.Assign(ProofEvidence.Unsupported(diagnostic)),
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        $"whitelist drift — whitelist-accepted form failed to translate: {diagnostic}")),
                     Duration: sw.Elapsed);
             }
             preconditionExprs.Add(preExpr);
@@ -228,7 +263,8 @@ public sealed class Z3Verifier : IDisposable
                 ?? translator.DiagnoseTranslationFailure(postcondition.Condition)
                 ?? "Unknown translation failure in postcondition";
             return ContractVerificationResult.FromOutcome(
-                ProofOutcome.Assign(ProofEvidence.Unsupported(diagnostic)),
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    $"whitelist drift — whitelist-accepted form failed to translate: {diagnostic}")),
                 Duration: sw.Elapsed);
         }
 
