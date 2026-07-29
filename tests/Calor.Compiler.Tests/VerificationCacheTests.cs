@@ -1090,7 +1090,7 @@ public class VerificationCacheTests : IDisposable
         // The eviction targets 80% of limit, so after eviction + 1 new write, we should be close to limit
         var cacheFiles = Directory.GetFiles(_testCacheDir, "*.json", SearchOption.AllDirectories);
         var totalSize = cacheFiles.Sum(f => new FileInfo(f).Length);
-        var maxAllowedSize = options.MaxCacheSizeBytes + 300; // Allow for one entry overhead
+        var maxAllowedSize = options.MaxCacheSizeBytes + 400; // Allow for one entry overhead (entry grew with format 1.3's outcome fields)
         Assert.True(totalSize <= maxAllowedSize,
             $"Cache size {totalSize} significantly exceeds limit {options.MaxCacheSizeBytes}");
     }

@@ -485,7 +485,7 @@ public class StructuredOutputTests : IDisposable
         Assert.Equal(0, contract.GetProperty("index").GetInt32());
 
         var status = contract.GetProperty("status").GetString();
-        Assert.Contains(status, new[] { "proven", "refuted", "unknown", "timeout", "unsupported" });
+        Assert.Contains(status, new[] { "proven", "refuted", "assumed", "unknown", "timeout", "unsupported", "unavailable" });
         Assert.False(string.IsNullOrEmpty(contract.GetProperty("legacyStatus").GetString()));
 
         if (status == "refuted" && contract.TryGetProperty("counterexample", out var cex))

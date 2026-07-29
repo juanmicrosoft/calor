@@ -46,7 +46,7 @@ public sealed class VerificationCacheEntry
     public string? CounterexampleDescription { get; set; }
 
     /// <summary>
-    /// Choke-point proof status wire name (proven|refuted|unknown|timeout|unsupported).
+    /// Choke-point proof status wire name (proven|refuted|assumed|unknown|timeout|unsupported|unavailable).
     /// </summary>
     public string? ProofStatus { get; set; }
 
@@ -65,6 +65,14 @@ public sealed class VerificationCacheEntry
     /// the cache round-trip: a rehydrated vacuous proof must still never elide checks.
     /// </summary>
     public bool ProofVacuous { get; set; }
+
+    /// <summary>
+    /// Named assumption set for Assumed outcomes (guarantees plan D-G2.1). Additive
+    /// within the current format: no pre-existing entry can hold an Assumed status
+    /// (the status shipped with this field), so a missing field (older writer)
+    /// never mispresents a real assumption set.
+    /// </summary>
+    public List<string>? ProofAssumptions { get; set; }
 
     /// <summary>
     /// Original verification duration in milliseconds.
@@ -87,7 +95,7 @@ public sealed class VerificationCacheEntry
     public ContractVerificationResult ToResult()
     {
         var outcome = ProofStatus != null
-            ? Verification.ProofOutcome.Rehydrate(ProofStatus, CounterexampleBindings, ProofReason, ProofVacuous)
+            ? Verification.ProofOutcome.Rehydrate(ProofStatus, CounterexampleBindings, ProofReason, ProofVacuous, ProofAssumptions)
             : null;
 
         return new ContractVerificationResult(
@@ -115,6 +123,7 @@ public sealed class VerificationCacheEntry
             ProofStatus = result.Outcome?.StatusName,
             ProofReason = result.Outcome?.Reason,
             ProofVacuous = result.Outcome?.IsVacuous ?? false,
+            ProofAssumptions = result.Outcome is { Assumptions.Count: > 0 } o ? o.Assumptions.ToList() : null,
             CounterexampleBindings = result.Outcome?.Counterexample?.Bindings.ToList(),
             OriginalDurationMs = result.Duration?.TotalMilliseconds ?? 0,
             CreatedAt = DateTime.UtcNow,

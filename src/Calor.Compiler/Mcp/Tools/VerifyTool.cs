@@ -187,7 +187,7 @@ public sealed class VerifyTool : McpToolBase
         [JsonPropertyName("skipped")]
         public int Skipped { get; init; }
 
-        /// <summary>Five-status (envelope schema v1.1) counts alongside the legacy counts.</summary>
+        /// <summary>Choke-point status counts (envelope schema 2.0 seven-status vocabulary) alongside the legacy counts.</summary>
         [JsonPropertyName("proofStatusCounts")]
         public required ProofStatusCountsOutput ProofStatusCounts { get; init; }
     }
@@ -200,6 +200,9 @@ public sealed class VerifyTool : McpToolBase
         [JsonPropertyName("refuted")]
         public int Refuted { get; private set; }
 
+        [JsonPropertyName("assumed")]
+        public int Assumed { get; private set; }
+
         [JsonPropertyName("unknown")]
         public int Unknown { get; private set; }
 
@@ -209,14 +212,19 @@ public sealed class VerifyTool : McpToolBase
         [JsonPropertyName("unsupported")]
         public int Unsupported { get; private set; }
 
+        [JsonPropertyName("unavailable")]
+        public int Unavailable { get; private set; }
+
         public void Increment(ProofStatus status)
         {
             switch (status)
             {
                 case ProofStatus.Proven: Proven++; break;
                 case ProofStatus.Refuted: Refuted++; break;
+                case ProofStatus.Assumed: Assumed++; break;
                 case ProofStatus.Timeout: Timeout++; break;
                 case ProofStatus.Unsupported: Unsupported++; break;
+                case ProofStatus.Unavailable: Unavailable++; break;
                 default: Unknown++; break;
             }
         }

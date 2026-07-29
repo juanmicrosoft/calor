@@ -17,14 +17,29 @@ public enum ProofStatus
     /// <summary>The obligation was proven violable; a counterexample is attached when the solver produced a model.</summary>
     Refuted,
 
-    /// <summary>The solver returned an inconclusive verdict that was not a timeout (too complex, incomplete theory, solver error, or solver unavailable).</summary>
+    /// <summary>
+    /// The obligation holds conditionally on a named, per-proof assumption set
+    /// (exceptional-path totality, callee summaries, aliasing assumptions).
+    /// Transitive; listed per-proof; never aggregates into Proven; never elides
+    /// runtime checks (strategy §5.1, guarantees plan D-G2.1).
+    /// </summary>
+    Assumed,
+
+    /// <summary>The solver returned an inconclusive verdict that was not a timeout (too complex, incomplete theory, or solver error).</summary>
     Unknown,
 
     /// <summary>The solver hit the configured time budget before reaching a verdict.</summary>
     Timeout,
 
     /// <summary>The obligation could not be translated to the solver (unsupported type or construct).</summary>
-    Unsupported
+    Unsupported,
+
+    /// <summary>
+    /// No solver was available to attempt the obligation (Z3 missing or disabled).
+    /// Split from Unknown (guarantees plan D-G2.2): "the solver gave up" and
+    /// "there was no solver" are different facts with different remedies.
+    /// </summary>
+    Unavailable
 }
 
 /// <summary>A single variable assignment inside a counterexample model.</summary>
@@ -96,7 +111,8 @@ public readonly struct ProofEvidence
         SolverError,
         Unsupported,
         SolverUnavailable,
-        VacuousProof
+        VacuousProof,
+        AssumedProof
     }
 
     internal EvidenceKind Kind { get; private init; }
@@ -105,6 +121,7 @@ public readonly struct ProofEvidence
     internal Counterexample? Model { get; private init; }
     internal string? ReasonUnknown { get; private init; }
     internal string? Detail { get; private init; }
+    internal IReadOnlyList<string>? AssumptionList { get; private init; }
 
     /// <summary>
     /// Captures a completed <c>solver.Check()</c>: the verdict, the model when SATISFIABLE,
@@ -164,6 +181,30 @@ public readonly struct ProofEvidence
         Detail = reason
     };
 
+    /// <summary>
+    /// Captures a proof that holds conditionally on a named assumption set: the solver
+    /// verdict was UNSAT-on-negation, but only under assumptions the solver did not
+    /// discharge (e.g. exceptional-path totality). Maps to <see cref="ProofStatus.Assumed"/>;
+    /// never elides runtime checks and never aggregates into Proven.
+    /// </summary>
+    public static ProofEvidence AssumedProof(string reason, IReadOnlyList<string> assumptions)
+    {
+        if (assumptions is not { Count: > 0 })
+        {
+            // An assumed proof without assumptions is a contradiction in terms —
+            // the envelope guarantees a non-empty list (schema 2.0).
+            throw new ArgumentException(
+                "AssumedProof requires a non-empty assumption list", nameof(assumptions));
+        }
+
+        return new ProofEvidence
+        {
+            Kind = EvidenceKind.AssumedProof,
+            Detail = reason,
+            AssumptionList = assumptions
+        };
+    }
+
     private static string? SafeReasonUnknown(Solver solver)
     {
         try
@@ -206,12 +247,27 @@ public sealed class ProofOutcome
     /// </summary>
     public bool IsVacuous { get; }
 
-    private ProofOutcome(ProofStatus status, Counterexample? counterexample, string? reason, bool isVacuous = false)
+    /// <summary>
+    /// The named assumption set an <see cref="ProofStatus.Assumed"/> proof is conditional
+    /// on. Empty for every other status. Stored sorted so the set has one canonical form
+    /// (content-addressing: equal sets hash equal — strategy §5.1 keying).
+    /// </summary>
+    public IReadOnlyList<string> Assumptions { get; }
+
+    private ProofOutcome(
+        ProofStatus status,
+        Counterexample? counterexample,
+        string? reason,
+        bool isVacuous = false,
+        IReadOnlyList<string>? assumptions = null)
     {
         Status = status;
         Counterexample = counterexample;
         Reason = reason;
         IsVacuous = isVacuous;
+        Assumptions = status == ProofStatus.Assumed && assumptions is { Count: > 0 }
+            ? assumptions.OrderBy(a => a, StringComparer.Ordinal).ToList()
+            : Array.Empty<string>();
     }
 
     /// <summary>
@@ -230,9 +286,14 @@ public sealed class ProofOutcome
             case ProofEvidence.EvidenceKind.VacuousProof:
                 return new ProofOutcome(ProofStatus.Proven, null, evidence.Detail, isVacuous: true);
 
+            case ProofEvidence.EvidenceKind.AssumedProof:
+                return new ProofOutcome(ProofStatus.Assumed, null, evidence.Detail, assumptions: evidence.AssumptionList);
+
             case ProofEvidence.EvidenceKind.SolverError:
-            case ProofEvidence.EvidenceKind.SolverUnavailable:
                 return new ProofOutcome(ProofStatus.Unknown, null, evidence.Detail);
+
+            case ProofEvidence.EvidenceKind.SolverUnavailable:
+                return new ProofOutcome(ProofStatus.Unavailable, null, evidence.Detail);
 
             case ProofEvidence.EvidenceKind.SolverVerdict:
                 switch (evidence.Check)
@@ -274,8 +335,10 @@ public sealed class ProofOutcome
     {
         ProofStatus.Proven => "proven",
         ProofStatus.Refuted => "refuted",
+        ProofStatus.Assumed => "assumed",
         ProofStatus.Timeout => "timeout",
         ProofStatus.Unsupported => "unsupported",
+        ProofStatus.Unavailable => "unavailable",
         _ => "unknown"
     };
 
@@ -288,6 +351,11 @@ public sealed class ProofOutcome
         ProofStatus.Proven => ContractVerificationStatus.Proven,
         ProofStatus.Refuted => ContractVerificationStatus.Disproven,
         ProofStatus.Unsupported => ContractVerificationStatus.Unsupported,
+        // Frozen rule (guarantees plan D-G2.2): Assumed NEVER maps to a legacy
+        // Proven-equivalent in any consumer — a conditional proof must not elide
+        // checks or count as proven anywhere downstream.
+        ProofStatus.Assumed => ContractVerificationStatus.Unproven,
+        ProofStatus.Unavailable => ContractVerificationStatus.Skipped,
         _ => ContractVerificationStatus.Unproven
     };
 
@@ -297,6 +365,8 @@ public sealed class ProofOutcome
         ProofStatus.Proven => ObligationStatus.Discharged,
         ProofStatus.Refuted => ObligationStatus.Failed,
         ProofStatus.Unsupported => ObligationStatus.Unsupported,
+        // Assumed/Unavailable land in the legacy inconclusive bucket — never
+        // Discharged (the D-G2.2 frozen rule).
         _ => ObligationStatus.Timeout
     };
 
@@ -306,6 +376,8 @@ public sealed class ProofOutcome
         ProofStatus.Proven => ImplicationStatus.Proven,
         ProofStatus.Refuted => ImplicationStatus.Disproven,
         ProofStatus.Unsupported => ImplicationStatus.Unsupported,
+        // Assumed/Unavailable are Unknown to the legacy implication consumer —
+        // never Proven (the D-G2.2 frozen rule).
         _ => ImplicationStatus.Unknown
     };
 
@@ -319,14 +391,20 @@ public sealed class ProofOutcome
         string statusName,
         IReadOnlyList<CounterexampleBinding>? counterexampleBindings,
         string? reason,
-        bool isVacuous = false)
+        bool isVacuous = false,
+        IReadOnlyList<string>? assumptions = null)
     {
         var status = statusName?.ToLowerInvariant() switch
         {
             "proven" => ProofStatus.Proven,
             "refuted" => ProofStatus.Refuted,
+            // An "assumed" entry without its assumption list (stale or hand-edited
+            // persistence) degrades to Unknown rather than minting an Assumed
+            // outcome that violates the non-empty envelope guarantee (G2 review m3).
+            "assumed" => assumptions is { Count: > 0 } ? ProofStatus.Assumed : ProofStatus.Unknown,
             "timeout" => ProofStatus.Timeout,
             "unsupported" => ProofStatus.Unsupported,
+            "unavailable" => ProofStatus.Unavailable,
             _ => ProofStatus.Unknown
         };
 
@@ -334,7 +412,10 @@ public sealed class ProofOutcome
             ? new Counterexample(counterexampleBindings)
             : null;
 
-        return new ProofOutcome(status, counterexample, reason, isVacuous && status == ProofStatus.Proven);
+        return new ProofOutcome(
+            status, counterexample, reason,
+            isVacuous && status == ProofStatus.Proven,
+            assumptions);
     }
 
     /// <summary>
@@ -349,7 +430,7 @@ public sealed class ProofOutcome
             ContractVerificationStatus.Proven => new ProofOutcome(ProofStatus.Proven, null, null),
             ContractVerificationStatus.Disproven => new ProofOutcome(ProofStatus.Refuted, null, description),
             ContractVerificationStatus.Unsupported => new ProofOutcome(ProofStatus.Unsupported, null, description),
-            ContractVerificationStatus.Skipped => new ProofOutcome(ProofStatus.Unknown, null, description ?? "Verification skipped (solver unavailable)"),
+            ContractVerificationStatus.Skipped => new ProofOutcome(ProofStatus.Unavailable, null, description ?? "Verification skipped (solver unavailable)"),
             _ => new ProofOutcome(ProofStatus.Unknown, null, description)
         };
     }

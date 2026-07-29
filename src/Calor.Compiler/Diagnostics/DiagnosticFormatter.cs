@@ -39,13 +39,19 @@ public sealed class TextDiagnosticFormatter : IDiagnosticFormatter
 public sealed class JsonDiagnosticFormatter : IDiagnosticFormatter
 {
     /// <summary>
-    /// Envelope schema version (loop plan D1.1). 1.1 adds per-diagnostic
+    /// Envelope schema version (loop plan D1.1). 1.1 added per-diagnostic
     /// <c>declarationId</c> (nearest enclosing declaration ID, null when IDs are
     /// absent) and <c>verification</c> (choke-point proof outcome with the closed
-    /// proven|refuted|unknown|timeout|unsupported status vocabulary and the
-    /// structured counterexample model on refuted).
+    /// status vocabulary and the structured counterexample model on refuted).
+    /// 2.0 (guarantees plan D-G2.4): the verification status vocabulary grows to
+    /// proven|refuted|assumed|unknown|timeout|unsupported|unavailable, and the
+    /// payload gains <c>vacuous</c> (true on vacuous proofs — never elidable) and
+    /// <c>assumptions</c> (the named set an assumed proof is conditional on).
+    /// The plan drafted this as "v1.2", but the schema doc's own versioning rule
+    /// makes the status vocabulary CLOSED — adding a status is a major bump, so
+    /// this is 2.0 with a CHANGELOG migration note. Everything else is additive.
     /// </summary>
-    public const string SchemaVersion = "1.1";
+    public const string SchemaVersion = "2.0";
 
     public string ContentType => "application/json";
 
@@ -162,6 +168,10 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
             var verification = new Dictionary<string, object> { ["status"] = d.Verification.StatusName };
             if (d.Verification.Reason != null)
                 verification["reason"] = d.Verification.Reason;
+            if (d.Verification.IsVacuous)
+                verification["vacuous"] = true;
+            if (d.Verification.Assumptions.Count > 0)
+                verification["assumptions"] = d.Verification.Assumptions.ToList();
             if (d.Verification.Counterexample != null)
             {
                 verification["counterexample"] = new Dictionary<string, object>

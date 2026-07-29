@@ -11,7 +11,7 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// Envelope schema v1.1 conformance (loop plan D1.4) and choke-point bypass
+/// Envelope schema 2.0 conformance (loop plan D1.4; guarantees plan D-G2.4) and choke-point bypass
 /// checks (D1.2). Drift in the serialized document shape or a verification
 /// status minted outside <c>ProofOutcome.Assign</c> is a build failure.
 /// </summary>
@@ -22,9 +22,9 @@ namespace Calor.Compiler.Tests;
 public static class EnvelopeSchemaValidator
 {
     internal static readonly string[] Severities = ["error", "warning", "info"];
-    internal static readonly string[] ProofStatusNames = ["proven", "refuted", "unknown", "timeout", "unsupported"];
+    internal static readonly string[] ProofStatusNames = ["proven", "refuted", "assumed", "unknown", "timeout", "unsupported", "unavailable"];
 
-    /// <summary>Validates a top-level envelope document (schema v1.1).</summary>
+    /// <summary>Validates a top-level envelope document (schema 2.0).</summary>
     public static void ValidateEnvelopeDocument(JsonElement root)
     {
         Assert.Equal(JsonValueKind.Object, root.ValueKind);
@@ -71,7 +71,30 @@ public static class EnvelopeSchemaValidator
 
         if (entry.TryGetProperty("verification", out var verification))
         {
-            Assert.Contains(verification.GetProperty("status").GetString(), ProofStatusNames);
+            var status = verification.GetProperty("status").GetString();
+            Assert.Contains(status, ProofStatusNames);
+
+            // Schema 2.0 payload guarantees (G2 review M4): vacuous is a bool,
+            // true only, and only on proven; assumptions is a non-empty sorted
+            // string array, and only on assumed — which must always carry one.
+            if (verification.TryGetProperty("vacuous", out var vacuous))
+            {
+                Assert.Equal(JsonValueKind.True, vacuous.ValueKind);
+                Assert.Equal("proven", status);
+            }
+            if (verification.TryGetProperty("assumptions", out var assumptions))
+            {
+                Assert.Equal("assumed", status);
+                var values = assumptions.EnumerateArray().Select(a => a.GetString()).ToList();
+                Assert.NotEmpty(values);
+                Assert.All(values, v => Assert.False(string.IsNullOrEmpty(v)));
+                Assert.Equal(values.OrderBy(v => v, StringComparer.Ordinal).ToList(), values);
+            }
+            else
+            {
+                Assert.NotEqual("assumed", status);
+            }
+
             if (verification.TryGetProperty("counterexample", out var counterexample))
             {
                 Assert.Equal(JsonValueKind.String, counterexample.GetProperty("rendered").ValueKind);
@@ -190,13 +213,21 @@ public class EnvelopeConformanceTests
     }
 
     [Fact]
-    public void ProofStatus_VocabularyIsClosedAtFive()
+    public void ProofStatus_VocabularyIsClosedAtSeven()
     {
+        // The closed vocabulary is a governance pin: growing it is a MAJOR envelope
+        // bump (1.x closed at five; 2.0 closed at seven — assumed + unavailable,
+        // guarantees plan D-G2.1/D-G2.2). This assertion exists to force that
+        // conversation, not to be silently edited alongside an enum change.
         var values = Enum.GetValues<ProofStatus>();
-        Assert.Equal(5, values.Length);
+        Assert.Equal(7, values.Length);
 
         var wireNames = values
-            .Select(v => ProofOutcome.Rehydrate(v.ToString().ToLowerInvariant(), null, null).StatusName)
+            .Select(v => ProofOutcome.Rehydrate(
+                v.ToString().ToLowerInvariant(), null, null,
+                // "assumed" requires a non-empty assumption list to rehydrate as
+                // Assumed (empty degrades to Unknown by design — G2 review m3).
+                assumptions: v == ProofStatus.Assumed ? ["a"] : null).StatusName)
             .Distinct()
             .OrderBy(n => n)
             .ToArray();

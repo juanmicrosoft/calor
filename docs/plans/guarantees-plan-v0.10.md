@@ -185,6 +185,14 @@ The hard rule, carried from v0.9: the control build is **archived before treatme
 
 ## 10. Revision log
 
+**v2 amendment (2026-07-29, G2 implementation)** — D-G2.4 called the envelope
+bump "schema v1.2 … additive minor bump per the schema's own rules." The
+schema's own rules say otherwise: the status vocabulary is **closed**, and
+growing it (five → seven) is a **major** bump. The implementation follows the
+schema's rule — envelope **2.0** — with a CHANGELOG migration note; everything
+else in the payload change is additive. Recorded here because the plan's label
+was wrong, not the plan's intent ("per the schema's own rules" decides).
+
 **Draft v2 (2026-07-29)** — adversarial review round 1 (independent agent; verdict on v1: 60 %). Dispositions:
 
 - **C1 (accepted)**: v1's PP-G1 threshold ("`proven-contracts.calr` 10/10") was mathematically unsatisfiable — the reviewer verified that 4 of the 7 refuted contracts are *genuinely violable* under the committed bit-vector semantics (`Square(46341)`, `AbsoluteValue(int.MinValue)`, `AddPositive(int.MaxValue,1)` all wrap), i.e. the flagship sample is itself unsound and only `Identity`/`Max`×2 are the spurious class. §1 item 2 taxonomy corrected; D-G1.4 gains the sample repair (overflow-excluding `§Q` bounds, CHANGELOG-visible) with the unbounded shapes pinned as honest-refutation fixtures; PP-G1 restated over the repaired, pre-frozen corpus. (Also disposes m5.)

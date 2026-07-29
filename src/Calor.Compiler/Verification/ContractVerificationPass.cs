@@ -220,6 +220,33 @@ public sealed class ContractVerificationPass
                 }
                 break;
 
+            case ProofStatus.Assumed:
+                _diagnostics.ReportVerification(
+                    span,
+                    DiagnosticCode.ContractVerificationAssumed,
+                    $"{kind} in function '{function.Name}' holds conditionally on assumptions: " +
+                        string.Join("; ", outcome.Assumptions) +
+                        ". Runtime check kept.",
+                    DiagnosticSeverity.Info,
+                    outcome);
+                break;
+
+            // NOTE (G2 review M1): this arm is currently unreachable on the compile
+            // path — the no-solver flow produces legacy Skipped results, and the
+            // Skipped early-return above fires first (module-level Calor0710 covers
+            // it once per module). The arm is kept for when a per-contract
+            // Unavailable producer appears (evidence-level SolverUnavailable).
+            case ProofStatus.Unavailable:
+                _diagnostics.ReportVerification(
+                    span,
+                    DiagnosticCode.ContractVerificationUnavailable,
+                    $"{kind} verification unavailable in function '{function.Name}'" +
+                        (outcome.Reason is { Length: > 0 } unavailWhy ? $" ({unavailWhy})" : "") +
+                        ". Runtime check kept.",
+                    DiagnosticSeverity.Info,
+                    outcome);
+                break;
+
             case ProofStatus.Timeout:
                 _diagnostics.ReportVerification(
                     span,

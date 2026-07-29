@@ -366,6 +366,30 @@ public static class DiagnosticCode
     /// </summary>
     public const string VacuousPrecondition = "Calor0719";
 
+    // Contract verification results, continued (Calor0720-0729 sub-band; the
+    // 0710-0719 sub-band is full). Guarantees plan WS-G2: the seven-status
+    // vocabulary's two new statuses get their own codes.
+
+    /// <summary>
+    /// Info: a contract holds conditionally on a named assumption set
+    /// (exceptional-path totality, callee summaries) that the solver did not
+    /// discharge. Never treated as proven: the runtime check is kept and the
+    /// assumptions are listed in the envelope payload (guarantees plan D-G2.1).
+    /// </summary>
+    public const string ContractVerificationAssumed = "Calor0720";
+
+    /// <summary>
+    /// Info: no solver was available to attempt a contract obligation (Z3
+    /// missing or disabled) — distinct from the solver giving up (Calor0716).
+    /// Guarantees plan D-G2.2 splits these; runtime check kept. RESERVED, not
+    /// yet emitted as a standalone diagnostic: the no-solver compile path
+    /// reports module-level Calor0710 and per-contract legacy Skipped results;
+    /// the `unavailable` status meanwhile surfaces through envelope
+    /// verification payloads (e.g. rehydrated legacy outcomes). This code goes
+    /// live when a per-contract Unavailable producer exists.
+    /// </summary>
+    public const string ContractVerificationUnavailable = "Calor0721";
+
     // ID errors (Calor0800-0899)
     /// <summary>
     /// Error: Declaration is missing a required ID.

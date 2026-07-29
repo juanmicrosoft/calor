@@ -240,15 +240,40 @@ public class OutcomeCorpusTests
     // ------------------------------------------------------------------
 
     [Fact]
-    public void SolverUnavailableEvidence_AssignsUnknown()
+    public void SolverUnavailableEvidence_AssignsUnavailable()
     {
+        // D-G2.2: "no solver" is its own status, split from "solver gave up".
         var outcome = ProofOutcome.Assign(
             ProofEvidence.SolverUnavailable("Z3 native library not found"));
 
-        Assert.Equal(ProofStatus.Unknown, outcome.Status);
-        Assert.Equal("unknown", outcome.StatusName);
+        Assert.Equal(ProofStatus.Unavailable, outcome.Status);
+        Assert.Equal("unavailable", outcome.StatusName);
         Assert.Null(outcome.Counterexample);
         Assert.Contains("not found", outcome.Reason);
+    }
+
+    [Fact]
+    public void AssumedProofEvidence_AssignsAssumedWithSortedAssumptions()
+    {
+        // D-G2.1: assumed carries its named assumption set, canonically sorted;
+        // it is not Proven and maps to no legacy Proven-equivalent.
+        var outcome = ProofOutcome.Assign(ProofEvidence.AssumedProof(
+            "proof conditional on undischarged assumptions",
+            ["zeta-assumption", "alpha-assumption"]));
+
+        Assert.Equal(ProofStatus.Assumed, outcome.Status);
+        Assert.Equal("assumed", outcome.StatusName);
+        Assert.Equal(["alpha-assumption", "zeta-assumption"], outcome.Assumptions);
+        Assert.Equal(Calor.Compiler.Verification.Z3.ContractVerificationStatus.Unproven, outcome.ToContractStatus());
+    }
+
+    [Fact]
+    public void RehydratedAssumed_RestoresAssumptions()
+    {
+        var outcome = ProofOutcome.Rehydrate("assumed", null, "conditional", assumptions: ["a1"]);
+
+        Assert.Equal(ProofStatus.Assumed, outcome.Status);
+        Assert.Equal(["a1"], outcome.Assumptions);
     }
 
     [Fact]
@@ -294,5 +319,54 @@ public class OutcomeCorpusTests
         Assert.True(outcome.IsVacuous);
         Assert.Null(outcome.Counterexample);
         Assert.Contains("unsat", outcome.Reason);
+    }
+
+    [Fact]
+    public void AssumedProofEvidence_RejectsEmptyAssumptions()
+    {
+        // Schema 2.0 guarantees `assumptions` is non-empty on assumed (G2 review m3).
+        Assert.Throws<ArgumentException>(() => ProofEvidence.AssumedProof("reason", []));
+    }
+
+    [Fact]
+    public void RehydratedAssumedWithoutAssumptions_DegradesToUnknown()
+    {
+        // A stale/hand-edited persistence entry must not mint an Assumed outcome
+        // that violates the non-empty envelope guarantee (G2 review m3).
+        var outcome = ProofOutcome.Rehydrate("assumed", null, "conditional", assumptions: null);
+
+        Assert.Equal(ProofStatus.Unknown, outcome.Status);
+        Assert.Empty(outcome.Assumptions);
+    }
+
+    [Fact]
+    public void JsonEnvelope_CarriesVacuousAndAssumptions()
+    {
+        // G2 review C1: the primary JSON envelope (not just SARIF) must carry the
+        // schema-2.0 payload additions.
+        var vacuous = Calor.Compiler.Diagnostics.DiagnosticEnvelope.BuildVerification(
+            ProofOutcome.Rehydrate("proven", null, "vacuous set", isVacuous: true));
+        Assert.NotNull(vacuous);
+        Assert.True(vacuous.Vacuous);
+        Assert.Null(vacuous.Assumptions);
+
+        var assumed = Calor.Compiler.Diagnostics.DiagnosticEnvelope.BuildVerification(
+            ProofOutcome.Rehydrate("assumed", null, "conditional", assumptions: ["b-assumption", "a-assumption"]));
+        Assert.NotNull(assumed);
+        Assert.Null(assumed.Vacuous);
+        Assert.Equal(["a-assumption", "b-assumption"], assumed.Assumptions);
+
+        var plain = Calor.Compiler.Diagnostics.DiagnosticEnvelope.BuildVerification(
+            ProofOutcome.Rehydrate("proven", null, null));
+        Assert.NotNull(plain);
+        Assert.Null(plain.Vacuous);
+        Assert.Null(plain.Assumptions);
+
+        // Wire form: absent-when-null, present otherwise
+        var json = System.Text.Json.JsonSerializer.Serialize(assumed);
+        Assert.Contains("\"Assumptions\"", json);
+        var plainJson = System.Text.Json.JsonSerializer.Serialize(plain);
+        Assert.DoesNotContain("Vacuous", plainJson);
+        Assert.DoesNotContain("Assumptions", plainJson);
     }
 }
