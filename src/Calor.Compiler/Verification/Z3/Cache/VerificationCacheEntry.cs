@@ -27,8 +27,14 @@ public sealed class VerificationCacheEntry
     /// keep eliding the runtime guard the Assumed verdict deliberately keeps
     /// (confirmed live by the slice-2 review). Verdict-SEMANTICS changes bump
     /// this version too, same rule as translation-semantics changes.
+    /// 1.6: precautionary bump alongside the positive modeled-forms whitelist
+    /// (D-G2.3). After deriving the gate exactly from the translator's surface,
+    /// no known verdict tightening remains (float-typed quantifier bound vars
+    /// were never provable, and unsupported is never cached) — the bump guards
+    /// any tightening the review failed to construct, at the cost of one cold
+    /// re-verify (#822 review C2 + re-verification m-new-2).
     /// </summary>
-    public const string CurrentFormatVersion = "1.5";
+    public const string CurrentFormatVersion = "1.6";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.

@@ -1446,6 +1446,10 @@ public sealed class ContractTranslator
             BinaryOperator.LeftShift or BinaryOperator.RightShift when left is not BitVecExpr || right is not BitVecExpr
                 => $"Bitwise operator '{node.Operator}' requires integer operands, but got {left.GetType().Name} and {right.GetType().Name}",
 
+            BinaryOperator.LessThan or BinaryOperator.LessOrEqual or
+            BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual when left is not BitVecExpr || right is not BitVecExpr
+                => $"Comparison operator '{node.Operator}' requires integer operands, but got {left.GetType().Name} and {right.GetType().Name} (string ordering is not modeled)",
+
             _ => null
         };
     }
@@ -1497,34 +1501,47 @@ public sealed class ContractTranslator
 
     private string? DiagnoseForall(ForallExpressionNode node)
     {
-        foreach (var bv in node.BoundVariables)
+        // Register bound variables in a scope before diagnosing the body —
+        // otherwise the quantifier's own variable is misreported as unknown
+        // (#822 review M2).
+        PushScope();
+        try
         {
-            var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
-            if (z3Var == null)
-                return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in forall expression";
+            foreach (var bv in node.BoundVariables)
+            {
+                var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
+                if (z3Var == null)
+                    return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in forall expression";
+                _variables[bv.Name] = (z3Var, bv.TypeName);
+            }
+
+            return DiagnoseNode(node.Body);
         }
-
-        var bodyDiag = DiagnoseNode(node.Body);
-        if (bodyDiag != null)
-            return bodyDiag;
-
-        return null;
+        finally
+        {
+            PopScope();
+        }
     }
 
     private string? DiagnoseExists(ExistsExpressionNode node)
     {
-        foreach (var bv in node.BoundVariables)
+        PushScope();
+        try
         {
-            var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
-            if (z3Var == null)
-                return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in exists expression";
+            foreach (var bv in node.BoundVariables)
+            {
+                var z3Var = CreateVariableForType(bv.Name, bv.TypeName);
+                if (z3Var == null)
+                    return $"Unsupported type '{bv.TypeName}' for bound variable '{bv.Name}' in exists expression";
+                _variables[bv.Name] = (z3Var, bv.TypeName);
+            }
+
+            return DiagnoseNode(node.Body);
         }
-
-        var bodyDiag = DiagnoseNode(node.Body);
-        if (bodyDiag != null)
-            return bodyDiag;
-
-        return null;
+        finally
+        {
+            PopScope();
+        }
     }
 
     private string? DiagnoseImplication(ImplicationExpressionNode node)
@@ -1546,6 +1563,17 @@ public sealed class ContractTranslator
 
     private string? DiagnoseArrayAccess(ArrayAccessNode node)
     {
+        if (node.Array is ReferenceNode baseRef
+            && _variables.TryGetValue(baseRef.Name, out var baseVar)
+            && !baseVar.Type.Contains('[')
+            && !baseVar.Type.StartsWith("array<", StringComparison.Ordinal))
+        {
+            // Auto-declared arrays are typed "array<T>" (no bracket) — exempt them
+            // so an index-typing diagnosis can fire instead (#822 re-verification
+            // m-new-1).
+            return $"Array access on '{baseRef.Name}', which has non-array type '{baseVar.Type}'";
+        }
+
         if (node.Array is not ReferenceNode)
         {
             var arrayType = node.Array.GetType().Name;
@@ -1610,5 +1638,184 @@ public sealed class ContractTranslator
                 => $"Type '{typeName}' is not supported (function/delegate types cannot be verified)",
             _ => $"Type '{typeName}' is not supported for verification"
         };
+    }
+}
+
+/// <summary>
+/// The positive modeled-forms whitelist (guarantees plan D-G2.3): the single
+/// in-code enumeration of what the contract prover models. `TryValidate` is the
+/// gate — <see cref="Z3Verifier"/> runs it before translation, so anything
+/// outside the whitelist is `unsupported` BY CONSTRUCTION rather than by
+/// whichever translator branch happens to return null ("a blacklist by
+/// accident", strategy §1.2). `RenderWhitelist` is the canonical enumeration a
+/// conformance test compares against the generated appendix in
+/// docs/verification-modeled-forms.md — the document no longer carries the only
+/// enumeration. Keep this class and the translator in lockstep: a
+/// whitelist-accepted form that fails to translate is surfaced as whitelist
+/// DRIFT in the outcome reason and pinned by ModeledFormsTests.
+/// </summary>
+public static class ModeledForms
+{
+    /// <summary>Scalar types modeled as solver variables (canonical spellings; aliases normalize).</summary>
+    public static readonly IReadOnlyList<string> ScalarTypes =
+        ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64", "bool", "str"];
+
+    /// <summary>Binary operators the translator models (bit-vector/bool/string semantics per the doc).</summary>
+    public static readonly IReadOnlyList<BinaryOperator> Operators =
+    [
+        BinaryOperator.Add, BinaryOperator.Subtract, BinaryOperator.Multiply,
+        BinaryOperator.Divide, BinaryOperator.Modulo,
+        BinaryOperator.Equal, BinaryOperator.NotEqual,
+        BinaryOperator.LessThan, BinaryOperator.LessOrEqual,
+        BinaryOperator.GreaterThan, BinaryOperator.GreaterOrEqual,
+        BinaryOperator.And, BinaryOperator.Or,
+        BinaryOperator.BitwiseAnd, BinaryOperator.BitwiseOr, BinaryOperator.BitwiseXor,
+        BinaryOperator.LeftShift, BinaryOperator.RightShift
+    ];
+
+    /// <summary>Unary operators the translator models.</summary>
+    public static readonly IReadOnlyList<UnaryOperator> UnaryOperators =
+        [UnaryOperator.Not, UnaryOperator.Negate];
+
+    /// <summary>String operations modeled via Z3's string theory.</summary>
+    public static readonly IReadOnlyList<StringOp> StringOperations =
+    [
+        StringOp.Length, StringOp.Contains, StringOp.StartsWith, StringOp.EndsWith,
+        StringOp.Equals, StringOp.IsNullOrEmpty, StringOp.IndexOf, StringOp.Substring,
+        StringOp.SubstringFrom, StringOp.Concat, StringOp.Replace
+    ];
+
+    /// <summary>Expression node kinds the whitelist accepts (children validated recursively).</summary>
+    public static readonly IReadOnlyList<string> ExpressionKinds =
+    [
+        nameof(IntLiteralNode), nameof(BoolLiteralNode), nameof(StringLiteralNode),
+        nameof(ReferenceNode), nameof(BinaryOperationNode), nameof(UnaryOperationNode),
+        nameof(ConditionalExpressionNode), nameof(ForallExpressionNode), nameof(ExistsExpressionNode),
+        nameof(ImplicationExpressionNode), nameof(ArrayAccessNode), nameof(ArrayLengthNode),
+        nameof(FieldAccessNode), nameof(StringOperationNode), nameof(SelfRefNode)
+    ];
+
+    private static readonly HashSet<string> s_floatTypeSpellings = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // The ONLY bound-variable types the translator refuses are floating-point
+        // (CreateVariableForType returns null for them); every other type is
+        // declarable — modeled scalars directly, unknown types as uninterpreted
+        // sorts. The whitelist matches the translator EXACTLY (a hand-narrowed
+        // set regressed alias spellings and user types — #822 review M1); any
+        // deliberate tightening must be its own recorded change.
+        "f32", "f64", "float", "double", "single", "system.single", "system.double"
+    };
+
+    /// <summary>
+    /// Validates that the expression tree lies entirely inside the modeled
+    /// surface. On failure, <paramref name="offending"/> names the first
+    /// out-of-whitelist construct in human terms. Purely syntactic: name
+    /// resolution, typing, and declarability are the translator's concern.
+    /// </summary>
+    public static bool TryValidate(ExpressionNode expr, out string? offending)
+    {
+        switch (expr)
+        {
+            case IntLiteralNode or BoolLiteralNode or StringLiteralNode or ReferenceNode or SelfRefNode:
+                offending = null;
+                return true;
+
+            case BinaryOperationNode b:
+                if (!Operators.Contains(b.Operator))
+                {
+                    offending = $"binary operator '{b.Operator}'";
+                    return false;
+                }
+                return TryValidate(b.Left, out offending) && TryValidate(b.Right, out offending);
+
+            case UnaryOperationNode u:
+                if (!UnaryOperators.Contains(u.Operator))
+                {
+                    offending = $"unary operator '{u.Operator}'";
+                    return false;
+                }
+                return TryValidate(u.Operand, out offending);
+
+            case ConditionalExpressionNode c:
+                return TryValidate(c.Condition, out offending)
+                    && TryValidate(c.WhenTrue, out offending)
+                    && TryValidate(c.WhenFalse, out offending);
+
+            case ForallExpressionNode f:
+                foreach (var bv in f.BoundVariables)
+                {
+                    if (s_floatTypeSpellings.Contains(bv.TypeName))
+                    {
+                        offending = $"quantifier bound variable of floating-point type '{bv.TypeName}'";
+                        return false;
+                    }
+                }
+                return TryValidate(f.Body, out offending);
+
+            case ExistsExpressionNode e:
+                foreach (var bv in e.BoundVariables)
+                {
+                    if (s_floatTypeSpellings.Contains(bv.TypeName))
+                    {
+                        offending = $"quantifier bound variable of floating-point type '{bv.TypeName}'";
+                        return false;
+                    }
+                }
+                return TryValidate(e.Body, out offending);
+
+            case ImplicationExpressionNode i:
+                return TryValidate(i.Antecedent, out offending) && TryValidate(i.Consequent, out offending);
+
+            case ArrayAccessNode a:
+                return TryValidate(a.Array, out offending) && TryValidate(a.Index, out offending);
+
+            case ArrayLengthNode al:
+                return TryValidate(al.Array, out offending);
+
+            case FieldAccessNode fa:
+                return TryValidate(fa.Target, out offending);
+
+            case StringOperationNode sop:
+                if (!StringOperations.Contains(sop.Operation))
+                {
+                    offending = $"string operation '{sop.Operation}'";
+                    return false;
+                }
+                foreach (var arg in sop.Arguments)
+                {
+                    if (!TryValidate(arg, out offending))
+                        return false;
+                }
+                offending = null;
+                return true;
+
+            default:
+                offending = expr switch
+                {
+                    FloatLiteralNode => "floating-point literal",
+                    CallExpressionNode => "function call",
+                    _ => $"expression kind '{expr.GetType().Name}'"
+                };
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Canonical, deterministic rendering of the whitelist — the source of the
+    /// generated appendix in docs/verification-modeled-forms.md (conformance-
+    /// checked by ModeledFormsTests; regenerate the doc block from this output
+    /// when the whitelist changes).
+    /// </summary>
+    public static string RenderWhitelist()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("scalar-types: ").Append(string.Join(", ", ScalarTypes)).Append('\n');
+        sb.Append("array-element-types: i8, i16, i32, i64, u8, u16, u32, u64 (with synthetic $length)\n");
+        sb.Append("expression-kinds: ").Append(string.Join(", ", ExpressionKinds)).Append('\n');
+        sb.Append("binary-operators: ").Append(string.Join(", ", Operators)).Append('\n');
+        sb.Append("unary-operators: ").Append(string.Join(", ", UnaryOperators)).Append('\n');
+        sb.Append("string-operations: ").Append(string.Join(", ", StringOperations)).Append('\n');
+        sb.Append("quantifier-bound-variable-types: any declarable type except floating-point (unmodeled types become uninterpreted sorts)\n");
+        return sb.ToString();
     }
 }

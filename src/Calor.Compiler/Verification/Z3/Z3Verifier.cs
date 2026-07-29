@@ -62,16 +62,30 @@ public sealed class Z3Verifier : IDisposable
             }
         }
 
-        // Translate the precondition
-        var preconditionExpr = translator.TranslateBoolExpr(precondition.Condition);
+        // Positive-whitelist gate (guarantees plan D-G2.3): unsupported is decided by
+        // ModeledForms, not by whichever translator branch happens to return null.
+        if (!ModeledForms.TryValidate(precondition.Condition, out var preOffending))
+        {
+            return GateReject(translator, precondition.Condition, preOffending!, sw);
+        }
+
+        // Translate the precondition (a raised solver exception is unsupported,
+        // never a crash — #822 review M3)
+        BoolExpr? preconditionExpr;
+        try
+        {
+            preconditionExpr = translator.TranslateBoolExpr(precondition.Condition);
+        }
+        catch (Z3Exception ex)
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    $"contract translation raised a solver exception: {ex.Message}. Runtime check kept.")),
+                Duration: sw.Elapsed);
+        }
         if (preconditionExpr == null)
         {
-            var diagnostic = translator.DiagnoseBoolExprFailure(precondition.Condition)
-                ?? translator.DiagnoseTranslationFailure(precondition.Condition)
-                ?? "Unknown translation failure in precondition";
-            return ContractVerificationResult.FromOutcome(
-                ProofOutcome.Assign(ProofEvidence.Unsupported(diagnostic)),
-                Duration: sw.Elapsed);
+            return AcceptedButUntranslatable(translator, precondition.Condition, "precondition", sw);
         }
 
         // For preconditions, we just check if they're satisfiable
@@ -165,19 +179,35 @@ public sealed class Z3Verifier : IDisposable
             }
         }
 
+        // Positive-whitelist gate over every contract expression in this obligation
+        // (guarantees plan D-G2.3).
+        foreach (var contractExpr in preconditions.Select(p => p.Condition).Append(postcondition.Condition))
+        {
+            if (!ModeledForms.TryValidate(contractExpr, out var gateOffending))
+            {
+                return GateReject(translator, contractExpr, gateOffending!, sw);
+            }
+        }
+
         // Translate preconditions
         var preconditionExprs = new List<BoolExpr>();
         foreach (var pre in preconditions)
         {
-            var preExpr = translator.TranslateBoolExpr(pre.Condition);
+            BoolExpr? preExpr;
+            try
+            {
+                preExpr = translator.TranslateBoolExpr(pre.Condition);
+            }
+            catch (Z3Exception ex)
+            {
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        $"contract translation raised a solver exception: {ex.Message}. Runtime check kept.")),
+                    Duration: sw.Elapsed);
+            }
             if (preExpr == null)
             {
-                var diagnostic = translator.DiagnoseBoolExprFailure(pre.Condition)
-                    ?? translator.DiagnoseTranslationFailure(pre.Condition)
-                    ?? "Unknown translation failure in precondition";
-                return ContractVerificationResult.FromOutcome(
-                    ProofOutcome.Assign(ProofEvidence.Unsupported(diagnostic)),
-                    Duration: sw.Elapsed);
+                return AcceptedButUntranslatable(translator, pre.Condition, "precondition", sw);
             }
             preconditionExprs.Add(preExpr);
         }
@@ -221,15 +251,21 @@ public sealed class Z3Verifier : IDisposable
         }
 
         // Translate the postcondition
-        var postconditionExpr = translator.TranslateBoolExpr(postcondition.Condition);
+        BoolExpr? postconditionExpr;
+        try
+        {
+            postconditionExpr = translator.TranslateBoolExpr(postcondition.Condition);
+        }
+        catch (Z3Exception ex)
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    $"contract translation raised a solver exception: {ex.Message}. Runtime check kept.")),
+                Duration: sw.Elapsed);
+        }
         if (postconditionExpr == null)
         {
-            var diagnostic = translator.DiagnoseBoolExprFailure(postcondition.Condition)
-                ?? translator.DiagnoseTranslationFailure(postcondition.Condition)
-                ?? "Unknown translation failure in postcondition";
-            return ContractVerificationResult.FromOutcome(
-                ProofOutcome.Assign(ProofEvidence.Unsupported(diagnostic)),
-                Duration: sw.Elapsed);
+            return AcceptedButUntranslatable(translator, postcondition.Condition, "postcondition", sw);
         }
 
         // Bind `result` to the function body (guarantees plan D-G1.1, #807). Without this
@@ -348,6 +384,82 @@ public sealed class Z3Verifier : IDisposable
                 ProofOutcome.Assign(ProofEvidence.SolverError(ex)),
                 Duration: sw.Elapsed);
         }
+    }
+
+    /// <summary>
+    /// Outcome for a contract expression the whitelist REJECTS (guarantees plan
+    /// D-G2.3; labeling per #822 review C1/M2): if the translator nevertheless
+    /// supports the form, that IS whitelist drift (the whitelist is too narrow) —
+    /// labeled as such; otherwise the legacy diagnosis is composed into the
+    /// whitelist framing without duplication.
+    /// </summary>
+    private static ContractVerificationResult GateReject(
+        ContractTranslator translator,
+        ExpressionNode expr,
+        string offending,
+        Stopwatch sw)
+    {
+        bool translates;
+        try
+        {
+            translates = translator.TranslateBoolExpr(expr) != null;
+        }
+        catch (Z3Exception)
+        {
+            translates = false;
+        }
+
+        if (translates)
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    $"whitelist drift — the whitelist rejects a form the translator supports ({offending}); please report. Runtime check kept.")),
+                Duration: sw.Elapsed);
+        }
+
+        string? detail = null;
+        try
+        {
+            detail = translator.DiagnoseBoolExprFailure(expr) ?? translator.DiagnoseTranslationFailure(expr);
+        }
+        catch (Z3Exception)
+        {
+        }
+
+        return ContractVerificationResult.FromOutcome(
+            ProofOutcome.Assign(ProofEvidence.Unsupported(
+                $"Contract uses a form outside the modeled whitelist ({offending})"
+                + (detail != null ? $": {detail}" : ". Runtime check kept."))),
+            Duration: sw.Elapsed);
+    }
+
+    /// <summary>
+    /// Outcome for a whitelist-ACCEPTED contract expression that failed to
+    /// translate: a typed diagnosis means unmodeled operand typing (routine,
+    /// not drift); no diagnosis at all is genuine whitelist/translator drift
+    /// (#822 review C1 — the drift bucket must not be noise).
+    /// </summary>
+    private static ContractVerificationResult AcceptedButUntranslatable(
+        ContractTranslator translator,
+        ExpressionNode expr,
+        string where,
+        Stopwatch sw)
+    {
+        string? detail = null;
+        try
+        {
+            detail = translator.DiagnoseBoolExprFailure(expr) ?? translator.DiagnoseTranslationFailure(expr);
+        }
+        catch (Z3Exception)
+        {
+        }
+
+        return ContractVerificationResult.FromOutcome(
+            ProofOutcome.Assign(ProofEvidence.Unsupported(
+                detail != null
+                    ? $"Contract form is in the modeled whitelist but its operand typing is not modeled: {detail}. Runtime check kept."
+                    : $"whitelist drift — whitelist-accepted form failed to translate with no diagnosis (in {where}). Runtime check kept.")),
+            Duration: sw.Elapsed);
     }
 
     public void Dispose()
