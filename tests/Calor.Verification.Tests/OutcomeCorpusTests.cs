@@ -320,4 +320,53 @@ public class OutcomeCorpusTests
         Assert.Null(outcome.Counterexample);
         Assert.Contains("unsat", outcome.Reason);
     }
+
+    [Fact]
+    public void AssumedProofEvidence_RejectsEmptyAssumptions()
+    {
+        // Schema 2.0 guarantees `assumptions` is non-empty on assumed (G2 review m3).
+        Assert.Throws<ArgumentException>(() => ProofEvidence.AssumedProof("reason", []));
+    }
+
+    [Fact]
+    public void RehydratedAssumedWithoutAssumptions_DegradesToUnknown()
+    {
+        // A stale/hand-edited persistence entry must not mint an Assumed outcome
+        // that violates the non-empty envelope guarantee (G2 review m3).
+        var outcome = ProofOutcome.Rehydrate("assumed", null, "conditional", assumptions: null);
+
+        Assert.Equal(ProofStatus.Unknown, outcome.Status);
+        Assert.Empty(outcome.Assumptions);
+    }
+
+    [Fact]
+    public void JsonEnvelope_CarriesVacuousAndAssumptions()
+    {
+        // G2 review C1: the primary JSON envelope (not just SARIF) must carry the
+        // schema-2.0 payload additions.
+        var vacuous = Calor.Compiler.Diagnostics.DiagnosticEnvelope.BuildVerification(
+            ProofOutcome.Rehydrate("proven", null, "vacuous set", isVacuous: true));
+        Assert.NotNull(vacuous);
+        Assert.True(vacuous.Vacuous);
+        Assert.Null(vacuous.Assumptions);
+
+        var assumed = Calor.Compiler.Diagnostics.DiagnosticEnvelope.BuildVerification(
+            ProofOutcome.Rehydrate("assumed", null, "conditional", assumptions: ["b-assumption", "a-assumption"]));
+        Assert.NotNull(assumed);
+        Assert.Null(assumed.Vacuous);
+        Assert.Equal(["a-assumption", "b-assumption"], assumed.Assumptions);
+
+        var plain = Calor.Compiler.Diagnostics.DiagnosticEnvelope.BuildVerification(
+            ProofOutcome.Rehydrate("proven", null, null));
+        Assert.NotNull(plain);
+        Assert.Null(plain.Vacuous);
+        Assert.Null(plain.Assumptions);
+
+        // Wire form: absent-when-null, present otherwise
+        var json = System.Text.Json.JsonSerializer.Serialize(assumed);
+        Assert.Contains("\"Assumptions\"", json);
+        var plainJson = System.Text.Json.JsonSerializer.Serialize(plain);
+        Assert.DoesNotContain("Vacuous", plainJson);
+        Assert.DoesNotContain("Assumptions", plainJson);
+    }
 }

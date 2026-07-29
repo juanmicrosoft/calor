@@ -323,9 +323,11 @@ public static class VerifyCommand
                 {
                     Proven = fileOutputs.Sum(f => f.Summary.Proven),
                     Refuted = fileOutputs.Sum(f => f.Summary.Refuted),
+                    Assumed = fileOutputs.Sum(f => f.Summary.Assumed),
                     Unknown = fileOutputs.Sum(f => f.Summary.Unknown),
                     Timeout = fileOutputs.Sum(f => f.Summary.Timeout),
-                    Unsupported = fileOutputs.Sum(f => f.Summary.Unsupported)
+                    Unsupported = fileOutputs.Sum(f => f.Summary.Unsupported),
+                    Unavailable = fileOutputs.Sum(f => f.Summary.Unavailable)
                 }
             }
         };
@@ -357,12 +359,16 @@ public static class VerifyCommand
                 Disproven = file.Summary.Disproven,
                 Unsupported = file.Summary.Unsupported,
                 Skipped = file.Summary.Skipped,
-                // Five-status counts from the choke-point outcome. proven and
-                // unsupported coincide with the legacy columns; refuted/unknown/
-                // timeout replace disproven and the unproven/skipped conflation.
+                // Choke-point status counts (schema 2.0 seven-status vocabulary).
+                // proven and unsupported coincide with the legacy columns;
+                // refuted/assumed/unknown/timeout/unavailable replace disproven and
+                // the legacy unproven/skipped conflation — the columns sum to the
+                // total contract count (G2 review M3).
                 Refuted = outcomes.Count(o => o.Status == ProofStatus.Refuted),
+                Assumed = outcomes.Count(o => o.Status == ProofStatus.Assumed),
                 Unknown = outcomes.Count(o => o.Status == ProofStatus.Unknown),
-                Timeout = outcomes.Count(o => o.Status == ProofStatus.Timeout)
+                Timeout = outcomes.Count(o => o.Status == ProofStatus.Timeout),
+                Unavailable = outcomes.Count(o => o.Status == ProofStatus.Unavailable)
             },
             Functions = file.Functions.Select(f => new FunctionJson
             {
@@ -559,8 +565,10 @@ public static class VerifyCommand
         // Five-status counts (envelope vocabulary); proven and unsupported
         // are shared with the legacy columns above.
         public int Refuted { get; init; }
+        public int Assumed { get; init; }
         public int Unknown { get; init; }
         public int Timeout { get; init; }
+        public int Unavailable { get; init; }
     }
 
     private sealed class FunctionJson
@@ -589,8 +597,10 @@ public static class VerifyCommand
     {
         public int Proven { get; init; }
         public int Refuted { get; init; }
+        public int Assumed { get; init; }
         public int Unknown { get; init; }
         public int Timeout { get; init; }
         public int Unsupported { get; init; }
+        public int Unavailable { get; init; }
     }
 }

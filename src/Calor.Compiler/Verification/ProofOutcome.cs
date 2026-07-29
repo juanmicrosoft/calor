@@ -187,12 +187,23 @@ public readonly struct ProofEvidence
     /// discharge (e.g. exceptional-path totality). Maps to <see cref="ProofStatus.Assumed"/>;
     /// never elides runtime checks and never aggregates into Proven.
     /// </summary>
-    public static ProofEvidence AssumedProof(string reason, IReadOnlyList<string> assumptions) => new()
+    public static ProofEvidence AssumedProof(string reason, IReadOnlyList<string> assumptions)
     {
-        Kind = EvidenceKind.AssumedProof,
-        Detail = reason,
-        AssumptionList = assumptions
-    };
+        if (assumptions is not { Count: > 0 })
+        {
+            // An assumed proof without assumptions is a contradiction in terms —
+            // the envelope guarantees a non-empty list (schema 2.0).
+            throw new ArgumentException(
+                "AssumedProof requires a non-empty assumption list", nameof(assumptions));
+        }
+
+        return new ProofEvidence
+        {
+            Kind = EvidenceKind.AssumedProof,
+            Detail = reason,
+            AssumptionList = assumptions
+        };
+    }
 
     private static string? SafeReasonUnknown(Solver solver)
     {
@@ -387,7 +398,10 @@ public sealed class ProofOutcome
         {
             "proven" => ProofStatus.Proven,
             "refuted" => ProofStatus.Refuted,
-            "assumed" => ProofStatus.Assumed,
+            // An "assumed" entry without its assumption list (stale or hand-edited
+            // persistence) degrades to Unknown rather than minting an Assumed
+            // outcome that violates the non-empty envelope guarantee (G2 review m3).
+            "assumed" => assumptions is { Count: > 0 } ? ProofStatus.Assumed : ProofStatus.Unknown,
             "timeout" => ProofStatus.Timeout,
             "unsupported" => ProofStatus.Unsupported,
             "unavailable" => ProofStatus.Unavailable,

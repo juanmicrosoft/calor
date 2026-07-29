@@ -110,9 +110,13 @@ statuses — `Rehydrate` (cache/telemetry deserialization) and
 that was originally assigned by `Assign`, carry no solver evidence of their
 own, and are confined to the same reviewed file; the guarantee is
 "single file, three documented entry points", not "the type system makes
-bypass impossible". Non-proven outcomes are always surfaced as diagnostics:
-refuted as warnings (`Calor0711`/`Calor0712`), timeout / unknown / unsupported
-as info (`Calor0717` / `Calor0716` / `Calor0718`).
+bypass impossible". Non-proven outcomes are surfaced as diagnostics:
+refuted as warnings (`Calor0711`/`Calor0712`), vacuous proofs as warnings
+(`Calor0719`), assumed as info (`Calor0720`), timeout / unknown / unsupported
+as info (`Calor0717` / `Calor0716` / `Calor0718`). `unavailable` currently
+surfaces per-module as `Calor0710` plus per-contract envelope payloads;
+`Calor0721` is reserved for a per-contract producer (see the code's doc
+comment).
 
 ## The denominator
 
@@ -136,7 +140,7 @@ Classes:
 | `lint` | E | **Yes** (`--format json\|sarif`) | |
 | `watch` | E | **Yes** (NDJSON, `--format json`) | one document per rebuild |
 | `self-check` | E | **Yes** (`--format json\|sarif`) | docs-drift findings |
-| `verify` | E | **Yes** (`--format json`) | envelope wrapper with `command: "verify"`; per-contract five-status (+`legacyStatus` for one release) and counterexamples under `data` |
+| `verify` | E | **Yes** (`--format json`) | envelope wrapper with `command: "verify"`; per-contract seven-status (+`legacyStatus` for one release), status-count columns summing to the contract total, and counterexamples under `data` |
 | `assess` | E | **Yes** (`--format json\|sarif`) | JSON wraps the assessment under `data`; SARIF shared |
 | `convert` | E | **Yes** (`--format json`) | conversion issues as `Calor1343` envelope diagnostics; direction/features/benchmark under `data` |
 | `format` | E | **Yes** (`--format json`) | real parser diagnostics + `Calor1340`-band; per-file statuses under `data` |
@@ -162,7 +166,7 @@ Classes:
 |:-----|:------|:------------------|:------|
 | `calor_compile` | E | **Yes** | `diagnostics[]` are envelope entries with `declarationId` |
 | `calor_check` | E | **Yes** | envelope entries; `commonMistake` hints moved to a sibling `hints[]` array |
-| `calor_verify` | E | **Yes** | five-status per contract (+`legacyStatus`), structured counterexamples, `proofStatusCounts` |
+| `calor_verify` | E | **Yes** | seven-status per contract (+`legacyStatus`), structured counterexamples, `proofStatusCounts` (seven columns) |
 | `calor_refine` | E | **Yes** | `proof_status` + `counterexample_bindings` added (snake_case retained) |
 | `calor_analyze` | E | **Yes** | issue groups are envelope entries with `declarationId` |
 | `calor_edit_preview` | E | **Yes** | `compilationResult.errors` are envelope entries; verdict payload unchanged |

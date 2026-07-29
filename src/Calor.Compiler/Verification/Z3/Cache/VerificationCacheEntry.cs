@@ -46,7 +46,7 @@ public sealed class VerificationCacheEntry
     public string? CounterexampleDescription { get; set; }
 
     /// <summary>
-    /// Choke-point proof status wire name (proven|refuted|unknown|timeout|unsupported).
+    /// Choke-point proof status wire name (proven|refuted|assumed|unknown|timeout|unsupported|unavailable).
     /// </summary>
     public string? ProofStatus { get; set; }
 

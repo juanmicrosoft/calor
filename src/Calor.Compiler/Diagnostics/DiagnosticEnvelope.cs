@@ -41,13 +41,23 @@ public sealed class EnvelopeLocation
 
 /// <summary>
 /// Verification payload: the choke-point proof outcome. Status is the closed
-/// vocabulary proven | refuted | unknown | timeout | unsupported; refuted
-/// carries the concrete solver model when one was produced.
+/// seven-status vocabulary proven | refuted | assumed | unknown | timeout |
+/// unsupported | unavailable (envelope schema 2.0); refuted carries the
+/// concrete solver model when one was produced, proven carries
+/// <c>vacuous: true</c> when the proof is vacuous (never elidable), and
+/// assumed carries the non-empty sorted <c>assumptions</c> list.
 /// </summary>
 public sealed class EnvelopeVerification
 {
     public required string Status { get; init; }
     public string? Reason { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Vacuous { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Assumptions { get; init; }
+
     public EnvelopeCounterexample? Counterexample { get; init; }
 }
 
@@ -163,6 +173,8 @@ public static class DiagnosticEnvelope
         {
             Status = outcome.StatusName,
             Reason = outcome.Reason,
+            Vacuous = outcome.IsVacuous ? true : null,
+            Assumptions = outcome.Assumptions.Count > 0 ? outcome.Assumptions.ToList() : null,
             Counterexample = outcome.Counterexample == null
                 ? null
                 : new EnvelopeCounterexample

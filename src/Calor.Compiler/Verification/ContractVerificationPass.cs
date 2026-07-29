@@ -231,6 +231,11 @@ public sealed class ContractVerificationPass
                     outcome);
                 break;
 
+            // NOTE (G2 review M1): this arm is currently unreachable on the compile
+            // path — the no-solver flow produces legacy Skipped results, and the
+            // Skipped early-return above fires first (module-level Calor0710 covers
+            // it once per module). The arm is kept for when a per-contract
+            // Unavailable producer appears (evidence-level SolverUnavailable).
             case ProofStatus.Unavailable:
                 _diagnostics.ReportVerification(
                     span,
