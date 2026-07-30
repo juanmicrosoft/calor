@@ -113,9 +113,15 @@ public sealed class Z3ImplicationProver : IDisposable
             }
         }
 
-        // Also declare 'result' variable in case contracts reference it
-        // Use i32 as the default type for result
-        translator.DeclareVariable("result", "i32");
+        // Also declare 'result' in case contracts reference it — but only when
+        // the caller has not already declared it with the real output type
+        // (#826 review C4: the unconditional i32 default silently overwrote a
+        // caller-supplied i64/bool result, producing false DETERMINATE
+        // weakening verdicts for non-i32 outputs).
+        if (!translator.Variables.ContainsKey("result"))
+        {
+            translator.DeclareVariable("result", "i32");
+        }
 
         // Translate antecedent → Z3 BoolExpr A
         var antecedentExpr = translator.TranslateBoolExpr(antecedent);

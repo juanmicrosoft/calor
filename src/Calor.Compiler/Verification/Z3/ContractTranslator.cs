@@ -220,6 +220,15 @@ public sealed class ContractTranslator
     {
         return node switch
         {
+            // Literals outside the signed 32-bit domain are REFUSED, not wrapped
+            // (#826 review C4 follow-through): MkBV silently truncates mod 2^32,
+            // which corrupted verdicts in BOTH directions — false refutations
+            // with nonsense counterexamples, and inverted implication verdicts
+            // in the weakening check. Refusal surfaces as unsupported/
+            // indeterminate, the honest outcome until literals are translated
+            // width-aware.
+            IntLiteralNode intLit when intLit.IsUnsigned && intLit.UnsignedValue > int.MaxValue => null,
+            IntLiteralNode intLit when intLit.Value > int.MaxValue || intLit.Value < int.MinValue => null,
             IntLiteralNode intLit => TrackBitVec(_ctx.MkBV(intLit.Value, 32), 32, isSigned: true),
             BoolLiteralNode boolLit => _ctx.MkBool(boolLit.Value),
             ReferenceNode refNode => TranslateReference(refNode),
@@ -1335,6 +1344,8 @@ public sealed class ContractTranslator
         return node switch
         {
             FloatLiteralNode f => $"Floating-point literal '{f.Value}' is not supported (Z3 bit-vector theory does not model floats)",
+            IntLiteralNode i when (i.IsUnsigned && i.UnsignedValue > int.MaxValue) || i.Value > int.MaxValue || i.Value < int.MinValue
+                => $"Integer literal '{(i.IsUnsigned ? i.UnsignedValue.ToString() : i.Value.ToString())}' is outside the signed 32-bit translation domain",
             CallExpressionNode c => $"Function call '{c.Target}' is not supported (only built-in operations are verifiable)",
             ReferenceNode r when !_variables.ContainsKey(r.Name) => $"Unknown variable '{r.Name}'",
             StringOperationNode s => DiagnoseStringOperation(s),

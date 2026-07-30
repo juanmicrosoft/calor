@@ -665,27 +665,44 @@ public static class VerifyCommand
         static Ast.FunctionNode? FindDeclaration(Ast.ModuleNode? module, string id)
             => module?.Functions.FirstOrDefault(f => f.Id == id);
 
-        static List<Ast.ExpressionNode> Contracts(Ast.FunctionNode fn)
-            => fn.Preconditions.Select(p => p.Condition)
-                .Concat(fn.Postconditions.Select(p => p.Condition))
-                .ToList();
+        static List<Ast.ExpressionNode> Preconditions(Ast.FunctionNode fn)
+            => fn.Preconditions.Select(p => p.Condition).ToList();
 
+        static List<Ast.ExpressionNode> Postconditions(Ast.FunctionNode fn)
+            => fn.Postconditions.Select(p => p.Condition).ToList();
+
+        // Empty contract sets conjoin to literal true — (== 0 0) is a modeled
+        // form the translator handles, so all four implication directions run
+        // through one uniform code path.
         static Ast.ExpressionNode Conjoin(List<Ast.ExpressionNode> conditions)
-            => conditions.Count == 1
+        {
+            if (conditions.Count == 0)
+            {
+                var zero = new Ast.IntLiteralNode(Parsing.TextSpan.Empty, 0);
+                var zero2 = new Ast.IntLiteralNode(Parsing.TextSpan.Empty, 0);
+                return new Ast.BinaryOperationNode(Parsing.TextSpan.Empty, Ast.BinaryOperator.Equal, zero, zero2);
+            }
+            return conditions.Count == 1
                 ? conditions[0]
                 : conditions.Skip(1).Aggregate(conditions[0], (acc, c) =>
                     new Ast.BinaryOperationNode(Parsing.TextSpan.Empty, Ast.BinaryOperator.And, acc, c));
+        }
 
         static int Emit(string declaration, bool? weakened, bool indeterminate, string reason,
-            string? forward = null, string? backward = null)
+            bool? intactOrStrengthened = null,
+            string? forward = null, string? backward = null,
+            string? qForward = null, string? qBackward = null)
         {
             var payload = new Dictionary<string, object?>
             {
                 ["declaration"] = declaration,
                 ["weakened"] = weakened,
                 ["indeterminate"] = indeterminate,
+                ["intactOrStrengthened"] = intactOrStrengthened,
                 ["forward"] = forward,
                 ["backward"] = backward,
+                ["qForward"] = qForward,
+                ["qBackward"] = qBackward,
                 ["reason"] = reason
             };
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(payload));
@@ -704,14 +721,16 @@ public static class VerifyCommand
         if (finalErrors || finalModule == null)
         {
             return Emit(declarationId, weakened: true, indeterminate: false,
-                "final source is missing or does not parse — declaration unavailable, weakened by rule");
+                "final source is missing or does not parse — declaration unavailable, weakened by rule",
+                intactOrStrengthened: false);
         }
 
         var finalFn = FindDeclaration(finalModule, declarationId);
         if (finalFn == null)
         {
             return Emit(declarationId, weakened: true, indeterminate: false,
-                "declaration renamed or removed in final source — weakened by rule");
+                "declaration renamed or removed in final source — weakened by rule",
+                intactOrStrengthened: false);
         }
 
         // Signature drift makes the conjunctions incomparable over one parameter
@@ -721,23 +740,29 @@ public static class VerifyCommand
         if (frozenSig != finalSig)
         {
             return Emit(declarationId, weakened: true, indeterminate: false,
-                "declaration signature changed — contract spaces incomparable, weakened by rule");
+                "declaration signature changed — contract spaces incomparable, weakened by rule",
+                intactOrStrengthened: false);
         }
 
-        var frozenContracts = Contracts(frozenFn);
-        var finalContracts = Contracts(finalFn);
-        if (frozenContracts.Count == 0)
+        var frozenQ = Preconditions(frozenFn);
+        var frozenS = Postconditions(frozenFn);
+        var finalQ = Preconditions(finalFn);
+        var finalS = Postconditions(finalFn);
+
+        if (frozenQ.Count + frozenS.Count == 0)
         {
             return Emit(declarationId, weakened: false, indeterminate: false,
-                "frozen contract set empty — nothing to weaken");
+                "frozen contract set empty — nothing to weaken",
+                intactOrStrengthened: true);
         }
-        if (finalContracts.Count == 0)
+        if (finalQ.Count + finalS.Count == 0)
         {
             return Emit(declarationId, weakened: true, indeterminate: false,
-                "final contract set empty — weakened by rule");
+                "final contract set empty — weakened by rule",
+                intactOrStrengthened: false);
         }
 
-        foreach (var condition in frozenContracts.Concat(finalContracts))
+        foreach (var condition in frozenQ.Concat(frozenS).Concat(finalQ).Concat(finalS))
         {
             if (!Verification.Z3.ModeledForms.TryValidate(condition, out var offending))
             {
@@ -759,49 +784,92 @@ public static class VerifyCommand
                 return Emit(declarationId, weakened: null, indeterminate: true,
                     "a parameter is named 'result' — collides with the postcondition result variable");
             }
-            // `result` joins the quantified space: the contracts are predicates
-            // over (inputs, result), and the implication must hold for all values.
+            // `result` joins the quantified space: the postconditions are
+            // predicates over (inputs, result), and each implication must hold
+            // for all values.
             parameters.Add(("result", frozenFn.Output!.TypeName));
         }
 
-        var frozenConj = Conjoin(frozenContracts);
-        var finalConj = Conjoin(finalContracts);
-
-        return RunWeakeningProofs(declarationId, parameters, frozenConj, finalConj, timeoutMs, Emit);
+        return RunWeakeningProofs(
+            declarationId, parameters,
+            Conjoin(frozenQ), Conjoin(finalQ),
+            Conjoin(frozenS), Conjoin(finalS),
+            timeoutMs, Emit);
     }
 
+    /// <summary>
+    /// The two-leg comparison (#826 review C2): §Q and §S are compared
+    /// SEPARATELY, because their weakening directions are opposite — a
+    /// contract is weakened by RELAXING its §S (promising less) or by
+    /// STRENGTHENING its §Q (restricting the inputs it promises anything
+    /// about, the canonical prover-appeasement move). A single mixed
+    /// conjunction scores an added §Q as a strengthening and hides the
+    /// appeasement. intactOrStrengthened (#826 review M3) is the PP-G3
+    /// leg-b quantity: final §S implies frozen §S AND frozen §Q implies
+    /// final §Q — NOT merely "not weakened", which a gutted incomparable
+    /// contract also satisfies.
+    /// </summary>
     private static int RunWeakeningProofs(
         string declarationId,
         List<(string Name, string TypeName)> parameters,
-        Ast.ExpressionNode frozenConj,
-        Ast.ExpressionNode finalConj,
+        Ast.ExpressionNode frozenQ,
+        Ast.ExpressionNode finalQ,
+        Ast.ExpressionNode frozenS,
+        Ast.ExpressionNode finalS,
         uint timeoutMs,
-        Func<string, bool?, bool, string, string?, string?, int> emit)
+        Func<string, bool?, bool, string, bool?, string?, string?, string?, string?, int> emit)
     {
         using var ctx = Verification.Z3.Z3ContextFactory.Create();
         var prover = new Verification.Z3.Z3ImplicationProver(ctx, timeoutMs);
         var typedParams = parameters.Select(p => (p.Name, p.TypeName)).ToList();
 
-        var forward = prover.ProveImplication(typedParams, frozenConj, finalConj);
-        var backward = prover.ProveImplication(typedParams, finalConj, frozenConj);
+        var sForward = prover.ProveImplication(typedParams, frozenS, finalS);
+        var sBackward = prover.ProveImplication(typedParams, finalS, frozenS);
+        var qForward = prover.ProveImplication(typedParams, frozenQ, finalQ);
+        var qBackward = prover.ProveImplication(typedParams, finalQ, frozenQ);
 
         static bool Definitive(Verification.Z3.ImplicationStatus status)
             => status is Verification.Z3.ImplicationStatus.Proven or Verification.Z3.ImplicationStatus.Disproven;
 
-        if (!Definitive(forward.Status) || !Definitive(backward.Status))
+        string sF = sForward.Status.ToString(), sB = sBackward.Status.ToString();
+        string qF = qForward.Status.ToString(), qB = qBackward.Status.ToString();
+
+        // A determinately-weakened leg decides the verdict even if the other
+        // leg is indeterminate: one proven weakening cannot be un-weakened.
+        var sWeakened = Definitive(sForward.Status) && Definitive(sBackward.Status)
+            && sForward.Status == Verification.Z3.ImplicationStatus.Proven
+            && sBackward.Status == Verification.Z3.ImplicationStatus.Disproven;
+        var qStrengthened = Definitive(qForward.Status) && Definitive(qBackward.Status)
+            && qBackward.Status == Verification.Z3.ImplicationStatus.Proven
+            && qForward.Status == Verification.Z3.ImplicationStatus.Disproven;
+
+        if (sWeakened || qStrengthened)
+        {
+            return emit(declarationId, true, false,
+                sWeakened && qStrengthened
+                    ? "postcondition relaxed and precondition strengthened — weakened"
+                    : sWeakened
+                        ? "frozen §S implies final §S but not conversely — postcondition weakened"
+                        : "final §Q implies frozen §Q but not conversely — precondition strengthened (prover appeasement)",
+                false, sF, sB, qF, qB);
+        }
+
+        if (!Definitive(sForward.Status) || !Definitive(sBackward.Status)
+            || !Definitive(qForward.Status) || !Definitive(qBackward.Status))
         {
             return emit(declarationId, null, true,
                 "non-definitive solver verdict on an implication direction",
-                forward.Status.ToString(), backward.Status.ToString());
+                null, sF, sB, qF, qB);
         }
 
-        var weakened = forward.Status == Verification.Z3.ImplicationStatus.Proven
-            && backward.Status == Verification.Z3.ImplicationStatus.Disproven;
+        var intactOrStrengthened =
+            sBackward.Status == Verification.Z3.ImplicationStatus.Proven
+            && qForward.Status == Verification.Z3.ImplicationStatus.Proven;
 
-        return emit(declarationId, weakened, false,
-            weakened
-                ? "frozen implies final but final does not imply frozen — weakened"
-                : "final is equivalent to, stronger than, or incomparable with frozen — not weakened",
-            forward.Status.ToString(), backward.Status.ToString());
+        return emit(declarationId, false, false,
+            intactOrStrengthened
+                ? "final contract is intact or strengthened — not weakened"
+                : "final contract is incomparable with frozen — not weakened, but NOT intact-or-strengthened",
+            intactOrStrengthened, sF, sB, qF, qB);
     }
 }

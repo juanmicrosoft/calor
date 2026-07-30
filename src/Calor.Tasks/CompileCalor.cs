@@ -195,6 +195,26 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         try
         {
 
+        // An armed verify gate whose solver cannot load must be loud (#826
+        // review C3): without this, a missing native libz3 silently turns
+        // Verify=true into a no-op — every contract reports Skipped at info
+        // severity, invisible at normal MSBuild verbosity.
+        if (Verify && !Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable)
+        {
+            Log.LogWarning(
+                subcategory: "Calor",
+                warningCode: "Calor0710",
+                helpKeyword: null,
+                file: null,
+                lineNumber: 0,
+                columnNumber: 0,
+                endLineNumber: 0,
+                endColumnNumber: 0,
+                message: "Verify=true but the Z3 SMT solver is not available in the MSBuild task context — "
+                    + "contract verification will be silently skipped. Ensure the Z3 native library sits "
+                    + "next to Calor.Tasks.dll.");
+        }
+
         var generatedFiles = new List<ITaskItem>();
         var success = true;
         var pathComparer = BuildStateCache.GetPathComparer();

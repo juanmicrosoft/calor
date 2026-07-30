@@ -78,6 +78,7 @@ public class WeakeningCheckCliTests : IDisposable
         Assert.False(json.Value.GetProperty("indeterminate").GetBoolean());
         Assert.Equal("Proven", json.Value.GetProperty("forward").GetString());
         Assert.Equal("Proven", json.Value.GetProperty("backward").GetString());
+        Assert.True(json.Value.GetProperty("intactOrStrengthened").GetBoolean());
     }
 
     [Fact]
@@ -127,6 +128,88 @@ public class WeakeningCheckCliTests : IDisposable
         if (SolverUnavailable(json.Value)) return; // Z3-less CI
         Assert.False(json.Value.GetProperty("weakened").GetBoolean());
         Assert.False(json.Value.GetProperty("indeterminate").GetBoolean());
+        Assert.True(json.Value.GetProperty("intactOrStrengthened").GetBoolean());
+    }
+
+    // #826 review C2: adding a §Q where the frozen contract has none is the
+    // canonical prover-appeasement move (restrict inputs until the refutation
+    // disappears, body unchanged) — it MUST score weakened.
+    [Fact]
+    public void AddedPrecondition_Weakened()
+    {
+        var frozen = WriteFile("frozen.calr", FrozenSource);
+        var final_ = WriteFile("final.calr", FrozenSource.Replace(
+            "§S (&& (<= result cap) (>= result 0))",
+            "§Q (<= (+ baseAmount surcharge) cap)\n    §S (&& (<= result cap) (>= result 0))"));
+
+        var (exit, json, _, _) = RunCheck(frozen, final_, "f003");
+
+        Assert.Equal(0, exit);
+        Assert.NotNull(json);
+        if (SolverUnavailable(json.Value)) return; // Z3-less CI
+        Assert.True(json.Value.GetProperty("weakened").GetBoolean());
+        Assert.Equal("Disproven", json.Value.GetProperty("qForward").GetString());
+        Assert.Equal("Proven", json.Value.GetProperty("qBackward").GetString());
+    }
+
+    // #826 review C2: reclassifying a §S as §Q deletes the guarantee — the
+    // §S leg sees an emptied set and must score weakened.
+    [Fact]
+    public void PostconditionReclassifiedAsPrecondition_Weakened()
+    {
+        var frozen = WriteFile("frozen.calr", FrozenSource);
+        var final_ = WriteFile("final.calr", FrozenSource.Replace(
+            "§S (&& (<= result cap) (>= result 0))",
+            "§Q (&& (<= result cap) (>= result 0))"));
+
+        var (exit, json, _, _) = RunCheck(frozen, final_, "f003");
+
+        Assert.Equal(0, exit);
+        Assert.NotNull(json);
+        if (SolverUnavailable(json.Value)) return; // Z3-less CI
+        Assert.True(json.Value.GetProperty("weakened").GetBoolean());
+    }
+
+    // #826 review M3: a gutted, incomparable contract is not weakened under
+    // the one-way asymmetry rule, but it is NOT intact-or-strengthened —
+    // PP-G3 leg-b adjudicates on this field, not on !weakened.
+    [Fact]
+    public void GuttedIncomparableContract_NotWeakenedButNotIntact()
+    {
+        var frozen = WriteFile("frozen.calr", FrozenSource);
+        var final_ = WriteFile("final.calr", FrozenSource.Replace(
+            "§S (&& (<= result cap) (>= result 0))", "§S (>= result 5)"));
+
+        var (exit, json, _, _) = RunCheck(frozen, final_, "f003");
+
+        Assert.Equal(0, exit);
+        Assert.NotNull(json);
+        if (SolverUnavailable(json.Value)) return; // Z3-less CI
+        Assert.False(json.Value.GetProperty("weakened").GetBoolean());
+        Assert.False(json.Value.GetProperty("intactOrStrengthened").GetBoolean());
+    }
+
+    // #826 review C4 follow-through: literals outside the signed 32-bit
+    // domain previously wrapped mod 2^32 and produced false DETERMINATE
+    // verdicts; they must now yield indeterminate.
+    [Fact]
+    public void OutOfRangeLiteral_Indeterminate()
+    {
+        const string bigFrozen = """
+            §M{m001:Big}
+              §F{f009:B:pub} (i64:a) -> i64
+                §S (&& (>= result 0) (<= result 4000000000))
+                §R a
+            """;
+        var frozen = WriteFile("frozen.calr", bigFrozen);
+        var final_ = WriteFile("final.calr", bigFrozen.Replace("4000000000", "8000000000"));
+
+        var (exit, json, _, _) = RunCheck(frozen, final_, "f009");
+
+        Assert.Equal(0, exit);
+        Assert.NotNull(json);
+        Assert.True(json.Value.GetProperty("indeterminate").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, json.Value.GetProperty("weakened").ValueKind);
     }
 
     [Fact]

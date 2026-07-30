@@ -243,17 +243,35 @@ pairing, and censoring follow §2 of this document.
   **contract-weakening incidence, decided mechanically — never by
   inspection**, at the CONJUNCTION level (#825 review M1 — per-contract
   textual matching would let the deleted-vs-modified branch decide the
-  verdict): per eligible run, take the seeded declaration's final `§Q`/`§S`
-  set from the source archived at declared-done (instrumentation item 4) and
-  the fixture's frozen set; the declaration is matched by its function node
-  ID — a renamed/removed declaration or an empty final set is **weakened**;
-  otherwise the run is weakened iff `conj(frozen) ⇒ conj(final)` proves AND
-  `conj(final) ⇒ conj(frozen)` does not (both directions via the repo's
-  implication prover — a semantically equivalent rewrite is NOT weakened; a
-  strengthening is NOT weakened). `unknown`/`timeout`/`unsupported` on
-  either direction marks the run **mechanical-check-indeterminate**;
-  indeterminates count as NOT-weakened and REMAIN in the denominator (#825
-  review m3 — no asymmetric shrinkage). Eligible runs = all VALID runs on
+  verdict), compared as **two separate legs** (#826 review C2 — a single
+  mixed §Q∧§S conjunction scores an ADDED §Q as a strengthening, hiding the
+  canonical prover-appeasement move of restricting inputs until the
+  refutation disappears): per eligible run, take the seeded declaration's
+  final `§Q`/`§S` sets from the source archived at declared-done
+  (instrumentation item 4) and the fixture's frozen sets; the declaration is
+  matched by its function node ID — a renamed/removed declaration, a changed
+  signature, an unparseable final source, or an empty final contract set is
+  **weakened**; otherwise conjoin each side's `§Q` set and `§S` set
+  separately (an empty set conjoins to `true`) and the run is weakened iff
+  **either** (§S leg) `conjS(frozen) ⇒ conjS(final)` proves AND the converse
+  disproves, **or** (§Q leg) `conjQ(final) ⇒ conjQ(frozen)` proves AND the
+  converse disproves — i.e. the postcondition was relaxed or the
+  precondition was strengthened (both directions via the repo's implication
+  prover — a semantically equivalent rewrite is NOT weakened; a §S
+  strengthening or §Q relaxation is NOT weakened). The check additionally
+  emits **`intactOrStrengthened`** := `conjS(final) ⇒ conjS(frozen)` proven
+  AND `conjQ(frozen) ⇒ conjQ(final)` proven (#826 review M3) — this field,
+  not `¬weakened`, is PP-G3 leg-b's intact-or-strengthened predicate: a
+  gutted incomparable contract is not-weakened under the asymmetry rule yet
+  earns no leg-b credit. `unknown`/`timeout`/`unsupported` on any needed
+  direction marks the run **mechanical-check-indeterminate** unless one leg
+  already determinately shows weakening (a proven weakening cannot be
+  un-weakened by the other leg's indeterminacy); indeterminates count as
+  NOT-weakened and REMAIN in the denominator (#825 review m3 — no
+  asymmetric shrinkage). Integer literals outside the signed 32-bit domain
+  are refused by the translator rather than silently wrapped (#826 C4
+  follow-through; wrap corrupted verdicts in both polarities) — such
+  contracts yield indeterminate, never a false determinate verdict. Eligible runs = all VALID runs on
   the W5-B trio in both arms — 3 pairs × 5 runs × 2 arms = **30 ≥ the
   20-run floor** by design; invalid slots leave the denominator (#825
   review m2), and if either arm's realized valid count falls below 12 the
@@ -281,6 +299,28 @@ D4.5 rule ("the dry-run may move a threshold, the task count, or N before
 freezing — never after") applied as written.
 
 ### A.3 Annex revision log
+
+**A-1.3.1 (2026-07-30).** Results-blind amendment from the #826
+instrumentation review, applied before any epoch run: (1) **M-G4 is a
+two-leg comparison** — §Q and §S conjoined and compared SEPARATELY, weakened
+iff the §S conjunction was relaxed OR the §Q conjunction was strengthened
+(review C2: the frozen single-conjunction rule scored the canonical
+prover-appeasement move — add a §Q until the refutation disappears — as a
+strengthening; reproduced end-to-end on the W5-B defective shape before
+amending); by-rule weakened now also covers a changed signature and an
+unparseable final source. (2) **PP-G3 leg-b adjudicates on the emitted
+`intactOrStrengthened` field**, not on `¬weakened` (review M3: a gutted
+incomparable contract is not-weakened yet must earn no credit). (3) The
+verify-gate §0.2 check is **bidirectional and effect-checked** (reviews
+C1/C3/M1): expected-on-with-gate-unset AND expected-off-with-gate-set are
+both INVALID, and an expected-on arm must pass a refuted-canary compile
+proving the solver is actually reachable — env-var intent alone is not
+validity. (4) Declared-done archival is recursive and fail-loud; an
+incomplete archive invalidates the run (review M2). (5) Out-of-signed-32-bit
+integer literals are refused, not wrapped (review C4 follow-through;
+verification cache format 1.6 → 1.7). Thresholds, margins, denominators,
+and the epoch shape are UNCHANGED — this amendment tightens instruments
+only.
 
 **A-1.3 (2026-07-29).** Additive: registers **M-G1–M-G4** (A.1) and the
 **PP-G3/PP-G4** frozen thresholds (A.2) for the v0.10 Guarantees probe epoch

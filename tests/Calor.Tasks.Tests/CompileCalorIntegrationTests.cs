@@ -721,6 +721,40 @@ public class CompileCalorIntegrationTests : IDisposable
     // flipping it on over a warm gate-off cache must recompile (and re-verify)
     // files whose content did not change — a cached skip here would silently
     // drop the refutation.
+    // #826 review M4: the in-process VerifyGate tests find libz3 through the
+    // test host's deps.json probing, which the real MSBuild task path does NOT
+    // get — the gate there depends on CopyZ3NativeToTasksOutput placing the
+    // native lib at the Tasks output ROOT. Pin that deployment directly: if
+    // the copy target regresses, this fails while the other gate tests stay
+    // green.
+    [Fact]
+    public void VerifyGate_NativeZ3_DeployedToTasksOutputRoot()
+    {
+        var dir = Directory.GetCurrentDirectory();
+        string? repoRoot = null;
+        while (dir != null)
+        {
+            if (File.Exists(Path.Combine(dir, "Calor.sln"))) { repoRoot = dir; break; }
+            dir = Directory.GetParent(dir)?.FullName;
+        }
+        Assert.NotNull(repoRoot);
+
+        var checkedConfigs = 0;
+        foreach (var config in new[] { "Debug", "Release" })
+        {
+            var binDir = Path.Combine(repoRoot!, "src", "Calor.Tasks", "bin", config, "net10.0");
+            if (!File.Exists(Path.Combine(binDir, "Calor.Tasks.dll"))) continue;
+            checkedConfigs++;
+            var hasNative = File.Exists(Path.Combine(binDir, "libz3.dylib"))
+                || File.Exists(Path.Combine(binDir, "libz3.so"))
+                || File.Exists(Path.Combine(binDir, "libz3.dll"));
+            Assert.True(hasNative,
+                $"No libz3 native library at the Calor.Tasks output root ({binDir}) — "
+                + "the MSBuild verify gate would silently report Z3 unavailable (CopyZ3NativeToTasksOutput regressed?)");
+        }
+        Assert.True(checkedConfigs > 0, "No built Calor.Tasks output found to check");
+    }
+
     [Fact]
     public void VerifyGate_FlippedOnOverWarmCache_Recompiles()
     {

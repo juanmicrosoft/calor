@@ -33,8 +33,14 @@ public sealed class VerificationCacheEntry
     /// were never provable, and unsupported is never cached) — the bump guards
     /// any tightening the review failed to construct, at the cost of one cold
     /// re-verify (#822 review C2 + re-verification m-new-2).
+    /// 1.7: out-of-signed-32-bit integer literals are refused instead of
+    /// silently wrapped mod 2^32 (#826 review C4 follow-through) — the bump
+    /// evicts pre-fix entries, which is required: a warm cache may hold
+    /// verdicts computed from wrapped (corrupted) literal values in either
+    /// polarity (false refuted with nonsense counterexamples, inverted
+    /// implication verdicts).
     /// </summary>
-    public const string CurrentFormatVersion = "1.6";
+    public const string CurrentFormatVersion = "1.7";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.

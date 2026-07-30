@@ -69,6 +69,33 @@ detect_invalid_run() {
     return 1
 }
 
+# Annex A-1.3 instrumentation item 4 (#826 review M2): archive the
+# declared-done source verbatim to $ws_out/final-src/ — M-G4's weakening
+# check diffs this against the frozen seeded declaration. Recursive (agents
+# may nest files) and fail-loud: an incomplete archive invalidates the run,
+# because M-G4 without its input would misread as weakened-by-rule.
+# Convention matches detect_invalid_run: return 0 + print reason = invalid.
+archive_final_src() {
+    local ws="$1" ws_out="$2"
+    rm -rf "$ws_out/final-src"
+    mkdir -p "$ws_out/final-src"
+    ( cd "$ws/src" && find . -type f \( -name '*.calr' -o -name '*.cs' \) \
+        -not -path '*/obj/*' -not -path '*/bin/*' -print0 \
+      | while IFS= read -r -d '' f; do
+            mkdir -p "$ws_out/final-src/$(dirname "$f")"
+            cp "$f" "$ws_out/final-src/$f"
+        done )
+    local src_count arch_count
+    src_count=$(find "$ws/src" -type f \( -name '*.calr' -o -name '*.cs' \) \
+        -not -path '*/obj/*' -not -path '*/bin/*' | wc -l | tr -d ' ')
+    arch_count=$(find "$ws_out/final-src" -type f | wc -l | tr -d ' ')
+    if [[ "$arch_count" != "$src_count" ]]; then
+        echo "declared-done archival incomplete ($arch_count/$src_count files)"
+        return 0
+    fi
+    return 1
+}
+
 # Test entrypoint: ./run-pair.sh --detect-invalid <ws_out> [agent_exit_code]
 # Exits 0 (and prints the reason) if the run directory is invalid, 1 if valid.
 if [[ "${1:-}" == "--detect-invalid" ]]; then
@@ -230,10 +257,30 @@ check_pins() {
     # Annex A-1.3 instrumentation item 3: when the epoch declares the verify
     # gate for this arm (CALOR_P0_VERIFY_EXPECTED=1), a run without the gate
     # actually armed is INVALID — the M-G3 build-proof channel would be
-    # silently absent (§0.2 semantics).
-    if [[ "\${CALOR_P0_VERIFY_EXPECTED:-0}" == "1" && -z "\${CALOR_P0_VERIFY_GATE:-}" ]]; then
+    # silently absent (§0.2 semantics). Bidirectional (#826 review M1): a
+    # gate armed on an arm that declared verify OFF is equally invalid — it
+    # silently drifts the control arm's registered configuration.
+    if [[ "${CALOR_P0_VERIFY_EXPECTED:-0}" == "1" && -z "${CALOR_P0_VERIFY_GATE:-}" ]]; then
         echo "INVALID: verify gate expected for this arm but CALOR_P0_VERIFY_GATE is unset (A-1.3 item 3)" >&2
         exit 3
+    fi
+    if [[ "${CALOR_P0_VERIFY_EXPECTED:-0}" != "1" && -n "${CALOR_P0_VERIFY_GATE:-}" ]]; then
+        echo "INVALID: verify gate is armed but this arm's config does not declare it (A-1.3 item 3, control-arm drift)" >&2
+        exit 3
+    fi
+    # #826 review C3: env checks prove intent, not effect. When the gate is
+    # expected, require the arm's compiler to actually produce a Calor0712
+    # refutation on a known-refuted canary — an armed gate whose solver is
+    # silently unavailable (missing libz3 in the Tasks/CLI context) must be
+    # caught here, before any spend.
+    if [[ "${CALOR_P0_VERIFY_EXPECTED:-0}" == "1" ]]; then
+        local canary="$REPO_ROOT/tests/TestData/Verification/Outcomes/refuted-with-binding.calr"
+        local canary_out
+        if ! canary_out="$(dotnet "$CALOR_CLI_DLL" verify "$canary" --no-cache --format json 2>&1)" \
+           || ! grep -q "refuted" <<< "$canary_out"; then
+            echo "INVALID: verify-gate canary did not refute — solver ineffective in this arm's compiler context (A-1.3 item 3 / #826 C3)" >&2
+            exit 3
+        fi
     fi
 }
 
@@ -779,14 +826,6 @@ extract_metrics() {
     local journal="$ws_out/journal.jsonl"
     touch "$journal"
 
-    # Archive the declared-done source verbatim (Annex A-1.3 instrumentation
-    # item 4): M-G4's weakening check diffs this against the frozen seeded
-    # declaration, so it must be the untouched final state — before any
-    # build/test below can rewrite obj/ artifacts alongside it.
-    mkdir -p "$ws_out/final-src"
-    cp "$ws"/src/*.calr "$ws_out/final-src/" 2>/dev/null || true
-    cp "$ws"/src/*.cs "$ws_out/final-src/" 2>/dev/null || true
-
     # Final silent held-out run = declared-done state (non-compiling = all fail)
     local final_pass=0 final_fail=$HELDOUT_TEST_COUNT final_build_ok=0
     if CALOR_P0_SHIM_OFF=1 dotnet build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_final.txt" 2>&1; then
@@ -975,7 +1014,11 @@ for (( run=1; run<=RUNS; run++ )); do
         write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
         run_agent "$WS" "$WS_OUT" "$SHIM_DIR"
 
-        if reason="$(detect_invalid_run "$WS_OUT" "$AGENT_RC")"; then
+        # Declared-done archival runs immediately after the agent stops —
+        # before the final build below can rewrite anything — and its failure
+        # is run-invalidating (A-1.3 item 4, #826 M2).
+        if reason="$(archive_final_src "$WS" "$WS_OUT")" \
+           || reason="$(detect_invalid_run "$WS_OUT" "$AGENT_RC")"; then
             printf '%s attempt=%d agent_rc=%d: %s\n' \
                 "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$attempt" "$AGENT_RC" "$reason" \
                 >> "$WS_OUT/invalid.txt"
