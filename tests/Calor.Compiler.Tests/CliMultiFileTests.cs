@@ -401,4 +401,73 @@ public class CliMultiFileTests : IDisposable
         var emitted = File.ReadAllText(Path.Combine(_tempDir, "icatalog.g.cs"));
         Assert.Contains("global::IStore.IStoreModule.Stash(path);", emitted);
     }
+
+
+    [Fact]
+    public void MultiFile_NestedClassCallingEnclosingStatic_IsNotMisqualified()
+    {
+        // #823 re-review NEW-1: enclosing classes' members are bare-visible from
+        // nested types; the guard must consult the whole class-scope stack.
+        var aPath = Path.Combine(_tempDir, "nest.calr");
+        var bPath = Path.Combine(_tempDir, "nbeta.calr");
+        File.WriteAllText(aPath, """
+            §M{m001:NAlpha}
+              §CL{c001:Outer:pub}
+                §MT{t001:Save:pub:stat} () -> void
+                  §E{cw}
+                  §P "outer-static-save"
+                §CL{c002:Inner:pub}
+                  §MT{t002:Go:pub} () -> void
+                    §E{cw}
+                    §C{Save}
+                    §/C
+            """);
+        File.WriteAllText(bPath, """
+            §M{m002:NBeta}
+              §F{f001:Save:pub} () -> void
+                §E{cw}
+                §P "beta-save"
+            """);
+
+        var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+
+        var emitted = File.ReadAllText(Path.Combine(_tempDir, "nest.g.cs"));
+        Assert.DoesNotContain("global::NBeta", emitted);
+    }
+
+    [Fact]
+    public void MultiFile_DerivedClassMethod_NeverQualifies()
+    {
+        // #823 re-review NEW-2: inherited members are not enumerable at emission,
+        // so derived classes suppress qualification entirely — a bare call to an
+        // inherited member must stay bare (CS0103 for genuinely-cross-module
+        // calls is the accepted trade-off; recorded in the CHANGELOG).
+        var aPath = Path.Combine(_tempDir, "derived.calr");
+        var bPath = Path.Combine(_tempDir, "dlib.calr");
+        File.WriteAllText(aPath, """
+            §M{m001:DApp}
+              §CL{c001:Base:pub}
+                §MT{t001:Ping:pub} () -> void
+                  §E{cw}
+                  §P "base-ping"
+              §CL{c002:Derived:Base}
+                §MT{t002:Go:pub} () -> void
+                  §E{cw}
+                  §C{Ping}
+                  §/C
+            """);
+        File.WriteAllText(bPath, """
+            §M{m002:DLib}
+              §F{f001:Ping:pub} () -> void
+                §E{cw}
+                §P "lib-ping"
+            """);
+
+        var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+
+        var emitted = File.ReadAllText(Path.Combine(_tempDir, "derived.g.cs"));
+        Assert.DoesNotContain("global::DLib", emitted);
+    }
 }

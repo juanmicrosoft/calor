@@ -646,4 +646,30 @@ public class CompileCalorIntegrationTests : IDisposable
         // Both files compile; nothing skips.
         Assert.DoesNotContain("skipping", msgs);
     }
+
+    [Fact]
+    public void CrossModuleCall_TasksPath_EmitsQualifiedTarget()
+    {
+        // #823 review M2 pin: MSBuild is the surface where csc consumes the
+        // outputs — the task itself must produce qualified cross-module calls.
+        var src1 = CreateSourceFile("Store.calr", """
+            §M{m001:Store}
+              §F{f001:SaveSnapshot:pub} (str:path) -> void
+                §E{fs:w}
+                §C{File.WriteAllText} §A path §A "x" §/C
+            """);
+        var src2 = CreateSourceFile("Catalog.calr", """
+            §M{m002:Catalog}
+              §F{f001:Ping:pub} (str:path) -> void
+                §E{fs:w}
+                §C{SaveSnapshot} §A path §/C
+            """);
+
+        var task = CreateTask(src1, src2);
+        Assert.True(task.Execute());
+
+        var catalogOut = task.GeneratedFiles.Single(f => f.ItemSpec.Contains("Catalog"));
+        var emitted = File.ReadAllText(catalogOut.ItemSpec);
+        Assert.Contains("global::Store.StoreModule.SaveSnapshot(path);", emitted);
+    }
 }

@@ -729,6 +729,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             || target.Contains('<')
             || IsVarDeclaredInScope(target)
             || _currentClassMemberNames.Contains(target)
+            // ENCLOSING classes' members are bare-visible from nested types too
+            // (#823 re-review NEW-1: a nested class calling an enclosing static
+            // was mis-qualified to another module — silent wrong code). Union
+            // over the scope stack errs toward under-qualification, the
+            // accepted failure direction.
+            || _classMemberScopes.Any(scope => scope.Members.Contains(target))
             || _currentModuleFunctionNames.Contains(target)
             || !CrossModuleFunctionModules.TryGetValue(target, out var calleeModule)
             || calleeModule == _currentModuleName)
@@ -2446,7 +2452,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             .Concat(node.Fields.Select(f => f.Name))
             .Concat(node.Properties.Select(pr => pr.Name))
             .ToHashSet(StringComparer.Ordinal);
-        _suppressCrossModuleQualification = !string.IsNullOrEmpty(node.BaseClass);
+        // Inherited (OR'd with the enclosing class's flag): a nested type inside a
+        // derived class also sees the enclosing base's statics bare (#823
+        // re-review NEW-1 adjacent).
+        _suppressCrossModuleQualification = _suppressCrossModuleQualification
+            || !string.IsNullOrEmpty(node.BaseClass);
 
         // Emit fields
         foreach (var field in node.Fields)
