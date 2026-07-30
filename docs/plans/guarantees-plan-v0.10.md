@@ -185,6 +185,37 @@ The hard rule, carried from v0.9: the control build is **archived before treatme
 
 ## 10. Revision log
 
+**v4 amendment (2026-07-30, Call G) — CALL G = PROCEED; v0.11 planning is
+verification-centerpiece-shaped.** Adjudicated per §6.2 on the merged
+`guarantees-probe-001` record (#828 → `dfa7371c`; independently recomputed
+RECORD-SOUND from raw artifacts): **PP-G3 HIT** — leg (a) treatment M-W1
+9/9 ≥ control 9/9; leg (b) all three W5-B defects earned joint-predicate
+credit (5/5, 4/5, 5/5 slots; the one unsatisfied slot lacked only the
+build-proof event — the agent pre-fixed the defect before any compile).
+M-G3 shows the headline conversion: all three contract-class defects moved
+`runtime-guard` → `build-proof` under the gate, effect classes unchanged.
+**PP-G4 PASS** (release blocker cleared) — leg (a) itg median paired ratio
+1.0000, one-sided 95 % lower bound 0.8462, no significant regression
+(floor-bound power honesty as frozen: bounds only LARGE regressions);
+leg (b) weakening 0/15 control vs 0/15 treatment, 0 indeterminate,
+absolute excess 0 ≤ 3. Preconditions discharged: PP-G1/M-G2 green on the
+treatment build (`d7c0e6ac` CI success), 90/90 valid runs, 0 tampered,
+0 censored. Realized spend $79.39 (authorized gate; ~4× the pre-epoch
+<$20 estimate — recorded, and the estimate method corrected for future
+gates: sum per-run `total_cost_usd`). Instrument amendments A-1.3.1 and
+A-1.3.2 were applied results-blind before the epoch and are part of the
+record. **Ceiling honesty, carried into v0.11 planning:** the control arm
+already catches 9/9 via runtime guards on these fixtures, so this epoch
+demonstrates the gate changes the *channel* (earlier, attributed,
+counterexample-bearing surfacing), not the catch *outcome*; whether
+earliness converts to outcome differences requires tasks above the current
+fixture ceiling — the natural v0.11 measurement question, adjacent to the
+deferred real-scale benchmark. Deferred-register items (§9: contract
+synthesis, `Justified`, frames/`old()`, real-scale benchmark) roll to
+v0.11 planning as registered — none is retired by this call. **Call 3
+(the v0.11 adoption one-way door) remains untouched and unexercised.**
+D-G5.3 is complete; the v0.10 program's in-repo work is done.
+
 **v3 amendment (2026-07-29, G5 kickoff)** — **A-1.3 froze** (gates doc Annex A):
 M-G1–M-G4 definitions and the PP-G3/PP-G4 thresholds are registered,
 results-blind, before the Guarantees probe epoch. The D-G3.1 restate-check for
