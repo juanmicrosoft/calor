@@ -134,7 +134,7 @@ public class BuildStateCacheTests : IDisposable
         var loaded = BuildStateCache.Load(outputDir);
 
         Assert.NotNull(loaded);
-        Assert.Equal("2.0", loaded.FormatVersion);
+        Assert.Equal("2.1", loaded.FormatVersion);
         Assert.Equal("abc123", loaded.CompilerHash);
         Assert.Equal("def456", loaded.OptionsHash);
         Assert.Equal("ghi789", loaded.ManifestHash);

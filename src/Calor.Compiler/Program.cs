@@ -887,6 +887,7 @@ public class Program
         // Code generation
         phaseSw.Restart();
         var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult, options.ObligationResults);
+        emitter.CrossModuleFunctionModules = options.CrossModuleFunctionModules;
         if (options.EmitLineDirectives && !string.IsNullOrEmpty(filePath))
         {
             emitter.LineDirectiveFilePath = filePath;
@@ -994,6 +995,15 @@ public sealed class CompilationOptions
     /// Enable verbose output.
     /// </summary>
     public bool Verbose { get; init; }
+
+    /// <summary>
+    /// Bare public function name → defining module name, for cross-module call
+    /// qualification at emission (G3/#809). Built by the multi-file driver from
+    /// a pre-parse of all inputs; unambiguous names only. Settable (not init)
+    /// because the driver constructs per-file options via a factory and applies
+    /// the shared map afterward.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? CrossModuleFunctionModules { get; set; }
 
     /// <summary>
     /// Writer for verbose/status messages emitted during compilation phases.
