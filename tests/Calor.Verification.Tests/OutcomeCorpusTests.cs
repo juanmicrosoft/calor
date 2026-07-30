@@ -134,7 +134,7 @@ public class OutcomeCorpusTests
             "proven.calr", "refuted-with-model.calr", "unsupported.calr", "timeout.calr",
             "proven-with-result.calr", "refuted-overflow.calr", "unsupported-body.calr",
             "vacuous-precondition.calr", "assumed-division.calr",
-            "proven-with-binding.calr"
+            "proven-with-binding.calr", "refuted-with-binding.calr"
         ];
 
         foreach (var fixture in fixtures)
@@ -240,6 +240,25 @@ public class OutcomeCorpusTests
             .ToList();
         Assert.Equal(3, proven.Count);
         Assert.All(proven, d => Assert.Equal(ProofStatus.Proven, d.Verification!.Status));
+    }
+
+    [SkippableFact]
+    public void RefutedWithBindingFixture_DefectiveW5BShapeRefutesWithModel()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // #825 review m1: A-1.3's feasibility-by-determinism claim for the
+        // Guarantees probe's surfacing half rests on the DEFECTIVE W5-B shapes
+        // refuting deterministically with a model — this fixture makes that a
+        // CI fact instead of an assertion.
+        var result = CompileFixture("refuted-with-binding.calr");
+
+        var refuted = ContractDiagnostics(result)
+            .Single(d => d.Code == DiagnosticCode.PostconditionMayBeViolated);
+        Assert.Equal(ProofStatus.Refuted, refuted.Verification!.Status);
+        var model = refuted.Verification.Counterexample;
+        Assert.NotNull(model);
+        Assert.Contains(model.Bindings, b => b.Name == "result");
     }
 
     [SkippableFact]

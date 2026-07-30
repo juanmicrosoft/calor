@@ -1,0 +1,7 @@
+§M{m1:OutcomeRefutedBinding}
+  §F{f1:QuoteWithSurchargeDefective:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
+    §S (<= result cap)
+    §B{total:i32} (+ baseAmount surcharge)
+    §IF{if1} (> total (+ cap 10))
+      §R cap
+    §R total
