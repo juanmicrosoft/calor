@@ -276,9 +276,26 @@ check_pins() {
     if [[ "${CALOR_P0_VERIFY_EXPECTED:-0}" == "1" ]]; then
         local canary="$REPO_ROOT/tests/TestData/Verification/Outcomes/refuted-with-binding.calr"
         local canary_out
-        if ! canary_out="$(dotnet "$CALOR_CLI_DLL" verify "$canary" --no-cache --format json 2>&1)" \
-           || ! grep -q "refuted" <<< "$canary_out"; then
+        # `calor verify` exits NON-ZERO on a refutation, so the exit code is
+        # ignored and the verdict is read from the JSON. The match must be the
+        # refutation-specific status token — a bare "refuted" matches JSON KEY
+        # NAMES ("refuted": 0) even in solver-unavailable output, which would
+        # pass a dead solver: the exact inversion this canary exists to catch
+        # (#826 re-verification C-new-1).
+        canary_out="$(dotnet "$CALOR_CLI_DLL" verify "$canary" --no-cache --format json 2>&1)" || true
+        if ! grep -q '"status": "refuted"' <<< "$canary_out"; then
             echo "INVALID: verify-gate canary did not refute — solver ineffective in this arm's compiler context (A-1.3 item 3 / #826 C3)" >&2
+            exit 3
+        fi
+        # The CLI canary proves the CLI/journal channel; the workspace Tasks
+        # build binds its own copy of the compiler, so also require the native
+        # solver next to the Calor.Tasks.dll the template references (#826
+        # re-verification recommendation — closes the Tasks-context gap the
+        # Calor0710 warning surfaces but does not invalidate).
+        local tasks_dir="$REPO_ROOT/src/Calor.Tasks/bin/Release/net10.0"
+        if [[ -d "$tasks_dir" ]] \
+           && ! compgen -G "$tasks_dir/libz3.*" > /dev/null; then
+            echo "INVALID: no libz3 native library beside Calor.Tasks.dll — the workspace verify gate would be silently dead (A-1.3 item 3 / #826 C3)" >&2
             exit 3
         fi
     fi
