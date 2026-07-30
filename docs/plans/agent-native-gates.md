@@ -300,6 +300,34 @@ freezing — never after") applied as written.
 
 ### A.3 Annex revision log
 
+**A-1.3.2 (2026-07-30).** Results-blind amendment from the #827 epoch-driver
+review, applied before any epoch run; instruments only, thresholds and epoch
+shape unchanged. (1) **Seeded-declaration registration:** each fixture's
+`defect.json` gains a `declarationId` field (W5A→`f003`, W5B→`f003`,
+W5C→`f005`, derived mechanically — Calor0410 declarationId from compiling
+the starter under the pinned config for the effect classes, §S-carrier scan
+for W5-B; agent-visible fixture content unchanged). The adjudicator resolves
+the M-G3 declaration from this field — a §S-only scan blinded the
+build-proof/build-block channels for 6 of 9 defects (review C1). (2)
+**M-G3 aggregation tie rule:** the 5-way channel vote can tie where the
+binary catch vote cannot (2-2-1); a tie resolves to the LATEST (least
+favorable) tied channel — plurality with a conservative tie-break, so an
+ambiguous vote never flatters the treatment arm (review M1). (3)
+**`build-block` code set** = exactly {`Calor0410`} under the pinned config:
+journal diagnostics carry no severity and warning-severity Calor04xx exist
+(review m1). (4) **Smoke-tamper enforcement at adjudication:** a
+`smokeTampered` run is INVALID for every instrument (missed channel, cannot
+satisfy the leg-b predicate, out of the M-G4 denominator) — the A-1.2
+semantics carried by A-1.3, now enforced mechanically rather than by
+post-hoc narrative (review C2). (5) **M-G4 archived-source resolution by
+declaration, not filename:** the final source is whichever archived file
+contains `§F{<declarationId>:...}`; weakened-by-rule applies only when NO
+archived file contains the declaration — a renamed/moved file with the
+declaration intact is not a weakening (review M3, faithful to the annex's
+function-node-ID matching). (6) **PP-G4 leg (a) decided by the bound**: the
+leg fails iff the one-sided 95% CI lower bound exceeds 1.0, exactly as
+worded; the bootstrap p-value is reported but does not decide (review m2).
+
 **A-1.3.1 (2026-07-30).** Results-blind amendment from the #826
 instrumentation review, applied before any epoch run: (1) **M-G4 is a
 two-leg comparison** — §Q and §S conjoined and compared SEPARATELY, weakened

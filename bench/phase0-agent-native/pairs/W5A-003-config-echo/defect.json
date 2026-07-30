@@ -1,9 +1,10 @@
 {
   "id": "W5A-003",
   "class": "W5-A",
+  "declarationId": "f003",
   "claim": "undeclared side effect on an enforcement-covered path",
-  "description": "FormatConfig is declared pure (calor: §E{}; csharp: doc comment 'Pure: no side effects') but echoes the formatted entry to a relative-path trace file via a named static call (File.WriteAllText -> fs:w per the bcl-io manifest).",
-  "coveredPath": "named static BCL call inside a first-order function body — EffectEnforcementPass manifest resolution; no delegates, no dispatch (the excluded holes are not involved)",
+  "description": "FormatConfig is declared pure (calor: \u00a7E{}; csharp: doc comment 'Pure: no side effects') but echoes the formatted entry to a relative-path trace file via a named static call (File.WriteAllText -> fs:w per the bcl-io manifest).",
+  "coveredPath": "named static BCL call inside a first-order function body \u2014 EffectEnforcementPass manifest resolution; no delegates, no dispatch (the excluded holes are not involved)",
   "calorCatchChannel": "build-blocking Calor0410 with call chain (FormatConfig -> File.WriteAllText), fires on the agent's first build",
   "probeTest": "ConfigPair.Probe.ProbeTests.Probe_FormatConfig_PerformsNoFileWrite",
   "acceptance": {
