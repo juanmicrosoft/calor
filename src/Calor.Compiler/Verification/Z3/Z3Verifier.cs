@@ -510,6 +510,15 @@ public static class FunctionBodyEncoder
         // sound under §S normal-return semantics because encodable initializers
         // are pure except division, whose throw-before-return case is covered by
         // the divisor side conditions collected at the BINDING site.
+        // M1 (#824 review): a binding whose name collides with a parameter makes
+        // the divisor collector (which walks UNSUBSTITUTED trees) resolve the
+        // name to the parameter while the encoder sees the binding — a wrong
+        // Assumed on API-driven ASTs. Calor0255 forbids the shape in legal
+        // source; refuse it here for unchecked-AST callers.
+        var shadowing = FindParameterShadowingBinding(body, declaredParameters);
+        if (shadowing != null)
+            return (null, $"the body binds '{shadowing}', which shadows a parameter of the same name");
+
         var undeclared = FindUndeclaredReference(
             body, declaredParameters, boundNames: new HashSet<string>(StringComparer.Ordinal));
         if (undeclared != null)
@@ -522,11 +531,53 @@ public static class FunctionBodyEncoder
             continuation: null);
     }
 
+    /// <summary>
+    /// Binding type annotations the encoder can preserve under substitution:
+    /// the translator's default 32-bit integer family, bool, and string. Any
+    /// other width changes runtime arithmetic semantics the substituted tree
+    /// would not reflect (#824 review C1).
+    /// </summary>
+    private static bool IsWidthNeutralBindingType(string? typeName) =>
+        // Two spelling families: compact/source ("i32") for direct-AST callers,
+        // and the parser's expanded forms ("INT"; width-annotated variants like
+        // "INT[bits=64][signed=true]" are deliberately NOT listed — width or
+        // signedness changes are exactly what substitution cannot preserve).
+        typeName is null
+            or "i32" or "int" or "Int32" or "System.Int32" or "INT"
+            or "bool" or "BOOL"
+            or "str" or "string" or "STRING";
+
     /// <summary>Maximum branch-nesting depth the encoder follows (D-G3.1 "bounded").</summary>
     private const int MaxEncodeDepth = 32;
 
     /// <summary>Maximum node count of a substituted expression (guards SSA blowup on chains).</summary>
     private const int MaxSubstitutedNodes = 10_000;
+
+    private static string? FindParameterShadowingBinding(
+        IReadOnlyList<StatementNode> statements,
+        IReadOnlyCollection<string> declaredParameters)
+    {
+        foreach (var stmt in statements)
+        {
+            switch (stmt)
+            {
+                case BindStatementNode bind when declaredParameters.Contains(bind.Name):
+                    return bind.Name;
+                case IfStatementNode ifStmt:
+                    var hit = FindParameterShadowingBinding(ifStmt.ThenBody, declaredParameters)
+                        ?? ifStmt.ElseIfClauses
+                            .Select(c => FindParameterShadowingBinding(c.Body, declaredParameters))
+                            .FirstOrDefault(h => h != null)
+                        ?? (ifStmt.ElseBody != null
+                            ? FindParameterShadowingBinding(ifStmt.ElseBody, declaredParameters)
+                            : null);
+                    if (hit != null)
+                        return hit;
+                    break;
+            }
+        }
+        return null;
+    }
 
     /// <summary>
     /// Walks the encodable statement surface (returns, bindings, if/elseif/else) and
@@ -856,6 +907,16 @@ public static class FunctionBodyEncoder
                     return (null, "the body contains a binding without an initializer");
                 if (bind.Name == "result")
                     return (null, "the body binds the name 'result', which collides with the postcondition result variable");
+                // C1 (#824 review): substitution ERASES the binding's type
+                // annotation, but the annotation changes runtime arithmetic width
+                // at every use site (§B{t:i64} INT:2147483647 → t+1 is 64-bit at
+                // runtime, 32-bit-wrapped in the encoding → false Proven, check
+                // deleted). Only width-neutral annotations are encodable;
+                // widening/narrowing bindings refuse. Conservative loss recorded:
+                // an i64 binding over i64-typed operands would be consistent but
+                // is refused too — width-matching inference is future work.
+                if (!IsWidthNeutralBindingType(bind.TypeName))
+                    return (null, $"the body binds '{bind.Name}' with type '{bind.TypeName}', whose width semantics substitution cannot preserve");
 
                 var (substInit, initReason) = SubstituteBindings(bind.Initializer, env);
                 if (substInit == null)
@@ -991,6 +1052,45 @@ public static class FunctionBodyEncoder
                         && ReferenceEquals(whenFalse, c.WhenFalse)
                     ? c
                     : new ConditionalExpressionNode(c.Span, condition, whenTrue, whenFalse);
+            }
+
+            case ArrayAccessNode a:
+            {
+                var array = SubstituteCore(a.Array, env, out failure);
+                if (array == null) return null;
+                var indexExpr = SubstituteCore(a.Index, env, out failure);
+                if (indexExpr == null) return null;
+                return ReferenceEquals(array, a.Array) && ReferenceEquals(indexExpr, a.Index)
+                    ? a
+                    : new ArrayAccessNode(a.Span, array, indexExpr);
+            }
+
+            case ArrayLengthNode al:
+            {
+                var array = SubstituteCore(al.Array, env, out failure);
+                if (array == null) return null;
+                return ReferenceEquals(array, al.Array) ? al : new ArrayLengthNode(al.Span, array);
+            }
+
+            case FieldAccessNode fa:
+            {
+                var target = SubstituteCore(fa.Target, env, out failure);
+                if (target == null) return null;
+                return ReferenceEquals(target, fa.Target) ? fa : new FieldAccessNode(fa.Span, target, fa.FieldName);
+            }
+
+            case StringOperationNode sop:
+            {
+                var args = new List<ExpressionNode>(sop.Arguments.Count);
+                var changed = false;
+                foreach (var arg in sop.Arguments)
+                {
+                    var substArg = SubstituteCore(arg, env, out failure);
+                    if (substArg == null) return null;
+                    changed |= !ReferenceEquals(substArg, arg);
+                    args.Add(substArg);
+                }
+                return changed ? new StringOperationNode(sop.Span, sop.Operation, args, sop.ComparisonMode) : sop;
             }
 
             default:

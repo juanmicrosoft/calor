@@ -265,6 +265,36 @@ public sealed class ContractHasher
                 sb.Append(')');
                 break;
 
+            // #824 review C2: these kinds are ENCODABLE (walker + translator model
+            // them), so their cacheable verdicts must hash on CONTENT — the
+            // content-free UNSUPPORTED marker let `(len s)` and `(len u)` share a
+            // key and serve a stale false Proven from the default-on cache. Hash
+            // changes here strand only previously-COLLIDING (broken) keys; no
+            // format bump needed (recorded per the semantics-ledger rule).
+            case StringOperationNode strOp:
+                sb.Append("(SOP:");
+                sb.Append(strOp.Operation);
+                if (strOp.ComparisonMode != null)
+                {
+                    sb.Append(':');
+                    sb.Append(strOp.ComparisonMode);
+                }
+                foreach (var arg in strOp.Arguments)
+                {
+                    sb.Append(' ');
+                    AppendExpression(sb, arg);
+                }
+                sb.Append(')');
+                break;
+
+            case FieldAccessNode fieldAccess:
+                sb.Append("(FLD ");
+                AppendExpression(sb, fieldAccess.Target);
+                sb.Append(' ');
+                sb.Append(fieldAccess.FieldName);
+                sb.Append(')');
+                break;
+
             default:
                 // For unsupported expressions, use the type name as a fallback
                 sb.Append("UNSUPPORTED:");

@@ -239,6 +239,87 @@ public class BindingEncodingTests
         Assert.Contains("conditionally-evaluated", result.EffectiveOutcome.Reason);
     }
 
+    [SkippableFact]
+    public void WideningBindingType_IsUnsupported_NeverFalseProven()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        WideningBindingCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void WideningBindingCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // #824 review C1: §B{t:i64} INT:MaxValue — the annotation makes t+1
+        // 64-bit at runtime while substitution encodes 32-bit-wrapped, minting a
+        // false Proven that deleted the runtime check. Width-changing binding
+        // annotations must refuse.
+        var parameters = new List<(string Name, string Type)> { ("a", "i32") };
+        var post = Ensures(Bin(BinaryOperator.Equal, Ref("result"), Int(0)));
+        var body = new List<StatementNode>
+        {
+            new BindStatementNode(TextSpan.Empty, "t", "i64", false, Int(int.MaxValue), new AttributeCollection()),
+            If(Bin(BinaryOperator.GreaterThan, Bin(BinaryOperator.Add, Ref("t"), Int(1)), Int(0)),
+               [Return(Int(1))]),
+            Return(Int(0))
+        };
+
+        var result = verifier.VerifyPostcondition(parameters, "i32", [], post, body);
+
+        Assert.NotEqual(ProofStatus.Proven, result.EffectiveOutcome.Status);
+        Assert.Equal(ProofStatus.Unsupported, result.EffectiveOutcome.Status);
+        Assert.Contains("width", result.EffectiveOutcome.Reason);
+    }
+
+    [SkippableFact]
+    public void BindingShadowingParameter_IsUnsupported()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ShadowParamCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ShadowParamCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // #824 review M1: a binding named like a parameter desynchronizes the
+        // divisor collector (unsubstituted trees) from the encoder — refuse
+        // (Calor0255 forbids the shape in legal source; this covers raw-AST callers).
+        var parameters = new List<(string Name, string Type)> { ("p", "i32") };
+        var post = Ensures(Bin(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0)));
+        var body = new List<StatementNode>
+        {
+            Bind("p", Bin(BinaryOperator.Subtract, Ref("p"), Int(1))),
+            Return(Bin(BinaryOperator.Divide, Int(100), Ref("p")))
+        };
+
+        var result = verifier.VerifyPostcondition(parameters, "i32", [], post, body);
+
+        Assert.Equal(ProofStatus.Unsupported, result.EffectiveOutcome.Status);
+        Assert.Contains("shadows a parameter", result.EffectiveOutcome.Reason);
+    }
+
+    [Fact]
+    public void HashPostcondition_DistinguishesStringOperationContent()
+    {
+        // #824 review C2: (len s) vs (len u) must never share a key — the
+        // content-free marker let a stale false Proven serve from cache.
+        var hasher = new Calor.Compiler.Verification.Z3.Cache.ContractHasher();
+        var parameters = new List<(string Name, string TypeName)> { ("s", "str"), ("u", "str") };
+        var post = Ensures(Bin(BinaryOperator.Equal, Ref("result"),
+            new StringOperationNode(TextSpan.Empty, StringOp.Length, [Ref("s")])));
+
+        string HashForBody(string arg) =>
+            hasher.HashPostcondition(parameters, "i32", [], post,
+                [Return(new StringOperationNode(TextSpan.Empty, StringOp.Length, [Ref(arg)]))]);
+
+        Assert.NotEqual(HashForBody("s"), HashForBody("u"));
+    }
+
     [Fact]
     public void HashPostcondition_DistinguishesInitializers_AndMutability()
     {
