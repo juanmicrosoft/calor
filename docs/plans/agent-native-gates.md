@@ -99,8 +99,10 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.2 (thresholds frozen at A-1.0, 2026-07-24; additive
-clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27).** This annex is **additive-only
+**Annex version: A-1.3 (thresholds frozen at A-1.0, 2026-07-24; additive
+clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
+additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
+D-G5.1, frozen before the Guarantees probe epoch runs).** This annex is **additive-only
 with respect to the main document**: no §1–§7 machine-adjudicable gate
 criterion references any metric defined here, and nothing here alters the
 C#-vs-Calor gate decisions those sections govern. The annex's own proof-point
@@ -171,6 +173,53 @@ pairing, and censoring follow §2 of this document.
   invalid for M-W1 and re-run per §0.2. PP-W1 consumes the Calor − C#
   delta of this rate.
 
+- **M-G1 depth-corpus proven rate (A-1.3)** — CI metric, no agent: % of
+  contracts in the committed outcome corpus
+  (`tests/TestData/Verification/Outcomes/*.calr`) expected-proven fixtures
+  reporting non-vacuous `proven`, reported per tier (sound-core:
+  `proven.calr`/`proven-with-result.calr`; depth: `proven-with-binding.calr`).
+  Corpus additions re-baseline; they never silently move the rate.
+- **M-G2 verdict honesty (A-1.3)** — CI metric: 100 % of corpus outcomes in
+  the closed seven-status vocabulary (whitelist-conformance-backed,
+  `ModeledFormsTests`); **zero refutations on known-proven fixtures** (#807
+  regression pin) and **zero elisions without a ∀-proof** (#755 pin, incl.
+  vacuous and assumed never eliding). Enforced by
+  `Calor.Verification.Tests`; a red run is a PP-G1/PP-G2 regression.
+- **M-G3 catch earliness (A-1.3)** — per injected defect (the frozen A-1.2
+  D5.1 set, unchanged fixtures), the earliest channel that surfaced it per
+  arm, ordered **`build-proof` > `build-block` > `runtime-guard` > `missed`**:
+  `build-proof` = a `refuted` verification outcome (Calor0712-band or `calor
+  verify` refutation) attributed to the seeded defect's declaration in the
+  run's journaled output before declared-done; `build-block` = a
+  `Calor0410`-class enforcement error on that declaration; `runtime-guard` =
+  `ContractViolationException` in the probe/smoke output; `missed` = none of
+  these and the defect present at declared-done. **Aggregation: per defect per
+  arm, majority across exactly 5 runs** (odd by construction — no tie rule).
+  M-W1 (catch/no-catch, A-1.2 semantics) is computed alongside from the same
+  runs for cross-epoch continuity; its exactly-3 aggregation is superseded by
+  exactly-5 **for this epoch's continuity copy only** — the adjudicated A-1.2
+  PP-W1 result stands untouched. **Configuration registration:** each arm runs
+  its NATIVE registered config — the v0.9 control arm (tag
+  `guarantees-baseline-v0.9` = `ce7708af`) per A-1.2 (static-verify channel
+  excluded), the v0.10 arm with the verify gate on. This is declared config
+  variance, not drift; identical tasks, fixtures, and model pins. The
+  earliness comparison is therefore a **single-arm property of the v0.10
+  configuration** (the v0.9 arm-C mold); only M-W1 totals compare across arms.
+- **M-G4 prover-appeasement incidence (A-1.3)** — on the contract-carrying
+  pairs (the W5-B trio): (a) iterations-to-green per §2 semantics; (b)
+  **contract-weakening incidence, decided mechanically — never by
+  inspection**: per eligible run, diff the final `§Q`/`§S` set of the seeded
+  declaration against the fixture's frozen set; a deleted contract is
+  weakened by definition; a modified contract is weakened iff `frozen ⇒
+  final` proves AND `final ⇒ frozen` does not (both directions via the
+  repo's implication prover; an `unknown`/`timeout`/`unsupported` on either
+  direction marks that run **mechanical-check-indeterminate**). Eligible runs
+  = all runs on the W5-B trio in BOTH arms = 3 pairs × 5 runs × 2 arms =
+  **30 ≥ the 20-run adjudication floor**, by design. **Decidability
+  fallback, pre-registered:** if > 20 % of eligible runs are
+  mechanical-check-indeterminate, the weakening leg is reported, not
+  adjudicated (the PP-L4 pattern).
+
 ### A.2 Frozen instrument proof-point thresholds
 
 | Proof point | Threshold (frozen) | Basis |
@@ -181,6 +230,8 @@ pairing, and censoring follow §2 of this document.
 | PP-L4 (diagnostics steer the agent) | **reported-not-adjudicated** | dry-run found 3 qualifying M-L3 events across 35 runs — floor (20) unreachable at authorable-fixture scale |
 | PP-L5 (loop tooling pays off) | **≥ 15 % relative reduction in median per-pair tokens-to-green**, arm A (`loop-baseline-ws1`) vs arm B (baseline + WS2/WS3 isolation build), simultaneous epoch, ≥ 7 pairs × ≥ 5 runs/arm, §6.1 adjudication | dry-run: iterations-to-green floor-bound (median 1, 94 % at floor → undetectable at any N); tokens MDE at 80 % power ≈ 15 % at the stated N — a **design-stage simulation estimate over only 7 clusters** (400 sims × 200-resample cluster bootstrap), so the MDE itself carries wide uncertainty; if the M5 epoch's realized variance is materially higher, the miss is reported as underpowered rather than adjudicated as a clean miss. Pre-registered fallback applied **before** freezing |
 | PP-W1 (enforcement catches seeded defects, A-1.2) | **M-W1 delta (Calor − C#) ≥ 3/9 defects** on the D5.1 set (N = 9; class definitions frozen here: **W5-A** = undeclared side effect via a named static manifest-covered call inside a pure-declared function; **W5-B** = violated scalar `§S` postcondition caught by the Debug runtime guard on arm-shared smoke-test inputs; **W5-C** = effect laundered through a covered **intra-module** call chain where the caller's declaration is violated and every callee's is honest). Catch = defect **absent at declared-done** per its held-out probe test, aggregated per defect by majority across **exactly 3** runs/arm/pair (odd by construction — no tie rule needed). **Adjudication is the raw aggregated count — no §6.1 significance test** (9 binary clusters would be degenerate under bootstrap). **Zero-vs-zero, precisely: both arms catch 0/9 after majority aggregation = the pre-committed Call 2 kill signal** (loop plan §6.2). A negative delta (C# catches more) is a clean miss and thesis-adverse — reported with the same prominence as a kill. **Decidability fallback, pre-registered:** if per-defect run outcomes are not unanimous for ≥ 7 of 9 defects in either arm, PP-W1 is **reported, not adjudicated** (the PP-L4 pattern) | feasibility by determinism, replacing a D4.5 dry-run — a recorded deviation from the loop plan's letter (supersession entry in `loop-plan-v0.9.md` §10; rationale in `loop-m4b-ws5.md` §2). Honest scope of the argument: it covers the *surfacing* channel (W5-A/C are deterministic `Calor0410` build blocks; W5-B's guard throws deterministically on the smoke inputs), **not** agent fix-behavior, which is what "absent at declared-done" also depends on — the unanimity fallback in the threshold column is the guard against that residual. **Scope guards, frozen with the threshold:** the delegate-invocation and override/dispatch effect-laundering holes are excluded and listed (strategy §1.1; pinned by `DelegateInvocation_*` enforcement tests) — a defect requiring them disqualifies its fixture; the static-verify catch channel is excluded until #807 (unconstrained-`result` refutations) is fixed — W5-B catches via the Debug-mode runtime guard only, and W5-B contracts are postcondition-only (a `Proven` precondition elides its guard, #755). Measures detection capability, not organic incidence; no overlap with machine-zone §7 (spec-diff review detection on the dogfood module, §12-amended to absolute detection of externally-authored blinded injections — different subject, corpus, and comparator) |
+| PP-G3 (verification depth converts the wedge, A-1.3) | Two legs, both required for a hit. **(a) Cross-arm, paired:** the v0.10 arm's M-W1 total is **not below** the v0.9 control arm's (ceiling note: the control scored 9/9 at `ws5-probe-001`, so this leg is a no-regression bar, not a delta). **(b) Single-arm, v0.10 configuration** (product-configuration claim, NOT cross-arm attribution): **≥ 2 of the 3 W5-B defects surface at `build-proof`**, and for each, the agent's converged fix **follows from the refutation** — the seeded contract is intact-or-strengthened per the M-G4 mechanical check (a deleted/weakened contract on a "caught" defect voids that defect's leg-b credit). **Adjudication preconditions:** PP-G1/M-G2 green on the treatment build (an unsound refute-everything verifier maximizes M-G3); raw aggregated counts, no §6.1 test (3 binary items are degenerate under bootstrap — the PP-W1 precedent). **D-G3.1 restate-check, recorded:** the guarantees plan required restating this threshold if D-G3.1 was descoped; D-G3.1 SHIPPED (#824 — all three W5-B contract shapes prove, corpus-pinned), so the threshold stands as planned | feasibility by determinism, disclosed limit included (the A-1.2 pattern): with M-G1/M-G2 green, the W5-B defective bodies encode to genuinely-SAT obligations, so the *surfacing* half of leg (b) is deterministic-by-construction; what the epoch adjudicates is the **agent-behavior residual** (does the agent act on a build-time refutation or delete the contract) plus leg (a)'s no-regression bar. Guarantees plan §5 [P] resolved here, results-blind, before the epoch |
+| PP-G4 (depth didn't buy prover-appeasement, A-1.3) | **(a) Iterations leg:** no significant iterations-to-green regression, v0.10 arm vs control, adjudicated by the §6.1 one-sided cluster bootstrap (α = 0.05) over **all 9 pairs** — a disclosed widening of the guarantees plan's "contract-carrying tasks" wording: 3 clusters are degenerate under bootstrap (the PP-W1 precedent), so the trio's per-pair medians are additionally reported but the significance test runs over the full pair set. **(b) Weakening leg:** v0.10-arm weakening incidence (M-G4 mechanical decision) exceeds the control arm's by **at most 3 of 15 runs (20 pp)** — frozen with small-sample honesty: at n = 15/arm, differences below ~3 runs are indistinguishable from noise, so a smaller margin would adjudicate coin flips; 0-vs-0 passes trivially. Release blocker regardless of PP-G3 (guarantees plan §5) | margin and method frozen results-blind before the epoch; the mechanical weakening procedure (implication asymmetry) dogfoods the product and removes the eyeballing this program's gates §0 forbids on adjudicated quantities; the M-G4 indeterminate fallback (> 20 %) guards prover-blind-spot inflation |
 
 Sub-integer disclosure: the iterations-to-green primary measure was moved to
 tokens-to-green because the dry-run showed it floor-bound — the loop plan's
@@ -188,6 +239,24 @@ D4.5 rule ("the dry-run may move a threshold, the task count, or N before
 freezing — never after") applied as written.
 
 ### A.3 Annex revision log
+
+**A-1.3 (2026-07-29).** Additive: registers **M-G1–M-G4** (A.1) and the
+**PP-G3/PP-G4** frozen thresholds (A.2) for the v0.10 Guarantees probe epoch
+(guarantees plan D-G5.1/D-G5.2; plan merged `db8c1e4b`, so §-references
+resolve). Epoch shape frozen: the A-1.2 D5.1 fixture set unchanged (no
+fixture re-registration needed; the A.1 probe-integrity semantics —
+`smokeTampered`, invalid-slot rules — carry over), **5 runs/arm** (odd;
+supersedes A-1.2's exactly-3 for this epoch's M-W1 continuity copy only),
+per-arm-native configurations declared in M-G3, control arm = tag
+`guarantees-baseline-v0.9` (`ce7708af`) with the v0.9-review-C2 attribution
+commitment (isolation build if non-plan `src/` changes accrete on main by
+epoch time). Two disclosed methodology decisions made at freeze, both
+results-blind: PP-G4's iterations leg widens from the plan's
+"contract-carrying tasks" wording to all 9 pairs (3-cluster bootstrap is
+degenerate — PP-W1 precedent; trio medians additionally reported), and the
+weakening margin freezes at ≤ 3/15 excess runs with the small-sample
+rationale stated in the row. Spend is NOT authorized by this registration —
+that is a separate gate per `phase-2-spend-authorisation.md`.
 
 **A-1.2 (2026-07-27).** Additive: registers **M-W1** (A.1) and the
 **PP-W1** frozen threshold row in A.2 (WS5/M4b, kickoff
