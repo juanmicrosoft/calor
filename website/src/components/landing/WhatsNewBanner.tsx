@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.9.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.10.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The Loop release: one machine-readable envelope across every command and MCP tool, a transactional MCP write path with warm sessions (P50 2 ms edit feedback), and paired A/B measurements showing ~35% fewer agent tokens-to-green and 9/9 vs 4/9 seeded-defect catches against the C# toolkit.</span>
+            <span className="text-foreground">The Guarantees release: sound, honestly-statused verification verdicts — result-bound postcondition proofs, a seven-status vocabulary with assumption provenance, cross-module linking, and an MSBuild verify gate that surfaces contract refutations at build time. Measured A/B: all three seeded contract defects moved from runtime exceptions to build-time refutations with zero catch regression and zero contract weakening.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"

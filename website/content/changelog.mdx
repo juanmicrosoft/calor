@@ -10,6 +10,23 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-30
+
+The Guarantees release: every verification verdict an agent sees is now sound, honestly statused, and provenance-aware — and the upgrade is measured. On a paired A/B probe epoch, all three seeded contract defects moved from runtime exceptions to build-time refutations under the new verify gate, with zero catch regression and zero contract weakening across 30 eligible runs.
+
+### Added
+- **Sound result binding (#807 closed).** Result-referencing postconditions are checked against the encoded function body (SSA-style substitution over immutable `§B` chains, guard-clause branching, and value returns); bodies outside the encodable surface report honest `unsupported` — never a refutation against an unconstrained `result`.
+- **Seven-status verdict vocabulary.** `assumed` (holds conditionally on a named assumption set — division side conditions are the first producer; never elides runtime checks) and `unavailable` (no solver present) join the five existing statuses; vacuous proofs carry a `vacuous` flag and keep their runtime checks. Envelope schema 2.0.
+- **Positive modeled-forms whitelist.** `unsupported` is decided by an enumerated, CI-byte-checked whitelist rather than by accident; out-of-surface contracts name the offending construct.
+- **Cross-module linking (#809 closed).** Bare-name calls across modules emit qualified C# and link under MSBuild/csc, covering both the CLI multi-input driver and the MSBuild task.
+- **MSBuild verify gate.** `CalorVerify=true` runs Z3 contract verification inside builds; refutation warnings surface as MSBuild warnings with declaration attribution.
+- **Mechanical weakening check.** `calor verify --weakening-check` decides whether a declaration's contract was weakened between two versions (postcondition relaxed or precondition strengthened), with an intact-or-strengthened verdict for CI gating.
+
+### Fixed
+- **Precondition guards are never elided on satisfiability results (#755).** Only genuine ∀-proofs elide checks.
+- **Contract-level vacuity is loud.** Jointly-unsatisfiable precondition sets no longer mint silent Proven verdicts.
+- **`%` semantics corrected** (`bvsrem`, C# remainder), **out-of-32-bit literals refused** instead of silently wrapped, and the flagship proven-contracts sample repaired to prove 14/14 soundly.
+
 ## [0.9.0] - 2026-07-29
 
 The Loop release: the agent edit–feedback cycle is now a first-class, measured product surface — one machine-readable envelope across every CLI command and MCP tool, a transactional MCP write path with warm project sessions, and millisecond-scale edit feedback. Measured on paired A/B epochs: the new loop tooling cuts agent tokens-to-green ~35%, and Calor's enforcement caught 9/9 seeded defects where the C# toolkit caught 4/9.
