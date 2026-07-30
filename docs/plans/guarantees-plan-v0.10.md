@@ -194,8 +194,10 @@ disclosure in the A.2 rows: the PP-G4 iterations leg adjudicates over all 9
 pairs (3-cluster bootstrap is degenerate — the PP-W1 precedent; the
 contract-carrying trio's medians are additionally reported), and the weakening
 margin froze at ≤ 3/15 excess runs (small-sample honesty). G1–G4 engineering
-complete at freeze time (#818/#820, #819/#821/#822, #823, #824); spend
-authorization remains a separate gate.
+complete at freeze time (#818/#820, #819/#821/#822, #823, #824); the
+registration itself was adversarially reviewed pre-merge (#825, twelve
+findings amended in-document, results-blind — the A.3 entry records the
+round). Spend authorization remains a separate gate.
 
 **v2 amendment (2026-07-29, G2 implementation)** — D-G2.4 called the envelope
 bump "schema v1.2 … additive minor bump per the schema's own rules." The
