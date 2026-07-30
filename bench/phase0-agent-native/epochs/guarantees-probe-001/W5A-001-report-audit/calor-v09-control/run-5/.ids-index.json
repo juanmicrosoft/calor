@@ -1,0 +1,51 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Report",
+    "file": "Report.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "FormatHeader",
+    "file": "Report.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "FormatLine",
+    "file": "Report.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "FormatSummary",
+    "file": "Report.calr",
+    "line": 10
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "WriteReport",
+    "file": "Report.calr",
+    "line": 16
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "FormatFooter",
+    "file": "Report.calr",
+    "line": 21
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "WriteReportWithFooter",
+    "file": "Report.calr",
+    "line": 25
+  }
+]

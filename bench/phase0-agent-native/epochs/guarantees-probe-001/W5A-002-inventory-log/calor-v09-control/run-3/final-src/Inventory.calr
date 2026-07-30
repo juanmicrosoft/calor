@@ -1,0 +1,32 @@
+§M{m001:Inventory}
+  §F{f001:FormatItem:pub} (str:name, i32:count) -> str
+    §E{}
+    §R (+ name (+ " x" §C{count.ToString} §/C))
+
+  §F{f002:CountTotal:pub} (i32:shelf, i32:backroom) -> i32
+    §E{}
+    §R (+ shelf backroom)
+
+  §F{f003:FormatStock:pub} (str:name, i32:shelf, i32:backroom) -> str
+    §E{}
+    §B{total:i32} §C{CountTotal} §A shelf §A backroom §/C
+    §B{line:str} §C{FormatItem} §A name §A total §/C
+    §R line
+
+  §F{f004:SaveStock:pub} (str:path, str:name, i32:shelf, i32:backroom) -> void
+    §E{fs:w}
+    §B{line:str} §C{FormatStock} §A name §A shelf §A backroom §/C
+    §C{File.WriteAllText} §A path §A line §/C
+
+  §F{f005:FormatRestock:pub} (str:name, i32:needed) -> str
+    §E{}
+    §R (+ "restock " (+ name (+ ": " §C{needed.ToString} §/C)))
+
+  §F{f006:RestockAmount:pub} (i32:shelf, i32:backroom, i32:target) -> i32
+    §E{}
+    §B{total:i32} §C{CountTotal} §A shelf §A backroom §/C
+    §B{diff:i32} (- target total)
+    §B{result:i32} §W{sw1:expr} diff
+      §K §VAR{d} §WHEN (> d 0) → d
+      §K _ → 0
+    §R result

@@ -1,0 +1,51 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Inventory",
+    "file": "Inventory.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "FormatItem",
+    "file": "Inventory.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "CountTotal",
+    "file": "Inventory.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "FormatStock",
+    "file": "Inventory.calr",
+    "line": 10
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "SaveStock",
+    "file": "Inventory.calr",
+    "line": 16
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "FormatRestock",
+    "file": "Inventory.calr",
+    "line": 21
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "RestockAmount",
+    "file": "Inventory.calr",
+    "line": 25
+  }
+]

@@ -1,0 +1,40 @@
+§M{m001:Session}
+  §F{f001:IndexLine:pub} (str:sessionId, i32:hits) -> str
+    §E{}
+    §R (+ sessionId (+ "=" §C{hits.ToString} §/C))
+
+  §F{f002:WriteIndex:pub} (str:path, str:sessionId, i32:hits) -> void
+    §E{fs:w}
+    §B{line:str} §C{IndexLine} §A sessionId §A hits §/C
+    §C{File.WriteAllText} §A path §A line §/C
+
+  §F{f003:ReadIndex:pub} (str:path) -> str
+    §E{fs:r}
+    §B{exists:bool} §C{File.Exists} §A path §/C
+    §IF{if1} (! exists)
+      §R ""
+    §R §C{File.ReadAllText} §A path §/C
+
+  §F{f004:MarkActive:pub} (str:sessionId) -> void
+    §E{fs:w}
+    §C{WriteIndex} §A "session-active.txt" §A sessionId §A 1 §/C
+
+  §F{f005:LookupSession:pub} (str:path, str:sessionId) -> str
+    §E{fs:r}
+    §B{content:str} §C{ReadIndex} §A path §/C
+    §R (+ sessionId (+ "#" §C{content.Length.ToString} §/C))
+
+  §F{f006:HasIndex:pub} (str:path) -> bool
+    §E{fs:r}
+    §B{content:str} §C{ReadIndex} §A path §/C
+    §R (> (len content) 0)
+
+  §F{f007:DescribeSession:pub} (str:path, str:sessionId) -> str
+    §E{fs:r}
+    §B{inner:str} §C{LookupSession} §A path §A sessionId §/C
+    §R (+ "session: " inner)
+
+  §F{f008:IndexSize:pub} (str:path) -> i32
+    §E{fs:r}
+    §B{content:str} §C{ReadIndex} §A path §/C
+    §R (len content)

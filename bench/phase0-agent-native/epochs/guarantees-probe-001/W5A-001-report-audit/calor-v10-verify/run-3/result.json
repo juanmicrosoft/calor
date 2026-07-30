@@ -1,0 +1,29 @@
+{
+  "pair": "W5A-001-report-audit",
+  "arm": "calor-v10-verify",
+  "run": 3,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 5,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1070,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5A-001",
+    "class": "W5-A",
+    "probeTest": "ReportPair.Probe.ProbeTests.Probe_FormatSummary_PerformsNoFileWrite",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "raw",
+  "tokens": {
+    "input": 26,
+    "output": 10439
+  },
+  "nullAgent": false
+}

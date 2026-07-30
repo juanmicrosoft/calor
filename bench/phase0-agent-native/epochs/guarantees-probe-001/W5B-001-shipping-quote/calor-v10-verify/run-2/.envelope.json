@@ -1,0 +1,27 @@
+{
+  "version": "2.0",
+  "diagnostics": [
+    {
+      "code": "Calor0718",
+      "message": "Postcondition could not be translated for verification in function \u0027QuoteWithFloor\u0027: Postcondition references \u0027result\u0027 but the body references \u0027\u003CCallExpressionNode\u003E\u0027, which is not a declared parameter. Runtime check kept. Runtime check kept.",
+      "severity": "info",
+      "location": {
+        "file": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/guarantees-probe-001/W5B-001-shipping-quote/calor-v10-verify/run-2/.envelope-src/Quote.calr",
+        "line": 26,
+        "column": 5,
+        "length": 20
+      },
+      "declarationId": "f005",
+      "verification": {
+        "status": "unsupported",
+        "reason": "Postcondition references \u0027result\u0027 but the body references \u0027\u003CCallExpressionNode\u003E\u0027, which is not a declared parameter. Runtime check kept."
+      }
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 0,
+    "info": 1
+  }
+}

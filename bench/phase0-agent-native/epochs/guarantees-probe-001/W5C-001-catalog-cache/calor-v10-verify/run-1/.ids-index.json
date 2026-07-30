@@ -1,0 +1,65 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Catalog",
+    "file": "Catalog.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "SnapshotLine",
+    "file": "Catalog.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "SaveSnapshot",
+    "file": "Catalog.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "ReadSnapshot",
+    "file": "Catalog.calr",
+    "line": 11
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "SummaryOf",
+    "file": "Catalog.calr",
+    "line": 18
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "LoadSummary",
+    "file": "Catalog.calr",
+    "line": 22
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "HasCatalog",
+    "file": "Catalog.calr",
+    "line": 27
+  },
+  {
+    "id": "f007",
+    "kind": "Function",
+    "name": "DescribeCatalog",
+    "file": "Catalog.calr",
+    "line": 32
+  },
+  {
+    "id": "f008",
+    "kind": "Function",
+    "name": "CatalogSize",
+    "file": "Catalog.calr",
+    "line": 37
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "pair": "W5B-002-loyalty-points",
+  "arm": "calor-v10-verify",
+  "run": 4,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 9,
+  "iterations": 3,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 919,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5B-002",
+    "class": "W5-B",
+    "probeTest": "LoyaltyPair.Probe.ProbeTests.Probe_AwardJustBelowFloor_GetsFloor",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "raw",
+  "tokens": {
+    "input": 45,
+    "output": 15267
+  },
+  "nullAgent": false
+}

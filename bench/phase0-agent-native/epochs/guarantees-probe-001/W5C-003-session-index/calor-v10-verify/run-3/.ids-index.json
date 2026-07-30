@@ -1,0 +1,65 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Session",
+    "file": "Session.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "IndexLine",
+    "file": "Session.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "WriteIndex",
+    "file": "Session.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "ReadIndex",
+    "file": "Session.calr",
+    "line": 11
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "MarkActive",
+    "file": "Session.calr",
+    "line": 18
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "LookupSession",
+    "file": "Session.calr",
+    "line": 22
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "HasIndex",
+    "file": "Session.calr",
+    "line": 27
+  },
+  {
+    "id": "f007",
+    "kind": "Function",
+    "name": "DescribeSession",
+    "file": "Session.calr",
+    "line": 32
+  },
+  {
+    "id": "f008",
+    "kind": "Function",
+    "name": "IndexSize",
+    "file": "Session.calr",
+    "line": 37
+  }
+]
