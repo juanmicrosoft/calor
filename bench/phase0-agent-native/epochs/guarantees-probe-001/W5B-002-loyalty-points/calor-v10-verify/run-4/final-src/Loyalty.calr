@@ -1,0 +1,34 @@
+§M{m001:Loyalty}
+  §F{f001:BasePoints:pub} (i32:spend) -> i32
+    §E{}
+    §R (* spend 2)
+
+  §F{f002:BonusPoints:pub} (i32:visits) -> i32
+    §E{}
+    §R (* visits 5)
+
+  §F{f003:AwardWithFloor:pub} (i32:earned, i32:bonus, i32:minPoints) -> i32
+    §E{}
+    §S (>= result minPoints)
+    §B{total:i32} (+ earned bonus)
+    §IF{if1} (< total minPoints)
+      §R minPoints
+    §R total
+
+  §F{f004:TotalAward:pub} (i32:spend, i32:visits, i32:minPoints) -> i32
+    §E{}
+    §B{earned:i32} §C{BasePoints} §A spend §/C
+    §B{bonus:i32} §C{BonusPoints} §A visits §/C
+    §R §C{AwardWithFloor} §A earned §A bonus §A minPoints §/C
+
+  §F{f005:AwardWithCap:pub} (i32:earned, i32:bonus, i32:minPoints, i32:maxPoints) -> i32
+    §E{}
+    §S (<= result maxPoints)
+    §B{floored:i32} §C{AwardWithFloor} §A earned §A bonus §A minPoints §/C
+    §IF{if1} (> floored maxPoints)
+      §R maxPoints
+    §R floored
+
+  §F{f006:FormatAward:pub} (i32:points) -> str
+    §E{}
+    §R (concat "points: " (str points))

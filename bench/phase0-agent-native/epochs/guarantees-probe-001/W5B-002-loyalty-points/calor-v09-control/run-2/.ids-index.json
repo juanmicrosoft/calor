@@ -1,0 +1,51 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Loyalty",
+    "file": "src/Loyalty.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "BasePoints",
+    "file": "src/Loyalty.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "BonusPoints",
+    "file": "src/Loyalty.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "AwardWithFloor",
+    "file": "src/Loyalty.calr",
+    "line": 10
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "TotalAward",
+    "file": "src/Loyalty.calr",
+    "line": 18
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "AwardWithCap",
+    "file": "src/Loyalty.calr",
+    "line": 24
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "FormatAward",
+    "file": "src/Loyalty.calr",
+    "line": 32
+  }
+]

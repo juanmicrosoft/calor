@@ -1,0 +1,51 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Config",
+    "file": "Config.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "FormatEntry",
+    "file": "Config.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "QuoteValue",
+    "file": "Config.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "FormatConfig",
+    "file": "Config.calr",
+    "line": 10
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "SaveConfig",
+    "file": "Config.calr",
+    "line": 16
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "FormatSection",
+    "file": "Config.calr",
+    "line": 21
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "LoadConfig",
+    "file": "Config.calr",
+    "line": 25
+  }
+]

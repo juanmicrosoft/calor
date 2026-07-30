@@ -1,0 +1,29 @@
+{
+  "pair": "W5A-003-config-echo",
+  "arm": "calor-v09-control",
+  "run": 5,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 6,
+  "iterations": 3,
+  "iterationsToGreen": 3,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1110,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": {
+    "id": "W5A-003",
+    "class": "W5-A",
+    "probeTest": "ConfigPair.Probe.ProbeTests.Probe_FormatConfig_PerformsNoFileWrite",
+    "caught": true,
+    "smokeTampered": false
+  },
+  "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/153bcf1c-5328-49d4-8e36-eeca2c4e76e4/scratchpad/guarantees-armA/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "editMechanism": "raw",
+  "tokens": {
+    "input": 30,
+    "output": 8177
+  },
+  "nullAgent": false
+}

@@ -1,0 +1,51 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Quote",
+    "file": "src/Quote.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "BaseFee",
+    "file": "src/Quote.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "DistanceFee",
+    "file": "src/Quote.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "QuoteWithSurcharge",
+    "file": "src/Quote.calr",
+    "line": 10
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "QuoteTotal",
+    "file": "src/Quote.calr",
+    "line": 18
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "QuoteWithFloor",
+    "file": "src/Quote.calr",
+    "line": 24
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "FormatQuote",
+    "file": "src/Quote.calr",
+    "line": 38
+  }
+]

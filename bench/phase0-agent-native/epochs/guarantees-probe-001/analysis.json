@@ -1,0 +1,662 @@
+{
+  "epochId": "guarantees-probe-001",
+  "kind": "guarantees-probe",
+  "armA": {
+    "label": "calor-v09-control",
+    "role": "guarantees-baseline-v0.9 native product (A-1.2 config, verify EXCLUDED)",
+    "commit": "ce7708af6d949cc27d8c645cd5c440d5b0b6a84e",
+    "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/153bcf1c-5328-49d4-8e36-eeca2c4e76e4/scratchpad/guarantees-armA/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "armRepoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/153bcf1c-5328-49d4-8e36-eeca2c4e76e4/scratchpad/guarantees-armA",
+    "editMechanism": "raw",
+    "verify": false
+  },
+  "armB": {
+    "label": "calor-v10-verify",
+    "role": "v0.10 native product (A-1.3 config, verify gate armed + effect-checked)",
+    "commit": "d7c0e6ac9187e5b2af283f907c6f2e78d104d3ed",
+    "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "armRepoRoot": "/Users/juanrivera/sources/repos/juanmicrosoft/calor",
+    "editMechanism": "raw",
+    "verify": true
+  },
+  "boot": 2000,
+  "alpha": 0.05,
+  "seededDeclarations": {
+    "W5A-001": {
+      "declId": "f003",
+      "frozen": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs/W5A-001-report-audit/calor/Report.calr"
+    },
+    "W5A-002": {
+      "declId": "f003",
+      "frozen": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs/W5A-002-inventory-log/calor/Inventory.calr"
+    },
+    "W5A-003": {
+      "declId": "f003",
+      "frozen": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs/W5A-003-config-echo/calor/Config.calr"
+    },
+    "W5B-001": {
+      "declId": "f003",
+      "frozen": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs/W5B-001-shipping-quote/calor/Quote.calr"
+    },
+    "W5B-002": {
+      "declId": "f003",
+      "frozen": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs/W5B-002-loyalty-points/calor/Loyalty.calr"
+    },
+    "W5B-003": {
+      "declId": "f003",
+      "frozen": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs/W5B-003-request-quota/calor/Quota.calr"
+    },
+    "W5C-001": {
+      "declId": "f005",
+      "frozen": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs/W5C-001-catalog-cache/calor/Catalog.calr"
+    },
+    "W5C-002": {
+      "declId": "f005",
+      "frozen": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs/W5C-002-ledger-view/calor/Ledger.calr"
+    },
+    "W5C-003": {
+      "declId": "f005",
+      "frozen": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/pairs/W5C-003-session-index/calor/Session.calr"
+    }
+  },
+  "mG3": {
+    "W5A-001": {
+      "calor-v09-control": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      },
+      "calor-v10-verify": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      }
+    },
+    "W5A-002": {
+      "calor-v09-control": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      },
+      "calor-v10-verify": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      }
+    },
+    "W5A-003": {
+      "calor-v09-control": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      },
+      "calor-v10-verify": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      }
+    },
+    "W5B-001": {
+      "calor-v09-control": {
+        "channel": "runtime-guard",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 0,
+          "runtime-guard": 4,
+          "caught-unattributed": 1,
+          "missed": 0
+        },
+        "mw1Caught": true
+      },
+      "calor-v10-verify": {
+        "channel": "build-proof",
+        "slotCounts": {
+          "build-proof": 5,
+          "build-block": 0,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      }
+    },
+    "W5B-002": {
+      "calor-v09-control": {
+        "channel": "runtime-guard",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 0,
+          "runtime-guard": 4,
+          "caught-unattributed": 1,
+          "missed": 0
+        },
+        "mw1Caught": true
+      },
+      "calor-v10-verify": {
+        "channel": "build-proof",
+        "slotCounts": {
+          "build-proof": 4,
+          "build-block": 0,
+          "runtime-guard": 0,
+          "caught-unattributed": 1,
+          "missed": 0
+        },
+        "mw1Caught": true
+      }
+    },
+    "W5B-003": {
+      "calor-v09-control": {
+        "channel": "runtime-guard",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 0,
+          "runtime-guard": 3,
+          "caught-unattributed": 2,
+          "missed": 0
+        },
+        "mw1Caught": true
+      },
+      "calor-v10-verify": {
+        "channel": "build-proof",
+        "slotCounts": {
+          "build-proof": 5,
+          "build-block": 0,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      }
+    },
+    "W5C-001": {
+      "calor-v09-control": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      },
+      "calor-v10-verify": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      }
+    },
+    "W5C-002": {
+      "calor-v09-control": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      },
+      "calor-v10-verify": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 4,
+          "runtime-guard": 0,
+          "caught-unattributed": 1,
+          "missed": 0
+        },
+        "mw1Caught": true
+      }
+    },
+    "W5C-003": {
+      "calor-v09-control": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      },
+      "calor-v10-verify": {
+        "channel": "build-block",
+        "slotCounts": {
+          "build-proof": 0,
+          "build-block": 5,
+          "runtime-guard": 0,
+          "caught-unattributed": 0,
+          "missed": 0
+        },
+        "mw1Caught": true
+      }
+    }
+  },
+  "integrity": {
+    "smokeTamperedRuns": 0,
+    "invalidRuns": 0,
+    "censoredFrac": {
+      "control": 0.0,
+      "treatment": 0.0
+    },
+    "note": "smoke-tampered runs are INVALID at adjudication (A-1.2 semantics carried by A-1.3; #827 C2)"
+  },
+  "preconditions": {
+    "ppG1mG2Green": "CI-external: PP-G3 adjudication requires PP-G1/M-G2 green on the treatment build \u2014 verify the treatment commit's CI before reading ppG3.hit as adjudicated"
+  },
+  "mW1": {
+    "control": 9,
+    "treatment": 9,
+    "note": "continuity copy, exactly-5 majority (supersedes A-1.2 exactly-3 for this epoch only)"
+  },
+  "mG4": {
+    "control": {
+      "eligible": 15,
+      "weakened": 0,
+      "indeterminate": 0,
+      "intact": 15,
+      "detail": [
+        {
+          "pair": "W5B-001",
+          "run": 1,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-001",
+          "run": 2,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-001",
+          "run": 3,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-001",
+          "run": 4,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-001",
+          "run": 5,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 1,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 2,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 3,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 4,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 5,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 1,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 2,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 3,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 4,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 5,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        }
+      ]
+    },
+    "treatment": {
+      "eligible": 15,
+      "weakened": 0,
+      "indeterminate": 0,
+      "intact": 15,
+      "detail": [
+        {
+          "pair": "W5B-001",
+          "run": 1,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-001",
+          "run": 2,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-001",
+          "run": 3,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-001",
+          "run": 4,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-001",
+          "run": 5,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 1,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 2,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 3,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 4,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-002",
+          "run": 5,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 1,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 2,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 3,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 4,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        },
+        {
+          "pair": "W5B-003",
+          "run": 5,
+          "weakened": false,
+          "indeterminate": false,
+          "intactOrStrengthened": true,
+          "reason": "final contract is intact or strengthened \u2014 not weakened"
+        }
+      ]
+    }
+  },
+  "ppG3": {
+    "legA": {
+      "pass": true,
+      "control": 9,
+      "treatment": 9,
+      "rule": "treatment M-W1 total not below control (ceiling note: control scored 9/9 at ws5-probe-001)"
+    },
+    "legB": {
+      "pass": true,
+      "defects": {
+        "W5B-001": {
+          "satisfiedSlots": 5,
+          "credit": true
+        },
+        "W5B-002": {
+          "satisfiedSlots": 4,
+          "credit": true
+        },
+        "W5B-003": {
+          "satisfiedSlots": 5,
+          "credit": true
+        }
+      },
+      "rule": ">=2 of 3 W5-B defects; credit = joint predicate (build-proof AND probe-pass AND intactOrStrengthened DETERMINATE) in >=3 of 5 slots"
+    },
+    "hit": true
+  },
+  "ppG4": {
+    "legA": {
+      "pass": true,
+      "medianPairedRatio_BoverA": 1.0,
+      "nPairs": 9,
+      "oneSided95LowerBound": 0.8461538461538461,
+      "pMedian_le_1.0": 0.9245,
+      "significantRegression": false,
+      "trioMedians": {
+        "W5B-001": {
+          "control": 1,
+          "treatment": 1
+        },
+        "W5B-002": {
+          "control": 1,
+          "treatment": 1
+        },
+        "W5B-003": {
+          "control": 1,
+          "treatment": 1
+        }
+      },
+      "rule": "fail iff one-sided 95% CI lower bound > 1.0 (regression); floor-bound metric \u2014 a pass bounds only LARGE regressions",
+      "perPair": [
+        {
+          "pair": "W5A-001",
+          "ratio": 1.4286
+        },
+        {
+          "pair": "W5A-002",
+          "ratio": 0.7143
+        },
+        {
+          "pair": "W5A-003",
+          "ratio": 0.7692
+        },
+        {
+          "pair": "W5B-001",
+          "ratio": 1.0
+        },
+        {
+          "pair": "W5B-002",
+          "ratio": 1.0
+        },
+        {
+          "pair": "W5B-003",
+          "ratio": 1.0
+        },
+        {
+          "pair": "W5C-001",
+          "ratio": 1.2857
+        },
+        {
+          "pair": "W5C-002",
+          "ratio": 1.1667
+        },
+        {
+          "pair": "W5C-003",
+          "ratio": 1.0
+        }
+      ]
+    },
+    "legB": {
+      "pass": true,
+      "note": "treatment excess = 0 runs (margin <= 3 absolute)",
+      "weakenedRuns": {
+        "control": 0,
+        "treatment": 0
+      },
+      "indeterminate": {
+        "control": 0,
+        "treatment": 0
+      },
+      "eligible": {
+        "control": 15,
+        "treatment": 15
+      }
+    },
+    "pass": true
+  }
+}

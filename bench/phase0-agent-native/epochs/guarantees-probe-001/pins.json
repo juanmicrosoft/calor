@@ -1,0 +1,48 @@
+{
+  "epochId": "guarantees-probe-001",
+  "kind": "guarantees-probe",
+  "modelPin": "claude-opus-4-8",
+  "agentVersion": "2.1.212 (Claude Code)",
+  "startedAt": "2026-07-30T16:23:56Z",
+  "mode": "live",
+  "runsPerArm": 5,
+  "suiteDirtyFiles": 5,
+  "armA": {
+    "label": "calor-v09-control",
+    "role": "guarantees-baseline-v0.9 native product (A-1.2 config, verify EXCLUDED)",
+    "commit": "ce7708af6d949cc27d8c645cd5c440d5b0b6a84e",
+    "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/153bcf1c-5328-49d4-8e36-eeca2c4e76e4/scratchpad/guarantees-armA/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "armRepoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/153bcf1c-5328-49d4-8e36-eeca2c4e76e4/scratchpad/guarantees-armA",
+    "editMechanism": "raw",
+    "verify": false
+  },
+  "armB": {
+    "label": "calor-v10-verify",
+    "role": "v0.10 native product (A-1.3 config, verify gate armed + effect-checked)",
+    "commit": "d7c0e6ac9187e5b2af283f907c6f2e78d104d3ed",
+    "calorDll": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "armRepoRoot": "/Users/juanrivera/sources/repos/juanmicrosoft/calor",
+    "editMechanism": "raw",
+    "verify": true
+  },
+  "ppG3": {
+    "legA": "cross-arm M-W1 not below control (ceiling 9/9)",
+    "legB": ">=2 of 3 W5-B defects, per-run joint predicate >=3-of-5 (build-proof AND probe-pass AND intactOrStrengthened DETERMINATE)"
+  },
+  "ppG4": {
+    "legA": "iterations-to-green one-sided cluster bootstrap a=0.05, ratio>1 = regression, all 9 pairs",
+    "legB": "weakening incidence excess <= 3 runs ABSOLUTE (indeterminate >20% => reported-not-adjudicated)"
+  },
+  "suite": [
+    "W5A-001",
+    "W5A-002",
+    "W5A-003",
+    "W5B-001",
+    "W5B-002",
+    "W5B-003",
+    "W5C-001",
+    "W5C-002",
+    "W5C-003"
+  ],
+  "telemetrySchema": "loop-telemetry/2"
+}

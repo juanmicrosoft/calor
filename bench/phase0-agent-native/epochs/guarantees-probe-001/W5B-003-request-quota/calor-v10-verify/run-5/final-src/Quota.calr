@@ -1,0 +1,33 @@
+§M{m001:Quota}
+  §F{f001:BaseAllowance:pub} (i32:tier) -> i32
+    §E{}
+    §R (* tier 5)
+
+  §F{f002:BurstBonus:pub} (i32:priority) -> i32
+    §E{}
+    §R (* priority 2)
+
+  §F{f003:GrantRequests:pub} (i32:requested, i32:maxAllowed) -> i32
+    §E{}
+    §S (<= result maxAllowed)
+    §IF{if1} (> requested maxAllowed)
+      §R maxAllowed
+    §R requested
+
+  §F{f004:GrantForTier:pub} (i32:tier, i32:priority, i32:maxAllowed) -> i32
+    §E{}
+    §B{allowance:i32} §C{BaseAllowance} §A tier §/C
+    §B{bonus:i32} §C{BurstBonus} §A priority §/C
+    §B{requested:i32} (+ allowance bonus)
+    §R §C{GrantRequests} §A requested §A maxAllowed §/C
+
+  §F{f005:GrantWithMinimum:pub} (i32:requested, i32:maxAllowed, i32:minGrant) -> i32
+    §E{}
+    §B{capped:i32} §C{GrantRequests} §A requested §A maxAllowed §/C
+    §IF{if1} (< capped minGrant)
+      §R minGrant
+    §R capped
+
+  §F{f006:FormatGrant:pub} (i32:amount) -> string
+    §E{}
+    §R (concat "granted: " (str amount))

@@ -1,0 +1,65 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Ledger",
+    "file": "Ledger.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "EntryLine",
+    "file": "Ledger.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "AppendEntry",
+    "file": "Ledger.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "ReadLedger",
+    "file": "Ledger.calr",
+    "line": 12
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "ReportOf",
+    "file": "Ledger.calr",
+    "line": 19
+  },
+  {
+    "id": "f005",
+    "kind": "Function",
+    "name": "BalanceReport",
+    "file": "Ledger.calr",
+    "line": 23
+  },
+  {
+    "id": "f006",
+    "kind": "Function",
+    "name": "HasEntries",
+    "file": "Ledger.calr",
+    "line": 28
+  },
+  {
+    "id": "f007",
+    "kind": "Function",
+    "name": "DescribeLedger",
+    "file": "Ledger.calr",
+    "line": 33
+  },
+  {
+    "id": "f008",
+    "kind": "Function",
+    "name": "LedgerSize",
+    "file": "Ledger.calr",
+    "line": 37
+  }
+]
