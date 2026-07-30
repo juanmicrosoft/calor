@@ -86,6 +86,22 @@ public sealed class ContractHasher
                     sb.Append(')');
                     break;
 
+                case BindStatementNode bind:
+                    // Immutable bindings are encodable (D-G3.1) and must hash their
+                    // FULL content — two bodies differing only in an initializer must
+                    // never share a cached result-bound verdict. Mutable bindings are
+                    // unencodable (never cached) but must still hash DISTINCTLY from
+                    // the immutable spelling.
+                    sb.Append(bind.IsMutable ? "B~(" : "B(");
+                    sb.Append(bind.Name);
+                    sb.Append(':');
+                    sb.Append(bind.TypeName ?? "?");
+                    sb.Append('=');
+                    if (bind.Initializer != null)
+                        AppendExpression(sb, bind.Initializer);
+                    sb.Append(')');
+                    break;
+
                 case IfStatementNode ifStmt:
                     sb.Append("IF(");
                     AppendExpression(sb, ifStmt.Condition);
@@ -246,6 +262,36 @@ public sealed class ContractHasher
             case ArrayLengthNode arrLen:
                 sb.Append("(LEN ");
                 AppendExpression(sb, arrLen.Array);
+                sb.Append(')');
+                break;
+
+            // #824 review C2: these kinds are ENCODABLE (walker + translator model
+            // them), so their cacheable verdicts must hash on CONTENT — the
+            // content-free UNSUPPORTED marker let `(len s)` and `(len u)` share a
+            // key and serve a stale false Proven from the default-on cache. Hash
+            // changes here strand only previously-COLLIDING (broken) keys; no
+            // format bump needed (recorded per the semantics-ledger rule).
+            case StringOperationNode strOp:
+                sb.Append("(SOP:");
+                sb.Append(strOp.Operation);
+                if (strOp.ComparisonMode != null)
+                {
+                    sb.Append(':');
+                    sb.Append(strOp.ComparisonMode);
+                }
+                foreach (var arg in strOp.Arguments)
+                {
+                    sb.Append(' ');
+                    AppendExpression(sb, arg);
+                }
+                sb.Append(')');
+                break;
+
+            case FieldAccessNode fieldAccess:
+                sb.Append("(FLD ");
+                AppendExpression(sb, fieldAccess.Target);
+                sb.Append(' ');
+                sb.Append(fieldAccess.FieldName);
                 sb.Append(')');
                 break;
 

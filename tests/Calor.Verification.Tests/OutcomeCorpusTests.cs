@@ -133,7 +133,8 @@ public class OutcomeCorpusTests
         [
             "proven.calr", "refuted-with-model.calr", "unsupported.calr", "timeout.calr",
             "proven-with-result.calr", "refuted-overflow.calr", "unsupported-body.calr",
-            "vacuous-precondition.calr", "assumed-division.calr"
+            "vacuous-precondition.calr", "assumed-division.calr",
+            "proven-with-binding.calr"
         ];
 
         foreach (var fixture in fixtures)
@@ -217,6 +218,28 @@ public class OutcomeCorpusTests
             Assert.Equal(ProofStatus.Unsupported, d.Verification!.Status);
             Assert.Contains("result", d.Verification.Reason);
         });
+    }
+
+    [SkippableFact]
+    public void ProvenWithBindingFixture_W5BShapesProve()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // D-G3.1: the three W5-B probe contract shapes — immutable §B chains with
+        // guard-clause branching — prove via SSA substitution. This is the depth
+        // surface PP-G3's threshold structurally depends on.
+        var result = CompileFixture("proven-with-binding.calr", verbose: true);
+
+        Assert.Empty(ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.PostconditionMayBeViolated));
+        Assert.Empty(ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.ContractVerificationUnsupported));
+
+        var proven = ContractDiagnostics(result)
+            .Where(d => d.Code == DiagnosticCode.PostconditionProven)
+            .ToList();
+        Assert.Equal(3, proven.Count);
+        Assert.All(proven, d => Assert.Equal(ProofStatus.Proven, d.Verification!.Status));
     }
 
     [SkippableFact]
