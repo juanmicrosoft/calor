@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-30
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Metrics**: Calor wins 7 categories, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x (Calor)
+  - ErrorDetection: 1.49x (Calor)
+  - TokenEconomics: 1.42x (Calor)
+
+### Added (release assembly)
+- **`calor verify --weakening-check <declId> <frozen.calr> <final.calr>`** — mechanical contract-weakening verdict between two versions of a declaration (guarantees plan G5 / gates Annex A-1.3.1 two-leg rule): weakened iff the `§S` conjunction was relaxed OR the `§Q` conjunction was strengthened (the prover-appeasement move); emits JSON with `weakened`/`indeterminate`/`intactOrStrengthened` and all four implication directions. By-rule verdicts (renamed/removed declaration, changed signature, unparseable final, emptied contract set) need no solver.
+- **`CalorVerify` MSBuild property** — `Verify="$(CalorVerify)"` on the `Calor.Tasks` compile task runs Z3 contract verification inside MSBuild builds; refutation warnings (`Calor0711`/`Calor0712`) surface as MSBuild warnings on successful compiles (previously the task dropped all non-error diagnostics on success), an armed-but-solverless gate warns loudly (`Calor0710`), the native Z3 library deploys to the Tasks output root (MSBuild task contexts get no deps.json native probing), and `Verify` participates in the incremental-build options hash so flipping it on over a warm cache recompiles.
+
+### Fixed (release assembly)
+- **Integer literals outside the signed 32-bit domain are refused by the contract translator instead of silently wrapped mod 2^32** — the wrap corrupted verdicts in both polarities (false refutations with nonsense counterexamples, inverted implication verdicts). Such contracts now report `unsupported`. Verification cache format 1.7 (pre-fix entries may hold wrapped-literal verdicts).
+
+
 ### Added
 - **Verifier depth: immutable `§B` binding chains are now encodable (guarantees plan G4/D-G3.1).** Result-referencing postconditions over bodies composed of immutable bindings, guard-clause branching, and value returns now prove via SSA-style substitution — including all three W5-B probe contract shapes (`total = a + b; if (total > cap) return cap; return total ⊨ result <= cap`), the surface PP-G3's threshold depends on. Soundness edges pinned: mutable (`§B{~}`) bindings, use-before-declaration, and branch-local bindings leaking into fall-through all refuse (`unsupported`); rebinding shadows lexically; a *dividing* initializer keeps its side condition anchored at the binding site (an unused dividing initializer still yields `assumed`, and a branch-local one is conditionally-evaluated → `unsupported`); nesting depth and substitution size are bounded. Cache keys cover binding content (no format bump needed: `§B` bodies were previously `unsupported`, which is never cached). **Deferred with rationale:** the D1 (narrow-type promotion) and D2 (literal signedness) divergence fixes turn out not to be cheap — both change translator width semantics with cache and test-matrix impact — and stay recorded in the divergence table.
 - **`assumed` goes live: *body*-division-carrying proofs are now conditional, not silently strengthened (guarantees plan D-G2.5 — the seven-status vocabulary's first `assumed` producer).** A result-referencing postcondition proof over a body containing `/` or `%` was reached under divisor-nonzero side conditions; it now reports **`assumed`** with the canonical assumption `exceptional-paths:division …` (envelope `assumptions` list, `Calor0720` info diagnostic) instead of plain `proven`. Behavior change: such proofs **no longer elide the runtime postcondition check** — `assumed` never elides, per the frozen D-G2.2 rule. Refutations under the same side conditions stay `refuted` (their models are genuine non-throwing executions). Corpus fixture `assumed-division.calr` pins the shape end-to-end (status, assumption, kept guard, wire payload). The verification cache format bumps to 1.5: a warm cache holding a pre-producer plain-`proven` verdict for a division body would otherwise keep eliding the guard the `assumed` verdict deliberately keeps. **Stated limit:** division inside *contract expressions* (`§Q`/`§S` themselves) is still totalized with no side conditions — a pre-existing divergence now recorded as D8 in `docs/verification-modeled-forms.md`, to be routed through the same producer in a later slice.
