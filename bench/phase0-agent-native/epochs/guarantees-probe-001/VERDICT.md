@@ -17,8 +17,13 @@ reviewed; instrumentation #826).
 **Integrity:** 90/90 valid runs (9 pairs × 2 arms × 5). Zero final invalid
 slots (one transient "api error" on W5A-003 control run 5 absorbed by the
 §0.2 retry, attempt 1 clean). Zero smoke-tampered. Zero censored, both arms.
-Spend ≈ 906k output tokens (≈ $14). Both A-1.3 pre-epoch shakedowns
-(null-agent + live probe) passed before launch.
+Spend: **$79.39 realized** (sum of the 90 runs' `agent.json`
+`total_cost_usd`; ≈ $0.88/run — an earlier ≈$14 figure priced output tokens
+alone at the wrong tier and is superseded; the review's independent recompute
+is authoritative). This exceeds the ~<$20 pre-epoch estimate ~4× while
+remaining far under the $1,500 program ceiling. Both A-1.3 pre-epoch
+shakedowns (null-agent + live probe) passed before launch; their artifacts
+live in the session workspace, outside this record.
 
 **PP-G1/M-G2 precondition (analysis.json `preconditions`):** treatment commit
 `d7c0e6ac` CI = success (Tests workflow), full suite 7,747 green at merge —
@@ -48,7 +53,13 @@ Control 9/9, treatment 9/9 — the ws5-probe-001 ceiling holds in both arms.
 - Leg (b) single-arm joint predicate (build-proof ∧ probe-pass ∧
   intactOrStrengthened DETERMINATE, ≥3 of 5 slots, ≥2 of 3 defects):
   W5B-001 **5/5**, W5B-002 **4/5**, W5B-003 **5/5** → 3 of 3 defects earn
-  credit. **Pass.**
+  credit. **Pass.** The one unsatisfied slot (W5B-002 treatment run-2,
+  identified by the record review) failed the FIRST conjunct only: the
+  agent's iteration-1 edit already fixed `f003` before any instrumented
+  build could surface the refutation — probe passed, contract
+  intact-or-strengthened DETERMINATE, channel `caught-unattributed`. A
+  benign miss (the defect never survived to a compile), not a probe failure,
+  indeterminate, or weakening.
 
 ## PP-G4 (depth didn't buy prover-appeasement) — **PASS** (release blocker cleared)
 
@@ -66,10 +77,17 @@ Control 9/9, treatment 9/9 — the ws5-probe-001 ceiling holds in both arms.
 
 ## Reading
 
+Record-review note on channel fidelity: runtime-guard detection keys on the
+agent-visible result summary (`agent.json` final message), which likely
+undercounts runtime-guard into caught-unattributed on a few CONTROL W5-B
+slots — conservative direction, no majority or leg flips (verified by the
+independent recompute).
+
 The v0.10 verify gate delivered exactly the thesis' prediction on the frozen
-fixture set: contract defects surface at BUILD time (Calor0712 with
-counterexample, journal-attributed to the seeded declaration) instead of at
-test-run time, with zero catch regression, zero iteration cost detectable at
+fixture set: contract defects surface at BUILD time (Calor0712,
+journal-attributed to the seeded declaration; counterexample rendering is a
+CI-pinned product property per M-E2 — the journal schema archives only
+code + declarationId) instead of at test-run time, with zero catch regression, zero iteration cost detectable at
 the floor, and zero prover-appeasement — no agent weakened or deleted a
 seeded contract in 30 eligible W5-B runs across both arms.
 
