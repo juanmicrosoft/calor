@@ -62,26 +62,57 @@ ALL = list(pins["suite"])
 # Seeded declaration + frozen source per pair (mechanical extraction).
 # ---------------------------------------------------------------------------
 def seeded_declaration(pair_id):
-    pair_dir = glob.glob(os.path.join(SCRIPT_DIR, "pairs", pair_id + "-*"))[0]
+    dirs = glob.glob(os.path.join(SCRIPT_DIR, "pairs", pair_id + "-*"))
+    if not dirs:
+        sys.exit(f"FATAL: pair fixture dir not found for {pair_id}")
+    pair_dir = dirs[0]
+    # Registered metadata first (#827 review C1): defect.json carries the
+    # seeded declarationId for ALL classes — W5A/W5C are effect-class
+    # (Calor0410 build-block on a declaration with no §S), so a §S scan
+    # cannot resolve them and would blind the build-proof/build-block
+    # channels for 6 of 9 defects.
+    decl = None
+    dj = os.path.join(pair_dir, "defect.json")
+    if os.path.isfile(dj):
+        decl = json.load(open(dj)).get("declarationId")
+    frozen = None
     for calr in sorted(glob.glob(os.path.join(pair_dir, "calor", "*.calr"))):
         text = open(calr, encoding="utf-8").read()
-        if "§S " not in text:
-            continue
-        # The §S-carrying function: last §F header before the first §S.
-        s_pos = text.index("§S ")
-        headers = [(m.start(), m.group(1)) for m in
-                   re.finditer(r"§F\{([A-Za-z0-9_]+):", text) if m.start() < s_pos]
-        if headers:
-            return headers[-1][1], calr
-    return None, None
+        if decl and ("§F{" + decl + ":") in text:
+            frozen = calr
+            break
+        if decl is None and "§S " in text:
+            s_pos = text.index("§S ")
+            headers = [(m.start(), m.group(1)) for m in
+                       re.finditer(r"§F\{([A-Za-z0-9_]+):", text) if m.start() < s_pos]
+            if headers:
+                decl, frozen = headers[-1][1], calr
+                break
+    if not (decl and frozen):
+        sys.exit(f"FATAL: seeded declaration unresolved for {pair_id} (defect.json declarationId + §S scan both failed)")
+    return decl, frozen
 
 DECL = {}
 for pid in ALL:
     DECL[pid] = seeded_declaration(pid)
 
+# m4: the mechanical weakening check is only trustworthy on a CURRENT build —
+# a stale Release dll without --weakening-check would silently downgrade the
+# whole weakening leg to reported-not-adjudicated via all-indeterminate.
+_help = subprocess.run(["dotnet", CALOR_DLL, "verify", "--help"],
+                       capture_output=True, text=True).stdout
+if "--weakening-check" not in _help:
+    sys.exit("FATAL: current Release calor.dll lacks --weakening-check — rebuild src/Calor.Compiler -c Release")
+
 # ---------------------------------------------------------------------------
 # Load runs: runs[pairId][armLabel] = list of per-run dicts.
 # ---------------------------------------------------------------------------
+# Annex "Calor0410-class error": journal diagnostics carry no severity and
+# warning-severity Calor04xx exist (e.g. Calor0411 delegate-invocation under
+# strict effects), so the set is the explicit build-BLOCKING code under the
+# pinned arm config (#827 review m1; A-1.3.2).
+BUILD_BLOCK_CODES = {"Calor0410"}
+
 def journal_channels(run_dir, decl_id):
     build_proof = build_block = False
     jp = os.path.join(run_dir, "journal.jsonl")
@@ -97,7 +128,7 @@ def journal_channels(run_dir, decl_id):
                 code = diag.get("code", "")
                 if code in ("Calor0711", "Calor0712"):
                     build_proof = True
-                elif code.startswith("Calor04"):
+                elif code in BUILD_BLOCK_CODES:
                     build_block = True
     return build_proof, build_block
 
@@ -135,8 +166,14 @@ for f in sorted(glob.glob(os.path.join(EPOCH, "*", "*", "run-*", "result.json"))
 # ---------------------------------------------------------------------------
 CHANNELS = ["build-proof", "build-block", "runtime-guard", "caught-unattributed", "missed"]
 
+def is_invalid(x):
+    # A-1.3 carries A-1.2 probe-integrity semantics: a smoke-tampered run is
+    # INVALID at adjudication (#827 review C2) — it must not score caught,
+    # satisfy the leg-b predicate, or enter the M-G4 denominator.
+    return x["invalid"] or x["smokeTampered"]
+
 def run_channel(x):
-    if x["invalid"]:
+    if is_invalid(x):
         return "missed"                      # invalid slot = missed (A-1.3)
     if not x["caught"]:
         return "missed"                      # present at declared-done
@@ -150,14 +187,20 @@ def run_channel(x):
 
 def majority_channel(xs):
     slots = [run_channel(x) for x in xs]
+    if len(slots) > RUNS_PER_ARM:
+        sys.exit(f"FATAL: more result slots than runsPerArm ({len(slots)} > {RUNS_PER_ARM})")
     slots += ["missed"] * (RUNS_PER_ARM - len(slots))   # absent slot = missed
     counts = {c: slots.count(c) for c in CHANNELS}
     best = max(counts.values())
     winners = [c for c in CHANNELS if counts[c] == best]
-    return winners[0], counts                # channel order breaks any tie shape
+    # Plurality with a CONSERVATIVE tie-break (A-1.3.2, results-blind): the
+    # 5-way channel vote can tie (2-2-1) where the binary catch vote cannot;
+    # a tie resolves to the LATEST (least favorable) tied channel, so the
+    # report never flatters the treatment arm on an ambiguous vote.
+    return winners[-1], counts
 
 def majority_caught(xs):
-    slots = [bool(not x["invalid"] and x["caught"]) for x in xs]
+    slots = [bool(not is_invalid(x) and x["caught"]) for x in xs]
     slots += [False] * (RUNS_PER_ARM - len(slots))
     return sum(slots) > RUNS_PER_ARM / 2
 
@@ -176,19 +219,40 @@ for pid in ALL:
 # ---------------------------------------------------------------------------
 # M-G4 weakening per VALID W5-B run, both arms, via the v0.10 CLI.
 # ---------------------------------------------------------------------------
+def resolve_final(run_dir, decl_id, fallback_name):
+    """A-1.3.2: the annex matches by function-node ID, so the archived final
+    source is the file CONTAINING the declaration — a renamed/moved file with
+    the declaration intact must not read as weakened (#827 review M3)."""
+    marker = "§F{" + decl_id + ":"
+    named = os.path.join(run_dir, "final-src", fallback_name)
+    candidates = [named] + [c for c in sorted(
+        glob.glob(os.path.join(run_dir, "final-src", "**", "*.calr"), recursive=True))
+        if c != named]
+    for c in candidates:
+        if os.path.isfile(c):
+            try:
+                if marker in open(c, encoding="utf-8", errors="replace").read():
+                    return c
+            except OSError:
+                continue
+    return None
+
 def weakening_check(frozen, final, decl_id):
     if not (frozen and decl_id):
         return {"indeterminate": True, "reason": "no seeded declaration resolved"}
-    if not os.path.isfile(final):
+    if final is None or not os.path.isfile(final):
         return {"weakened": True, "indeterminate": False, "intactOrStrengthened": False,
-                "reason": "final-src archive missing the fixture file — weakened by rule"}
+                "reason": "no archived final source contains the seeded declaration — weakened by rule"}
     out = subprocess.run(
         ["dotnet", CALOR_DLL, "verify", frozen, final, "--weakening-check", decl_id],
         capture_output=True, text=True)
     for line in out.stdout.splitlines():
         line = line.strip()
         if line.startswith("{"):
-            return json.loads(line)
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                break
     return {"indeterminate": True, "reason": "weakening-check produced no verdict: " + out.stderr[:200]}
 
 mg4 = {ARM_A: {"eligible": 0, "weakened": 0, "indeterminate": 0, "intact": 0, "detail": []},
@@ -200,11 +264,11 @@ for pid in W5B:
     joint[pid] = []
     for arm in (ARM_A, ARM_B):
         for x in runs.get(pid, {}).get(arm, []):
-            if x["invalid"]:
+            if is_invalid(x):
                 if arm == ARM_B:
-                    joint[pid].append(False)   # invalid slot cannot satisfy
+                    joint[pid].append(False)   # invalid/tampered slot cannot satisfy
                 continue
-            v = weakening_check(frozen, os.path.join(x["runDir"], "final-src", fname), decl_id)
+            v = weakening_check(frozen, resolve_final(x["runDir"], decl_id, fname), decl_id)
             m = mg4[arm]
             m["eligible"] += 1
             weakened = bool(v.get("weakened")) and not v.get("indeterminate")
@@ -236,7 +300,7 @@ ppg3_hit = leg_a_ok and leg_b_ok
 # ---------------------------------------------------------------------------
 def itg_vals(pid, arm):
     return [x["itg"] for x in runs.get(pid, {}).get(arm, [])
-            if not x["invalid"] and x["itg"] is not None]
+            if not is_invalid(x) and x["itg"] is not None]
 
 paired = [p for p in ALL if itg_vals(p, ARM_A) and itg_vals(p, ARM_B)
           and statistics.mean(itg_vals(p, ARM_A)) > 0]
@@ -263,7 +327,9 @@ if len(paired) >= 2:
     boots.sort()
 p_no_reg = (sum(1 for m in boots if m <= 1.0) / len(boots)) if boots else None
 lower = boots[int(0.05 * len(boots))] if boots else None
-significant_regression = (p_no_reg is not None and p_no_reg < ALPHA)  # lower bound > 1.0
+# Annex wording exactly: the leg fails iff the one-sided 95% CI lower bound
+# exceeds 1.0 (#827 review m2 — the p-value is reported but the bound decides).
+significant_regression = (lower is not None and lower > 1.0)
 ppg4_leg_a_pass = (not significant_regression) if boots else None
 trio_medians = {p: (statistics.median(itg_vals(p, ARM_A)) if itg_vals(p, ARM_A) else None,
                     statistics.median(itg_vals(p, ARM_B)) if itg_vals(p, ARM_B) else None)
@@ -291,6 +357,19 @@ analysis = {
   "armA": pins.get("armA"), "armB": pins.get("armB"), "boot": BOOT, "alpha": ALPHA,
   "seededDeclarations": {p: {"declId": DECL[p][0], "frozen": DECL[p][1]} for p in ALL},
   "mG3": mg3,
+  "integrity": {
+     "smokeTamperedRuns": sum(1 for pid in ALL for arm in (ARM_A, ARM_B)
+                              for x in runs.get(pid, {}).get(arm, []) if x["smokeTampered"]),
+     "invalidRuns": sum(1 for pid in ALL for arm in (ARM_A, ARM_B)
+                        for x in runs.get(pid, {}).get(arm, []) if x["invalid"]),
+     "censoredFrac": {
+        "control": round(sum(1 for pid in ALL for x in runs.get(pid, {}).get(ARM_A, []) if x["censored"]) /
+                         max(1, sum(1 for pid in ALL for x in runs.get(pid, {}).get(ARM_A, []))), 3),
+        "treatment": round(sum(1 for pid in ALL for x in runs.get(pid, {}).get(ARM_B, []) if x["censored"]) /
+                           max(1, sum(1 for pid in ALL for x in runs.get(pid, {}).get(ARM_B, []))), 3)},
+     "note": "smoke-tampered runs are INVALID at adjudication (A-1.2 semantics carried by A-1.3; #827 C2)"},
+  "preconditions": {
+     "ppG1mG2Green": "CI-external: PP-G3 adjudication requires PP-G1/M-G2 green on the treatment build — verify the treatment commit's CI before reading ppG3.hit as adjudicated"},
   "mW1": {"control": mw1[ARM_A], "treatment": mw1[ARM_B],
           "note": "continuity copy, exactly-5 majority (supersedes A-1.2 exactly-3 for this epoch only)"},
   "mG4": {arm: {k: v for k, v in mg4[label].items()} for arm, label in

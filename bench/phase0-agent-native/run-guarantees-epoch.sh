@@ -68,6 +68,26 @@ ARM_B_DLL="$REPO_ROOT/src/Calor.Compiler/bin/Release/net10.0/calor.dll"
 [[ -f "$ARM_B_DLL" ]] || { echo "ERROR: arm-B calor.dll not built: $ARM_B_DLL" >&2; exit 2; }
 [[ "$ARM_A_ROOT" != "$REPO_ROOT" ]] || { echo "ERROR: arm-A root IS the current checkout — no A/B contrast" >&2; exit 2; }
 
+# The control PRODUCT must be exactly the tag: HEAD equality alone misses
+# uncommitted src/ edits in the worktree (#827 review M2). Z3 seeding writes
+# only untracked/ignored paths, so a clean src/ status is achievable and
+# required.
+if [[ -n "$(git -C "$ARM_A_ROOT" status --porcelain src/)" ]]; then
+    echo "ERROR: arm-A worktree has uncommitted src/ modifications — control product would drift from the tag:" >&2
+    git -C "$ARM_A_ROOT" status --porcelain src/ | head -10 >&2
+    exit 2
+fi
+
+# Stray build artifacts inside pairs/ (a *.g.cs or .calor from an ad-hoc
+# in-place compile) break every subsequent calor-arm run with CS0101/CS0111
+# duplicates (#827 review, incidental hazard). Refuse before any spend.
+stray="$(find "$SCRIPT_DIR/pairs" \( -name '*.g.cs' -o -name '.calor' \) 2>/dev/null | head -5)"
+if [[ -n "$stray" ]]; then
+    echo "ERROR: stray build artifacts inside pairs/ would poison every run:" >&2
+    echo "$stray" >&2
+    exit 2
+fi
+
 ARM_A_COMMIT="$(git -C "$ARM_A_ROOT" rev-parse HEAD)"
 ARM_B_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 BASELINE_COMMIT="$(git -C "$REPO_ROOT" rev-parse 'guarantees-baseline-v0.9^{commit}' 2>/dev/null || echo unknown)"
@@ -141,7 +161,9 @@ summarize() {
 
 for pid in "${PAIRS[@]}"; do
     pair_dir="$(echo "$SCRIPT_DIR"/pairs/${pid}-*)"
-    [[ -d "$pair_dir" ]] || { echo "WARNING: pair not found, skipping: $pid" >&2; continue; }
+    # Fatal, not a skip (#827 review m5): pins.json already recorded the full
+    # suite, and a silently-skipped pair would score all-missed downstream.
+    [[ -d "$pair_dir" ]] || { echo "ERROR: pair not found: $pid — aborting before spend" >&2; exit 2; }
     echo "=== $pid / arm A (v0.9 control, gateless) ==="
     "$SCRIPT_DIR/run-pair.sh" --pair "$pair_dir" --arm calor \
         --calor-dll "$ARM_A_DLL" --arm-repo-root "$ARM_A_ROOT" \
