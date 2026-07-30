@@ -45,6 +45,7 @@
         ProjectDirectory="$(MSBuildProjectDirectory)"
         Verbose="$(CalorVerbose)"
         EnforceEffects="$(CalorEnforceEffects)"
+        Verify="$(CalorVerify)"
         EnableILAnalysis="$(CalorEnableILAnalysis)"
         ReferencedAssemblies="@(ReferencePath)"
         RuntimeDirectory="$(_CalorRuntimeDir)"

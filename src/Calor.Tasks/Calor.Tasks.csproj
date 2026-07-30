@@ -29,4 +29,34 @@
     </ProjectReference>
   </ItemGroup>
 
+  <!-- Copy the current platform's Z3 native library to the output root
+       (mirrors Calor.Compiler's CopyZ3NativeToOutput). MSBuild loads task
+       assemblies without deps.json native probing, so libz3 under
+       runtimes/<rid>/native/ is invisible to P/Invoke inside the task —
+       without this, the Verify gate silently reports Z3 as unavailable. -->
+  <Target Name="CopyZ3NativeToTasksOutput" AfterTargets="Build">
+    <PropertyGroup>
+      <_CalorZ3RuntimesDir>..\Calor.Compiler\runtimes</_CalorZ3RuntimesDir>
+    </PropertyGroup>
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">
+      <_CalorZ3NativeLib Include="$(_CalorZ3RuntimesDir)/osx-arm64/native/libz3.dylib" />
+    </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'X64'">
+      <_CalorZ3NativeLib Include="$(_CalorZ3RuntimesDir)/osx-x64/native/libz3.dylib" />
+    </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'X64'">
+      <_CalorZ3NativeLib Include="$(_CalorZ3RuntimesDir)/win-x64/native/libz3.dll" />
+    </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">
+      <_CalorZ3NativeLib Include="$(_CalorZ3RuntimesDir)/win-arm64/native/libz3.dll" />
+    </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'X64'">
+      <_CalorZ3NativeLib Include="$(_CalorZ3RuntimesDir)/linux-x64/native/libz3.so" />
+    </ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">
+      <_CalorZ3NativeLib Include="$(_CalorZ3RuntimesDir)/linux-arm64/native/libz3.so" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_CalorZ3NativeLib)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'@(_CalorZ3NativeLib)' != ''" />
+  </Target>
+
 </Project>

@@ -74,6 +74,15 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool EnforceEffects { get; set; } = true;
 
     /// <summary>
+    /// Run static contract verification during compilation (Annex A-1.3
+    /// instrumentation item 1): refutations surface as Calor0712-band build
+    /// diagnostics (Warning severity — the build still succeeds). Off by
+    /// default; the Guarantees probe epoch's v0.10 arm turns it on via the
+    /// workspace template.
+    /// </summary>
+    public bool Verify { get; set; }
+
+    /// <summary>
     /// Semicolon- or comma-separated list of experimental feature flag names to enable.
     /// Plumbed through to <see cref="Calor.Compiler.CompilationOptions.ExperimentalFlags"/>.
     /// Unknown flags are accepted silently — see <see cref="Calor.Compiler.ExperimentalFlags"/>.
@@ -108,7 +117,11 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // 2. Compute global hashes
         var tasksAssemblyPath = typeof(CompileCalor).Assembly.Location;
         var compilerHash = BuildStateCache.ComputeCompilerHash(tasksAssemblyPath);
-        var optionsHash = BuildStateCache.ComputeOptionsHash(EnforceEffects);
+        // Verify is diagnostics-affecting (Calor0711/0712 warnings), so it must be
+        // in the options token: flipping it on with a warm cache has to force a
+        // recompile, or refutations on unchanged files are silently missed.
+        var optionsHash = BuildStateCache.ComputeOptionsHash(
+            $"enforceEffects:{EnforceEffects}|verify:{Verify}");
         var manifestHash = BuildStateCache.ComputeManifestHash(ProjectDirectory);
 
         // 3. Global invalidation check
@@ -181,6 +194,26 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
 
         try
         {
+
+        // An armed verify gate whose solver cannot load must be loud (#826
+        // review C3): without this, a missing native libz3 silently turns
+        // Verify=true into a no-op — every contract reports Skipped at info
+        // severity, invisible at normal MSBuild verbosity.
+        if (Verify && !Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable)
+        {
+            Log.LogWarning(
+                subcategory: "Calor",
+                warningCode: "Calor0710",
+                helpKeyword: null,
+                file: null,
+                lineNumber: 0,
+                columnNumber: 0,
+                endLineNumber: 0,
+                endColumnNumber: 0,
+                message: "Verify=true but the Z3 SMT solver is not available in the MSBuild task context — "
+                    + "contract verification will be silently skipped. Ensure the Z3 native library sits "
+                    + "next to Calor.Tasks.dll.");
+        }
 
         var generatedFiles = new List<ITaskItem>();
         var success = true;
@@ -324,57 +357,63 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     ProjectDirectory = ProjectDirectory,
                     Context = compilationContext,
                     EnableILAnalysis = EnableILAnalysis,
-                    ExperimentalFlags = Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags)
+                    ExperimentalFlags = Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags),
+                    VerifyContracts = Verify
                 };
                 compileOptions.CrossModuleFunctionModules = crossModuleMap;
                 var result = Program.Compile(source, inputPath, compileOptions);
 
+                // Log ALL diagnostics, not only on failure: verification findings
+                // (e.g. Calor0711/0712 refutation warnings) arrive on otherwise
+                // successful compiles and must reach MSBuild output — dropping
+                // them here would make the verify gate silent exactly when it
+                // has something to say.
+                foreach (var diagnostic in result.Diagnostics)
+                {
+                    if (diagnostic.IsError)
+                    {
+                        Log.LogError(
+                            subcategory: "Calor",
+                            errorCode: diagnostic.Code,
+                            helpKeyword: null,
+                            file: diagnostic.FilePath ?? inputPath,
+                            lineNumber: diagnostic.Span.Line,
+                            columnNumber: diagnostic.Span.Column,
+                            endLineNumber: 0,
+                            endColumnNumber: 0,
+                            message: diagnostic.Message);
+                    }
+                    else if (diagnostic.IsWarning)
+                    {
+                        Log.LogWarning(
+                            subcategory: "Calor",
+                            warningCode: diagnostic.Code,
+                            helpKeyword: null,
+                            file: diagnostic.FilePath ?? inputPath,
+                            lineNumber: diagnostic.Span.Line,
+                            columnNumber: diagnostic.Span.Column,
+                            endLineNumber: 0,
+                            endColumnNumber: 0,
+                            message: diagnostic.Message);
+                    }
+                    else
+                    {
+                        Log.LogMessage(
+                            subcategory: "Calor",
+                            code: diagnostic.Code,
+                            helpKeyword: null,
+                            file: diagnostic.FilePath ?? inputPath,
+                            lineNumber: diagnostic.Span.Line,
+                            columnNumber: diagnostic.Span.Column,
+                            endLineNumber: 0,
+                            endColumnNumber: 0,
+                            importance: MessageImportance.Normal,
+                            message: diagnostic.Message);
+                    }
+                }
+
                 if (result.HasErrors)
                 {
-                    foreach (var diagnostic in result.Diagnostics)
-                    {
-                        if (diagnostic.IsError)
-                        {
-                            Log.LogError(
-                                subcategory: "Calor",
-                                errorCode: diagnostic.Code,
-                                helpKeyword: null,
-                                file: diagnostic.FilePath ?? inputPath,
-                                lineNumber: diagnostic.Span.Line,
-                                columnNumber: diagnostic.Span.Column,
-                                endLineNumber: 0,
-                                endColumnNumber: 0,
-                                message: diagnostic.Message);
-                        }
-                        else if (diagnostic.IsWarning)
-                        {
-                            Log.LogWarning(
-                                subcategory: "Calor",
-                                warningCode: diagnostic.Code,
-                                helpKeyword: null,
-                                file: diagnostic.FilePath ?? inputPath,
-                                lineNumber: diagnostic.Span.Line,
-                                columnNumber: diagnostic.Span.Column,
-                                endLineNumber: 0,
-                                endColumnNumber: 0,
-                                message: diagnostic.Message);
-                        }
-                        else
-                        {
-                            Log.LogMessage(
-                                subcategory: "Calor",
-                                code: diagnostic.Code,
-                                helpKeyword: null,
-                                file: diagnostic.FilePath ?? inputPath,
-                                lineNumber: diagnostic.Span.Line,
-                                columnNumber: diagnostic.Span.Column,
-                                endLineNumber: 0,
-                                endColumnNumber: 0,
-                                importance: MessageImportance.Normal,
-                                message: diagnostic.Message);
-                        }
-                    }
-
                     // Failure: delete prior .g.cs if exists, do NOT cache
                     if (File.Exists(outputPath))
                     {

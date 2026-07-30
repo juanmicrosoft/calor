@@ -672,4 +672,105 @@ public class CompileCalorIntegrationTests : IDisposable
         var emitted = File.ReadAllText(catalogOut.ItemSpec);
         Assert.Contains("global::Store.StoreModule.SaveSnapshot(path);", emitted);
     }
+
+    // A refutable postcondition: total can exceed cap because the guard's
+    // threshold is (cap + 10) — the W5-B defective shape from the outcome corpus.
+    private const string RefutedContractSource = """
+        §M{m001:Quotes}
+          §F{f003:QuoteWithSurchargeDefective:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
+            §S (<= result cap)
+            §B{total:i32} (+ baseAmount surcharge)
+            §IF{if1} (> total (+ cap 10))
+              §R cap
+            §R total
+        """;
+
+    // G5 instrumentation (A-1.3 item 1): the Verify task property must run Z3
+    // verification and surface refutation warnings (Calor0712) through MSBuild —
+    // the epoch's build-proof channel. Succeeding compiles must still log
+    // their non-error diagnostics.
+    [Fact]
+    public void VerifyGate_RefutedContract_SurfacesWarningAndStillBuilds()
+    {
+        if (!Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable) return; // Z3-less CI
+
+        var src = CreateSourceFile("Quotes.calr", RefutedContractSource);
+
+        var task = CreateTask(src);
+        task.Verify = true;
+        Assert.True(task.Execute());
+        Assert.Single(task.GeneratedFiles);
+
+        var engine = (TestBuildEngine)task.BuildEngine;
+        Assert.Contains(engine.Warnings, w => w.Contains("Postcondition may be violated"));
+    }
+
+    [Fact]
+    public void VerifyGate_Off_NoVerificationWarnings()
+    {
+        var src = CreateSourceFile("Quotes.calr", RefutedContractSource);
+
+        var task = CreateTask(src);
+        Assert.True(task.Execute());
+
+        var engine = (TestBuildEngine)task.BuildEngine;
+        Assert.DoesNotContain(engine.Warnings, w => w.Contains("Postcondition may be violated"));
+    }
+
+    // Verify is diagnostics-affecting, so it participates in the options hash:
+    // flipping it on over a warm gate-off cache must recompile (and re-verify)
+    // files whose content did not change — a cached skip here would silently
+    // drop the refutation.
+    // #826 review M4: the in-process VerifyGate tests find libz3 through the
+    // test host's deps.json probing, which the real MSBuild task path does NOT
+    // get — the gate there depends on CopyZ3NativeToTasksOutput placing the
+    // native lib at the Tasks output ROOT. Pin that deployment directly: if
+    // the copy target regresses, this fails while the other gate tests stay
+    // green.
+    [Fact]
+    public void VerifyGate_NativeZ3_DeployedToTasksOutputRoot()
+    {
+        var dir = Directory.GetCurrentDirectory();
+        string? repoRoot = null;
+        while (dir != null)
+        {
+            if (File.Exists(Path.Combine(dir, "Calor.sln"))) { repoRoot = dir; break; }
+            dir = Directory.GetParent(dir)?.FullName;
+        }
+        Assert.NotNull(repoRoot);
+
+        var checkedConfigs = 0;
+        foreach (var config in new[] { "Debug", "Release" })
+        {
+            var binDir = Path.Combine(repoRoot!, "src", "Calor.Tasks", "bin", config, "net10.0");
+            if (!File.Exists(Path.Combine(binDir, "Calor.Tasks.dll"))) continue;
+            checkedConfigs++;
+            var hasNative = File.Exists(Path.Combine(binDir, "libz3.dylib"))
+                || File.Exists(Path.Combine(binDir, "libz3.so"))
+                || File.Exists(Path.Combine(binDir, "libz3.dll"));
+            Assert.True(hasNative,
+                $"No libz3 native library at the Calor.Tasks output root ({binDir}) — "
+                + "the MSBuild verify gate would silently report Z3 unavailable (CopyZ3NativeToTasksOutput regressed?)");
+        }
+        Assert.True(checkedConfigs > 0, "No built Calor.Tasks output found to check");
+    }
+
+    [Fact]
+    public void VerifyGate_FlippedOnOverWarmCache_Recompiles()
+    {
+        if (!Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable) return; // Z3-less CI
+
+        var src = CreateSourceFile("Quotes.calr", RefutedContractSource);
+
+        var task1 = CreateTask(src);
+        Assert.True(task1.Execute());
+        Assert.DoesNotContain(((TestBuildEngine)task1.BuildEngine).Warnings,
+            w => w.Contains("Postcondition may be violated"));
+
+        var task2 = CreateTask(src);
+        task2.Verify = true;
+        Assert.True(task2.Execute());
+        Assert.Contains(((TestBuildEngine)task2.BuildEngine).Warnings,
+            w => w.Contains("Postcondition may be violated"));
+    }
 }
