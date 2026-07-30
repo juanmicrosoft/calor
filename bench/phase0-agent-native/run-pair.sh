@@ -118,6 +118,8 @@ TIMEOUT_SECS=600
 EXEMPLAR_FILE=""
 EDIT_MECHANISM="raw"
 CALOR_DLL_OVERRIDE=""
+ARM_REPO_ROOT=""
+ARM_LABEL_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -129,11 +131,29 @@ while [[ $# -gt 0 ]]; do
         --exemplar) EXEMPLAR_FILE="$2"; shift 2 ;;
         --edit-mechanism) EDIT_MECHANISM="$2"; shift 2 ;;
         --calor-dll) CALOR_DLL_OVERRIDE="$2"; shift 2 ;;
+        --arm-repo-root) ARM_REPO_ROOT="$2"; shift 2 ;;
+        --arm-label) ARM_LABEL_OVERRIDE="$2"; shift 2 ;;
         *) echo "Unknown arg: $1" >&2; exit 2 ;;
     esac
 done
 
-[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--out <dir>]" >&2; exit 2; }
+[[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
+
+# Per-arm PRODUCT checkout (guarantees plan G5, A-1.3 epoch): --calor-dll pins
+# only the CLI/MCP/envelope build; the workspace's own `dotnet build` binds
+# Calor.Tasks / Calor.Sdk / Calor.Runtime and the emitter to the repo root
+# substituted into the CalorArm template. A workstream that changes those (the
+# v0.10 verify gate did — #826 touched Calor.Tasks + Sdk.targets + template)
+# needs the whole PRODUCT bound per arm: --arm-repo-root points the template,
+# the Tasks-libz3 pin, and the verify canary at that checkout, while THIS
+# script (the measurement harness) keeps running from the current checkout.
+if [[ -n "$ARM_REPO_ROOT" ]]; then
+    [[ -d "$ARM_REPO_ROOT/src/Calor.Tasks" && -d "$ARM_REPO_ROOT/bench/phase0-agent-native/templates" ]] \
+        || { echo "ERROR: --arm-repo-root is not a calor checkout: $ARM_REPO_ROOT" >&2; exit 2; }
+    ARM_REPO_ROOT="$(cd "$ARM_REPO_ROOT" && pwd -P)"
+else
+    ARM_REPO_ROOT="$REPO_ROOT"
+fi
 [[ "$ARM" == "calor" || "$ARM" == "csharp" ]] || { echo "--arm must be calor|csharp" >&2; exit 2; }
 case "$EDIT_MECHANISM" in
     raw) ;;
@@ -175,6 +195,13 @@ fi
 # collide with the unconstrained baseline (e.g. "calor+mcp-file").
 if [[ "$EDIT_MECHANISM" != "raw" ]]; then
     ARM_LABEL="${ARM_LABEL}+${EDIT_MECHANISM}"
+fi
+# Explicit arm-label override (guarantees plan G5): the A-1.3 epoch runs the
+# SAME arm/mechanism (calor+raw) in both arms — the contrast is the product
+# build + verify gate, so the caller must name the arms to keep results from
+# colliding (e.g. calor-v09-control / calor-v10-verify).
+if [[ -n "$ARM_LABEL_OVERRIDE" ]]; then
+    ARM_LABEL="$ARM_LABEL_OVERRIDE"
 fi
 PAIR_DIR="$(cd "$PAIR_DIR" && pwd)"
 PAIR_ID="$(jq -r .id "$PAIR_DIR/pair.json")"
@@ -292,7 +319,7 @@ check_pins() {
         # solver next to the Calor.Tasks.dll the template references (#826
         # re-verification recommendation — closes the Tasks-context gap the
         # Calor0710 warning surfaces but does not invalidate).
-        local tasks_dir="$REPO_ROOT/src/Calor.Tasks/bin/Release/net10.0"
+        local tasks_dir="$ARM_REPO_ROOT/src/Calor.Tasks/bin/Release/net10.0"
         if [[ -d "$tasks_dir" ]] \
            && ! compgen -G "$tasks_dir/libz3.*" > /dev/null; then
             echo "INVALID: no libz3 native library beside Calor.Tasks.dll — the workspace verify gate would be silently dead (A-1.3 item 3 / #826 C3)" >&2
@@ -314,8 +341,11 @@ materialize() {
     cp "$PAIR_DIR/spec.md" "$ws/spec.md"
 
     if [[ "$ARM" == "calor" ]]; then
-        sed "s|__REPO_ROOT__|$REPO_ROOT|g" \
-            "$SCRIPT_DIR/templates/calor-arm/CalorArm.csproj.template" > "$ws/src/Src.csproj"
+        # Per-arm-native (A-1.3): the TEMPLATE comes from the arm's own product
+        # checkout — the control arm's registered configuration includes its
+        # template exactly as archived (pre-verify-gate), not main's.
+        sed "s|__REPO_ROOT__|$ARM_REPO_ROOT|g" \
+            "$ARM_REPO_ROOT/bench/phase0-agent-native/templates/calor-arm/CalorArm.csproj.template" > "$ws/src/Src.csproj"
     else
         cat > "$ws/src/Src.csproj" <<'EOF'
 <Project Sdk="Microsoft.NET.Sdk">
