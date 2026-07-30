@@ -15,6 +15,11 @@
     <CalorTasksAssembly>__REPO_ROOT__/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll</CalorTasksAssembly>
     <CalorOutputDirectory>$(MSBuildThisFileDirectory)obj/calor/</CalorOutputDirectory>
     <CalorEnforceEffects>true</CalorEnforceEffects>
+    <!-- A-1.3 verify gate (instrumentation item 1): the same env knob that
+         adds the verify flag to the envelope compile turns on contract
+         verification in the Tasks build. MSBuild reads env vars as ambient
+         properties, so no template substitution is needed. -->
+    <CalorVerify Condition="'$(CALOR_P0_VERIFY_GATE)' != ''">true</CalorVerify>
   </PropertyGroup>
 
   <ItemGroup>

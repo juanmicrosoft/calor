@@ -227,6 +227,14 @@ check_pins() {
         cfg="$(jq -r '.arms.calor.config | "\(.enforceEffects) \(.permissiveEffects) \(.contractMode) \(.z3Required)"' "$PAIR_DIR/pair.json")"
         [[ "$cfg" == "true false debug true" ]] || { echo "INVALID: pair.json calor config violates gates-doc pin: $cfg" >&2; exit 3; }
     fi
+    # Annex A-1.3 instrumentation item 3: when the epoch declares the verify
+    # gate for this arm (CALOR_P0_VERIFY_EXPECTED=1), a run without the gate
+    # actually armed is INVALID — the M-G3 build-proof channel would be
+    # silently absent (§0.2 semantics).
+    if [[ "\${CALOR_P0_VERIFY_EXPECTED:-0}" == "1" && -z "\${CALOR_P0_VERIFY_GATE:-}" ]]; then
+        echo "INVALID: verify gate expected for this arm but CALOR_P0_VERIFY_GATE is unset (A-1.3 item 3)" >&2
+        exit 3
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -581,8 +589,11 @@ case "\${1:-}" in
           inputs+=(--input "$ws_out/.envelope-src/\$rel")
         done < <(cd "$ws/src" && find . -name '*.calr' -not -path '*/obj/*' -not -path '*/bin/*' | sed 's|^\\./||')
         if [[ \${#inputs[@]} -gt 0 ]]; then
+          # Annex A-1.3 instrumentation item 2: the Guarantees-probe v0.10 arm
+          # adds --verify so journal diagnostics carry Calor0711/0712 events
+          # (M-G3 build-proof channel). Off unless the arm config sets it.
           CALOR_P0_SHIM_OFF=1 "$real_dotnet" "$CALOR_CLI_DLL" "\${inputs[@]}" \\
-            --enforce-effects --contract-mode debug --no-telemetry --format json \\
+            --enforce-effects --contract-mode debug \${CALOR_P0_VERIFY_GATE:+--verify} --no-telemetry --format json \\
             > "$ws_out/.envelope.json" 2> "$ws_out/.envelope.err" || true
           python3 "$TELEMETRY_HELPERS" envelope "$ws_out/.envelope.json" > "$ws_out/.envelope-meta.json" 2>/dev/null \\
             || echo '{"diagnostics":[],"diagnostics_truncated":false,"envelope_valid":false}' > "$ws_out/.envelope-meta.json"
@@ -767,6 +778,14 @@ extract_metrics() {
     local ws="$1" ws_out="$2" run_idx="$3"
     local journal="$ws_out/journal.jsonl"
     touch "$journal"
+
+    # Archive the declared-done source verbatim (Annex A-1.3 instrumentation
+    # item 4): M-G4's weakening check diffs this against the frozen seeded
+    # declaration, so it must be the untouched final state — before any
+    # build/test below can rewrite obj/ artifacts alongside it.
+    mkdir -p "$ws_out/final-src"
+    cp "$ws"/src/*.calr "$ws_out/final-src/" 2>/dev/null || true
+    cp "$ws"/src/*.cs "$ws_out/final-src/" 2>/dev/null || true
 
     # Final silent held-out run = declared-done state (non-compiling = all fail)
     local final_pass=0 final_fail=$HELDOUT_TEST_COUNT final_build_ok=0

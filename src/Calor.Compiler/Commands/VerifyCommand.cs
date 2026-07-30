@@ -67,6 +67,12 @@ public static class VerifyCommand
             aliases: ["--clear-cache"],
             description: "Clear verification cache before verifying");
 
+        var weakeningOption = new Option<string?>(
+            aliases: ["--weakening-check"],
+            description: "M-G4 mode (gates doc Annex A-1.3): with exactly two input files "
+                + "(frozen, final), mechanically decide whether the named declaration's "
+                + "§Q/§S conjunction was weakened — prints a JSON verdict, exit 0");
+
         var command = new Command("verify", "Verify contracts in Calor files using Z3 SMT solver")
         {
             inputArgument,
@@ -75,13 +81,24 @@ public static class VerifyCommand
             verboseOption,
             timeoutOption,
             noCacheOption,
-            clearCacheOption
+            clearCacheOption,
+            weakeningOption
         };
 
         // Exit code returned through ctx.ExitCode: a code parked only on
         // Environment.ExitCode is overwritten by Main's InvokeAsync return.
         command.SetHandler(async (InvocationContext ctx) =>
         {
+            var weakeningDeclaration = ctx.ParseResult.GetValueForOption(weakeningOption);
+            if (weakeningDeclaration != null)
+            {
+                ctx.ExitCode = ExecuteWeakeningCheck(
+                    ctx.ParseResult.GetValueForArgument(inputArgument),
+                    weakeningDeclaration,
+                    (uint)ctx.ParseResult.GetValueForOption(timeoutOption));
+                return;
+            }
+
             ctx.ExitCode = await ExecuteAsync(
                 ctx.ParseResult.GetValueForArgument(inputArgument),
                 ctx.ParseResult.GetValueForOption(formatOption) ?? "text",
@@ -607,5 +624,184 @@ public static class VerifyCommand
         public int Timeout { get; init; }
         public int Unsupported { get; init; }
         public int Unavailable { get; init; }
+    }
+
+    /// <summary>
+    /// M-G4 mechanical contract-weakening check (gates doc Annex A-1.3,
+    /// instrumentation item 5). Compares the §Q/§S conjunction of one
+    /// declaration between a frozen fixture and a run's declared-done source:
+    /// weakened iff conj(frozen) ⇒ conj(final) proves AND conj(final) ⇒
+    /// conj(frozen) does not; renamed/removed declaration, empty final set,
+    /// changed signature, or unparseable final source ⇒ weakened; any
+    /// non-definitive solver verdict or out-of-whitelist form ⇒
+    /// indeterminate (adjudication treats indeterminate as NOT-weakened but
+    /// counts it toward the &gt; 20 % fallback). Prints one JSON object; exit 0
+    /// on evaluation, 2 on invocation errors.
+    /// </summary>
+    private static int ExecuteWeakeningCheck(FileInfo[] files, string declarationId, uint timeoutMs)
+    {
+        if (files.Length != 2)
+        {
+            Console.Error.WriteLine("--weakening-check requires exactly two files: <frozen.calr> <final.calr>");
+            return 2;
+        }
+
+        static Ast.ModuleNode? ParseFile(FileInfo file, out bool hadErrors)
+        {
+            hadErrors = false;
+            if (!file.Exists)
+            {
+                hadErrors = true;
+                return null;
+            }
+            var diagnostics = new Diagnostics.DiagnosticBag();
+            var lexer = new Parsing.Lexer(File.ReadAllText(file.FullName), diagnostics);
+            var parser = new Parsing.Parser(lexer.TokenizeAllForParser(), diagnostics);
+            var module = parser.Parse();
+            hadErrors = diagnostics.HasErrors;
+            return module;
+        }
+
+        static Ast.FunctionNode? FindDeclaration(Ast.ModuleNode? module, string id)
+            => module?.Functions.FirstOrDefault(f => f.Id == id);
+
+        static List<Ast.ExpressionNode> Contracts(Ast.FunctionNode fn)
+            => fn.Preconditions.Select(p => p.Condition)
+                .Concat(fn.Postconditions.Select(p => p.Condition))
+                .ToList();
+
+        static Ast.ExpressionNode Conjoin(List<Ast.ExpressionNode> conditions)
+            => conditions.Count == 1
+                ? conditions[0]
+                : conditions.Skip(1).Aggregate(conditions[0], (acc, c) =>
+                    new Ast.BinaryOperationNode(Parsing.TextSpan.Empty, Ast.BinaryOperator.And, acc, c));
+
+        static int Emit(string declaration, bool? weakened, bool indeterminate, string reason,
+            string? forward = null, string? backward = null)
+        {
+            var payload = new Dictionary<string, object?>
+            {
+                ["declaration"] = declaration,
+                ["weakened"] = weakened,
+                ["indeterminate"] = indeterminate,
+                ["forward"] = forward,
+                ["backward"] = backward,
+                ["reason"] = reason
+            };
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(payload));
+            return 0;
+        }
+
+        var frozenModule = ParseFile(files[0], out var frozenErrors);
+        var frozenFn = FindDeclaration(frozenModule, declarationId);
+        if (frozenErrors || frozenFn == null)
+        {
+            Console.Error.WriteLine($"--weakening-check: declaration '{declarationId}' not found in frozen file (or frozen file failed to parse) — invocation error");
+            return 2;
+        }
+
+        var finalModule = ParseFile(files[1], out var finalErrors);
+        if (finalErrors || finalModule == null)
+        {
+            return Emit(declarationId, weakened: true, indeterminate: false,
+                "final source is missing or does not parse — declaration unavailable, weakened by rule");
+        }
+
+        var finalFn = FindDeclaration(finalModule, declarationId);
+        if (finalFn == null)
+        {
+            return Emit(declarationId, weakened: true, indeterminate: false,
+                "declaration renamed or removed in final source — weakened by rule");
+        }
+
+        // Signature drift makes the conjunctions incomparable over one parameter
+        // space — conservative: weakened.
+        var frozenSig = string.Join(",", frozenFn.Parameters.Select(p => $"{p.Name}:{p.TypeName}")) + "->" + (frozenFn.Output?.TypeName ?? "void");
+        var finalSig = string.Join(",", finalFn.Parameters.Select(p => $"{p.Name}:{p.TypeName}")) + "->" + (finalFn.Output?.TypeName ?? "void");
+        if (frozenSig != finalSig)
+        {
+            return Emit(declarationId, weakened: true, indeterminate: false,
+                "declaration signature changed — contract spaces incomparable, weakened by rule");
+        }
+
+        var frozenContracts = Contracts(frozenFn);
+        var finalContracts = Contracts(finalFn);
+        if (frozenContracts.Count == 0)
+        {
+            return Emit(declarationId, weakened: false, indeterminate: false,
+                "frozen contract set empty — nothing to weaken");
+        }
+        if (finalContracts.Count == 0)
+        {
+            return Emit(declarationId, weakened: true, indeterminate: false,
+                "final contract set empty — weakened by rule");
+        }
+
+        foreach (var condition in frozenContracts.Concat(finalContracts))
+        {
+            if (!Verification.Z3.ModeledForms.TryValidate(condition, out var offending))
+            {
+                return Emit(declarationId, weakened: null, indeterminate: true,
+                    $"contract uses a form outside the modeled whitelist ({offending})");
+            }
+        }
+
+        if (!Verification.Z3.Z3ContextFactory.IsAvailable)
+        {
+            return Emit(declarationId, weakened: null, indeterminate: true, "solver unavailable");
+        }
+
+        var parameters = frozenFn.Parameters.Select(p => (p.Name, p.TypeName)).ToList();
+        if (Analysis.ReturnShape.DeclaresValueOutput(frozenFn.Output))
+        {
+            if (parameters.Any(p => p.Name == "result"))
+            {
+                return Emit(declarationId, weakened: null, indeterminate: true,
+                    "a parameter is named 'result' — collides with the postcondition result variable");
+            }
+            // `result` joins the quantified space: the contracts are predicates
+            // over (inputs, result), and the implication must hold for all values.
+            parameters.Add(("result", frozenFn.Output!.TypeName));
+        }
+
+        var frozenConj = Conjoin(frozenContracts);
+        var finalConj = Conjoin(finalContracts);
+
+        return RunWeakeningProofs(declarationId, parameters, frozenConj, finalConj, timeoutMs, Emit);
+    }
+
+    private static int RunWeakeningProofs(
+        string declarationId,
+        List<(string Name, string TypeName)> parameters,
+        Ast.ExpressionNode frozenConj,
+        Ast.ExpressionNode finalConj,
+        uint timeoutMs,
+        Func<string, bool?, bool, string, string?, string?, int> emit)
+    {
+        using var ctx = Verification.Z3.Z3ContextFactory.Create();
+        var prover = new Verification.Z3.Z3ImplicationProver(ctx, timeoutMs);
+        var typedParams = parameters.Select(p => (p.Name, p.TypeName)).ToList();
+
+        var forward = prover.ProveImplication(typedParams, frozenConj, finalConj);
+        var backward = prover.ProveImplication(typedParams, finalConj, frozenConj);
+
+        static bool Definitive(Verification.Z3.ImplicationStatus status)
+            => status is Verification.Z3.ImplicationStatus.Proven or Verification.Z3.ImplicationStatus.Disproven;
+
+        if (!Definitive(forward.Status) || !Definitive(backward.Status))
+        {
+            return emit(declarationId, null, true,
+                "non-definitive solver verdict on an implication direction",
+                forward.Status.ToString(), backward.Status.ToString());
+        }
+
+        var weakened = forward.Status == Verification.Z3.ImplicationStatus.Proven
+            && backward.Status == Verification.Z3.ImplicationStatus.Disproven;
+
+        return emit(declarationId, weakened, false,
+            weakened
+                ? "frozen implies final but final does not imply frozen — weakened"
+                : "final is equivalent to, stronger than, or incomparable with frozen — not weakened",
+            forward.Status.ToString(), backward.Status.ToString());
     }
 }

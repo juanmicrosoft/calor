@@ -88,6 +88,9 @@ CLAUDE.md.bak
 tests/TestData/Verification/**/.calor/
 tests/TestData/Verification/**/*.g.cs
 
+# Verification cache directories from ad-hoc verify runs anywhere in the tree
+.calor/
+
 # Harness run-internal state must not be committed with epoch results
 bench/phase0-agent-native/epochs/**/.envelope-src/
 bench/phase0-agent-native/epochs/**/.envelope-meta.json

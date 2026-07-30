@@ -74,6 +74,15 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool EnforceEffects { get; set; } = true;
 
     /// <summary>
+    /// Run static contract verification during compilation (Annex A-1.3
+    /// instrumentation item 1): refutations surface as Calor0712-band build
+    /// diagnostics (Warning severity — the build still succeeds). Off by
+    /// default; the Guarantees probe epoch's v0.10 arm turns it on via the
+    /// workspace template.
+    /// </summary>
+    public bool Verify { get; set; }
+
+    /// <summary>
     /// Semicolon- or comma-separated list of experimental feature flag names to enable.
     /// Plumbed through to <see cref="Calor.Compiler.CompilationOptions.ExperimentalFlags"/>.
     /// Unknown flags are accepted silently — see <see cref="Calor.Compiler.ExperimentalFlags"/>.
@@ -108,7 +117,11 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // 2. Compute global hashes
         var tasksAssemblyPath = typeof(CompileCalor).Assembly.Location;
         var compilerHash = BuildStateCache.ComputeCompilerHash(tasksAssemblyPath);
-        var optionsHash = BuildStateCache.ComputeOptionsHash(EnforceEffects);
+        // Verify is diagnostics-affecting (Calor0711/0712 warnings), so it must be
+        // in the options token: flipping it on with a warm cache has to force a
+        // recompile, or refutations on unchanged files are silently missed.
+        var optionsHash = BuildStateCache.ComputeOptionsHash(
+            $"enforceEffects:{EnforceEffects}|verify:{Verify}");
         var manifestHash = BuildStateCache.ComputeManifestHash(ProjectDirectory);
 
         // 3. Global invalidation check
@@ -324,57 +337,63 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     ProjectDirectory = ProjectDirectory,
                     Context = compilationContext,
                     EnableILAnalysis = EnableILAnalysis,
-                    ExperimentalFlags = Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags)
+                    ExperimentalFlags = Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags),
+                    VerifyContracts = Verify
                 };
                 compileOptions.CrossModuleFunctionModules = crossModuleMap;
                 var result = Program.Compile(source, inputPath, compileOptions);
 
+                // Log ALL diagnostics, not only on failure: verification findings
+                // (e.g. Calor0711/0712 refutation warnings) arrive on otherwise
+                // successful compiles and must reach MSBuild output — dropping
+                // them here would make the verify gate silent exactly when it
+                // has something to say.
+                foreach (var diagnostic in result.Diagnostics)
+                {
+                    if (diagnostic.IsError)
+                    {
+                        Log.LogError(
+                            subcategory: "Calor",
+                            errorCode: diagnostic.Code,
+                            helpKeyword: null,
+                            file: diagnostic.FilePath ?? inputPath,
+                            lineNumber: diagnostic.Span.Line,
+                            columnNumber: diagnostic.Span.Column,
+                            endLineNumber: 0,
+                            endColumnNumber: 0,
+                            message: diagnostic.Message);
+                    }
+                    else if (diagnostic.IsWarning)
+                    {
+                        Log.LogWarning(
+                            subcategory: "Calor",
+                            warningCode: diagnostic.Code,
+                            helpKeyword: null,
+                            file: diagnostic.FilePath ?? inputPath,
+                            lineNumber: diagnostic.Span.Line,
+                            columnNumber: diagnostic.Span.Column,
+                            endLineNumber: 0,
+                            endColumnNumber: 0,
+                            message: diagnostic.Message);
+                    }
+                    else
+                    {
+                        Log.LogMessage(
+                            subcategory: "Calor",
+                            code: diagnostic.Code,
+                            helpKeyword: null,
+                            file: diagnostic.FilePath ?? inputPath,
+                            lineNumber: diagnostic.Span.Line,
+                            columnNumber: diagnostic.Span.Column,
+                            endLineNumber: 0,
+                            endColumnNumber: 0,
+                            importance: MessageImportance.Normal,
+                            message: diagnostic.Message);
+                    }
+                }
+
                 if (result.HasErrors)
                 {
-                    foreach (var diagnostic in result.Diagnostics)
-                    {
-                        if (diagnostic.IsError)
-                        {
-                            Log.LogError(
-                                subcategory: "Calor",
-                                errorCode: diagnostic.Code,
-                                helpKeyword: null,
-                                file: diagnostic.FilePath ?? inputPath,
-                                lineNumber: diagnostic.Span.Line,
-                                columnNumber: diagnostic.Span.Column,
-                                endLineNumber: 0,
-                                endColumnNumber: 0,
-                                message: diagnostic.Message);
-                        }
-                        else if (diagnostic.IsWarning)
-                        {
-                            Log.LogWarning(
-                                subcategory: "Calor",
-                                warningCode: diagnostic.Code,
-                                helpKeyword: null,
-                                file: diagnostic.FilePath ?? inputPath,
-                                lineNumber: diagnostic.Span.Line,
-                                columnNumber: diagnostic.Span.Column,
-                                endLineNumber: 0,
-                                endColumnNumber: 0,
-                                message: diagnostic.Message);
-                        }
-                        else
-                        {
-                            Log.LogMessage(
-                                subcategory: "Calor",
-                                code: diagnostic.Code,
-                                helpKeyword: null,
-                                file: diagnostic.FilePath ?? inputPath,
-                                lineNumber: diagnostic.Span.Line,
-                                columnNumber: diagnostic.Span.Column,
-                                endLineNumber: 0,
-                                endColumnNumber: 0,
-                                importance: MessageImportance.Normal,
-                                message: diagnostic.Message);
-                        }
-                    }
-
                     // Failure: delete prior .g.cs if exists, do NOT cache
                     if (File.Exists(outputPath))
                     {
