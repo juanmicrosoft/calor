@@ -500,22 +500,46 @@ public static class FunctionBodyEncoder
         if (body == null || body.Count == 0)
             return (null, "the function body is empty or unavailable");
 
-        var undeclared = FindUndeclaredReference(body, declaredParameters);
+        // Immutable §B bindings encode by SSA-style AST substitution (guarantees
+        // plan D-G3.1): the env maps a bound name to its (already-substituted)
+        // initializer tree, applied at each use site before translation. The env
+        // is copy-on-extend and captured by branch continuations at creation, so
+        // branch-local bindings never leak into fall-through code and the
+        // memoized continuation is scope-safe by construction. Semantics note:
+        // an initializer whose value is unused is dropped from the encoding —
+        // sound under §S normal-return semantics because encodable initializers
+        // are pure except division, whose throw-before-return case is covered by
+        // the divisor side conditions collected at the BINDING site.
+        var undeclared = FindUndeclaredReference(
+            body, declaredParameters, boundNames: new HashSet<string>(StringComparer.Ordinal));
         if (undeclared != null)
             return (null, $"the body references '{undeclared}', which is not a declared parameter");
 
-        return EncodeSequence(translator, ctx, body, 0, continuation: null);
+        return EncodeSequence(
+            translator, ctx, body, 0,
+            env: new Dictionary<string, ExpressionNode>(StringComparer.Ordinal),
+            depth: 0,
+            continuation: null);
     }
 
+    /// <summary>Maximum branch-nesting depth the encoder follows (D-G3.1 "bounded").</summary>
+    private const int MaxEncodeDepth = 32;
+
+    /// <summary>Maximum node count of a substituted expression (guards SSA blowup on chains).</summary>
+    private const int MaxSubstitutedNodes = 10_000;
+
     /// <summary>
-    /// Walks the encodable statement surface (returns, if/elseif/else) and reports the
-    /// first reference whose base identifier is not a declared parameter — or a marker
-    /// for an expression kind the walker does not model (conservative: such bodies fail
-    /// encoding rather than risk translating against an auto-declared free variable).
+    /// Walks the encodable statement surface (returns, bindings, if/elseif/else) and
+    /// reports the first reference whose base identifier is neither a declared
+    /// parameter nor a §B name bound EARLIER in flow order — or a marker for an
+    /// expression kind the walker does not model (conservative: such bodies fail
+    /// encoding rather than risk translating against an auto-declared free
+    /// variable). Branch-local bindings do not escape their branch.
     /// </summary>
     private static string? FindUndeclaredReference(
         IReadOnlyList<StatementNode> statements,
-        IReadOnlyCollection<string> declaredParameters)
+        IReadOnlyCollection<string> declaredParameters,
+        HashSet<string> boundNames)
     {
         foreach (var stmt in statements)
         {
@@ -524,31 +548,44 @@ public static class FunctionBodyEncoder
                 case ReturnStatementNode ret:
                     if (ret.Expression != null)
                     {
-                        var hit = FindUndeclaredInExpression(ret.Expression, declaredParameters);
+                        var hit = FindUndeclaredInExpression(ret.Expression, declaredParameters, boundNames);
                         if (hit != null)
                             return hit;
                     }
                     break;
 
+                case BindStatementNode bind:
+                    if (bind.Initializer != null)
+                    {
+                        var initHit = FindUndeclaredInExpression(bind.Initializer, declaredParameters, boundNames);
+                        if (initHit != null)
+                            return initHit;
+                    }
+                    boundNames = new HashSet<string>(boundNames, StringComparer.Ordinal) { bind.Name };
+                    break;
+
                 case IfStatementNode ifStmt:
-                    var condHit = FindUndeclaredInExpression(ifStmt.Condition, declaredParameters);
+                    var condHit = FindUndeclaredInExpression(ifStmt.Condition, declaredParameters, boundNames);
                     if (condHit != null)
                         return condHit;
-                    var thenHit = FindUndeclaredReference(ifStmt.ThenBody, declaredParameters);
+                    var thenHit = FindUndeclaredReference(
+                        ifStmt.ThenBody, declaredParameters, new HashSet<string>(boundNames, StringComparer.Ordinal));
                     if (thenHit != null)
                         return thenHit;
                     foreach (var clause in ifStmt.ElseIfClauses)
                     {
-                        var clauseCondHit = FindUndeclaredInExpression(clause.Condition, declaredParameters);
+                        var clauseCondHit = FindUndeclaredInExpression(clause.Condition, declaredParameters, boundNames);
                         if (clauseCondHit != null)
                             return clauseCondHit;
-                        var clauseHit = FindUndeclaredReference(clause.Body, declaredParameters);
+                        var clauseHit = FindUndeclaredReference(
+                            clause.Body, declaredParameters, new HashSet<string>(boundNames, StringComparer.Ordinal));
                         if (clauseHit != null)
                             return clauseHit;
                     }
                     if (ifStmt.ElseBody != null)
                     {
-                        var elseHit = FindUndeclaredReference(ifStmt.ElseBody, declaredParameters);
+                        var elseHit = FindUndeclaredReference(
+                            ifStmt.ElseBody, declaredParameters, new HashSet<string>(boundNames, StringComparer.Ordinal));
                         if (elseHit != null)
                             return elseHit;
                     }
@@ -561,9 +598,10 @@ public static class FunctionBodyEncoder
         return null;
     }
 
-    private static string? FindUndeclaredInExpression(
+        private static string? FindUndeclaredInExpression(
         ExpressionNode expr,
-        IReadOnlyCollection<string> declaredParameters)
+        IReadOnlyCollection<string> declaredParameters,
+        IReadOnlyCollection<string> boundNames)
     {
         switch (expr)
         {
@@ -572,29 +610,29 @@ public static class FunctionBodyEncoder
             case ReferenceNode r:
             {
                 var baseName = r.Name.Split('.')[0];
-                return declaredParameters.Contains(baseName) ? null : r.Name;
+                return declaredParameters.Contains(baseName) || boundNames.Contains(baseName) ? null : r.Name;
             }
             case BinaryOperationNode b:
-                return FindUndeclaredInExpression(b.Left, declaredParameters)
-                    ?? FindUndeclaredInExpression(b.Right, declaredParameters);
+                return FindUndeclaredInExpression(b.Left, declaredParameters, boundNames)
+                    ?? FindUndeclaredInExpression(b.Right, declaredParameters, boundNames);
             case UnaryOperationNode u:
-                return FindUndeclaredInExpression(u.Operand, declaredParameters);
+                return FindUndeclaredInExpression(u.Operand, declaredParameters, boundNames);
             case ConditionalExpressionNode c:
-                return FindUndeclaredInExpression(c.Condition, declaredParameters)
-                    ?? FindUndeclaredInExpression(c.WhenTrue, declaredParameters)
-                    ?? FindUndeclaredInExpression(c.WhenFalse, declaredParameters);
+                return FindUndeclaredInExpression(c.Condition, declaredParameters, boundNames)
+                    ?? FindUndeclaredInExpression(c.WhenTrue, declaredParameters, boundNames)
+                    ?? FindUndeclaredInExpression(c.WhenFalse, declaredParameters, boundNames);
             case ArrayAccessNode a:
-                return FindUndeclaredInExpression(a.Array, declaredParameters)
-                    ?? FindUndeclaredInExpression(a.Index, declaredParameters);
+                return FindUndeclaredInExpression(a.Array, declaredParameters, boundNames)
+                    ?? FindUndeclaredInExpression(a.Index, declaredParameters, boundNames);
             case ArrayLengthNode al:
-                return FindUndeclaredInExpression(al.Array, declaredParameters);
+                return FindUndeclaredInExpression(al.Array, declaredParameters, boundNames);
             case FieldAccessNode fa:
-                return FindUndeclaredInExpression(fa.Target, declaredParameters);
+                return FindUndeclaredInExpression(fa.Target, declaredParameters, boundNames);
             case StringOperationNode sop:
             {
                 foreach (var arg in sop.Arguments)
                 {
-                    var hit = FindUndeclaredInExpression(arg, declaredParameters);
+                    var hit = FindUndeclaredInExpression(arg, declaredParameters, boundNames);
                     if (hit != null)
                         return hit;
                 }
@@ -654,6 +692,19 @@ public static class FunctionBodyEncoder
                     // Everything after a return is dead code — it is never evaluated
                     // and must not contribute constraints.
                     return null;
+
+                case BindStatementNode bind when bind.Initializer != null:
+                    // A binding's initializer evaluates AT THE BINDING SITE (eagerly,
+                    // once) — divisors inside it take the binding's own position
+                    // conditionality, not the use sites' (D-G3.1: SSA substitution
+                    // moves the expression to use sites for the ENCODING, but runtime
+                    // evaluation order stays here). An unused dividing initializer
+                    // still throws at runtime on a zero divisor, so its side
+                    // condition genuinely holds on every normal-return path.
+                    var bindFailure = CollectDivisorsFromExpression(translator, ctx, bind.Initializer, constraints, conditional);
+                    if (bindFailure != null)
+                        return bindFailure;
+                    break;
 
                 case IfStatementNode ifStmt:
                 {
@@ -757,14 +808,22 @@ public static class FunctionBodyEncoder
     /// Encodes a statement list starting at <paramref name="index"/>. When control can fall
     /// past the end of the list, <paramref name="continuation"/> encodes the statements that
     /// follow (guard-clause style: an if without an else falls through to the next statement).
+    /// <paramref name="env"/> carries the SSA substitution for immutable §B bindings in
+    /// scope; it is never mutated — extensions copy — so continuations capture the correct
+    /// pre-branch environment.
     /// </summary>
     private static (Expr? Result, string? Reason) EncodeSequence(
         ContractTranslator translator,
         Context ctx,
         IReadOnlyList<StatementNode> statements,
         int index,
+        Dictionary<string, ExpressionNode> env,
+        int depth,
         Func<(Expr?, string?)>? continuation)
     {
+        if (depth > MaxEncodeDepth)
+            return (null, $"branch nesting exceeds the encoder's bound ({MaxEncodeDepth})");
+
         if (index >= statements.Count)
         {
             return continuation != null
@@ -775,14 +834,39 @@ public static class FunctionBodyEncoder
         switch (statements[index])
         {
             case ReturnStatementNode ret when ret.Expression != null:
-                var value = translator.Translate(ret.Expression);
+            {
+                var (substituted, substReason) = SubstituteBindings(ret.Expression, env);
+                if (substituted == null)
+                    return (null, substReason);
+                var value = translator.Translate(substituted);
                 return value != null
                     ? (value, null)
-                    : (null, translator.DiagnoseTranslationFailure(ret.Expression)
+                    : (null, translator.DiagnoseTranslationFailure(substituted)
                         ?? "a returned expression is outside the modeled surface");
+            }
 
             case ReturnStatementNode:
                 return (null, "a return statement carries no value");
+
+            case BindStatementNode bind:
+            {
+                if (bind.IsMutable)
+                    return (null, "the body contains a mutable (§B{~}) binding, which is outside the encodable surface");
+                if (bind.Initializer == null)
+                    return (null, "the body contains a binding without an initializer");
+                if (bind.Name == "result")
+                    return (null, "the body binds the name 'result', which collides with the postcondition result variable");
+
+                var (substInit, initReason) = SubstituteBindings(bind.Initializer, env);
+                if (substInit == null)
+                    return (null, initReason);
+
+                var extended = new Dictionary<string, ExpressionNode>(env, StringComparer.Ordinal)
+                {
+                    [bind.Name] = substInit
+                };
+                return EncodeSequence(translator, ctx, statements, index + 1, extended, depth, continuation);
+            }
 
             case IfStatementNode ifStmt:
             {
@@ -790,12 +874,13 @@ public static class FunctionBodyEncoder
                 // every branch that does not return on all paths. Memoized: each branch
                 // that falls through re-invokes it, and un-memoized the tail would be
                 // re-encoded 2^depth times on nested guard-clause chains (G1 review m3).
+                // The captured env is the PRE-branch environment by construction.
                 (Expr?, string?)? fallThroughMemo = null;
                 Func<(Expr?, string?)> fallThrough = () =>
-                    fallThroughMemo ??= EncodeSequence(translator, ctx, statements, index + 1, continuation);
+                    fallThroughMemo ??= EncodeSequence(translator, ctx, statements, index + 1, env, depth, continuation);
 
                 var (elseValue, elseReason) = ifStmt.ElseBody != null
-                    ? EncodeSequence(translator, ctx, ifStmt.ElseBody, 0, fallThrough)
+                    ? EncodeSequence(translator, ctx, ifStmt.ElseBody, 0, env, depth + 1, fallThrough)
                     : fallThrough();
                 if (elseValue == null)
                     return (null, elseReason);
@@ -803,10 +888,13 @@ public static class FunctionBodyEncoder
                 for (int i = ifStmt.ElseIfClauses.Count - 1; i >= 0; i--)
                 {
                     var clause = ifStmt.ElseIfClauses[i];
-                    var clauseCond = translator.TranslateBoolExpr(clause.Condition);
+                    var (clauseCondSubst, clauseCondReason) = SubstituteBindings(clause.Condition, env);
+                    if (clauseCondSubst == null)
+                        return (null, clauseCondReason);
+                    var clauseCond = translator.TranslateBoolExpr(clauseCondSubst);
                     if (clauseCond == null)
                         return (null, "an elseif condition is outside the modeled surface");
-                    var (clauseValue, clauseReason) = EncodeSequence(translator, ctx, clause.Body, 0, fallThrough);
+                    var (clauseValue, clauseReason) = EncodeSequence(translator, ctx, clause.Body, 0, env, depth + 1, fallThrough);
                     if (clauseValue == null)
                         return (null, clauseReason);
                     if (!clauseValue.Sort.Equals(elseValue.Sort))
@@ -814,10 +902,13 @@ public static class FunctionBodyEncoder
                     elseValue = ctx.MkITE(clauseCond, clauseValue, elseValue);
                 }
 
-                var cond = translator.TranslateBoolExpr(ifStmt.Condition);
+                var (condSubst, condReason) = SubstituteBindings(ifStmt.Condition, env);
+                if (condSubst == null)
+                    return (null, condReason);
+                var cond = translator.TranslateBoolExpr(condSubst);
                 if (cond == null)
                     return (null, "an if condition is outside the modeled surface");
-                var (thenValue, thenReason) = EncodeSequence(translator, ctx, ifStmt.ThenBody, 0, fallThrough);
+                var (thenValue, thenReason) = EncodeSequence(translator, ctx, ifStmt.ThenBody, 0, env, depth + 1, fallThrough);
                 if (thenValue == null)
                     return (null, thenReason);
                 if (!thenValue.Sort.Equals(elseValue.Sort))
@@ -830,6 +921,94 @@ public static class FunctionBodyEncoder
                 return (null, $"the body contains a statement outside the modeled surface ({statements[index].GetType().Name})");
         }
     }
+
+    /// <summary>
+    /// Applies the SSA env to an expression: every reference to a bound name is replaced
+    /// by its (already-substituted) initializer tree. Returns null with a reason when the
+    /// expression contains a kind substitution does not model (conservative: such
+    /// expressions must not slip through with a bound reference intact) or when the
+    /// result exceeds the size bound.
+    /// </summary>
+    private static (ExpressionNode? Result, string? Reason) SubstituteBindings(
+        ExpressionNode expr,
+        Dictionary<string, ExpressionNode> env)
+    {
+        if (env.Count == 0)
+            return (expr, null);
+
+        var substituted = SubstituteCore(expr, env, out var failure);
+        if (substituted == null)
+            return (null, failure ?? "substitution failed");
+
+        if (CountNodes(substituted) > MaxSubstitutedNodes)
+            return (null, $"the binding chain expands past the encoder's size bound ({MaxSubstitutedNodes} nodes)");
+
+        return (substituted, null);
+    }
+
+    private static ExpressionNode? SubstituteCore(
+        ExpressionNode expr,
+        Dictionary<string, ExpressionNode> env,
+        out string? failure)
+    {
+        failure = null;
+        switch (expr)
+        {
+            case IntLiteralNode or BoolLiteralNode or StringLiteralNode or FloatLiteralNode or SelfRefNode:
+                return expr;
+
+            case ReferenceNode r:
+                return env.TryGetValue(r.Name, out var replacement) ? replacement : expr;
+
+            case BinaryOperationNode b:
+            {
+                var left = SubstituteCore(b.Left, env, out failure);
+                if (left == null) return null;
+                var right = SubstituteCore(b.Right, env, out failure);
+                if (right == null) return null;
+                return ReferenceEquals(left, b.Left) && ReferenceEquals(right, b.Right)
+                    ? b
+                    : new BinaryOperationNode(b.Span, b.Operator, left, right);
+            }
+
+            case UnaryOperationNode u:
+            {
+                var operand = SubstituteCore(u.Operand, env, out failure);
+                if (operand == null) return null;
+                return ReferenceEquals(operand, u.Operand) ? u : new UnaryOperationNode(u.Span, u.Operator, operand);
+            }
+
+            case ConditionalExpressionNode c:
+            {
+                var condition = SubstituteCore(c.Condition, env, out failure);
+                if (condition == null) return null;
+                var whenTrue = SubstituteCore(c.WhenTrue, env, out failure);
+                if (whenTrue == null) return null;
+                var whenFalse = SubstituteCore(c.WhenFalse, env, out failure);
+                if (whenFalse == null) return null;
+                return ReferenceEquals(condition, c.Condition)
+                        && ReferenceEquals(whenTrue, c.WhenTrue)
+                        && ReferenceEquals(whenFalse, c.WhenFalse)
+                    ? c
+                    : new ConditionalExpressionNode(c.Span, condition, whenTrue, whenFalse);
+            }
+
+            default:
+                // Conservative: an unmodeled expression kind could carry a bound
+                // reference we cannot rewrite — refuse rather than translate a
+                // stale name (the translator would auto-declare arrays, G1 M3).
+                failure = $"the body contains an expression kind substitution does not model ({expr.GetType().Name})";
+                return null;
+        }
+    }
+
+    private static int CountNodes(ExpressionNode expr) => expr switch
+    {
+        BinaryOperationNode b => 1 + CountNodes(b.Left) + CountNodes(b.Right),
+        UnaryOperationNode u => 1 + CountNodes(u.Operand),
+        ConditionalExpressionNode c => 1 + CountNodes(c.Condition) + CountNodes(c.WhenTrue) + CountNodes(c.WhenFalse),
+        _ => 1
+    };
 
     /// <summary>
     /// True when the expression references the special <c>result</c> identifier — bare or

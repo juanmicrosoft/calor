@@ -86,6 +86,22 @@ public sealed class ContractHasher
                     sb.Append(')');
                     break;
 
+                case BindStatementNode bind:
+                    // Immutable bindings are encodable (D-G3.1) and must hash their
+                    // FULL content — two bodies differing only in an initializer must
+                    // never share a cached result-bound verdict. Mutable bindings are
+                    // unencodable (never cached) but must still hash DISTINCTLY from
+                    // the immutable spelling.
+                    sb.Append(bind.IsMutable ? "B~(" : "B(");
+                    sb.Append(bind.Name);
+                    sb.Append(':');
+                    sb.Append(bind.TypeName ?? "?");
+                    sb.Append('=');
+                    if (bind.Initializer != null)
+                        AppendExpression(sb, bind.Initializer);
+                    sb.Append(')');
+                    break;
+
                 case IfStatementNode ifStmt:
                     sb.Append("IF(");
                     AppendExpression(sb, ifStmt.Condition);

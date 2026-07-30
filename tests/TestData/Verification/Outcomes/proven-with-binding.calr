@@ -1,0 +1,20 @@
+§M{m001:W5BShapes}
+  §F{f001:QuoteWithSurcharge:pub} (i32:baseAmount, i32:surcharge, i32:cap) -> i32
+    §S (<= result cap)
+    §B{total:i32} (+ baseAmount surcharge)
+    §IF{if1} (> total cap)
+      §R cap
+    §R total
+
+  §F{f002:AwardWithFloor:pub} (i32:earned, i32:bonus, i32:minPoints) -> i32
+    §S (>= result minPoints)
+    §B{total:i32} (+ earned bonus)
+    §IF{if1} (< total minPoints)
+      §R minPoints
+    §R total
+
+  §F{f003:GrantRequests:pub} (i32:requested, i32:maxAllowed) -> i32
+    §S (<= result maxAllowed)
+    §IF{if1} (> requested maxAllowed)
+      §R maxAllowed
+    §R requested
