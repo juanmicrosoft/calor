@@ -1631,7 +1631,9 @@ public class VerifierTests
         using var verifier = new Z3Verifier(ctx);
 
         // Postcondition: (starts (replace s "" "X") "X")
-        // Should be PROVEN because replacing empty string inserts at the beginning
+        // W1 Slice 1 (T1/D9): Replace is un-whitelisted — this obligation is now
+        // UNSUPPORTED (runtime check kept) instead of proven through a model whose
+        // first-occurrence semantics diverge from .NET's replace-all.
         var parameters = new List<(string Name, string Type)> { ("s", "string") };
 
         var postcondition = new EnsuresNode(
@@ -1661,7 +1663,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
 
     [SkippableFact]

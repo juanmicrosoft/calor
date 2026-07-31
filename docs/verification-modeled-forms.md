@@ -36,11 +36,11 @@ Names are case-insensitive and normalized (`NormalizeTypeName`, `:656–677`). A
 
 **References:** simple variable references; dotted paths (`a.b.c`) resolve as chained uninterpreted field functions on user-type sorts (`ResolveDotPath :275–327`).
 
-**Binary operators** (operand widths normalized by sign/zero-extension, `:763–788`):
+**Binary operators** (operand widths normalized by sign/zero-extension):
 `+  -  *  /  %  ==  !=  <  <=  >  >=  &&  ||  &  |  ^  <<  >>`
-Division, modulo, comparisons, and right-shift are signedness-aware (`ShouldUseUnsignedComparison :718–740`): both-unsigned → unsigned ops; mixed → unsigned only when the signed operand is a provably non-negative literal, else signed.
+Division, modulo, comparisons, and right-shift are signedness-aware (`ShouldUseUnsignedComparison`): both-unsigned → unsigned ops; mixed → unsigned only when the signed operand is a provably non-negative literal. **Typing refusals (W1 Slice 1 — `DiagnoseUnmodeledBitVecTyping`):** arithmetic and shifts where BOTH operands are sub-32-bit are `Unsupported` (C# promotes narrow integers to int; the solver would wrap at the narrow width — D1); mixed signed/unsigned comparison, equality, and division where the signed operand is NOT a provably non-negative literal are `Unsupported` (C# compares via promotion to a wider signed type; a same-width solver comparison reads the raw bit pattern — `-1 == 4294967295u` would hold). A 32-bit-or-wider operand rescues narrow arithmetic: width normalization extends the narrow side first, matching promotion. **Division and modulo inside contract expressions carry divisor-nonzero side conditions** (collected with the body collector's position rules); a proof that used them reports **`assumed`** with the named `exceptional-paths:contract-division` assumption, never plain `Proven` — and divisors in conditionally-evaluated positions (short-circuit RHS, `?:` arms) make the obligation `Unsupported` (D8, closed W1 Slice 1). *Residual:* `Z3ImplicationProver` (the M-G4 weakening check) still totalizes division — an implication verdict over dividing contracts can be wrong in either direction; treat those as indeterminate until it adopts the same side conditions.
 
-**Unary operators:** `!` (bool), unary `-` (integer).
+**Unary operators:** `!` (bool), unary `-` (integer, 32-bit-or-wider operand only — narrow negation refused, D1's unary form).
 
 **Conditional:** `(cond ? a : b)` → Z3 ITE (`:420–430`).
 
@@ -48,17 +48,17 @@ Division, modulo, comparisons, and right-shift are signedness-aware (`ShouldUseU
 
 **Self-reference `#`** in refinement predicates (`:332–342`).
 
-**Arrays:** element access **only on a simple variable base** (no computed/nested/method-returned arrays, `:534`); array length (simple variable base only). An array first seen at an access site defaults to i32 elements (see divergence D6).
+**Arrays:** element access **only on a simple variable base** (no computed/nested/method-returned arrays); array length (simple variable base only). An array must be **declared with an element type** — an array first seen at an access or length site is `Unsupported` (the old i32-element default guessed a width; D6, closed W1 Slice 1).
 
-**User-type fields:** `obj.Field` and dot-paths, modeled as uninterpreted functions; result sorts come from the user-type registry when supplied, else default to i32/BitVec32 (see divergence D7).
+**User-type fields:** `obj.Field` and dot-paths, modeled as uninterpreted functions; result sorts **must come from the user-type registry** — a field the registry doesn't know is `Unsupported` (the old i32 default guessed a width/signedness; D7, closed W1 Slice 1).
 
-**String operations (exhaustive):** `Length`, `Contains`, `StartsWith`, `EndsWith`, `Equals`, `IsNullOrEmpty`, `IndexOf` (2- and 3-arg), `Substring` (3-arg), `SubstringFrom`, `Concat`, `Replace` (first occurrence). Everything else is out (see §3).
+**String operations (exhaustive):** `Length`, `Contains`, `StartsWith`, `EndsWith`, `Equals`, `IsNullOrEmpty`, `IndexOf` (2- and 3-arg), `Substring` (3-arg), `SubstringFrom`, `Concat`. Everything else is out (see §3) — including `Replace`, un-whitelisted W1 Slice 1 (D9).
 
 ## 3. Explicitly NOT modeled (→ `Unsupported`, runtime check retained)
 
 1. **Function and method calls of any kind** in contracts (`CallExpressionNode → null`, `:245`). Calls-in-contracts via callee summaries is Phase 2b work and will carry `Assumed` status, never `Proven`.
 2. **All floating-point** types and literals.
-3. **String operations:** `ToUpper`, `ToLower`, `Trim`, `TrimStart`, `TrimEnd`, `PadLeft`, `PadRight`, `Split`, `Join`, `Format`, `ToString`, `IsNullOrWhiteSpace`, all Regex operations (`:1353–1362`).
+3. **String operations:** `Replace` (first-vs-all-occurrence divergence, D9 — refused W1 Slice 1), `ToUpper`, `ToLower`, `Trim`, `TrimStart`, `TrimEnd`, `PadLeft`, `PadRight`, `Split`, `Join`, `Format`, `ToString`, `IsNullOrWhiteSpace`, all Regex operations.
 4. **`StringComparison` modes:** accepted syntactically, **ignored semantically** — verification is ordinal-only; non-ordinal modes add a warning but the proof proceeds (`:863–870`). Treat culture-sensitive string contracts as unverified.
 5. **Computed array bases** (method returns, nested accesses) for element access or length.
 6. **`object`/`dynamic`, delegate types** as variables.
@@ -67,16 +67,18 @@ Division, modulo, comparisons, and right-shift are signedness-aware (`ShouldUseU
 
 ## 4. Known semantic divergences from C# (tracked as defects per strategy §5.2 rule 4)
 
-| # | Divergence | Consequence |
+| # | Divergence | Consequence / status |
 |---|---|---|
-| D1 | **No narrow-type promotion** (`:33–39`): `byte + byte` wraps at 8 bits; C# promotes to `int` (400 stays 400) | False positives *and* negatives on `byte`/`short` arithmetic contracts |
-| D2 | **Integer literals always signed 32-bit** (`:223`); out-of-range values truncate | Long-range contracts mis-modeled |
-| D3 | **Z3 strings cannot be null** (`:44–48`): `IsNullOrEmpty` tests length==0 only | Null-vs-empty indistinguishable |
+| D1 | **No narrow-type promotion**: `byte + byte` wraps at 8 bits; C# promotes to `int` (400 stays 400) | **Closed by refusal (W1 Slice 1):** arithmetic/shifts/negation on all-sub-32-bit operands → `Unsupported`. Comparisons on narrow operands stay modeled (extension matches promotion). Full promotion modeling deferred |
+| D2 | **Integer literals always signed 32-bit**; out-of-int32 literals are **refused** (cache 1.7) | Within-range signedness context still unmodeled; the truncation half is closed |
+| D3 | **Z3 strings cannot be null** (`IsNullOrEmpty` tests length==0 only) | Null-vs-empty indistinguishable |
 | D4 | **Ordinal-only string comparison** (§3 item 4) | Culture-sensitive contracts unverified without loud failure |
-| D5 | Contract `§S` holds **only on normal return**; exceptional paths unverified (strategy 2b item 6) | Exception-heavy code has weaker guarantees than the word "Proven" suggests |
-| D6 | Arrays first seen at an access site default to **i32 elements** (`:544–551`) | Element-width mismatch possible |
-| D7 | User-type fields default to **i32** without a registry (`:1185`) | Field-width/signedness mismatch possible |
-| D8 | **Contract-expression division/modulo is totalized** — `/` and `%` inside `§Q`/`§S` translate to `bvsdiv`/`bvsrem` with no divisor-nonzero side conditions | A proof may rely on `x/0 = -1` while the emitted runtime check would throw `DivideByZeroException` evaluating the same expression; distinct from *body* division, which the D-G2.5 `assumed` producer covers. Route through the same producer or `unsupported` in a later slice |
+| D5 | Contract `§S` holds **only on normal return**; exceptional paths surface as `assumed` (D-G2.5) | Exception-heavy code has weaker guarantees than the word "Proven" suggests |
+| D6 | Arrays first seen at an access/length site defaulted to **i32 elements** | **Closed by refusal (W1 Slice 1):** undeclared arrays → `Unsupported` |
+| D7 | User-type fields defaulted to **i32** without a registry entry | **Closed by refusal (W1 Slice 1):** unregistered fields → `Unsupported` |
+| D8 | **Contract-expression division/modulo was totalized** — no divisor-nonzero side conditions | **Closed (W1 Slice 1):** §Q/§S divisors carry side conditions with the body collector's position rules; proofs demote to `assumed` (`exceptional-paths:contract-division`); conditional-position divisors → `Unsupported`. Residual: `Z3ImplicationProver` still totalizes (noted §2) |
+| D9 | **`string.Replace` modeled as first-occurrence** while .NET replaces all occurrences (was documented in §2 but untabled — the W1 kickoff's T1 finding) | **Closed by refusal (W1 Slice 1):** `Replace` un-whitelisted → `Unsupported` |
+| D10 | **Mixed signed/unsigned comparison** defaulted to signed same-width comparison; C# promotes to a wider signed type (`-1 == 4294967295u` held) | **Closed by refusal (W1 Slice 1):** mixed comparisons without a non-negative-literal signed operand → `Unsupported` |
 
 ## 5. The second translator (bug-pattern checkers) — differences
 
@@ -113,7 +115,7 @@ array-element-types: i8, i16, i32, i64, u8, u16, u32, u64 (with synthetic $lengt
 expression-kinds: IntLiteralNode, BoolLiteralNode, StringLiteralNode, ReferenceNode, BinaryOperationNode, UnaryOperationNode, ConditionalExpressionNode, ForallExpressionNode, ExistsExpressionNode, ImplicationExpressionNode, ArrayAccessNode, ArrayLengthNode, FieldAccessNode, StringOperationNode, SelfRefNode
 binary-operators: Add, Subtract, Multiply, Divide, Modulo, Equal, NotEqual, LessThan, LessOrEqual, GreaterThan, GreaterOrEqual, And, Or, BitwiseAnd, BitwiseOr, BitwiseXor, LeftShift, RightShift
 unary-operators: Not, Negate
-string-operations: Length, Contains, StartsWith, EndsWith, Equals, IsNullOrEmpty, IndexOf, Substring, SubstringFrom, Concat, Replace
+string-operations: Length, Contains, StartsWith, EndsWith, Equals, IsNullOrEmpty, IndexOf, Substring, SubstringFrom, Concat
 quantifier-bound-variable-types: any declarable type except floating-point (unmodeled types become uninterpreted sorts)
 ```
 <!-- END GENERATED WHITELIST -->

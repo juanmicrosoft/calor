@@ -978,13 +978,16 @@ public class ArrayLengthSoundnessTests
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
 
-        // This test documents implementation behavior with mixed signed/unsigned semantics.
-        // When len(arr) > INT32_MAX (e.g., 0x80000001), interpreted as signed it's negative.
-        // Then (len(arr) - 1) as signed could compare unexpectedly with unsigned len(arr).
+        // W1 Slice 1 (D10 fix): `len - 1` with a non-negative literal now stays
+        // UNSIGNED (C#'s implicit constant conversion), so under §Q len > 0 the
+        // subtraction cannot wrap and (len - 1) < len holds — matching runtime.
+        // The old expectation (Disproven) pinned the signed-poisoning artifact
+        // where the literal 1 marked the result signed and large lengths read
+        // negative — a model no C# execution exhibits.
         //
         // Precondition: len(arr) > 0 (only)
         // Postcondition: (len(arr) - 1) < len(arr)
-        // Should be DISPROVEN due to potential signed interpretation of large lengths
+        // PROVEN — unsigned semantics throughout, as at runtime
 
         var parameters = new List<(string Name, string Type)> { ("arr", "i32[]") };
 
@@ -1018,7 +1021,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
     }
 
     [SkippableFact]
@@ -1220,13 +1223,16 @@ public class ArrayLengthSoundnessTests
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
 
-        // This test documents implementation behavior with mixed signed/unsigned semantics.
-        // When len(arr) > INT32_MAX, the signed index i (i32) cannot reach it.
-        // With signed comparison semantics, the exists quantifier fails.
+        // W1 Slice 1 (D10 fix): i (i32) vs len (u32) is genuinely mixed, now
+        // modeled by C#'s promotion — both sides extend to 64-bit and compare
+        // signed (int vs uint → long). Under §Q len > 0, i = 0 always satisfies
+        // 0 <= i < len, so the exists holds — matching runtime, where i = 0
+        // indexes any non-empty array. The old expectation (Disproven) pinned the
+        // signed-misread of large lengths, a state no C# array can occupy.
         //
         // Precondition: len(arr) > 0 (only)
         // Postcondition: exists i: i >= 0 AND i < len(arr)
-        // Should be DISPROVEN due to signed/unsigned comparison issues
+        // PROVEN — promotion semantics, as at runtime
 
         var parameters = new List<(string Name, string Type)> { ("arr", "i32[]") };
 
@@ -1270,7 +1276,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
     }
 
     // ===========================================
@@ -1290,10 +1296,12 @@ public class ArrayLengthSoundnessTests
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
 
-        // -1 (signed) compared with len(arr) (unsigned)
-        // For signed comparison: -1 < len(arr) depends on interpretation
-        // Postcondition: -1 < len(arr) when using signed comparison
-        // Result depends on how mixed sign comparison is handled
+        // -1 (signed) compared with len(arr) (unsigned) — the canonical D10 shape.
+        // W1 Slice 1: genuinely-mixed comparison now models C#'s promotion (both
+        // sides to 64-bit signed), so -1 != len holds for every len — exactly the
+        // runtime behavior (`-1 == 4294967295u` is false in C#). The old
+        // expectation (Disproven at len = 0xFFFFFFFF) pinned the raw bit-pattern
+        // equality this slice removed.
 
         var parameters = new List<(string Name, string Type)> { ("arr", "i32[]") };
 
@@ -1325,10 +1333,9 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        // -1 as i32 is 0xFFFFFFFF which as u32 is a large positive number
-        // So -1 (as u32) != len(arr) when len(arr) > 0 might not hold if len is large
-        // This should be DISPROVEN because len(arr) could be 0xFFFFFFFF
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        // Under promotion semantics -1 can never equal any u32 value: PROVEN,
+        // matching runtime (see comment above).
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
     }
 
     [SkippableFact]
@@ -1563,14 +1570,15 @@ public class ArrayLengthSoundnessTests
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
 
-        // This test documents the signed/unsigned interaction.
-        // Even with u32 index, subtracting Int(1) (signed i32) produces a signed result.
-        // When comparing (index - 1) [signed] with index [unsigned], mixed comparison
-        // uses signed semantics by default.
+        // W1 Slice 1 (D10 fix): `index - 1` over u32 with a non-negative literal
+        // stays UNSIGNED (C#'s implicit constant conversion — `uint - 1` is uint),
+        // so under §Q index > 0 the subtraction cannot wrap and (index - 1) < index
+        // holds — matching runtime. The old expectation (Disproven) pinned the
+        // signed-poisoning artifact where the literal marked the result signed.
         //
         // Precondition: index > 0
         // Postcondition: (index - 1) < index
-        // Should be DISPROVEN due to mixed signed/unsigned comparison semantics
+        // PROVEN — unsigned semantics throughout, as at runtime
 
         var parameters = new List<(string Name, string Type)>
         {
@@ -1608,8 +1616,8 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        // Documents that even u32 - i32 produces signed result
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        // u32 with a non-negative literal stays unsigned (D10 companion fix)
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
     }
 
     [SkippableFact]

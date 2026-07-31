@@ -73,6 +73,11 @@ public sealed class ContractSimplificationPass
             return module;
         }
 
+        // W1 Slice 1 (#781 preservation half): this pass runs unconditionally on the
+        // main compile path, so its reconstruction must preserve EVERY module field —
+        // the previous overload silently dropped EnumExtensions, InteropBlocks,
+        // RefinementTypes, IndexedTypes, and TypePreprocessorBlocks whenever any
+        // contract simplified.
         return new ModuleNode(
             module.Span,
             module.Id,
@@ -81,6 +86,7 @@ public sealed class ContractSimplificationPass
             simplifiedInterfaces,
             simplifiedClasses,
             module.Enums,
+            module.EnumExtensions,
             module.Delegates,
             simplifiedFunctions,
             module.Attributes,
@@ -88,7 +94,11 @@ public sealed class ContractSimplificationPass
             module.Assumptions,
             simplifiedInvariants,
             module.Decisions,
-            module.Context);
+            module.Context,
+            module.InteropBlocks,
+            module.RefinementTypes,
+            module.IndexedTypes,
+            module.TypePreprocessorBlocks);
     }
 
     private FunctionNode SimplifyFunction(FunctionNode function)
@@ -209,6 +219,9 @@ public sealed class ContractSimplificationPass
             return iface;
         }
 
+        // W1 Slice 1 (#781 preservation half): the 8-arg overload defaulted
+        // Properties/Indexers to empty — simplifying an interface's method
+        // contracts silently deleted its property and indexer members.
         return new InterfaceDefinitionNode(
             iface.Span,
             iface.Id,
@@ -216,8 +229,10 @@ public sealed class ContractSimplificationPass
             iface.BaseInterfaces,
             iface.TypeParameters,
             simplifiedMethods,
+            iface.Properties,
             iface.Attributes,
-            iface.CSharpAttributes);
+            iface.CSharpAttributes,
+            iface.Indexers);
     }
 
     private MethodNode SimplifyMethod(MethodNode method)

@@ -1482,6 +1482,9 @@ public class TranslatorTests
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void TranslatesStringReplaceCore()
     {
+        // W1 Slice 1 (T1/D9): Replace is REFUSED — Z3's MkReplace substitutes the
+        // first occurrence while .NET substitutes all occurrences; proving through
+        // that divergence could elide a runtime guard the program needs.
         using var ctx = Z3ContextFactory.Create();
         var translator = new ContractTranslator(ctx);
 
@@ -1500,8 +1503,9 @@ public class TranslatorTests
 
         var result = translator.Translate(expr);
 
-        Assert.NotNull(result);
-        Assert.IsType<Microsoft.Z3.SeqExpr>(result);
+        Assert.Null(result);
+        Assert.Contains("first", translator.LastRefusalReason);
+        Assert.DoesNotContain(StringOp.Replace, ModeledForms.StringOperations);
     }
 
     // ===========================================
@@ -1813,7 +1817,9 @@ public class TranslatorTests
 
         translator.DeclareVariable("s", "string");
 
-        // (replace s "" "x") - replace empty with "x"
+        // (replace s "" "x") — Replace is refused since W1 Slice 1 (T1/D9),
+        // regardless of arguments: the first-vs-all-occurrence divergence is a
+        // property of the operation, not of specific inputs.
         var expr = new StringOperationNode(
             TextSpan.Empty,
             StringOp.Replace,
@@ -1826,8 +1832,8 @@ public class TranslatorTests
 
         var result = translator.Translate(expr);
 
-        Assert.NotNull(result);
-        Assert.IsType<Microsoft.Z3.SeqExpr>(result);
+        Assert.Null(result);
+        Assert.Contains("Replace", translator.LastRefusalReason);
     }
 
     [SkippableFact]

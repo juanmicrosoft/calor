@@ -886,7 +886,7 @@ public class Program
 
         // Code generation
         phaseSw.Restart();
-        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult, options.ObligationResults);
+        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult, options.ObligationResults, diagnostics);
         emitter.CrossModuleFunctionModules = options.CrossModuleFunctionModules;
         if (options.EmitLineDirectives && !string.IsNullOrEmpty(filePath))
         {

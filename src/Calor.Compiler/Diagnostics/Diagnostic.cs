@@ -682,6 +682,15 @@ public static class DiagnosticCode
     /// </summary>
     public const string CodeGenSyntaxError = "Calor1000";
 
+    /// <summary>
+    /// Warning: postcondition runtime checks were not emitted for a declaration
+    /// whose body has an early, nested, or raw-C# return — the current lowering
+    /// rewrites only the single final top-level return, and instrumenting such a
+    /// body would silently skip the check or change execution order (W1 Slice 1
+    /// stopgap for #764; the structural lowering retires this diagnostic).
+    /// </summary>
+    public const string PostconditionCheckNotLowered = "Calor1001";
+
     // C# Interop diagnostics (Calor1010-1019)
 
     /// <summary>

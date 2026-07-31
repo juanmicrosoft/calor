@@ -27,6 +27,15 @@ public sealed class Z3Verifier : IDisposable
     public const string ExceptionalPathDivisionAssumption =
         "exceptional-paths:division — every division/modulo divisor on a verified path is nonzero; a zero divisor throws before §S is evaluated (normal-return semantics)";
 
+    /// <summary>
+    /// The canonical assumption-set entry for proofs conditional on the contract
+    /// expressions' own evaluability (W1 Slice 1, D8): §Q/§S contain division/modulo,
+    /// and a zero divisor would make the runtime contract check itself throw rather
+    /// than pass or fail. Content-stable: envelopes carry this exact string.
+    /// </summary>
+    public const string ContractExpressionDivisionAssumption =
+        "exceptional-paths:contract-division — every division/modulo divisor inside §Q/§S on a verified state is nonzero; a zero divisor makes the runtime contract check itself throw";
+
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
     private bool _disposed;
@@ -323,6 +332,28 @@ public sealed class Z3Verifier : IDisposable
             pathConditions = divisorConstraints;
         }
 
+        // W1 Slice 1 (D8): division/modulo INSIDE the contract expressions themselves
+        // was totalized (bvsdiv/bvsrem are total) with no side conditions — a proof
+        // could rely on x/0 = -1 while runtime evaluation of the same §Q/§S throws.
+        // Collect divisor-nonzero side conditions from every contract expression with
+        // the same position rules as the body collector; a proof reached under them
+        // is demoted to Assumed below (never elides), and a refutation model becomes
+        // runtime-genuine (its divisors are nonzero).
+        var contractDivisorConditions = new List<BoolExpr>();
+        foreach (var contractExpr in preconditions.Select(p => p.Condition).Append(postcondition.Condition))
+        {
+            var (contractConstraints, contractDivFailure) =
+                FunctionBodyEncoder.CollectDivisorNonZeroConstraintsFromExpression(translator, _ctx, contractExpr);
+            if (contractDivFailure != null)
+            {
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        $"{contractDivFailure}. Runtime check kept.")),
+                    Duration: sw.Elapsed);
+            }
+            contractDivisorConditions.AddRange(contractConstraints);
+        }
+
         // Create solver and perform verification
         try
         {
@@ -347,6 +378,27 @@ public sealed class Z3Verifier : IDisposable
                 solver.Assert(pathCondition);
             }
 
+            // Divisor-nonzero side conditions for the contract expressions (D8).
+            // Entailment refinement: when §Q (+ the result binding) already entails
+            // every side condition — the guard idiom `§Q (!= y 0)`, or an equality
+            // pinning the divisor — the runtime check cannot throw on any valid
+            // call, so the proof needs no Assumed demotion. Only side conditions
+            // that genuinely restrict the verified state force the demotion.
+            var contractDivisionAssumed = false;
+            if (contractDivisorConditions.Count > 0)
+            {
+                solver.Push();
+                solver.Assert(_ctx.MkNot(_ctx.MkAnd(contractDivisorConditions.ToArray())));
+                var entailed = solver.Check() == Status.UNSATISFIABLE;
+                solver.Pop();
+                contractDivisionAssumed = !entailed;
+
+                foreach (var contractCondition in contractDivisorConditions)
+                {
+                    solver.Assert(contractCondition);
+                }
+            }
+
             // Assert the negation of the postcondition
             // If this is UNSAT, the postcondition always holds when preconditions hold
             solver.Assert(_ctx.MkNot(postconditionExpr));
@@ -362,12 +414,24 @@ public sealed class Z3Verifier : IDisposable
             // check and never aggregates into proven. A refutation under the same
             // side conditions needs no assumption — its model is a genuine
             // non-throwing execution.
-            if (status == Status.UNSATISFIABLE && pathConditions.Count > 0)
+            if (status == Status.UNSATISFIABLE && (pathConditions.Count > 0 || contractDivisionAssumed))
             {
+                var assumptions = new List<string>();
+                var reasons = new List<string>();
+                if (pathConditions.Count > 0)
+                {
+                    assumptions.Add(ExceptionalPathDivisionAssumption);
+                    reasons.Add("the body divides, and paths with a zero divisor throw before the postcondition is evaluated");
+                }
+                if (contractDivisionAssumed)
+                {
+                    assumptions.Add(ContractExpressionDivisionAssumption);
+                    reasons.Add("the contract expressions divide, and a zero divisor would make the runtime contract check itself throw (W1 Slice 1, D8)");
+                }
                 return ContractVerificationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.AssumedProof(
-                        "Proof is conditional on §S normal-return semantics: the body divides, and paths with a zero divisor throw before the postcondition is evaluated. Runtime check kept.",
-                        [ExceptionalPathDivisionAssumption])),
+                        $"Proof is conditional on §S normal-return semantics: {string.Join("; ", reasons)}. Runtime check kept.",
+                        assumptions)),
                     warnings,
                     sw.Elapsed);
             }
@@ -417,13 +481,19 @@ public sealed class Z3Verifier : IDisposable
                 Duration: sw.Elapsed);
         }
 
-        string? detail = null;
-        try
+        // A deliberate refusal (W1 Slice 1: narrow-int arithmetic, mixed-signedness
+        // comparison, unknown field/array widths, string.Replace) carries its own
+        // reason — prefer it over the generic diagnosis walk.
+        string? detail = translator.LastRefusalReason;
+        if (detail == null)
         {
-            detail = translator.DiagnoseBoolExprFailure(expr) ?? translator.DiagnoseTranslationFailure(expr);
-        }
-        catch (Z3Exception)
-        {
+            try
+            {
+                detail = translator.DiagnoseBoolExprFailure(expr) ?? translator.DiagnoseTranslationFailure(expr);
+            }
+            catch (Z3Exception)
+            {
+            }
         }
 
         return ContractVerificationResult.FromOutcome(
@@ -445,13 +515,19 @@ public sealed class Z3Verifier : IDisposable
         string where,
         Stopwatch sw)
     {
-        string? detail = null;
-        try
+        // A deliberate refusal (W1 Slice 1: narrow-int arithmetic, mixed-signedness
+        // comparison, unknown field/array widths, string.Replace) carries its own
+        // reason — prefer it over the generic diagnosis walk.
+        string? detail = translator.LastRefusalReason;
+        if (detail == null)
         {
-            detail = translator.DiagnoseBoolExprFailure(expr) ?? translator.DiagnoseTranslationFailure(expr);
-        }
-        catch (Z3Exception)
-        {
+            try
+            {
+                detail = translator.DiagnoseBoolExprFailure(expr) ?? translator.DiagnoseTranslationFailure(expr);
+            }
+            catch (Z3Exception)
+            {
+            }
         }
 
         return ContractVerificationResult.FromOutcome(
@@ -712,6 +788,28 @@ public static class FunctionBodyEncoder
     /// Collection stops at the first return in a statement list: dead code must not
     /// constrain the query either.
     /// </summary>
+    /// <summary>
+    /// W1 Slice 1 (D8): collects divisor-nonzero side conditions for division/modulo
+    /// inside a CONTRACT expression (§Q/§S), which the translator otherwise totalizes
+    /// (bvsdiv/bvsrem are total; runtime evaluation of the same expression throws on a
+    /// zero divisor). Same position rules as the body collector: a divisor in a
+    /// conditionally-evaluated position (short-circuit RHS, ?: arm) reports a failure
+    /// and the obligation becomes Unsupported.
+    /// </summary>
+    public static (IReadOnlyList<BoolExpr> Constraints, string? Failure) CollectDivisorNonZeroConstraintsFromExpression(
+        ContractTranslator translator,
+        Context ctx,
+        ExpressionNode expr)
+    {
+        var constraints = new List<BoolExpr>();
+        var failure = CollectDivisorsFromExpression(translator, ctx, expr, constraints, conditional: false);
+        if (failure != null)
+        {
+            failure = failure.Replace("the body contains", "the contract expression contains");
+        }
+        return (constraints, failure);
+    }
+
     public static (IReadOnlyList<BoolExpr> Constraints, string? Failure) CollectDivisorNonZeroConstraints(
         ContractTranslator translator,
         Context ctx,
@@ -816,6 +914,13 @@ public static class FunctionBodyEncoder
                     return rightFailure;
                 if (b.Operator is BinaryOperator.Divide or BinaryOperator.Modulo)
                 {
+                    // A non-zero literal divisor can never throw: no side condition
+                    // is needed and the proof needs no demotion (W1 Slice 1).
+                    if (b.Right is IntLiteralNode constDivisor
+                        && (constDivisor.IsUnsigned ? constDivisor.UnsignedValue != 0 : constDivisor.Value != 0))
+                    {
+                        return null;
+                    }
                     if (conditional)
                     {
                         return "the body contains division/modulo in a conditionally-evaluated position, "
