@@ -426,7 +426,7 @@ public sealed class Z3Verifier : IDisposable
                 if (contractDivisionAssumed)
                 {
                     assumptions.Add(ContractExpressionDivisionAssumption);
-                    reasons.Add("the contract expressions divide, and a zero divisor would make the runtime contract check itself throw (W1 Slice 1, D8)");
+                    reasons.Add("the contract expressions divide, and a zero divisor (or MinValue ÷ -1 overflow) would make the runtime contract check itself throw (W1 Slice 1, D8)");
                 }
                 return ContractVerificationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.AssumedProof(

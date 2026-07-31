@@ -467,12 +467,20 @@ public sealed class ContractTranslator
             or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual
             or BinaryOperator.Divide or BinaryOperator.Modulo;
         if (isSignednessSensitive
-            && EffectiveIsSigned(left, right) != EffectiveIsSigned(right, left)
-            && Math.Max(left.SortSize, right.SortSize) >= 64)
+            && EffectiveIsSigned(left, right) != EffectiveIsSigned(right, left))
         {
-            return "mixed signed/unsigned 64-bit comparison has no common C# type " +
-                   "(long vs ulong does not compile); the raw bit-pattern comparison the " +
-                   "solver would use diverges from any runtime semantics";
+            // Only a 64-bit UNSIGNED side is unmodelable (long vs ulong has no
+            // common C# type). A signed 64-bit side with a sub-64 unsigned side
+            // promotes to long and is modeled (verification round N2 — the
+            // earlier max-width condition wrongly refused uint-vs-long, which
+            // compiles in C#).
+            var unsignedWidth = EffectiveIsSigned(left, right) ? right.SortSize : left.SortSize;
+            if (unsignedWidth >= 64)
+            {
+                return "mixed signed/unsigned comparison with a 64-bit unsigned operand has " +
+                       "no common C# type (long vs ulong does not compile); the raw bit-pattern " +
+                       "comparison the solver would use diverges from any runtime semantics";
+            }
         }
 
         return null;
@@ -1010,10 +1018,11 @@ public sealed class ContractTranslator
         Func<BitVecExpr, BitVecExpr, BitVecExpr> signedOp,
         Func<BitVecExpr, BitVecExpr, BitVecExpr> unsignedOp)
     {
-        // Genuinely-mixed sub-64-bit operands: C# promotion — int/uint division
-        // is long division (W1 Slice 1, D10); result is 64-bit signed.
+        // Genuinely-mixed operands: C# promotion (W1 Slice 1, D10) — signed at
+        // the promoted width (verification round N1: was hardcoded 64 while the
+        // promotion can target 32 for narrow-unsigned pairs).
         if (TryPromoteMixed(left, right, out var l64, out var r64))
-            return TrackBitVec(signedOp(l64, r64), 64, isSigned: true);
+            return TrackBitVec(signedOp(l64, r64), l64.SortSize, isSigned: true);
 
         var (normalizedLeft, normalizedRight) = NormalizeBitVecWidths(left, right);
         var useUnsigned = !EffectiveIsSigned(left, right) && !EffectiveIsSigned(right, left);

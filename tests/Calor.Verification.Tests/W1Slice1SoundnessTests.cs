@@ -141,6 +141,33 @@ public class W1Slice1SoundnessTests
     }
 
     [SkippableFact]
+    public void MixedSignedness_U32WithI64_ComparisonModeled()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        MixedSignedness_U32WithI64_ComparisonModeledCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void MixedSignedness_U32WithI64_ComparisonModeledCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // Verification round N2: uint-vs-long COMPILES in C# (uint → long
+        // implicit), so it must be modeled (promotion to 64-bit signed), not
+        // refused — only a 64-bit UNSIGNED side has no common type.
+        var result = Verify(verifier,
+            [("x", "u32"), ("y", "i64")],
+            [
+                Requires(BinOp(BinaryOperator.Equal, Ref("y"), Int(10))),
+                Requires(BinOp(BinaryOperator.LessOrEqual, Ref("x"), Int(5)))
+            ],
+            Ensures(BinOp(BinaryOperator.LessThan, Ref("x"), Ref("y"))));
+
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+    }
+
+    [SkippableFact]
     public void MixedSignedness64Bit_IsRefused()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
