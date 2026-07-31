@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **W1 Slice 2 trust surface (wedge plan v0.11, kickoff §4 Slice 2):**
+  - **Telemetry is now OPT-IN and metadata-only (#792).** A default invocation sends nothing; telemetry activates only with `CALOR_TELEMETRY=1` (`--no-telemetry`/`CALOR_TELEMETRY_OPTOUT=1` still force it off). Payloads are stripped: diagnostic **codes** only (never message text, which can embed source fragments and paths) and exception **type names** only (never messages or stack traces — `ExceptionTelemetry` replaced by a bare event). Full inventory in the new `docs/telemetry.md`. Previously telemetry was default-on and sent raw diagnostics and full exceptions from every CLI run.
+  - **The #793 release-policy containment is now code, not prose (kickoff T3):** `calor format --write` refuses with **`Calor1346`** unless `--experimental` (or `CALOR_EXPERIMENTAL_FORMAT_WRITE=1`) acknowledges the write path's known defects (#760: ID-rewriting regexes, comment loss) — `--check`/`--diff`/stdout stay available; the LSP **formatting** and **rename** handlers register only under `CALOR_LSP_EXPERIMENTAL=1` (#760/#765) — all read-only handlers unchanged.
+  - **Z3 binaries are checksum-verified everywhere they are fetched (#789).** `publish-nuget.yml` previously fetched natives with a bare `curl -L` (no `-f`, no verification) — a 404 page could ship inside the nupkg as `libz3`. Both the repo's `z3-binaries` release assets (`.github/z3-binaries-4.15.7.sha256`) and the upstream Z3 4.15.7 archives (`src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256`) now verify against committed SHA-256 manifests, fail-closed: a missing manifest or a mismatched hash aborts the release/build.
+
 ### Fixed
 - **W1 Slice 1 soundness batch (wedge plan v0.11, kickoff T1/T2 + D6–D10):** every known false-`Proven`-that-elides vector on the modeled-forms whitelist is closed, and the postcondition runtime-check lowering no longer silently skips or reorders checks. Verification cache format bumps to **1.8** (verdict semantics changed in both polarities — warm 1.7 caches could serve stale verdicts for all shapes below).
   - **`string.Replace` un-whitelisted (D9):** Z3 models first-occurrence replacement, .NET replaces all occurrences; contracts using it now report `unsupported` (runtime check kept) instead of proving through the divergence.

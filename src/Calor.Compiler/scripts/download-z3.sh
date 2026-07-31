@@ -21,6 +21,36 @@ download() {
         --connect-timeout 30 --max-time 600 \
         -o "$out" "$url"
 }
+
+# W1 Slice 2 (#789): every upstream archive is verified against the committed
+# SHA-256 manifest before anything is extracted from it. A corrupt or
+# substituted archive fails the build instead of feeding the toolchain.
+CHECKSUM_MANIFEST="$SCRIPT_DIR/z3-upstream-${Z3_VERSION}.sha256"
+verify_archive() {
+    local zip_file="$1"
+    local name
+    name="$(basename "$zip_file")"
+    if [ ! -s "$CHECKSUM_MANIFEST" ]; then
+        echo "ERROR: checksum manifest $CHECKSUM_MANIFEST missing — refusing to use unverified Z3 archives" >&2
+        exit 1
+    fi
+    local expected
+    expected="$(grep -v '^#' "$CHECKSUM_MANIFEST" | awk -v n="$name" '$2 == n {print $1}')"
+    if [ -z "$expected" ]; then
+        echo "ERROR: no checksum entry for $name in $CHECKSUM_MANIFEST" >&2
+        exit 1
+    fi
+    local actual
+    actual="$(shasum -a 256 "$zip_file" | awk '{print $1}')"
+    if [ "$actual" != "$expected" ]; then
+        echo "ERROR: checksum mismatch for $name" >&2
+        echo "  expected: $expected" >&2
+        echo "  actual:   $actual" >&2
+        rm -f "$zip_file"
+        exit 1
+    fi
+    echo "  [verified] $name"
+}
 RUNTIMES_DIR="$SCRIPT_DIR/../runtimes"
 Z3_DIR="$SCRIPT_DIR/../z3"
 TEMP_DIR="$SCRIPT_DIR/../.z3-temp"
@@ -89,6 +119,7 @@ if [ "$managed_dll_exists" = false ]; then
     if [ ! -f "$zip_file" ]; then
         download "${BASE_URL}/${MANAGED_DLL_ARCHIVE}.zip" "$zip_file"
     fi
+    verify_archive "$zip_file"
 
     # Extract Microsoft.Z3.dll
     unzip -q -o "$zip_file" "${MANAGED_DLL_ARCHIVE}/bin/Microsoft.Z3.dll" -d "$TEMP_DIR" 2>/dev/null || true
@@ -123,6 +154,7 @@ for platform in "${PLATFORMS[@]}"; do
     if [ ! -f "$zip_file" ]; then
         download "${BASE_URL}/${archive}.zip" "$zip_file"
     fi
+    verify_archive "$zip_file"
 
     # Extract the library
     mkdir -p "$target_dir"

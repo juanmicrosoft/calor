@@ -56,6 +56,12 @@ public static class FormatCommand
             description: "Output format: text (human-readable) or json (envelope document on stdout). No short alias.");
         formatOption.FromAmong("text", "json");
 
+        var experimentalOption = new Option<bool>(
+            aliases: ["--experimental"],
+            description: "Acknowledge that the formatter WRITE path is experimental and " +
+                         "release-policy-disabled (#760: it can rewrite identifiers via its " +
+                         "ID-abbreviation regexes and drops comments). Required for --write.");
+
         var command = new Command("format", "Format Calor source files to canonical style")
         {
             inputArgument,
@@ -64,7 +70,8 @@ public static class FormatCommand
             diffOption,
             verboseOption,
             healOption,
-            formatOption
+            formatOption,
+            experimentalOption
         };
 
         // Return the exit code through the handler (ctx.ExitCode) instead of
@@ -73,10 +80,28 @@ public static class FormatCommand
         // Environment.ExitCode is overwritten by Main's return value.
         command.SetHandler(async (InvocationContext ctx) =>
         {
+            // W1 Slice 2 (T3, kickoff §1.4): the #793 release policy holds the
+            // formatter WRITE path disabled — the containment was policy text
+            // until now; this makes it code. Read-only modes (--check, --diff,
+            // stdout preview) stay available.
+            var wantsWrite = ctx.ParseResult.GetValueForOption(writeOption);
+            var experimentalAcknowledged = ctx.ParseResult.GetValueForOption(experimentalOption)
+                || Environment.GetEnvironmentVariable("CALOR_EXPERIMENTAL_FORMAT_WRITE") is "1" or "true";
+            if (wantsWrite && !experimentalAcknowledged)
+            {
+                Console.Error.WriteLine(
+                    $"error {Diagnostics.DiagnosticCode.FormatWriteExperimentalRequired}: 'format --write' is disabled by the release policy (#793/#760): " +
+                    "the formatter write path can rewrite identifiers and drops comments. " +
+                    "Pass --experimental (or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to acknowledge, " +
+                    "or use --check/--diff for read-only formatting.");
+                ctx.ExitCode = 1;
+                return;
+            }
+
             ctx.ExitCode = await ExecuteAsync(
                 ctx.ParseResult.GetValueForArgument(inputArgument),
                 ctx.ParseResult.GetValueForOption(checkOption),
-                ctx.ParseResult.GetValueForOption(writeOption),
+                wantsWrite,
                 ctx.ParseResult.GetValueForOption(diffOption),
                 ctx.ParseResult.GetValueForOption(verboseOption),
                 ctx.ParseResult.GetValueForOption(healOption),

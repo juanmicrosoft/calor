@@ -955,6 +955,14 @@ public static class DiagnosticCode
     /// parseable envelope document, mirroring the root compile command.
     /// </summary>
     public const string ConvertCommandError = "Calor1345";
+
+    /// <summary>
+    /// Error: `format --write` invoked without the experimental acknowledgment.
+    /// The formatter write path is release-policy-disabled (#793/#760 — it can
+    /// rewrite identifiers via ID-abbreviation regexes and drops comments);
+    /// pass --experimental or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1 (W1 Slice 2).
+    /// </summary>
+    public const string FormatWriteExperimentalRequired = "Calor1346";
 }
 
 /// <summary>

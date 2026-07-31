@@ -9,8 +9,16 @@ namespace Calor.Compiler.Telemetry;
 
 /// <summary>
 /// Anonymous telemetry service for the Calor CLI.
-/// Tracks command usage, compilation performance, and failures.
-/// Opt-out via --no-telemetry flag or CALOR_TELEMETRY_OPTOUT=1 environment variable.
+/// Tracks command usage, compilation performance, and failure shapes.
+/// <para>
+/// <b>OPT-IN (W1 Slice 2, #792):</b> a default invocation sends NOTHING.
+/// Telemetry activates only when <c>CALOR_TELEMETRY=1</c> (or <c>true</c>) is
+/// set; <c>--no-telemetry</c> / <c>CALOR_TELEMETRY_OPTOUT=1</c> force it off
+/// even then. Payloads are metadata-only: diagnostic CODES (never messages,
+/// which can embed source fragments and paths), exception TYPE NAMES (never
+/// exception messages or stack traces), command names, durations, and
+/// aggregate input profiles. See docs/telemetry.md for the full inventory.
+/// </para>
 /// </summary>
 public sealed class CalorTelemetry : IDisposable
 {
@@ -118,11 +126,15 @@ public sealed class CalorTelemetry : IDisposable
     /// </summary>
     public static CalorTelemetry Initialize(bool noTelemetryFlag)
     {
+        // W1 Slice 2 (#792): OPT-IN. The old default-on/opt-out posture sent
+        // raw diagnostics and exceptions from every invocation un-consented —
+        // the single worst adopter-facing trust defect in the W1 triage.
+        var optIn = Environment.GetEnvironmentVariable("CALOR_TELEMETRY") is "1" or "true";
         var optOut = noTelemetryFlag
             || Environment.GetEnvironmentVariable("CALOR_TELEMETRY_OPTOUT") == "1"
             || Environment.GetEnvironmentVariable("CALOR_TELEMETRY_OPTOUT") == "true";
 
-        _instance = new CalorTelemetry(!optOut);
+        _instance = new CalorTelemetry(optIn && !optOut);
         return _instance;
     }
 
@@ -224,7 +236,10 @@ public sealed class CalorTelemetry : IDisposable
 
         try
         {
-            var telemetry = new TraceTelemetry($"[{code}] {message}", severity);
+            // W1 Slice 2 (#792): send the diagnostic CODE only — the message
+            // text can embed source fragments, identifiers, literals, and paths.
+            _ = message;
+            var telemetry = new TraceTelemetry($"[{code}]", severity);
             telemetry.Properties["diagnosticCode"] = code;
 
             foreach (var kvp in _commandProperties)
@@ -241,7 +256,9 @@ public sealed class CalorTelemetry : IDisposable
     }
 
     /// <summary>
-    /// Tracks an exception with full context.
+    /// Tracks an exception SHAPE — the exception's type name only (W1 Slice 2,
+    /// #792): messages and stack traces can embed user paths, source fragments,
+    /// and machine details, so they are never sent.
     /// </summary>
     public void TrackException(Exception exception, Dictionary<string, string>? properties = null)
     {
@@ -249,7 +266,9 @@ public sealed class CalorTelemetry : IDisposable
 
         try
         {
-            var telemetry = new ExceptionTelemetry(exception);
+            var telemetry = new EventTelemetry("exception");
+            telemetry.Properties["exceptionType"] =
+                exception.GetType().FullName ?? exception.GetType().Name;
 
             foreach (var kvp in _commandProperties)
             {
@@ -264,7 +283,7 @@ public sealed class CalorTelemetry : IDisposable
                 }
             }
 
-            _client.TrackException(telemetry);
+            _client.TrackEvent(telemetry);
         }
         catch
         {
