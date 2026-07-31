@@ -4,8 +4,30 @@ using System.Runtime.InteropServices;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.DataContracts;
 using Microsoft.ApplicationInsights.Extensibility;
+using Microsoft.ApplicationInsights.Extensibility.Implementation;
 
 namespace Calor.Compiler.Telemetry;
+
+/// <summary>
+/// Strips machine-identifying context the Application Insights SDK attaches
+/// automatically (W1 Slice 2, #834 review M1): the default channel stamps the
+/// machine HOSTNAME into cloud.roleInstance on every item. Replaced with a
+/// constant so no payload carries host or device identity.
+/// </summary>
+public sealed class AnonymizingTelemetryInitializer : ITelemetryInitializer
+{
+    public void Initialize(Microsoft.ApplicationInsights.Channel.ITelemetry telemetry)
+    {
+        telemetry.Context.Cloud.RoleInstance = "calor-cli";
+        telemetry.Context.Cloud.RoleName = "calor-cli";
+        // #834 verification round: pinning RoleInstance alone RELOCATES the
+        // hostname — TelemetryClient.Initialize stamps the machine name into
+        // ai.internal.nodeName whenever it isn't already set, so the wire
+        // payload still carried it. Pin the internal node name too (verified
+        // at serialization level against App Insights 2.22.0).
+        telemetry.Context.GetInternalContext().NodeName = "calor-cli";
+    }
+}
 
 /// <summary>
 /// Anonymous telemetry service for the Calor CLI.
@@ -20,21 +42,6 @@ namespace Calor.Compiler.Telemetry;
 /// aggregate input profiles. See docs/telemetry.md for the full inventory.
 /// </para>
 /// </summary>
-/// <summary>
-/// Strips machine-identifying context the Application Insights SDK attaches
-/// automatically (W1 Slice 2, #834 review M1): the default channel stamps the
-/// machine HOSTNAME into cloud.roleInstance on every item. Replaced with a
-/// constant so no payload carries host or device identity.
-/// </summary>
-public sealed class AnonymizingTelemetryInitializer : ITelemetryInitializer
-{
-    public void Initialize(Microsoft.ApplicationInsights.Channel.ITelemetry telemetry)
-    {
-        telemetry.Context.Cloud.RoleInstance = "calor-cli";
-        telemetry.Context.Cloud.RoleName = "calor-cli";
-    }
-}
-
 public sealed class CalorTelemetry : IDisposable
 {
     private const string ConnectionString =

@@ -19,7 +19,7 @@ function Test-ArchiveChecksum {
         throw "Checksum manifest $CHECKSUM_MANIFEST missing - refusing to use unverified Z3 archives"
     }
     $expected = (Get-Content $CHECKSUM_MANIFEST |
-        Where-Object { $_ -notmatch '^#' -and $_ -match [regex]::Escape($name) } |
+        Where-Object { $_ -notmatch '^#' -and (($_ -split '\s+')[1]) -eq $name } |
         ForEach-Object { ($_ -split '\s+')[0] } |
         Select-Object -First 1)
     if (-not $expected) {

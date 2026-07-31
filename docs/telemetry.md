@@ -32,12 +32,16 @@ in the #834 review — an item not on this list being transmitted is a bug):
 - **Help-query shape**: query **length** and hit/miss for `calor_help` lookups,
   plus matched section titles from the compiler's own documentation — never the
   query text itself.
+- **Hook decisions** (`calor hook` agent-integration events): the hook name,
+  allow/block decision, file extension (`.calr`/`.cs`), and agent name.
 - **Session metadata**: a random per-invocation operation ID (not tied to
   machine or user identity), OS description and process architecture as
-  reported by .NET, the .NET and Calor versions, and the coding-agent name when
-  one identifies itself (e.g. `claude-code`). The Application Insights cloud
-  role is pinned to the constant `calor-cli` — the SDK's default would transmit
-  your machine's hostname, which is explicitly scrubbed.
+  reported by .NET, the .NET, Calor, and Calor-semantics versions, and the
+  coding-agent name when one identifies itself (e.g. `claude-code`). The
+  Application Insights cloud role AND internal node name are pinned to the
+  constant `calor-cli` — the SDK's defaults would transmit your machine's
+  hostname through either tag, and both are explicitly scrubbed (pinned by a
+  serialization-level test).
 
 ## What is never sent
 

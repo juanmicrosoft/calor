@@ -207,18 +207,53 @@ public class W1Slice2TrustSurfaceTests
     }
 
     [Fact]
-    public void TelemetryInitializer_ScrubsMachineHostname()
+    public async Task LintFix_WithExperimentalFlag_Proceeds()
     {
-        // #834 review M1: the App Insights SDK stamps the machine hostname into
-        // cloud.roleInstance on every item; the initializer pins it to a
-        // constant so no payload carries host identity.
-        var telemetry = new EventTelemetry("probe");
-        telemetry.Context.Cloud.RoleInstance = Environment.MachineName;
+        using var env = WithEnv("CALOR_EXPERIMENTAL_FORMAT_WRITE", null);
+        var file = Path.Combine(Path.GetTempPath(), $"calor-w1s2-{Guid.NewGuid():N}.calr");
+        await File.WriteAllTextAsync(file, "§M{m001:T}\n");
+        try
+        {
+            var command = Calor.Compiler.Commands.LintCommand.Create();
 
-        new AnonymizingTelemetryInitializer().Initialize(telemetry);
+            var exit = await command.InvokeAsync(["--fix", "--experimental", file]);
 
-        Assert.Equal("calor-cli", telemetry.Context.Cloud.RoleInstance);
-        Assert.Equal("calor-cli", telemetry.Context.Cloud.RoleName);
+            Assert.Equal(0, exit);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public void TelemetryPayload_SerializedBytes_CarryNoHostname()
+    {
+        // #834 review M1 + verification round: the SDK stamps the machine
+        // hostname into cloud.roleInstance AND — once that is pinned — into
+        // ai.internal.nodeName. An object-level assertion passed while the
+        // wire payload still leaked, so this pin works at SERIALIZATION level:
+        // the exact bytes the channel would transmit must not contain the
+        // machine's name in any tag.
+        var channel = new StubTelemetryChannel();
+        var config = new TelemetryConfiguration
+        {
+            TelemetryChannel = channel,
+            ConnectionString = "InstrumentationKey=00000000-0000-0000-0000-000000000000"
+        };
+        config.TelemetryInitializers.Add(new AnonymizingTelemetryInitializer());
+        var client = new TelemetryClient(config);
+
+        client.TrackEvent("probe");
+
+        var item = Assert.Single(channel.Items);
+        var json = System.Text.Encoding.UTF8.GetString(
+            Microsoft.ApplicationInsights.Extensibility.Implementation.JsonSerializer.Serialize(
+                new[] { item }, compress: false));
+
+        Assert.DoesNotContain(Environment.MachineName, json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(System.Net.Dns.GetHostName(), json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("calor-cli", json);
     }
 
     [Fact]
