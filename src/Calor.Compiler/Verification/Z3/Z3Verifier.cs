@@ -914,10 +914,15 @@ public static class FunctionBodyEncoder
                     return rightFailure;
                 if (b.Operator is BinaryOperator.Divide or BinaryOperator.Modulo)
                 {
-                    // A non-zero literal divisor can never throw: no side condition
-                    // is needed and the proof needs no demotion (W1 Slice 1).
-                    if (b.Right is IntLiteralNode constDivisor
-                        && (constDivisor.IsUnsigned ? constDivisor.UnsignedValue != 0 : constDivisor.Value != 0))
+                    // A literal divisor that is neither 0 nor −1 can never throw
+                    // (no DivideByZeroException, no MinValue÷−1 OverflowException):
+                    // no side condition, no demotion (W1 Slice 1).
+                    var literalDivisor = b.Right as IntLiteralNode;
+                    var isSafeLiteral = literalDivisor != null
+                        && (literalDivisor.IsUnsigned
+                            ? literalDivisor.UnsignedValue != 0
+                            : literalDivisor.Value != 0 && literalDivisor.Value != -1);
+                    if (isSafeLiteral)
                     {
                         return null;
                     }
@@ -926,9 +931,32 @@ public static class FunctionBodyEncoder
                         return "the body contains division/modulo in a conditionally-evaluated position, "
                             + "which is not yet modeled for exception-path soundness (a path-guarded encoding is planned)";
                     }
-                    if (translator.Translate(b.Right) is not BitVecExpr divisor)
+                    var operands = translator.GetDivModOperands(b.Left, b.Right);
+                    if (operands == null)
                         return "a division/modulo divisor could not be modeled for the non-zero side condition";
-                    constraints.Add(ctx.MkNot(ctx.MkEq(divisor, ctx.MkBV(0, divisor.SortSize))));
+                    var (dividend, divisor, signedDivision) = operands.Value;
+
+                    // A literal −1 divisor cannot be zero — skip the zero condition.
+                    var isNegOneLiteral = literalDivisor != null
+                        && !literalDivisor.IsUnsigned && literalDivisor.Value == -1;
+                    if (!isNegOneLiteral)
+                    {
+                        constraints.Add(ctx.MkNot(ctx.MkEq(divisor, ctx.MkBV(0, divisor.SortSize))));
+                    }
+
+                    // Signed division: MinValue ÷ −1 throws OverflowException in C#
+                    // (checked AND unchecked) while bvsdiv wraps to MinValue — a
+                    // proof relying on that state would elide a check that throws
+                    // (review #833 C4). Same demote-unless-entailed machinery.
+                    if (signedDivision)
+                    {
+                        var w = dividend.SortSize;
+                        var minValue = ctx.MkBVSHL(ctx.MkBV(1, w), ctx.MkBV(w - 1, w));
+                        var negOne = ctx.MkBVNeg(ctx.MkBV(1, w));
+                        constraints.Add(ctx.MkNot(ctx.MkAnd(
+                            ctx.MkEq(dividend, minValue),
+                            ctx.MkEq(divisor, negOne))));
+                    }
                 }
                 return null;
             }
@@ -938,6 +966,20 @@ public static class FunctionBodyEncoder
                 return CollectDivisorsFromExpression(translator, ctx, c.Condition, constraints, conditional)
                     ?? CollectDivisorsFromExpression(translator, ctx, c.WhenTrue, constraints, conditional: true)
                     ?? CollectDivisorsFromExpression(translator, ctx, c.WhenFalse, constraints, conditional: true);
+            // Review #833 C5: these previously fell to the default (no constraints,
+            // no failure) — a division inside `(-> p q)`'s consequent or a
+            // quantifier body was silently uncovered, and the emitted short-circuit
+            // check could throw where the proof said nothing. The consequent of an
+            // implication is conditionally evaluated (`!p || q`); quantifier bodies
+            // are evaluated per-element with varying bound values — both take the
+            // conditional-position rule (division there → Unsupported).
+            case ImplicationExpressionNode imp:
+                return CollectDivisorsFromExpression(translator, ctx, imp.Antecedent, constraints, conditional)
+                    ?? CollectDivisorsFromExpression(translator, ctx, imp.Consequent, constraints, conditional: true);
+            case ForallExpressionNode forall:
+                return CollectDivisorsFromExpression(translator, ctx, forall.Body, constraints, conditional: true);
+            case ExistsExpressionNode exists:
+                return CollectDivisorsFromExpression(translator, ctx, exists.Body, constraints, conditional: true);
             case ArrayAccessNode a:
                 return CollectDivisorsFromExpression(translator, ctx, a.Array, constraints, conditional)
                     ?? CollectDivisorsFromExpression(translator, ctx, a.Index, constraints, conditional);

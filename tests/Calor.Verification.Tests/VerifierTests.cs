@@ -1,6 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
+using ProofStatus = Calor.Compiler.Verification.ProofStatus;
 using Xunit;
 using System.Runtime.CompilerServices;
 
@@ -902,8 +903,15 @@ public class VerifierTests
             new[] { precondition1, precondition2 },
             postcondition);
 
-        // This should be proven - INT_MIN / -1 = INT_MIN in bit-vector arithmetic
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // W1 Slice 1 (#833 C4): bit-vector division wraps INT_MIN / -1 to
+        // INT_MIN, but the emitted runtime check `x / y == x` THROWS
+        // OverflowException at exactly this state (C# division overflow throws
+        // in checked and unchecked contexts alike). A plain Proven would elide
+        // a throwing check; the proof holds only under the overflow side
+        // condition — which these §Q violate — so: Assumed, never elides.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.ContractExpressionDivisionAssumption,
+            result.EffectiveOutcome.Assumptions);
     }
 
     // ===========================================

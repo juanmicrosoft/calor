@@ -415,13 +415,12 @@ public sealed class ContractTranslator
                 => ApplyBitVecBinaryOp(bol, bor, _ctx.MkBVOR),
             BinaryOperator.BitwiseXor when left is BitVecExpr bxl && right is BitVecExpr bxr
                 => ApplyBitVecBinaryOp(bxl, bxr, _ctx.MkBVXOR),
+            // Shifts: dedicated C# semantics — count masked, no binary numeric
+            // promotion (review #833 C3)
             BinaryOperator.LeftShift when left is BitVecExpr shl && right is BitVecExpr shr
-                => ApplyBitVecBinaryOp(shl, shr, _ctx.MkBVSHL),
-            // Right shift: use arithmetic (signed) or logical (unsigned) shift
+                => ApplyShiftOp(shl, shr, leftShift: true),
             BinaryOperator.RightShift when left is BitVecExpr ashl && right is BitVecExpr ashr
-                => IsSigned(left)
-                    ? ApplyBitVecBinaryOp(ashl, ashr, _ctx.MkBVASHR)
-                    : ApplyBitVecBinaryOp(ashl, ashr, _ctx.MkBVLSHR),
+                => ApplyShiftOp(ashl, ashr, leftShift: false),
 
             _ => null
         };
@@ -452,6 +451,13 @@ public sealed class ContractTranslator
                    "would wrap at the narrow width (modeled-forms divergence D1)";
         }
 
+        // Shift counts wider than 32 bits have no C# typing (the count operand
+        // must convert to int); refuse rather than guess (review #833 C3).
+        if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift && right.SortSize > 32)
+        {
+            return "a shift count wider than 32 bits has no C# typing (the count must be an int)";
+        }
+
         // Genuinely-mixed signedness (no literal rescue) below 64 bits is MODELED
         // by promotion to a 64-bit signed comparison — exactly C#'s int-vs-uint →
         // long semantics (PromoteMixedTo64). At 64 bits there is no common C# type
@@ -473,26 +479,38 @@ public sealed class ContractTranslator
     }
 
     /// <summary>
-    /// C# promotion for genuinely-mixed signed/unsigned operands below 64 bits
-    /// (W1 Slice 1, D10): both sides extend to 64-bit — sign-extension for the
-    /// signed side, zero-extension for the unsigned side — and the operation
-    /// proceeds SIGNED at 64 bits, exactly C#'s int-vs-uint → long semantics
-    /// (`-1 == 4294967295u` is false, as at runtime). Returns false when the
-    /// operands are not effectively mixed (caller uses the same-signedness path).
+    /// C# binary numeric promotion for genuinely-mixed signed/unsigned operands
+    /// (W1 Slice 1, D10; corrected per review #833 C1): the promoted type is
+    /// **long (64-bit signed)** only when the unsigned side is exactly `uint`
+    /// (int-vs-uint → long) or either side is 64-bit signed (`i64` with any
+    /// sub-64 unsigned → long); a **narrow** unsigned side (`u8`/`u16`) with a
+    /// signed side ≤ 32 promotes to **int (32-bit signed)** — C# has no
+    /// byte/ushort arithmetic, so `u8 + i32` computes and WRAPS at 32 bits.
+    /// Both embeddings are value-preserving into the promoted type
+    /// (sign-extension for the signed side, zero-extension for the unsigned
+    /// side), and the operation proceeds SIGNED at the promoted width.
+    /// A 64-bit unsigned side is refused upstream (no common C# type).
+    /// Returns false when the operands are not effectively mixed.
     /// </summary>
-    private bool TryPromoteMixedTo64(BitVecExpr left, BitVecExpr right, out BitVecExpr left64, out BitVecExpr right64)
+    private bool TryPromoteMixed(BitVecExpr left, BitVecExpr right, out BitVecExpr leftP, out BitVecExpr rightP)
     {
-        left64 = left;
-        right64 = right;
+        leftP = left;
+        rightP = right;
         var leftSigned = EffectiveIsSigned(left, right);
         var rightSigned = EffectiveIsSigned(right, left);
-        if (leftSigned == rightSigned || Math.Max(left.SortSize, right.SortSize) >= 64)
+        if (leftSigned == rightSigned)
             return false;
 
-        left64 = left.SortSize == 64 ? left
-            : leftSigned ? _ctx.MkSignExt(64 - left.SortSize, left) : _ctx.MkZeroExt(64 - left.SortSize, left);
-        right64 = right.SortSize == 64 ? right
-            : rightSigned ? _ctx.MkSignExt(64 - right.SortSize, right) : _ctx.MkZeroExt(64 - right.SortSize, right);
+        var unsignedSize = leftSigned ? right.SortSize : left.SortSize;
+        if (unsignedSize >= 64)
+            return false; // u64 mixed: refused upstream, no C# promotion exists
+
+        var targetWidth = (unsignedSize == 32 || left.SortSize == 64 || right.SortSize == 64) ? 64u : 32u;
+
+        leftP = left.SortSize == targetWidth ? left
+            : leftSigned ? _ctx.MkSignExt(targetWidth - left.SortSize, left) : _ctx.MkZeroExt(targetWidth - left.SortSize, left);
+        rightP = right.SortSize == targetWidth ? right
+            : rightSigned ? _ctx.MkSignExt(targetWidth - right.SortSize, right) : _ctx.MkZeroExt(targetWidth - right.SortSize, right);
         return true;
     }
 
@@ -885,12 +903,41 @@ public sealed class ContractTranslator
     /// <summary>
     /// Applies a binary bit-vector operation with width normalization.
     /// </summary>
+    /// <summary>
+    /// C# shift semantics (review #833 C3): shifts do NOT follow binary numeric
+    /// promotion — the LEFT operand promotes individually (narrow → int, uint
+    /// stays uint, i64/u64 stay), the count is an int, and the runtime MASKS the
+    /// count by (width − 1): `1 &lt;&lt; 32` is 1 at runtime, while an unmasked
+    /// solver shift yields 0 — a false-Proven vector. The mask is modeled
+    /// explicitly. Right shifts pick arithmetic vs logical by the promoted left
+    /// operand's signedness (narrow operands promote to int = signed).
+    /// </summary>
+    private BitVecExpr ApplyShiftOp(BitVecExpr left, BitVecExpr right, bool leftShift)
+    {
+        // Promote the left operand individually; the count extends to match.
+        var (normalizedLeft, normalizedCount) = NormalizeBitVecWidths(left, right);
+        var w = normalizedLeft.SortSize;
+        var maskedCount = _ctx.MkBVAND(normalizedCount, _ctx.MkBV(w - 1, w));
+
+        // Promoted-left signedness: sub-32-bit operands promote to int (signed).
+        var resultSigned = left.SortSize < 32 || IsSigned(left);
+
+        var result = leftShift
+            ? _ctx.MkBVSHL(normalizedLeft, maskedCount)
+            : resultSigned
+                ? _ctx.MkBVASHR(normalizedLeft, maskedCount)
+                : _ctx.MkBVLSHR(normalizedLeft, maskedCount);
+        return TrackBitVec(result, w, resultSigned);
+    }
+
     private BitVecExpr ApplyBitVecBinaryOp(BitVecExpr left, BitVecExpr right, Func<BitVecExpr, BitVecExpr, BitVecExpr> op)
     {
-        // Genuinely-mixed sub-64-bit operands: C# promotion — int-with-uint
-        // arithmetic is long arithmetic (W1 Slice 1, D10); result 64-bit signed.
-        if (TryPromoteMixedTo64(left, right, out var l64, out var r64))
-            return TrackBitVec(op(l64, r64), 64, isSigned: true);
+        // Genuinely-mixed operands: C# binary numeric promotion (W1 Slice 1,
+        // D10; width per TryPromoteMixed — long for uint-with-signed, int for
+        // narrow-unsigned-with-signed, review #833 C1); result signed at the
+        // promoted width.
+        if (TryPromoteMixed(left, right, out var lp, out var rp))
+            return TrackBitVec(op(lp, rp), lp.SortSize, isSigned: true);
 
         var (normalizedLeft, normalizedRight) = NormalizeBitVecWidths(left, right);
         var result = op(normalizedLeft, normalizedRight);
@@ -906,10 +953,17 @@ public sealed class ContractTranslator
     /// <summary>
     /// The C#-typing signedness of <paramref name="operand"/> in a binary
     /// operation with <paramref name="other"/>: a signed non-negative literal
-    /// paired with an unsigned operand converts implicitly to the unsigned type.
+    /// paired with a **32-bit-or-wider** unsigned operand converts implicitly to
+    /// the unsigned type (`u32 x - 1` is uint). Review #833 C2: the rescue must
+    /// NOT apply to narrow unsigned operands — C# has no byte/ushort arithmetic,
+    /// `byte - const` is plain int (signed), so `u8 x - 5` can be negative.
     /// </summary>
     private bool EffectiveIsSigned(Expr operand, Expr other)
-        => IsSigned(operand) && !(IsNonNegativeLiteral(operand) && !IsSigned(other));
+        => IsSigned(operand)
+           && !(IsNonNegativeLiteral(operand)
+                && !IsSigned(other)
+                && other is BitVecExpr otherBv
+                && otherBv.SortSize >= 32);
 
     /// <summary>
     /// Applies a signed or unsigned comparison operation with width normalization.
@@ -920,7 +974,7 @@ public sealed class ContractTranslator
     {
         // Genuinely-mixed sub-64-bit operands: C# promotion to a 64-bit signed
         // comparison (W1 Slice 1, D10).
-        if (TryPromoteMixedTo64(left, right, out var l64, out var r64))
+        if (TryPromoteMixed(left, right, out var l64, out var r64))
             return signedOp(l64, r64);
 
         var (normalizedLeft, normalizedRight) = NormalizeBitVecWidths(left, right);
@@ -931,13 +985,34 @@ public sealed class ContractTranslator
     /// <summary>
     /// Applies a division or modulo operation, choosing signed or unsigned variant.
     /// </summary>
+    /// <summary>
+    /// Translates a division/modulo's operands to the width and signedness the
+    /// operation itself will use (mirrors <see cref="ApplyDivModOp"/> — mixed
+    /// operands promote, same-signedness operands normalize). Used by the
+    /// divisor-side-condition collector (review #833 C4) so the
+    /// MinValue-÷-(−1) overflow condition is expressed at the operation's own
+    /// width. Null when either operand is outside the bit-vector surface.
+    /// </summary>
+    public (BitVecExpr Left, BitVecExpr Right, bool Signed)? GetDivModOperands(ExpressionNode leftNode, ExpressionNode rightNode)
+    {
+        if (Translate(leftNode) is not BitVecExpr l || Translate(rightNode) is not BitVecExpr r)
+            return null;
+
+        if (TryPromoteMixed(l, r, out var lp, out var rp))
+            return (lp, rp, true);
+
+        var (nl, nr) = NormalizeBitVecWidths(l, r);
+        var signed = EffectiveIsSigned(l, r) || EffectiveIsSigned(r, l);
+        return (nl, nr, signed);
+    }
+
     private BitVecExpr ApplyDivModOp(BitVecExpr left, BitVecExpr right,
         Func<BitVecExpr, BitVecExpr, BitVecExpr> signedOp,
         Func<BitVecExpr, BitVecExpr, BitVecExpr> unsignedOp)
     {
         // Genuinely-mixed sub-64-bit operands: C# promotion — int/uint division
         // is long division (W1 Slice 1, D10); result is 64-bit signed.
-        if (TryPromoteMixedTo64(left, right, out var l64, out var r64))
+        if (TryPromoteMixed(left, right, out var l64, out var r64))
             return TrackBitVec(signedOp(l64, r64), 64, isSigned: true);
 
         var (normalizedLeft, normalizedRight) = NormalizeBitVecWidths(left, right);
@@ -956,7 +1031,7 @@ public sealed class ContractTranslator
         {
             // Genuinely-mixed sub-64-bit operands: C# promotion to 64-bit signed
             // equality (W1 Slice 1, D10) — `-1 == 4294967295u` is false, as at runtime.
-            if (TryPromoteMixedTo64(bvLeft, bvRight, out var l64, out var r64))
+            if (TryPromoteMixed(bvLeft, bvRight, out var l64, out var r64))
                 return _ctx.MkEq(l64, r64);
 
             var (normalizedLeft, normalizedRight) = NormalizeBitVecWidths(bvLeft, bvRight);

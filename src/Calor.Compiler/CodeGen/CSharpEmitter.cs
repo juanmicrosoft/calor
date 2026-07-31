@@ -3409,7 +3409,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine(Visit(pre));
         }
 
-        if (node.Postconditions.Count > 0)
+        // W1 Slice 1 T2 (review #833 M1): this fifth lowering site was ungated —
+        // nested returns silently bypassed the §S check and the check used the
+        // raw `result` identifier with no substitution.
+        if (node.Postconditions.Count > 0 && CanLowerPostconditions(node.Body))
         {
             // When postconditions exist, capture the result
             // Emit body statements except for the last return
@@ -3422,7 +3425,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     AppendLine($"var __result__ = {resultExpr};");
                     foreach (var post in node.Postconditions)
                     {
-                        AppendLine(Visit(post));
+                        AppendLine(SubstituteResultIdentifier(Visit(post)));
                     }
                     AppendLine("return __result__;");
                 }
@@ -3442,6 +3445,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else
         {
+            if (node.Postconditions.Count > 0)
+            {
+                ReportPostconditionChecksNotLowered($"operator {node.OperatorToken}", node.Span);
+            }
+
             foreach (var stmt in node.Body)
             {
                 EmitStatement(stmt);

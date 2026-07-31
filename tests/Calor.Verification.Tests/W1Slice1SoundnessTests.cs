@@ -237,9 +237,128 @@ public class W1Slice1SoundnessTests
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
 
-        // The guard idiom: §Q (!= y 0) entails the divisor side condition, so
-        // the runtime check cannot throw on any valid call — plain Proven, no
-        // assumption (the entailment refinement).
+        // The guard idiom for SIGNED division needs to exclude both throw
+        // states: §Q (> y 0) entails y ≠ 0 AND ¬(x = MinValue ∧ y = −1)
+        // (review #833 C4 added the overflow condition), so the runtime check
+        // cannot throw on any valid call — plain Proven, no assumption.
+        var result = Verify(verifier,
+            [("x", "i32"), ("y", "i32")],
+            [Requires(BinOp(BinaryOperator.GreaterThan, Ref("y"), Int(0)))],
+            Ensures(BinOp(BinaryOperator.Equal,
+                BinOp(BinaryOperator.Multiply,
+                    BinOp(BinaryOperator.Divide, Ref("x"), Ref("y")),
+                    Int(0)),
+                Int(0))));
+
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+    }
+
+    // ---- Review #833 repro pins ----
+
+    [SkippableFact]
+    public void NarrowUnsignedWithInt32Arithmetic_WrapsAt32_NotAt64()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        NarrowUnsignedWithInt32Arithmetic_WrapsAt32_NotAt64Core();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void NarrowUnsignedWithInt32Arithmetic_WrapsAt32_NotAt64Core()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // Review #833 C1 repro: `b + x` over (u8, i32) is INT arithmetic in C#
+        // and wraps at 32 bits — b=1, x=int.MaxValue gives int.MinValue < 0.
+        // The 64-bit promotion never wrapped and falsely PROVED this (eliding
+        // the check the runtime violates).
+        var result = Verify(verifier,
+            [("b", "u8"), ("x", "i32")],
+            [Requires(BinOp(BinaryOperator.Equal, Ref("x"), Int(int.MaxValue)))],
+            Ensures(BinOp(BinaryOperator.GreaterThan,
+                BinOp(BinaryOperator.Add, Ref("b"), Ref("x")),
+                Int(0))));
+
+        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+    }
+
+    [SkippableFact]
+    public void NarrowUnsignedMinusLiteral_IsSignedInt_CanBeNegative()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        NarrowUnsignedMinusLiteral_IsSignedInt_CanBeNegativeCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void NarrowUnsignedMinusLiteral_IsSignedInt_CanBeNegativeCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // Review #833 C2 repro: C# has no byte arithmetic — `x - 5` over u8 is
+        // int and is negative for x < 5. The literal-conversion rescue wrongly
+        // typed it unsigned (BVUGE always true → false Proven + elide).
+        var result = Verify(verifier,
+            [("x", "u8")],
+            [],
+            Ensures(BinOp(BinaryOperator.GreaterOrEqual,
+                BinOp(BinaryOperator.Subtract, Ref("x"), Int(5)),
+                Int(0))));
+
+        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+    }
+
+    [SkippableFact]
+    public void ShiftCount_IsMasked_LikeCSharp()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ShiftCount_IsMasked_LikeCSharpCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ShiftCount_IsMasked_LikeCSharpCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // Review #833 C3 repro: C# masks the shift count by width−1, so
+        // `x << 32` IS `x` at runtime — an unmasked solver shift yields 0 and
+        // falsely proved `(x << 32) == 0`. With the mask modeled, the
+        // runtime-true identity proves and the runtime-false one refutes.
+        var identity = Verify(verifier,
+            [("x", "i32")],
+            [],
+            Ensures(BinOp(BinaryOperator.Equal,
+                BinOp(BinaryOperator.LeftShift, Ref("x"), Int(32)),
+                Ref("x"))));
+        Assert.Equal(ContractVerificationStatus.Proven, identity.Status);
+
+        var zeroClaim = Verify(verifier,
+            [("x", "i32")],
+            [],
+            Ensures(BinOp(BinaryOperator.Equal,
+                BinOp(BinaryOperator.LeftShift, Ref("x"), Int(32)),
+                Int(0))));
+        Assert.Equal(ContractVerificationStatus.Disproven, zeroClaim.Status);
+    }
+
+    [SkippableFact]
+    public void ContractDivision_NonZeroGuardAlone_StillAssumed_OverflowResidual()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ContractDivision_NonZeroGuardAlone_StillAssumed_OverflowResidualCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ContractDivision_NonZeroGuardAlone_StillAssumed_OverflowResidualCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // Review #833 C4: §Q (!= y 0) does NOT entail the MinValue÷−1 overflow
+        // condition — x=MinValue, y=−1 passes the guard and the runtime check
+        // throws OverflowException. The proof stays Assumed.
         var result = Verify(verifier,
             [("x", "i32"), ("y", "i32")],
             [Requires(BinOp(BinaryOperator.NotEqual, Ref("y"), Int(0)))],
@@ -249,8 +368,36 @@ public class W1Slice1SoundnessTests
                     Int(0)),
                 Int(0))));
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
-        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+    }
+
+    [SkippableFact]
+    public void ContractDivision_InsideImplicationConsequent_IsUnsupported()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ContractDivision_InsideImplicationConsequent_IsUnsupportedCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ContractDivision_InsideImplicationConsequent_IsUnsupportedCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // Review #833 C5 repro: the collector silently skipped implications —
+        // §S (-> (== y 0) (!= (/ x y) 5)) was Proven+elided while the emitted
+        // short-circuit check `!(y==0) || x/y != 5` throws at y=0. The
+        // consequent is conditionally evaluated: Unsupported, check kept.
+        var result = Verify(verifier,
+            [("x", "i32"), ("y", "i32")],
+            [],
+            Ensures(new ImplicationExpressionNode(TextSpan.Empty,
+                BinOp(BinaryOperator.Equal, Ref("y"), Int(0)),
+                BinOp(BinaryOperator.NotEqual,
+                    BinOp(BinaryOperator.Divide, Ref("x"), Ref("y")),
+                    Int(5)))));
+
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
 
     [SkippableFact]

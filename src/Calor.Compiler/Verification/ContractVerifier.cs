@@ -328,6 +328,19 @@ public sealed class ContractVerifier
             case FieldAccessNode fieldAccess:
                 CollectReferencesInternal(fieldAccess.Target, references, boundVariables);
                 break;
+            // Review #833 m1 (defensive): these arms were missing, so a reference
+            // inside `(len xs)` or a string operation escaped the undeclared-
+            // variable check (Calor0200) and leaned on the translator's own
+            // refusal as the only backstop.
+            case ArrayLengthNode arrayLength:
+                CollectReferencesInternal(arrayLength.Array, references, boundVariables);
+                break;
+            case StringOperationNode stringOp:
+                foreach (var arg in stringOp.Arguments)
+                {
+                    CollectReferencesInternal(arg, references, boundVariables);
+                }
+                break;
             case RecordCreationNode recordCreate:
                 foreach (var field in recordCreate.Fields)
                 {

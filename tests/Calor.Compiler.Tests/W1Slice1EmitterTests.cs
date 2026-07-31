@@ -90,6 +90,53 @@ public class W1Slice1EmitterTests
     }
 
     [Fact]
+    public void OperatorOverload_NestedReturn_ChecksOmitted_Calor1001()
+    {
+        // Review #833 M1: the operator-overload lowering was the fifth,
+        // ungated site — a nested return silently bypassed the §S check and
+        // the check used the raw `result` identifier with no substitution.
+        var source = @"
+§M{m001:T}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{i32:left}
+        §I{i32:right}
+        §O{i32}
+        §S (>= result 0)
+        §IF{if1} (> left 0)
+          §R left
+        §R right
+      §/OP{op001}
+";
+        var (code, diagnostics) = EmitWithDiagnostics(source);
+
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.PostconditionCheckNotLowered);
+        Assert.DoesNotContain("__result__", code);
+    }
+
+    [Fact]
+    public void OperatorOverload_FinalReturn_SubstitutesResult()
+    {
+        var source = @"
+§M{m001:T}
+  §CL{c1:MyType}
+      §OP{op001:+:pub}
+        §I{i32:left}
+        §I{i32:right}
+        §O{i32}
+        §S (>= result 0)
+        §R left
+      §/OP{op001}
+";
+        var (code, diagnostics) = EmitWithDiagnostics(source);
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.PostconditionCheckNotLowered);
+        Assert.Contains("__result__", code);
+        // The check must reference the captured local, not the raw identifier.
+        Assert.DoesNotContain("!(result >= 0)", code);
+    }
+
+    [Fact]
     public void ResultSubstring_IdentifierNotCorrupted()
     {
         // The old textual Replace("result", "__result__") corrupted every
