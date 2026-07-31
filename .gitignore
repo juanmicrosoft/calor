@@ -109,3 +109,4 @@ bench/phase0-agent-native/epochs/**/.probe_final.txt
 bench/phase0-agent-native/epochs/**/.smokehash
 # WS2 MCP write-path reject replay payloads (run-internal; recorded in mcp-writes.jsonl)
 bench/phase0-agent-native/epochs/**/rejects/
+.DS_Store
