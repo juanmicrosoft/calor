@@ -1,6 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
+using ProofStatus = Calor.Compiler.Verification.ProofStatus;
 using Microsoft.Z3;
 using Xunit;
 using Xunit.Abstractions;
@@ -442,10 +443,15 @@ public class RuntimeValidationTests
             parameters: new[] { ("x", "i32"), ("y", "i32") });
 
         _output.WriteLine($"Verifier result: {result.Status}");
-        _output.WriteLine($"  (Verifier models unchecked/hardware semantics where INT_MIN / -1 = INT_MIN)");
+        _output.WriteLine($"  (W1 Slice 1 / #833 C4: the emitted runtime check `x / y == x` THROWS");
+        _output.WriteLine($"   OverflowException at this exact state — C# division overflow throws in");
+        _output.WriteLine($"   checked AND unchecked contexts — so a plain Proven would elide a check");
+        _output.WriteLine($"   the program needs. The proof survives only under the overflow side");
+        _output.WriteLine($"   condition, which §Q here VIOLATES: Assumed, never elides.)");
 
-        // Verifier should PROVE this because bit-vector division gives INT_MIN / -1 = INT_MIN
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.ContractExpressionDivisionAssumption,
+            result.EffectiveOutcome.Assumptions);
     }
 
     #endregion

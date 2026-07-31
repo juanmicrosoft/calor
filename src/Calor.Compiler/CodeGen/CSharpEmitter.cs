@@ -61,6 +61,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private readonly ModuleVerificationResult? _verificationResults;
     private readonly ModuleInheritanceResult? _inheritanceResult;
     private readonly Verification.Obligations.ObligationTracker? _obligationTracker;
+    private readonly Diagnostics.DiagnosticBag? _diagnostics;
 
     // Track current indices for contract emission
     private int _currentPostconditionIndex;
@@ -154,7 +155,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     public CSharpEmitter(ContractMode contractMode, ModuleVerificationResult? verificationResults, ModuleInheritanceResult? inheritanceResult,
-        Verification.Obligations.ObligationTracker? obligationTracker = null)
+        Verification.Obligations.ObligationTracker? obligationTracker = null,
+        Diagnostics.DiagnosticBag? diagnostics = null)
     {
         _contractMode = contractMode switch
         {
@@ -165,6 +167,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _verificationResults = verificationResults;
         _inheritanceResult = inheritanceResult;
         _obligationTracker = obligationTracker;
+        _diagnostics = diagnostics;
     }
 
     public CSharpEmitter(EmitContractMode contractMode)
@@ -211,6 +214,87 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// return an empty string; the trailing empty <c>AppendLine</c> preserves the
     /// blank line the previous inline emission produced.
     /// </summary>
+    /// <summary>
+    /// W1 Slice 1 (T2, #764 stopgap): the postcondition lowering rewrites only
+    /// DIRECT-CHILD return statements — a nested return would bypass the emitted
+    /// postcondition check entirely, and an early top-level return would become an
+    /// assignment that keeps executing the rest of the body. Lowering is therefore
+    /// refused — loudly, via Calor1001 — unless every return is the single final
+    /// top-level statement. Unknown statement kinds (and raw C#) are conservatively
+    /// assumed to contain returns.
+    /// </summary>
+    private static bool CanLowerPostconditions(IReadOnlyList<StatementNode> body)
+    {
+        for (var i = 0; i < body.Count; i++)
+        {
+            if (i == body.Count - 1 && body[i] is ReturnStatementNode)
+            {
+                continue; // the single final top-level return: the shape the lowering handles
+            }
+            if (StatementSubtreeMayContainReturn(body[i]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool BodyContainsAnyReturn(IReadOnlyList<StatementNode> body)
+        => body.Any(StatementSubtreeMayContainReturn);
+
+    private static bool StatementSubtreeMayContainReturn(StatementNode stmt) => stmt switch
+    {
+        ReturnStatementNode => true,
+        IfStatementNode i => i.ThenBody.Any(StatementSubtreeMayContainReturn)
+            || i.ElseIfClauses.Any(c => c.Body.Any(StatementSubtreeMayContainReturn))
+            || (i.ElseBody != null && i.ElseBody.Any(StatementSubtreeMayContainReturn)),
+        ForStatementNode f => f.Body.Any(StatementSubtreeMayContainReturn),
+        WhileStatementNode w => w.Body.Any(StatementSubtreeMayContainReturn),
+        DoWhileStatementNode d => d.Body.Any(StatementSubtreeMayContainReturn),
+        ForeachStatementNode fe => fe.Body.Any(StatementSubtreeMayContainReturn),
+        DictionaryForeachNode df => df.Body.Any(StatementSubtreeMayContainReturn),
+        TryStatementNode t => t.TryBody.Any(StatementSubtreeMayContainReturn)
+            || t.CatchClauses.Any(c => c.Body.Any(StatementSubtreeMayContainReturn))
+            || (t.FinallyBody != null && t.FinallyBody.Any(StatementSubtreeMayContainReturn)),
+        UsingStatementNode u => u.Body.Any(StatementSubtreeMayContainReturn),
+        UnsafeBlockNode ub => ub.Body.Any(StatementSubtreeMayContainReturn),
+        FixedStatementNode fx => fx.Body.Any(StatementSubtreeMayContainReturn),
+        SyncBlockNode sb => sb.Body.Any(StatementSubtreeMayContainReturn),
+        MatchStatementNode m => m.Cases.Any(c => c.Body.Any(StatementSubtreeMayContainReturn)),
+        // Leaves that cannot contain a function-level return. Lambda-carrying
+        // statements are deliberately leaves: a return inside a lambda exits the
+        // lambda, not the enclosing function.
+        AssignmentStatementNode or CompoundAssignmentStatementNode or BindStatementNode
+            or CallStatementNode or ExpressionStatementNode or PrintStatementNode
+            or ThrowStatementNode or RethrowStatementNode or BreakStatementNode
+            or ContinueStatementNode or GotoStatementNode or LabelStatementNode
+            or YieldReturnStatementNode or YieldBreakStatementNode
+            or CollectionPushNode or DictionaryPutNode or CollectionRemoveNode
+            or CollectionSetIndexNode or CollectionClearNode or CollectionInsertNode
+            or EventSubscribeNode or EventUnsubscribeNode or ProofObligationNode
+            or FallbackCommentNode or PreprocessorDirectiveNode => false,
+        // RawCSharpNode can literally contain `return ...;`; unknown kinds are
+        // conservatively assumed to.
+        _ => true
+    };
+
+    /// <summary>
+    /// Substitutes the postcondition's `result` pseudo-variable with the lowered
+    /// local using a word boundary — the previous plain string Replace corrupted
+    /// every identifier CONTAINING "result" (`resultCode` → `__result__Code`).
+    /// </summary>
+    private static string SubstituteResultIdentifier(string check)
+        => System.Text.RegularExpressions.Regex.Replace(check, @"\bresult\b", "__result__");
+
+    private void ReportPostconditionChecksNotLowered(string declarationName, Parsing.TextSpan span)
+    {
+        _diagnostics?.Add(new Diagnostics.Diagnostic(
+            Diagnostics.DiagnosticCode.PostconditionCheckNotLowered,
+            $"Postcondition runtime checks for '{declarationName}' were NOT emitted: its body has an early, nested, or raw-C# return that the current check lowering cannot instrument (the check would be silently skipped or the body's execution order changed). Static verification is unaffected; a non-proven postcondition on this declaration has no runtime net until the structural lowering (#764) lands.",
+            span,
+            Diagnostics.DiagnosticSeverity.Warning));
+    }
+
     private void EmitStatement(AstNode statement, bool skipEmptyLine = false)
     {
         var mapped = TryBeginLineMapping(statement);
@@ -628,8 +712,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine(check);
         }
 
-        // If we have postconditions and a return value, we need special handling
-        if (node.Postconditions.Count > 0 && hasReturnValue)
+        // If we have postconditions and a return value, we need special handling.
+        // W1 Slice 1 (T2): only when the body shape is one the lowering can
+        // instrument faithfully — otherwise emit the body untransformed and say so.
+        if (node.Postconditions.Count > 0 && hasReturnValue && CanLowerPostconditions(node.Body))
         {
             AppendLine($"{mappedReturnType} __result__ = default;");
             AppendLine();
@@ -654,8 +740,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // Emit postconditions (ENSURES)
             foreach (var ensures in node.Postconditions)
             {
-                // Replace 'result' references with '__result__'
-                var check = Visit(ensures).Replace("result", "__result__");
+                // Replace 'result' references with '__result__' (word-boundary)
+                var check = SubstituteResultIdentifier(Visit(ensures));
                 AppendLine(check);
             }
 
@@ -663,6 +749,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else
         {
+            if (node.Postconditions.Count > 0 && hasReturnValue)
+            {
+                // Unlowerable body shape: real returns preserved, checks omitted LOUDLY.
+                ReportPostconditionChecksNotLowered(node.Name, node.Span);
+            }
+
             // No postconditions or void return - emit body normally
             foreach (var statement in node.Body)
             {
@@ -670,10 +762,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
 
             // Emit postconditions for void functions (they can't reference 'result')
-            foreach (var ensures in node.Postconditions)
+            if (node.Postconditions.Count > 0 && !hasReturnValue && BodyContainsAnyReturn(node.Body))
             {
-                var check = Visit(ensures);
-                AppendLine(check);
+                // A void body with ANY return exits before the trailing checks —
+                // they were silently skippable; now they are loudly omitted (T2).
+                ReportPostconditionChecksNotLowered(node.Name, node.Span);
+            }
+            else if (!hasReturnValue)
+            {
+                foreach (var ensures in node.Postconditions)
+                {
+                    var check = Visit(ensures);
+                    AppendLine(check);
+                }
             }
         }
 
@@ -1605,7 +1706,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         // If we have postconditions and a return value, we need special handling
-        if (method.Postconditions.Count > 0 && hasReturnValue)
+        // (W1 Slice 1 T2: only for lowerable body shapes — see CanLowerPostconditions)
+        if (method.Postconditions.Count > 0 && hasReturnValue && CanLowerPostconditions(method.Body))
         {
             AppendLine($"{mappedReturnType} __result__ = default;");
             AppendLine();
@@ -1628,7 +1730,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine();
             foreach (var ensures in method.Postconditions)
             {
-                var check = Visit(ensures).Replace("result", "__result__");
+                var check = SubstituteResultIdentifier(Visit(ensures));
                 AppendLine(check);
             }
 
@@ -1636,15 +1738,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else
         {
+            if (method.Postconditions.Count > 0 && hasReturnValue)
+            {
+                ReportPostconditionChecksNotLowered(method.Name, method.Span);
+            }
+
             foreach (var statement in method.Body)
             {
                 EmitStatement(statement);
             }
 
-            foreach (var ensures in method.Postconditions)
+            if (method.Postconditions.Count > 0 && !hasReturnValue && BodyContainsAnyReturn(method.Body))
             {
-                var check = Visit(ensures);
-                AppendLine(check);
+                ReportPostconditionChecksNotLowered(method.Name, method.Span);
+            }
+            else if (!hasReturnValue)
+            {
+                foreach (var ensures in method.Postconditions)
+                {
+                    var check = Visit(ensures);
+                    AppendLine(check);
+                }
             }
         }
 
@@ -2703,7 +2817,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var hasInheritedPostconditions = !node.HasContracts && inheritedContracts != null && inheritedContracts.Postconditions.Count > 0;
 
         // Handle postconditions similar to FunctionNode
-        if (effectivePostconditions.Count > 0 && hasReturnValue)
+        // (W1 Slice 1 T2: only for lowerable body shapes — see CanLowerPostconditions)
+        if (effectivePostconditions.Count > 0 && hasReturnValue && CanLowerPostconditions(node.Body))
         {
             AppendLine($"{mappedReturnType} __result__ = default;");
             AppendLine();
@@ -2728,7 +2843,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // Emit explicit postconditions
             foreach (var ensures in node.Postconditions)
             {
-                var check = Visit(ensures).Replace("result", "__result__");
+                var check = SubstituteResultIdentifier(Visit(ensures));
                 AppendLine(check);
             }
 
@@ -2738,7 +2853,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 foreach (var ensures in inheritedContracts!.Postconditions)
                 {
                     AppendLine($"// Inherited from {inheritedContracts.InterfaceName}.{inheritedContracts.MethodName}");
-                    var check = Visit(ensures).Replace("result", "__result__");
+                    var check = SubstituteResultIdentifier(Visit(ensures));
                     AppendLine(check);
                 }
             }
@@ -2747,25 +2862,37 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else
         {
+            if (effectivePostconditions.Count > 0 && hasReturnValue)
+            {
+                ReportPostconditionChecksNotLowered(node.Name, node.Span);
+            }
+
             foreach (var statement in node.Body)
             {
                 EmitStatement(statement);
             }
 
-            foreach (var ensures in node.Postconditions)
+            if (effectivePostconditions.Count > 0 && !hasReturnValue && BodyContainsAnyReturn(node.Body))
             {
-                var check = Visit(ensures);
-                AppendLine(check);
+                ReportPostconditionChecksNotLowered(node.Name, node.Span);
             }
-
-            // Emit inherited postconditions for void methods
-            if (hasInheritedPostconditions)
+            else if (!hasReturnValue)
             {
-                foreach (var ensures in inheritedContracts!.Postconditions)
+                foreach (var ensures in node.Postconditions)
                 {
-                    AppendLine($"// Inherited from {inheritedContracts.InterfaceName}.{inheritedContracts.MethodName}");
                     var check = Visit(ensures);
                     AppendLine(check);
+                }
+
+                // Emit inherited postconditions for void methods
+                if (hasInheritedPostconditions)
+                {
+                    foreach (var ensures in inheritedContracts!.Postconditions)
+                    {
+                        AppendLine($"// Inherited from {inheritedContracts.InterfaceName}.{inheritedContracts.MethodName}");
+                        var check = Visit(ensures);
+                        AppendLine(check);
+                    }
                 }
             }
         }
@@ -2833,7 +2960,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
 
         // Handle postconditions
-        if (node.Postconditions.Count > 0 && hasReturnValue)
+        // (W1 Slice 1 T2: only for lowerable body shapes — see CanLowerPostconditions)
+        if (node.Postconditions.Count > 0 && hasReturnValue && CanLowerPostconditions(node.Body))
         {
             AppendLine($"{mappedReturnType} __result__ = default;");
             AppendLine();
@@ -2857,7 +2985,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             foreach (var ensures in node.Postconditions)
             {
-                var check = Visit(ensures).Replace("result", "__result__");
+                var check = SubstituteResultIdentifier(Visit(ensures));
                 AppendLine(check);
             }
 
@@ -2865,15 +2993,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else
         {
+            if (node.Postconditions.Count > 0 && hasReturnValue)
+            {
+                ReportPostconditionChecksNotLowered(node.Name, node.Span);
+            }
+
             foreach (var statement in node.Body)
             {
                 EmitStatement(statement);
             }
 
-            foreach (var ensures in node.Postconditions)
+            if (node.Postconditions.Count > 0 && !hasReturnValue && BodyContainsAnyReturn(node.Body))
             {
-                var check = Visit(ensures);
-                AppendLine(check);
+                ReportPostconditionChecksNotLowered(node.Name, node.Span);
+            }
+            else if (!hasReturnValue)
+            {
+                foreach (var ensures in node.Postconditions)
+                {
+                    var check = Visit(ensures);
+                    AppendLine(check);
+                }
             }
         }
 
@@ -3269,7 +3409,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             AppendLine(Visit(pre));
         }
 
-        if (node.Postconditions.Count > 0)
+        // W1 Slice 1 T2 (review #833 M1): this fifth lowering site was ungated —
+        // nested returns silently bypassed the §S check and the check used the
+        // raw `result` identifier with no substitution.
+        if (node.Postconditions.Count > 0 && CanLowerPostconditions(node.Body))
         {
             // When postconditions exist, capture the result
             // Emit body statements except for the last return
@@ -3282,7 +3425,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     AppendLine($"var __result__ = {resultExpr};");
                     foreach (var post in node.Postconditions)
                     {
-                        AppendLine(Visit(post));
+                        AppendLine(SubstituteResultIdentifier(Visit(post)));
                     }
                     AppendLine("return __result__;");
                 }
@@ -3302,6 +3445,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         else
         {
+            if (node.Postconditions.Count > 0)
+            {
+                ReportPostconditionChecksNotLowered($"operator {node.OperatorToken}", node.Span);
+            }
+
             foreach (var stmt in node.Body)
             {
                 EmitStatement(stmt);

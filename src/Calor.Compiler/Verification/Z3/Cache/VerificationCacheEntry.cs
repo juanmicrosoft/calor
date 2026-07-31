@@ -40,7 +40,14 @@ public sealed class VerificationCacheEntry
     /// polarity (false refuted with nonsense counterexamples, inverted
     /// implication verdicts).
     /// </summary>
-    public const string CurrentFormatVersion = "1.7";
+    // 1.8 (2026-07-31, W1 Slice 1): verdict semantics changed in both polarities —
+    // string.Replace un-whitelisted (first-vs-all-occurrence divergence); narrow-int
+    // arithmetic, mixed-signedness comparisons, unknown field/array widths refused
+    // (previously mis-modeled behind guessed widths/signedness); contract-expression
+    // division/modulo now carries divisor-nonzero side conditions and demotes proofs
+    // to Assumed (previously totalized). Warm caches from 1.7 could serve stale
+    // Proven/Refuted verdicts for all of these shapes.
+    public const string CurrentFormatVersion = "1.8";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.

@@ -1,6 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
+using ProofStatus = Calor.Compiler.Verification.ProofStatus;
 using Xunit;
 using System.Runtime.CompilerServices;
 
@@ -902,8 +903,15 @@ public class VerifierTests
             new[] { precondition1, precondition2 },
             postcondition);
 
-        // This should be proven - INT_MIN / -1 = INT_MIN in bit-vector arithmetic
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // W1 Slice 1 (#833 C4): bit-vector division wraps INT_MIN / -1 to
+        // INT_MIN, but the emitted runtime check `x / y == x` THROWS
+        // OverflowException at exactly this state (C# division overflow throws
+        // in checked and unchecked contexts alike). A plain Proven would elide
+        // a throwing check; the proof holds only under the overflow side
+        // condition — which these §Q violate — so: Assumed, never elides.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.ContractExpressionDivisionAssumption,
+            result.EffectiveOutcome.Assumptions);
     }
 
     // ===========================================
@@ -1631,7 +1639,9 @@ public class VerifierTests
         using var verifier = new Z3Verifier(ctx);
 
         // Postcondition: (starts (replace s "" "X") "X")
-        // Should be PROVEN because replacing empty string inserts at the beginning
+        // W1 Slice 1 (T1/D9): Replace is un-whitelisted — this obligation is now
+        // UNSUPPORTED (runtime check kept) instead of proven through a model whose
+        // first-occurrence semantics diverge from .NET's replace-all.
         var parameters = new List<(string Name, string Type)> { ("s", "string") };
 
         var postcondition = new EnsuresNode(
@@ -1661,7 +1671,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
 
     [SkippableFact]
