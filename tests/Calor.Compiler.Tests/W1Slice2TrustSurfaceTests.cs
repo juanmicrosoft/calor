@@ -31,12 +31,27 @@ public class W1Slice2TrustSurfaceTests
         public void Dispose() => Environment.SetEnvironmentVariable(name, previous);
     }
 
+    /// <summary>
+    /// #834 review M4: Initialize replaces the process-wide singleton, and the
+    /// opt-in test would otherwise leave a LIVE production-endpoint client
+    /// installed for the rest of the test run — any later Track* from any test
+    /// could buffer real events to production App Insights. Restore a disabled
+    /// singleton on dispose.
+    /// </summary>
+    private static IDisposable WithDisabledSingletonAfter() => new SingletonReset();
+
+    private sealed class SingletonReset : IDisposable
+    {
+        public void Dispose() => CalorTelemetry.Initialize(noTelemetryFlag: true);
+    }
+
     [Fact]
     public void Telemetry_DefaultInvocation_IsDisabled()
     {
         // #792: the old posture was default-ON with an embedded ingestion key,
         // sending raw diagnostics from every CLI run. A default invocation must
         // now send nothing.
+        using var reset = WithDisabledSingletonAfter();
         using var optIn = WithEnv("CALOR_TELEMETRY", null);
         using var optOut = WithEnv("CALOR_TELEMETRY_OPTOUT", null);
 
@@ -48,6 +63,7 @@ public class W1Slice2TrustSurfaceTests
     [Fact]
     public void Telemetry_OptInEnvironmentVariable_Enables()
     {
+        using var reset = WithDisabledSingletonAfter();
         using var optIn = WithEnv("CALOR_TELEMETRY", "1");
         using var optOut = WithEnv("CALOR_TELEMETRY_OPTOUT", null);
 
@@ -59,6 +75,7 @@ public class W1Slice2TrustSurfaceTests
     [Fact]
     public void Telemetry_OptOut_OverridesOptIn()
     {
+        using var reset = WithDisabledSingletonAfter();
         using var optIn = WithEnv("CALOR_TELEMETRY", "1");
         using var optOut = WithEnv("CALOR_TELEMETRY_OPTOUT", "1");
 
@@ -70,6 +87,7 @@ public class W1Slice2TrustSurfaceTests
     [Fact]
     public void Telemetry_NoTelemetryFlag_OverridesOptIn()
     {
+        using var reset = WithDisabledSingletonAfter();
         using var optIn = WithEnv("CALOR_TELEMETRY", "1");
         using var optOut = WithEnv("CALOR_TELEMETRY_OPTOUT", null);
 
@@ -161,6 +179,61 @@ public class W1Slice2TrustSurfaceTests
         {
             File.Delete(file);
         }
+    }
+
+    [Fact]
+    public async Task LintFix_WithoutExperimentalAcknowledgment_IsRefused()
+    {
+        // #834 review C1: `lint --fix` writes through the SAME CalorFormatter
+        // machinery `format --write` gates — an ungated --fix was a one-command
+        // bypass of the #793 containment.
+        using var env = WithEnv("CALOR_EXPERIMENTAL_FORMAT_WRITE", null);
+        var file = Path.Combine(Path.GetTempPath(), $"calor-w1s2-{Guid.NewGuid():N}.calr");
+        await File.WriteAllTextAsync(file, "§M{m001:T}\n");
+        try
+        {
+            var original = await File.ReadAllTextAsync(file);
+            var command = Calor.Compiler.Commands.LintCommand.Create();
+
+            var exit = await command.InvokeAsync(["--fix", file]);
+
+            Assert.Equal(1, exit);
+            Assert.Equal(original, await File.ReadAllTextAsync(file)); // untouched
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public void TelemetryInitializer_ScrubsMachineHostname()
+    {
+        // #834 review M1: the App Insights SDK stamps the machine hostname into
+        // cloud.roleInstance on every item; the initializer pins it to a
+        // constant so no payload carries host identity.
+        var telemetry = new EventTelemetry("probe");
+        telemetry.Context.Cloud.RoleInstance = Environment.MachineName;
+
+        new AnonymizingTelemetryInitializer().Initialize(telemetry);
+
+        Assert.Equal("calor-cli", telemetry.Context.Cloud.RoleInstance);
+        Assert.Equal("calor-cli", telemetry.Context.Cloud.RoleName);
+    }
+
+    [Fact]
+    public void CompilationDeterminism_SendsNothing()
+    {
+        // #834 review M2: input/output SHA hashes are derived from file content
+        // and enable exact-file identification — retired to a no-op.
+        var (telemetry, channel) = CreateTestTelemetry();
+
+        telemetry.TrackCompilationDeterminism("aabbcc", "ddeeff");
+        telemetry.TrackCompilationOutcome("aabbcc", success: true, errorCount: 0, warningCount: 0);
+
+        Assert.DoesNotContain(channel.Items, i =>
+            i is EventTelemetry e && (e.Properties.ContainsKey("inputHash") || e.Properties.ContainsKey("outputHash")));
+        Assert.DoesNotContain(channel.Items, i => i is EventTelemetry e && e.Name == "CompilationDeterminism");
     }
 
     private static (CalorTelemetry telemetry, StubTelemetryChannel channel) CreateTestTelemetry()

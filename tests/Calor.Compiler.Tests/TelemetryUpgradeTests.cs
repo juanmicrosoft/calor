@@ -302,31 +302,32 @@ public class TelemetryUpgradeTests
     #region Phase 5: Version Regression Detection Tests
 
     [Fact]
-    public void CompilationOutcome_EmitsHash_NotSource()
+    public void CompilationOutcome_EmitsNoContentHash()
     {
+        // W1 Slice 2 (#834 review M2): a content hash is derived from the
+        // user's source and enables exact-file identification - not sent.
         var (telemetry, channel) = CreateTestTelemetry();
 
         telemetry.TrackCompilationOutcome("abc123def456", true, 0, 2);
 
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
         Assert.Equal("CompilationOutcome", evt.Name);
-        Assert.Equal("abc123def456", evt.Properties["inputHash"]);
+        Assert.False(evt.Properties.ContainsKey("inputHash"));
         Assert.Equal("True", evt.Properties["success"]);
         Assert.Equal(0.0, evt.Metrics["errorCount"]);
         Assert.Equal(2.0, evt.Metrics["warningCount"]);
     }
 
     [Fact]
-    public void CompilationDeterminism_SameInput_SameHash()
+    public void CompilationDeterminism_IsRetired_SendsNothing()
     {
+        // W1 Slice 2 (#834 review M2): determinism tracking sent SHA hashes of
+        // the user's source AND the generated output - retired to a no-op.
         var (telemetry, channel) = CreateTestTelemetry();
 
         telemetry.TrackCompilationDeterminism("inputhash123456", "outputhash654321");
 
-        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
-        Assert.Equal("CompilationDeterminism", evt.Name);
-        Assert.Equal("inputhash123456", evt.Properties["inputHash"]);
-        Assert.Equal("outputhash654321", evt.Properties["outputHash"]);
+        Assert.Empty(channel.Items);
     }
 
     #endregion
@@ -377,8 +378,8 @@ public class TelemetryUpgradeTests
             .Where(e => e.Name == "CompilationOutcome").ToList();
         Assert.NotEmpty(outcomeEvents);
         var evt = outcomeEvents[0];
-        Assert.True(evt.Properties.ContainsKey("inputHash"));
-        Assert.Equal(16, evt.Properties["inputHash"].Length); // 16 hex chars
+        // W1 Slice 2 (#834 review M2): no content hash on the wire.
+        Assert.False(evt.Properties.ContainsKey("inputHash"));
         // Must not contain source code
         foreach (var value in evt.Properties.Values)
         {
@@ -396,15 +397,15 @@ public class TelemetryUpgradeTests
 
         Program.Compile(ValidCalorSource, "calculator.calr");
 
+        // W1 Slice 2 (#834 review M2): determinism events are retired - the
+        // compile path must emit none.
         var deterministicEvents = channel.Items.OfType<EventTelemetry>()
             .Where(e => e.Name == "CompilationDeterminism").ToList();
-        Assert.NotEmpty(deterministicEvents);
-        Assert.True(deterministicEvents[0].Properties.ContainsKey("inputHash"));
-        Assert.True(deterministicEvents[0].Properties.ContainsKey("outputHash"));
+        Assert.Empty(deterministicEvents);
     }
 
     [Fact]
-    public void ProgramCompile_SameSource_ProducesSameHashes()
+    public void ProgramCompile_RepeatCompiles_EmitNoContentHashes()
     {
         var (telemetry, channel) = CreateTestTelemetry();
         using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
@@ -414,21 +415,12 @@ public class TelemetryUpgradeTests
         Program.Compile(ValidCalorSource, "calculator.calr");
         Program.Compile(ValidCalorSource, "calculator.calr");
 
-        var deterministicEvents = channel.Items.OfType<EventTelemetry>()
-            .Where(e => e.Name == "CompilationDeterminism").ToList();
-        Assert.True(deterministicEvents.Count >= 2,
-            $"Expected at least 2 CompilationDeterminism events, got {deterministicEvents.Count}");
-
-        // Group by inputHash — our two compilations should share the same hash
-        var groups = deterministicEvents.GroupBy(e => e.Properties["inputHash"])
-            .Where(g => g.Count() >= 2)
-            .ToList();
-        Assert.NotEmpty(groups); // At least one inputHash appears 2+ times
-
-        // For that group, all outputHashes should be identical (deterministic)
-        var matchingGroup = groups.First();
-        var outputHashes = matchingGroup.Select(e => e.Properties["outputHash"]).Distinct().ToList();
-        Assert.Single(outputHashes);
+        // W1 Slice 2 (#834 review M2): hashes retired - no determinism events,
+        // and no property named *Hash on any emitted event.
+        Assert.Empty(channel.Items.OfType<EventTelemetry>()
+            .Where(e => e.Name == "CompilationDeterminism"));
+        Assert.DoesNotContain(channel.Items.OfType<EventTelemetry>(),
+            e => e.Properties.Keys.Any(k => k.Contains("Hash", StringComparison.OrdinalIgnoreCase)));
     }
 
     [Fact]

@@ -723,7 +723,7 @@ public class SyntaxHelpTelemetryTests
 
         // Filter by feature name to isolate from concurrent non-collection tests
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
-            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["feature"] == "contracts"));
+            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["featureLength"] == "contracts".Length.ToString()));
         Assert.Equal("contracts", evt.Properties["resolvedCategory"]);
         Assert.Equal("True", evt.Properties["isHit"]);
         Assert.True(int.Parse(evt.Properties["resultCount"]) > 0);
@@ -743,7 +743,7 @@ public class SyntaxHelpTelemetryTests
 
         // Filter by feature name to isolate from concurrent non-collection tests
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
-            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["feature"] == "unknown_feature_xyz"));
+            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["featureLength"] == "unknown_feature_xyz".Length.ToString()));
         Assert.Equal("none", evt.Properties["resolvedCategory"]);
         Assert.Equal("False", evt.Properties["isHit"]);
         Assert.Equal("0", evt.Properties["resultCount"]);
@@ -764,7 +764,7 @@ public class SyntaxHelpTelemetryTests
 
         // Filter by feature name to isolate from concurrent non-collection tests
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
-            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["feature"] == "await"));
+            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["featureLength"] == "await".Length.ToString()));
         Assert.Equal("async", evt.Properties["resolvedCategory"]);
     }
 
@@ -787,7 +787,9 @@ public class SyntaxHelpTelemetryTests
 
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
         Assert.Equal("SyntaxHelpQuery", evt.Name);
-        Assert.Equal("struct", evt.Properties["feature"]);
+        // W1 Slice 2 (#834 review M2): the raw query text is never sent.
+        Assert.False(evt.Properties.ContainsKey("feature"));
+        Assert.Equal("6", evt.Properties["featureLength"]);
         Assert.Equal("structs", evt.Properties["resolvedCategory"]);
         Assert.Equal("2", evt.Properties["resultCount"]);
         Assert.Equal("True", evt.Properties["isHit"]);
@@ -832,7 +834,7 @@ public class SyntaxHelpTelemetryTests
             await tool.ExecuteAsync(args);
 
             var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
-                .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["feature"] == "testtopic"));
+                .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["featureLength"] == "testtopic".Length.ToString()));
             Assert.Equal("8", evt.Properties["resultCount"]);
             var sectionCount = evt.Properties["matchedSections"].Split(';').Length;
             Assert.Equal(5, sectionCount);

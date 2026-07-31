@@ -1,8 +1,13 @@
 # SHA-256 manifest for the repo's z3-binaries-4.15.7 release assets
 # (W1 Slice 2, #789). publish-nuget.yml verifies every download against
 # this file before packing — a missing or corrupt native fails the release
-# instead of shipping inside the nupkg. Regenerate ONLY when the
-# z3-binaries release is deliberately republished:
+# instead of shipping inside the nupkg.
+# Provenance (trust-on-first-use): computed 2026-07-31 by downloading the
+# then-current z3-binaries-4.15.7 release assets and hashing them — the pin
+# guarantees the RELEASE cannot change silently afterward, not that the
+# original upload was audited. Regenerate ONLY when the z3-binaries release
+# is deliberately republished, and only from a build-z3.yml run whose
+# upstream inputs verified against scripts/z3-upstream-4.15.7.sha256:
 #   for a in <assets>; do curl -fL -o "$a" "$RELEASE_URL/$a"; done && shasum -a 256 *
 b9b26761e2da23c38836e65cbc0dd0e50f5bace35293b4be1385265f64cd3124  Microsoft.Z3.dll
 9646bb8e5599a93bc4f26c9c593d6e0261f029eee73a896f15ce8502fc22d55b  libz3-linux-arm64.so

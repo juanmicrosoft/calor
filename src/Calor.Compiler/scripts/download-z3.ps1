@@ -9,6 +9,30 @@ $RUNTIMES_DIR = Join-Path $SCRIPT_DIR "..\runtimes"
 $Z3_DIR = Join-Path $SCRIPT_DIR "..\z3"
 $TEMP_DIR = Join-Path $SCRIPT_DIR "..\.z3-temp"
 
+# W1 Slice 2 (#789, #834 review M3): verify every downloaded archive against
+# the committed SHA-256 manifest before extracting anything from it.
+$CHECKSUM_MANIFEST = Join-Path $SCRIPT_DIR "z3-upstream-$Z3_VERSION.sha256"
+function Test-ArchiveChecksum {
+    param([string]$ZipFile)
+    $name = Split-Path -Leaf $ZipFile
+    if (-not (Test-Path $CHECKSUM_MANIFEST)) {
+        throw "Checksum manifest $CHECKSUM_MANIFEST missing - refusing to use unverified Z3 archives"
+    }
+    $expected = (Get-Content $CHECKSUM_MANIFEST |
+        Where-Object { $_ -notmatch '^#' -and $_ -match [regex]::Escape($name) } |
+        ForEach-Object { ($_ -split '\s+')[0] } |
+        Select-Object -First 1)
+    if (-not $expected) {
+        throw "No checksum entry for $name in $CHECKSUM_MANIFEST"
+    }
+    $actual = (Get-FileHash -Algorithm SHA256 -Path $ZipFile).Hash.ToLowerInvariant()
+    if ($actual -ne $expected.ToLowerInvariant()) {
+        Remove-Item -Force $ZipFile
+        throw "Checksum mismatch for ${name}: expected $expected, got $actual"
+    }
+    Write-Host "  [verified] $name"
+}
+
 # Platform mappings
 $PLATFORMS = @(
     @{ rid = "osx-arm64"; archive = "z3-$Z3_VERSION-arm64-osx-15.7.3"; lib = "libz3.dylib" },
@@ -63,6 +87,7 @@ if (-not $managedDllExists) {
     if (-not (Test-Path $zipFile)) {
         Invoke-WebRequest -Uri "$BASE_URL/$MANAGED_DLL_ARCHIVE.zip" -OutFile $zipFile
     }
+    Test-ArchiveChecksum -ZipFile $zipFile
 
     # Extract
     Expand-Archive -Path $zipFile -DestinationPath $TEMP_DIR -Force
@@ -100,6 +125,7 @@ foreach ($platform in $PLATFORMS) {
     if (-not (Test-Path $zipFile)) {
         Invoke-WebRequest -Uri "$BASE_URL/$archive.zip" -OutFile $zipFile
     }
+    Test-ArchiveChecksum -ZipFile $zipFile
 
     # Extract
     Expand-Archive -Path $zipFile -DestinationPath $TEMP_DIR -Force

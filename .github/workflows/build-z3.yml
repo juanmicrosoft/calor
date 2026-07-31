@@ -134,14 +134,36 @@ jobs:
             lib: libz3.dll
 
     steps:
-      - name: Download Z3 binaries
+      - uses: actions/checkout@v4
+
+      # W1 Slice 2 (#789, #834 review M3): this job's output BECOMES the
+      # z3-binaries release that publish-nuget later trusts — an unverified
+      # fetch here would launder a poisoned upstream archive into a pinned,
+      # "verified" release. Verify against the same committed manifest
+      # download-z3.sh uses, fail-closed.
+      - name: Download Z3 binaries (checksum-verified)
         run: |
+          set -euo pipefail
           BASE_URL="https://github.com/Z3Prover/z3/releases/download/z3-${{ env.Z3_VERSION }}"
           ARCHIVE="z3-${{ env.Z3_VERSION }}-${{ matrix.archive }}"
+          MANIFEST="src/Calor.Compiler/scripts/z3-upstream-${{ env.Z3_VERSION }}.sha256"
+
+          if [ ! -s "$MANIFEST" ]; then
+            echo "::error::Z3 upstream checksum manifest $MANIFEST is missing — refusing to publish unverified binaries"
+            exit 1
+          fi
 
           mkdir -p artifacts
 
-          curl -L -o z3.zip "${BASE_URL}/${ARCHIVE}.zip"
+          curl -fL -sS --retry 5 --retry-delay 3 -o z3.zip "${BASE_URL}/${ARCHIVE}.zip"
+
+          EXPECTED="$(grep -v '^#' "$MANIFEST" | awk -v n="${ARCHIVE}.zip" '$2 == n {print $1}')"
+          if [ -z "$EXPECTED" ]; then
+            echo "::error::no checksum entry for ${ARCHIVE}.zip in $MANIFEST"
+            exit 1
+          fi
+          echo "$EXPECTED  z3.zip" | sha256sum --check --strict -
+
           unzip -q z3.zip
 
           # Copy native library

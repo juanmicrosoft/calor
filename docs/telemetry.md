@@ -12,25 +12,41 @@ of `calor` sends nothing, to anyone, ever.
 
 ## What is sent when enabled
 
-All payloads are metadata-only. The exact inventory:
+All payloads are metadata-only. The exact inventory (audited against the code
+in the #834 review — an item not on this list being transmitted is a bug):
 
-- **Command names** and exit codes (`compile`, `verify`, …) and wall-clock durations.
-- **Diagnostic codes** (e.g. `Calor0410`) with severity — **never diagnostic
-  message text**, which can embed source fragments, identifiers, literals, and
-  file paths.
+- **Command names**, the sequence of commands in a session, exit codes, and
+  wall-clock durations (total and per compiler phase).
+- **Diagnostic codes** (e.g. `Calor0410`) with severity, per-code counts, and
+  code co-occurrence pairs — **never diagnostic message text**, which can embed
+  source fragments, identifiers, literals, and file paths.
 - **Exception type names** (e.g. `System.IO.IOException`) — **never exception
   messages or stack traces**.
-- **Aggregate input profiles**: line-count bucket (small/medium/large/xlarge),
-  estimated token count, and boolean feature flags (has-contracts, has-effects,
-  has-modules). No source content.
+- **Aggregate input profiles**: line count and size bucket
+  (small/medium/large/xlarge), estimated token count, and boolean feature flags
+  (has-contracts, has-effects, has-modules). No source content.
+- **Compile configuration**: which compiler flags/modes were active (a
+  fixed-vocabulary flag map), compilation success, and error/warning counts.
+- **Conversion/migration metadata**: unsupported-feature names from the
+  compiler's own fixed registry, with counts and line numbers.
+- **Help-query shape**: query **length** and hit/miss for `calor_help` lookups,
+  plus matched section titles from the compiler's own documentation — never the
+  query text itself.
 - **Session metadata**: a random per-invocation operation ID (not tied to
-  machine or user identity), OS platform, compiler version.
+  machine or user identity), OS description and process architecture as
+  reported by .NET, the .NET and Calor versions, and the coding-agent name when
+  one identifies itself (e.g. `claude-code`). The Application Insights cloud
+  role is pinned to the constant `calor-cli` — the SDK's default would transmit
+  your machine's hostname, which is explicitly scrubbed.
 
 ## What is never sent
 
 Source code, file paths, file names, identifiers, diagnostic messages,
-exception messages, stack traces, environment variables, or anything derived
-from the content of your files beyond the aggregate profile above.
+exception messages, stack traces, environment variables, machine hostnames, or
+anything derived from the content of your files beyond the aggregate profile
+above — including content hashes: earlier builds sent SHA hashes of the input
+source and generated output for determinism tracking; those enable exact-file
+identification and were removed in the same change that made telemetry opt-in.
 
 ## Where it goes
 

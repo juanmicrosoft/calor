@@ -20,6 +20,21 @@ namespace Calor.Compiler.Telemetry;
 /// aggregate input profiles. See docs/telemetry.md for the full inventory.
 /// </para>
 /// </summary>
+/// <summary>
+/// Strips machine-identifying context the Application Insights SDK attaches
+/// automatically (W1 Slice 2, #834 review M1): the default channel stamps the
+/// machine HOSTNAME into cloud.roleInstance on every item. Replaced with a
+/// constant so no payload carries host or device identity.
+/// </summary>
+public sealed class AnonymizingTelemetryInitializer : ITelemetryInitializer
+{
+    public void Initialize(Microsoft.ApplicationInsights.Channel.ITelemetry telemetry)
+    {
+        telemetry.Context.Cloud.RoleInstance = "calor-cli";
+        telemetry.Context.Cloud.RoleName = "calor-cli";
+    }
+}
+
 public sealed class CalorTelemetry : IDisposable
 {
     private const string ConnectionString =
@@ -99,6 +114,10 @@ public sealed class CalorTelemetry : IDisposable
         {
             var config = TelemetryConfiguration.CreateDefault();
             config.ConnectionString = ConnectionString;
+            // #834 review M1: without this initializer the SDK auto-attaches the
+            // MACHINE HOSTNAME as ai.cloud.roleInstance on every item — hostnames
+            // commonly embed the user's personal name. Scrub to a constant.
+            config.TelemetryInitializers.Add(new AnonymizingTelemetryInitializer());
             _client = new TelemetryClient(config);
 
             // Set anonymous context
@@ -544,7 +563,10 @@ public sealed class CalorTelemetry : IDisposable
     // ── MCP Tool Telemetry ─────────────────────────────────────────────
 
     /// <summary>
-    /// Tracks a syntax help query, including whether it produced results.
+    /// Tracks a syntax help query's SHAPE, never its content (W1 Slice 2, #834
+    /// review M2): the feature string is free-form user/agent text and is not
+    /// sent — only its length, the resolved category (our own vocabulary), the
+    /// hit/miss outcome, and matched section titles (our own doc headings).
     /// </summary>
     public void TrackSyntaxHelpQuery(string feature, string? resolvedCategory, int resultCount, string? matchedSections)
     {
@@ -553,7 +575,7 @@ public sealed class CalorTelemetry : IDisposable
         try
         {
             var telemetry = new EventTelemetry("SyntaxHelpQuery");
-            telemetry.Properties["feature"] = feature;
+            telemetry.Properties["featureLength"] = (feature?.Length ?? 0).ToString();
             telemetry.Properties["resolvedCategory"] = resolvedCategory ?? "none";
             telemetry.Properties["resultCount"] = resultCount.ToString();
             telemetry.Properties["isHit"] = (resultCount > 0).ToString();
@@ -574,7 +596,11 @@ public sealed class CalorTelemetry : IDisposable
     // ── Phase 5: Version Regression Detection ─────────────────────────
 
     /// <summary>
-    /// Tracks a compilation outcome with input hash for regression detection.
+    /// Tracks a compilation outcome. W1 Slice 2 (#834 review M2): the input
+    /// hash is NOT sent — a content hash is derived from the user's source and
+    /// enables exact-file identification, contradicting the metadata-only
+    /// contract (docs/telemetry.md). The parameter is kept for call-site
+    /// stability and discarded.
     /// </summary>
     public void TrackCompilationOutcome(string inputHash, bool success, int errorCount, int warningCount)
     {
@@ -582,8 +608,8 @@ public sealed class CalorTelemetry : IDisposable
 
         try
         {
+            _ = inputHash;
             var telemetry = new EventTelemetry("CompilationOutcome");
-            telemetry.Properties["inputHash"] = inputHash;
             telemetry.Properties["success"] = success.ToString();
             telemetry.Properties["version"] = GetCalorVersion();
             telemetry.Metrics["errorCount"] = errorCount;
@@ -601,28 +627,16 @@ public sealed class CalorTelemetry : IDisposable
     }
 
     /// <summary>
-    /// Tracks compilation determinism (same input should produce same output).
+    /// W1 Slice 2 (#834 review M2): retired to a no-op. Determinism tracking
+    /// sent SHA hashes of the user's source AND generated output — both derived
+    /// from file content, both enabling exact-file identification. A
+    /// server-side determinism signal needs a content-free design; until one
+    /// exists, nothing is sent. Signature kept for call-site stability.
     /// </summary>
     public void TrackCompilationDeterminism(string inputHash, string outputHash)
     {
-        if (_client == null) return;
-
-        try
-        {
-            var telemetry = new EventTelemetry("CompilationDeterminism");
-            telemetry.Properties["inputHash"] = inputHash;
-            telemetry.Properties["outputHash"] = outputHash;
-            telemetry.Properties["version"] = GetCalorVersion();
-
-            foreach (var kvp in _commandProperties)
-                telemetry.Properties[kvp.Key] = kvp.Value;
-
-            _client.TrackEvent(telemetry);
-        }
-        catch
-        {
-            // Never crash the CLI
-        }
+        _ = inputHash;
+        _ = outputHash;
     }
 
     // ── Flush & Dispose ───────────────────────────────────────────────
