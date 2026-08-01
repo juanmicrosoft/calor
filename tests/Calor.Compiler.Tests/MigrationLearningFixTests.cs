@@ -840,13 +840,14 @@ public class MigrationLearningFixTests
         var result = _converter.Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
 
-        var cls = result.Ast!.Classes.First();
-        // "Name" has an explicit property, so primary constructor should NOT create a duplicate
-        var nameProps = cls.Properties.Where(p => p.Name == "Name").ToList();
-        Assert.Single(nameProps);
-        // "Age" has no explicit member, so primary constructor SHOULD create it
-        var ageProps = cls.Properties.Where(p => p.Name == "Age").ToList();
-        Assert.Single(ageProps);
+        // W1 Slice 3 (#773): records are preserved verbatim as §CSHARP interop
+        // while the registry marks them NotSupported (the native conversion
+        // emitted a class with no constructor). The property-dedup logic in
+        // ConvertRecord stays dormant until records go native again.
+        Assert.Empty(result.Ast!.Classes);
+        var interop = Assert.Single(result.Ast.InteropBlocks);
+        Assert.Contains("record Person(string Name, int Age)", interop.CSharpCode);
+        Assert.Contains("public string Name { get; init; } = Name;", interop.CSharpCode);
     }
 
     [Fact]
@@ -866,11 +867,14 @@ public class MigrationLearningFixTests
         var result = _converter.Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
 
-        var cls = result.Ast!.Classes.First();
-        // Both params have explicit properties — no extra properties should be generated
-        Assert.Equal(2, cls.Properties.Count);
-        Assert.Single(cls.Properties.Where(p => p.Name == "Key"));
-        Assert.Single(cls.Properties.Where(p => p.Name == "Value"));
+        // W1 Slice 3 (#773): records are preserved verbatim as §CSHARP interop
+        // while the registry marks them NotSupported — nothing is dropped and
+        // no broken class shape is emitted.
+        Assert.Empty(result.Ast!.Classes);
+        var interop = Assert.Single(result.Ast.InteropBlocks);
+        Assert.Contains("record Config(string Key, string Value)", interop.CSharpCode);
+        Assert.Contains("public string Key { get; init; } = Key;", interop.CSharpCode);
+        Assert.Contains("public string Value { get; init; } = Value;", interop.CSharpCode);
     }
 
     #endregion

@@ -1,9 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Migration;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using CalorProgram = Calor.Compiler.Program;
 using CalorCompilationOptions = Calor.Compiler.CompilationOptions;
 using CalorCompilationResult = Calor.Compiler.CompilationResult;
@@ -59,7 +58,8 @@ public class ConversionScorecardRunner
                 CompilationSuccess: false,
                 CompilationErrors: 0,
                 CompilationDiagnostics: Array.Empty<string>(),
-                RoslynParseSuccess: false,
+                CSharpSyntaxSuccess: false,
+                CSharpCompilationSuccess: false,
                 ConversionDuration: TimeSpan.Zero,
                 CompilationDuration: TimeSpan.Zero);
         }
@@ -88,7 +88,8 @@ public class ConversionScorecardRunner
                 CompilationSuccess: false,
                 CompilationErrors: 0,
                 CompilationDiagnostics: Array.Empty<string>(),
-                RoslynParseSuccess: false,
+                CSharpSyntaxSuccess: false,
+                CSharpCompilationSuccess: false,
                 ConversionDuration: TimeSpan.Zero,
                 CompilationDuration: TimeSpan.Zero);
         }
@@ -114,7 +115,8 @@ public class ConversionScorecardRunner
                 CompilationSuccess: false,
                 CompilationErrors: 0,
                 CompilationDiagnostics: Array.Empty<string>(),
-                RoslynParseSuccess: false,
+                CSharpSyntaxSuccess: false,
+                CSharpCompilationSuccess: false,
                 ConversionDuration: conversionDuration,
                 CompilationDuration: TimeSpan.Zero);
         }
@@ -150,7 +152,8 @@ public class ConversionScorecardRunner
                 CompilationSuccess: false,
                 CompilationErrors: 1,
                 CompilationDiagnostics: new[] { $"Compiler crash: {ex.GetType().Name}: {ex.Message}" },
-                RoslynParseSuccess: false,
+                CSharpSyntaxSuccess: false,
+                CSharpCompilationSuccess: false,
                 ConversionDuration: conversionDuration,
                 CompilationDuration: TimeSpan.Zero);
         }
@@ -174,30 +177,34 @@ public class ConversionScorecardRunner
                 CompilationSuccess: false,
                 CompilationErrors: compilationDiagnostics.Length,
                 CompilationDiagnostics: compilationDiagnostics,
-                RoslynParseSuccess: false,
+                CSharpSyntaxSuccess: false,
+                CSharpCompilationSuccess: false,
                 ConversionDuration: conversionDuration,
                 CompilationDuration: compilationDuration);
         }
 
-        // Stage 3: Roslyn syntax check
-        var roslynSuccess = false;
+        // Stage 3: Roslyn validation of the generated C# — a full semantic
+        // compilation through the shared production helper, split into syntax
+        // vs compilation success (#771). "FullyConverted" previously required
+        // only a parse, silently counting type-invalid output as success.
+        var csharpSyntaxSuccess = false;
+        var csharpCompilationSuccess = false;
         if (!string.IsNullOrWhiteSpace(compilationResult.GeneratedCode))
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(compilationResult.GeneratedCode);
-            var roslynDiags = syntaxTree.GetDiagnostics()
-                .Where(d => d.Severity == DiagnosticSeverity.Error)
-                .ToList();
-            roslynSuccess = roslynDiags.Count == 0;
+            var validation = GeneratedCSharpCompiler.Validate(compilationResult.GeneratedCode!);
+            csharpSyntaxSuccess = validation.SyntaxSuccess;
+            csharpCompilationSuccess = validation.CompilationSuccess;
 
-            if (!roslynSuccess)
+            if (!csharpCompilationSuccess)
             {
                 compilationDiagnostics = compilationDiagnostics
-                    .Concat(roslynDiags.Select(d => $"Roslyn: {d}"))
+                    .Concat(validation.FormattedCompilationErrors.Select(e => $"Roslyn: {e}"))
                     .ToArray();
             }
         }
 
-        var status = roslynSuccess
+        // FullyConverted = conversion + Calor compilation + C# COMPILATION.
+        var status = csharpCompilationSuccess
             ? SnippetStatus.FullyConverted
             : SnippetStatus.PartiallyConverted;
 
@@ -212,9 +219,10 @@ public class ConversionScorecardRunner
             ConversionWarnings: conversionWarnings,
             ConversionIssues: conversionIssues,
             CompilationSuccess: true,
-            CompilationErrors: roslynSuccess ? 0 : compilationDiagnostics.Length,
+            CompilationErrors: csharpCompilationSuccess ? 0 : compilationDiagnostics.Length,
             CompilationDiagnostics: compilationDiagnostics,
-            RoslynParseSuccess: roslynSuccess,
+            CSharpSyntaxSuccess: csharpSyntaxSuccess,
+            CSharpCompilationSuccess: csharpCompilationSuccess,
             ConversionDuration: conversionDuration,
             CompilationDuration: compilationDuration);
     }

@@ -131,10 +131,26 @@ public sealed class CSharpToCalorConverter
 
         try
         {
-            // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM
+            // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM.
+            // Stripping keeps the first #if branch UNEVALUATED and deletes the
+            // alternates — a semantic loss, recorded per directive (#770/#773).
             if (_options.StripPreprocessor)
             {
-                try { csharpSource = PreprocessorStripper.Strip(csharpSource); }
+                try
+                {
+                    var stripResult = PreprocessorStripper.StripWithReport(csharpSource);
+                    csharpSource = stripResult.Source;
+                    foreach (var directive in stripResult.ConditionalDirectives)
+                    {
+                        var dropped = directive.DroppedLines > 0
+                            ? $"; {directive.DroppedLines} line(s) of the inactive branch dropped"
+                            : "";
+                        context.RecordLoss(ConversionLossKind.PreprocessorStripped,
+                            "preprocessor-directive",
+                            $"'{directive.Directive}' stripped (first branch kept unevaluated{dropped})",
+                            directive.Line);
+                    }
+                }
                 catch (Exception stripEx)
                 {
                     context.AddError($"Preprocessor stripping failed: {stripEx.GetType().Name}: {stripEx.Message}");
@@ -451,6 +467,11 @@ public sealed class CSharpToCalorConverter
 
         context.Stats.InteropBlocksEmitted += interops.Count;
         context.Stats.FallbackInteropBlocksEmitted += interops.Count;
+        foreach (var interop in interops)
+        {
+            context.RecordLoss(ConversionLossKind.InteropPreserved, "post-validation-fallback",
+                interop.Reason ?? "Member re-preserved as §CSHARP after emitted Calor failed to parse (#717)");
+        }
 
         return new ModuleNode(
             module.Span, module.Id, module.Name, module.Usings,

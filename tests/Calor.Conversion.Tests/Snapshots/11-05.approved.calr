@@ -8,7 +8,7 @@
         §KV "Alice" 95
         §KV "Bob" 87
         §KV "Charlie" 92
-      §R 
+      §R dict003
 
     §MT{m004:GetImmutableScores:pub} () -> ImmutableDictionary<str, i32>
       §R ImmutableDictionary<str, i32>.Empty

@@ -1008,6 +1008,31 @@ public sealed class CalorEmitter : IAstVisitor<string>
             else
             {
                 var expr = node.Expression.Accept(this);
+
+                // Block-emitting collection initializers (§DICT/§HSET/§LIST
+                // blocks) append their binding block and return "" — the naive
+                // `§R {expr}` then emits a bare `§R` that re-parses as
+                // return-VOID, silently dropping the return value (exposed by
+                // the #771 compile gate). Reference the block's binding instead.
+                // Inline-emitting collections (e.g. size-only §ARR) return a
+                // non-empty string and take the normal path.
+                if (string.IsNullOrWhiteSpace(expr))
+                {
+                    var collectionRef = node.Expression switch
+                    {
+                        ListCreationNode l => l.Id,
+                        DictionaryCreationNode d => d.Id,
+                        SetCreationNode s => s.Id,
+                        ArrayCreationNode a => a.Id,
+                        MultiDimArrayCreationNode m => m.Id,
+                        _ => null
+                    };
+                    if (collectionRef != null)
+                    {
+                        expr = collectionRef;
+                    }
+                }
+
                 AppendLine($"§R {expr}");
             }
         }

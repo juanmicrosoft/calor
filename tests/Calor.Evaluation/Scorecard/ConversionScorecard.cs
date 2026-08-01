@@ -23,11 +23,15 @@ public record SnippetResult(
     bool CompilationSuccess,
     int CompilationErrors,
     string[] CompilationDiagnostics,
-    bool RoslynParseSuccess,
+    bool CSharpSyntaxSuccess,
+    bool CSharpCompilationSuccess,
     TimeSpan ConversionDuration,
     TimeSpan CompilationDuration)
 {
-    public bool RoundTripSuccess => ConversionSuccess && CompilationSuccess && RoslynParseSuccess;
+    // #771: round-trip success requires the generated C# to COMPILE (full
+    // Roslyn semantic compilation), not merely parse — syntax-valid but
+    // type-invalid output no longer counts.
+    public bool RoundTripSuccess => ConversionSuccess && CompilationSuccess && CSharpCompilationSuccess;
 }
 
 public record ConversionScorecard(

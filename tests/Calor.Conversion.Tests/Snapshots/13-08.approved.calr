@@ -6,13 +6,13 @@
       §DICT{dict003:str:i32}
         §KV "a" §C{Compute} §A 1 §/C
         §KV "b" §C{Compute} §A 2 §/C
-      §R 
+      §R dict003
 
     §MT{m004:GetNames:pub} () -> Set<str>
       §HSET{set005:str}
         §C{Format} §A "x" §/C
         §C{Format} §A "y" §/C
-      §R 
+      §R set005
 
     §MT{m006:Compute:priv} (i32:x) -> i32
       §R (* x 2)

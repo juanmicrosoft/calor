@@ -192,14 +192,12 @@ public class PrimaryConstructorTests
         var result = _converter.Convert(csharp);
         Assert.True(result.Success, FormatIssues(result));
 
-        var cls = Assert.Single(result.Ast!.Classes);
-        Assert.Equal("Person", cls.Name);
-
-        // Record primary ctor params become public properties (not fields)
-        Assert.Empty(cls.Fields);
-        Assert.Equal(2, cls.Properties.Count);
-        Assert.Contains(cls.Properties, p => p.Name == "Name");
-        Assert.Contains(cls.Properties, p => p.Name == "Age");
+        // W1 Slice 3 (#773): records are preserved verbatim as §CSHARP interop
+        // while the registry marks them NotSupported — the old native path
+        // produced properties but NO constructor (non-compiling C#).
+        Assert.Empty(result.Ast!.Classes);
+        var interop = Assert.Single(result.Ast.InteropBlocks);
+        Assert.Contains("record Person(string Name, int Age)", interop.CSharpCode);
     }
 
     [Fact]

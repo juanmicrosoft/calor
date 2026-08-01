@@ -1351,6 +1351,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(BindStatementNode node)
     {
+        // Discard-await (`§B{_} §AWAIT ...`, produced by the C# converter for a
+        // bare `await X();` statement): emit a plain await statement. The old
+        // `var _ = await X();` form is invalid C# (CS0815) when the awaited
+        // task is non-generic, and the discard is a no-op for value-returning
+        // awaits too (exposed by the #771 compile gate).
+        if (node.Name == "_" && node.TypeName == null && node.Initializer is AwaitExpressionNode awaitInit)
+        {
+            return $"{awaitInit.Accept(this)};";
+        }
+
         var varName = SanitizeIdentifier(node.Name);
         var typeName = node.TypeName != null ? MapTypeName(node.TypeName) : "var";
 
@@ -5670,5 +5680,150 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // Default: no tracker or pending status — emit as comment
         AppendLine($"// TODO: proof obligation [{node.Id}{desc}]");
         return "";
+    }
+}
+
+/// <summary>
+/// Result of validating generated C# with a full Roslyn compilation.
+/// Splits pure syntax validity from semantic (compilation) validity so callers
+/// can report <c>CSharpSyntaxSuccess</c> and <c>CSharpCompilationSuccess</c>
+/// separately (#771).
+/// </summary>
+public sealed class GeneratedCSharpValidation
+{
+    public GeneratedCSharpValidation(
+        IReadOnlyList<Microsoft.CodeAnalysis.Diagnostic> syntaxErrors,
+        IReadOnlyList<Microsoft.CodeAnalysis.Diagnostic> compilationErrors)
+    {
+        SyntaxErrors = syntaxErrors;
+        CompilationErrors = compilationErrors;
+    }
+
+    /// <summary>Parse-level error diagnostics (syntax only).</summary>
+    public IReadOnlyList<Microsoft.CodeAnalysis.Diagnostic> SyntaxErrors { get; }
+
+    /// <summary>
+    /// Error diagnostics from the full semantic compilation (superset of syntax
+    /// errors — a syntax-broken input is also compilation-broken).
+    /// </summary>
+    public IReadOnlyList<Microsoft.CodeAnalysis.Diagnostic> CompilationErrors { get; }
+
+    /// <summary>True when the source parses with zero syntax errors.</summary>
+    public bool SyntaxSuccess => SyntaxErrors.Count == 0;
+
+    /// <summary>True when the source compiles with zero Roslyn errors.</summary>
+    public bool CompilationSuccess => CompilationErrors.Count == 0;
+
+    /// <summary>Compilation errors formatted as "CSxxxx: message (line N)".</summary>
+    public IReadOnlyList<string> FormattedCompilationErrors => CompilationErrors
+        .Select(FormatDiagnostic)
+        .ToList();
+
+    internal static string FormatDiagnostic(Microsoft.CodeAnalysis.Diagnostic d)
+    {
+        var line = d.Location.GetLineSpan().StartLinePosition.Line + 1;
+        return $"{d.Id}: {d.GetMessage()} (line {line})";
+    }
+}
+
+/// <summary>
+/// Shared Roslyn compilation helper for validating generated C# (#771/#761).
+///
+/// <para>Resolves the full trusted-platform-assembly reference set plus
+/// <c>Calor.Runtime</c>, and supplies the implicit global usings the Calor SDK
+/// provides to generated code — the same environment the production self-check
+/// exemplar compile uses (<see cref="SelfCheck.ExemplarCompileChecker"/> delegates
+/// here). Test helpers must use this instead of hand-rolled minimal reference
+/// sets, whose failures are unassertable (missing-reference noise drowns real
+/// emitter defects).</para>
+/// </summary>
+public static class GeneratedCSharpCompiler
+{
+    // Built once — enumerating the trusted-platform-assembly set is not free and
+    // the reference set is constant for the process lifetime. Lazy<T> makes the
+    // one-time build thread-safe under xUnit's parallel test classes.
+    private static readonly Lazy<IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference>> _references =
+        new(BuildReferences);
+
+    /// <summary>The reference set: all TPA assemblies plus Calor.Runtime.</summary>
+    public static IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference> References => _references.Value;
+
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("SingleFile", "IL3000",
+        Justification = "Assembly.Location is checked for empty string; the reference is skipped in single-file mode.")]
+    private static IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference> BuildReferences()
+    {
+        var tpa = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? "";
+        var references = tpa
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            .Select(p => (Microsoft.CodeAnalysis.MetadataReference)
+                Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(p))
+            .ToList();
+
+        // Belt-and-suspenders: generated C# for contract-bearing programs
+        // references Calor.Runtime; ensure it is present even if TPA omitted it.
+        var runtime = typeof(Calor.Runtime.ContractKind).Assembly.Location;
+        if (!string.IsNullOrEmpty(runtime) &&
+            !references.Any(r => (r as Microsoft.CodeAnalysis.PortableExecutableReference)?.FilePath == runtime))
+        {
+            references.Add(Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(runtime));
+        }
+
+        return references;
+    }
+
+    /// <summary>
+    /// The implicit global usings the Calor SDK provides to generated code —
+    /// mirrors Microsoft.NET.Sdk's ImplicitUsings set as of .NET 10. The emitter
+    /// relies on these (it emits <c>File.ReadAllLines(...)</c> with no
+    /// <c>using System.IO;</c>), so generated C# only compiles standalone when
+    /// they are supplied here too.
+    /// </summary>
+    public const string GlobalUsingsPreamble =
+        "global using System;\n" +
+        "global using System.Collections.Generic;\n" +
+        "global using System.IO;\n" +
+        "global using System.Linq;\n" +
+        "global using System.Net.Http;\n" +
+        "global using System.Threading;\n" +
+        "global using System.Threading.Tasks;\n";
+
+    /// <summary>
+    /// Parses and compiles one or more generated C# sources together (so
+    /// cross-file references resolve) and returns split syntax/compilation
+    /// error diagnostics. Warnings are ignored.
+    /// </summary>
+    public static GeneratedCSharpValidation Validate(params string[] csharpSources)
+    {
+        var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+            Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview);
+
+        var sourceTrees = csharpSources
+            .Select(s => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(s, parseOptions))
+            .ToList();
+
+        var syntaxErrors = sourceTrees
+            .SelectMany(t => t.GetDiagnostics())
+            .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+            .ToList();
+
+        var trees = new List<Microsoft.CodeAnalysis.SyntaxTree>
+        {
+            Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(GlobalUsingsPreamble, parseOptions),
+        };
+        trees.AddRange(sourceTrees);
+
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+            "GeneratedCSharpValidation",
+            trees,
+            References,
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+
+        var compilationErrors = compilation.GetDiagnostics()
+            .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+            .ToList();
+
+        return new GeneratedCSharpValidation(syntaxErrors, compilationErrors);
     }
 }

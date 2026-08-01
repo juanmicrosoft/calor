@@ -576,7 +576,13 @@ public static class ConversionCatalog
             }
         }
         """,
-        RoundTripSupported: true);
+        // W1 Slice 3 (#771): the honest compile gate exposed that identifiers
+        // named after type-alias keywords (@object here) emit as bare `object`
+        // — CSharpEmitter.SanitizeIdentifier deliberately excludes type-alias
+        // keywords because it is also called on type names, so `@object` cannot
+        // currently round-trip. Reclassified until the emitter separates
+        // identifier vs type-name escaping contexts.
+        RoundTripSupported: false);
 
     public static readonly ConversionSnippet NullableGenericsInArrayType = new(
         "13-03", "Phase6Regression", "Nullable types inside generic array-bracket notation",

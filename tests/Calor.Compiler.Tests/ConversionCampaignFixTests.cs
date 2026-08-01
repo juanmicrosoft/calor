@@ -1806,19 +1806,24 @@ public delegate bool Predicate<T>(T item);";
         Assert.NotNull(result.Ast);
         Assert.NotNull(result.CalorSource);
 
-        // Verify delegates are in the AST
-        Assert.Equal(2, result.Ast!.Delegates.Count);
+        // W1 Slice 3 (#773): the non-generic delegate converts natively; the
+        // generic one is preserved verbatim as §CSHARP interop (the native
+        // §DEL form has no type parameters and previously emitted
+        // `Predicate(T item)` with a dangling T — non-compiling C#).
+        Assert.Single(result.Ast!.Delegates);
         Assert.Equal("MyHandler", result.Ast.Delegates[0].Name);
 
-        // Verify delegates appear in Calor output
         var calor = result.CalorSource!;
         Assert.Contains("§DEL", calor);
+        Assert.Contains("§CSHARP", calor);
+        Assert.Contains("Predicate<T>(T item)", calor);
 
-        // Compile round-trip
+        // Compile round-trip — both delegates survive with their semantics.
         var compiled = Compile(calor);
         Assert.NotNull(compiled);
         Assert.Contains("delegate", compiled);
         Assert.Contains("MyHandler", compiled);
+        Assert.Contains("Predicate<T>", compiled);
     }
 
     [Fact]

@@ -2,8 +2,6 @@ using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 
 namespace Calor.Conversion.Tests;
 
@@ -60,35 +58,14 @@ public static class TestHelpers
     }
 
     /// <summary>
-    /// Compiles C# source with Roslyn and returns diagnostics.
-    /// Only returns errors (not warnings).
+    /// Compiles C# source with Roslyn and returns the split syntax/compilation
+    /// validation. Uses the shared production helper
+    /// (<see cref="GeneratedCSharpCompiler"/>) — full trusted-platform-assembly
+    /// reference set plus Calor.Runtime — so compile failures are assertable
+    /// emitter defects, not missing-reference noise (#771).
     /// </summary>
-    public static IReadOnlyList<Microsoft.CodeAnalysis.Diagnostic> RoslynCompile(string csharpSource)
-    {
-        var syntaxTree = CSharpSyntaxTree.ParseText(csharpSource);
-
-        var references = new[]
-        {
-            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(System.Collections.Generic.List<>).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly.Location),
-            MetadataReference.CreateFromFile(System.IO.Path.Combine(
-                System.IO.Path.GetDirectoryName(typeof(object).Assembly.Location)!,
-                "System.Runtime.dll")),
-        };
-
-        var compilation = CSharpCompilation.Create(
-            "RoundTripTest",
-            new[] { syntaxTree },
-            references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        return compilation.GetDiagnostics()
-            .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
-            .ToArray();
-    }
+    public static GeneratedCSharpValidation RoslynCompile(string csharpSource)
+        => GeneratedCSharpCompiler.Validate(csharpSource);
 
     /// <summary>
     /// Full round-trip: C# → Calor → C# → Roslyn compile.
@@ -119,7 +96,7 @@ public static class TestHelpers
             };
         }
 
-        var roslynErrors = RoslynCompile(emittedCSharp);
+        var validation = RoslynCompile(emittedCSharp);
 
         return new RoundTripResult
         {
@@ -127,8 +104,9 @@ public static class TestHelpers
             CalorSource = conversionResult.CalorSource,
             CalorParseSuccess = true,
             EmittedCSharp = emittedCSharp,
-            RoslynErrors = roslynErrors.Select(d => d.GetMessage()).ToList(),
-            RoslynSuccess = roslynErrors.Count == 0,
+            RoslynErrors = validation.FormattedCompilationErrors.ToList(),
+            CSharpSyntaxSuccess = validation.SyntaxSuccess,
+            RoslynSuccess = validation.CompilationSuccess,
         };
     }
 
@@ -150,6 +128,11 @@ public sealed class RoundTripResult
     public bool CalorParseSuccess { get; init; }
     public string? EmittedCSharp { get; init; }
     public List<string> RoslynErrors { get; init; } = new();
+
+    /// <summary>The emitted C# parses with zero syntax errors (#771 split status).</summary>
+    public bool CSharpSyntaxSuccess { get; init; }
+
+    /// <summary>The emitted C# compiles with zero Roslyn errors (full semantic compilation).</summary>
     public bool RoslynSuccess { get; init; }
 
     public bool FullSuccess => ConversionSuccess && CalorParseSuccess && RoslynSuccess;

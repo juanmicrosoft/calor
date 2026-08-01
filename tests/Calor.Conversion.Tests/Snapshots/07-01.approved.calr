@@ -2,7 +2,5 @@
   §DEL{del001:MyHandler}
     §I{i32:x}
 
-  §DEL{del002:Predicate}
-    §I{T:item}
-    §O{bool}
+  §CSHARP{public delegate bool Predicate<T>(T item);}§/CSHARP
 

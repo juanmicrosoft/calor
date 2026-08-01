@@ -120,6 +120,46 @@ public sealed class ConversionExplanation
 }
 
 /// <summary>
+/// The kind of semantic loss recorded during a C# → Calor conversion (#770).
+/// </summary>
+public enum ConversionLossKind
+{
+    /// <summary>A member/type/statement was preserved verbatim as §CSHARP interop instead of native Calor.</summary>
+    InteropPreserved,
+
+    /// <summary>A construct was replaced by a TODO fallback comment (its behavior is lost).</summary>
+    FallbackTodo,
+
+    /// <summary>A construct was dropped entirely from the output.</summary>
+    Dropped,
+
+    /// <summary>A preprocessor directive/branch was stripped before conversion (branch content or condition lost).</summary>
+    PreprocessorStripped
+}
+
+/// <summary>
+/// One structured, located semantic loss recorded during conversion (#770 item 8):
+/// every interop preservation, fallback, and dropped construct is counted with a
+/// file:line location so callers can distinguish faithful conversion from loss.
+/// </summary>
+public sealed class ConversionLoss
+{
+    public required ConversionLossKind Kind { get; init; }
+    public required string Feature { get; init; }
+    public required string Description { get; init; }
+    public int? Line { get; init; }
+    public string? File { get; init; }
+
+    public override string ToString()
+    {
+        var location = File != null
+            ? $"{File}:{Line?.ToString() ?? "?"}"
+            : Line.HasValue ? $"line {Line}" : "unknown location";
+        return $"[{Kind}] {location} [{Feature}] {Description}";
+    }
+}
+
+/// <summary>
 /// Represents an issue encountered during conversion.
 /// </summary>
 public sealed class ConversionIssue
@@ -177,6 +217,7 @@ public sealed class ConversionStats
 public sealed class ConversionContext
 {
     private readonly List<ConversionIssue> _issues = new();
+    private readonly List<ConversionLoss> _losses = new();
     private readonly HashSet<string> _usedFeatures = new();
     private readonly Stack<string> _scopeStack = new();
     private readonly Dictionary<string, List<UnsupportedFeatureInstance>> _unsupportedFeatures = new();
@@ -272,6 +313,28 @@ public sealed class ConversionContext
     /// Conversion statistics.
     /// </summary>
     public ConversionStats Stats { get; } = new();
+
+    /// <summary>
+    /// Structured semantic-loss accounting (#770): every interop preservation,
+    /// fallback, dropped construct, and stripped preprocessor branch, each with a
+    /// file:line location. Empty means the output is fully native with no known loss.
+    /// </summary>
+    public IReadOnlyList<ConversionLoss> Losses => _losses;
+
+    /// <summary>
+    /// Records a structured semantic loss with its location.
+    /// </summary>
+    public void RecordLoss(ConversionLossKind kind, string feature, string description, int? line = null)
+    {
+        _losses.Add(new ConversionLoss
+        {
+            Kind = kind,
+            Feature = feature,
+            Description = description.Length > 120 ? description[..117] + "..." : description,
+            Line = line,
+            File = SourceFile
+        });
+    }
 
     /// <summary>
     /// Original C# source code.
@@ -582,6 +645,7 @@ public sealed class ConversionContext
     public void Reset()
     {
         _issues.Clear();
+        _losses.Clear();
         _usedFeatures.Clear();
         _scopeStack.Clear();
         _unsupportedFeatures.Clear();
@@ -601,5 +665,7 @@ public sealed class ConversionContext
         Stats.StatementsConverted = 0;
         Stats.ExpressionsConverted = 0;
         Stats.InteropBlocksEmitted = 0;
+        Stats.FallbackInteropBlocksEmitted = 0;
+        Stats.MembersDropped = 0;
     }
 }
