@@ -365,6 +365,15 @@ jobs:
       # step scanned a nonexistent `examples/` and swallowed every failure).
       # Each sample directory is an independent program, so IDs are scoped
       # per-directory — cross-sample reuse of f001/m001 is legitimate.
+      # Test-manifest honesty (#790, W1 Slice 4): every test tree is either
+      # wired to CI or declared. Wired: all 11 sln projects (test job),
+      # Calor.Ids.Tests (this job), Calor.RoundTrip.Harness.Tests (sln),
+      # tests/E2E/agent-tasks (benchmark.yml + embedded self-test resources),
+      # Calor.Performance.Tests (nightly performance.yml — wall-clock
+      # assertions are load-sensitive). Declared non-gating: tests/
+      # Calor.RoundTrip.Synthetic (harness CORPUS, exercised by the
+      # roundtrip-verification job, not a test project to run directly);
+      # tests/DebugRT (manual scratch console harness, not a test project).
       - name: Check IDs in samples
         run: |
           set -euo pipefail
