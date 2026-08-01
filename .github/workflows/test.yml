@@ -365,15 +365,18 @@ jobs:
       # step scanned a nonexistent `examples/` and swallowed every failure).
       # Each sample directory is an independent program, so IDs are scoped
       # per-directory — cross-sample reuse of f001/m001 is legitimate.
-      - name: Check IDs in samples and docs
+      - name: Check IDs in samples
         run: |
           set -euo pipefail
+          # Per-directory: each sample is an independent program, so IDs must be
+          # unique within a sample but may repeat across samples. docs/ is NOT
+          # ids-checked here — it contains no .calr files (ids check exits 1 on
+          # an empty target by design) and its fenced calor blocks are already
+          # drift-checked by `calor self-check docs` in the test job.
           for d in samples/*/; do
             echo "== ids check $d =="
             dotnet run -c Release --no-build --project src/Calor.Compiler -- ids check "$d" --allow-test-ids
           done
-          echo "== ids check docs =="
-          dotnet run -c Release --no-build --project src/Calor.Compiler -- ids check docs --allow-test-ids
 
   sdk-package-consumer:
     # M-A1 SDK consumability (wedge plan v0.11 D-W1.2, PP-A1): a template
