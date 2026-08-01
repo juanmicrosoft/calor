@@ -647,6 +647,67 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.DoesNotContain("skipping", msgs);
     }
 
+    // #788 (W1 Slice 4): the options hash must cover EVERY diagnostics-affecting
+    // task option. Flipping any one of them over a warm cache must invalidate
+    // every skip — a cached output was produced under a different option set and
+    // its (absent) diagnostics would be silently stale.
+    [Theory]
+    [InlineData("enforceEffects")]
+    [InlineData("verify")]
+    [InlineData("ilAnalysis")]
+    [InlineData("experimental")]
+    public void OptionsHash_FlippingAnyDiagnosticsAffectingOption_InvalidatesWarmCache(string option)
+    {
+        var src = CreateSourceFile("OptFlip.calr", ValidCalorSource);
+
+        // Cold build + warm build with defaults: second run skips.
+        Assert.True(CreateTask(src).Execute());
+        var warm = CreateTask(src);
+        Assert.True(warm.Execute());
+        Assert.Contains(((TestBuildEngine)warm.BuildEngine).Messages,
+            m => m.Contains("skipping"));
+
+        // Third build with one option flipped: nothing may skip.
+        var flipped = CreateTask(src);
+        switch (option)
+        {
+            case "enforceEffects": flipped.EnforceEffects = false; break;
+            case "verify": flipped.Verify = true; break;
+            case "ilAnalysis": flipped.EnableILAnalysis = true; break;
+            case "experimental": flipped.ExperimentalFlags = "pilot-hello-world"; break;
+        }
+        Assert.True(flipped.Execute());
+        var msgs = string.Join("\n", ((TestBuildEngine)flipped.BuildEngine).Messages);
+        Assert.DoesNotContain("skipping", msgs);
+        Assert.Contains("Compiling", msgs);
+    }
+
+    [Fact]
+    public void OptionsHash_ExperimentalFlagsAreCanonicalized_EquivalentSpellingsStayWarm()
+    {
+        // "b;a" and "A, b" are the same flag set — the hash canonicalizes
+        // (parse, case-fold, sort), so respelling must NOT invalidate the cache.
+        var src = CreateSourceFile("OptCanon.calr", ValidCalorSource);
+
+        var task1 = CreateTask(src);
+        task1.ExperimentalFlags = "pilot-hello-world;another-flag";
+        Assert.True(task1.Execute());
+
+        var task2 = CreateTask(src);
+        task2.ExperimentalFlags = "Another-Flag, pilot-hello-world";
+        Assert.True(task2.Execute());
+        Assert.Contains(((TestBuildEngine)task2.BuildEngine).Messages,
+            m => m.Contains("skipping"));
+    }
+
+    // #788 fail-closed note: the IL-analysis init and cross-module enforcement
+    // catch blocks in CompileCalor now FAIL the build instead of warning and
+    // continuing. Neither failure is cheaply reachable with real components
+    // (AssemblyIndex and ManifestLoader are internally defensive and skip
+    // malformed inputs), so the fail-closed branches are covered by review,
+    // not by a fixture — a garbage referenced assembly is deliberately
+    // tolerated (skipped) by design and does not trip them.
+
     [Fact]
     public void CrossModuleCall_TasksPath_EmitsQualifiedTarget()
     {
