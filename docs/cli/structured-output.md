@@ -179,6 +179,7 @@ pipeline) so they can flow through the structured formats:
 | `Calor1343` | Convert: conversion issue (severity mirrors the issue; message prefixed with the feature name, e.g. `[local-functions] …`) |
 | `Calor1344` | Convert: `--validate` found a parse error in the generated output (warning — the output was still written) |
 | `Calor1345` | Convert: command-level failure — input not found, unknown file type, timeout, or crash |
+| `Calor1346` | Format/Lint: `format --write` or `lint --fix` refused without the experimental acknowledgment — the formatter write path is release-policy-disabled (#793/#760); pass `--experimental` or set `CALOR_EXPERIMENTAL_FORMAT_WRITE=1` |
 
 ## Notes on specific commands
 

@@ -184,6 +184,7 @@ See [calor mcp](https://juanmicrosoft.github.io/calor/docs/cli/mcp/) for the com
 - **[Syntax Reference](https://juanmicrosoft.github.io/calor/docs/syntax-reference/)** — Complete language reference
 - **[CLI Reference](https://juanmicrosoft.github.io/calor/docs/cli/)** — All `calor` commands including `mcp`, `analyze`, `convert`, and `migrate`
 - **[Benchmarking](https://juanmicrosoft.github.io/calor/docs/benchmarking/)** — How we measure Calor vs C#
+- **[Telemetry](docs/telemetry.md)** — Opt-in, off by default; exactly what is (and is never) collected
 
 ## Contributing
 

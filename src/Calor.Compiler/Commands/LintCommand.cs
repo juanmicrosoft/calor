@@ -27,7 +27,13 @@ public static class LintCommand
 
         var fixOption = new Option<bool>(
             aliases: ["--fix", "-f"],
-            description: "Auto-fix lint issues by reformatting");
+            description: "Auto-fix lint issues by reformatting (formatter WRITE path — requires --experimental)");
+
+        var experimentalOption = new Option<bool>(
+            aliases: ["--experimental"],
+            description: "Acknowledge that the formatter WRITE path --fix rides is experimental and " +
+                         "release-policy-disabled (#760: it can rewrite identifiers via its " +
+                         "ID-abbreviation regexes and drops comments). Required for --fix.");
 
         var checkOption = new Option<bool>(
             aliases: ["--check", "-c"],
@@ -51,7 +57,8 @@ public static class LintCommand
             fixOption,
             checkOption,
             verboseOption,
-            formatOption
+            formatOption,
+            experimentalOption
         };
 
         // Set the exit code through InvocationContext: Main returns InvokeAsync's
@@ -59,9 +66,26 @@ public static class LintCommand
         // Environment.ExitCode assignment (lint --check must exit nonzero on issues).
         command.SetHandler(async (InvocationContext ctx) =>
         {
+            // W1 Slice 2 (T3, #834 review C1): `lint --fix` writes files through
+            // the SAME CalorFormatter machinery `format --write` gates — an
+            // ungated --fix was a one-command bypass of the #793 containment.
+            var wantsFix = ctx.ParseResult.GetValueForOption(fixOption);
+            var experimentalAcknowledged = ctx.ParseResult.GetValueForOption(experimentalOption)
+                || Environment.GetEnvironmentVariable("CALOR_EXPERIMENTAL_FORMAT_WRITE") is "1" or "true";
+            if (wantsFix && !experimentalAcknowledged)
+            {
+                Console.Error.WriteLine(
+                    $"error {Diagnostics.DiagnosticCode.FormatWriteExperimentalRequired}: 'lint --fix' is disabled by the release policy (#793/#760): " +
+                    "it rewrites files through the formatter write path, which can rewrite identifiers and drops comments. " +
+                    "Pass --experimental (or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to acknowledge, " +
+                    "or use --check for read-only linting.");
+                ctx.ExitCode = 1;
+                return;
+            }
+
             ctx.ExitCode = await ExecuteAsync(
                 ctx.ParseResult.GetValueForArgument(inputArgument),
-                ctx.ParseResult.GetValueForOption(fixOption),
+                wantsFix,
                 ctx.ParseResult.GetValueForOption(checkOption),
                 ctx.ParseResult.GetValueForOption(verboseOption),
                 ctx.ParseResult.GetValueForOption(formatOption) ?? "text");

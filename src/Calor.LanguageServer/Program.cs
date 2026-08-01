@@ -12,7 +12,16 @@ public static class Program
     {
         var workspace = new WorkspaceState();
 
+        // W1 Slice 2 (T3, kickoff §1.4): the #793 release policy holds LSP
+        // formatting and rename disabled — formatting applies the CalorFormatter's
+        // id-rewriting machinery as whole-document edits (#760), and rename lacks
+        // exact-span indexing (#765). Both register only under an explicit
+        // experimental opt-in; every read-only handler stays available.
+        var experimentalWriteHandlers =
+            Environment.GetEnvironmentVariable("CALOR_LSP_EXPERIMENTAL") is "1" or "true";
+
         var server = await OmniSharp.Extensions.LanguageServer.Server.LanguageServer.From(options =>
+        {
             options
                 .WithInput(Console.OpenStandardInput())
                 .WithOutput(Console.OpenStandardOutput())
@@ -27,12 +36,10 @@ public static class Program
                 .WithHandler<DocumentSymbolHandler>()
                 .WithHandler<DefinitionHandler>()
                 .WithHandler<HoverHandler>()
-                .WithHandler<FormattingHandler>()
                 .WithHandler<CompletionHandler>()
                 .WithHandler<CodeActionHandler>()
                 .WithHandler<SignatureHelpHandler>()
                 .WithHandler<ReferencesHandler>()
-                .WithHandler<RenameHandler>()
                 .WithHandler<WorkspaceSymbolHandler>()
                 .WithHandler<SemanticTokensHandler>()
                 .OnInitialize((server, request, token) =>
@@ -43,8 +50,15 @@ public static class Program
                         opts.AddHandler(new TextDocumentSyncHandler(workspace, server));
                     });
                     return Task.CompletedTask;
-                })
-        ).ConfigureAwait(false);
+                });
+
+            if (experimentalWriteHandlers)
+            {
+                options
+                    .WithHandler<FormattingHandler>()
+                    .WithHandler<RenameHandler>();
+            }
+        }).ConfigureAwait(false);
 
         await server.WaitForExit.ConfigureAwait(false);
 

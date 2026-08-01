@@ -95,7 +95,8 @@ public class Program
 
         var noTelemetryOption = new Option<bool>(
             aliases: ["--no-telemetry"],
-            description: "Disable anonymous usage telemetry");
+            description: "Force-disable anonymous usage telemetry (telemetry is OPT-IN and off " +
+                         "by default; it activates only when CALOR_TELEMETRY=1 is set — see docs/telemetry.md)");
 
         var analyzeOption = new Option<bool>(
             aliases: ["--analyze"],
