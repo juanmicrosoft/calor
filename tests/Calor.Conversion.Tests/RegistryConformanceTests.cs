@@ -343,6 +343,194 @@ public class RegistryConformanceTests
     // broaden to wildcard — they escalate to member interop.
     // ------------------------------------------------------------------
 
+    // ------------------------------------------------------------------
+    // #836 review fixes
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void C1_PassthroughStatementPreservation_RawStatementSurvivesRoundTrip()
+    {
+        // #836 C1: in C#-preserving modes an escalated statement is contained
+        // as a §RAW statement — previously Visit(RawCSharpNode) RETURNED the
+        // §RAW text while body loops discard Accept() results, so the
+        // statement VANISHED and the failed statement's partial conversions
+        // (hoisted `§ASSIGN total (+ total x)`) leaked into the body.
+        var csharp = """
+            public class Acc
+            {
+                public int M(int x)
+                {
+                    int total = 0;
+                    int y = (total += x) + (x >>> 2);
+                    return total + y;
+                }
+            }
+            """;
+
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            ModuleName = "ConformanceTest",
+            GracefulFallback = true,
+            AutoGenerateIds = true,
+            StripPreprocessor = false,
+            PassthroughOnError = true
+        });
+        var result = converter.Convert(csharp, "Conformance.cs");
+
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        _output.WriteLine(result.CalorSource!);
+
+        // The raw statement is actually IN the output…
+        Assert.Contains("§RAW", result.CalorSource);
+        Assert.Contains(">>> 2", result.CalorSource);
+        // …and the half-converted compound assignment did not leak next to it.
+        Assert.DoesNotContain("(+ total x)", result.CalorSource);
+
+        // Ledger matches reality.
+        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+
+        // Round trip: the raw statement text survives and the emitted C# compiles.
+        var emitted = TestHelpers.CompileCalorToCSharp(result.CalorSource!);
+        Assert.NotNull(emitted);
+        _output.WriteLine(emitted!);
+        Assert.Contains(">>> 2", emitted);
+        var validation = Calor.Compiler.CodeGen.GeneratedCSharpCompiler.Validate(emitted!);
+        Assert.True(validation.CompilationSuccess,
+            "Round-tripped C# does not compile: " + string.Join("; ", validation.FormattedCompilationErrors));
+    }
+
+    [Fact]
+    public void C2_EscalationInsideActivePreprocessorBranch_NoDanglingDirective()
+    {
+        // #836 C2: a member escalating inside an active #if branch was wrapped
+        // via ToFullString(), capturing the `#if` leading trivia with no
+        // `#endif` → dangling directive inside §CSHARP → CS1027 on re-compile.
+        var result = RoundTrip("""
+            public class Cond
+            {
+            #if true
+                public int Bad(int x)
+                {
+                    return x >>> 1;
+                }
+            #endif
+                public int Good() { return 1; }
+            }
+            """);
+
+        _output.WriteLine(result.CalorSource!);
+        _output.WriteLine(result.EmittedCSharp!);
+
+        // The escalated member is preserved without directive trivia.
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains(">>> 1", result.CalorSource);
+
+        // And the round-tripped C# compiles (a dangling #if would be CS1027).
+        Assert.True(result.RoslynSuccess,
+            "Round-tripped C# does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Fact]
+    public void M1_DisabledBranchMember_PreservedVerbatim_WithLoss()
+    {
+        // #836 M1: an unconvertible member in a DISABLED #if branch was
+        // replaced by a renamed `_PP_Fallback_*` comment stub — original API
+        // gone, zero losses, Success:true. It must be preserved verbatim and
+        // ledgered.
+        var csharp = """
+            public class Cfg
+            {
+            #if DEBUG
+                public int DebugOnly(int x)
+                {
+                    return x >>> 3;
+                }
+            #endif
+                public int Always() { return 1; }
+            }
+            """;
+
+        var result = Convert(csharp); // StripPreprocessor=false → §PP conversion path
+
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        _output.WriteLine(result.CalorSource!);
+
+        // The disabled member's original text survives in the output…
+        Assert.Contains(">>> 3", result.CalorSource);
+        // …and the loss is ledgered.
+        Assert.Contains(result.Context.Losses, l =>
+            l.Kind == ConversionLossKind.InteropPreserved && l.Feature == "preprocessor-disabled");
+    }
+
+    [Fact]
+    public void M2_EmitterSideRawFallback_IsCountedAsLoss()
+    {
+        // #836 M2: raw C# reaching the output through emitter/visitor paths
+        // that bypass the ledger (§CS{…} from RawCSharpExpressionNode here)
+        // must still be counted, so "zero losses" always means fully native.
+        var csharp = """
+            public class Test
+            {
+                public void M()
+                {
+                    int x = 0;
+                    var r = __makeref(x);
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        _output.WriteLine(result.CalorSource!);
+        Assert.Contains("__makeref", result.CalorSource);
+
+        // The §CS{…} fallback has no visitor-side ledger entry — the
+        // post-emission reconciliation must count it.
+        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.EmitterFallback);
+    }
+
+    [Fact]
+    public void M2_FullyNativeOutput_HasZeroEmitterFallbackLosses()
+    {
+        var result = Convert("""
+            public class Clean
+            {
+                public int Add(int a, int b) { return a + b; }
+            }
+            """);
+
+        Assert.True(result.Success);
+        Assert.Empty(result.Context.Losses);
+    }
+
+    [Fact]
+    public void CharLiteral_LoneSurrogate_EscalatesToInterop()
+    {
+        // #836 m1: '\uD83D' (lone high surrogate) previously became '�' via
+        // the UTF-8 replacement fallback while reporting success. The member
+        // escalates to interop, preserving the ESCAPED source text.
+        var csharp = """
+            public class Chars
+            {
+                public char High()
+                {
+                    return '\uD83D';
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        _output.WriteLine(result.CalorSource!);
+
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("'\\uD83D'", result.CalorSource);
+        Assert.DoesNotContain("�", result.CalorSource);
+        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+    }
+
     [Fact]
     public void PatternSwitchLabel_EscalatesInsteadOfWildcard()
     {

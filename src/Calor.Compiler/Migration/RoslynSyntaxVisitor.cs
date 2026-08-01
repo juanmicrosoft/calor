@@ -3111,15 +3111,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 catch
                 {
-                    // Preserve unconvertible members as a method with fallback comment body
+                    // #836 M1: preserve the member VERBATIM (in all modes — the
+                    // disabled branch is never active C#, so a §RAW body is
+                    // safe) and record the loss; the old comment-stub silently
+                    // deleted the original API with zero ledger entries.
                     var fallbackId = _context.GenerateId("m");
                     var fallbackBody = new List<StatementNode>
                     {
-                        _context.PassthroughOnError
-                            ? new RawCSharpNode(TextSpan.Empty, member.ToString().Trim())
-                            : new FallbackCommentNode(TextSpan.Empty, member.ToString().Trim(), "preprocessor-disabled",
-                                "Member in disabled preprocessor branch could not be converted")
+                        new RawCSharpNode(TextSpan.Empty, member.ToString().Trim())
                     };
+                    _context.RecordLoss(ConversionLossKind.InteropPreserved, "preprocessor-disabled",
+                        $"Member in disabled #if branch preserved as raw C# inside a fallback stub: {TruncateForMessage(member.ToString())}");
+                    _context.AddWarning(
+                        $"Member in disabled preprocessor branch could not be converted; preserved verbatim: {TruncateForMessage(member.ToString())}",
+                        feature: "preprocessor-disabled");
                     methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
                         Visibility.Private, MethodModifiers.None,
                         Array.Empty<TypeParameterNode>(), Array.Empty<ParameterNode>(),
@@ -3130,15 +3135,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         catch
         {
-            // If the disabled text can't be parsed at all, preserve it as a fallback method
+            // #836 M1: if the disabled text can't be parsed at all, preserve it
+            // VERBATIM (all modes) and record the loss — never a silent
+            // zero-ledger comment stub.
             var fallbackId = _context.GenerateId("m");
             var fallbackBody = new List<StatementNode>
             {
-                _context.PassthroughOnError
-                    ? new RawCSharpNode(TextSpan.Empty, disabledText.Trim())
-                    : new FallbackCommentNode(TextSpan.Empty, disabledText.Trim(), "preprocessor-disabled",
-                        "Disabled preprocessor text could not be parsed as class members")
+                new RawCSharpNode(TextSpan.Empty, disabledText.Trim())
             };
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "preprocessor-disabled",
+                $"Disabled #if branch text preserved as raw C# inside a fallback stub: {TruncateForMessage(disabledText.Trim())}");
+            _context.AddWarning(
+                $"Disabled preprocessor text could not be parsed as class members; preserved verbatim: {TruncateForMessage(disabledText.Trim())}",
+                feature: "preprocessor-disabled");
             methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
                 Visibility.Private, MethodModifiers.None,
                 Array.Empty<TypeParameterNode>(), Array.Empty<ParameterNode>(),
@@ -4027,6 +4036,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // contained at the nearest statement boundary: the statement is
             // preserved verbatim and counted as a loss (#770). In Standard mode
             // escalation propagates to the containing member boundary instead.
+            // Discard partial conversions hoisted while converting the failed
+            // statement — flushing them would duplicate its side effects next
+            // to the verbatim preservation (#836 C1).
+            _pendingStatements.Clear();
             _context.IncrementSkipped();
             _context.RecordLoss(ConversionLossKind.InteropPreserved,
                 ex is MemberInteropEscalationException esc ? esc.FeatureName : "conversion-error",
@@ -5355,6 +5368,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             else if (incrementor is AssignmentExpressionSyntax assignment)
             {
+                // KNOWN LIMITATION (#836 m2, pre-existing on main; #774
+                // follow-up): §L's step is ADDITIVE, but this takes the RHS of
+                // any compound assignment — `k *= 2` / `j >>= 1` become
+                // additive step 2 / 1, and `i -= 2` a positive step 2,
+                // changing loop semantics. Documented in the FeatureSupport
+                // "for" entry; the fix is to restrict this to += (negating -=)
+                // and route other compound incrementors to the while-loop
+                // fallback.
                 step = ConvertExpression(assignment.Right);
             }
         }
@@ -6123,11 +6144,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private ExpressionNode ConvertCharLiteral(LiteralExpressionSyntax literal)
     {
+        // #836 m1: a lone surrogate (e.g. '\uD83D') cannot survive the
+        // (char-lit "…") round trip — the UTF-8 file write replaces the
+        // unpaired surrogate with U+FFFD, silently corrupting the value.
+        // Escalate to member interop, which preserves the original ESCAPED
+        // source text ('\uD83D') verbatim.
+        var value = literal.Token.ValueText;
+        if (value.Length == 1 && char.IsSurrogate(value[0]))
+        {
+            throw EscalateExpression(literal, "char-literal-surrogate");
+        }
+
         _context.RecordFeatureUsage("char-literal");
         return new CharOperationNode(GetTextSpan(literal), CharOp.CharLiteral,
             new List<ExpressionNode>
             {
-                new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText)
+                new StringLiteralNode(GetTextSpan(literal), value)
             });
     }
 
@@ -9909,12 +9941,37 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private CSharpInteropBlockNode CreateInteropBlock(SyntaxNode node, string? featureName, InteropMemberKind kind)
     {
+        // #836 C1: preserving this node verbatim abandons its partial
+        // conversion — discard any statements hoisted while converting it so
+        // they don't leak into the next converted member's flush.
+        _pendingStatements.Clear();
+
         // Use ToString() (without trivia) when the node lives inside a namespace.
         // ToFullString() can capture leading trivia that bleeds namespace context,
         // causing duplicate namespace wrappers since the module tag already provides one.
-        var sourceCode = node.Parent is BaseNamespaceDeclarationSyntax
-            ? node.ToString()
-            : node.ToFullString();
+        string sourceCode;
+        if (node.Parent is BaseNamespaceDeclarationSyntax)
+        {
+            sourceCode = node.ToString();
+        }
+        else if (node.GetLeadingTrivia().Any(t => t.IsDirective) ||
+                 node.GetTrailingTrivia().Any(t => t.IsDirective))
+        {
+            // #836 C2: ToFullString() would capture preprocessor directive
+            // trivia (e.g. the `#if` opening the active branch this member
+            // sits in) WITHOUT its matching `#endif`, emitting a dangling
+            // directive inside the §CSHARP block (CS1027 on re-compilation).
+            // Keep doc comments, drop directive-bearing trivia.
+            var docs = string.Concat(node.GetLeadingTrivia()
+                .Where(t => t.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                         || t.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+                .Select(t => t.ToFullString()));
+            sourceCode = docs + node.ToString();
+        }
+        else
+        {
+            sourceCode = node.ToFullString();
+        }
         var lineSpan = node.GetLocation().GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
 

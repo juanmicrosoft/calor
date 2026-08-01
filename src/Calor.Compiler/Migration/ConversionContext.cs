@@ -134,7 +134,16 @@ public enum ConversionLossKind
     Dropped,
 
     /// <summary>A preprocessor directive/branch was stripped before conversion (branch content or condition lost).</summary>
-    PreprocessorStripped
+    PreprocessorStripped,
+
+    /// <summary>
+    /// A raw C# fallback (§CS{…}/§RAW/§CSHARP) found in the emitted Calor with no
+    /// matching ledger entry — produced by the Calor emitter's internal fallback
+    /// paths, which do not (yet) thread through the loss ledger (#836 M2). Counted
+    /// by post-emission reconciliation so raw C# in the output can never coexist
+    /// with a zero-loss "fully native" claim.
+    /// </summary>
+    EmitterFallback
 }
 
 /// <summary>

@@ -111,11 +111,19 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "If statements are converted to Calor IF blocks"
         },
+        // NOTE (#836 m2, pre-existing; #774 follow-up): §L's step is additive,
+        // but compound incrementors currently take the raw RHS — `k *= 2` /
+        // `j >>= 1` / `i -= 2` produce wrong additive steps. Kept at Full for
+        // the common ++/--/+= forms (a Partial level would warn on every for
+        // loop); the limitation is documented here and at the extraction site
+        // in RoslynSyntaxVisitor until the #774 follow-up routes non-additive
+        // incrementors to the while-loop fallback.
         ["for"] = new FeatureInfo
         {
             Name = "for",
             Support = SupportLevel.Full,
-            Description = "For loops are converted to Calor LOOP blocks"
+            Description = "For loops are converted to Calor LOOP blocks. Known limitation (#774 follow-up): non-additive compound incrementors (*=, /=, <<=, >>=, -=) take the raw RHS as an additive §L step, changing loop semantics",
+            Workaround = "Rewrite non-additive incrementors as while loops, or review converted §L steps"
         },
         ["foreach"] = new FeatureInfo
         {
@@ -644,6 +652,13 @@ public static class FeatureSupport
             Support = SupportLevel.NotSupported,
             Description = "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as §CSHARP interop (never defaulted to ==/&&)",
             Workaround = "Rewrite the pattern with supported operators, or keep the member as §CSHARP interop"
+        },
+        ["char-literal-surrogate"] = new FeatureInfo
+        {
+            Name = "char-literal-surrogate",
+            Support = SupportLevel.NotSupported,
+            Description = "Lone-surrogate char literals (e.g. '\\uD83D') cannot round-trip through UTF-8 Calor source; the containing member is preserved as §CSHARP interop with the escaped source text intact",
+            Workaround = "Use the integer code unit ((char)0xD83D) or keep the member as §CSHARP interop"
         },
         ["generic-delegate"] = new FeatureInfo
         {
