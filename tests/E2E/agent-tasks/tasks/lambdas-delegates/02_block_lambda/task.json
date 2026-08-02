@@ -5,8 +5,13 @@
   "fixture": "basic-calor-project",
   "prompt": "Add a public function called ApplyComplex to Calculator.calr that uses a block lambda with multiple statements. The lambda takes an integer, checks if it's positive (return doubled value) or not (return 0). Apply the lambda to parameter x and return the result.",
   "verification": {
-    "compilation": { "mustSucceed": true },
-    "z3": { "enabled": false }
+    "compilation": {
+      "mustSucceed": true,
+      "permissiveEffects": true
+    },
+    "z3": {
+      "enabled": false
+    }
   },
   "timeout": 120
 }

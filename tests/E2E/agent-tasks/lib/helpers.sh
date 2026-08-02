@@ -1471,9 +1471,14 @@ detect_project_type() {
 }
 
 # Verify Calor compilation
+# $3 (optional): extra compiler flags, e.g. "--permissive-effects" for tasks
+# whose subject matter is outside the enforced first-order wedge (WS-W2:
+# delegate invocation is a Calor0418 error under the default-on enforcement;
+# the per-task flag is the explicit migration-policy waiver).
 verify_calor_compilation() {
     local workspace="$1"
     local must_succeed="${2:-true}"
+    local extra_flags="${3:-}"
 
     local original_dir
     original_dir=$(pwd)
@@ -1491,7 +1496,8 @@ verify_calor_compilation() {
         # Capture output for debugging
         local compile_output
         local compile_status=0
-        compile_output=$("$COMPILER" --input "$calr_file" --output "$cs_file" 2>&1) || compile_status=$?
+        # shellcheck disable=SC2086 — extra_flags is intentionally word-split
+        compile_output=$("$COMPILER" --input "$calr_file" --output "$cs_file" $extra_flags 2>&1) || compile_status=$?
 
         if [[ $compile_status -ne 0 ]]; then
             log_debug "Calor compilation failed for $calr_file (exit code: $compile_status)"
@@ -1581,6 +1587,7 @@ verify_csharp_compilation() {
 verify_compilation() {
     local workspace="$1"
     local must_succeed="${2:-true}"
+    local calor_extra_flags="${3:-}"
 
     local project_type
     project_type=$(detect_project_type "$workspace")
@@ -1589,7 +1596,7 @@ verify_compilation() {
 
     case "$project_type" in
         calor)
-            verify_calor_compilation "$workspace" "$must_succeed"
+            verify_calor_compilation "$workspace" "$must_succeed" "$calor_extra_flags"
             ;;
         csharp)
             verify_csharp_compilation "$workspace" "$must_succeed"
@@ -1691,7 +1698,15 @@ verify_task() {
     must_compile=$(json_get_nested_file "$task_file" "verification.compilation.mustSucceed" "true")
 
     if [[ "$must_compile" == "true" ]]; then
-        if ! verify_compilation "$workspace" "true"; then
+        # WS-W2: per-task opt-in waiver for code outside the enforced
+        # first-order wedge (delegate/lambda invocation tasks).
+        local permissive_effects
+        permissive_effects=$(json_get_nested_file "$task_file" "verification.compilation.permissiveEffects" "false")
+        local calor_extra_flags=""
+        if [[ "$permissive_effects" == "true" ]]; then
+            calor_extra_flags="--permissive-effects"
+        fi
+        if ! verify_compilation "$workspace" "true" "$calor_extra_flags"; then
             log_debug "Compilation verification failed"
             return 1
         fi

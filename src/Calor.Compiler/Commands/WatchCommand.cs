@@ -39,7 +39,8 @@ public static class WatchCommand
         var clearCacheOption = new Option<bool>(["--clear-cache"], "Clear .calor-build-state.json before the initial compile");
         var strictApiOption = new Option<bool>(["--strict-api"], "Enable strict API mode");
         var requireDocsOption = new Option<bool>(["--require-docs"], "Require documentation on public functions and types");
-        var enforceEffectsOption = new Option<bool>(["--enforce-effects"], () => false, "Enforce effect declarations");
+        var enforceEffectsOption = new Option<bool>(["--enforce-effects"], () => true, "Enforce effect declarations (default: true as of v0.11)");
+        var noEnforceEffectsOption = new Option<bool>(["--no-enforce-effects"], () => false, "Disable effect enforcement (opt out of the v0.11 default-on behavior)");
         var strictEffectsOption = new Option<bool>(["--strict-effects"], () => false, "Promote unknown external call warnings (Calor0411) to errors");
         var permissiveEffectsOption = new Option<bool>(["--permissive-effects"], () => false, "Permissive effect mode (unknown calls assumed pure, violations demoted to warnings)");
         var contractModeOption = new Option<string>(["--contract-mode"], () => "debug", "Contract enforcement mode: off, debug, or release");
@@ -62,6 +63,7 @@ public static class WatchCommand
             strictApiOption,
             requireDocsOption,
             enforceEffectsOption,
+            noEnforceEffectsOption,
             strictEffectsOption,
             permissiveEffectsOption,
             contractModeOption,
@@ -77,7 +79,8 @@ public static class WatchCommand
                 ClearCache: ctx.ParseResult.GetValueForOption(clearCacheOption),
                 StrictApi: ctx.ParseResult.GetValueForOption(strictApiOption),
                 RequireDocs: ctx.ParseResult.GetValueForOption(requireDocsOption),
-                EnforceEffects: ctx.ParseResult.GetValueForOption(enforceEffectsOption),
+                EnforceEffects: ctx.ParseResult.GetValueForOption(enforceEffectsOption)
+                    && !ctx.ParseResult.GetValueForOption(noEnforceEffectsOption),
                 StrictEffects: ctx.ParseResult.GetValueForOption(strictEffectsOption),
                 PermissiveEffects: ctx.ParseResult.GetValueForOption(permissiveEffectsOption),
                 ContractMode: ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",

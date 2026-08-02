@@ -46,7 +46,12 @@ public class Program
 
         var enforceEffectsOption = new Option<bool>(
             aliases: ["--enforce-effects"],
-            description: "Enforce effect declarations (default: false; opt in for strict checking)",
+            description: "Enforce effect declarations (default: true as of v0.11; use --no-enforce-effects to opt out)",
+            getDefaultValue: () => true);
+
+        var noEnforceEffectsOption = new Option<bool>(
+            aliases: ["--no-enforce-effects"],
+            description: "Disable effect enforcement (opt out of the v0.11 default-on behavior)",
             getDefaultValue: () => false);
 
         var strictEffectsOption = new Option<bool>(
@@ -135,6 +140,7 @@ public class Program
             strictApiOption,
             requireDocsOption,
             enforceEffectsOption,
+            noEnforceEffectsOption,
             strictEffectsOption,
             permissiveEffectsOption,
             contractModeOption,
@@ -172,6 +178,9 @@ public class Program
             var strictApi = ctx.ParseResult.GetValueForOption(strictApiOption);
             var requireDocs = ctx.ParseResult.GetValueForOption(requireDocsOption);
             var enforceEffects = ctx.ParseResult.GetValueForOption(enforceEffectsOption);
+            var noEnforceEffects = ctx.ParseResult.GetValueForOption(noEnforceEffectsOption);
+            // --no-enforce-effects always wins over the default-on behavior (D-W2.5)
+            if (noEnforceEffects) enforceEffects = false;
             var strictEffects = ctx.ParseResult.GetValueForOption(strictEffectsOption);
             var permissiveEffects = ctx.ParseResult.GetValueForOption(permissiveEffectsOption);
             var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
@@ -519,7 +528,8 @@ public class Program
         writer.WriteLine("Strictness options:");
         writer.WriteLine("  --strict-api      Require §BREAKING markers for public API changes");
         writer.WriteLine("  --require-docs    Require documentation on public functions");
-        writer.WriteLine("  --enforce-effects Enforce effect declarations (default: false)");
+        writer.WriteLine("  --enforce-effects Enforce effect declarations (default: true as of v0.11)");
+        writer.WriteLine("  --no-enforce-effects  Disable effect enforcement (opt-out)");
         writer.WriteLine("  --strict-effects  Promote unknown external call warnings to errors");
         writer.WriteLine("  --permissive-effects  Permissive mode for converted code (suppress effect errors)");
         writer.WriteLine("  --contract-mode   Contract mode: off, debug, release (default: debug)");
@@ -700,7 +710,8 @@ public class Program
                 options.UnknownCallPolicy,
                 resolver: sharedResolver,
                 strictEffects: options.StrictEffects,
-                projectDirectory: options.ProjectDirectory);
+                projectDirectory: options.ProjectDirectory,
+                crossModuleFunctionNames: options.CrossModuleFunctionModules?.Keys);
             enforcementPass.Enforce(ast);
             phaseSw.Stop();
             telemetry?.TrackPhase("EffectEnforcement", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
