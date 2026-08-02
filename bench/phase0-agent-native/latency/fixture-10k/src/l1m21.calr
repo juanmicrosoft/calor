@@ -2,101 +2,113 @@
 
   §F{f001:l1m21_fn01:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 7)
-    §Q (>= y 0)
-    §S (>= x 5)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if01} (> acc 21113)
-      §R (+ acc 21113)
-    §EL
-      §R (+ (* acc 2) 21113)
+    §B{v1:i32} §C{l2m05_fn10} §A x §A INT:39 §/C
+    §R (+ v1 y)
 
   §F{f002:l1m21_fn02:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{v1:i32} §C{l2m08_fn03} §A x §A INT:11 §/C
-    §R (+ v1 y)
+    §Q (> x 2)
+    §S (>= x 3)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if02} (> acc 21050)
+      §R (+ acc 21050)
+    §EL
+      §R (+ (* acc 2) 21050)
 
   §F{f003:l1m21_fn03:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 5)
     §Q (>= y 0)
-    §S (>= x 3)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if03} (> acc 21120)
-      §R (+ acc 21120)
+    §S (>= result x)
+    §S (>= result 21057)
+    §IF{if03} (>= x 21057)
+      §R x
     §EL
-      §R (+ (* acc 2) 21120)
+      §R 21057
 
   §F{f004:l1m21_fn04:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF{if04} (> acc 21127)
-      §R (+ acc 21127)
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 21064)
+    §IF{if04} (>= x 21064)
+      §R x
     §EL
-      §R (+ (* acc 2) 21127)
+      §R 21064
 
   §F{f005:l1m21_fn05:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{v1:i32} §C{l2m16_fn09} §A x §A INT:55 §/C
-    §B{v2:i32} §C{l2m20_fn02} §A x §A INT:36 §/C
-    §R (+ (+ v1 v2) y)
+    §Q (>= x 0)
+    §S (<= result 21071)
+    §B{total:i32} (+ (* x 3) y)
+    §IF{if05} (> total 21071)
+      §R 21071
+    §R total
 
   §F{f006:l1m21_fn06:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if06} (> acc 21134)
-      §R (+ acc 21134)
-    §EL
-      §R (+ (* acc 2) 21134)
+    §B{v1:i32} §C{l2m03_fn02} §A x §A INT:51 §/C
+    §B{v2:i32} §C{l2m24_fn11} §A x §A INT:37 §/C
+    §R (+ (+ v1 v2) y)
 
   §F{f007:l1m21_fn07:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 5)
-    §Q (>= y 0)
+    §Q (> x 2)
     §S (>= x 3)
     §B{acc:i32} (+ (* x 3) y)
-    §IF{if07} (> acc 21141)
-      §R (+ acc 21141)
+    §IF{if07} (> acc 21078)
+      §R (+ acc 21078)
     §EL
-      §R (+ (* acc 2) 21141)
+      §R (+ (* acc 2) 21078)
 
   §F{f008:l1m21_fn08:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{v1:i32} §C{l2m33_fn09} §A x §A INT:86 §/C
-    §R (+ v1 y)
+    §Q (>= x 7)
+    §Q (>= y 0)
+    §S (>= result 21085)
+    §B{total:i32} (+ (* x 2) y)
+    §IF{if08} (< total 21085)
+      §R 21085
+    §EL
+      §R total
 
   §F{f009:l1m21_fn09:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m22_fn10} §A x §A INT:23 §/C
-    §R (+ v1 y)
-
-  §F{f010:l1m21_fn10:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m20_fn02} §A x §A INT:85 §/C
-    §B{v2:i32} §C{l2m24_fn01} §A x §A INT:74 §/C
-    §R (+ (+ v1 v2) y)
-
-  §F{f011:l1m21_fn11:pub} (i32:x, i32:y) -> i32
-    §E{}
-    §B{v1:i32} §C{l2m28_fn02} §A x §A INT:6 §/C
-    §R (+ v1 y)
-
-  §F{f012:l1m21_fn12:pub} (i32:x, i32:y) -> i32
     §E{}
     §Q (> x 1)
     §S (>= x 2)
     §B{acc:i32} (+ (* x 3) y)
-    §IF{if12} (> acc 21148)
-      §R (+ acc 21148)
+    §IF{if09} (> acc 21092)
+      §R (+ acc 21092)
     §EL
-      §R (+ (* acc 2) 21148)
+      §R (+ (* acc 2) 21092)
+
+  §F{f010:l1m21_fn10:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (> x 1)
+    §S (>= x 2)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if10} (> acc 21099)
+      §R (+ acc 21099)
+    §EL
+      §R (+ (* acc 2) 21099)
+
+  §F{f011:l1m21_fn11:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §B{v1:i32} §C{l2m25_fn03} §A x §A INT:17 §/C
+    §B{v2:i32} §C{l2m16_fn02} §A x §A INT:62 §/C
+    §R (+ (+ v1 v2) y)
+
+  §F{f012:l1m21_fn12:pub} (i32:x, i32:y) -> i32
+    §E{}
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 21106)
+    §IF{if12} (>= x 21106)
+      §R x
+    §EL
+      §R 21106
 
   §F{f013:l1m21_fn13:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{v1:i32} §C{l2m12_fn08} §A x §A INT:64 §/C
-    §B{v2:i32} §C{l2m25_fn13} §A x §A INT:27 §/C
+    §B{v1:i32} §C{l2m07_fn07} §A x §A INT:84 §/C
+    §B{v2:i32} §C{l2m10_fn12} §A x §A INT:25 §/C
     §R (+ (+ v1 v2) y)
