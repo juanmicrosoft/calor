@@ -477,7 +477,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, node.Identifier.Text, InteropMemberKind.Class))
+        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Class))
             return;
 
         _context.RecordFeatureUsage("interface");
@@ -568,7 +568,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, node.Identifier.Text, InteropMemberKind.Class))
+        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Class))
             return;
 
         _context.RecordFeatureUsage("class");
@@ -649,7 +649,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, node.Identifier.Text, InteropMemberKind.Class))
+        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Class))
             return;
 
         _context.RecordFeatureUsage("struct");
@@ -685,7 +685,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, node.Identifier.Text, InteropMemberKind.Other))
+        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Other))
             return;
 
         _context.RecordFeatureUsage("enum");
@@ -752,7 +752,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             throw EscalateExpression(node, "generic-delegate");
         }
 
-        if (TryRefuseCrossNamespaceCollision(node, node.Identifier.Text, InteropMemberKind.Other))
+        if (TryRefuseCrossNamespaceCollision(node, InteropMemberKind.Other))
             return;
 
         _context.RecordFeatureUsage("delegate");
@@ -2344,83 +2344,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return Array.Empty<StatementNode>();
     }
 
-    /// <summary>
-    /// Converts a C# local function to a module-level §F function.
-    /// Local functions are hoisted out of the containing method body since
-    /// Calor doesn't have nested function declarations.
-    /// </summary>
-    private FunctionNode ConvertLocalFunction(LocalFunctionStatementSyntax node)
-    {
-        var id = _context.GenerateId("f");
-        var name = node.Identifier.ValueText;
-        var parameters = ConvertParameters(node.ParameterList);
-
-        var isAsync = node.Modifiers.Any(SyntaxKind.AsyncKeyword);
-        var returnTypeStr = node.ReturnType.ToString();
-
-        if (isAsync)
-        {
-            returnTypeStr = UnwrapTaskType(returnTypeStr);
-        }
-
-        var returnType = TypeMapper.CSharpToCalor(returnTypeStr);
-        var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
-        var body = ConvertMethodBody(node.Body, node.ExpressionBody);
-
-        _context.Stats.MethodsConverted++;
-        _context.IncrementConverted();
-
-        return new FunctionNode(
-            GetTextSpan(node),
-            id,
-            name,
-            Visibility.Private,
-            Array.Empty<TypeParameterNode>(),
-            parameters,
-            output,
-            effects: InferEffectsFromBody(body),
-            Array.Empty<RequiresNode>(),
-            Array.Empty<EnsuresNode>(),
-            body,
-            new AttributeCollection(),
-            Array.Empty<ExampleNode>(),
-            Array.Empty<IssueNode>(),
-            null, null,
-            Array.Empty<AssumeNode>(),
-            null, null, null,
-            Array.Empty<BreakingChangeNode>(),
-            Array.Empty<PropertyTestNode>(),
-            null, null, null,
-            isAsync);
-    }
-
     // ------------------------------------------------------------------
     // #769 (WS-W4 D2): cross-namespace same-name refusal
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Populates <see cref="_crossNamespaceCollisionNames"/> with the bare names of
-    /// top-level types declared in two or more distinct namespaces. The module
-    /// flattens every namespace into one unit, so two such types would collapse to
-    /// a single identity — a silent merge (#769). Recording the name lets the type
-    /// visitors refuse those types (escalate to §CSHARP interop) instead of merging.
-    /// Types with a unique bare name, or all in one namespace, are not collisions.
+    /// Populates <see cref="_crossNamespaceCollisionNames"/> with the identity keys
+    /// (bare name + generic arity) of top-level types declared in two or more
+    /// distinct namespaces. The module flattens every namespace into one unit, so
+    /// two such types would collapse to a single identity — a silent merge (#769).
+    /// Recording the key lets the type visitors refuse those types (escalate to
+    /// §CSHARP interop) instead of merging. Types with a unique key, or all in one
+    /// namespace, are not collisions. Generic arity is part of the key so
+    /// <c>A.Foo</c> and <c>B.Foo&lt;T&gt;</c> — distinct types that coexist fine —
+    /// are NOT treated as a collision.
     /// </summary>
     private void ScanCrossNamespaceCollisions(CompilationUnitSyntax root)
     {
-        var namespacesByName = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var namespacesByKey = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (var member in root.DescendantNodes().OfType<MemberDeclarationSyntax>())
         {
             if (member.Parent is not (BaseNamespaceDeclarationSyntax or CompilationUnitSyntax))
                 continue;
 
-            var name = member switch
-            {
-                BaseTypeDeclarationSyntax t => t.Identifier.Text,
-                DelegateDeclarationSyntax d => d.Identifier.Text,
-                _ => null,
-            };
-            if (name == null)
+            var key = TypeIdentityKey(member);
+            if (key == null)
                 continue;
 
             // Full namespace path (outer→inner), so A.X.Foo and C.X.Foo are two
@@ -2430,28 +2378,47 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .OfType<BaseNamespaceDeclarationSyntax>()
                 .Select(n => n.Name.ToString())
                 .Reverse());
-            if (!namespacesByName.TryGetValue(name, out var set))
-                namespacesByName[name] = set = new HashSet<string>(StringComparer.Ordinal);
+            if (!namespacesByKey.TryGetValue(key, out var set))
+                namespacesByKey[key] = set = new HashSet<string>(StringComparer.Ordinal);
             set.Add(ns);
         }
 
-        foreach (var (name, namespaces) in namespacesByName)
+        foreach (var (key, namespaces) in namespacesByKey)
         {
             if (namespaces.Count >= 2)
-                _crossNamespaceCollisionNames.Add(name);
+                _crossNamespaceCollisionNames.Add(key);
         }
     }
 
     /// <summary>
-    /// If <paramref name="node"/> is a top-level type whose bare name collides with
-    /// a same-named type in another namespace (#769), refuse to flatten/merge it:
-    /// preserve it verbatim as a §CSHARP interop block (a counted loss, so the file
-    /// is non-native) and return true. Returns false when there is no collision.
+    /// The flatten-identity key for a top-level type/delegate declaration:
+    /// <c>Name`Arity</c>. Arity distinguishes <c>Foo</c> from <c>Foo&lt;T&gt;</c>,
+    /// which are separate types that never collide. Returns null for non-type
+    /// members.
+    /// </summary>
+    private static string? TypeIdentityKey(MemberDeclarationSyntax member)
+    {
+        var (name, arity) = member switch
+        {
+            TypeDeclarationSyntax t => (t.Identifier.Text, t.TypeParameterList?.Parameters.Count ?? 0),
+            EnumDeclarationSyntax e => (e.Identifier.Text, 0),
+            DelegateDeclarationSyntax d => (d.Identifier.Text, d.TypeParameterList?.Parameters.Count ?? 0),
+            _ => (null, 0),
+        };
+        return name == null ? null : $"{name}`{arity}";
+    }
+
+    /// <summary>
+    /// If <paramref name="node"/> is a top-level type whose identity (name + arity)
+    /// collides with a same-identity type in another namespace (#769), refuse to
+    /// flatten/merge it: preserve it verbatim as a §CSHARP interop block (a counted
+    /// loss, so the file is non-native) and return true. Returns false otherwise.
     /// </summary>
     private bool TryRefuseCrossNamespaceCollision(
-        MemberDeclarationSyntax node, string name, InteropMemberKind kind)
+        MemberDeclarationSyntax node, InteropMemberKind kind)
     {
-        if (!_crossNamespaceCollisionNames.Contains(name))
+        var key = TypeIdentityKey(node);
+        if (key == null || !_crossNamespaceCollisionNames.Contains(key))
             return false;
         if (node.Parent is not (BaseNamespaceDeclarationSyntax or CompilationUnitSyntax))
             return false;
@@ -2459,121 +2426,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("namespace");
         _moduleInteropBlocks.Add(CreateInteropBlock(node, "namespace-collision", kind));
         return true;
-    }
-
-    // ------------------------------------------------------------------
-    // #777 (WS-W4 D4): local-function hoist-fidelity refusal
-    // ------------------------------------------------------------------
-
-    /// <summary>
-    /// True when a local function cannot survive the hoist-to-module-level lowering
-    /// without a silent divergence (#777). Generic local functions lose their type
-    /// parameters (identity loss — the hoist may still compile); capturing local
-    /// functions reference enclosing locals/parameters that do not exist at module
-    /// scope. Both must escalate the containing member to §CSHARP interop. A
-    /// non-generic, non-capturing local function round-trips faithfully and stays
-    /// native. Capture detection over-approximates (a false positive only sends more
-    /// to interop, never a wrong native), so a missed capture is still caught loudly
-    /// by the emitted-C# build break.
-    /// </summary>
-    private static bool LocalFunctionMustEscalate(LocalFunctionStatementSyntax fn)
-    {
-        if (fn.TypeParameterList is { Parameters.Count: > 0 })
-            return true;
-        return CapturesEnclosingLocals(fn);
-    }
-
-    private static bool CapturesEnclosingLocals(LocalFunctionStatementSyntax fn)
-    {
-        SyntaxNode? scope = (SyntaxNode?)fn.Body ?? fn.ExpressionBody;
-        if (scope == null)
-            return false;
-
-        // Names usable inside fn without capture: its own parameters and type
-        // parameters, plus everything declared within its own body.
-        var bound = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var p in fn.ParameterList.Parameters)
-            bound.Add(p.Identifier.ValueText);
-        if (fn.TypeParameterList != null)
-            foreach (var tp in fn.TypeParameterList.Parameters)
-                bound.Add(tp.Identifier.ValueText);
-        foreach (var d in scope.DescendantNodes())
-        {
-            switch (d)
-            {
-                case VariableDeclaratorSyntax vd: bound.Add(vd.Identifier.ValueText); break;
-                case SingleVariableDesignationSyntax sv: bound.Add(sv.Identifier.ValueText); break;
-                case ForEachStatementSyntax fe: bound.Add(fe.Identifier.ValueText); break;
-                case ParameterSyntax ps: bound.Add(ps.Identifier.ValueText); break;
-            }
-        }
-
-        var enclosing = CollectEnclosingLocalNames(fn);
-        if (enclosing.Count == 0)
-            return false;
-
-        foreach (var id in scope.DescendantNodes().OfType<IdentifierNameSyntax>())
-        {
-            // Skip the member-name side of `x.Member` and named-argument labels —
-            // those are not variable references.
-            if (id.Parent is MemberAccessExpressionSyntax ma && ma.Name == id)
-                continue;
-            if (id.Parent is NameColonSyntax or NameEqualsSyntax)
-                continue;
-
-            var name = id.Identifier.ValueText;
-            if (bound.Contains(name))
-                continue;
-            if (enclosing.Contains(name))
-                return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Local names (parameters and locals) declared in the member enclosing
-    /// <paramref name="fn"/>, excluding anything declared inside fn itself. Sibling
-    /// local-function names are intentionally omitted: they hoist to module scope
-    /// too, so referencing one is not a capture.
-    /// </summary>
-    private static HashSet<string> CollectEnclosingLocalNames(LocalFunctionStatementSyntax fn)
-    {
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        SyntaxNode? container = fn.Ancestors()
-            .FirstOrDefault(a => a is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax);
-        if (container == null)
-            return names;
-
-        switch (container)
-        {
-            case BaseMethodDeclarationSyntax bm when bm.ParameterList != null:
-                AddParameterNames(names, bm.ParameterList);
-                break;
-            case AccessorDeclarationSyntax:
-                names.Add("value"); // property/indexer set accessor implicit parameter
-                break;
-        }
-
-        foreach (var d in container.DescendantNodes())
-        {
-            if (fn.Span.Contains(d.Span))
-                continue; // declared inside fn — not a capture source
-
-            switch (d)
-            {
-                case VariableDeclaratorSyntax vd: names.Add(vd.Identifier.ValueText); break;
-                case SingleVariableDesignationSyntax sv: names.Add(sv.Identifier.ValueText); break;
-                case ForEachStatementSyntax fe: names.Add(fe.Identifier.ValueText); break;
-                case ParameterSyntax ps: names.Add(ps.Identifier.ValueText); break;
-            }
-        }
-        return names;
-    }
-
-    private static void AddParameterNames(HashSet<string> names, BaseParameterListSyntax list)
-    {
-        foreach (var p in list.Parameters)
-            names.Add(p.Identifier.ValueText);
     }
 
     /// <summary>
@@ -3985,18 +3837,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var statements = new List<StatementNode>();
 
-        // #777 (WS-W4 D4): at each member-body boundary, scan the whole body up
-        // front for a generic or capturing local function. Either kind cannot be
-        // faithfully hoisted to module scope, so refuse — escalate the containing
-        // member to §CSHARP interop. Doing this before any statement is processed
-        // means no sibling local function is half-hoisted before the refusal.
+        // #777 (WS-W4 D4): at each member-body boundary, refuse ANY member that
+        // contains a local function — escalate the whole member to §CSHARP interop.
+        // The hoist-to-module-level lowering is never sound: its own happy path
+        // (a plain `int Add(...)` with no collision) build-breaks (CS0103) because
+        // the call site is left in the class while the function moves to the module
+        // static class; and when a same-named member DOES exist, the orphaned call
+        // silently rebinds to it and compiles clean (LossCount==0, wrong behaviour) —
+        // the exact §1 predicate-trust blocker. Escalating all local functions turns
+        // both outcomes into honest interop; no correct native coverage is lost.
+        // Done before any statement is processed so no sibling is half-hoisted.
         if (block.Parent is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax)
         {
-            foreach (var fn in block.DescendantNodes().OfType<LocalFunctionStatementSyntax>())
-            {
-                if (LocalFunctionMustEscalate(fn))
-                    throw EscalateExpression(fn, "local-function");
-            }
+            var localFn = block.DescendantNodes()
+                .OfType<LocalFunctionStatementSyntax>()
+                .FirstOrDefault();
+            if (localFn != null)
+                throw EscalateExpression(localFn, "local-function");
         }
 
         // Extract preprocessor regions from trivia
@@ -4153,14 +4010,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 continue;
             }
 
-            // Handle local functions by hoisting to module-level §F functions
+            // #777 (WS-W4 D4): local functions are never hoisted — the lowering is
+            // unsound (orphaned call site build-breaks or silently rebinds to a
+            // same-named member). Escalate to §CSHARP interop. The member-body scan
+            // at the top of ConvertBlock normally throws first; this backstops any
+            // other path (e.g. a top-level-statement local function, caught by
+            // VisitGlobalStatement).
             if (statement is LocalFunctionStatementSyntax localFunc)
             {
-                _context.RecordFeatureUsage("local-function");
-                var hoisted = ConvertLocalFunction(localFunc);
-                _functions.Add(hoisted);
-                FlushPendingStatements(statements);
-                continue;
+                throw EscalateExpression(localFunc, "local-function");
             }
 
             // Handle lock statements: comment before body (correct semantic order)

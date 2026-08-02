@@ -156,6 +156,28 @@ public class WedgeW4SliceAStructuralTests
     }
 
     [Fact]
+    public void D2_SameNameDifferentArity_StaysNative_AndRoundTrips()
+    {
+        // `A.Foo` (arity 0) and `B.Foo<T>` (arity 1) are distinct types that coexist
+        // fine — different generic arity means no identity merge. The collision key
+        // includes arity, so these must NOT be refused; they stay native.
+        var csharp = """
+            namespace A { public class Foo { public int V() => 1; } }
+            namespace B { public class Foo<T> { public T V(T x) => x; } }
+            """;
+
+        var result = Convert(csharp);
+        Assert.True(result.Success);
+        Assert.DoesNotContain(result.Context.Losses,
+            l => l.Feature == "namespace-collision");
+
+        var roundTrip = TestHelpers.FullRoundTrip(csharp, "W4SliceA");
+        Assert.True(roundTrip.RoslynSuccess,
+            "Same-name-different-arity cross-namespace types must stay native and compile:\n"
+            + string.Join("\n", roundTrip.RoslynErrors));
+    }
+
+    [Fact]
     public void D2_SameNameInSingleNamespacePartial_IsNotACollision()
     {
         // Two partial declarations of one type in the SAME namespace are a
@@ -276,12 +298,34 @@ public class WedgeW4SliceAStructuralTests
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Get");
     }
 
-    [Fact]
-    public void D4_PlainLocalFunction_IsNotEscalatedToInterop_ButBuildBreakIsTheLoudBackstop()
+    // A member containing ANY local function escalates to §CSHARP interop. The
+    // hoist-to-module lowering is unsound in both directions: its happy path
+    // (no same-named member) build-breaks (the call site is orphaned from the
+    // hoisted function → CS0103), and when a same-named member DOES exist the
+    // orphaned call silently rebinds to it and compiles clean (LossCount==0, wrong
+    // behaviour) — the §1 predicate-trust blocker. Escalate-all makes every
+    // outcome honest interop; no correct native coverage is lost.
+
+    private static void AssertLocalFunctionEscalated(ConversionResult result, string localName)
     {
-        // A non-generic, non-capturing local function is left on the native hoist
-        // path (NOT escalated to interop) — distinguishing it from the generic and
-        // capturing cases above.
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        // Non-native: the whole containing member is preserved verbatim as raw C#
+        // (a counted interop loss). The loss is labelled by the member kind; the
+        // escalation is attributed to the local function in the conversion issues.
+        Assert.Contains(result.Context.Losses,
+            l => l.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Contains(result.Issues, i => i.Feature == "local-function");
+        Assert.Contains("§CSHARP", result.CalorSource);
+        // Never hoisted as a native module function.
+        Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == localName);
+    }
+
+    [Fact]
+    public void D4_PlainLocalFunction_EscalatesToInterop()
+    {
+        // Even a plain non-generic, non-capturing local function escalates: the
+        // hoist's own happy path build-breaks (orphaned call site), so there is no
+        // correct native conversion to preserve.
         var csharp = """
             public class D
             {
@@ -293,31 +337,12 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        var result = Convert(csharp);
-        Assert.True(result.Success);
-        Assert.DoesNotContain("§CSHARP", result.CalorSource);
-        Assert.DoesNotContain(result.Context.Losses,
-            l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains(result.Ast!.Functions, f => f.Name == "Add");
-
-        // The hoist relocates the function to the module's static class while the
-        // call site stays in the original class, so the emitted C# does NOT resolve
-        // the call (CS0103). That build break is the LOUD backstop: the file is
-        // non-native (reverted), never a silent substitution. If a future emitter
-        // change makes the hoist faithfully round-trip, this becomes true-native
-        // (an improvement) and this assertion should be revisited.
-        var roundTrip = TestHelpers.FullRoundTrip(csharp, "W4SliceA");
-        Assert.False(roundTrip.RoslynSuccess,
-            "Expected the hoisted-call-site build break to keep plain local functions "
-            + "loudly non-native; if the hoist became faithful, update this test.");
+        AssertLocalFunctionEscalated(Convert(csharp), "Add");
     }
 
     [Fact]
-    public void D4_RecursiveNonCapturingLocalFunction_IsNotEscalatedToInterop()
+    public void D4_RecursiveLocalFunction_EscalatesToInterop()
     {
-        // Self-recursion is not a capture (the function's own name is not an
-        // enclosing local) — the capture detector must not misfire on it, so it
-        // stays on the native hoist path rather than escalating to interop.
         var csharp = """
             public class F
             {
@@ -333,10 +358,68 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        var result = Convert(csharp);
-        Assert.True(result.Success);
-        Assert.DoesNotContain(result.Context.Losses,
-            l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Contains(result.Ast!.Functions, f => f.Name == "Fac");
+        AssertLocalFunctionEscalated(Convert(csharp), "Fac");
+    }
+
+    [Fact]
+    public void D4_C1_LocalShadowsSameClassMethod_EscalatesToInterop_NotSilentRebind()
+    {
+        // C-1: the class has both `int Foo() => 999` and a local `int Foo() => 1`.
+        // The source M() returns 1; a naive hoist would orphan the call and silently
+        // rebind it to the class method (round-trip M() == 999) — a silent
+        // substitution with zero recorded losses. Escalate-all refuses it loudly.
+        var csharp = """
+            public class C
+            {
+                public int Foo() => 999;
+                public int M()
+                {
+                    int Foo() => 1;
+                    return Foo();
+                }
+            }
+            """;
+
+        AssertLocalFunctionEscalated(Convert(csharp), "Foo");
+    }
+
+    [Fact]
+    public void D4_C2_LocalShadowsInheritedMethod_EscalatesToInterop_NotSilentRebind()
+    {
+        // C-2: the local `Foo` shadows an INHERITED Base.Foo(). A hoist would orphan
+        // the call and it would rebind to the base method — silent.
+        var csharp = """
+            public class Base { public int Foo() => 999; }
+            public class Derived : Base
+            {
+                public int M()
+                {
+                    int Foo() => 1;
+                    return Foo();
+                }
+            }
+            """;
+
+        AssertLocalFunctionEscalated(Convert(csharp), "Foo");
+    }
+
+    [Fact]
+    public void D4_C3_LocalShadowsClassOverload_EscalatesToInterop_NotSilentRebind()
+    {
+        // C-3: the local `Foo(int)` shadows a class overload `Foo(int)`. A hoist
+        // would orphan the call and rebind to the class overload — silent.
+        var csharp = """
+            public class C
+            {
+                public int Foo(int x) => 999;
+                public int M()
+                {
+                    int Foo(int x) => x;
+                    return Foo(1);
+                }
+            }
+            """;
+
+        AssertLocalFunctionEscalated(Convert(csharp), "Foo");
     }
 }

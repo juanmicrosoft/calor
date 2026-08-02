@@ -592,18 +592,18 @@ public static class FeatureSupport
             Workaround = "Split multi-namespace files, or keep same-named cross-namespace types as §CSHARP interop blocks"
         },
 
-        // #777 (WS-W4 D4): local functions are lowered by hoisting to module-level
-        // §F functions. A non-generic, non-capturing local function round-trips
-        // faithfully. A generic local function would lose its type parameters, and a
-        // capturing local function would reference enclosing locals that do not exist
-        // at module scope — both are refused and escalate the containing member to
-        // §CSHARP interop (a counted loss) rather than silently diverging.
+        // #777 (WS-W4 D4): any member containing a local function escalates to
+        // §CSHARP interop. The hoist-to-module-level lowering is never sound — its
+        // own happy path build-breaks (the call site is orphaned from the hoisted
+        // function), and when a same-named member exists the orphaned call silently
+        // rebinds to it (a silent substitution). So local functions are refused
+        // wholesale (a counted loss) rather than converted.
         ["local-function"] = new FeatureInfo
         {
             Name = "local-function",
-            Support = SupportLevel.Partial,
-            Description = "Non-generic, non-capturing local functions are hoisted to module-level §F functions; generic or capturing local functions escalate the containing member to §CSHARP interop",
-            Workaround = "Keep generic or capturing local functions as §CSHARP interop, or lift them to methods with explicit parameters"
+            Support = SupportLevel.NotSupported,
+            Description = "A member containing a local function is preserved verbatim as a §CSHARP interop block; hoisting to a module-level §F function is unsound (orphaned call site build-breaks or silently rebinds)",
+            Workaround = "Lift the local function to a method with explicit parameters before migration, or keep the member as a §CSHARP interop block"
         },
 
         // Phase 4 features (C# 11-13)
