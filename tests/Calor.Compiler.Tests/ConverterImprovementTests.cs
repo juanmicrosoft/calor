@@ -1837,8 +1837,14 @@ public class ConverterImprovementTests
 
     #region Target-Typed New in Return/Arrow Contexts (InferTargetType Case 3)
 
+    // #777 (WS-W4 D4): a member containing a local function is preserved verbatim as
+    // §CSHARP interop — hoisting to a module-level §F function is unsound (the
+    // orphaned call site build-breaks, or silently rebinds to a same-named member).
+    // Target-typed-new inference on ordinary methods stays covered by the
+    // Migration_TargetTypedNew_InMethod*/_AsyncMethod tests below.
+
     [Fact]
-    public void Migration_TargetTypedNew_InLocalFunctionArrow_InfersReturnType()
+    public void Migration_LocalFunctionArrow_EscalatesToInterop()
     {
         var csharp = """
             public class Example
@@ -1854,17 +1860,13 @@ public class ConverterImprovementTests
         var result = _converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
-        // The local function is hoisted to a module-level §F function.
-        // The return expression should be a NewExpressionNode with type "str" (not "object").
-        var hoistedFunc = result.Ast!.Functions.FirstOrDefault(f => f.Name == "Local");
-        Assert.NotNull(hoistedFunc);
-        var ret = Assert.IsType<ReturnStatementNode>(hoistedFunc.Body[0]);
-        var newExpr = Assert.IsType<NewExpressionNode>(ret.Expression);
-        Assert.Equal("str", newExpr.TypeName);
+        Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Local");
+        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Contains("§CSHARP", result.CalorSource!);
     }
 
     [Fact]
-    public void Migration_TargetTypedNew_InLocalFunctionReturnStatement_InfersReturnType()
+    public void Migration_LocalFunctionReturnStatement_EscalatesToInterop()
     {
         var csharp = """
             using System.Collections.Generic;
@@ -1884,11 +1886,9 @@ public class ConverterImprovementTests
         var result = _converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
-        var hoistedFunc = result.Ast!.Functions.FirstOrDefault(f => f.Name == "Local");
-        Assert.NotNull(hoistedFunc);
-        var ret = Assert.IsType<ReturnStatementNode>(hoistedFunc.Body[0]);
-        var newExpr = Assert.IsType<NewExpressionNode>(ret.Expression);
-        Assert.Equal("List<i32>", newExpr.TypeName);
+        Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Local");
+        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Contains("§CSHARP", result.CalorSource!);
     }
 
     [Fact]
@@ -1941,7 +1941,7 @@ public class ConverterImprovementTests
     }
 
     [Fact]
-    public void Migration_TargetTypedNew_AsyncLocalFunction_UnwrapsTaskType()
+    public void Migration_AsyncLocalFunction_EscalatesToInterop()
     {
         var csharp = """
             using System.Collections.Generic;
@@ -1962,11 +1962,9 @@ public class ConverterImprovementTests
         var result = _converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
-        var hoistedFunc = result.Ast!.Functions.FirstOrDefault(f => f.Name == "LocalAsync");
-        Assert.NotNull(hoistedFunc);
-        var ret = Assert.IsType<ReturnStatementNode>(hoistedFunc.Body[0]);
-        var newExpr = Assert.IsType<NewExpressionNode>(ret.Expression);
-        Assert.Equal("List<i32>", newExpr.TypeName);
+        Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "LocalAsync");
+        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Contains("§CSHARP", result.CalorSource!);
     }
 
     [Fact]

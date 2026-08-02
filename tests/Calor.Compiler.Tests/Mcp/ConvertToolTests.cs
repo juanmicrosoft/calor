@@ -161,8 +161,11 @@ public class ConvertToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WithLocalFunction_HoistsToModuleLevel()
+    public async Task ExecuteAsync_WithLocalFunction_EscalatesToInterop()
     {
+        // #777 (WS-W4 D4): a member containing a local function is preserved verbatim
+        // as interop rather than hoisted to a module-level function (the hoist orphans
+        // the call site — build break or silent rebind).
         var args = JsonDocument.Parse("""
             {
                 "source": "public class Example { public int Calculate(int x) { int Square(int n) => n * n; return Square(x); } }",
@@ -176,9 +179,9 @@ public class ConvertToolTests
         var text = result.Content[0].Text!;
         var json = JsonDocument.Parse(text);
         var calorSource = json.RootElement.GetProperty("calorSource").GetString()!;
-        Assert.Contains("\u00A7F{", calorSource);  // Hoisted to module-level §F function
+        Assert.Contains("\u00A7CSHARP", calorSource);   // member preserved as interop
         Assert.Contains("Square", calorSource);
-        Assert.DoesNotContain("localfunction", calorSource);
+        Assert.DoesNotContain("\u00A7F{", calorSource);  // NOT hoisted to a module-level function
     }
 
     [Fact]

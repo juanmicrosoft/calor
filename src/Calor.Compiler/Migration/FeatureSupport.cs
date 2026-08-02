@@ -577,6 +577,35 @@ public static class FeatureSupport
             Workaround = "Review conditional-compilation blocks manually; alternate branches are not preserved in the default pipeline"
         },
 
+        // #769 (WS-W4 D2): namespace topology is NOT preserved — every type in a
+        // file is flattened into a single module named after the first namespace,
+        // so a type's fully-qualified identity changes. Flattening that carries no
+        // identity-merge risk (single namespace, or types with unique bare names)
+        // stays native; two top-level types that share a bare name across different
+        // namespaces would collapse to one identity, so they are refused and escalated
+        // to §CSHARP interop (a counted loss) rather than silently merged.
+        ["namespace"] = new FeatureInfo
+        {
+            Name = "namespace",
+            Support = SupportLevel.Partial,
+            Description = "Namespace topology is flattened into one module; cross-namespace same-name types are refused (escalated to §CSHARP interop) rather than silently merged",
+            Workaround = "Split multi-namespace files, or keep same-named cross-namespace types as §CSHARP interop blocks"
+        },
+
+        // #777 (WS-W4 D4): any member containing a local function escalates to
+        // §CSHARP interop. The hoist-to-module-level lowering is never sound — its
+        // own happy path build-breaks (the call site is orphaned from the hoisted
+        // function), and when a same-named member exists the orphaned call silently
+        // rebinds to it (a silent substitution). So local functions are refused
+        // wholesale (a counted loss) rather than converted.
+        ["local-function"] = new FeatureInfo
+        {
+            Name = "local-function",
+            Support = SupportLevel.NotSupported,
+            Description = "A member containing a local function is preserved verbatim as a §CSHARP interop block; hoisting to a module-level §F function is unsound (orphaned call site build-breaks or silently rebinds)",
+            Workaround = "Lift the local function to a method with explicit parameters before migration, or keep the member as a §CSHARP interop block"
+        },
+
         // Phase 4 features (C# 11-13)
         ["default-lambda-parameter"] = new FeatureInfo
         {
