@@ -22,6 +22,7 @@
       §ASSIGN _items §NEW{List<T>} §/NEW
 
     §MT{mt101:Add:pub} (T:item) -> void
+      §E{mut}
       §C{_items.Add} item
 
     §MT{mt102:GetAll:pub} () -> ReadList<T>

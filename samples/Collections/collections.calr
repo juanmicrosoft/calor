@@ -1,6 +1,6 @@
 §M{m001:Collections}
   §F{f001:Main:pub} () -> void
-    §E{cw}
+    §E{cw,mut}
     §C{Console.WriteLine} "=== Calor Collections Demo ==="
     §C{Console.WriteLine} ""
     §C{Console.WriteLine} "--- List Operations ---"

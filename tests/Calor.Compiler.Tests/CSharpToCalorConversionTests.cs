@@ -1456,7 +1456,11 @@ public class CSharpToCalorConversionTests
         Assert.DoesNotContain("§/USE{", conversionResult.CalorSource);
 
         // Step 2: Calor -> C#
-        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        // WS-W2 (D-W2.3/D-W2.6): §USING bodies now contribute effects and the
+        // converted code carries no §E declarations — compile converted output
+        // with enforcement off per this file's converted-code precedent.
+        var compilationResult = Program.Compile(conversionResult.CalorSource!, null,
+            new CompilationOptions { EnforceEffects = false });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
 
@@ -1487,7 +1491,11 @@ public class CSharpToCalorConversionTests
         Assert.NotNull(conversionResult.CalorSource);
 
         // Calor -> C#
-        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        // WS-W2 (D-W2.3/D-W2.6): §USING bodies now contribute effects and the
+        // converted code carries no §E declarations — compile converted output
+        // with enforcement off per this file's converted-code precedent.
+        var compilationResult = Program.Compile(conversionResult.CalorSource!, null,
+            new CompilationOptions { EnforceEffects = false });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
 
@@ -1519,7 +1527,11 @@ public class CSharpToCalorConversionTests
         Assert.NotNull(conversionResult.CalorSource);
 
         // Calor -> C#
-        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        // WS-W2 (D-W2.3/D-W2.6): §USING bodies now contribute effects and the
+        // converted code carries no §E declarations — compile converted output
+        // with enforcement off per this file's converted-code precedent.
+        var compilationResult = Program.Compile(conversionResult.CalorSource!, null,
+            new CompilationOptions { EnforceEffects = false });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
 

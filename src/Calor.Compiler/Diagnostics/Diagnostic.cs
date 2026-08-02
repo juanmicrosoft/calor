@@ -255,7 +255,7 @@ public static class DiagnosticCode
     public const string UnusedEffectDeclaration = "Calor0401";
     public const string EffectMismatch = "Calor0402";
 
-    // Effect enforcement (Calor0410-0419)
+    // Effect enforcement (Calor0410-0429)
     public const string ForbiddenEffect = "Calor0410";
     public const string UnknownExternalCall = "Calor0411";
     public const string MissingSpecificEffect = "Calor0412";
@@ -268,6 +268,39 @@ public static class DiagnosticCode
     /// Warning: Public Calor function has no §E effect declaration. Cross-module callers cannot verify effect safety.
     /// </summary>
     public const string UndeclaredPublicFunction = "Calor0417";
+
+    /// <summary>
+    /// Error: Invocation of a delegate/function-typed value under effect enforcement.
+    /// Function-typed values carry no effect contract (effect-annotated function types
+    /// are a future design), so their invocation cannot be charged and is rejected.
+    /// Migration policy: wrap in §CSHARP interop (surfaced as an assumption via
+    /// Calor0419) or compile with --permissive-effects (an explicit waiver; demoted
+    /// to a warning).
+    /// </summary>
+    public const string DelegateInvocation = "Calor0418";
+
+    /// <summary>
+    /// Warning (error under --strict-effects): the effects of a function are assumed,
+    /// not verified — it contains C# interop content, an unrecognized construct, or
+    /// calls a function whose effects are assumed. The assumption propagates to
+    /// callers through the SCC pass instead of feeding silently-pure summaries
+    /// into the enforced tier.
+    /// </summary>
+    public const string AssumedEffects = "Calor0419";
+
+    /// <summary>
+    /// Error: an override declares effects not covered by the base method's declared
+    /// effect set (behavioral-subtyping rule: override §E ⊆ base §E). Broader
+    /// override effects would launder through dynamic dispatch.
+    /// </summary>
+    public const string OverrideEffectVariance = "Calor0420";
+
+    /// <summary>
+    /// Error: an interface implementation declares effects not covered by the
+    /// interface method's declared effect set (implementation §E ⊆ interface §E).
+    /// Interface dispatch launders effects identically to overrides.
+    /// </summary>
+    public const string InterfaceEffectVariance = "Calor0421";
 
     // Pattern matching errors (Calor0500-0599)
     public const string NonExhaustiveMatch = "Calor0500";

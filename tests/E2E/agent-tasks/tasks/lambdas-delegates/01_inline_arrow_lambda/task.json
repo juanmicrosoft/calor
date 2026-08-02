@@ -5,8 +5,13 @@
   "fixture": "basic-calor-project",
   "prompt": "Add a public function called ApplyDouble to Calculator.calr that takes an integer x, creates an inline lambda that doubles its input, binds it to a variable, calls the lambda with x, and returns the result.",
   "verification": {
-    "compilation": { "mustSucceed": true },
-    "z3": { "enabled": false }
+    "compilation": {
+      "mustSucceed": true,
+      "permissiveEffects": true
+    },
+    "z3": {
+      "enabled": false
+    }
   },
   "timeout": 120
 }

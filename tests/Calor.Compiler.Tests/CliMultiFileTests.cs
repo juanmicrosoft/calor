@@ -239,7 +239,12 @@ public class CliMultiFileTests : IDisposable
                 §/C
             """);
 
-        RunCli("--input", aPath, "--input", bPath, "--input", cPath);
+        // WS-W2 (D-W2.1): an ambiguous cross-module bare name is not in the
+        // unambiguous pre-parse map, so under default enforcement the per-module
+        // pass now fails closed (Calor0411 + Calor0410) instead of assuming
+        // purity. This test pins EMISSION shape, so it compiles under the
+        // --permissive-effects waiver; csc's CS0103 remains the honest failure.
+        RunCli("--input", aPath, "--input", bPath, "--input", cPath, "--permissive-effects");
 
         var emitted = File.ReadAllText(Path.Combine(_tempDir, "c.g.cs"));
         Assert.Contains("Emit();", emitted);
@@ -365,7 +370,12 @@ public class CliMultiFileTests : IDisposable
                 §P x
             """);
 
-        var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath);
+        // WS-W2 (D-W2.1): invoking the Func-typed 'Notify' parameter is now a
+        // Calor0418 error under default enforcement (the parameter shadows the
+        // cross-module name for effects exactly as it does for emission). This
+        // test pins EMISSION shape, so it compiles under the
+        // --permissive-effects waiver (Calor0418 demoted to a warning).
+        var (exit, stdOut, stdErr) = RunCli("--input", aPath, "--input", bPath, "--permissive-effects");
         Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
 
         var emitted = File.ReadAllText(Path.Combine(_tempDir, "caller.g.cs"));

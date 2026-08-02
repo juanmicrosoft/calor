@@ -57,6 +57,106 @@ public sealed class CallGraphAnalysis
     }
 
     /// <summary>
+    /// Enumerates all classes in a module, including classes wrapped in
+    /// module-level §PP type-preprocessor blocks (any branch — a
+    /// conditional-compilation branch may be active, so every branch's members
+    /// participate in analysis; W2 review C1).
+    /// </summary>
+    public static IEnumerable<ClassDefinitionNode> EnumerateClasses(ModuleNode module)
+    {
+        foreach (var cls in module.Classes)
+            yield return cls;
+        foreach (var block in module.TypePreprocessorBlocks)
+        {
+            var branch = block;
+            while (branch != null)
+            {
+                foreach (var cls in branch.Classes)
+                    yield return cls;
+                branch = branch.ElseBranch;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Enumerates all interfaces in a module, including §PP-wrapped ones.
+    /// </summary>
+    public static IEnumerable<InterfaceDefinitionNode> EnumerateInterfaces(ModuleNode module)
+    {
+        foreach (var iface in module.Interfaces)
+            yield return iface;
+        foreach (var block in module.TypePreprocessorBlocks)
+        {
+            var branch = block;
+            while (branch != null)
+            {
+                foreach (var iface in branch.Interfaces)
+                    yield return iface;
+                branch = branch.ElseBranch;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Enumerates all delegate definitions in a module, including §PP-wrapped ones.
+    /// </summary>
+    public static IEnumerable<DelegateDefinitionNode> EnumerateDelegates(ModuleNode module)
+    {
+        foreach (var del in module.Delegates)
+            yield return del;
+        foreach (var block in module.TypePreprocessorBlocks)
+        {
+            var branch = block;
+            while (branch != null)
+            {
+                foreach (var del in branch.Delegates)
+                    yield return del;
+                branch = branch.ElseBranch;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Enumerates all methods of a class, including methods wrapped in
+    /// class-level §PP member-preprocessor blocks (all branches; W2 review C1 —
+    /// a §PP-wrapped method must not escape effect enforcement).
+    /// </summary>
+    public static IEnumerable<MethodNode> EnumerateMethods(ClassDefinitionNode cls)
+    {
+        foreach (var method in cls.Methods)
+            yield return method;
+        foreach (var block in cls.PreprocessorBlocks)
+        {
+            var branch = block;
+            while (branch != null)
+            {
+                foreach (var method in branch.Methods)
+                    yield return method;
+                branch = branch.ElseBranch;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Enumerates all constructors of a class, including §PP-wrapped ones.
+    /// </summary>
+    public static IEnumerable<ConstructorNode> EnumerateConstructors(ClassDefinitionNode cls)
+    {
+        foreach (var ctor in cls.Constructors)
+            yield return ctor;
+        foreach (var block in cls.PreprocessorBlocks)
+        {
+            var branch = block;
+            while (branch != null)
+            {
+                foreach (var ctor in branch.Constructors)
+                    yield return ctor;
+                branch = branch.ElseBranch;
+            }
+        }
+    }
+
+    /// <summary>
     /// Builds a call graph analysis from a module AST.
     /// </summary>
     public static CallGraphAnalysis Build(ModuleNode ast)
@@ -78,10 +178,11 @@ public sealed class CallGraphAnalysis
             callerToCallees[function.Id] = new List<(string, TextSpan)>();
         }
 
-        // Index class methods and constructors
-        foreach (var cls in ast.Classes)
+        // Index class methods and constructors (including §PP-wrapped members
+        // and §PP-wrapped classes — W2 review C1)
+        foreach (var cls in EnumerateClasses(ast))
         {
-            foreach (var method in cls.Methods)
+            foreach (var method in EnumerateMethods(cls))
             {
                 var wrapped = ToFunctionNode(method, cls.Name);
                 functions[wrapped.Id] = wrapped;
@@ -96,7 +197,7 @@ public sealed class CallGraphAnalysis
                 }
                 ids.Add(wrapped.Id);
             }
-            foreach (var ctor in cls.Constructors)
+            foreach (var ctor in EnumerateConstructors(cls))
             {
                 var wrapped = ToCtorFunctionNode(ctor, cls.Name);
                 functions[wrapped.Id] = wrapped;
@@ -277,6 +378,13 @@ public sealed class CallGraphAnalysis
             case AssignmentStatementNode assign:
                 CollectCallsFromExpression(assign.Target, calls);
                 CollectCallsFromExpression(assign.Value, calls);
+                break;
+            case PreprocessorDirectiveNode pp:
+                // Conditional-compilation branches may be active: collect call
+                // edges from every branch (W2 review C1).
+                CollectCallsFromStatements(pp.Body, calls);
+                if (pp.ElseBody != null)
+                    CollectCallsFromStatements(pp.ElseBody, calls);
                 break;
         }
     }

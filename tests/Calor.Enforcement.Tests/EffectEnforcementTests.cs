@@ -348,10 +348,13 @@ public class EffectEnforcementTests
     }
 
     [Fact]
-    public void DelegateInvocation_SingleWordTarget_DoesNotFail()
+    public void DelegateInvocation_SingleWordTarget_FailsClosed()
     {
-        // Calling a variable (delegate/Func parameter) should not produce
-        // an "unknown external call" error since it's not an external call
+        // WS-W2 (D-W2.1): a bare-name invocation that is not an internal
+        // function no longer passes as silently pure. A free name (here a
+        // delegate-typed member the pass cannot see) routes through the
+        // unknown-call chain and fails closed under the default strict policy.
+        // (Pre-W2 this test pinned the delegate hole: it asserted no failure.)
         var source = @"
 §M{m001:Test}
   §CL{c001:Mapper:pub}
@@ -362,14 +365,17 @@ public class EffectEnforcementTests
 ";
         var result = TestHarness.Compile(source);
 
-        Assert.False(result.HasErrors,
-            $"Delegate invocation should not fail. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        Assert.True(result.HasErrors,
+            "Bare-name invocation of an unresolvable target must fail closed");
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("transform"));
     }
 
     [Fact]
-    public void DelegateInvocation_InStrictMode_EmitsWarning()
+    public void DelegateInvocation_InStrictMode_IsError()
     {
-        // In strict effects mode, delegate invocations should get a warning
+        // WS-W2 (D-W2.1): under --strict-effects an unresolvable bare-name
+        // invocation is a hard Calor0411 error (pre-W2: warning only).
         var source = @"
 §M{m001:Test}
   §F{f001:UseDelegate:pub}
@@ -384,11 +390,8 @@ public class EffectEnforcementTests
         };
         var result = TestHarness.Compile(source, options);
 
-        // Should not produce errors (delegate invocations are assumed pure)
-        Assert.False(result.HasErrors,
-            $"Delegate invocation should not be an error even in strict mode. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
-        // But should produce a warning about unverified effects
-        Assert.Contains(result.Diagnostics.Warnings,
+        Assert.True(result.HasErrors, "Unresolvable bare-name invocation must be an error in strict mode");
+        Assert.Contains(result.Diagnostics.Errors,
             d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("callback"));
     }
 

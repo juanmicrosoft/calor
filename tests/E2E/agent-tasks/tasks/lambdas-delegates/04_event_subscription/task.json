@@ -5,8 +5,13 @@
   "fixture": "oop-project",
   "prompt": "Add a public class called EventPublisher to Domain.calr with a public event called OnDataReceived of type EventHandler. Add a public method Subscribe that takes an EventHandler parameter and subscribes it to the event.",
   "verification": {
-    "compilation": { "mustSucceed": true },
-    "z3": { "enabled": false }
+    "compilation": {
+      "mustSucceed": true,
+      "permissiveEffects": true
+    },
+    "z3": {
+      "enabled": false
+    }
   },
   "timeout": 120
 }
