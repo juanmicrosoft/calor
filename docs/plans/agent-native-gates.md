@@ -99,10 +99,12 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.3 (thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.4 tranche 1 (thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
-D-G5.1, frozen before the Guarantees probe epoch runs).** This annex is **additive-only
+D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
+A-1.4 tranche 1, 2026-08-01 — wedge plan D-W5.1, frozen before any WS-W2
+strictness-batch code merges; tranche 2 pending the D-W4.4 dry-run).** This annex is **additive-only
 with respect to the main document**: no §1–§7 machine-adjudicable gate
 criterion references any metric defined here, and nothing here alters the
 C#-vs-Calor gate decisions those sections govern. The annex's own proof-point
@@ -293,12 +295,27 @@ pairing, and censoring follow §2 of this document.
 | PP-G3 (verification depth converts the wedge, A-1.3) | Two legs, both required for a hit. **(a) Cross-arm, paired:** the v0.10 arm's M-W1 total is **not below** the v0.9 control arm's (ceiling note: the control scored 9/9 at `ws5-probe-001`, so this leg is a no-regression bar, not a delta). **(b) Single-arm, v0.10 configuration** (product-configuration claim, NOT cross-arm attribution): **≥ 2 of the 3 W5-B defects earn leg-b credit**, where credit is a per-run JOINT predicate aggregated per defect by majority (≥ 3 of the 5 slots; an invalid slot cannot satisfy the predicate) — the predicate, frozen (#825 review C3): a `build-proof` surfacing event occurred **∧** the defect is absent at declared-done (its probe passes) **∧** the seeded contract is intact-or-strengthened per the M-G4 mechanical check with a DETERMINATE result (mechanical-check-indeterminate counts as not-satisfying — conservative). An agent that ignores the refutation (defect present) or deletes/weakens the contract earns no credit for that run, however loudly the defect surfaced. **Adjudication preconditions:** PP-G1/M-G2 green on the treatment build (an unsound refute-everything verifier maximizes M-G3); raw aggregated counts, no §6.1 test (3 binary items are degenerate under bootstrap — the PP-W1 precedent). **D-G3.1 restate-check, recorded:** the guarantees plan required restating this threshold if D-G3.1 was descoped; D-G3.1 SHIPPED (#824 — all three W5-B contract shapes prove, corpus-pinned), so the threshold stands as planned | feasibility by determinism, disclosed limit included (the A-1.2 pattern): with M-G1/M-G2 green, the W5-B defective bodies encode to genuinely-SAT obligations, so the *surfacing* half of leg (b) is deterministic-by-construction; what the epoch adjudicates is the **agent-behavior residual** (does the agent act on a build-time refutation or delete the contract) plus leg (a)'s no-regression bar. Guarantees plan §5 [P] resolved here, results-blind, before the epoch |
 | PP-G4 (depth didn't buy prover-appeasement, A-1.3) | **(a) Iterations leg:** no significant iterations-to-green regression, v0.10 arm vs control: one-sided §6.1 cluster bootstrap (α = 0.05) over **all 9 pairs** on the median paired ratio (v0.10/control), direction convention frozen — a REGRESSION is ratio > 1, and the leg fails iff the one-sided 95 % CI lower bound exceeds 1.0. Disclosed widening of the plan's "contract-carrying tasks" wording: 3 clusters are degenerate under bootstrap (the PP-W1 precedent); the trio's per-pair medians are additionally reported. **Power honesty (the PP-L5 pattern):** iterations-to-green is floor-bound on these fixtures (median 1), so a pass at this N bounds only LARGE regressions; the all-identical degenerate case (every ratio 1.0) is a pass and means "no detectable movement at the floor", not "proven equal" — stated so the blocker's pass cannot be overread. **(b) Weakening leg:** v0.10-arm weakening incidence (M-G4 mechanical decision) exceeds the control arm's by **at most 3 runs, an ABSOLUTE excess** (≈ 20 pp at the designed 15/arm; the run-count margin is the frozen quantity when denominators shrink toward the 12-run floor) — frozen with small-sample honesty: at n = 15/arm, differences below ~3 runs are indistinguishable from noise, so a smaller margin would adjudicate coin flips; 0-vs-0 passes trivially. Release blocker regardless of PP-G3 (guarantees plan §5) | margin and method frozen results-blind before the epoch; the mechanical weakening procedure (implication asymmetry) dogfoods the product and removes the eyeballing this program's gates §0 forbids on adjudicated quantities; the M-G4 indeterminate fallback (> 20 %) guards prover-blind-spot inflation |
 
+| PP-W5 (strictness didn't tax the loop, A-1.4 tranche 1) | **Fails iff BOTH**: the one-sided 95 % cluster-bootstrap lower bound of the **median paired per-pair output-tokens-to-green ratio** (v0.11 treatment / v0.10.0 control) exceeds **1.0**, AND the point estimate exceeds **1.25**. Epoch shape: the four registered N1 neutral pairs (N1-001-string-utils, N1-002-inventory, N1-003-csv-row, N1-005-order-pipeline), **5 runs/arm**, simultaneous, same pinned model; control arm = the immutable `v0.10.0` release tag build, treatment = post-WS-W2 main (attribution commitment: isolation build if non-plan `src/` changes accrete); **identical harness configuration both arms** (the gates §1 pinned config — enforcement on — so the measured delta is the strictness batch's toolchain behavior, not config variance); edit mechanism `raw` both arms. Iterations-to-green recorded observational (floor-bound); §2 censoring caps apply. **Power honesty (the PP-L5/PP-G4 pattern):** at 4 clusters × 5 runs this rule bounds only LARGE regressions — measured detection 0.33/0.62/0.87 at true 1.25×/1.4×/1.6× regressions — so a pass means "no large tax detected", never "proven equal". **Release blocker** per wedge plan §5 | Frozen results-blind before any WS-W2 batch code merges (wedge plan §6.1: register-then-merge, or the comparison is unfalsifiable in the wrong direction). Margin and rule derived from the existing `m5-compare-001` N1 cells (the correct population — same 4 pairs, Calor arms, neutral tasks): within-cell output-token CV median 0.20 (max 0.43); null-simulation point-estimate p95 = 1.247 (the 1.25 margin sits AT the null p95, so the point test alone would false-fail ~5 %); the bootstrap-bound conjunction calibrates the measured null false-fail to ≈ 1.7 %. The PP-L6(b) precedent already adjudicated neutral parity on this same 4-pair N1 set via the §6.1 bootstrap. N1-005 contributed 3 valid runs/arm at m5 (its API-cluster cap-exhaustion, recorded there); the derivation used the realized data |
+
 Sub-integer disclosure: the iterations-to-green primary measure was moved to
 tokens-to-green because the dry-run showed it floor-bound — the loop plan's
 D4.5 rule ("the dry-run may move a threshold, the task count, or N before
 freezing — never after") applied as written.
 
 ### A.3 Annex revision log
+
+**A-1.4 tranche 1 (2026-08-01).** Additive: registers the **PP-W5** frozen row
+(A.2) — the wedge plan v0.11's strictness-parity release blocker — per the
+plan's two-tranche A-1.4 structure (D-W5.1: tranche 1 freezes PP-W5 from
+existing N1 epoch variance BEFORE the WS-W2 strictness batch merges; tranche 2
+— the real-scale PP-W2 threshold, fidelity bar, eligibility predicate, and
+annotation protocol — freezes after the D-W4.4 dry-run, before the real-scale
+epoch). Derivation data, simulation method (300 null simulations × 400-resample
+two-level cluster bootstrap over the archived `m5-compare-001` N1 result files),
+and the power table are recorded in the row's Basis column; the margin (1.25)
+deliberately coincides with the main document's frozen Phase-1 neutral
+iterations envelope (125 %). No existing metric, threshold, or frozen row is
+altered. Registered results-blind: zero WS-W2 batch code exists at freeze time.
 
 **A-1.3.2 (2026-07-30).** Results-blind amendment from the #827 epoch-driver
 review, applied before any epoch run; instruments only, thresholds and epoch
