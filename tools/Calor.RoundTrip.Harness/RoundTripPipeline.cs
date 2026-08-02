@@ -41,7 +41,7 @@ public sealed class RoundTripPipeline
 
         // Step 3: Convert & Replace
         Console.WriteLine("\nPhase 3/5: Converting library source files...");
-        report.FileResults = await ConvertAndReplaceAsync(workDir, config);
+        report.FileResults = await ConvertAndReplaceAsync(workDir, config, report);
         var replaced = report.FileResults.Count(f => f.Status == FileStatus.Replaced);
         var total = report.FileResults.Count;
         Console.WriteLine($"  Converted: {replaced}/{total} files replaced");
@@ -78,6 +78,14 @@ public sealed class RoundTripPipeline
 
         // Compare
         report.Comparison = CompareTestResults(report.Baseline, report.RoundTripTests, report.BuildResult);
+
+        // Fidelity: separated verdict dimensions (coverage / build / tests)
+        report.Fidelity = ProjectFidelity.Compute(report);
+        var cov = report.Fidelity.Coverage;
+        Console.WriteLine(
+            $"\nFidelity: coverage {cov.CoverageFraction:P1} " +
+            $"({cov.ConvertedNative} native + {cov.ConvertedWithLosses} with-losses of {cov.TotalConvertibleFiles}; " +
+            $"{cov.Reverted} reverted, {cov.FailedConversion} failed)");
 
         // Bisect regressions if enabled and there are few enough
         if (config.EnableBisect
@@ -147,9 +155,8 @@ public sealed class RoundTripPipeline
         var (exitCode, stdout, stderr) = await ProcessRunner.RunAsync(
             config.DotnetPath, args, workDir, config.TestTimeout);
 
-        // Parse the TRX file for structured results
-        var trxPath = TrxParser.FindTrxFile(workDir);
-        var testResults = trxPath != null ? TrxParser.Parse(trxPath) : [];
+        // Parse and aggregate ALL TRX files (one per test assembly)
+        var (testResults, trxFiles) = TrxParser.ParseAll(workDir);
 
         // Fallback: if TRX parsing found no results, parse console output
         if (testResults.Count == 0)
@@ -165,6 +172,7 @@ public sealed class RoundTripPipeline
             Failed = testResults.Count(t => t.Outcome == "Failed"),
             Skipped = testResults.Count(t => t.Outcome is "NotExecuted" or "Skipped"),
             Results = testResults,
+            TrxFiles = trxFiles.Select(f => Path.GetRelativePath(workDir, f)).ToList(),
             Stdout = stdout,
             Stderr = stderr,
         };
@@ -187,6 +195,7 @@ public sealed class RoundTripPipeline
             Failed = failed,
             Skipped = skipped,
             Results = [],
+            UsedConsoleFallback = true,
             Stdout = stdout,
             Stderr = stderr,
         };
@@ -202,7 +211,7 @@ public sealed class RoundTripPipeline
     }
 
     private async Task<List<FileConversionResult>> ConvertAndReplaceAsync(
-        string workDir, RoundTripConfig config)
+        string workDir, RoundTripConfig config, RoundTripReport report)
     {
         var results = new List<FileConversionResult>();
         var libDir = Path.Combine(workDir, config.LibrarySourceRelativePath);
@@ -213,12 +222,15 @@ public sealed class RoundTripPipeline
             return results;
         }
 
-        var csFiles = Directory.GetFiles(libDir, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !ShouldExclude(f, config.ExcludePatterns))
+        var allCsFiles = Directory.GetFiles(libDir, "*.cs", SearchOption.AllDirectories)
             .OrderBy(f => f)
             .ToList();
+        var csFiles = allCsFiles
+            .Where(f => !ShouldExclude(f, config.ExcludePatterns))
+            .ToList();
+        report.ExcludedFileCount = allCsFiles.Count - csFiles.Count;
 
-        Console.WriteLine($"  Found {csFiles.Count} C# files to convert");
+        Console.WriteLine($"  Found {csFiles.Count} C# files to convert ({report.ExcludedFileCount} excluded by pattern)");
 
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
@@ -242,6 +254,10 @@ public sealed class RoundTripPipeline
 
                 result.ConversionSuccess = conversionResult.Success;
                 result.ConversionRate = conversionResult.Context.Stats.ConversionRate;
+
+                // Consume the Slice-3 conversion loss ledger (#770): populate
+                // Gaps / InteropBlocks / loss counts from real conversion data.
+                result.ApplyLossLedger(conversionResult.Context.Losses);
 
                 if (conversionResult.Success && conversionResult.CalorSource != null)
                 {
@@ -365,7 +381,11 @@ public sealed class RoundTripPipeline
 
                 var original = await File.ReadAllTextAsync(originalPath);
                 await File.WriteAllTextAsync(workPath, original);
-                fileResult.Status = FileStatus.CompileError;
+                // A reverted file is a coverage FAILURE: it stays in the denominator
+                // and is never counted as converted. Do NOT relabel it CompileError —
+                // it compiled standalone; the round-tripped output broke the build.
+                fileResult.Status = FileStatus.Reverted;
+                fileResult.RevertReason = $"build-recovery round {attempt + 1}: build error in round-tripped output";
                 fileResult.Errors = [$"Reverted: build error in round-tripped output (recovery round {attempt + 1})"];
                 revertedThisRound++;
                 Console.WriteLine($"    Reverted: {relPath}");
@@ -510,33 +530,35 @@ public sealed class RoundTripPipeline
             RoundTripPassed = roundTrip.Passed,
         };
 
-        // Find regressions: passing in baseline, failing after round-trip
+        // Find regressions: passing in baseline, failing after round-trip.
+        // Match on the robust Identity (assembly + executor + class + display name)
+        // so duplicate display names across test assemblies never collide.
         var baselinePassedSet = baseline.Results
             .Where(t => t.Outcome == "Passed")
-            .Select(t => t.TestName)
+            .Select(t => t.Identity)
             .ToHashSet();
 
         var roundTripFailedSet = roundTrip.Results
             .Where(t => t.Outcome == "Failed")
-            .Select(t => t.TestName)
+            .Select(t => t.Identity)
             .ToHashSet();
 
         comparison.Regressions = baselinePassedSet
             .Intersect(roundTripFailedSet)
-            .Select(name => roundTrip.Results.First(t => t.TestName == name))
+            .Select(id => roundTrip.Results.First(t => t.Identity == id))
             .ToList();
 
         // Pre-existing failures
         var baselineFailedSet = baseline.Results
             .Where(t => t.Outcome == "Failed")
-            .Select(t => t.TestName)
+            .Select(t => t.Identity)
             .ToHashSet();
 
         comparison.PreExistingFailures = baselineFailedSet.Count;
 
         // New passes: failing in baseline, passing in round-trip
         comparison.NewPasses = roundTrip.Results
-            .Where(t => t.Outcome == "Passed" && baselineFailedSet.Contains(t.TestName))
+            .Where(t => t.Outcome == "Passed" && baselineFailedSet.Contains(t.Identity))
             .Select(t => t.TestName)
             .ToList();
 

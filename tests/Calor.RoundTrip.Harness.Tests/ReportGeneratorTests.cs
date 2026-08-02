@@ -82,6 +82,63 @@ public class ReportGeneratorTests
         Assert.Equal(1, files.GetProperty("compile_error").GetInt32());
     }
 
+    [Fact]
+    public void GenerateJson_IncludesFidelityDimensions()
+    {
+        var report = CreatePassingReport();
+        report.FileResults.Add(new FileConversionResult
+        {
+            FilePath = "Lib/Rev.cs",
+            Status = FileStatus.Reverted,
+            RevertReason = "build-recovery round 1",
+        });
+        report.Fidelity = ProjectFidelity.Compute(report);
+        var json = ReportGenerator.GenerateJson(report);
+
+        var doc = JsonDocument.Parse(json);
+        var fidelity = doc.RootElement.GetProperty("fidelity");
+
+        var coverage = fidelity.GetProperty("coverage");
+        Assert.Equal(4, coverage.GetProperty("total_convertible_files").GetInt32());
+        Assert.Equal(1, coverage.GetProperty("reverted").GetInt32());
+        Assert.Equal(0.5, coverage.GetProperty("coverage_fraction").GetDouble());
+
+        var build = fidelity.GetProperty("build");
+        Assert.True(build.GetProperty("succeeded").GetBoolean());
+        Assert.Equal(1, build.GetProperty("recovery_reverted_files").GetInt32());
+
+        var tests = fidelity.GetProperty("tests");
+        Assert.Equal(10, tests.GetProperty("baseline_total").GetInt32());
+        Assert.Equal(0, tests.GetProperty("inventory_delta").GetInt32());
+        Assert.Equal("Pass", tests.GetProperty("comparison_status").GetString());
+
+        // Per-file detail carries revert visibility
+        var detail = doc.RootElement.GetProperty("file_detail");
+        var reverted = detail.EnumerateArray().Single(e => e.GetProperty("status").GetString() == "Reverted");
+        Assert.Equal("build-recovery round 1", reverted.GetProperty("revert_reason").GetString());
+    }
+
+    [Fact]
+    public void GenerateMarkdown_IncludesFidelitySection_AndRevertedRow()
+    {
+        var report = CreatePassingReport();
+        report.FileResults.Add(new FileConversionResult
+        {
+            FilePath = "Lib/Rev.cs",
+            Status = FileStatus.Reverted,
+            RevertReason = "build-recovery round 1",
+            Errors = ["Reverted: build error in round-tripped output (recovery round 1)"],
+        });
+        report.Fidelity = ProjectFidelity.Compute(report);
+        var md = ReportGenerator.GenerateMarkdown(report);
+
+        Assert.Contains("## Fidelity (separated verdict dimensions)", md);
+        Assert.Contains("### Conversion Coverage", md);
+        Assert.Contains("### Build Outcome", md);
+        Assert.Contains("### Test Outcome", md);
+        Assert.Contains("REVERTED", md);
+    }
+
     private static RoundTripReport CreatePassingReport() => new()
     {
         ProjectName = "TestProject",

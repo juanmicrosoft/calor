@@ -121,6 +121,65 @@ public class ComparisonTests
         Assert.Equal(ComparisonStatus.Incomplete, result.Status);
     }
 
+    [Fact]
+    public void DuplicateDisplayNames_AcrossAssemblies_NotConflated()
+    {
+        // Same display name "SharedName" in two assemblies: passing in alpha,
+        // pre-existing failure in beta. Name-only matching would flag a false
+        // regression (passed-in-baseline ∩ failed-in-roundtrip on display name).
+        var baseline = MakeRun(
+            ("alpha.tests.dll", "Alpha.Suite", "SharedName", "Passed"),
+            ("beta.tests.dll", "Beta.Suite", "SharedName", "Failed"));
+        var roundTrip = MakeRun(
+            ("alpha.tests.dll", "Alpha.Suite", "SharedName", "Passed"),
+            ("beta.tests.dll", "Beta.Suite", "SharedName", "Failed"));
+        var build = new BuildResult { Succeeded = true };
+
+        var result = Compare(baseline, roundTrip, build);
+
+        Assert.Empty(result.Regressions);
+        Assert.Equal(ComparisonStatus.Pass, result.Status);
+        Assert.Equal(1, result.PreExistingFailures);
+    }
+
+    [Fact]
+    public void RegressionInOneAssembly_DetectedByIdentity()
+    {
+        var baseline = MakeRun(
+            ("alpha.tests.dll", "Alpha.Suite", "SharedName", "Passed"),
+            ("beta.tests.dll", "Beta.Suite", "SharedName", "Passed"));
+        var roundTrip = MakeRun(
+            ("alpha.tests.dll", "Alpha.Suite", "SharedName", "Failed"),
+            ("beta.tests.dll", "Beta.Suite", "SharedName", "Passed"));
+        var build = new BuildResult { Succeeded = true };
+
+        var result = Compare(baseline, roundTrip, build);
+
+        var regression = Assert.Single(result.Regressions);
+        Assert.Equal("alpha.tests.dll", regression.Assembly);
+    }
+
+    private static TestRunResult MakeRun(params (string Assembly, string ClassName, string Name, string Outcome)[] entries)
+    {
+        var results = entries.Select(e => new TestResult
+        {
+            TestName = e.Name,
+            Assembly = e.Assembly,
+            ClassName = e.ClassName,
+            ExecutorUri = "executor://xunit",
+            Outcome = e.Outcome,
+        }).ToList();
+
+        return new TestRunResult
+        {
+            ExitCode = results.Any(r => r.Outcome == "Failed") ? 1 : 0,
+            TotalTests = results.Count,
+            Passed = results.Count(r => r.Outcome == "Passed"),
+            Failed = results.Count(r => r.Outcome == "Failed"),
+            Results = results,
+        };
+    }
+
     private static TestRunResult MakeTestRun(params string[] entries)
     {
         var results = entries.Select(e =>
