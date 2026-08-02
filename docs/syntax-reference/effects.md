@@ -283,12 +283,25 @@ You cannot hide an effect by burying it in helper functions.
   §C{f001:Helper}                  // ERROR: cw effect leaks through
 ```
 
+### Soundness Diagnostics (v0.11 strictness batch)
+
+Effect enforcement is fail-closed. The diagnostics on the enforcement surface:
+
+- **Calor0410** — a function uses an effect it does not declare (with call chain).
+- **Calor0411** — an unknown external call; add the callee to a `.calor-effects.json` manifest. Unknown calls contribute worst-case effects, so under the default policy they fail loud rather than being assumed pure.
+- **Calor0418** — invocation of a delegate/function-typed value (a parameter, binding, or field being called). Function-typed values carry no effect contract, so the call is an **error** under enforcement. There is no annotation escape hatch; wrap the call in `§CSHARP` interop (surfaced as an assumption via Calor0419) or compile with `--permissive-effects` (an explicit waiver that demotes the error to a warning).
+- **Calor0419** — the effects of a function are **assumed**, not verified: it contains raw C# interop (`§CSHARP`/`§CS`), an unrecognized construct, or calls a function whose effects are assumed. The assumption propagates to callers through the interprocedural pass. Warning by default; error under `--strict-effects`.
+- **Calor0420** — an override declares effects not covered by its base method's declared `§E` (override `§E` must be a subset of base `§E`). Broader override effects would launder through dynamic dispatch.
+- **Calor0421** — an interface implementation declares effects not covered by the interface method's declared `§E`.
+
+Calls through a receiver whose static type is an in-module interface or class charge the static type's *declared* `§E` — sound because Calor0420/Calor0421 pin every override and implementation to a subset of that declared set. Overrides of **external C# base classes** cannot be variance-checked and are surfaced through the Calor0419 assumption channel.
+
 ### Disabling Enforcement (Not Recommended)
 
 For migration scenarios, you can disable enforcement:
 
 ```bash
-calor compile myprogram.calr --enforce-effects=false
+calor --input myprogram.calr --no-enforce-effects
 ```
 
 Or in MSBuild:

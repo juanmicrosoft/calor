@@ -55,6 +55,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--strict-api` | | No | Require `§BR` breaking-change markers for public API changes |
 | `--require-docs` | | No | Require documentation on public functions |
 | `--enforce-effects` | | No | Enforce effect declarations (default: true) |
+| `--no-enforce-effects` | | No | Disable effect enforcement (opt out of the v0.11 default-on behavior) |
 
 ---
 

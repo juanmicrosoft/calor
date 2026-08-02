@@ -275,6 +275,11 @@ public class GenericSyntaxTests
     [Fact]
     public void E2E_GenericMethod_InClass_CompilesCorrectly()
     {
+        // WS-W2 (D-W2.1): invoking the Func-typed 'converter' parameter is a
+        // Calor0418 error under enforcement (enforced Calor is first-order by
+        // design). This test pins EMISSION shape for generic methods, so it
+        // compiles under the --permissive-effects waiver per the migration
+        // policy (the delegate error is demoted to a warning).
         var calor = """
             §M{m001:Test}
               §CL{c001:Container:pub}
@@ -285,7 +290,12 @@ public class GenericSyntaxTests
                       §R §C{converter} §A input §/C
             """;
 
-        var csharp = CompileToCS(calor);
+        var result = Program.Compile(calor, null, new CompilationOptions
+        {
+            UnknownCallPolicy = Calor.Compiler.Effects.UnknownCallPolicy.Permissive
+        });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
+        var csharp = result.GeneratedCode;
 
         Assert.Contains("public class Container", csharp);
         Assert.Contains("public U Convert<T, U>(T input, Func<T, U> converter)", csharp);

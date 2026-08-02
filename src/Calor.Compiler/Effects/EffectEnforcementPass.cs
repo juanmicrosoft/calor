@@ -17,6 +17,7 @@ public sealed class EffectEnforcementPass
     private readonly EffectResolver _resolver;
     private readonly UnknownCallPolicy _policy;
     private readonly bool _strictEffects;
+    private readonly HashSet<string> _crossModuleFunctionNames;
 
     // Delegated call graph analysis (populated by Enforce)
     private CallGraphAnalysis _callGraphAnalysis = null!;
@@ -24,17 +25,39 @@ public sealed class EffectEnforcementPass
     // Maps function ID to computed effects
     private readonly Dictionary<string, EffectSet> _computedEffects = new(StringComparer.Ordinal);
 
+    // D-W2.3: per-function assumption provenance (function ID → reasons). A function
+    // with entries here has effects that are ASSUMED, not verified (C# interop content,
+    // an unrecognized construct, an uncheckable external base, or a call into any of
+    // those). The marker propagates to callers after SCC processing and is surfaced
+    // per function via Calor0419 — never silently pure.
+    private readonly Dictionary<string, List<string>> _assumedEffects = new(StringComparer.Ordinal);
+
+    // Module-shape lookups for delegate detection (D-W2.1), static-receiver
+    // call-site charging and declaration-local effect variance (D-W2.2).
+    private Dictionary<string, ClassDefinitionNode> _classesByName = new(StringComparer.Ordinal);
+    private Dictionary<string, InterfaceDefinitionNode> _interfacesByName = new(StringComparer.Ordinal);
+    private HashSet<string> _delegateTypeNames = new(StringComparer.Ordinal);
+    private Dictionary<string, ClassDefinitionNode> _ownerClassByFunctionId = new(StringComparer.Ordinal);
+
     public EffectEnforcementPass(
         DiagnosticBag diagnostics,
         UnknownCallPolicy policy = UnknownCallPolicy.Strict,
         EffectResolver? resolver = null,
         bool strictEffects = false,
         string? projectDirectory = null,
-        string? solutionDirectory = null)
+        string? solutionDirectory = null,
+        IEnumerable<string>? crossModuleFunctionNames = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
         _policy = policy;
         _strictEffects = strictEffects;
+        // Bare public function names exported by OTHER modules in the same
+        // multi-file compilation (unambiguous names only, from the driver's
+        // pre-parse). Calls to these are legitimately bare per-module; the
+        // cross-module pass charges their declared effects.
+        _crossModuleFunctionNames = crossModuleFunctionNames != null
+            ? new HashSet<string>(crossModuleFunctionNames, StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
 
         // Initialize the effect resolver with manifests
         _resolver = resolver ?? new EffectResolver();
@@ -49,12 +72,39 @@ public sealed class EffectEnforcementPass
         // Phase 1: Build function map and call graph (includes functions and methods)
         _callGraphAnalysis = CallGraphAnalysis.Build(module);
 
+        // Phase 1b: index module shape for delegate detection, static-receiver
+        // resolution and variance checks.
+        _classesByName = new Dictionary<string, ClassDefinitionNode>(StringComparer.Ordinal);
+        foreach (var cls in module.Classes)
+            _classesByName[cls.Name] = cls;
+        _interfacesByName = new Dictionary<string, InterfaceDefinitionNode>(StringComparer.Ordinal);
+        foreach (var iface in module.Interfaces)
+            _interfacesByName[iface.Name] = iface;
+        _delegateTypeNames = new HashSet<string>(module.Delegates.Select(d => d.Name), StringComparer.Ordinal);
+        _ownerClassByFunctionId = new Dictionary<string, ClassDefinitionNode>(StringComparer.Ordinal);
+        foreach (var cls in module.Classes)
+        {
+            foreach (var method in cls.Methods)
+                _ownerClassByFunctionId[$"{cls.Name}.{method.Id}"] = cls;
+            foreach (var ctor in cls.Constructors)
+                _ownerClassByFunctionId[$"{cls.Name}.{ctor.Id}"] = cls;
+        }
+
         // Phase 2+3: Process SCCs in reverse topological order
         // (Tarjan produces them in reverse topological order already)
         foreach (var scc in _callGraphAnalysis.StronglyConnectedComponents)
         {
             ProcessScc(scc);
         }
+
+        // Phase 3b (D-W2.2): declaration-local effect-variance checks
+        // (override §E ⊆ base §E; implementation §E ⊆ interface §E). External
+        // bases route their overrides to the Assumed channel below.
+        CheckEffectVariance(module);
+
+        // Phase 3c (D-W2.3): propagate assumption provenance to callers — a caller
+        // of an assumed-effect function inherits the assumption transitively.
+        PropagateAssumptions();
 
         // Phase 4: Check each function's computed effects against declared effects
         foreach (var function in module.Functions)
@@ -143,14 +193,29 @@ public sealed class EffectEnforcementPass
 
     private EffectSet InferEffects(FunctionNode function, HashSet<string> sccMembers)
     {
+        var assumptions = new List<string>();
         var context = new InferenceContext(
             _resolver, _computedEffects,
             _callGraphAnalysis.Functions,
             _callGraphAnalysis.FunctionNameToId,
             _callGraphAnalysis.MethodNameToIds,
-            sccMembers, _policy, _strictEffects, _diagnostics, function.Id);
+            sccMembers, _policy, _strictEffects, _diagnostics, function.Id,
+            _crossModuleFunctionNames,
+            _classesByName, _interfacesByName, _delegateTypeNames,
+            _ownerClassByFunctionId.GetValueOrDefault(function.Id),
+            assumptions);
         var inferrer = new EffectInferrer(context);
-        return inferrer.InferFromStatements(function.Body);
+        var effects = inferrer.InferFromStatements(function.Body);
+
+        // Direct in-body assumption reasons REPLACE previous ones so SCC fixpoint
+        // iterations don't accumulate duplicates. (Variance and propagation reasons
+        // are added after all SCCs are processed.)
+        if (assumptions.Count > 0)
+            _assumedEffects[function.Id] = assumptions;
+        else
+            _assumedEffects.Remove(function.Id);
+
+        return effects;
     }
 
     private void CheckEffects(FunctionNode function)
@@ -227,11 +292,37 @@ public sealed class EffectEnforcementPass
                 }
             }
         }
+
+        // D-W2.3: surface assumption provenance. An assumed-effect function satisfies
+        // its declaration only WITH the assumption named; strict mode fails loud.
+        if (_assumedEffects.TryGetValue(function.Id, out var reasons) && reasons.Count > 0)
+        {
+            var assumedSeverity = _strictEffects
+                ? DiagnosticSeverity.Error
+                : DiagnosticSeverity.Warning;
+            var shown = string.Join("; ", reasons.Take(3));
+            if (reasons.Count > 3)
+                shown += $"; and {reasons.Count - 3} more";
+            _diagnostics.Report(
+                function.Effects?.Span ?? function.Span,
+                DiagnosticCode.AssumedEffects,
+                $"Effects of '{function.Name}' are ASSUMED, not verified: {shown}. " +
+                "The declared effect set is accepted as an assumption, not a proof; " +
+                "narrow the interop surface or add manifest coverage to restore verification.",
+                assumedSeverity);
+        }
     }
 
-    private EffectSet GetDeclaredEffects(FunctionNode function)
+    private EffectSet GetDeclaredEffects(FunctionNode function) => GetDeclaredEffects(function.Effects);
+
+    /// <summary>
+    /// Computes the declared effect set from an §E node. A missing declaration is the
+    /// empty (pure) set — consistent with per-function enforcement, where an
+    /// undeclared function may not exhibit any effect.
+    /// </summary>
+    internal static EffectSet GetDeclaredEffects(EffectsNode? effectsNode)
     {
-        if (function.Effects == null || function.Effects.Effects.Count == 0)
+        if (effectsNode == null || effectsNode.Effects.Count == 0)
         {
             return EffectSet.Empty;
         }
@@ -244,7 +335,7 @@ public sealed class EffectEnforcementPass
         // We build (EffectKind, string) tuples directly to match the internal representation
         // used by the enforcement pass and manifest resolver.
         var effects = new List<(EffectKind Kind, string Value)>();
-        foreach (var kv in function.Effects.Effects)
+        foreach (var kv in effectsNode.Effects)
         {
             var kind = ParseEffectCategory(kv.Key);
             var values = kv.Value.Split(',');
@@ -258,6 +349,191 @@ public sealed class EffectEnforcementPass
             }
         }
         return EffectSet.FromInternal(effects);
+    }
+
+    /// <summary>
+    /// D-W2.2 — declaration-local effect-variance checks (behavioral subtyping):
+    /// an override may declare only effects covered by its base method's declared
+    /// set (Calor0420), and an interface implementation only effects covered by the
+    /// interface method's declared set (Calor0421). A missing §E declaration is the
+    /// pure contract, consistent with per-function enforcement. Overrides whose base
+    /// class is external C# (not in this module) cannot be checked and route to the
+    /// Assumed channel (Calor0419). Implementations of external interfaces are not
+    /// per-method attributable and are outside the declared-variance surface; calls
+    /// through such receivers hit the unknown-call chain, which fails loud.
+    /// </summary>
+    private void CheckEffectVariance(ModuleNode module)
+    {
+        var varianceSeverity = _policy == UnknownCallPolicy.Permissive
+            ? DiagnosticSeverity.Warning
+            : DiagnosticSeverity.Error;
+
+        foreach (var cls in module.Classes)
+        {
+            foreach (var method in cls.Methods)
+            {
+                if (!method.IsOverride)
+                    continue;
+
+                var (baseMethod, baseClassName) = FindBaseMethod(cls, method.Name);
+                if (baseMethod != null)
+                {
+                    var overrideDeclared = GetDeclaredEffects(method.Effects);
+                    var baseDeclared = GetDeclaredEffects(baseMethod.Effects);
+                    if (!overrideDeclared.IsSubsetOf(baseDeclared))
+                    {
+                        var extra = overrideDeclared.Except(baseDeclared)
+                            .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
+                        _diagnostics.Report(
+                            method.Effects?.Span ?? method.Span,
+                            DiagnosticCode.OverrideEffectVariance,
+                            $"Override '{cls.Name}.{method.Name}' declares effect(s) [{string.Join(", ", extra)}] " +
+                            $"not declared by base method '{baseClassName}.{method.Name}' " +
+                            $"(base declares: {baseDeclared.ToDisplayString()}). " +
+                            "An override may not broaden its base method's effect set — broader effects " +
+                            "would launder through dynamic dispatch.",
+                            varianceSeverity);
+                    }
+                }
+                else if (baseClassName != null)
+                {
+                    // External C# base class — variance cannot be checked declaration-locally.
+                    AddAssumption($"{cls.Name}.{method.Id}",
+                        $"overrides a method of external base class '{baseClassName}', so effect variance cannot be checked");
+                }
+            }
+
+            foreach (var iface in ResolveInterfaceChain(cls))
+            {
+                foreach (var sig in iface.Methods)
+                {
+                    var impl = cls.Methods.FirstOrDefault(
+                        m => m.Name.Equals(sig.Name, StringComparison.Ordinal));
+                    if (impl == null)
+                        continue;
+
+                    var implDeclared = GetDeclaredEffects(impl.Effects);
+                    var ifaceDeclared = GetDeclaredEffects(sig.Effects);
+                    if (!implDeclared.IsSubsetOf(ifaceDeclared))
+                    {
+                        var extra = implDeclared.Except(ifaceDeclared)
+                            .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
+                        _diagnostics.Report(
+                            impl.Effects?.Span ?? impl.Span,
+                            DiagnosticCode.InterfaceEffectVariance,
+                            $"Implementation '{cls.Name}.{impl.Name}' declares effect(s) [{string.Join(", ", extra)}] " +
+                            $"not declared by interface method '{iface.Name}.{sig.Name}' " +
+                            $"(interface declares: {ifaceDeclared.ToDisplayString()}). " +
+                            "An implementation may not broaden the interface's declared effect set — interface " +
+                            "dispatch launders effects identically to overrides.",
+                            varianceSeverity);
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Walks the in-module base-class chain looking for a method with the given name.
+    /// Returns (method, definingClassName) when found; (null, firstUnresolvedBaseName)
+    /// when the chain leaves the module (external C# base); (null, null) when there is
+    /// no base class at all.
+    /// </summary>
+    private (MethodNode? Method, string? BaseClassName) FindBaseMethod(ClassDefinitionNode cls, string methodName)
+    {
+        var baseName = StripGenericArguments(cls.BaseClass);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (baseName != null && visited.Add(baseName))
+        {
+            if (!_classesByName.TryGetValue(baseName, out var baseCls))
+                return (null, baseName); // external base class
+            var found = baseCls.Methods.FirstOrDefault(
+                m => m.Name.Equals(methodName, StringComparison.Ordinal));
+            if (found != null)
+                return (found, baseName);
+            baseName = StripGenericArguments(baseCls.BaseClass);
+        }
+        return (null, null);
+    }
+
+    /// <summary>
+    /// Resolves the transitive set of in-module interfaces a class implements
+    /// (declared interfaces plus their base-interface chains). External interface
+    /// names are skipped: they carry no §E declarations to check against.
+    /// </summary>
+    private List<InterfaceDefinitionNode> ResolveInterfaceChain(ClassDefinitionNode cls)
+    {
+        var result = new List<InterfaceDefinitionNode>();
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var queue = new Queue<string>();
+        foreach (var name in cls.ImplementedInterfaces)
+        {
+            var stripped = StripGenericArguments(name);
+            if (stripped != null)
+                queue.Enqueue(stripped);
+        }
+        while (queue.Count > 0)
+        {
+            var name = queue.Dequeue();
+            if (!visited.Add(name))
+                continue;
+            if (!_interfacesByName.TryGetValue(name, out var iface))
+                continue;
+            result.Add(iface);
+            foreach (var baseName in iface.BaseInterfaces)
+            {
+                var stripped = StripGenericArguments(baseName);
+                if (stripped != null)
+                    queue.Enqueue(stripped);
+            }
+        }
+        return result;
+    }
+
+    internal static string? StripGenericArguments(string? typeName)
+    {
+        if (typeName == null)
+            return null;
+        var trimmed = typeName.Trim().TrimEnd('?');
+        var idx = trimmed.IndexOf('<');
+        return idx > 0 ? trimmed[..idx] : trimmed;
+    }
+
+    private void AddAssumption(string functionId, string reason)
+    {
+        if (!_assumedEffects.TryGetValue(functionId, out var list))
+        {
+            list = new List<string>();
+            _assumedEffects[functionId] = list;
+        }
+        if (!list.Contains(reason))
+            list.Add(reason);
+    }
+
+    /// <summary>
+    /// D-W2.3 — transitively marks every caller of an assumed-effect function as
+    /// itself assumed (via the reverse call graph), so the assumption is inherited
+    /// rather than laundered at the first call boundary.
+    /// </summary>
+    private void PropagateAssumptions()
+    {
+        var queue = new Queue<string>(_assumedEffects.Where(kv => kv.Value.Count > 0).Select(kv => kv.Key));
+        var enqueued = new HashSet<string>(queue, StringComparer.Ordinal);
+        while (queue.Count > 0)
+        {
+            var calleeId = queue.Dequeue();
+            var calleeName = _callGraphAnalysis.Functions.TryGetValue(calleeId, out var callee)
+                ? callee.Name
+                : calleeId;
+            foreach (var callerId in _callGraphAnalysis.GetCallers(calleeId))
+            {
+                if (callerId.Equals(calleeId, StringComparison.Ordinal))
+                    continue;
+                AddAssumption(callerId, $"calls '{calleeName}', whose effects are assumed");
+                if (enqueued.Add(callerId))
+                    queue.Enqueue(callerId);
+            }
+        }
     }
 
     internal static EffectKind ParseEffectCategory(string category)
@@ -307,6 +583,25 @@ public sealed class EffectEnforcementPass
         if (shortName.Contains('!') && !shortName.Contains('.') && !shortName.Contains('('))
             return "Calor.Runtime.Result`2";
 
+        // Normalize declared generic collection types ("List<i32>") to their
+        // manifest identities so typed receivers resolve to the correct entries
+        // (e.g. List`1.Add = mut) instead of hitting the unknown-call chain.
+        var genericIdx = shortName.IndexOf('<');
+        if (genericIdx > 0 && shortName.EndsWith('>'))
+        {
+            var baseName = shortName[..genericIdx];
+            var mapped = baseName switch
+            {
+                "List" => "System.Collections.Generic.List`1",
+                "Dictionary" => "System.Collections.Generic.Dictionary`2",
+                "HashSet" => "System.Collections.Generic.HashSet`1",
+                "Task" => "System.Threading.Tasks.Task`1",
+                _ => null
+            };
+            if (mapped != null)
+                return mapped;
+        }
+
         return MapKnownShortTypeName(shortName);
     }
 
@@ -317,6 +612,11 @@ public sealed class EffectEnforcementPass
         "Result" => "Calor.Runtime.Result",
         // BCL types
         "Console" => "System.Console",
+        // Generic collections referenced by bare name (e.g. §NEW{List<i32>}
+        // stores TypeName "List" with separate type arguments)
+        "List" => "System.Collections.Generic.List`1",
+        "Dictionary" => "System.Collections.Generic.Dictionary`2",
+        "HashSet" => "System.Collections.Generic.HashSet`1",
         "File" => "System.IO.File",
         "Directory" => "System.IO.Directory",
         "Path" => "System.IO.Path",
@@ -466,6 +766,17 @@ public sealed class EffectEnforcementPass
         public bool StrictEffects { get; }
         public DiagnosticBag Diagnostics { get; }
         public string CurrentFunctionId { get; }
+        public IReadOnlyCollection<string> CrossModuleFunctionNames { get; }
+        public IReadOnlyDictionary<string, ClassDefinitionNode> ClassesByName { get; }
+        public IReadOnlyDictionary<string, InterfaceDefinitionNode> InterfacesByName { get; }
+        public IReadOnlyCollection<string> DelegateTypeNames { get; }
+        public ClassDefinitionNode? OwnerClass { get; }
+
+        /// <summary>
+        /// Sink for D-W2.3 assumption reasons collected while inferring the current
+        /// function (interop content, unrecognized constructs, expression-target calls).
+        /// </summary>
+        public List<string> Assumptions { get; }
 
         public InferenceContext(
             EffectResolver resolver,
@@ -477,7 +788,13 @@ public sealed class EffectEnforcementPass
             UnknownCallPolicy policy,
             bool strictEffects,
             DiagnosticBag diagnostics,
-            string currentFunctionId)
+            string currentFunctionId,
+            IReadOnlyCollection<string> crossModuleFunctionNames,
+            IReadOnlyDictionary<string, ClassDefinitionNode> classesByName,
+            IReadOnlyDictionary<string, InterfaceDefinitionNode> interfacesByName,
+            IReadOnlyCollection<string> delegateTypeNames,
+            ClassDefinitionNode? ownerClass,
+            List<string> assumptions)
         {
             Resolver = resolver;
             ComputedEffects = computedEffects;
@@ -489,6 +806,12 @@ public sealed class EffectEnforcementPass
             StrictEffects = strictEffects;
             Diagnostics = diagnostics;
             CurrentFunctionId = currentFunctionId;
+            CrossModuleFunctionNames = crossModuleFunctionNames;
+            ClassesByName = classesByName;
+            InterfacesByName = interfacesByName;
+            DelegateTypeNames = delegateTypeNames;
+            OwnerClass = ownerClass;
+            Assumptions = assumptions;
         }
     }
 
@@ -503,6 +826,24 @@ public sealed class EffectEnforcementPass
         /// Known-pure method names (LINQ extension methods and similar).
         /// Used as a last-resort fallback when full type resolution fails
         /// because extension methods are called on instances (e.g., items.OrderBy(...)).
+        ///
+        /// D-W2.4 audit rule: a name stays on this list only if EVERY common BCL
+        /// method with that name is pure (no receiver/argument mutation, no I/O).
+        /// Mutators and receiver-ambiguous names (pure on one common receiver type,
+        /// mutating on another) were purged and now route through the unknown-call
+        /// chain, which fails loud under the strict policy; typed receivers still
+        /// resolve mutators correctly via the manifests (e.g. List`1.Add = mut).
+        /// Purged: Add, AddRange, Remove, RemoveAt, RemoveAll, Clear, Insert, Sort,
+        /// ForEach (delegate-taking, List-mutation idiom), Reverse (List/Array
+        /// mutate in place), Append/AppendLine/AppendFormat (StringBuilder mutates),
+        /// CopyTo (mutates the destination argument), Log (ILogger/Serilog I/O
+        /// collision with Math.Log; Math resolves via manifest).
+        /// Kept deliberately: ConvertAll (returns a new list; pure modulo its
+        /// delegate argument, which is charged at the lambda definition site),
+        /// PadLeft/PadRight (string-only in the BCL, pure), Replace/Insert-free
+        /// string ops (Substring, Trim*, ToUpper/ToLower, Split, Join), Replace
+        /// (string.Replace/Regex.Replace are pure; StringBuilder receivers resolve
+        /// via manifest and native §SB ops are charged as mut by the inferrer).
         /// </summary>
         private static readonly HashSet<string> KnownPureMethodNames = new(StringComparer.Ordinal)
         {
@@ -515,32 +856,30 @@ public sealed class EffectEnforcementPass
             "Sum", "Average", "Min", "Max",
             "Distinct", "DistinctBy", "Union", "UnionBy", "Intersect", "IntersectBy", "Except", "ExceptBy",
             "Skip", "Take", "SkipWhile", "TakeWhile", "SkipLast", "TakeLast",
-            "Reverse", "Concat", "Zip",
+            "Concat", "Zip",
             "Aggregate",
             "ToList", "ToArray", "ToDictionary", "ToHashSet", "ToLookup",
             "OfType", "Cast", "AsEnumerable",
-            "DefaultIfEmpty", "Append", "Prepend",
+            "DefaultIfEmpty", "Prepend",
             "Contains", "SequenceEqual",
             "Range", "Repeat", "Empty",
             "ElementAt", "ElementAtOrDefault",
             "Chunk", "Order", "OrderDescending",
             // Common pure instance methods
             "ToString", "GetHashCode", "Equals", "CompareTo", "GetType",
-            "Clone", "CopyTo", "GetEnumerator",
+            "Clone", "GetEnumerator",
             "Substring", "Trim", "TrimStart", "TrimEnd",
             "StartsWith", "EndsWith", "Contains", "IndexOf", "LastIndexOf",
             "Replace", "Split", "Join", "ToUpper", "ToLower", "ToUpperInvariant", "ToLowerInvariant",
-            "PadLeft", "PadRight", "Insert", "Remove",
-            // Collection methods
-            "Add", "Remove", "Clear", "ContainsKey", "ContainsValue",
-            "TryGetValue", "AddRange", "RemoveAt", "RemoveAll",
-            "Sort", "BinarySearch", "Find", "FindAll", "FindIndex", "FindLast",
-            "Exists", "TrueForAll", "ForEach", "ConvertAll",
-            // StringBuilder
-            "Append", "AppendLine", "AppendFormat",
+            "PadLeft", "PadRight",
+            // Collection read-only methods
+            "ContainsKey", "ContainsValue",
+            "TryGetValue",
+            "BinarySearch", "Find", "FindAll", "FindIndex", "FindLast",
+            "Exists", "TrueForAll", "ConvertAll",
             // Math functions
             "Abs", "Sqrt", "Pow", "Floor", "Ceiling", "Round",
-            "Log", "Log10", "Log2", "Sin", "Cos", "Tan",
+            "Log10", "Log2", "Sin", "Cos", "Tan",
             "Clamp", "Sign", "Truncate",
         };
 
@@ -561,9 +900,13 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromStatement(StatementNode statement)
         {
+            // D-W2.6: this switch is exhaustive over the statement kinds the pass
+            // understands. Anything else falls into the final arm, which routes to
+            // the Assumed channel (Calor0419) — an unknown construct is an
+            // assumption, never silently pure.
             return statement switch
             {
-                PrintStatementNode => EffectSet.From("cw"),
+                PrintStatementNode print => EffectSet.From("cw").Union(InferFromExpression(print.Expression)),
                 CallStatementNode call => InferFromCallStatement(call),
                 IfStatementNode ifStmt => InferFromIf(ifStmt),
                 ForStatementNode forStmt => InferFromFor(forStmt),
@@ -572,21 +915,67 @@ public sealed class EffectEnforcementPass
                 ForeachStatementNode foreach_ => InferFromExpression(foreach_.Collection).Union(InferFromStatements(foreach_.Body)),
                 MatchStatementNode matchStmt => InferFromMatch(matchStmt),
                 TryStatementNode tryStmt => InferFromTry(tryStmt),
-                ThrowStatementNode => EffectSet.From("throw"),
+                ThrowStatementNode throwStmt => EffectSet.From("throw")
+                    .Union(throwStmt.Exception != null ? InferFromExpression(throwStmt.Exception) : EffectSet.Empty),
                 RethrowStatementNode => EffectSet.From("throw"),
                 ReturnStatementNode ret => ret.Expression != null ? InferFromExpression(ret.Expression) : EffectSet.Empty,
                 BindStatementNode bind => bind.Initializer != null ? InferFromExpression(bind.Initializer) : EffectSet.Empty,
                 AssignmentStatementNode assign => InferFromAssignment(assign),
-                // Collection mutations
-                CollectionPushNode => EffectSet.From("mut"),
-                DictionaryPutNode => EffectSet.From("mut"),
-                CollectionRemoveNode => EffectSet.From("mut"),
-                CollectionSetIndexNode => EffectSet.From("mut"),
+                CompoundAssignmentStatementNode compound => InferFromCompoundAssignment(compound),
+                ExpressionStatementNode exprStmt => InferFromExpression(exprStmt.Expression),
+                YieldReturnStatementNode yield => yield.Expression != null ? InferFromExpression(yield.Expression) : EffectSet.Empty,
+                UsingStatementNode usingStmt => InferFromExpression(usingStmt.Resource).Union(InferFromStatements(usingStmt.Body)),
+                SyncBlockNode sync => InferFromExpression(sync.LockExpression).Union(InferFromStatements(sync.Body)),
+                UnsafeBlockNode unsafeBlock => EffectSet.From("unsafe").Union(InferFromStatements(unsafeBlock.Body)),
+                FixedStatementNode fixedStmt => EffectSet.From("unsafe")
+                    .Union(InferFromExpression(fixedStmt.Initializer))
+                    .Union(InferFromStatements(fixedStmt.Body)),
+                // Event handler (un)subscription mutates the event's invocation list.
+                EventSubscribeNode sub => EffectSet.From("mut").Union(InferFromExpression(sub.Handler)),
+                EventUnsubscribeNode unsub => EffectSet.From("mut").Union(InferFromExpression(unsub.Handler)),
+                // Collection mutations (child expressions charged too)
+                CollectionPushNode push => EffectSet.From("mut").Union(InferFromExpression(push.Value)),
+                DictionaryPutNode put => EffectSet.From("mut")
+                    .Union(InferFromExpression(put.Key))
+                    .Union(InferFromExpression(put.Value)),
+                CollectionRemoveNode remove => EffectSet.From("mut").Union(InferFromExpression(remove.KeyOrValue)),
+                CollectionSetIndexNode setIndex => EffectSet.From("mut")
+                    .Union(InferFromExpression(setIndex.Index))
+                    .Union(InferFromExpression(setIndex.Value)),
                 CollectionClearNode => EffectSet.From("mut"),
-                CollectionInsertNode => EffectSet.From("mut"),
-                DictionaryForeachNode dictForeach => InferFromStatements(dictForeach.Body),
-                _ => EffectSet.Empty
+                CollectionInsertNode insert => EffectSet.From("mut")
+                    .Union(InferFromExpression(insert.Index))
+                    .Union(InferFromExpression(insert.Value)),
+                DictionaryForeachNode dictForeach => InferFromExpression(dictForeach.Dictionary).Union(InferFromStatements(dictForeach.Body)),
+                // No-effect control-flow / declaration-only constructs
+                BreakStatementNode or ContinueStatementNode or GotoStatementNode or LabelStatementNode
+                    or YieldBreakStatementNode or PreprocessorDirectiveNode or ProofObligationNode => EffectSet.Empty,
+                // D-W2.3: interop content — effects are assumed, not silently pure
+                RawCSharpNode => RecordAssumption("contains a raw C# interop statement (§CSHARP)"),
+                FallbackCommentNode => RecordAssumption("contains an unconverted C# fallback statement"),
+                // D-W2.6: fail-loud catch-all
+                _ => RecordAssumption($"contains an unrecognized statement construct '{statement.GetType().Name}' whose effects cannot be inferred")
             };
+        }
+
+        private EffectSet InferFromCompoundAssignment(CompoundAssignmentStatementNode compound)
+        {
+            var effects = InferFromExpression(compound.Value);
+            if (compound.Target is FieldAccessNode)
+                effects = effects.Union(EffectSet.From("mut"));
+            return effects;
+        }
+
+        /// <summary>
+        /// Records a D-W2.3 assumption reason for the current function and returns the
+        /// empty effect set: the construct contributes an assumption marker (surfaced
+        /// as Calor0419 and propagated to callers), not silent purity.
+        /// </summary>
+        private EffectSet RecordAssumption(string reason)
+        {
+            if (!_context.Assumptions.Contains(reason))
+                _context.Assumptions.Add(reason);
+            return EffectSet.Empty;
         }
 
         private EffectSet InferFromCallStatement(CallStatementNode call)
@@ -604,6 +993,31 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromCallTarget(string target, TextSpan span)
         {
+            // Bare (no-dot) targets: either an internal function/method, a value
+            // invocation (delegate — D-W2.1), or an unresolvable free name.
+            if (!target.Contains('.'))
+            {
+                var internalByName = FindInternalFunctionByName(target);
+                if (internalByName != null)
+                {
+                    if (_context.ComputedEffects.TryGetValue(internalByName.Id, out var computedBare))
+                        return computedBare;
+                    if (_context.SccMembers.Contains(internalByName.Id))
+                        return _context.ComputedEffects.GetValueOrDefault(internalByName.Id, EffectSet.Empty);
+                }
+                return InferFromBareNameTarget(target, span);
+            }
+
+            // D-W2.2 (call-site leg): a call through a receiver whose static type is an
+            // in-module interface or class charges the static type's DECLARED §E. Sound
+            // for dispatch because the declaration-local variance checks (Calor0420/0421)
+            // pin every override/implementation to a subset of that declared set.
+            var staticCharge = TryChargeStaticReceiverType(target);
+            if (staticCharge != null)
+            {
+                return staticCharge;
+            }
+
             // Check if it's an internal function call by name
             var internalFunc = FindInternalFunctionByName(target);
             if (internalFunc != null)
@@ -654,22 +1068,6 @@ public sealed class EffectEnforcementPass
                 }
             }
 
-            // Single-word targets with no dot are local variable/delegate invocations,
-            // not external calls. Assume pure since we lack type information.
-            // In strict mode, emit a warning so users know the effects are unverified.
-            if (!target.Contains('.'))
-            {
-                if (_context.StrictEffects)
-                {
-                    _context.Diagnostics.Report(
-                        span,
-                        DiagnosticCode.UnknownExternalCall,
-                        $"Delegate/variable invocation '{target}' has unverified effects. Consider wrapping in a function with declared effects.",
-                        DiagnosticSeverity.Warning);
-                }
-                return EffectSet.Empty;
-            }
-
             // Permissive mode: assume pure for unknown calls (no diagnostic)
             if (_context.Policy == UnknownCallPolicy.Permissive)
             {
@@ -679,6 +1077,293 @@ public sealed class EffectEnforcementPass
             // Unknown external call - report diagnostic based on policy
             ReportUnknownCall(target, span);
             return EffectSet.Unknown;
+        }
+
+        /// <summary>
+        /// D-W2.1 detection rule for bare-name call targets that are NOT internal
+        /// functions/methods:
+        /// (a) the name resolves lexically to a parameter of the current function, a
+        ///     §B binding in its body, or a field of the enclosing class — a VALUE is
+        ///     being invoked, which is by construction a delegate/function-typed
+        ///     invocation → unconditional Calor0418 error under enforcement (demoted
+        ///     to a warning only under --permissive-effects, the explicit waiver).
+        ///     There is no annotation escape hatch: effect-annotated function types
+        ///     are a Phase 3 design.
+        /// (b) the name is a free name the pass cannot see (e.g. an inherited member
+        ///     of an external C# base) — routed through the unknown-call chain, which
+        ///     fails loud under the strict policy (Calor0411 + unknown effects)
+        ///     instead of the pre-W2 behavior of silently assuming purity.
+        /// </summary>
+        private EffectSet InferFromBareNameTarget(string target, TextSpan span)
+        {
+            var valueType = ResolveLocalValueType(target);
+            if (valueType != null)
+            {
+                var severity = _context.Policy == UnknownCallPolicy.Permissive
+                    ? DiagnosticSeverity.Warning
+                    : DiagnosticSeverity.Error;
+                var typeDescription = IsFunctionTypeName(valueType)
+                    ? $"function-typed value '{target}' (type '{valueType}')"
+                    : $"value '{target}' (declared type '{valueType}')";
+                _context.Diagnostics.Report(
+                    span,
+                    DiagnosticCode.DelegateInvocation,
+                    $"Invocation of {typeDescription} is an error under effect enforcement: " +
+                    "function-typed values carry no effect contract, so the call cannot be charged. " +
+                    "Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or " +
+                    "compile with --permissive-effects (an explicit waiver).",
+                    severity);
+                return EffectSet.Empty;
+            }
+
+            // A bare public function exported by another module of the same
+            // multi-file compilation (unambiguous, from the driver's pre-parse):
+            // legitimately bare here — the cross-module pass charges its declared
+            // effects, so the per-module pass contributes nothing.
+            if (_context.CrossModuleFunctionNames.Contains(target))
+            {
+                return EffectSet.Empty;
+            }
+
+            // Unresolvable free name: fail closed through the unknown-call chain.
+            if (_context.Policy == UnknownCallPolicy.Permissive)
+            {
+                return EffectSet.Empty;
+            }
+
+            var unknownSeverity = _context.StrictEffects
+                ? DiagnosticSeverity.Error
+                : DiagnosticSeverity.Warning;
+            if (_context.Policy == UnknownCallPolicy.Strict || _context.StrictEffects)
+            {
+                _context.Diagnostics.Report(
+                    span,
+                    DiagnosticCode.UnknownExternalCall,
+                    $"Unknown call target '{target}': not an internal function, parameter, binding, or field " +
+                    "visible to the effect pass. If this is a delegate-typed member, delegate invocation is " +
+                    "disallowed under enforcement (Calor0418); otherwise add the callee to a " +
+                    ".calor-effects.json manifest.",
+                    unknownSeverity);
+            }
+            else if (_context.Policy == UnknownCallPolicy.Warn)
+            {
+                _context.Diagnostics.Report(
+                    span,
+                    DiagnosticCode.UnknownExternalCall,
+                    $"Unknown call target '{target}' - assuming worst-case effects. Consider adding to manifest.",
+                    DiagnosticSeverity.Warning);
+            }
+            return EffectSet.Unknown;
+        }
+
+        /// <summary>
+        /// D-W2.2 call-site resolution: if the receiver of "recv.Method" is a
+        /// parameter/binding/field whose declared static type is an in-module
+        /// interface or class, charge that static type's declared §E for the method.
+        /// Returns null when the receiver's static type is unknown, external, or the
+        /// method is not found on the static type (e.g. extension methods) — callers
+        /// fall through to the existing resolution chain.
+        /// </summary>
+        private EffectSet? TryChargeStaticReceiverType(string target)
+        {
+            var lastDot = target.LastIndexOf('.');
+            if (lastDot <= 0)
+                return null;
+            var receiver = target[..lastDot];
+            var methodName = target[(lastDot + 1)..];
+            if (receiver.Contains('.'))
+                return null; // chained receivers not modeled — fall through
+
+            var receiverType = ResolveLocalValueType(receiver);
+            if (receiverType == null)
+                return null;
+            var typeName = StripGenericArguments(receiverType);
+            if (typeName == null)
+                return null;
+
+            if (_context.InterfacesByName.TryGetValue(typeName, out var iface))
+            {
+                var sig = FindInterfaceMethodSignature(iface, methodName);
+                if (sig != null)
+                {
+                    // Absent §E on the interface method is the declared-pure contract.
+                    return GetDeclaredEffects(sig.Effects);
+                }
+                return null;
+            }
+
+            if (_context.ClassesByName.TryGetValue(typeName, out var cls))
+            {
+                var resolved = FindClassMethod(cls, methodName);
+                if (resolved != null)
+                {
+                    var (ownerName, method) = resolved.Value;
+                    // Prefer the declared contract (dispatch-safe under Calor0420);
+                    // fall back to computed effects when no declaration exists.
+                    if (method.Effects != null)
+                        return GetDeclaredEffects(method.Effects);
+                    var id = $"{ownerName}.{method.Id}";
+                    if (_context.ComputedEffects.TryGetValue(id, out var computed))
+                        return computed;
+                    if (_context.SccMembers.Contains(id))
+                        return _context.ComputedEffects.GetValueOrDefault(id, EffectSet.Empty);
+                }
+                return null;
+            }
+
+            return null;
+        }
+
+        private MethodSignatureNode? FindInterfaceMethodSignature(InterfaceDefinitionNode iface, string methodName)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var queue = new Queue<InterfaceDefinitionNode>();
+            queue.Enqueue(iface);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                if (!visited.Add(current.Name))
+                    continue;
+                var sig = current.Methods.FirstOrDefault(
+                    m => m.Name.Equals(methodName, StringComparison.Ordinal));
+                if (sig != null)
+                    return sig;
+                foreach (var baseName in current.BaseInterfaces)
+                {
+                    var stripped = StripGenericArguments(baseName);
+                    if (stripped != null && _context.InterfacesByName.TryGetValue(stripped, out var baseIface))
+                        queue.Enqueue(baseIface);
+                }
+            }
+            return null;
+        }
+
+        private (string OwnerName, MethodNode Method)? FindClassMethod(ClassDefinitionNode cls, string methodName)
+        {
+            var current = cls;
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            while (current != null && visited.Add(current.Name))
+            {
+                var method = current.Methods.FirstOrDefault(
+                    m => m.Name.Equals(methodName, StringComparison.Ordinal));
+                if (method != null)
+                    return (current.Name, method);
+                var baseName = StripGenericArguments(current.BaseClass);
+                current = baseName != null && _context.ClassesByName.TryGetValue(baseName, out var baseCls)
+                    ? baseCls
+                    : null;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Resolves a bare name to the declared type of the value it denotes:
+        /// current-function parameter, §B binding (anywhere in the body, including
+        /// nested blocks), or enclosing-class field. Returns null for free names.
+        /// A lambda-initialized binding without an explicit type reports the marker
+        /// type "Func&lt;&gt;" (function-typed by construction).
+        /// </summary>
+        private string? ResolveLocalValueType(string name)
+        {
+            if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
+                return null;
+
+            foreach (var parameter in function.Parameters)
+            {
+                if (parameter.Name.Equals(name, StringComparison.Ordinal))
+                    return parameter.TypeName;
+            }
+
+            var declaredType = FindLocalDeclarationType(name, function.Body);
+            if (declaredType != null)
+                return declaredType;
+
+            var field = _context.OwnerClass?.Fields.FirstOrDefault(
+                f => f.Name.Equals(name, StringComparison.Ordinal));
+            if (field != null)
+                return field.TypeName;
+
+            return null;
+        }
+
+        private static string? FindLocalDeclarationType(string name, IEnumerable<StatementNode> statements)
+        {
+            foreach (var statement in statements)
+            {
+                switch (statement)
+                {
+                    case BindStatementNode bind when bind.Name.Equals(name, StringComparison.Ordinal):
+                        if (bind.TypeName != null)
+                            return bind.TypeName;
+                        if (bind.Initializer is NewExpressionNode newExpr)
+                            return newExpr.TypeName;
+                        if (bind.Initializer is LambdaExpressionNode)
+                            return "Func<>";
+                        return "?"; // known value, unknown type
+                    case IfStatementNode ifStmt:
+                        var inIf = FindLocalDeclarationType(name, ifStmt.ThenBody)
+                            ?? ifStmt.ElseIfClauses.Select(c => FindLocalDeclarationType(name, c.Body)).FirstOrDefault(t => t != null)
+                            ?? (ifStmt.ElseBody != null ? FindLocalDeclarationType(name, ifStmt.ElseBody) : null);
+                        if (inIf != null) return inIf;
+                        break;
+                    case ForStatementNode forStmt:
+                        if (FindLocalDeclarationType(name, forStmt.Body) is { } inFor) return inFor;
+                        break;
+                    case WhileStatementNode whileStmt:
+                        if (FindLocalDeclarationType(name, whileStmt.Body) is { } inWhile) return inWhile;
+                        break;
+                    case DoWhileStatementNode doWhile:
+                        if (FindLocalDeclarationType(name, doWhile.Body) is { } inDoWhile) return inDoWhile;
+                        break;
+                    case ForeachStatementNode foreachStmt:
+                        if (FindLocalDeclarationType(name, foreachStmt.Body) is { } inForeach) return inForeach;
+                        break;
+                    case MatchStatementNode matchStmt:
+                        var inMatch = matchStmt.Cases.Select(c => FindLocalDeclarationType(name, c.Body)).FirstOrDefault(t => t != null);
+                        if (inMatch != null) return inMatch;
+                        break;
+                    case TryStatementNode tryStmt:
+                        var inTry = FindLocalDeclarationType(name, tryStmt.TryBody)
+                            ?? tryStmt.CatchClauses.Select(c => FindLocalDeclarationType(name, c.Body)).FirstOrDefault(t => t != null)
+                            ?? (tryStmt.FinallyBody != null ? FindLocalDeclarationType(name, tryStmt.FinallyBody) : null);
+                        if (inTry != null) return inTry;
+                        break;
+                    case UsingStatementNode usingStmt:
+                        // §USING{Type:name} declares a typed resource variable.
+                        if (name.Equals(usingStmt.VariableName, StringComparison.Ordinal))
+                            return usingStmt.VariableType ?? "?";
+                        if (FindLocalDeclarationType(name, usingStmt.Body) is { } inUsing) return inUsing;
+                        break;
+                    case SyncBlockNode sync:
+                        if (FindLocalDeclarationType(name, sync.Body) is { } inSync) return inSync;
+                        break;
+                    case UnsafeBlockNode unsafeBlock:
+                        if (FindLocalDeclarationType(name, unsafeBlock.Body) is { } inUnsafe) return inUnsafe;
+                        break;
+                    case FixedStatementNode fixedStmt:
+                        if (FindLocalDeclarationType(name, fixedStmt.Body) is { } inFixed) return inFixed;
+                        break;
+                }
+            }
+            return null;
+        }
+
+        private bool IsFunctionTypeName(string typeName)
+        {
+            var t = typeName.Trim().TrimEnd('?');
+            var stripped = StripGenericArguments(t);
+            if (stripped != null && _context.DelegateTypeNames.Contains(stripped))
+                return true;
+            return t.Equals("Action", StringComparison.Ordinal)
+                || t.StartsWith("Action<", StringComparison.Ordinal)
+                || t.StartsWith("Func<", StringComparison.Ordinal)
+                || t.StartsWith("Predicate<", StringComparison.Ordinal)
+                || t.StartsWith("Comparison<", StringComparison.Ordinal)
+                || t.StartsWith("Converter<", StringComparison.Ordinal)
+                || t.Equals("Delegate", StringComparison.Ordinal)
+                || t.Equals("MulticastDelegate", StringComparison.Ordinal)
+                || t.Equals("EventHandler", StringComparison.Ordinal)
+                || t.StartsWith("EventHandler<", StringComparison.Ordinal);
         }
 
         private void ReportUnknownCall(string target, TextSpan span)
@@ -767,37 +1452,17 @@ public sealed class EffectEnforcementPass
         }
 
         /// <summary>
-        /// Resolves a variable name to its declared type by scanning the current function's
-        /// body for §B (bind) statements with §NEW initializers.
+        /// Resolves a variable name to its manifest-ready declared type: parameters,
+        /// §B bindings (explicit type or §NEW initializer, anywhere in the body),
+        /// §USING resource variables, and enclosing-class fields.
         /// E.g., "§B{client} §NEW{HttpClient}" → "client" resolves to "System.Net.Http.HttpClient".
         /// </summary>
         private string? ResolveVariableType(string variableName)
         {
-            if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function))
+            var declared = ResolveLocalValueType(variableName);
+            if (declared == null || declared == "?" || declared == "Func<>")
                 return null;
-
-            return ScanForVariableType(variableName, function.Body);
-        }
-
-        private static string? ScanForVariableType(string variableName, IEnumerable<StatementNode> statements)
-        {
-            foreach (var stmt in statements)
-            {
-                if (stmt is BindStatementNode bind && bind.Name == variableName && bind.Initializer != null)
-                {
-                    // §B{var} §NEW{TypeName} → resolve TypeName
-                    if (bind.Initializer is NewExpressionNode newExpr)
-                    {
-                        return MapShortTypeNameToFullName(newExpr.TypeName);
-                    }
-                    // §B{var:TypeName} — explicit type declaration
-                    if (bind.TypeName != null)
-                    {
-                        return MapShortTypeNameToFullName(bind.TypeName);
-                    }
-                }
-            }
-            return null;
+            return MapShortTypeNameToFullName(declared);
         }
 
         private EffectSet InferFromIf(IfStatementNode ifStmt)
@@ -873,9 +1538,13 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromExpression(ExpressionNode expr)
         {
+            // D-W2.6: exhaustive over the expression kinds the pass understands;
+            // the final arm routes unrecognized constructs to the Assumed channel
+            // (Calor0419) — never silently pure.
             return expr switch
             {
                 CallExpressionNode call => InferFromCallExpression(call),
+                ExpressionCallNode exprCall => InferFromExpressionCall(exprCall),
                 MatchExpressionNode match => InferFromMatchExpression(match),
                 BinaryOperationNode binOp => InferFromExpression(binOp.Left).Union(InferFromExpression(binOp.Right)),
                 UnaryOperationNode unOp => InferFromExpression(unOp.Operand),
@@ -890,8 +1559,104 @@ public sealed class EffectEnforcementPass
                 ArrayAccessNode array => InferFromExpression(array.Array).Union(InferFromExpression(array.Index)),
                 LambdaExpressionNode lambda => InferFromLambda(lambda),
                 AwaitExpressionNode await_ => InferFromExpression(await_.Awaited),
-                _ => EffectSet.Empty
+                ThrowExpressionNode throwExpr => EffectSet.From("throw").Union(InferFromExpression(throwExpr.Exception)),
+                InterpolatedStringNode interp => InferFromInterpolatedString(interp),
+                NullCoalesceNode coalesce => InferFromExpression(coalesce.Left).Union(InferFromExpression(coalesce.Right)),
+                NullConditionalNode nullCond => InferFromExpression(nullCond.Target),
+                RangeExpressionNode range =>
+                    (range.Start != null ? InferFromExpression(range.Start) : EffectSet.Empty)
+                    .Union(range.End != null ? InferFromExpression(range.End) : EffectSet.Empty),
+                IndexFromEndNode indexFromEnd => InferFromExpression(indexFromEnd.Offset),
+                TypeOperationNode typeOp => InferFromExpression(typeOp.Operand),
+                IsPatternNode isPattern => InferFromExpression(isPattern.Operand),
+                WithExpressionNode with => with.Assignments.Aggregate(
+                    InferFromExpression(with.Target),
+                    (acc, a) => acc.Union(InferFromExpression(a.Value))),
+                ArrayCreationNode arrayCreation =>
+                    (arrayCreation.Size != null ? InferFromExpression(arrayCreation.Size) : EffectSet.Empty)
+                    .Union(InferFromMany(arrayCreation.Initializer)),
+                MultiDimArrayCreationNode multiDim => InferFromMany(multiDim.DimensionSizes),
+                MultiDimArrayAccessNode multiDimAccess =>
+                    InferFromExpression(multiDimAccess.Array).Union(InferFromMany(multiDimAccess.Indices)),
+                ArrayLengthNode arrayLength => InferFromExpression(arrayLength.Array),
+                ListCreationNode listCreation => InferFromMany(listCreation.Elements),
+                SetCreationNode setCreation => InferFromMany(setCreation.Elements),
+                DictionaryCreationNode dictCreation => dictCreation.Entries.Aggregate(
+                    EffectSet.Empty,
+                    (acc, e) => acc.Union(InferFromExpression(e.Key)).Union(InferFromExpression(e.Value))),
+                CollectionContainsNode contains => InferFromExpression(contains.KeyOrValue),
+                CollectionCountNode count => InferFromExpression(count.Collection),
+                TupleLiteralNode tuple => InferFromMany(tuple.Elements),
+                RecordCreationNode record => record.Fields.Aggregate(
+                    EffectSet.Empty, (acc, f) => acc.Union(InferFromExpression(f.Value))),
+                AnonymousObjectCreationNode anonymous => anonymous.Initializers.Aggregate(
+                    EffectSet.Empty, (acc, i) => acc.Union(InferFromExpression(i.Value))),
+                StringOperationNode stringOp => InferFromMany(stringOp.Arguments),
+                CharOperationNode charOp => InferFromMany(charOp.Arguments),
+                // Native §SB modification ops mutate the builder (heap write);
+                // creation/query ops are pure.
+                StringBuilderOperationNode sbOp => (sbOp.Operation switch
+                {
+                    StringBuilderOp.Append or StringBuilderOp.AppendLine or StringBuilderOp.Insert
+                        or StringBuilderOp.Remove or StringBuilderOp.Clear => EffectSet.From("mut"),
+                    _ => EffectSet.Empty
+                }).Union(InferFromMany(sbOp.Arguments)),
+                StackAllocNode stackAlloc =>
+                    (stackAlloc.Size != null ? InferFromExpression(stackAlloc.Size) : EffectSet.Empty)
+                    .Union(InferFromMany(stackAlloc.Initializer)),
+                AddressOfNode addressOf => InferFromExpression(addressOf.Operand),
+                PointerDereferenceNode deref => InferFromExpression(deref.Operand),
+                // No-effect leaves
+                IntLiteralNode or StringLiteralNode or BoolLiteralNode or FloatLiteralNode
+                    or DecimalLiteralNode or ReferenceNode or NoneExpressionNode
+                    or ThisExpressionNode or BaseExpressionNode or SelfRefNode
+                    or GenericTypeNode or TypeOfExpressionNode or NameOfExpressionNode
+                    or SizeOfNode or KeywordArgNode => EffectSet.Empty,
+                // Contract-form quantifiers evaluate over pure predicates
+                ForallExpressionNode or ExistsExpressionNode or ImplicationExpressionNode => EffectSet.Empty,
+                // D-W2.3: interop / unconverted content — assumed, not silently pure
+                RawCSharpExpressionNode => RecordAssumption("contains a raw C# interop expression (§CS)"),
+                FallbackExpressionNode fallback => RecordAssumption(
+                    $"contains an unconverted C# fallback expression ('{fallback.FeatureName}')"),
+                // D-W2.6: fail-loud catch-all
+                _ => RecordAssumption($"contains an unrecognized expression construct '{expr.GetType().Name}' whose effects cannot be inferred")
             };
+        }
+
+        private EffectSet InferFromMany(IEnumerable<ExpressionNode> expressions)
+        {
+            var effects = EffectSet.Empty;
+            foreach (var expression in expressions)
+            {
+                effects = effects.Union(InferFromExpression(expression));
+            }
+            return effects;
+        }
+
+        private EffectSet InferFromInterpolatedString(InterpolatedStringNode interpolated)
+        {
+            var effects = EffectSet.Empty;
+            foreach (var part in interpolated.Parts)
+            {
+                if (part is InterpolatedStringExpressionNode exprPart)
+                {
+                    effects = effects.Union(InferFromExpression(exprPart.Expression));
+                }
+            }
+            return effects;
+        }
+
+        private EffectSet InferFromExpressionCall(ExpressionCallNode call)
+        {
+            var effects = InferFromExpression(call.TargetExpression);
+            foreach (var arg in call.Arguments)
+            {
+                effects = effects.Union(InferFromExpression(arg));
+            }
+            // A call through an expression-valued target cannot be resolved to a
+            // callee — surface the assumption instead of silently charging nothing.
+            return effects.Union(RecordAssumption(
+                "calls through an expression-valued target whose callee cannot be resolved"));
         }
 
         private EffectSet InferFromCallExpression(CallExpressionNode call)
@@ -930,6 +1695,11 @@ public sealed class EffectEnforcementPass
             foreach (var arg in newExpr.Arguments)
             {
                 effects = effects.Union(InferFromExpression(arg));
+            }
+
+            foreach (var initializer in newExpr.Initializers)
+            {
+                effects = effects.Union(InferFromExpression(initializer.Value));
             }
 
             return effects;
