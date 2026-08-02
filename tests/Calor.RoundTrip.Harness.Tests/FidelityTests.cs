@@ -248,3 +248,30 @@ public class FidelityTests
             TrxFiles = Enumerable.Range(1, trxFiles).Select(i => $"TestResults/r{i}.trx").ToList(),
         };
 }
+
+/// <summary>
+/// #837 review M-1: `**/*.g.cs`-style exclude patterns compared the `*`
+/// literally and matched nothing — generated files entered the coverage
+/// denominator the fidelity gate thresholds on. Pins the star-suffix branch.
+/// </summary>
+public class GlobExcludeTests
+{
+    private static bool MatchGlob(string path, string pattern)
+    {
+        var method = typeof(RoundTripPipeline).GetMethod(
+            "MatchGlob",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        return (bool)method.Invoke(null, new object[] { path, pattern })!;
+    }
+
+    [Theory]
+    [InlineData("src/Lib/Skip.g.cs", "**/*.g.cs", true)]
+    [InlineData("src/Lib/Model.generated.cs", "**/*.generated.cs", true)]
+    [InlineData("src/Lib/Form.Designer.cs", "**/*.Designer.cs", true)]
+    [InlineData("src/Lib/Native.cs", "**/*.g.cs", false)]
+    [InlineData("src/Lib/regular.cs", "**/*.Designer.cs", false)]
+    [InlineData("src/obj/Debug/net10.0/x.cs", "**/obj/**", true)]
+    [InlineData("src/Lib/AssemblyInfo.cs", "**/AssemblyInfo.cs", true)]
+    public void MatchGlob_StarSuffixPatterns_MatchByExtension(string path, string pattern, bool expected)
+        => Assert.Equal(expected, MatchGlob(path, pattern));
+}

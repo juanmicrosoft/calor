@@ -467,6 +467,14 @@ public sealed class RoundTripPipeline
                 var segment = suffix.Replace("/**", "");
                 return path.Contains($"/{segment}/") || path.EndsWith($"/{segment}");
             }
+            // Pattern like **/*.g.cs — star-suffix must match by extension, not
+            // literally (#837 review M-1: the literal comparison made every
+            // `**/*.x` exclude inert, letting generated files into the coverage
+            // denominator the fidelity gate thresholds on).
+            if (suffix.StartsWith("*."))
+            {
+                return path.EndsWith(suffix[1..]);
+            }
             // Pattern like **/AssemblyInfo.cs
             return path.EndsWith("/" + suffix) || path.EndsWith(suffix);
         }
