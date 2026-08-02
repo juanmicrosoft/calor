@@ -72,6 +72,13 @@ public sealed class ReviewPacketBuilder
         var anyRefinements = false;
         var compiledModules = new List<(InputFile File, ModuleNode Module)>();
 
+        // Multi-file invocations mirror the CLI driver's cross-module map
+        // (G3/#809): without it, a cross-file internal call is an unknown
+        // call to the per-file effect pass and — under the W2 default-on
+        // strictness — fails the compile with Calor0410, dropping the file
+        // from the packet entirely.
+        var crossModuleMap = files.Count > 1 ? BuildCrossModuleFunctionMap(files) : null;
+
         foreach (var file in files)
         {
             var compileOptions = new CompilationOptions
@@ -86,6 +93,7 @@ public sealed class ReviewPacketBuilder
                 ProjectDirectory = options.ProjectDirectory
                     ?? System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(file.Path))
             };
+            compileOptions.CrossModuleFunctionModules = crossModuleMap;
 
             var result = Program.Compile(file.Source, file.Path, compileOptions);
 
@@ -115,6 +123,57 @@ public sealed class ReviewPacketBuilder
         FinalizeSummary(packet);
 
         return new Result(packet, compileDiagnostics, hasCompileErrors, anyRefinements, unmatched);
+    }
+
+    /// <summary>
+    /// Builds the bare-name → defining-module map from the in-memory sources,
+    /// matching <c>CompilationDriver.BuildCrossModuleFunctionMap</c>'s rule
+    /// exactly (public AND internal functions; ambiguous names dropped). The
+    /// driver's helper reads from disk — the packet builder's inputs may not
+    /// exist on disk (tests, editor buffers), so the map is built from the
+    /// sources it already holds.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> BuildCrossModuleFunctionMap(
+        IReadOnlyList<InputFile> files)
+    {
+        var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var file in files)
+        {
+            var diagnostics = new DiagnosticBag();
+            ModuleNode? module;
+            try
+            {
+                var lexer = new Parsing.Lexer(file.Source, diagnostics);
+                var parser = new Parsing.Parser(lexer.TokenizeAllForParser(), diagnostics);
+                module = parser.Parse();
+            }
+            catch (Exception)
+            {
+                // Pre-parse is best-effort; the real compile reports errors.
+                continue;
+            }
+
+            if (module is null || string.IsNullOrEmpty(module.Name) || module.Name == "_global")
+                continue;
+
+            foreach (var fn in module.Functions)
+            {
+                if (fn.Visibility is not (Visibility.Public or Visibility.Internal))
+                    continue;
+                if (!byName.TryGetValue(fn.Name, out var modules))
+                    byName[fn.Name] = modules = [];
+                if (!modules.Contains(module.Name))
+                    modules.Add(module.Name);
+            }
+        }
+
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (name, modules) in byName)
+        {
+            if (modules.Count == 1)
+                map[name] = modules[0];
+        }
+        return map;
     }
 
     // ------------------------------------------------------------------
