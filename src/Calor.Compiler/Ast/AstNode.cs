@@ -164,6 +164,7 @@ public interface IAstVisitor
     void Visit(NegatedPatternNode node);
     void Visit(OrPatternNode node);
     void Visit(AndPatternNode node);
+    void Visit(TypePatternNode node);
     // Extended Features Phase 1: Quick Wins
     void Visit(ExampleNode node);
     void Visit(IssueNode node);
@@ -388,6 +389,7 @@ public interface IAstVisitor<T>
     T Visit(NegatedPatternNode node);
     T Visit(OrPatternNode node);
     T Visit(AndPatternNode node);
+    T Visit(TypePatternNode node);
     // Extended Features Phase 1: Quick Wins
     T Visit(ExampleNode node);
     T Visit(IssueNode node);

@@ -473,3 +473,32 @@ public sealed class AndPatternNode : PatternNode
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
     public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
+
+/// <summary>
+/// Represents a type-test pattern that carries its runtime type test (#774).
+/// Models both the C# type-only pattern (<c>case string:</c>) and the typed
+/// declaration pattern (<c>case string s:</c>). A previous conversion path
+/// collapsed these to a bare variable/literal pattern, silently DROPPING the
+/// type test and broadening the arm to match every value. This node keeps the
+/// type test so the selected arm and binding survive C# → Calor → C#.
+/// §PTYPE{TypeName}           → type-only:    <c>TypeName</c>
+/// §PTYPE{TypeName:binding}   → declaration:  <c>TypeName binding</c>
+/// </summary>
+public sealed class TypePatternNode : PatternNode
+{
+    /// <summary>The type being tested (raw source type name, e.g. "string", "Point").</summary>
+    public string TypeName { get; }
+
+    /// <summary>The variable bound when the test succeeds, or null for a type-only pattern.</summary>
+    public string? BindingName { get; }
+
+    public TypePatternNode(TextSpan span, string typeName, string? bindingName)
+        : base(span)
+    {
+        TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        BindingName = string.IsNullOrEmpty(bindingName) ? null : bindingName;
+    }
+
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
+}

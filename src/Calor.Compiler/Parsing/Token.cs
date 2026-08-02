@@ -236,6 +236,7 @@ public enum TokenKind
     PropertyMatch,
     RelationalPattern,
     ListPattern,
+    TypePattern,        // §PTYPE - type-test / typed-declaration pattern (#774)
     Var,
     Rest,
 

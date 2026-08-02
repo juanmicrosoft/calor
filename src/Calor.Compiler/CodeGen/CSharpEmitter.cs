@@ -1903,6 +1903,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 ? SanitizeIdentifier(vp.Name)
                 : $"var {SanitizeIdentifier(vp.Name)}",
             VarPatternNode varP => $"var {SanitizeIdentifier(varP.Name)}",
+            TypePatternNode tp => Visit(tp),
             LiteralPatternNode lp => lp.Literal.Accept(this),
             RelationalPatternNode rp => Visit(rp),
             PropertyPatternNode pp => Visit(pp),
@@ -1916,7 +1917,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             NegatedPatternNode np => $"not {EmitPattern(np.Inner)}",
             OrPatternNode orp => $"{EmitPattern(orp.Left)} or {EmitPattern(orp.Right)}",
             AndPatternNode andp => $"{EmitPattern(andp.Left)} and {EmitPattern(andp.Right)}",
-            _ => "_"
+            // #774: no silent wildcard fallback — an unhandled pattern node would
+            // broaden the arm to match everything. Fail loud instead.
+            _ => throw new ArgumentOutOfRangeException(nameof(pattern),
+                $"Unhandled pattern node in C# emitter: {pattern.GetType().Name}")
         };
     }
 
@@ -1939,6 +1943,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         => $"{{ IsSome: true, Value: {node.InnerPattern.Accept(this)} }}";
 
     public string Visit(NonePatternNode node) => "{ IsNone: true }";
+
+    public string Visit(TypePatternNode node)
+        => node.BindingName is { } name
+            ? $"{node.TypeName} {SanitizeIdentifier(name)}"
+            : node.TypeName;
 
     public string Visit(OkPatternNode node)
         => $"{{ IsOk: true, Value: {node.InnerPattern.Accept(this)} }}";
@@ -3502,7 +3511,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             CompoundAssignmentOperator.LeftShift => "<<=",
             CompoundAssignmentOperator.RightShift => ">>=",
             CompoundAssignmentOperator.NullCoalesce => "??=",
-            _ => "+="
+            // #774: no silent fallback to "+=" — an unmapped compound operator
+            // would change the arithmetic. This switch is exhaustive over the enum.
+            _ => throw new ArgumentOutOfRangeException(nameof(node),
+                $"Unhandled compound assignment operator: {node.Operator}")
         };
         return $"{target} {op} {value};";
     }

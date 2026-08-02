@@ -339,9 +339,295 @@ public class RegistryConformanceTests
     }
 
     // ------------------------------------------------------------------
-    // Switch labels and patterns (#774): unsupported shapes must never
-    // broaden to wildcard — they escalate to member interop.
+    // Prefix unary operators (#774): exhaustive SyntaxKind mapping — an
+    // unknown prefix operator must never silently become negation, and unary
+    // plus (no Calor node) escalates instead of being dropped.
     // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("-x", "(- x")]     // unary minus  → negate
+    [InlineData("!b", "(! b")]     // logical not
+    [InlineData("~x", "(~ x")]     // bitwise not
+    public void PrefixUnary_KnownOperators_ConvertNatively(string expr, string expectedCalor)
+    {
+        var isBool = expr.Contains('b');
+        var type = isBool ? "bool" : "int";
+        var result = RoundTrip($$"""
+            public class U
+            {
+                public {{type}} M({{type}} x, bool b)
+                {
+                    return {{expr}};
+                }
+            }
+            """);
+
+        _output.WriteLine(result.CalorSource!);
+        Assert.Contains(expectedCalor, result.CalorSource);
+        Assert.True(result.RoslynSuccess,
+            "Prefix-unary round trip does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Fact]
+    public void PrefixUnary_UnaryPlus_EscalatesToInterop()
+    {
+        // +x has no Calor node and could change user-defined operator+ overload
+        // resolution. The old code silently mapped ANY unknown prefix operator
+        // (including +) to negation, turning `+x` into `-x`. It must escalate.
+        var csharp = """
+            public class U
+            {
+                public int Pos(int x)
+                {
+                    return +x;
+                }
+                public int Untouched() { return 1; }
+            }
+            """;
+
+        var result = Convert(csharp);
+
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        _output.WriteLine(result.CalorSource!);
+
+        // Preserved verbatim — the unary + survives, never becomes negation.
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("+x", result.CalorSource);
+        Assert.DoesNotContain("(- x)", result.CalorSource);
+        // Sibling member still converts natively.
+        Assert.Contains("Untouched", result.CalorSource);
+        Assert.Contains(result.Context.Losses,
+            l => l.Kind == ConversionLossKind.InteropPreserved);
+    }
+
+    // ------------------------------------------------------------------
+    // Registry no-silent-default proof (#774 requirement 8): every C# binary
+    // operator either maps to its OWN Calor operator or escalates — never to a
+    // different operator (the old default was addition).
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("+", "int", "(+ a b)")]
+    [InlineData("-", "int", "(- a b)")]
+    [InlineData("*", "int", "(* a b)")]
+    [InlineData("/", "int", "(/ a b)")]
+    [InlineData("%", "int", "(% a b)")]
+    [InlineData("&", "int", "(& a b)")]
+    [InlineData("|", "int", "(| a b)")]
+    [InlineData("^", "int", "(^ a b)")]
+    [InlineData("<<", "int", "(<< a b)")]
+    [InlineData(">>", "int", "(>> a b)")]
+    [InlineData("==", "int", "(== a b)")]
+    [InlineData("!=", "int", "(!= a b)")]
+    [InlineData("<", "int", "(< a b)")]
+    [InlineData("<=", "int", "(<= a b)")]
+    [InlineData(">", "int", "(> a b)")]
+    [InlineData(">=", "int", "(>= a b)")]
+    [InlineData("&&", "bool", "(&& a b)")]
+    [InlineData("||", "bool", "(|| a b)")]
+    public void Registry_BinaryOperator_MapsToOwnOperator_NeverDefaultsToAdd(
+        string op, string operandType, string expectedCalor)
+    {
+        var retType = op is "==" or "!=" or "<" or "<=" or ">" or ">=" or "&&" or "||"
+            ? "bool" : operandType;
+        var result = Convert($$"""
+            public class Ops
+            {
+                public {{retType}} M({{operandType}} a, {{operandType}} b)
+                {
+                    return a {{op}} b;
+                }
+            }
+            """);
+
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        _output.WriteLine(result.CalorSource!);
+
+        Assert.Contains(expectedCalor, result.CalorSource);
+        // The old silent default turned unknown operators into addition — prove
+        // no non-additive operator ever produced a `(+ a b)` form.
+        if (op != "+")
+            Assert.DoesNotContain("(+ a b)", result.CalorSource);
+    }
+
+    // ------------------------------------------------------------------
+    // Numeric literal width / signedness audit (#774 requirement 7): the
+    // out-of-int-range integer widths that determine overload resolution
+    // (L / UL) survive C# → Calor → C#, never silently narrowed to a plain int.
+    //
+    // AUDIT FINDING (tracked as a separate literal-fidelity item, NOT the
+    // operator/pattern/assignment core of #774): Calor's numeric literal
+    // surface carries no unsigned/float marker, so an unsigned literal that
+    // still FITS in a long (e.g. `4000000000u`) and a `float` literal
+    // (`3.14f`) lose their suffix on re-parse. Fixing that needs an unsigned/
+    // width tag in the Calor lexer+parser — see the sibling literal-honesty
+    // issues (#751/#775). The 64-bit widths below round-trip today because the
+    // value itself forces the width.
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("long", "10000000000L", "L")]     // signed 64-bit above int range
+    [InlineData("ulong", "18446744073709551615UL", "UL")] // unsigned 64-bit max
+    public void NumericLiteral_WidthAndSignedness_SurviveRoundTrip(
+        string type, string literal, string expectedSuffix)
+    {
+        var result = RoundTrip($$"""
+            public class Nums
+            {
+                public {{type}} M()
+                {
+                    return {{literal}};
+                }
+            }
+            """);
+
+        _output.WriteLine(result.EmittedCSharp!);
+        // The width/sign suffix is preserved — the value did not silently
+        // narrow to a plain int (which would change overload resolution).
+        Assert.Contains(expectedSuffix, result.EmittedCSharp);
+        Assert.True(result.RoslynSuccess,
+            $"Numeric literal round trip does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    // ------------------------------------------------------------------
+    // Switch labels and patterns (#774): unsupported shapes must never
+    // broaden to wildcard — they escalate to member interop; typed
+    // declaration / type-only patterns keep their runtime type test.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Registry_TypePattern_IsFull()
+    {
+        Assert.Equal(SupportLevel.Full, FeatureSupport.GetSupportLevel("type-pattern"));
+    }
+
+    [Fact]
+    public void DeclarationPattern_PreservesTypeTest_NotBroadenedToVar()
+    {
+        // `object o switch { string s => ... }` must keep the `string` test.
+        // The old path collapsed `string s` to a bare `var s`, which matches
+        // EVERY value and would steal the int/other arms.
+        var result = RoundTrip("""
+            public class Matcher
+            {
+                public int Describe(object o)
+                {
+                    return o switch
+                    {
+                        string s => s.Length,
+                        int => -1,
+                        _ => 0
+                    };
+                }
+            }
+            """);
+
+        _output.WriteLine(result.CalorSource!);
+        _output.WriteLine(result.EmittedCSharp!);
+
+        // Calor keeps the type test natively.
+        Assert.Contains("§PTYPE{string:s}", result.CalorSource);
+        Assert.Contains("§PTYPE{int}", result.CalorSource);
+
+        // Emitted C# restores the real declaration/type patterns — the type
+        // test survives and the arm is NOT broadened to `var s`.
+        Assert.Contains("string s", result.EmittedCSharp);
+        Assert.DoesNotContain("var s =>", result.EmittedCSharp);
+        Assert.True(result.RoslynSuccess,
+            "Type-pattern round trip does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Fact]
+    public void DeclarationPattern_GenericType_RoundTripsThroughBothEmitters()
+    {
+        // The §PTYPE{Type<T>:x} form must survive the Calor parser too, so a
+        // generic-typed declaration pattern keeps its type test end-to-end.
+        var result = RoundTrip("""
+            public class Box<T> { public T Value; }
+            public class Matcher
+            {
+                public int Describe(object o)
+                {
+                    return o switch
+                    {
+                        Box<int> b => 1,
+                        _ => 0
+                    };
+                }
+            }
+            """);
+
+        _output.WriteLine(result.CalorSource!);
+        _output.WriteLine(result.EmittedCSharp!);
+
+        Assert.Contains("§PTYPE{Box<int>:b}", result.CalorSource);
+        // The generic type test is restored, not broadened to `var b`.
+        Assert.Contains("Box<int> b", result.EmittedCSharp);
+        Assert.True(result.RoslynSuccess,
+            "Generic type-pattern round trip does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Fact]
+    public void TypeOnlyPattern_PreservesTypeTest()
+    {
+        var result = RoundTrip("""
+            public class Matcher
+            {
+                public string Kind(object o)
+                {
+                    return o switch
+                    {
+                        int => "int",
+                        string => "string",
+                        _ => "other"
+                    };
+                }
+            }
+            """);
+
+        _output.WriteLine(result.CalorSource!);
+        _output.WriteLine(result.EmittedCSharp!);
+
+        Assert.Contains("§PTYPE{int}", result.CalorSource);
+        Assert.Contains("§PTYPE{string}", result.CalorSource);
+        // Type-only arms carry no binding.
+        Assert.DoesNotContain("§PTYPE{int:", result.CalorSource);
+        Assert.True(result.RoslynSuccess,
+            "Type-only-pattern round trip does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Fact]
+    public void PatternSwitchLabel_RelationalStatement_EscalatesInsteadOfWildcard()
+    {
+        var csharp = """
+            public class Matcher
+            {
+                public string Classify(int x)
+                {
+                    switch (x)
+                    {
+                        case > 100:
+                            return "big";
+                        case 0:
+                            return "zero";
+                        default:
+                            return "other";
+                    }
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        _output.WriteLine(result.CalorSource!);
+
+        // Preserved verbatim — `case > 100:` semantics intact, never broadened.
+        Assert.Contains("§CSHARP", result.CalorSource);
+        Assert.Contains("case > 100:", result.CalorSource);
+        Assert.Contains(result.Context.Losses,
+            l => l.Kind == ConversionLossKind.InteropPreserved);
+    }
 
     // ------------------------------------------------------------------
     // #836 review fixes

@@ -203,6 +203,7 @@ public sealed class Lexer
         ["PMATCH"] = TokenKind.PropertyMatch,
         ["PREL"] = TokenKind.RelationalPattern,
         ["PLIST"] = TokenKind.ListPattern,
+        ["PTYPE"] = TokenKind.TypePattern,
         ["VAR"] = TokenKind.Var,
         ["REST"] = TokenKind.Rest,
 

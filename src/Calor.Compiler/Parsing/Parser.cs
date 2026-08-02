@@ -4014,6 +4014,12 @@ public sealed class Parser
             return ParsePropertyPattern();
         }
 
+        // Handle §PTYPE pattern (type-test / typed-declaration pattern, #774)
+        if (Check(TokenKind.TypePattern))
+        {
+            return ParseTypePattern();
+        }
+
         // Handle raw { } property pattern from converter output
         if (Check(TokenKind.OpenBrace))
         {
@@ -10305,6 +10311,20 @@ public sealed class Parser
     }
 
     /// <summary>
+    /// Parses a type-test / typed-declaration pattern (#774).
+    /// §PTYPE{TypeName}          → type-only pattern (matches when value is TypeName)
+    /// §PTYPE{TypeName:binding}  → declaration pattern (also binds the value)
+    /// </summary>
+    private TypePatternNode ParseTypePattern()
+    {
+        var startToken = Expect(TokenKind.TypePattern);
+        var attrs = ParseAttributes();
+        var typeName = attrs["_pos0"] ?? "";
+        var binding = attrs["_pos1"];
+        return new TypePatternNode(startToken.Span, typeName, binding);
+    }
+
+    /// <summary>
     /// Parses a relational pattern.
     /// §PREL[gte] 18
     /// </summary>
@@ -10416,6 +10436,7 @@ public sealed class Parser
         return Current.Kind is TokenKind.PositionalPattern
             or TokenKind.PropertyPattern
             or TokenKind.ListPattern
+            or TokenKind.TypePattern
             or TokenKind.Var
             or TokenKind.RelationalPattern
             or TokenKind.OpenBrace  // Property pattern: { Prop: value }
