@@ -65,6 +65,35 @@
         "ForContext": [],
         "Dispose": []
       }
+    },
+    {
+      "type": "Serilog.Context.LogContext",
+      "methods": {
+        "PushProperty": ["mut"],
+        "Push": ["mut"],
+        "Suspend": ["mut"],
+        "Reset": ["mut"]
+      }
+    },
+    {
+      "type": "Serilog.Configuration.LoggerSinkConfiguration",
+      "defaultEffects": [],
+      "methods": { "*": [] }
+    },
+    {
+      "type": "Serilog.Configuration.LoggerMinimumLevelConfiguration",
+      "defaultEffects": [],
+      "methods": { "*": [] }
+    },
+    {
+      "type": "Serilog.Configuration.LoggerEnrichmentConfiguration",
+      "defaultEffects": [],
+      "methods": { "*": [] }
+    },
+    {
+      "type": "Serilog.Configuration.LoggerAuditSinkConfiguration",
+      "defaultEffects": [],
+      "methods": { "*": [] }
     }
   ],
   "namespaceDefaults": {

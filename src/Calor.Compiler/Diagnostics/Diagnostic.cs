@@ -963,6 +963,69 @@ public static class DiagnosticCode
     /// pass --experimental or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1 (W1 Slice 2).
     /// </summary>
     public const string FormatWriteExperimentalRequired = "Calor1346";
+
+    // `calor import` command diagnostics (Calor1350-1354) — package ingestion
+    // (wedge plan v0.11 D-W3.1/D-W3.2). Tier C honesty rides Calor1351: an
+    // unresolved public member is surfaced loudly, never emitted as pure.
+
+    /// <summary>
+    /// Error (import): the package or assembly passed to <c>calor import</c>
+    /// could not be resolved — the .dll does not exist, or the NuGet package id
+    /// is not present in the global packages folder (at the requested version).
+    /// </summary>
+    public const string ImportInputNotFound = "Calor1350";
+
+    /// <summary>
+    /// Warning (import): one or more public members could not be resolved by
+    /// IL analysis or curated manifests (Tier C). Their effects are UNKNOWN and
+    /// are deliberately NOT emitted into the manifest — emitting them would
+    /// under-approximate (an empty effect list means pure). The report lists
+    /// each unresolved member with a reason.
+    /// </summary>
+    public const string ImportUnresolvedEffects = "Calor1351";
+
+    /// <summary>
+    /// Error (import): a command-level failure — unreadable assembly, write
+    /// failure, or an unhandled crash. Emitted so <c>--json</c> always produces
+    /// a parseable envelope document.
+    /// </summary>
+    public const string ImportCommandError = "Calor1352";
+
+    /// <summary>
+    /// Info (import): contract facts were synthesized from assembly metadata
+    /// (NRT non-null parameters, unsigned-type range facts) with <c>assumed</c>
+    /// provenance. They are annotation-only output: verification never consumes
+    /// them as trusted, they can never produce <c>Proven</c>, and they never
+    /// elide runtime checks (wedge plan D-W3.2 / M-T1).
+    /// </summary>
+    public const string ImportSynthesizedContractsAssumed = "Calor1353";
+
+    // `calor review-packet` command diagnostics (Calor1355-1359) — the
+    // per-change review artifact (wedge plan v0.11 D-W3.3).
+
+    /// <summary>
+    /// Error (review-packet): a command-level failure — input file missing,
+    /// compile failure, git diff failure, or an unhandled crash. Emitted so
+    /// <c>--json</c> always produces a parseable envelope document.
+    /// </summary>
+    public const string ReviewPacketCommandError = "Calor1355";
+
+    /// <summary>
+    /// Info (review-packet): the analyzed module(s) carry refinement-type
+    /// obligations, and refinement types are NOT runtime-enforced (#782):
+    /// refinement obligations are compile-time analysis only — no runtime
+    /// guard is emitted for them. Stated per the W1 kickoff honesty item
+    /// (wedge-w1-prereqs.md §1.1).
+    /// </summary>
+    public const string ReviewPacketRefinementHonesty = "Calor1356";
+
+    /// <summary>
+    /// Warning (review-packet): the packet was produced under an explicit
+    /// waiver — <c>--permissive-effects</c> (voids the effect guarantee) or
+    /// <c>--contract-mode off</c> (voids the contract guarantee). The waiver
+    /// is disclosed on the first line of the packet (strategy §5.2).
+    /// </summary>
+    public const string ReviewPacketWaiverDisclosure = "Calor1357";
 }
 
 /// <summary>

@@ -44,6 +44,8 @@ dotnet tool update -g calor
 | [`calor benchmark`](/calor/cli/benchmark/) | Compare Calor vs C# across evaluation metrics |
 | [`calor format`](/calor/cli/format/) | Format Calor source files to canonical style |
 | [`calor fix`](/calor/cli/fix/) | Bulk, reversible source rewrites (e.g. drop legacy closing-tag IDs) |
+| `calor import` | Generate effect manifests (and assumed-provenance contract facts) for a package's public surface |
+| `calor review-packet` | Assemble a per-change review packet that leads with the unproven remainder |
 | [`calor mcp`](/calor/cli/mcp/) | Start MCP server for AI agent tool integration |
 | [`calor self-check docs`](/calor/cli/self-check/) | Verify agent-facing docs against the implementation (keywords, diagnostic codes, effect codes, parseable examples, version); exits nonzero on drift |
 | `calor lsp` | Start Language Server Protocol server for IDE features |

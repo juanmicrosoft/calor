@@ -180,6 +180,13 @@ pipeline) so they can flow through the structured formats:
 | `Calor1344` | Convert: `--validate` found a parse error in the generated output (warning — the output was still written) |
 | `Calor1345` | Convert: command-level failure — input not found, unknown file type, timeout, or crash |
 | `Calor1346` | Format/Lint: `format --write` or `lint --fix` refused without the experimental acknowledgment — the formatter write path is release-policy-disabled (#793/#760); pass `--experimental` or set `CALOR_EXPERIMENTAL_FORMAT_WRITE=1` |
+| `Calor1350` | Import: package or assembly not found (`.dll` path missing, or NuGet package id absent from the global packages folder at the requested version) |
+| `Calor1351` | Import: unresolved public members (Tier C) — their effects are UNKNOWN and are NOT emitted into the manifest (an empty effect list would mean pure); each is listed in the report with a reason |
+| `Calor1352` | Import: command-level failure — unreadable assembly, write failure, or crash |
+| `Calor1353` | Import: contract facts synthesized from assembly metadata with `assumed` provenance — annotation-only; never consumed by verification as trusted, never `Proven`, never elides runtime checks |
+| `Calor1355` | Review packet: command-level failure — input missing, compile failure, git diff failure, or crash |
+| `Calor1356` | Review packet: refinement-type honesty note (#782) — refinement obligations are compile-time analysis only; no runtime guard is emitted for them |
+| `Calor1357` | Review packet: produced under an explicit waiver (`--permissive-effects` or `--contract-mode off`) — disclosed on the packet's first line |
 
 ## Notes on specific commands
 

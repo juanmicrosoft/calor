@@ -398,12 +398,45 @@
         "View": [],
         "PartialView": []
       }
+    },
+    {
+      "type": "Microsoft.Extensions.Caching.Memory.IMemoryCache",
+      "methods": {
+        "TryGetValue": [],
+        "CreateEntry": ["mut"],
+        "Remove": ["mut"],
+        "Dispose": []
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Caching.Memory.CacheExtensions",
+      "methods": {
+        "Get": [],
+        "TryGetValue": [],
+        "Set": ["mut"],
+        "GetOrCreate": ["mut"],
+        "GetOrCreateAsync": ["mut"]
+      }
+    },
+    {
+      "type": "Microsoft.Extensions.Caching.Distributed.IDistributedCache",
+      "methods": {
+        "Get": ["db:r"],
+        "GetAsync": ["db:r"],
+        "Set": ["db:w"],
+        "SetAsync": ["db:w"],
+        "Refresh": ["db:w"],
+        "RefreshAsync": ["db:w"],
+        "Remove": ["db:w"],
+        "RemoveAsync": ["db:w"]
+      }
     }
   ],
   "namespaceDefaults": {
     "Microsoft.Extensions.Logging": ["cw"],
     "Microsoft.Extensions.Configuration": ["env:r"],
     "Microsoft.Extensions.Options": [],
-    "Microsoft.Extensions.DependencyInjection": []
+    "Microsoft.Extensions.DependencyInjection": [],
+    "Microsoft.Extensions.Caching.Memory": []
   }
 }
