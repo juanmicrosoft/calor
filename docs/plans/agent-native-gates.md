@@ -303,6 +303,21 @@ freezing — never after") applied as written.
 
 ### A.3 Annex revision log
 
+**A-1.4 exclusion-closure note (2026-08-02).** Additive record, no threshold or
+frozen-row change. The **PP-W1** row's frozen scope guards exclude "the
+delegate-invocation and override/dispatch effect-laundering holes … pinned by
+`DelegateInvocation_*` enforcement tests." WS-W2 (wedge plan §2; PR #842) has
+now **closed both holes** — D-W2.1 makes delegate invocation an error
+(`Calor0418`) and D-W2.2 enforces override/interface effect variance
+(`Calor0420`/`Calor0421`). This note satisfies the WS-W2 exit criterion that the
+A-1.2/A-1.3 scope-guard exclusion list "be updated (additively, as a note —
+frozen rows themselves untouched)." **It does NOT alter PP-W1's adjudication:**
+PP-W1 already ran and was adjudicated at `guarantees-probe-001` with those
+exclusions in force, and closing the holes afterward cannot retroactively change
+that epoch's scope. The closure's forward effect is only that a *future* gate
+need not carry these two exclusions. No supersession claim (§7); the PP-W1 row
+is unchanged.
+
 **A-1.4 tranche 1 (2026-08-01).** Additive: registers the **PP-W5** frozen row
 (A.2) — the wedge plan v0.11's strictness-parity release blocker — per the
 plan's two-tranche A-1.4 structure (D-W5.1: tranche 1 freezes PP-W5 from

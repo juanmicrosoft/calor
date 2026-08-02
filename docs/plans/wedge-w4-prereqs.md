@@ -42,6 +42,19 @@ generalized across all six migration-fidelity items.
 expression/operator/pattern silent class) is the keystone and is already in
 flight; the structural items get a smaller loud-refusal treatment (§2).
 
+**Residual honestly stated (review M3):** Slice A closes the clause-(b) coverage
+gap for the *enumerated* silent classes (§2's six items). It does **not** reduce
+the residual to zero: a converter bug that mis-converts a nominally-`Full`
+construct in a way no removed test covers would still yield `LossCount == 0` →
+`ConvertedNative`, be invisible to Slice A's differential runtime-equivalence
+check (itself suite-coverage-bounded), and sit outside clause (b). So the
+residual silent-drift path is **narrowed to not-yet-known faithful-conversion
+bugs on the supported surface** — mitigated by the differential check and the
+converter-attribution rule (D-W4.3), not eliminated. §1's principle is
+*achieved for the enumerated classes*, and the interpretation rule at A-1.4
+tranche 2 will state this residual explicitly so a PP-W2 hit is not overread as
+proof of a perfect converter.
+
 ---
 
 ## §2 — Migration-fidelity go/no-go triage (six epic items)
@@ -62,9 +75,11 @@ needs only containment/registry-honesty, not a predicate-blocking fix.
 | **#777** P0 | **MIXED, leans LOUD** | **CONTAINMENT** | Unresolved captured locals already build-break (excluded). Owed: whole-member interop for local functions with type params or captures (the residual silent case = a hoisted non-capturing generic local fn that compiles but loses generic identity); registry honesty. |
 | **#751** | **LOUD** (`Calor0258`) | **NO PREDICATE FIX** | Bare-block flattening now fails loud at `calor -i` (post-#731). Excluded by predicate clause (a). Low priority; author notes the case is uncommon. |
 
-**Frozen list for W4 Slice A (the conversion-honesty prerequisite):** `#774`
-(full), `#772` (loud-refusal), `#769` (loud-refusal, no-merge), `#775`/`#777`
-(containment + registry honesty). `#751` requires nothing. **Definition of done
+**Committed scope for W4 Slice A (the conversion-honesty prerequisite)** — note
+"committed scope," not the tranche-2 measurement-*freeze* sense of the word
+(§8.1): `#774` (full), `#772` (loud-refusal), `#769` (loud-refusal, no-merge),
+`#775`/`#777` (containment + registry honesty). `#751` requires nothing.
+**Definition of done
 for Slice A:** a corpus-wide sweep proves that on the pinned corpus, no file
 converts *natively* while carrying a silent substitution — operationalized as: a
 registry/loss-ledger audit test asserting every unsupported construct routes to
@@ -150,7 +165,8 @@ Per project, per task: the converted arm's baseline suite must be green **and**
 its coverage ≥ the A-1.4-registered bar **before** any task from that project
 counts. The bar attaches to `ConversionCoverage.NativeFraction`
 (`RoundTripReport.cs:299`), with **reverted files kept in the denominator as
-failures** (the #837 anti-masking property, `RoundTripReport.cs:258`). The
+failures** (the #776/D-W1.4 anti-masking property, `RoundTripReport.cs:258` —
+distinct from #837's generated-file glob-exclusion fix). The
 **converter-attribution rule**: a defect expressible *only* through
 converter-introduced divergence is excluded, isolated via `BisectRegressionsAsync`
 (`RoundTripPipeline.cs:585`). **Threshold value is NOT frozen here** — provisional
@@ -189,27 +205,43 @@ codebases of this shape,"* nothing broader.
 ## §5 — Dry-run spend (D-W4.4) — separate numbered authorization required
 
 The dry-run's agent spend is **authorized separately, with numbers**, via a new
-`phase-2-spend-authorisation.md` entry **before the dry-run starts** — it is
-**not** covered by the W5 epoch authorization (review m6). The user's standing
-"I approve the epoch spend too" pre-approves the spend under the **$1,500/epoch
-ceiling**; the numbered doc + §2 real-scale calibration is the owed *artifact*,
-not a fresh approval gate.
+`phase-2-spend-authorisation.md` entry **before the dry-run starts** — and it is
+**explicitly NOT covered by the W5 epoch authorization** (wedge §2 D-W4.4,
+review m6). That entry is a **real authorization gate**, not a formality: it
+carries the same sign-then-spend discipline as the existing instance (§2
+real-money calibration on real-scale tasks, §3 envelope, §5 cool-off, §6
+signature). **Open question deferred to Slice E (not resolved here):** whether
+the user's standing "I approve the epoch spend too" extends to the *non-epoch*
+dry-run spend the plan carves out. This kickoff does not assume it does; at
+Slice E the numbered authorization is produced and the spend-approval question
+is surfaced to the user explicitly if the standing approval's scope is still
+ambiguous. No dry-run agent run happens before that gate closes.
 
 Cost model (brief §E; trustworthy unit = **$0.88/run** from `guarantees-probe-001`
-summed `total_cost_usd` — **not** the m5 hand-priced $0.176 artifact):
+summed `total_cost_usd` — **not** the m5 hand-priced $0.176 artifact). **"Runs"
+below = total agent runs across all arms**, decomposed as *tasks × arms ×
+runs-per-task-per-arm*; the dry-run floor (wedge D-W4.4) is ≥3 runs-per-task-
+per-arm on ≥5 tasks across ≥2 projects, i.e. **30 total for a 2-arm shape
+(5×2×3)** and **45 for a 3-arm shape (5×3×3)** — floor estimates. The 5×/20×
+real-scale multipliers are **illustrative, not derived** — a placeholder for
+repo-context + iteration + full-suite-churn overhead that the §2 calibration
+replaces with measured numbers:
 
-| Scenario | per-run | runs | dry-run total |
+| Scenario | per-run | runs (tasks×arms×reps) | dry-run total |
 |---|---:|---:|---:|
-| Authorable-fixture floor | $0.88 | 30 | ~$26 |
-| Real-scale conservative (5× repo/iteration) | $4.40 | 30 | ~$132 |
-| Real-scale heavy (20× full-suite churn) | $17.60 | 30 | ~$528 |
-| 3-arm (iii), heavy | $17.60 | 45 | ~$792 |
+| Authorable-fixture floor | $0.88 | 30 (5×2×3) | ~$26 |
+| Real-scale conservative (illustrative 5×) | $4.40 | 30 (5×2×3) | ~$132 |
+| Real-scale heavy (illustrative 20×) | $17.60 | 30 (5×2×3) | ~$528 |
+| 3-arm (iii), heavy (illustrative 20×) | $17.60 | 45 (5×3×3) | ~$792 |
 
-All scenarios sit under the $1,500 ceiling; the dry-run's §2 calibration
-(≥3 real-money trials on real-scale tasks) replaces these estimates with
-measured cost, variance, and achievable MDE **before** PP-W2's threshold
-freezes. The dry-run may move the threshold, task count N, or corpus before the
-freeze — never after.
+At the dry-run floor (5 tasks) all four scenarios sit under the $1,500/epoch
+ceiling. **This is a floor claim only**: if the §2 calibration measures a per-run
+cost materially above the illustrative 20×, or the dry-run needs more than 5
+tasks to estimate variance, the 3-arm shape could approach the ceiling — which
+is exactly what the calibration must confirm *before* the authorization is
+signed. The calibration replaces these estimates with measured cost, variance,
+and achievable MDE **before** PP-W2's threshold freezes. The dry-run may move
+the threshold, task count N, or corpus before the freeze — never after.
 
 ---
 
@@ -245,10 +277,14 @@ freeze, which gates the W5 epochs.
 WS-W2 (D-W2.1 delegate-invocation = error `Calor0418`; D-W2.2 override/interface
 effect variance `Calor0420`/`Calor0421`) **closed both holes** cited as
 exclusions by the frozen **PP-W1 row** (`agent-native-gates.md:294`) and the
-A-1.2 log (`:409-410`). The wedge plan (§2 WS-W2 exit) requires this be recorded
-**additively, as a note — the frozen rows themselves are untouched.** This note
-lands with the A-1.4 tranche-2 registration PR (a natural batching point), not
-as an edit to any frozen row.
+A-1.2 log. The wedge plan (§2 WS-W2 exit) makes this a **WS-W2 exit criterion**,
+recorded **additively, as a note — the frozen rows themselves untouched.**
+Because WS-W2 already merged (#842) without it, this note **lands now, in this
+PR** (the A.3 revision-log entry "A-1.4 exclusion-closure note (2026-08-02)"),
+rather than being deferred to the tranche-2 PR (review M4) — closing the W2-exit
+item at the earliest gates-Annex edit. It alters no frozen row and makes no
+supersession claim; it explicitly does **not** change PP-W1's already-adjudicated
+scope.
 
 ---
 
