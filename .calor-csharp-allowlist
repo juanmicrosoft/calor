@@ -22,3 +22,14 @@ src/Calor.Compiler/Mcp/Sessions/ProjectSession.cs
 src/Calor.Compiler/Mcp/Sessions/ProjectSessionManager.cs
 src/Calor.Compiler/Mcp/Tools/SessionTool.cs
 src/Calor.Compiler/Mcp/Tools/FileWriteTool.cs
+
+# W3 kickoff (wedge plan v0.11 WS-W3 — docs/plans/wedge-plan-v0.11.md §2) —
+# adoption-surface command files. Compiler-internal CLI/tooling surfaces
+# (package-manifest generation over the IL analyzer and manifest loader;
+# per-change review-packet assembly over verification outcomes) that cannot
+# be authored in Calor, same rationale as #754.
+src/Calor.Compiler/Commands/ImportCommand.cs
+src/Calor.Compiler/Commands/ReviewPacketCommand.cs
+src/Calor.Compiler/Effects/Manifests/PackageManifestGenerator.cs
+src/Calor.Compiler/Reporting/ReviewPacket.cs
+src/Calor.Compiler/Reporting/ReviewPacketBuilder.cs
