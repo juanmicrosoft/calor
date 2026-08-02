@@ -14,10 +14,12 @@ Structure: one Main module (layer 0) over three layers of 35 modules each;
 cross-module calls flow strictly downward (L0→L1→L2→L3), giving a
 module-graph reference depth of 3. Each module holds two function kinds:
 
-  calc  — contract-bearing (§Q on inputs, §S provable by Z3 over the pure
-          arithmetic body), never called cross-module, so no call-site
+  calc  — contract-bearing (§Q on inputs, §S provable by Z3 — including
+          result-referencing postconditions over §B-chain bodies, the
+          post-#807 surface), never called cross-module, so no call-site
           obligations enter verification. Their trailing constants are the
-          safe-edit targets.
+          safe-edit targets, and every contract form is bitvector-sound for
+          any constant value so the edit chain preserves Proven.
   flow  — contract-free; L1/L2 flow functions call one or two public flow
           functions of the layer below (the cross-module edges); L3 flow
           functions are pure arithmetic. Their definitions are the
@@ -33,7 +35,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-SEED = 4537  # recorded default; --seed overrides
+SEED = 6089  # recorded default; --seed overrides (re-baseline 2026-08-01;
+             # the original 2026-07-27 fixture was seed 4537)
 LAYERS = 3
 MODULES_PER_LAYER = 35
 FUNCS_PER_MODULE = 13     # ~p90 of corpus functions/module (13.0)
@@ -91,27 +94,59 @@ def generate(seed):
                     next_const += 7
                     const_of[(layer, mod, idx)] = const
                     scale = rng.choice([2, 3, 5])
-                    # Contract forms are drawn from the verifier's
-                    # proven-outcome surface (D1.5 corpus, Outcomes/proven
-                    # .calr): single-parameter inequality chains. Postconds
-                    # over `result` or over parameter arithmetic are
-                    # excluded — the current verifier refutes both (result
-                    # left unconstrained / bitvector overflow), see the
-                    # fixture README. Q lower bounds never bind callers:
-                    # calc functions have none.
+                    # Contract forms (re-baseline, post-#807): drawn
+                    # uniformly from four Proven-at-generation shapes —
+                    # three carry result-referencing postconditions (the
+                    # surface #807/G4 opened: body→result binding over §R
+                    # returns, §IF/§EI/§EL branching, and immutable §B
+                    # chains), one keeps the legacy single-parameter
+                    # inequality chain for lineage comparability. All four
+                    # avoid the W1 Slice 1 refusal classes (no division,
+                    # all-i32, in-domain literals) and forms a/b/d are
+                    # bitvector-sound for ANY constant value, so safe-edit
+                    # bumps preserve Proven. Q lower bounds never bind
+                    # callers: calc functions have none.
                     bound = rng.randrange(1, 9)
-                    if rng.random() < 0.5:
-                        lines.append(f"    §Q (> x {bound - 1})")
-                        lines.append(f"    §S (>= x {bound})")
-                    else:
+                    form = rng.choice(["cap", "floor", "legacy", "max"])
+                    if form == "cap":
+                        # result-cap: §B chain + guard-clause fall-through
+                        # (the W5-B / Outcomes/proven-with-binding shape).
+                        lines.append(f"    §Q (>= x 0)")
+                        lines.append(f"    §S (<= result {const})")
+                        lines.append(f"    §B{{total:i32}} (+ (* x {scale}) y)")
+                        lines.append(f"    §IF{{if{idx:02d}}} (> total {const})")
+                        lines.append(f"      §R {const}")
+                        lines.append(f"    §R total")
+                    elif form == "floor":
+                        # result-floor: §B chain + §IF/§EL.
                         lines.append(f"    §Q (>= x {bound})")
                         lines.append(f"    §Q (>= y 0)")
-                        lines.append(f"    §S (>= x {max(bound - 2, 0)})")
-                    lines.append(f"    §B{{acc:i32}} (+ (* x {scale}) y)")
-                    lines.append(f"    §IF{{if{idx:02d}}} (> acc {const})")
-                    lines.append(f"      §R (+ acc {const})")
-                    lines.append("    §EL")
-                    lines.append(f"      §R (+ (* acc 2) {const})")
+                        lines.append(f"    §S (>= result {const})")
+                        lines.append(f"    §B{{total:i32}} (+ (* x {scale}) y)")
+                        lines.append(f"    §IF{{if{idx:02d}}} (< total {const})")
+                        lines.append(f"      §R {const}")
+                        lines.append("    §EL")
+                        lines.append(f"      §R total")
+                    elif form == "legacy":
+                        # the pre-#807 form, kept for lineage comparability.
+                        lines.append(f"    §Q (> x {bound - 1})")
+                        lines.append(f"    §S (>= x {bound})")
+                        lines.append(f"    §B{{acc:i32}} (+ (* x {scale}) y)")
+                        lines.append(f"    §IF{{if{idx:02d}}} (> acc {const})")
+                        lines.append(f"      §R (+ acc {const})")
+                        lines.append("    §EL")
+                        lines.append(f"      §R (+ (* acc 2) {const})")
+                    else:
+                        # result-max: two result-referencing §S (one
+                        # param-relative, one constant-relative), pure
+                        # branching, no binding.
+                        lines.append(f"    §Q (>= y 0)")
+                        lines.append(f"    §S (>= result x)")
+                        lines.append(f"    §S (>= result {const})")
+                        lines.append(f"    §IF{{if{idx:02d}}} (>= x {const})")
+                        lines.append(f"      §R x")
+                        lines.append("    §EL")
+                        lines.append(f"      §R {const}")
                 else:
                     if layer < LAYERS:
                         n_calls = rng.choice([1, 2])
@@ -222,9 +257,9 @@ against these bytes in git, never against a regenerator's output.
 
 | Metric | Corpus p50 | Corpus p90 | Fixture | Note |
 |---|---|---|---|---|
-| lines per module file | {c_lines_p50:.0f} | {c_lines_p90:.0f} | ~{f_lines_per_file:.0f} | sized between corpus p75 and p90 — larger-than-median files keep ~10k lines at ~{n_files} files rather than the ~360 that p50 sizing would need |
-| functions per module | {c_fpm_p50:.0f} | {c_fpm_p90:.0f} | {funcs_per_module} | p90 |
-| contract markers per function | {c_cd_p50:.1f} | {c_cd_p90:.1f} | {f_contract_density:.1f} | corpus is bimodal (p50 0, p90 3); fixture sits between, via ~{calc_pct:.0f}% calc functions carrying 2–3 markers |
+| lines per module file | {c_lines_p50:.0f} | {c_lines_p90:.0f} | ~{f_lines_per_file:.0f} | sized between corpus p75 and p90 — larger-than-median files keep ~10k lines at ~{n_files} files rather than the ~{p50_files_needed} that p50 sizing would need |
+| functions per module | {c_fpm_p50:.0f} | {c_fpm_p90:.0f} | {funcs_per_module} | at corpus p90 (±1: the p90 moves with the corpus snapshot; the generator constant stays pinned across re-baselines) |
+| contract markers per function | {c_cd_p50:.1f} | {c_cd_p90:.1f} | {f_contract_density:.1f} | corpus is bimodal (p50 {c_cd_p50:.0f}, p90 {c_cd_p90:.1f}); fixture sits between, via ~{calc_pct:.0f}% calc functions carrying 2–3 markers |
 | effect markers per function | {c_ed_p50:.1f} | {c_ed_p90:.1f} | 1.0 | corpus constant |
 | calls per function | {c_cpf_p50:.1f} | {c_cpf_p90:.1f} | {f_calls_density:.2f} | {calls_note} |
 | cross-module ref depth | 0 | 0 | 3 | **deliberate deviation, recorded**: the corpus contains no multi-module project at all, while D3.3 mandates one — depth 3 (Main→L1→L2→L3) is the minimum that exercises the session's project-wide reference checks with real fan-in |
@@ -232,25 +267,52 @@ against these bytes in git, never against a regenerator's output.
 Corpus numbers from `../corpus-stats.py` (snapshot in `../corpus-stats.json`).
 
 **Corpus-scope deviation, recorded:** the parent plan says "sample/test
-corpus"; the stats corpus here is `samples/` + bench pair fixtures (43
-files) and deliberately excludes `tests/TestData` (~289 `.calr`, dominated
-by golden files and deliberately broken parser fixtures that would skew
-every density toward pathological shapes). The bench pairs are the code
-agents actually work on. Consequence: n = 43 makes the p90s coarse.
+corpus"; the stats corpus here is `samples/` + bench pair fixtures
+({corpus_files} files) and deliberately excludes `tests/TestData` (~289
+`.calr`, dominated by golden files and deliberately broken parser fixtures
+that would skew every density toward pathological shapes). The bench pairs
+are the code agents actually work on. Consequence: n = {corpus_files} makes
+the p90s coarse.
 
-## Contract forms (constraint recorded 2026-07-27)
+## Contract forms (re-baselined 2026-08-01 — the #807 constraint is lifted)
 
 Every contract in the fixture verifies **Proven** under `calor verify` at
-generation time (checked in the generating PR). The forms are restricted to
-the verifier's current proven surface — single-parameter inequality chains,
-as in `tests/TestData/Verification/Outcomes/proven.calr` — because at the
-time of generation the verifier refutes (a) any postcondition over `result`
-(the counterexamples show `result` unconstrained by the body, e.g.
-`samples/Verification/proven-contracts.calr` Identity: `§S (== result x)`,
-`§R x`, "violated" at x=0/result=-1) and (b) parameter arithmetic that can
-overflow i32 bitvectors (honest refutation). (a) is a verifier limitation,
-not a fixture choice — if it is fixed, regenerating with richer forms is a
-re-baseline per the policy above.
+generation time — 100% plain Proven: 0 assumed, 0 unsupported, 0 refuted
+(checked in the regenerating PR). The 2026-07-27 constraint — forms
+restricted to single-parameter inequality chains because the pre-#807
+verifier refuted any postcondition over `result` against an unconstrained
+result variable — is lifted: #807 landed in v0.10 (result-referencing
+postconditions bind against the body; immutable §B-chain bodies prove,
+guarantees plan D-G1.1/G4). Both recorded regeneration triggers fired (the
+#807 fix and the 0.9→0.10 minor bump); this regeneration covers both. Calc
+functions now draw uniformly from four forms:
+
+- **result-cap** — `§S (<= result C)` over an immutable §B binding chain
+  with a guard-clause fall-through return (the W5-B /
+  `Outcomes/proven-with-binding.calr` shape);
+- **result-floor** — `§S (>= result C)` over a §B chain with `§IF`/`§EL`;
+- **legacy chain** — the pre-#807 single-parameter inequality chain
+  (`Outcomes/proven.calr` shape), kept deliberately for lineage
+  comparability;
+- **result-max** — two result-referencing `§S` (one param-relative, one
+  constant-relative) over pure branching.
+
+The cap/floor/max forms are bitvector-sound for **every** value of their
+trailing constant, so the safe-edit constant bumps preserve Proven across
+the whole edit script. The boundary is now the W1 Slice 1 refusal classes,
+deliberately avoided: division anywhere in contracts or §B-chain bodies
+(reports `assumed` under divisor side conditions — D8/D-G2.5 — never plain
+Proven), narrow-int (sub-32-bit) arithmetic and 64-bit-unsigned/signed
+mixes (`unsupported`), and integer literals outside the signed 32-bit
+domain (refused). The fixture stays all-i32 with 5-digit constants, so no
+refusal class can enter via an edit.
+
+## M-L1 lineage
+
+Regeneration re-baselines any published M-L1 result (policy above):
+`../ml1-001` and `../ml1-002` are records for the **old** lineage
+(seed 4537, pre-#807 forms) and are not comparable to numbers measured on
+these bytes; `../ml1-003` is the adjudicating record for this lineage.
 
 ## Layout
 
@@ -318,6 +380,7 @@ def main():
 
     readme = README.format(
         seed=args.seed,
+        p50_files_needed=round(total_lines / m["lines_per_module_file"]["p50"] / 5) * 5,
         n_edits=len(edits),
         n_safe=sum(1 for e in edits if e["kind"] == "safe"),
         n_breaking=sum(1 for e in edits if e["kind"] == "breaking"),

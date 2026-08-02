@@ -2,121 +2,115 @@
 
   §F{f001:l3m31_fn01:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 11)
+    §Q (> x 0)
+    §S (>= x 1)
+    §B{acc:i32} (+ (* x 5) y)
+    §IF{if01} (> acc 25292)
+      §R (+ acc 25292)
+    §EL
+      §R (+ (* acc 2) 25292)
 
   §F{f002:l3m31_fn02:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if02} (> acc 25411)
-      §R (+ acc 25411)
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 25299)
+    §IF{if02} (>= x 25299)
+      §R x
     §EL
-      §R (+ (* acc 2) 25411)
+      §R 25299
 
   §F{f003:l3m31_fn03:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 8)
+    §Q (>= x 4)
     §Q (>= y 0)
-    §S (>= x 6)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if03} (> acc 25418)
-      §R (+ acc 25418)
+    §S (>= result 25306)
+    §B{total:i32} (+ (* x 3) y)
+    §IF{if03} (< total 25306)
+      §R 25306
     §EL
-      §R (+ (* acc 2) 25418)
+      §R total
 
   §F{f004:l3m31_fn04:pub} (i32:x, i32:y) -> i32
     §E{}
     §B{base:i32} (- (* x 4) y)
-    §R (+ base 31)
+    §R (+ base 49)
 
   §F{f005:l3m31_fn05:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 3)
-    §Q (>= y 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF{if05} (> acc 25425)
-      §R (+ acc 25425)
-    §EL
-      §R (+ (* acc 2) 25425)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 56)
 
   §F{f006:l3m31_fn06:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 2)
-    §Q (>= y 0)
-    §S (>= x 0)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if06} (> acc 25432)
-      §R (+ acc 25432)
-    §EL
-      §R (+ (* acc 2) 25432)
+    §Q (>= x 0)
+    §S (<= result 25313)
+    §B{total:i32} (+ (* x 5) y)
+    §IF{if06} (> total 25313)
+      §R 25313
+    §R total
 
   §F{f007:l3m31_fn07:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 4)
-    §S (>= x 5)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF{if07} (> acc 25439)
-      §R (+ acc 25439)
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 25320)
+    §IF{if07} (>= x 25320)
+      §R x
     §EL
-      §R (+ (* acc 2) 25439)
+      §R 25320
 
   §F{f008:l3m31_fn08:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 8)
-    §Q (>= y 0)
-    §S (>= x 6)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF{if08} (> acc 25446)
-      §R (+ acc 25446)
-    §EL
-      §R (+ (* acc 2) 25446)
+    §Q (>= x 0)
+    §S (<= result 25327)
+    §B{total:i32} (+ (* x 2) y)
+    §IF{if08} (> total 25327)
+      §R 25327
+    §R total
 
   §F{f009:l3m31_fn09:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if09} (> acc 25453)
-      §R (+ acc 25453)
-    §EL
-      §R (+ (* acc 2) 25453)
+    §Q (>= x 0)
+    §S (<= result 25334)
+    §B{total:i32} (+ (* x 5) y)
+    §IF{if09} (> total 25334)
+      §R 25334
+    §R total
 
   §F{f010:l3m31_fn10:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 63)
+    §Q (>= x 5)
+    §Q (>= y 0)
+    §S (>= result 25341)
+    §B{total:i32} (+ (* x 5) y)
+    §IF{if10} (< total 25341)
+      §R 25341
+    §EL
+      §R total
 
   §F{f011:l3m31_fn11:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 5)
+    §Q (>= x 1)
     §Q (>= y 0)
-    §S (>= x 3)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if11} (> acc 25460)
-      §R (+ acc 25460)
+    §S (>= result 25348)
+    §B{total:i32} (+ (* x 3) y)
+    §IF{if11} (< total 25348)
+      §R 25348
     §EL
-      §R (+ (* acc 2) 25460)
+      §R total
 
   §F{f012:l3m31_fn12:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 2)
-    §Q (>= y 0)
-    §S (>= x 0)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if12} (> acc 25467)
-      §R (+ acc 25467)
-    §EL
-      §R (+ (* acc 2) 25467)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 77)
 
   §F{f013:l3m31_fn13:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 0)
-    §S (>= x 1)
+    §Q (> x 3)
+    §S (>= x 4)
     §B{acc:i32} (+ (* x 2) y)
-    §IF{if13} (> acc 25474)
-      §R (+ acc 25474)
+    §IF{if13} (> acc 25355)
+      §R (+ acc 25355)
     §EL
-      §R (+ (* acc 2) 25474)
+      §R (+ (* acc 2) 25355)

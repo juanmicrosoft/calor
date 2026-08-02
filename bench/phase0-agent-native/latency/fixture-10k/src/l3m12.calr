@@ -4,110 +4,90 @@
     §E{}
     §Q (> x 3)
     §S (>= x 4)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if01} (> acc 24354)
-      §R (+ acc 24354)
+    §B{acc:i32} (+ (* x 2) y)
+    §IF{if01} (> acc 24256)
+      §R (+ acc 24256)
     §EL
-      §R (+ (* acc 2) 24354)
+      §R (+ (* acc 2) 24256)
 
   §F{f002:l3m12_fn02:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 4)
-    §Q (>= y 0)
-    §S (>= x 2)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if02} (> acc 24361)
-      §R (+ acc 24361)
-    §EL
-      §R (+ (* acc 2) 24361)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 4)
 
   §F{f003:l3m12_fn03:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 33)
+    §Q (>= x 0)
+    §S (<= result 24263)
+    §B{total:i32} (+ (* x 5) y)
+    §IF{if03} (> total 24263)
+      §R 24263
+    §R total
 
   §F{f004:l3m12_fn04:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 6)
-    §S (>= x 7)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if04} (> acc 24368)
-      §R (+ acc 24368)
-    §EL
-      §R (+ (* acc 2) 24368)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 72)
 
   §F{f005:l3m12_fn05:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 6)
-    §S (>= x 7)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF{if05} (> acc 24375)
-      §R (+ acc 24375)
+    §Q (>= x 5)
+    §Q (>= y 0)
+    §S (>= result 24270)
+    §B{total:i32} (+ (* x 2) y)
+    §IF{if05} (< total 24270)
+      §R 24270
     §EL
-      §R (+ (* acc 2) 24375)
+      §R total
 
   §F{f006:l3m12_fn06:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if06} (> acc 24382)
-      §R (+ acc 24382)
-    §EL
-      §R (+ (* acc 2) 24382)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 76)
 
   §F{f007:l3m12_fn07:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if07} (> acc 24389)
-      §R (+ acc 24389)
-    §EL
-      §R (+ (* acc 2) 24389)
+    §Q (>= x 0)
+    §S (<= result 24277)
+    §B{total:i32} (+ (* x 3) y)
+    §IF{if07} (> total 24277)
+      §R 24277
+    §R total
 
   §F{f008:l3m12_fn08:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 40)
+    §Q (>= x 0)
+    §S (<= result 24284)
+    §B{total:i32} (+ (* x 3) y)
+    §IF{if08} (> total 24284)
+      §R 24284
+    §R total
 
   §F{f009:l3m12_fn09:pub} (i32:x, i32:y) -> i32
     §E{}
     §B{base:i32} (- (* x 4) y)
-    §R (+ base 60)
+    §R (+ base 71)
 
   §F{f010:l3m12_fn10:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 6)
-    §Q (>= y 0)
-    §S (>= x 4)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF{if10} (> acc 24396)
-      §R (+ acc 24396)
-    §EL
-      §R (+ (* acc 2) 24396)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 39)
 
   §F{f011:l3m12_fn11:pub} (i32:x, i32:y) -> i32
     §E{}
     §B{base:i32} (- (* x 4) y)
-    §R (+ base 20)
+    §R (+ base 85)
 
   §F{f012:l3m12_fn12:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 6)
-    §S (>= x 7)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if12} (> acc 24403)
-      §R (+ acc 24403)
-    §EL
-      §R (+ (* acc 2) 24403)
+    §Q (>= x 0)
+    §S (<= result 24291)
+    §B{total:i32} (+ (* x 3) y)
+    §IF{if12} (> total 24291)
+      §R 24291
+    §R total
 
   §F{f013:l3m12_fn13:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 7)
-    §S (>= x 8)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF{if13} (> acc 24410)
-      §R (+ acc 24410)
-    §EL
-      §R (+ (* acc 2) 24410)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 53)

@@ -2,128 +2,100 @@
 
   §F{f001:l3m25_fn01:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 5)
-    §Q (>= y 0)
-    §S (>= x 3)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF{if01} (> acc 25103)
-      §R (+ acc 25103)
-    §EL
-      §R (+ (* acc 2) 25103)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 48)
 
   §F{f002:l3m25_fn02:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 54)
+    §Q (>= y 0)
+    §S (>= result x)
+    §S (>= result 24991)
+    §IF{if02} (>= x 24991)
+      §R x
+    §EL
+      §R 24991
 
   §F{f003:l3m25_fn03:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 5)
-    §Q (>= y 0)
-    §S (>= x 3)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if03} (> acc 25110)
-      §R (+ acc 25110)
-    §EL
-      §R (+ (* acc 2) 25110)
+    §Q (>= x 0)
+    §S (<= result 24998)
+    §B{total:i32} (+ (* x 2) y)
+    §IF{if03} (> total 24998)
+      §R 24998
+    §R total
 
   §F{f004:l3m25_fn04:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 6)
-    §S (>= x 7)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if04} (> acc 25117)
-      §R (+ acc 25117)
+    §Q (>= x 1)
+    §Q (>= y 0)
+    §S (>= result 25005)
+    §B{total:i32} (+ (* x 5) y)
+    §IF{if04} (< total 25005)
+      §R 25005
     §EL
-      §R (+ (* acc 2) 25117)
+      §R total
 
   §F{f005:l3m25_fn05:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 3)
-    §Q (>= y 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if05} (> acc 25124)
-      §R (+ acc 25124)
-    §EL
-      §R (+ (* acc 2) 25124)
+    §Q (>= x 0)
+    §S (<= result 25012)
+    §B{total:i32} (+ (* x 2) y)
+    §IF{if05} (> total 25012)
+      §R 25012
+    §R total
 
   §F{f006:l3m25_fn06:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 4)
-    §Q (>= y 0)
-    §S (>= x 2)
-    §B{acc:i32} (+ (* x 5) y)
-    §IF{if06} (> acc 25131)
-      §R (+ acc 25131)
-    §EL
-      §R (+ (* acc 2) 25131)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 78)
 
   §F{f007:l3m25_fn07:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 5)
-    §S (>= x 6)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if07} (> acc 25138)
-      §R (+ acc 25138)
+    §Q (>= x 3)
+    §Q (>= y 0)
+    §S (>= result 25019)
+    §B{total:i32} (+ (* x 5) y)
+    §IF{if07} (< total 25019)
+      §R 25019
     §EL
-      §R (+ (* acc 2) 25138)
+      §R total
 
   §F{f008:l3m25_fn08:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (> x 2)
-    §S (>= x 3)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if08} (> acc 25145)
-      §R (+ acc 25145)
+    §Q (>= x 8)
+    §Q (>= y 0)
+    §S (>= result 25026)
+    §B{total:i32} (+ (* x 3) y)
+    §IF{if08} (< total 25026)
+      §R 25026
     §EL
-      §R (+ (* acc 2) 25145)
+      §R total
 
   §F{f009:l3m25_fn09:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 4)
-    §Q (>= y 0)
-    §S (>= x 2)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if09} (> acc 25152)
-      §R (+ acc 25152)
-    §EL
-      §R (+ (* acc 2) 25152)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 62)
 
   §F{f010:l3m25_fn10:pub} (i32:x, i32:y) -> i32
     §E{}
-    §B{base:i32} (- (* x 4) y)
-    §R (+ base 89)
+    §Q (>= x 0)
+    §S (<= result 25033)
+    §B{total:i32} (+ (* x 5) y)
+    §IF{if10} (> total 25033)
+      §R 25033
+    §R total
 
   §F{f011:l3m25_fn11:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 3)
-    §Q (>= y 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if11} (> acc 25159)
-      §R (+ acc 25159)
-    §EL
-      §R (+ (* acc 2) 25159)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 41)
 
   §F{f012:l3m25_fn12:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 4)
-    §Q (>= y 0)
-    §S (>= x 2)
-    §B{acc:i32} (+ (* x 2) y)
-    §IF{if12} (> acc 25166)
-      §R (+ acc 25166)
-    §EL
-      §R (+ (* acc 2) 25166)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 32)
 
   §F{f013:l3m25_fn13:pub} (i32:x, i32:y) -> i32
     §E{}
-    §Q (>= x 3)
-    §Q (>= y 0)
-    §S (>= x 1)
-    §B{acc:i32} (+ (* x 3) y)
-    §IF{if13} (> acc 25173)
-      §R (+ acc 25173)
-    §EL
-      §R (+ (* acc 2) 25173)
+    §B{base:i32} (- (* x 4) y)
+    §R (+ base 40)
