@@ -261,7 +261,8 @@ the threshold, task count N, or corpus before the freeze — never after.
   bar (the Slice-5b threshold substrate) + converter-attribution rule via
   bisect.
 - **Slice E — dry-run.** New numbered spend authorization + §2 calibration →
-  **D-W4.4 dry-run** (≥3 runs/arm × ≥5 tasks × ≥2 projects) → **A-1.4 tranche 2
+  **D-W4.4 dry-run** (≥3 runs/arm on ≥5 tasks across ≥2 projects — the §5 floor,
+  30 total runs for a 2-arm shape) → **A-1.4 tranche 2
   freeze** (protocol, predicate, fidelity bar, attribution rule,
   ceiling-recurrence floor, N, PP-W2 threshold + restated wording, quantified
   underpowered criterion, M-A1/M-R*/M-T1 defs).
