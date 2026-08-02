@@ -1,6 +1,16 @@
 namespace Calor.Compiler.Effects.IL;
 
 /// <summary>
+/// Per-method result of detailed propagation: resolution status, unioned
+/// effects, and the assumed-pure leaves the method's transitive chain touched
+/// (empty = every leaf was manifest-covered or fully analyzed IL).
+/// </summary>
+public sealed record ILMethodOutcome(
+    ILResolutionStatus Status,
+    EffectSet Effects,
+    IReadOnlyCollection<MethodKey> AssumedPureLeaves);
+
+/// <summary>
 /// Propagates effects transitively through the IL call graph.
 ///
 /// Phase 1 (Graph construction): Demand-driven BFS from entry points.
@@ -37,20 +47,37 @@ public sealed class TransitiveEffectPropagator
     public Dictionary<MethodKey, (ILResolutionStatus Status, EffectSet Effects)> Propagate(
         IEnumerable<MethodKey> entryPoints)
     {
+        return PropagateDetailed(entryPoints)
+            .ToDictionary(kvp => kvp.Key, kvp => (kvp.Value.Status, kvp.Value.Effects));
+    }
+
+    /// <summary>
+    /// Like <see cref="Propagate"/> but additionally reports, per method, the
+    /// set of assumed-pure leaves its transitive chain touched — callees that
+    /// were seeded pure NOT because a manifest covered them but because they
+    /// were missing from the loaded assemblies or had no IL body (extern,
+    /// abstract, delegate <c>Invoke</c>). A non-empty set means the effect
+    /// result rests on unverified assumptions; honest consumers (calor import
+    /// Tier A) must not present such a method as cleanly derived.
+    /// </summary>
+    public Dictionary<MethodKey, ILMethodOutcome> PropagateDetailed(IEnumerable<MethodKey> entryPoints)
+    {
         // Phase 1: Build call graph via demand-driven BFS
-        var (forwardEdges, seeds, incomplete) = BuildCallGraph(entryPoints);
+        var (forwardEdges, seeds, incomplete, assumedLeaves) = BuildCallGraph(entryPoints);
 
         // Phase 2: Tarjan SCC + fixpoint propagation
-        return PropagateEffects(forwardEdges, seeds, incomplete);
+        return PropagateEffects(forwardEdges, seeds, incomplete, assumedLeaves);
     }
 
     private (Dictionary<MethodKey, List<CallEdge>> ForwardEdges,
              Dictionary<MethodKey, EffectSet> Seeds,
-             HashSet<MethodKey> Incomplete) BuildCallGraph(IEnumerable<MethodKey> entryPoints)
+             HashSet<MethodKey> Incomplete,
+             HashSet<MethodKey> AssumedLeaves) BuildCallGraph(IEnumerable<MethodKey> entryPoints)
     {
         var forwardEdges = new Dictionary<MethodKey, List<CallEdge>>();
         var seeds = new Dictionary<MethodKey, EffectSet>();
         var incomplete = new HashSet<MethodKey>();
+        var assumedLeaves = new HashSet<MethodKey>();
         var visited = new HashSet<MethodKey>();
 
         // Sort entry points for determinism
@@ -80,8 +107,16 @@ public sealed class TransitiveEffectPropagator
                 continue;
             }
 
-            // Find method in loaded assemblies
+            // Find method in loaded assemblies. Generic instantiations carry
+            // decorated type names ("Foo`1<System.String>") while the type
+            // index holds open definitions — retry on the bare name (the open
+            // definition's IL body is what any instantiation executes).
             var location = _assemblyIndex.FindMethod(method);
+            if (location == null && method.TypeName.Contains('<'))
+            {
+                location = _assemblyIndex.FindMethod(
+                    BareTypeName(method.TypeName), method.MethodName);
+            }
             if (location == null)
             {
                 // Method not in any loaded assembly. If it's an external BCL/framework
@@ -89,15 +124,19 @@ public sealed class TransitiveEffectPropagator
                 // Rationale: marking every unresolvable BCL method as Incomplete would make
                 // ALL chains Incomplete (every method eventually calls Object:.ctor, exception
                 // constructors, etc.). Methods with effects should be covered by manifests.
+                // The assumption is RECORDED: PropagateDetailed surfaces it per method so
+                // consumers that need honesty (calor import) can refuse to trust the chain.
                 seeds[method] = EffectSet.Empty;
+                assumedLeaves.Add(method);
                 continue;
             }
 
             if (!location.HasBody)
             {
-                // Method exists but has no IL body (extern, P/Invoke, abstract).
-                // Same reasoning: treat as pure if manifests didn't cover it.
+                // Method exists but has no IL body (extern, P/Invoke, abstract,
+                // delegate Invoke). Same reasoning — and same recording.
                 seeds[method] = EffectSet.Empty;
+                assumedLeaves.Add(method);
                 continue;
             }
 
@@ -119,10 +158,14 @@ public sealed class TransitiveEffectPropagator
             {
                 if (edge.IsVirtual)
                 {
-                    // Skip known-unresolvable interfaces — don't include in graph
-                    if (_options.SkipInterfaces.Contains(edge.Callee.TypeName))
+                    // Skip known-unresolvable interfaces — don't include in graph.
+                    // Compare on the OPEN generic name: IL callees on generic
+                    // instantiations carry "IEnumerable`1<System.String>" and
+                    // would otherwise bypass the skip lists entirely.
+                    var calleeTypeName = BareTypeName(edge.Callee.TypeName);
+                    if (_options.SkipInterfaces.Contains(calleeTypeName))
                         continue;
-                    if (_options.UbiquitousInterfaces.Contains(edge.Callee.TypeName))
+                    if (_options.UbiquitousInterfaces.Contains(calleeTypeName))
                         continue;
 
                     keptEdges.Add(edge);
@@ -151,7 +194,7 @@ public sealed class TransitiveEffectPropagator
             forwardEdges[method] = keptEdges;
         }
 
-        return (forwardEdges, seeds, incomplete);
+        return (forwardEdges, seeds, incomplete, assumedLeaves);
     }
 
     /// <summary>
@@ -161,8 +204,13 @@ public sealed class TransitiveEffectPropagator
     /// </summary>
     private EffectResolution ResolveFromManifest(MethodKey method)
     {
+        // Manifests are keyed by open generic names ("IEnumerable`1"); IL
+        // callees on instantiations carry "IEnumerable`1<System.String>" —
+        // resolve on the bare name.
+        var typeName = BareTypeName(method.TypeName);
+
         // Try standard method resolution first
-        var result = _manifestResolver.Resolve(method.TypeName, method.MethodName);
+        var result = _manifestResolver.Resolve(typeName, method.MethodName);
         if (result.Status != EffectResolutionStatus.Unknown)
             return result;
 
@@ -170,7 +218,7 @@ public sealed class TransitiveEffectPropagator
         if (method.MethodName.StartsWith("set_") && method.MethodName.Length > 4)
         {
             var propertyName = method.MethodName[4..];
-            result = _manifestResolver.ResolveSetter(method.TypeName, propertyName);
+            result = _manifestResolver.ResolveSetter(typeName, propertyName);
             if (result.Status != EffectResolutionStatus.Unknown)
                 return result;
         }
@@ -179,7 +227,7 @@ public sealed class TransitiveEffectPropagator
         if (method.MethodName.StartsWith("get_") && method.MethodName.Length > 4)
         {
             var propertyName = method.MethodName[4..];
-            result = _manifestResolver.ResolveGetter(method.TypeName, propertyName);
+            result = _manifestResolver.ResolveGetter(typeName, propertyName);
             if (result.Status != EffectResolutionStatus.Unknown)
                 return result;
         }
@@ -187,7 +235,7 @@ public sealed class TransitiveEffectPropagator
         // Constructor: .ctor → ResolveConstructor(type)
         if (method.MethodName == ".ctor")
         {
-            result = _manifestResolver.ResolveConstructor(method.TypeName);
+            result = _manifestResolver.ResolveConstructor(typeName);
             if (result.Status != EffectResolutionStatus.Unknown)
                 return result;
         }
@@ -195,10 +243,18 @@ public sealed class TransitiveEffectPropagator
         return result;
     }
 
-    private Dictionary<MethodKey, (ILResolutionStatus, EffectSet)> PropagateEffects(
+    /// <summary>Strips a generic instantiation suffix: "IEnumerable`1&lt;System.String&gt;" → "IEnumerable`1".</summary>
+    private static string BareTypeName(string typeName)
+    {
+        var angle = typeName.IndexOf('<');
+        return angle < 0 ? typeName : typeName[..angle];
+    }
+
+    private Dictionary<MethodKey, ILMethodOutcome> PropagateEffects(
         Dictionary<MethodKey, List<CallEdge>> forwardEdges,
         Dictionary<MethodKey, EffectSet> seeds,
-        HashSet<MethodKey> incomplete)
+        HashSet<MethodKey> incomplete,
+        HashSet<MethodKey> assumedLeaves)
     {
         // Build the set of all known methods
         var allMethods = new HashSet<MethodKey>();
@@ -216,18 +272,23 @@ public sealed class TransitiveEffectPropagator
 
         // Process SCCs in reverse topological order (leaves first — Tarjan gives this)
         var computed = new Dictionary<MethodKey, (ILResolutionStatus Status, EffectSet Effects)>();
+        // Parallel lattice: per method, which assumed-pure leaves its chain touched.
+        var assumptions = new Dictionary<MethodKey, HashSet<MethodKey>>();
+        var emptySet = new HashSet<MethodKey>();
 
         // Seed entries
         foreach (var (method, effects) in seeds)
         {
             var status = effects.IsEmpty ? ILResolutionStatus.ResolvedPure : ILResolutionStatus.Resolved;
             computed[method] = (status, effects);
+            assumptions[method] = assumedLeaves.Contains(method) ? [method] : emptySet;
         }
 
         // Incomplete entries
         foreach (var method in incomplete)
         {
             computed.TryAdd(method, (ILResolutionStatus.Incomplete, EffectSet.Unknown));
+            assumptions.TryAdd(method, emptySet);
         }
 
         foreach (var scc in sccs)
@@ -242,15 +303,59 @@ public sealed class TransitiveEffectPropagator
                     : effects.IsEmpty ? ILResolutionStatus.ResolvedPure
                     : ILResolutionStatus.Resolved;
                 computed[method] = (status, effects);
+                assumptions[method] = UnionCalleeAssumptions(method, forwardEdges, assumptions, emptySet);
             }
             else
             {
                 // Multi-method SCC — fixpoint iteration
                 ProcessSccFixpoint(scc, forwardEdges, computed, seeds, incomplete);
+
+                // Assumptions inside an SCC are shared: every member's chain can
+                // reach every other member, so the union over the whole SCC (plus
+                // each member's callees outside it) applies to all members.
+                var sccUnion = new HashSet<MethodKey>();
+                foreach (var member in scc)
+                {
+                    if (assumptions.TryGetValue(member, out var own))
+                        sccUnion.UnionWith(own);
+                    sccUnion.UnionWith(UnionCalleeAssumptions(member, forwardEdges, assumptions, emptySet));
+                }
+                var shared = sccUnion.Count == 0 ? emptySet : sccUnion;
+                foreach (var member in scc)
+                    assumptions[member] = shared;
             }
         }
 
-        return computed;
+        var outcomes = new Dictionary<MethodKey, ILMethodOutcome>(computed.Count);
+        foreach (var (method, value) in computed)
+        {
+            outcomes[method] = new ILMethodOutcome(
+                value.Status,
+                value.Effects,
+                assumptions.TryGetValue(method, out var set) ? set : emptySet);
+        }
+        return outcomes;
+    }
+
+    private static HashSet<MethodKey> UnionCalleeAssumptions(
+        MethodKey method,
+        Dictionary<MethodKey, List<CallEdge>> forwardEdges,
+        Dictionary<MethodKey, HashSet<MethodKey>> assumptions,
+        HashSet<MethodKey> emptySet)
+    {
+        if (!forwardEdges.TryGetValue(method, out var edges) || edges.Count == 0)
+            return emptySet;
+
+        HashSet<MethodKey>? union = null;
+        foreach (var edge in edges)
+        {
+            if (assumptions.TryGetValue(edge.Callee, out var calleeSet) && calleeSet.Count > 0)
+            {
+                union ??= [];
+                union.UnionWith(calleeSet);
+            }
+        }
+        return union ?? emptySet;
     }
 
     private static (EffectSet Effects, bool IsComplete) ComputeMethodEffects(

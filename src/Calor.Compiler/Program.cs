@@ -252,7 +252,9 @@ public class Program
         rootCommand.AddCommand(IdsCommand.Create());
         rootCommand.AddCommand(FixCommand.Create());
         rootCommand.AddCommand(EffectsCommand.Create());
+        rootCommand.AddCommand(ImportCommand.Create());
         rootCommand.AddCommand(VerifyCommand.Create());
+        rootCommand.AddCommand(ReviewPacketCommand.Create());
         rootCommand.AddCommand(LspCommand.Create());
         rootCommand.AddCommand(McpCommand.Create());
         rootCommand.AddCommand(FeatureCheckCommand.Create());

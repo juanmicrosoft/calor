@@ -174,6 +174,126 @@
         "Clear": ["mut"],
         "ToString": []
       }
+    },
+    {
+      "type": "System.Object",
+      "constructors": { "()": [] },
+      "methods": {
+        "Equals": [],
+        "GetHashCode": [],
+        "GetType": [],
+        "ReferenceEquals": [],
+        "MemberwiseClone": []
+      }
+    },
+    {
+      "type": "System.Nullable`1",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.Type",
+      "methods": {
+        "GetTypeFromHandle": [],
+        "Equals": [],
+        "GetHashCode": [],
+        "ToString": []
+      }
+    },
+    {
+      "type": "System.Func`1",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Func`2",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Func`3",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Func`4",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Func`5",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Action",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Action`1",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Action`2",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Action`3",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Action`4",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Predicate`1",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Comparison`1",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.EventHandler",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.EventHandler`1",
+      "constructors": { "()": [] }
+    },
+    {
+      "type": "System.Exception",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.ArgumentException",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.ArgumentNullException",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.ArgumentOutOfRangeException",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.InvalidOperationException",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.NotSupportedException",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.NotImplementedException",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.IndexOutOfRangeException",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.FormatException",
+      "defaultEffects": []
+    },
+    {
+      "type": "System.ObjectDisposedException",
+      "defaultEffects": []
     }
   ],
   "namespaceDefaults": {

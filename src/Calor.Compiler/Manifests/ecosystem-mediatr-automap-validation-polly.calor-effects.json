@@ -63,8 +63,27 @@
         "Validate": [],
         "ValidateAsync": [],
         "ValidateAndThrow": ["throw"],
+        "ValidateAndThrowAsync": ["throw"],
+        "RuleFor": ["mut"],
+        "RuleForEach": ["mut"],
+        "Include": ["mut"],
+        "RuleSet": ["mut"],
+        "When": ["mut"],
+        "Unless": ["mut"],
+        "PreValidate": []
+      }
+    },
+    {
+      "type": "FluentValidation.DefaultValidatorExtensions",
+      "methods": {
+        "ValidateAndThrow": ["throw"],
         "ValidateAndThrowAsync": ["throw"]
       }
+    },
+    {
+      "type": "FluentValidation.ValidationContext`1",
+      "defaultEffects": [],
+      "constructors": { "()": [] }
     },
     {
       "type": "FluentValidation.IValidator",

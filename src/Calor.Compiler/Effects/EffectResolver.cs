@@ -48,8 +48,13 @@ public sealed class EffectResolver
     {
         EnsureInitialized();
 
-        // Build cache key
-        var signature = BuildSignature(fullyQualifiedType, methodName, parameterTypes);
+        // Build cache key. The "m:" prefix keeps this entry point's cache
+        // disjoint from ResolveSetter/ResolveGetter/ResolveConstructor —
+        // without it, Resolve(T, "set_X") and ResolveSetter(T, "X") build the
+        // IDENTICAL key, and whichever runs first poisons the other's result
+        // (observed: the IL propagator probed Resolve(...) first and cached
+        // Unknown, making manifest-covered setters look like assumptions).
+        var signature = "m:" + BuildSignature(fullyQualifiedType, methodName, parameterTypes);
         if (_methodCache.TryGetValue(signature, out var cached))
             return cached;
 
@@ -65,7 +70,7 @@ public sealed class EffectResolver
     {
         EnsureInitialized();
 
-        var signature = $"{fullyQualifiedType}::get_{propertyName}()";
+        var signature = $"g:{fullyQualifiedType}::get_{propertyName}()";
         if (_methodCache.TryGetValue(signature, out var cached))
             return cached;
 
@@ -81,7 +86,7 @@ public sealed class EffectResolver
     {
         EnsureInitialized();
 
-        var signature = $"{fullyQualifiedType}::set_{propertyName}()";
+        var signature = $"s:{fullyQualifiedType}::set_{propertyName}()";
         if (_methodCache.TryGetValue(signature, out var cached))
             return cached;
 
@@ -98,7 +103,7 @@ public sealed class EffectResolver
         EnsureInitialized();
 
         var paramSig = $"({string.Join(",", parameterTypes)})";
-        var signature = $"{fullyQualifiedType}::.ctor{paramSig}";
+        var signature = $"c:{fullyQualifiedType}::.ctor{paramSig}";
 
         if (_methodCache.TryGetValue(signature, out var cached))
             return cached;
