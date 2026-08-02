@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Calor MSBuild SDK, resolved from the package feed via
+       global.json msbuild-sdks — NOT a source-tree reference. -->
+  <Sdk Name="Calor.Sdk" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Exercise the packaged Z3 verify gate: the canary contract in
+         quotes.calr must produce a Calor0712 refutation warning. -->
+    <CalorVerify>true</CalorVerify>
+  </PropertyGroup>
+
+</Project>

@@ -34,6 +34,17 @@ public static class Z3ContextFactory
 
             // Register resolver for any future P/Invoke calls
             AssemblyLoadContext.Default.ResolvingUnmanagedDll += OnResolvingUnmanagedDll;
+
+            // When this assembly is loaded by MSBuild (Calor.Sdk package path),
+            // it lives in a non-default AssemblyLoadContext, and Microsoft.Z3's
+            // DllImport failure resolution raises ResolvingUnmanagedDll on THAT
+            // context — the Default-context handler above never fires there.
+            var ownContext = AssemblyLoadContext.GetLoadContext(typeof(Z3ContextFactory).Assembly);
+            if (ownContext != null && ownContext != AssemblyLoadContext.Default)
+            {
+                ownContext.ResolvingUnmanagedDll += OnResolvingUnmanagedDll;
+            }
+
             _resolverRegistered = true;
         }
     }
@@ -54,31 +65,44 @@ public static class Z3ContextFactory
 
     private static IntPtr TryLoadZ3Native()
     {
-        var basePath = AppContext.BaseDirectory;
-        var libPaths = new List<string>();
+        // Probe roots, in order:
+        //  1. AppContext.BaseDirectory — the CLI / test-host case (libz3 copied
+        //     to the output root, or under runtimes/<rid>/native).
+        //  2. The directory containing this assembly — the MSBuild task case
+        //     (Calor.Sdk package): AppContext.BaseDirectory is the MSBuild host
+        //     directory there, while the packaged natives sit next to calor.dll
+        //     under tasks/net10.0/runtimes/<rid>/native.
+        var basePaths = new List<string> { AppContext.BaseDirectory };
+        var assemblyDir = Path.GetDirectoryName(typeof(Z3ContextFactory).Assembly.Location);
+        if (!string.IsNullOrEmpty(assemblyDir) && !basePaths.Contains(assemblyDir))
+            basePaths.Add(assemblyDir);
 
-        // Try output root first (where we copy the current platform's native lib)
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        var libPaths = new List<string>();
+        foreach (var basePath in basePaths)
         {
-            libPaths.Add(Path.Combine(basePath, "libz3.dll"));
-            libPaths.Add(Path.Combine(basePath, "runtimes", "win-x64", "native", "libz3.dll"));
-            libPaths.Add(Path.Combine(basePath, "runtimes", "win-arm64", "native", "libz3.dll"));
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-        {
-            libPaths.Add(Path.Combine(basePath, "libz3.dylib"));
-            if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
-                libPaths.Add(Path.Combine(basePath, "runtimes", "osx-arm64", "native", "libz3.dylib"));
-            else
-                libPaths.Add(Path.Combine(basePath, "runtimes", "osx-x64", "native", "libz3.dylib"));
-        }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            libPaths.Add(Path.Combine(basePath, "libz3.so"));
-            if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
-                libPaths.Add(Path.Combine(basePath, "runtimes", "linux-arm64", "native", "libz3.so"));
-            else
-                libPaths.Add(Path.Combine(basePath, "runtimes", "linux-x64", "native", "libz3.so"));
+            // Try each root first (where we copy the current platform's native lib)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                libPaths.Add(Path.Combine(basePath, "libz3.dll"));
+                libPaths.Add(Path.Combine(basePath, "runtimes", "win-x64", "native", "libz3.dll"));
+                libPaths.Add(Path.Combine(basePath, "runtimes", "win-arm64", "native", "libz3.dll"));
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                libPaths.Add(Path.Combine(basePath, "libz3.dylib"));
+                if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    libPaths.Add(Path.Combine(basePath, "runtimes", "osx-arm64", "native", "libz3.dylib"));
+                else
+                    libPaths.Add(Path.Combine(basePath, "runtimes", "osx-x64", "native", "libz3.dylib"));
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            {
+                libPaths.Add(Path.Combine(basePath, "libz3.so"));
+                if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
+                    libPaths.Add(Path.Combine(basePath, "runtimes", "linux-arm64", "native", "libz3.so"));
+                else
+                    libPaths.Add(Path.Combine(basePath, "runtimes", "linux-x64", "native", "libz3.so"));
+            }
         }
 
         foreach (var path in libPaths)

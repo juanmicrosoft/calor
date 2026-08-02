@@ -8,22 +8,38 @@
     <IsPackable>true</IsPackable>
     <PackageId>Calor.Sdk</PackageId>
     <PackageType>MSBuildSdk</PackageType>
-    <Description>MSBuild SDK for building Calor projects. Use with Sdk="Calor.Sdk/$(Version)"</Description>
+    <Description>MSBuild SDK for building Calor projects. Reference from a csproj with &lt;Sdk Name="Calor.Sdk" /&gt; plus a global.json msbuild-sdks entry, or Sdk="Calor.Sdk/$(Version)"</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>See https://github.com/juanmicrosoft/calor/blob/main/CHANGELOG.md</PackageReleaseNotes>
 
-    <!-- Suppress NU5128 warning about dependency groups -->
-    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- NU5128: dependency-group warning — dependencies are intentionally bundled.
+         NU5100: assemblies outside lib/ — expected for an MSBuild task package;
+         nothing in tasks/ is meant to be a compile-time reference. -->
+    <NoWarn>$(NoWarn);NU5128;NU5100</NoWarn>
 
     <!-- Don't produce a DLL - this is just an SDK package -->
     <IncludeBuildOutput>false</IncludeBuildOutput>
+
+    <!-- Topology decision (#787 / W1 Slice 4): SELF-CONTAINED MSBuild SDK.
+         The package bundles the entire Calor.Tasks dependency closure — the
+         compiler (calor.dll), Calor.Runtime.dll, Microsoft.Z3.dll + per-RID
+         native libz3, Roslyn, and every transitive managed dependency — under
+         tasks/net10.0. MSBuild loads task assemblies with directory probing
+         only (no NuGet dependency resolution), so declaring NuGet dependencies
+         instead of bundling would not make them loadable in the task context.
+         Because everything is intentionally bundled, dependency metadata is
+         suppressed on purpose. -->
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
 
-    <!-- Include content files in package -->
-    <ContentTargetFolders>content</ContentTargetFolders>
+    <!-- Supported pack extension point (replaces the former late None-item glob
+         in BeforeTargets="GenerateNuspec", which silently packed nothing). -->
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);_CalorSdkPackTasksClosure</TargetsForTfmSpecificContentInPackage>
+
+    <!-- Staging directory for the published Calor.Tasks closure. -->
+    <_CalorSdkTasksStageDir>$([System.IO.Path]::GetFullPath('$(BaseIntermediateOutputPath)sdk-tasks-publish/', '$(MSBuildProjectDirectory)'))</_CalorSdkTasksStageDir>
   </PropertyGroup>
 
-  <!-- Reference Calor.Tasks to get its output -->
+  <!-- Reference Calor.Tasks for build ordering (its output is staged via Publish below) -->
   <ItemGroup>
     <ProjectReference Include="..\Calor.Tasks\Calor.Tasks.csproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
@@ -31,18 +47,79 @@
     </ProjectReference>
   </ItemGroup>
 
-  <!-- Include SDK files in the package -->
+  <!-- Static SDK files -->
   <ItemGroup>
     <None Include="Sdk\Sdk.props" Pack="true" PackagePath="Sdk" />
     <None Include="Sdk\Sdk.targets" Pack="true" PackagePath="Sdk" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
-  <!-- Include task assemblies in the package -->
-  <Target Name="IncludeTaskAssemblies" BeforeTargets="GenerateNuspec">
+  <!-- Stage the full Calor.Tasks closure via Publish: unlike the bin directory
+       (classlib builds do not copy NuGet package assemblies), publish output
+       contains every managed dependency (Roslyn, System.CommandLine, …) plus
+       the runtimes/<rid>/native Z3 libraries flowing from Calor.Compiler. -->
+  <Target Name="_CalorSdkStageTasksPublish">
+    <RemoveDir Directories="$(_CalorSdkTasksStageDir)" />
+    <!-- ErrorOnDuplicatePublishOutputFiles=false: Microsoft.Z3.dll reaches the
+         publish set twice in Calor.Compiler (direct Reference + the z3/ None
+         copy item) with identical content; publish conflict resolution would
+         otherwise hard-fail on the benign duplicate. -->
+    <MSBuild Projects="..\Calor.Tasks\Calor.Tasks.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(_CalorSdkTasksStageDir);ErrorOnDuplicatePublishOutputFiles=false" />
+  </Target>
+
+  <!-- Fail-loud closure verification + pack. Every required file is asserted
+       before GenerateNuspec runs; a regression that empties the staging dir
+       breaks the pack instead of shipping a hollow package (#787). -->
+  <Target Name="_CalorSdkPackTasksClosure" DependsOnTargets="_CalorSdkStageTasksPublish">
+
+    <Error Condition="!Exists('$(_CalorSdkTasksStageDir)Calor.Tasks.dll')"
+           Text="Calor.Sdk pack: staged closure is missing Calor.Tasks.dll ($(_CalorSdkTasksStageDir))" />
+    <Error Condition="!Exists('$(_CalorSdkTasksStageDir)calor.dll')"
+           Text="Calor.Sdk pack: staged closure is missing the compiler assembly calor.dll" />
+    <Error Condition="!Exists('$(_CalorSdkTasksStageDir)Calor.Runtime.dll')"
+           Text="Calor.Sdk pack: staged closure is missing Calor.Runtime.dll" />
+    <Error Condition="!Exists('$(_CalorSdkTasksStageDir)Microsoft.Z3.dll')"
+           Text="Calor.Sdk pack: staged closure is missing Microsoft.Z3.dll (run src/Calor.Compiler/scripts/download-z3.sh)" />
+    <Error Condition="!Exists('$(_CalorSdkTasksStageDir)Microsoft.CodeAnalysis.CSharp.dll')"
+           Text="Calor.Sdk pack: staged closure is missing Microsoft.CodeAnalysis.CSharp.dll (publish staging did not capture package dependencies)" />
+
+    <!-- The current build machine's Z3 native must always be present (proves
+         the runtimes flow works at all). -->
+    <PropertyGroup>
+      <_CalorSdkHasAnyNative Condition="Exists('$(_CalorSdkTasksStageDir)runtimes/osx-arm64/native/libz3.dylib')
+        or Exists('$(_CalorSdkTasksStageDir)runtimes/osx-x64/native/libz3.dylib')
+        or Exists('$(_CalorSdkTasksStageDir)runtimes/linux-x64/native/libz3.so')
+        or Exists('$(_CalorSdkTasksStageDir)runtimes/linux-arm64/native/libz3.so')
+        or Exists('$(_CalorSdkTasksStageDir)runtimes/win-x64/native/libz3.dll')
+        or Exists('$(_CalorSdkTasksStageDir)runtimes/win-arm64/native/libz3.dll')">true</_CalorSdkHasAnyNative>
+    </PropertyGroup>
+    <Error Condition="'$(_CalorSdkHasAnyNative)' != 'true'"
+           Text="Calor.Sdk pack: no Z3 native library found under $(_CalorSdkTasksStageDir)runtimes — the packaged verify gate would be silently unavailable" />
+
+    <!-- Release publishing must carry every supported RID (set by the publish
+         workflow after the checksum-verified Z3 download). -->
+    <Error Condition="'$(CalorSdkRequireAllRids)' == 'true' and (!Exists('$(_CalorSdkTasksStageDir)runtimes/linux-x64/native/libz3.so')
+        or !Exists('$(_CalorSdkTasksStageDir)runtimes/linux-arm64/native/libz3.so')
+        or !Exists('$(_CalorSdkTasksStageDir)runtimes/osx-x64/native/libz3.dylib')
+        or !Exists('$(_CalorSdkTasksStageDir)runtimes/osx-arm64/native/libz3.dylib')
+        or !Exists('$(_CalorSdkTasksStageDir)runtimes/win-x64/native/libz3.dll')
+        or !Exists('$(_CalorSdkTasksStageDir)runtimes/win-arm64/native/libz3.dll'))"
+           Text="Calor.Sdk pack: CalorSdkRequireAllRids=true but at least one supported RID's libz3 is missing under $(_CalorSdkTasksStageDir)runtimes" />
+
     <ItemGroup>
-      <None Include="..\Calor.Tasks\bin\$(Configuration)\net10.0\*.dll" Pack="true" PackagePath="tasks\net10.0" />
+      <!-- Exclude: symbols; MSBuild assemblies (provided by the MSBuild host and
+           refused from task directories by MSBuildLoadContext anyway); the CLI
+           apphost binary (tasks load calor.dll directly). -->
+      <_CalorSdkTaskFile Include="$(_CalorSdkTasksStageDir)**\*"
+                         Exclude="$(_CalorSdkTasksStageDir)**\*.pdb;$(_CalorSdkTasksStageDir)Microsoft.Build.*.dll;$(_CalorSdkTasksStageDir)calor;$(_CalorSdkTasksStageDir)calor.exe;$(_CalorSdkTasksStageDir)*\*.resources.dll" />
+      <TfmSpecificPackageFile Include="@(_CalorSdkTaskFile)"
+                              PackagePath="tasks/net10.0/%(RecursiveDir)%(Filename)%(Extension)" />
     </ItemGroup>
+
+    <Message Importance="high"
+             Text="Calor.Sdk pack: staged @(_CalorSdkTaskFile->Count()) files into tasks/net10.0" />
   </Target>
 
 </Project>

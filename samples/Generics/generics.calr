@@ -1,14 +1,14 @@
 §M{m001:Generics}
   §IFACE{i001:IRepository<T>}
     §WHERE T : class
-    §MT{m001:Add} (T:item) -> void
-    §MT{m002:GetAll} () -> ReadList<T>
+    §MT{mt001:Add} (T:item) -> void
+    §MT{mt002:GetAll} () -> ReadList<T>
 
   §CL{c001:Pair<T,U>:pub}
     §FLD{T:First:pub}
     §FLD{U:Second:pub}
 
-    §CTOR{ct001:pub} (T:first, U:second)
+    §CTOR{ctor001:pub} (T:first, U:second)
       §ASSIGN First first
       §ASSIGN Second second
 
@@ -18,16 +18,16 @@
 
     §FLD{List<T>:_items:priv}
 
-    §CTOR{ct001:pub}
+    §CTOR{ctor002:pub}
       §ASSIGN _items §NEW{List<T>} §/NEW
 
-    §MT{m001:Add:pub} (T:item) -> void
+    §MT{mt101:Add:pub} (T:item) -> void
       §C{_items.Add} item
 
-    §MT{m002:GetAll:pub} () -> ReadList<T>
+    §MT{mt102:GetAll:pub} () -> ReadList<T>
       §R _items
 
-    §MT{m003:Count:pub} () -> i32
+    §MT{mt103:Count:pub} () -> i32
       §R _items.Count
 
 
