@@ -126,6 +126,10 @@ public static class ImportCommand
             }
 
             var referencePaths = ExpandReferencePaths(references);
+            // Explicit --references first (they win the AssemblyIndex
+            // first-loaded-wins collision rule), then the package's own
+            // dependency closure.
+            referencePaths.AddRange(target.DependencyAssemblyPaths);
 
             var loader = new ManifestLoader();
             var resolver = new EffectResolver(loader);
@@ -134,7 +138,8 @@ public static class ImportCommand
             var ilOptions = new ILAnalysisOptions
             {
                 RuntimeDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location),
-                NuGetPackageRoot = GetNuGetPackagesRoot()
+                NuGetPackageRoot = GetNuGetPackagesRoot(),
+                DepsFilePath = target.DepsFilePath
             };
 
             var report = PackageManifestGenerator.Generate(
@@ -145,6 +150,23 @@ public static class ImportCommand
                 libraryVersion: target.Version,
                 synthesizeContracts: !noContracts,
                 ilOptions: ilOptions);
+
+            // M1: an input that is not a usable assembly must fail loudly —
+            // no exit 0, no empty manifest on disk.
+            if (report.PublicMethodCount == 0 && report.LoadErrors.Count > 0)
+            {
+                var message = "Import failed: no usable assembly metadata in "
+                    + string.Join(", ", target.AssemblyPaths.Select(Path.GetFileName))
+                    + " — " + string.Join("; ", report.LoadErrors);
+                if (json)
+                {
+                    Console.WriteLine(EnvelopeWriter.Serialize("import", null,
+                        [new Diagnostic(DiagnosticCode.ImportCommandError, DiagnosticSeverity.Error,
+                            message, filePath: null, line: 1, column: 1)]));
+                }
+                Console.Error.WriteLine($"Error: {message}");
+                return 1;
+            }
 
             var diagnostics = new List<Diagnostic>();
             if (report.Unresolved.Count > 0)
@@ -226,16 +248,31 @@ public static class ImportCommand
     // Target resolution
     // ------------------------------------------------------------------
 
-    private sealed record ImportTarget(IReadOnlyList<string> AssemblyPaths, string? Library, string? Version);
+    private sealed record ImportTarget(
+        IReadOnlyList<string> AssemblyPaths,
+        string? Library,
+        string? Version,
+        IReadOnlyList<string> DependencyAssemblyPaths,
+        string? DepsFilePath);
 
     private static ImportTarget? ResolveTarget(string package, string? version)
     {
         // Direct assembly path
         if (package.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
         {
-            return File.Exists(package)
-                ? new ImportTarget([Path.GetFullPath(package)], Path.GetFileNameWithoutExtension(package), null)
-                : null;
+            if (!File.Exists(package))
+                return null;
+            var fullPath = Path.GetFullPath(package);
+            // A sibling deps.json lets the analyzer resolve reference
+            // assemblies to implementation assemblies (C1: tier A needs the
+            // dependency closure before falling back to unresolved).
+            var depsPath = Path.ChangeExtension(fullPath, ".deps.json");
+            return new ImportTarget(
+                [fullPath],
+                Path.GetFileNameWithoutExtension(fullPath),
+                Version: null,
+                DependencyAssemblyPaths: [],
+                DepsFilePath: File.Exists(depsPath) ? depsPath : null);
         }
 
         // NuGet package id in the global packages folder
@@ -282,7 +319,97 @@ public static class ImportCommand
         if (dlls.Count == 0)
             return null;
 
-        return new ImportTarget(dlls, package, Path.GetFileName(versionDir));
+        // C1: wire the package's own dependency closure (from the .nuspec,
+        // resolved against the global packages folder) so Tier-A analysis has
+        // the assemblies a chain needs before falling back to unresolved.
+        var dependencyDlls = ResolvePackageDependencyClosure(root, package);
+
+        return new ImportTarget(dlls, package, Path.GetFileName(versionDir), dependencyDlls, DepsFilePath: null);
+    }
+
+    /// <summary>
+    /// Walks the .nuspec dependency graph of <paramref name="packageId"/>
+    /// through the global packages folder, collecting each installed
+    /// dependency's best-TFM lib assemblies. Dependencies that are not
+    /// restored locally are simply absent — their chains then surface as
+    /// unresolved (Tier C), never as silently pure.
+    /// </summary>
+    private static List<string> ResolvePackageDependencyClosure(string packagesRoot, string packageId)
+    {
+        var result = new List<string>();
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { packageId };
+        var queue = new Queue<string>(ReadNuspecDependencyIds(packagesRoot, packageId));
+
+        while (queue.Count > 0)
+        {
+            var depId = queue.Dequeue();
+            if (!visited.Add(depId))
+                continue;
+
+            var depDir = Path.Combine(packagesRoot, depId.ToLowerInvariant());
+            if (!Directory.Exists(depDir))
+                continue; // not restored — chains through it stay unresolved, honestly
+
+            var versionDir = Directory.GetDirectories(depDir)
+                .OrderByDescending(d => ParseVersionKey(Path.GetFileName(d)))
+                .ThenByDescending(d => Path.GetFileName(d), StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+            if (versionDir is null)
+                continue;
+
+            var libDir = Path.Combine(versionDir, "lib");
+            if (Directory.Exists(libDir))
+            {
+                var tfmDir = Directory.GetDirectories(libDir)
+                    .OrderBy(d => TfmRank(Path.GetFileName(d)))
+                    .ThenBy(d => Path.GetFileName(d), StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault();
+                if (tfmDir is not null)
+                {
+                    result.AddRange(Directory.GetFiles(tfmDir, "*.dll", SearchOption.TopDirectoryOnly)
+                        .OrderBy(f => f, StringComparer.OrdinalIgnoreCase));
+                }
+            }
+
+            foreach (var transitive in ReadNuspecDependencyIds(packagesRoot, depId))
+                queue.Enqueue(transitive);
+        }
+
+        return result;
+    }
+
+    private static IEnumerable<string> ReadNuspecDependencyIds(string packagesRoot, string packageId)
+    {
+        var packageDir = Path.Combine(packagesRoot, packageId.ToLowerInvariant());
+        if (!Directory.Exists(packageDir))
+            return [];
+
+        var versionDir = Directory.GetDirectories(packageDir)
+            .OrderByDescending(d => ParseVersionKey(Path.GetFileName(d)))
+            .ThenByDescending(d => Path.GetFileName(d), StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        if (versionDir is null)
+            return [];
+
+        var nuspec = Path.Combine(versionDir, $"{packageId.ToLowerInvariant()}.nuspec");
+        if (!File.Exists(nuspec))
+            return [];
+
+        try
+        {
+            var doc = System.Xml.Linq.XDocument.Load(nuspec);
+            return doc.Descendants()
+                .Where(e => e.Name.LocalName == "dependency")
+                .Select(e => e.Attribute("id")?.Value)
+                .Where(id => !string.IsNullOrEmpty(id))
+                .Select(id => id!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (Exception ex) when (ex is System.Xml.XmlException or IOException)
+        {
+            return [];
+        }
     }
 
     private static string? GetNuGetPackagesRoot()

@@ -97,8 +97,11 @@ calor import path/to/Some.Assembly.dll
 
 Three tiers, honestly labeled:
 
-- **Derived (Tier A)** — IL analysis resolved the concrete call chain.
-  Emitted with provenance `inferred`.
+- **Derived (Tier A)** — IL analysis resolved the ENTIRE concrete call
+  chain with no unverified assumptions. Emitted with provenance `inferred`.
+  A chain that touches a callee missing from the loaded assemblies, a
+  bodiless declaration, or a delegate invocation is never emitted as
+  derived — it goes to unresolved instead, naming the assumption.
 - **Curated (Tier B)** — already covered by the compiler's reviewed
   interface-level manifests (`ILogger`, `DbContext`, `IConfiguration`,
   `IMediator`, Serilog, FluentValidation, Polly, caching, …). Not re-emitted.
@@ -124,8 +127,11 @@ The packet leads with the **unproven remainder** — every contract that is
 not cleanly proven, with its status (`refuted | assumed | unknown | timeout
 | unsupported | unavailable`), assumption lists, vacuity flags, and
 counterexamples — then the per-module interop fraction, waiver disclosures,
-and the direct callers of what changed. `--json` emits the same content in
-the CLI envelope for tooling.
+and the direct callers of what changed (resolved across all files in the
+invocation). `--json` emits the same content in the CLI envelope for
+tooling. `--baseline-ref` approximation: a declaration's extent runs to the
+next declaration's start, so an edit between declarations attributes to the
+preceding one — conservative over-inclusion, never omission.
 
 The point of the packet is what it does NOT claim: `Proven` means proven
 under the modeled semantics; everything else stays visible with its reason.

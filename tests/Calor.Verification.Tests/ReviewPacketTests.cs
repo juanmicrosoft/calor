@@ -183,6 +183,82 @@ public class ReviewPacketTests
     }
 
     [Fact]
+    public void Packet_CallerImpact_FindsCrossFileCallers()
+    {
+        // M2 pin (PR #841 review): a caller in one file of a declaration
+        // changed in another file of the SAME invocation must be found.
+        const string lib = @"
+§M{m001:Lib}
+  §F{f100:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §R (* x x)
+";
+        const string app = @"
+§M{m002:App}
+  §F{f200:UseSquare:pub}
+      §I{i32:y}
+      §O{i32}
+      §R §C{Square} §A y §/C
+";
+        var result = ReviewPacketBuilder.Build(
+            [
+                new ReviewPacketBuilder.InputFile("lib.calr", lib),
+                new ReviewPacketBuilder.InputFile("app.calr", app)
+            ],
+            new ReviewPacketBuilder.Options(ChangedDeclarations: ["f100"]));
+
+        var impact = Assert.Single(result.Packet.CallerImpact);
+        Assert.Equal("f100", impact.ChangedId);
+        Assert.Contains(impact.Callers, c => c.Id == "f200");
+        Assert.Empty(result.UnmatchedChangedDeclarations);
+    }
+
+    [Fact]
+    public void Packet_UnknownChangedSelector_ReportedNotSilent()
+    {
+        // m1 pin: a typo'd --changed selector is surfaced, not swallowed.
+        var result = Build(MixedModule, new ReviewPacketBuilder.Options(
+            ChangedDeclarations: ["zz999"]));
+        Assert.Contains("zz999", result.UnmatchedChangedDeclarations);
+        Assert.Empty(result.Packet.CallerImpact);
+    }
+
+    [SkippableFact]
+    public void Summary_Proven_ExcludesVacuous()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // m2 pin: a vacuously-proven contract (unsatisfiable §Q set) must not
+        // let summary.proven read clean — proven counts non-vacuous only.
+        const string vacuous = @"
+§M{m001:Vac}
+  §F{f001:Weird:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x 1)
+      §Q (<= x 0)
+      §S (== result 5)
+      §R 7
+";
+        var result = Build(vacuous);
+        var summary = result.Packet.Summary;
+
+        var vacuousRecords = result.Packet.UnprovenRemainder
+            .Where(c => c.Status == "proven" && c.Vacuous).ToList();
+        Assert.NotEmpty(vacuousRecords);
+        Assert.Equal(vacuousRecords.Count, summary.ProvenVacuous);
+
+        // No clean-proven contract exists in this module, and vacuous ones
+        // never count as proven.
+        Assert.DoesNotContain(result.Packet.Proven, c => c.Vacuous);
+        Assert.True(summary.Proven + summary.ProvenVacuous
+            <= summary.TotalContracts);
+        Assert.DoesNotContain(result.Packet.UnprovenRemainder,
+            c => c.Status == "proven" && !c.Vacuous);
+    }
+
+    [Fact]
     public void Packet_CompileError_SurfacesDiagnosticsAndFlags()
     {
         // A parse-level error: unterminated call argument list.

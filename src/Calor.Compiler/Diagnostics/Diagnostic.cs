@@ -1026,6 +1026,14 @@ public static class DiagnosticCode
     /// is disclosed on the first line of the packet (strategy §5.2).
     /// </summary>
     public const string ReviewPacketWaiverDisclosure = "Calor1357";
+
+    /// <summary>
+    /// Warning (review-packet): a <c>--changed</c> selector matched no
+    /// declaration id or name in the given files — its caller impact is
+    /// silently absent from the packet otherwise, so the mismatch (likely a
+    /// typo) is surfaced loudly.
+    /// </summary>
+    public const string ReviewPacketUnknownChangedDeclaration = "Calor1358";
 }
 
 /// <summary>

@@ -40,7 +40,8 @@ public sealed class ReviewPacketBuilder
         ReviewPacket Packet,
         IReadOnlyList<Diagnostic> CompileDiagnostics,
         bool HasCompileErrors,
-        bool AnyRefinementTypes);
+        bool AnyRefinementTypes,
+        IReadOnlyList<string> UnmatchedChangedDeclarations);
 
     private ReviewPacketBuilder() { }
 
@@ -69,6 +70,7 @@ public sealed class ReviewPacketBuilder
         var compileDiagnostics = new List<Diagnostic>();
         var hasCompileErrors = false;
         var anyRefinements = false;
+        var compiledModules = new List<(InputFile File, ModuleNode Module)>();
 
         foreach (var file in files)
         {
@@ -98,15 +100,21 @@ public sealed class ReviewPacketBuilder
 
             var module = result.Ast;
             anyRefinements |= module.RefinementTypes.Count > 0;
+            compiledModules.Add((file, module));
 
             CollectContracts(packet, file, module, compileOptions.VerificationResults);
             CollectModuleDisclosure(packet, file, module, options);
-            CollectCallerImpact(packet, file, module, options);
         }
+
+        // Caller impact runs over the UNION of all files in the invocation —
+        // a caller in one file of a declaration changed in another must be
+        // found (review M2). Cross-invocation impact stays deferred with the
+        // persisted index (wedge plan §9).
+        var unmatched = CollectCallerImpact(packet, compiledModules, options);
 
         FinalizeSummary(packet);
 
-        return new Result(packet, compileDiagnostics, hasCompileErrors, anyRefinements);
+        return new Result(packet, compileDiagnostics, hasCompileErrors, anyRefinements, unmatched);
     }
 
     // ------------------------------------------------------------------
@@ -233,51 +241,138 @@ public sealed class ReviewPacketBuilder
     // Caller impact — in-memory call graph
     // ------------------------------------------------------------------
 
-    private static void CollectCallerImpact(
+    /// <summary>
+    /// Computes caller impact over the union of every module in the
+    /// invocation: per-module call graphs are built, then call edges are
+    /// re-resolved against the combined declaration set so a caller in one
+    /// file of a declaration defined in another is found (review M2).
+    /// Returns the requested changed-declaration selectors that matched no
+    /// declaration in any module (review m1 — a typo must not silently yield
+    /// an impact-free packet).
+    /// </summary>
+    private static IReadOnlyList<string> CollectCallerImpact(
         ReviewPacket packet,
-        InputFile file,
-        ModuleNode module,
+        IReadOnlyList<(InputFile File, ModuleNode Module)> compiledModules,
         Options options)
     {
-        var explicitIds = options.ChangedDeclarations;
-        IReadOnlyList<(int StartLine, int EndLine)>? ranges = null;
-        options.ChangedLineRanges?.TryGetValue(System.IO.Path.GetFullPath(file.Path), out ranges);
+        var explicitIds = options.ChangedDeclarations ?? [];
+        var anyRanges = options.ChangedLineRanges is { Count: > 0 };
+        if (explicitIds.Count == 0 && !anyRanges)
+            return [];
 
-        if ((explicitIds is null || explicitIds.Count == 0) && (ranges is null || ranges.Count == 0))
-            return;
+        // Combined declaration set + per-module graphs.
+        var declarations = new Dictionary<string, (FunctionNode Node, string Module)>(StringComparer.Ordinal);
+        var nameToIds = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var graphs = new List<(InputFile File, ModuleNode Module, CallGraphAnalysis Graph)>();
 
-        var callGraph = CallGraphAnalysis.Build(module);
-
-        var changed = new List<string>();
-        if (explicitIds is not null)
+        foreach (var (file, module) in compiledModules)
         {
-            foreach (var id in explicitIds)
+            var graph = CallGraphAnalysis.Build(module);
+            graphs.Add((file, module, graph));
+            foreach (var (id, node) in graph.Functions)
             {
-                if (callGraph.Functions.ContainsKey(id))
-                    changed.Add(id);
-                else if (callGraph.FunctionNameToId.TryGetValue(id, out var resolved))
-                    changed.Add(resolved);
+                declarations.TryAdd(id, (node, module.Name));
+                if (!nameToIds.TryGetValue(node.Name, out var ids))
+                {
+                    ids = [];
+                    nameToIds[node.Name] = ids;
+                }
+                if (!ids.Contains(id))
+                    ids.Add(id);
             }
         }
 
-        if (ranges is not null && ranges.Count > 0)
-            changed.AddRange(DeclarationsInRanges(callGraph, ranges));
+        // Cross-module reverse edges: re-resolve every call-site name against
+        // the combined declaration set.
+        var reverse = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        foreach (var (_, _, graph) in graphs)
+        {
+            foreach (var (callerId, callees) in graph.ForwardGraph)
+            {
+                foreach (var (calleeName, _) in callees)
+                {
+                    var bareName = calleeName;
+                    var lastDot = bareName.LastIndexOf('.');
+                    if (lastDot >= 0)
+                        bareName = bareName[(lastDot + 1)..];
+
+                    foreach (var candidate in ResolveNames(calleeName, bareName, declarations, nameToIds))
+                    {
+                        if (!reverse.TryGetValue(candidate, out var callers))
+                        {
+                            callers = new HashSet<string>(StringComparer.Ordinal);
+                            reverse[candidate] = callers;
+                        }
+                        callers.Add(callerId);
+                    }
+                }
+            }
+        }
+
+        // Resolve the changed set.
+        var changed = new List<string>();
+        var unmatched = new List<string>();
+        foreach (var selector in explicitIds)
+        {
+            if (declarations.ContainsKey(selector))
+                changed.Add(selector);
+            else if (nameToIds.TryGetValue(selector, out var ids))
+                changed.AddRange(ids);
+            else
+                unmatched.Add(selector);
+        }
+
+        if (options.ChangedLineRanges is { Count: > 0 } rangesByFile)
+        {
+            foreach (var (file, _, graph) in graphs)
+            {
+                if (rangesByFile.TryGetValue(System.IO.Path.GetFullPath(file.Path), out var ranges)
+                    && ranges is { Count: > 0 })
+                {
+                    changed.AddRange(DeclarationsInRanges(graph, ranges));
+                }
+            }
+        }
 
         foreach (var id in changed.Distinct().OrderBy(c => c, StringComparer.Ordinal))
         {
             if (!packet.ChangedDeclarations.Contains(id))
                 packet.ChangedDeclarations.Add(id);
 
-            var name = callGraph.Functions.TryGetValue(id, out var node) ? node.Name : id;
-            var callers = callGraph.GetCallers(id)
-                .Distinct()
+            var (node, moduleName) = declarations[id];
+            var callers = (reverse.TryGetValue(id, out var callerIds)
+                    ? (IEnumerable<string>)callerIds
+                    : Array.Empty<string>())
+                .Where(callerId => callerId != id)
                 .OrderBy(c => c, StringComparer.Ordinal)
                 .Select(callerId => new CallerRef(
                     callerId,
-                    callGraph.Functions.TryGetValue(callerId, out var callerNode) ? callerNode.Name : callerId))
+                    declarations.TryGetValue(callerId, out var caller) ? caller.Node.Name : callerId))
                 .ToList();
 
-            packet.CallerImpact.Add(new CallerImpactRecord(id, name, module.Name, callers));
+            packet.CallerImpact.Add(new CallerImpactRecord(id, node.Name, moduleName, callers));
+        }
+
+        return unmatched;
+    }
+
+    private static IEnumerable<string> ResolveNames(
+        string calleeName,
+        string bareName,
+        Dictionary<string, (FunctionNode Node, string Module)> declarations,
+        Dictionary<string, List<string>> nameToIds)
+    {
+        if (declarations.ContainsKey(calleeName))
+            yield return calleeName;
+        if (nameToIds.TryGetValue(calleeName, out var direct))
+        {
+            foreach (var id in direct)
+                yield return id;
+        }
+        if (bareName != calleeName && nameToIds.TryGetValue(bareName, out var bare))
+        {
+            foreach (var id in bare)
+                yield return id;
         }
     }
 
@@ -285,7 +380,9 @@ public sealed class ReviewPacketBuilder
     /// Maps changed line ranges to declarations. A declaration's extent is
     /// approximated as [its start line, next declaration's start line - 1]
     /// within the file — sufficient for overlap tests without an end-line on
-    /// the AST node.
+    /// the AST node. Consequence (documented): an edit BETWEEN declarations
+    /// attributes to the preceding declaration — conservative over-inclusion,
+    /// never omission.
     /// </summary>
     private static IEnumerable<string> DeclarationsInRanges(
         CallGraphAnalysis callGraph,
@@ -319,7 +416,11 @@ public sealed class ReviewPacketBuilder
         var all = packet.UnprovenRemainder.Concat(packet.Proven).ToList();
         var summary = packet.Summary;
         summary.TotalContracts = all.Count;
-        summary.Proven = all.Count(c => c.Status == "proven");
+        // 'proven' counts CLEAN proofs only — a vacuous proof is unproven
+        // remainder and must not let automated consumers read
+        // proven == totalContracts as clean (review m2).
+        summary.Proven = all.Count(c => c.Status == "proven" && !c.Vacuous);
+        summary.ProvenVacuous = all.Count(c => c.Status == "proven" && c.Vacuous);
         summary.Refuted = all.Count(c => c.Status == "refuted");
         summary.Assumed = all.Count(c => c.Status == "assumed");
         summary.Unknown = all.Count(c => c.Status == "unknown");

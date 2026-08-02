@@ -470,6 +470,24 @@ public static class ConvertCommand
             envelope.Data.Success = true;
         }
 
+        // Non-error diagnostics must be visible on the default text path too
+        // (review M3): the Calor1001 postcondition-refusal warning changes
+        // what the ejected C# enforces at runtime — an eject that prints only
+        // "✓ Conversion successful" while a §S check was dropped is a silent
+        // degradation. Envelope mode already carries them under diagnostics.
+        if (envelope == null)
+        {
+            var nonErrors = result.Diagnostics.Where(d => !d.IsError).ToList();
+            if (nonErrors.Count > 0)
+            {
+                Console.Error.WriteLine($"{nonErrors.Count} warning(s)/note(s):");
+                foreach (var diag in nonErrors)
+                {
+                    Console.Error.WriteLine($"  {diag}");
+                }
+            }
+        }
+
         statusOut.WriteLine($"✓ Conversion successful");
         statusOut.WriteLine($"Output: {outputPath}");
         return 0;

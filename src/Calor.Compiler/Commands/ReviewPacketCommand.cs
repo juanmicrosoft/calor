@@ -33,7 +33,9 @@ public static class ReviewPacketCommand
 
         var baselineRefOption = new Option<string?>(
             aliases: ["--baseline-ref"],
-            description: "Git ref to diff against; changed declarations are derived from the diff's line ranges");
+            description: "Git ref to diff against; changed declarations are derived from the diff's line ranges. "
+                + "Approximation: a declaration's extent runs to the next declaration's start, so an edit between "
+                + "declarations attributes to the preceding one (conservative over-inclusion, never omission)");
 
         var permissiveOption = new Option<bool>(
             aliases: ["--permissive-effects"],
@@ -145,6 +147,14 @@ public static class ReviewPacketCommand
                 BaselineRef: baselineRef));
 
             var diagnostics = new List<Diagnostic>(result.CompileDiagnostics);
+            foreach (var selector in result.UnmatchedChangedDeclarations)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCode.ReviewPacketUnknownChangedDeclaration, DiagnosticSeverity.Warning,
+                    $"--changed '{selector}' matched no declaration id or name in the given files — "
+                    + "its caller impact is absent from this packet. Check for a typo.",
+                    filePath: null, line: 1, column: 1));
+            }
             if (result.Packet.Waivers.Count > 0)
             {
                 diagnostics.Add(new Diagnostic(
@@ -164,6 +174,13 @@ public static class ReviewPacketCommand
             {
                 Console.WriteLine(EnvelopeWriter.Serialize("review-packet", result.Packet, diagnostics));
                 return result.HasCompileErrors ? 1 : 0;
+            }
+
+            foreach (var selector in result.UnmatchedChangedDeclarations)
+            {
+                Console.Error.WriteLine(
+                    $"Warning: --changed '{selector}' matched no declaration id or name in the given files "
+                    + "— its caller impact is absent from this packet. Check for a typo.");
             }
 
             var markdown = ReviewPacketBuilder.RenderMarkdown(result.Packet);

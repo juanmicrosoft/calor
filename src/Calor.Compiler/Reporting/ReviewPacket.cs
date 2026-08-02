@@ -60,7 +60,14 @@ public sealed class ReviewPacket
 public sealed class ReviewPacketSummary
 {
     public int TotalContracts { get; set; }
+
+    /// <summary>Clean, non-vacuous proven contracts only (m2): a vacuous
+    /// proof never counts here — see <see cref="ProvenVacuous"/>.</summary>
     public int Proven { get; set; }
+
+    /// <summary>Vacuously proven contracts (unsatisfiable §Q set) — part of
+    /// the unproven remainder, never of <see cref="Proven"/>.</summary>
+    public int ProvenVacuous { get; set; }
     public int Refuted { get; set; }
     public int Assumed { get; set; }
     public int Unknown { get; set; }

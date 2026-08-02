@@ -13,8 +13,12 @@ namespace Calor.Compiler.Effects.Manifests;
 ///
 /// <list type="bullet">
 /// <item><b>Tier A</b> — compile-time IL derivation for concrete call chains,
-/// via the existing <see cref="ILEffectAnalyzer"/> machinery. Emitted with
-/// provenance <c>inferred</c> (derived).</item>
+/// via the existing IL analysis machinery. Emitted with provenance
+/// <c>inferred</c> (derived) — and ONLY for members whose entire transitive
+/// chain resolved without unverified assumptions: a chain that touches a
+/// callee that is missing from the loaded assemblies, has no IL body, or is
+/// a delegate invocation is routed to Tier C instead (review C1 invariant —
+/// derived-pure must never rest on an assumed-pure leaf).</item>
 /// <item><b>Tier B</b> — methods already covered by curated manifests
 /// (built-in, user, solution, project) are reported as <c>curated</c> and
 /// never re-emitted.</item>
@@ -117,12 +121,15 @@ public sealed class PackageManifestGenerator
         {
             var union = EffectSet.Empty;
             var incomplete = false;
+            var assumedLeaves = new SortedSet<MethodKey>();
             foreach (var overload in group)
             {
                 if (ilResults.TryGetValue(overload.Key, out var result)
                     && result.Status != ILResolutionStatus.Incomplete)
                 {
                     union = union.Union(result.Effects);
+                    foreach (var leaf in result.AssumedPureLeaves)
+                        assumedLeaves.Add(leaf);
                 }
                 else
                 {
@@ -136,6 +143,17 @@ public sealed class PackageManifestGenerator
                 report.Unresolved.Add(new UnresolvedEntry(
                     group.Key.TypeName, group.Key.DisplayMember, KindLabel(group.Key.Kind),
                     "incomplete: dynamic dispatch, indirect calls, or analysis limits — supply a curated or supplemental manifest entry"));
+            }
+            else if (assumedLeaves.Count > 0)
+            {
+                // The chain rests on assumed-pure leaves that no manifest
+                // covered — emitting the union as a clean Tier-A entry would
+                // silently under-approximate (the honesty invariant of the
+                // adversarial review C1 finding). Route to Tier C, naming the
+                // assumptions so the user knows what to cover.
+                report.Unresolved.Add(new UnresolvedEntry(
+                    group.Key.TypeName, group.Key.DisplayMember, KindLabel(group.Key.Kind),
+                    DescribeAssumedLeaves(assumedLeaves)));
             }
             else
             {
@@ -276,6 +294,28 @@ public sealed class PackageManifestGenerator
         return false;
     }
 
+    /// <summary>
+    /// Builds the Tier-C reason for a chain that touched assumed-pure leaves,
+    /// naming up to three so the user knows what to cover with manifests.
+    /// Delegate invocations are called out — they are the classic laundering
+    /// vector, not merely a missing reference.
+    /// </summary>
+    private static string DescribeAssumedLeaves(IReadOnlyCollection<MethodKey> leaves)
+    {
+        static bool IsDelegateInvoke(MethodKey key)
+            => key.MethodName is "Invoke" or "BeginInvoke" or "EndInvoke" or "DynamicInvoke";
+
+        static string Describe(MethodKey key)
+            => IsDelegateInvoke(key)
+                ? $"delegate invocation ({key.TypeName}.{key.MethodName})"
+                : $"assumed-pure leaf {key.TypeName}.{key.MethodName}";
+
+        var named = leaves.Take(3).Select(Describe).ToList();
+        var suffix = leaves.Count > 3 ? $" (+{leaves.Count - 3} more)" : "";
+        return "chain rests on unverified assumptions: " + string.Join("; ", named) + suffix
+            + " — cover the leaves with curated or supplemental manifest entries, or pass their assemblies via --references";
+    }
+
     private static string KindLabel(ImportMemberKind kind) => kind switch
     {
         ImportMemberKind.Getter => "getter",
@@ -319,7 +359,7 @@ public sealed class PackageManifestGenerator
         };
     }
 
-    private static Dictionary<MethodKey, (ILResolutionStatus Status, EffectSet Effects)> AnalyzeBodied(
+    private static Dictionary<MethodKey, ILMethodOutcome> AnalyzeBodied(
         List<PublicMethod> bodied,
         IReadOnlyList<string> targetAssemblyPaths,
         IReadOnlyList<string> referenceAssemblyPaths,
@@ -337,7 +377,7 @@ public sealed class PackageManifestGenerator
         var stateMachines = new StateMachineResolver(index);
         var propagator = new TransitiveEffectPropagator(builder, index, stateMachines, resolver, options);
 
-        return propagator.Propagate(bodied.Select(m => m.Key));
+        return propagator.PropagateDetailed(bodied.Select(m => m.Key));
     }
 
     private static List<string> SurfaceCodes(EffectSet effects)
@@ -355,9 +395,10 @@ public sealed class PackageManifestGenerator
         var manifest = new EffectManifest
         {
             Version = "1.0",
-            Description = library is null
-                ? "Effects derived by calor import (Tier A IL analysis of concrete call chains)"
-                : $"Effects derived by calor import for {library} (Tier A IL analysis of concrete call chains)",
+            Description = (library is null
+                ? "Effects derived by calor import"
+                : $"Effects derived by calor import for {library}")
+                + " (Tier A IL analysis; only members whose full call chains resolved with no unverified assumptions)",
             Library = library,
             LibraryVersion = libraryVersion,
             GeneratedBy = "calor import",

@@ -95,6 +95,31 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
         }
     }
 
+    [Fact]
+    public void Import_GarbageDll_FailsLoudly_WritesNothing()
+    {
+        // M1 pin: a file that is not an assembly must produce Calor1352,
+        // exit 1, and NO manifest file — not a clean exit with an empty
+        // manifest on disk.
+        var garbage = Path.Combine(_tempDir, "garbage.dll");
+        File.WriteAllBytes(garbage, [0xFF, 0xFE, 0x00, 0x01, 0x02]);
+
+        var (exitCode, stdOut, _) = CliTestHarness.RunCli(_tempDir,
+            "import", garbage, "--json");
+
+        Assert.Equal(1, exitCode);
+        var root = ParseSingleDocument(stdOut);
+        var diagnostic = Assert.Single(root.GetProperty("diagnostics").EnumerateArray());
+        Assert.Equal(DiagnosticCode.ImportCommandError, diagnostic.GetProperty("code").GetString());
+
+        // Text mode: same failure, and nothing written.
+        var (textExit, _, textErr) = CliTestHarness.RunCli(_tempDir, "import", garbage);
+        Assert.Equal(1, textExit);
+        Assert.Contains("no usable assembly metadata", textErr);
+        Assert.Empty(Directory.GetFiles(_tempDir, "*.calor-effects.json"));
+        Assert.Empty(Directory.GetFiles(_tempDir, "*.calor-contracts.json"));
+    }
+
     // ------------------------------------------------------------------
     // calor review-packet
     // ------------------------------------------------------------------
@@ -164,6 +189,45 @@ public class ImportReviewPacketEnvelopeTests : IDisposable
 
         var diagnostic = Assert.Single(root.GetProperty("diagnostics").EnumerateArray());
         Assert.Equal(DiagnosticCode.ReviewPacketCommandError, diagnostic.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public void ReviewPacket_Json_UnknownChangedSelector_WarnsLoudly()
+    {
+        // m1 pin: a typo'd --changed id must not silently yield a packet
+        // with the caller-impact section absent.
+        var module = WriteModule();
+        var (exitCode, stdOut, _) = CliTestHarness.RunCli(_tempDir,
+            "review-packet", module, "--changed", "zz999", "--json");
+
+        Assert.Equal(0, exitCode);
+        var root = ParseSingleDocument(stdOut);
+        var codes = root.GetProperty("diagnostics").EnumerateArray()
+            .Select(d => d.GetProperty("code").GetString()).ToList();
+        Assert.Contains(DiagnosticCode.ReviewPacketUnknownChangedDeclaration, codes);
+    }
+
+    [Fact]
+    public void Convert_TextMode_SurfacesPostconditionRefusalWarning()
+    {
+        // M3 pin: the Calor1001 §S-early-return refusal must be visible on
+        // the DEFAULT eject path, not only under --format json.
+        var path = Path.Combine(_tempDir, "eject.calr");
+        File.WriteAllText(path,
+            "§M{m001:Pricing}\n"
+            + "  §F{f001:ClampToCap:pub} (i32:amount, i32:cap) -> i32\n"
+            + "    §Q (>= cap 0)\n"
+            + "    §S (<= result cap)\n"
+            + "    §IF{if1} (> amount cap)\n"
+            + "      §R cap\n"
+            + "    §R amount\n");
+
+        var (exitCode, stdOut, stdErr) = CliTestHarness.RunCli(_tempDir,
+            "convert", path, "-o", Path.Combine(_tempDir, "eject.out.cs"));
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Conversion successful", stdOut);
+        Assert.Contains("Calor1001", stdErr);
     }
 
     [Fact]

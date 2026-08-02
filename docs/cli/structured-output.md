@@ -187,6 +187,7 @@ pipeline) so they can flow through the structured formats:
 | `Calor1355` | Review packet: command-level failure — input missing, compile failure, git diff failure, or crash |
 | `Calor1356` | Review packet: refinement-type honesty note (#782) — refinement obligations are compile-time analysis only; no runtime guard is emitted for them |
 | `Calor1357` | Review packet: produced under an explicit waiver (`--permissive-effects` or `--contract-mode off`) — disclosed on the packet's first line |
+| `Calor1358` | Review packet: a `--changed` selector matched no declaration id or name in the given files (likely a typo) — its caller impact is absent from the packet |
 
 ## Notes on specific commands
 
