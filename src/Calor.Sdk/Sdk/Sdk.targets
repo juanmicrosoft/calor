@@ -5,18 +5,41 @@
   <PropertyGroup>
     <!-- CalorCompilerOverride: point at a local Calor.Tasks.dll to use a dev-built compiler -->
     <CalorTasksAssembly Condition="'$(CalorCompilerOverride)' != '' and '$(CalorTasksAssembly)' == ''">$(CalorCompilerOverride)</CalorTasksAssembly>
-    <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\net10.0\Calor.Tasks.dll</CalorTasksAssembly>
+    <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)../tasks/net10.0/Calor.Tasks.dll</CalorTasksAssembly>
     <!-- Effect enforcement: default true, matching CompilationOptions.EnforceEffects -->
     <CalorEnforceEffects Condition="'$(CalorEnforceEffects)' == ''">true</CalorEnforceEffects>
   </PropertyGroup>
 
-  <!-- IL analysis: resolve runtime directory for BCL implementation assemblies -->
-  <PropertyGroup Condition="'$(CalorEnableILAnalysis)' == 'true'">
-    <_CalorCompileCalorDependsOn>ResolveAssemblyReferences</_CalorCompileCalorDependsOn>
-    <_CalorRuntimeDir Condition="'$(NetCoreTargetingPackRoot)' != ''">$([System.IO.Path]::GetFullPath('$(NetCoreTargetingPackRoot)\..\..\..\shared\Microsoft.NETCore.App\$(BundledNETCoreAppTargetFrameworkVersion)'))\</_CalorRuntimeDir>
-  </PropertyGroup>
+  <!-- When consumed from the Calor.Sdk package, the bundled Calor.Runtime.dll
+       sits in the tasks closure; inject a compile-time reference so generated
+       code that uses Calor runtime types builds without a separate package.
+       Private=true copies it to the consumer's output so tests/apps run.
+       Set CalorSdkImportRuntime=false to opt out (e.g. source-tree consumers
+       that ProjectReference Calor.Runtime directly). -->
+  <ItemGroup Condition="'$(CalorSdkImportRuntime)' != 'false' and Exists('$(MSBuildThisFileDirectory)../tasks/net10.0/Calor.Runtime.dll')">
+    <Reference Include="Calor.Runtime">
+      <HintPath>$(MSBuildThisFileDirectory)../tasks/net10.0/Calor.Runtime.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
 
   <UsingTask TaskName="Calor.Tasks.CompileCalor" AssemblyFile="$(CalorTasksAssembly)" />
+
+  <!-- Import-order-independent defaults: when this SDK is imported via an <Sdk>
+       element, this file can be evaluated before Microsoft.NET.Sdk's targets, so
+       IntermediateOutputPath/NetCoreTargetingPackRoot are not yet available at
+       evaluation time. Target-time property assignment sees the final values. -->
+  <Target Name="_CalorComputeDefaults" BeforeTargets="CompileCalorFiles;CleanCalorFiles">
+    <PropertyGroup>
+      <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == ''">$(IntermediateOutputPath)calor\</CalorOutputDirectory>
+      <!-- IL analysis: resolve runtime directory for BCL implementation assemblies -->
+      <_CalorRuntimeDir Condition="'$(CalorEnableILAnalysis)' == 'true' and '$(_CalorRuntimeDir)' == '' and '$(NetCoreTargetingPackRoot)' != ''">$([System.IO.Path]::GetFullPath('$(NetCoreTargetingPackRoot)\..\..\..\shared\Microsoft.NETCore.App\$(BundledNETCoreAppTargetFrameworkVersion)'))\</_CalorRuntimeDir>
+    </PropertyGroup>
+  </Target>
+
+  <PropertyGroup Condition="'$(CalorEnableILAnalysis)' == 'true'">
+    <_CalorCompileCalorDependsOn>ResolveAssemblyReferences</_CalorCompileCalorDependsOn>
+  </PropertyGroup>
 
   <!-- Validate CalorCompilerOverride (runs unconditionally, not subject to incremental build skip) -->
   <Target Name="ValidateCalorCompilerOverride"

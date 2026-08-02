@@ -1,0 +1,5 @@
+{
+  "msbuild-sdks": {
+    "Calor.Sdk": "CALOR_SDK_VERSION_PLACEHOLDER"
+  }
+}

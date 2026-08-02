@@ -117,11 +117,19 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // 2. Compute global hashes
         var tasksAssemblyPath = typeof(CompileCalor).Assembly.Location;
         var compilerHash = BuildStateCache.ComputeCompilerHash(tasksAssemblyPath);
-        // Verify is diagnostics-affecting (Calor0711/0712 warnings), so it must be
-        // in the options token: flipping it on with a warm cache has to force a
-        // recompile, or refutations on unchanged files are silently missed.
+        // Every diagnostics-affecting task option must be in the options token:
+        // flipping one with a warm cache has to force a recompile, or findings
+        // the new option set would report on unchanged files are silently
+        // missed (#788: ExperimentalFlags and EnableILAnalysis were omitted).
+        // Experimental flags are canonicalized (parsed, sorted, case-folded) so
+        // "a;b" and "B,a" hash identically.
+        var canonicalExperimentalFlags = string.Join(",",
+            Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags).EnabledFlags
+                .Select(f => f.ToLowerInvariant())
+                .OrderBy(f => f, StringComparer.Ordinal));
         var optionsHash = BuildStateCache.ComputeOptionsHash(
-            $"enforceEffects:{EnforceEffects}|verify:{Verify}");
+            $"enforceEffects:{EnforceEffects}|verify:{Verify}"
+            + $"|ilAnalysis:{EnableILAnalysis}|experimental:{canonicalExperimentalFlags}");
         var manifestHash = BuildStateCache.ComputeManifestHash(ProjectDirectory);
 
         // 3. Global invalidation check
@@ -188,7 +196,18 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             }
             catch (Exception ex)
             {
-                Log.LogWarning("Calor: failed to initialize IL analysis: {0}", ex.Message);
+                // Fail closed (#788): EnableILAnalysis=true is a request for a
+                // safety analysis — a swallowed initialization failure would
+                // silently skip it and let effect violations through. Fail the
+                // build instead of downgrading to a warning.
+                compilationContext?.Dispose();
+                ilAnalyzer?.Dispose();
+                Log.LogError(
+                    "Calor: EnableILAnalysis=true but IL analysis failed to initialize ({0}: {1}). "
+                    + "The build fails rather than silently skipping the requested analysis; "
+                    + "set CalorEnableILAnalysis=false to build without it.",
+                    ex.GetType().Name, ex.Message);
+                return false;
             }
         }
 
@@ -521,9 +540,16 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             }
             catch (Exception ex)
             {
-                Log.LogWarning(
-                    "Calor: cross-module effect enforcement skipped due to {0}: {1}",
+                // Fail closed (#788): EnforceEffects=true means cross-module
+                // enforcement is part of the requested safety guarantee — an
+                // exception here must not silently downgrade the build to
+                // single-module checking only.
+                Log.LogError(
+                    "Calor: cross-module effect enforcement failed ({0}: {1}). "
+                    + "The build fails rather than silently skipping the requested enforcement; "
+                    + "set CalorEnforceEffects=false to build without it.",
                     ex.GetType().Name, ex.Message);
+                success = false;
             }
         }
 

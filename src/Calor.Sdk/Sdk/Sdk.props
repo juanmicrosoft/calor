@@ -1,9 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
-  <!-- Default properties for Calor projects -->
+  <!-- Default properties for Calor projects.
+       CalorOutputDirectory is only defaulted here when IntermediateOutputPath is
+       already known; import-order-independent defaulting happens again in the
+       _CalorComputeDefaults target in Sdk.targets (when this SDK is imported via
+       an <Sdk> element, its targets can evaluate before Microsoft.NET.Sdk sets
+       IntermediateOutputPath, which would otherwise bake in a bogus relative
+       path). -->
   <PropertyGroup>
-    <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == ''">$(IntermediateOutputPath)calor\</CalorOutputDirectory>
+    <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == '' and '$(IntermediateOutputPath)' != ''">$(IntermediateOutputPath)calor\</CalorOutputDirectory>
     <CalorVerbose Condition="'$(CalorVerbose)' == ''">false</CalorVerbose>
     <CalorEnableILAnalysis Condition="'$(CalorEnableILAnalysis)' == ''">false</CalorEnableILAnalysis>
   </PropertyGroup>

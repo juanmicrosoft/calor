@@ -1,0 +1,29 @@
+name: Performance Tests
+
+# Test-manifest honesty (#790, W1 Slice 4): tests/Calor.Performance.Tests was
+# in no workflow at all — an unwired suite is an untruthful manifest. It runs
+# here nightly (plus on demand) rather than per-PR because its assertions are
+# wall-clock thresholds; on shared runners those are load-sensitive, and a
+# flaky per-PR gate trains people to ignore red. A red nightly run is a real
+# signal and should be investigated, not re-run into silence.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run performance tests
+        run: dotnet test tests/Calor.Performance.Tests -c Release --verbosity normal

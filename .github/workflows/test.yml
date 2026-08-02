@@ -363,18 +363,55 @@ jobs:
       - name: Run ID validation tests
         run: dotnet test tests/Calor.Ids.Tests -c Release --verbosity normal
 
-      - name: Install Calor tool
-        run: dotnet tool install --global --add-source ./src/Calor.Compiler/bin/Release calor || true
-
-      - name: Check IDs in examples
+      # Truthful gate (#790, W1 Slice 4): no `|| true` / `|| echo` masking, and
+      # the check targets directories that actually exist (`samples/`; the old
+      # step scanned a nonexistent `examples/` and swallowed every failure).
+      # Each sample directory is an independent program, so IDs are scoped
+      # per-directory — cross-sample reuse of f001/m001 is legitimate.
+      # Test-manifest honesty (#790, W1 Slice 4): every test tree is either
+      # wired to CI or declared. Wired: all 11 sln projects (test job),
+      # Calor.Ids.Tests (this job), Calor.RoundTrip.Harness.Tests (sln),
+      # tests/E2E/agent-tasks (benchmark.yml + embedded self-test resources),
+      # Calor.Performance.Tests (nightly performance.yml — wall-clock
+      # assertions are load-sensitive). Declared non-gating: tests/
+      # Calor.RoundTrip.Synthetic (harness CORPUS, exercised by the
+      # roundtrip-verification job, not a test project to run directly);
+      # tests/DebugRT (manual scratch console harness, not a test project).
+      - name: Check IDs in samples
         run: |
-          if find docs examples -name "*.calr" 2>/dev/null | head -1 | grep -q .; then
-            find docs examples -name "*.calr" -exec echo "Checking {}" \;
-            # Allow test IDs in docs/examples
-            dotnet run --project src/Calor.Compiler -- ids check docs examples --allow-test-ids || echo "No ID issues found or no .calr files"
-          else
-            echo "No .calr files found in docs or examples"
-          fi
+          set -euo pipefail
+          # Per-directory: each sample is an independent program, so IDs must be
+          # unique within a sample but may repeat across samples. docs/ is NOT
+          # ids-checked here — it contains no .calr files (ids check exits 1 on
+          # an empty target by design) and its fenced calor blocks are already
+          # drift-checked by `calor self-check docs` in the test job.
+          for d in samples/*/; do
+            echo "== ids check $d =="
+            dotnet run -c Release --no-build --project src/Calor.Compiler -- ids check "$d" --allow-test-ids
+          done
+
+  sdk-package-consumer:
+    # M-A1 SDK consumability (wedge plan v0.11 D-W1.2, PP-A1): a template
+    # consumer project restores, builds, and tests green against the PACKAGED
+    # Calor.Sdk from a local feed — never a source-tree ProjectReference.
+    # Includes package-content inspection and the in-task Z3 verify canary.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run M-A1 consumer check (pack -> local feed -> restore/build/test)
+        env:
+          # download-z3.sh populates all supported RIDs on CI, so the packed
+          # nupkg must carry every one of them.
+          CALOR_SDK_REQUIRE_ALL_RIDS: "1"
+        run: bash .github/scripts/test-sdk-package.sh
 
   verify-phase1:
     # Tier 1 self-verification harness — v6 §3.1.
