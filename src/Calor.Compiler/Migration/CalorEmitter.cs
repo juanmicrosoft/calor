@@ -1008,6 +1008,31 @@ public sealed class CalorEmitter : IAstVisitor<string>
             else
             {
                 var expr = node.Expression.Accept(this);
+
+                // Block-emitting collection initializers (§DICT/§HSET/§LIST
+                // blocks) append their binding block and return "" — the naive
+                // `§R {expr}` then emits a bare `§R` that re-parses as
+                // return-VOID, silently dropping the return value (exposed by
+                // the #771 compile gate). Reference the block's binding instead.
+                // Inline-emitting collections (e.g. size-only §ARR) return a
+                // non-empty string and take the normal path.
+                if (string.IsNullOrWhiteSpace(expr))
+                {
+                    var collectionRef = node.Expression switch
+                    {
+                        ListCreationNode l => l.Id,
+                        DictionaryCreationNode d => d.Id,
+                        SetCreationNode s => s.Id,
+                        ArrayCreationNode a => a.Id,
+                        MultiDimArrayCreationNode m => m.Id,
+                        _ => null
+                    };
+                    if (collectionRef != null)
+                    {
+                        expr = collectionRef;
+                    }
+                }
+
                 AppendLine($"§R {expr}");
             }
         }
@@ -1320,7 +1345,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // fixed indent that gets jammed onto the §B line and dedents below the
         // enclosing scope, producing unparseable output (#705).
         if (node.Initializer is LambdaExpressionNode { IsExpressionLambda: false, StatementBody.Count: > 0 } blockLambda
-            && !(blockLambda.StatementBody.Count <= 2 && !blockLambda.StatementBody.Any(s => s is FallbackCommentNode)))
+            && !(blockLambda.StatementBody.Count <= 2 && !blockLambda.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode)))
         {
             EmitBlockLambdaAsBindingInitializer(bindHeader, blockLambda);
             return "";
@@ -2782,7 +2807,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // For short lambdas (1-2 statements), emit inline — unless any statement
             // produces multi-line output (e.g. FallbackCommentNode), which would bury
             // the §/LAM closing tag inside a comment line.
-            var hasMultiLineStmt = node.StatementBody.Any(s => s is FallbackCommentNode);
+            var hasMultiLineStmt = node.StatementBody.Any(s => s is FallbackCommentNode or RawCSharpNode);
             if (node.StatementBody.Count <= 2 && !hasMultiLineStmt)
             {
                 // Inline-sibling context: each statement is space-joined on a single
@@ -3883,7 +3908,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(RawCSharpNode node)
     {
-        return $"§RAW\n{node.CSharpCode}\n§/RAW";
+        // Statement-position raw C# MUST be appended: statement body loops call
+        // stmt.Accept(this) and discard the return value, so a returned string
+        // silently VANISHED from the output while the loss ledger claimed the
+        // statement was preserved (#836 C1). The lexer captures §RAW…§/RAW as
+        // one token and CSharpEmitter re-emits the content verbatim.
+        AppendLine("§RAW");
+        AppendLine(node.CSharpCode);
+        AppendLine("§/RAW");
+        return "";
     }
 
     public string Visit(RawCSharpExpressionNode node)

@@ -94,13 +94,16 @@ public class RoundTripTests
             _output.WriteLine($"  Roslyn errors:");
             foreach (var err in result.RoslynErrors)
                 _output.WriteLine($"    - {err}");
-
-            // Roslyn compile failures may be expected for some snippets where the
-            // emitted C# references types not available in the minimal compilation
-            // context (e.g., Task, Func<>, Math).
-            _output.WriteLine($"  [INFO] Roslyn compile has {result.RoslynErrors.Count} errors " +
-                $"(may be expected due to limited references in test compilation)");
         }
+
+        // #771: this test's name promises a compile — it must ASSERT one. The
+        // shared GeneratedCSharpCompiler resolves the full trusted-platform
+        // reference set plus Calor.Runtime, so a failure here is a real
+        // conversion/emitter defect, not missing-reference noise.
+        Assert.True(result.CSharpSyntaxSuccess,
+            $"[{id}] Emitted C# has syntax errors: {string.Join("; ", result.RoslynErrors)}");
+        Assert.True(result.RoslynSuccess,
+            $"[{id}] Emitted C# does not compile: {string.Join("; ", result.RoslynErrors)}");
     }
 
     [Fact]
@@ -130,10 +133,13 @@ public class RoundTripTests
             _output.WriteLine($"  [{status}] {id}: {desc}");
         }
 
-        // All round-trip snippets must convert and parse successfully
+        // All round-trip snippets must convert, parse, AND compile (#771 — the
+        // Roslyn column was previously computed but never asserted).
         Assert.All(results, r => Assert.True(r.ConvOk,
             $"[{r.Id}] {r.Desc}: conversion failed"));
         Assert.All(results, r => Assert.True(r.ParseOk,
             $"[{r.Id}] {r.Desc}: Calor parse failed"));
+        Assert.All(results, r => Assert.True(r.RoslynOk,
+            $"[{r.Id}] {r.Desc}: emitted C# does not compile"));
     }
 }

@@ -585,8 +585,12 @@ public class StructAndOperatorTests
         var result = _converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
-        var cls = Assert.Single(result.Ast!.Classes);
-        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Add);
+        // W1 Slice 3 (#773): records (including their operators) are preserved
+        // verbatim as §CSHARP interop while the registry marks them
+        // NotSupported — nothing is dropped.
+        Assert.Empty(result.Ast!.Classes);
+        var interop = Assert.Single(result.Ast.InteropBlocks);
+        Assert.Contains("operator +(Money a, Money b)", interop.CSharpCode);
     }
 
     [Fact]
@@ -605,8 +609,12 @@ public class StructAndOperatorTests
         var result = _converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
-        var cls = Assert.Single(result.Ast!.Classes);
-        Assert.Contains(cls.OperatorOverloads, o => o.Kind == OperatorOverloadKind.Implicit);
+        // W1 Slice 3 (#773): records (including conversion operators) are
+        // preserved verbatim as §CSHARP interop while the registry marks them
+        // NotSupported — nothing is dropped.
+        Assert.Empty(result.Ast!.Classes);
+        var interop = Assert.Single(result.Ast.InteropBlocks);
+        Assert.Contains("implicit operator double(Celsius c)", interop.CSharpCode);
     }
 
     #endregion

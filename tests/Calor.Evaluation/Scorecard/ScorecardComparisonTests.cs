@@ -208,7 +208,8 @@ public class ScorecardComparisonTests
                 CompilationDiagnostics: s.roundTripSuccess
                     ? Array.Empty<string>()
                     : new[] { "mock error" },
-                RoslynParseSuccess: s.roundTripSuccess,
+                CSharpSyntaxSuccess: s.roundTripSuccess,
+                CSharpCompilationSuccess: s.roundTripSuccess,
                 ConversionDuration: TimeSpan.FromMilliseconds(10),
                 CompilationDuration: TimeSpan.FromMilliseconds(5));
         }).ToList();

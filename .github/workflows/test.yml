@@ -217,8 +217,11 @@ jobs:
             for (const r of current.results) {
               const b = baselineById[r.id];
               if (!b) continue;
-              const bPass = b.conversionSuccess && b.compilationSuccess && b.roslynParseSuccess;
-              const cPass = r.conversionSuccess && r.compilationSuccess && r.roslynParseSuccess;
+              // W1 Slice 3: roslynParseSuccess split into cSharpSyntaxSuccess +
+              // cSharpCompilationSuccess — reading the old field would be
+              // undefined and silently fail-open (no regression ever flagged).
+              const bPass = b.conversionSuccess && b.compilationSuccess && b.cSharpSyntaxSuccess && b.cSharpCompilationSuccess;
+              const cPass = r.conversionSuccess && r.compilationSuccess && r.cSharpSyntaxSuccess && r.cSharpCompilationSuccess;
               if (bPass && !cPass) regressions.push(r.id);
             }
 

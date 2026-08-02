@@ -343,4 +343,79 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.Contains("Conversion successful", stdOut);
         Assert.DoesNotContain("\"diagnostics\"", stdOut);
     }
+
+    // ------------------------------------------------------------------
+    // W1 Slice 3 (#770): no false "✓ Conversion successful" — a conversion
+    // with recorded semantic losses prints a located loss summary instead,
+    // and the JSON envelope carries the structured loss accounting.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Convert_TextMode_WithLosses_PrintsLossSummary_NotSuccessLine()
+    {
+        // A record is preserved as §CSHARP interop → a counted loss (#773).
+        var csFile = WriteFile("Rec.cs", """
+            namespace N
+            {
+                public record Person(string Name, int Age);
+            }
+            """);
+
+        var (exitCode, stdOut, _) = RunCli("convert", csFile);
+
+        Assert.Equal(0, exitCode); // conversion still succeeds — but honestly
+        Assert.DoesNotContain("Conversion successful", stdOut);
+        Assert.Contains("semantic loss", stdOut);
+        Assert.Contains("InteropPreserved", stdOut);
+        // The loss line carries a file:line location.
+        Assert.Contains("Rec.cs:", stdOut);
+        Assert.Contains("[record]", stdOut);
+    }
+
+    [Fact]
+    public void Convert_Json_WithLosses_EnvelopeCarriesLossAccounting()
+    {
+        var csFile = WriteFile("Rec2.cs", """
+            namespace N
+            {
+                public record Point(int X, int Y);
+            }
+            """);
+
+        var (_, stdOut, stdErr) = RunCli("convert", csFile, "--format", "json");
+
+        var root = ParseAndValidate(stdOut, "convert");
+        var data = root.GetProperty("data");
+        Assert.True(data.GetProperty("success").GetBoolean());
+        Assert.True(data.GetProperty("lossCount").GetInt32() >= 1);
+
+        var loss = data.GetProperty("losses").EnumerateArray()
+            .Single(l => l.GetProperty("feature").GetString() == "record");
+        Assert.Equal("InteropPreserved", loss.GetProperty("kind").GetString());
+        Assert.True(loss.GetProperty("line").GetInt32() >= 1);
+
+        // Human loss summary goes to stderr in envelope mode; no success line.
+        Assert.DoesNotContain("Conversion successful", stdErr);
+        Assert.Contains("semantic loss", stdErr);
+    }
+
+    [Fact]
+    public void Convert_TextMode_NoLosses_StillPrintsSuccessLine()
+    {
+        var csFile = WriteFile("CleanFile.cs", """
+            namespace N
+            {
+                public class Clean
+                {
+                    public int Two() => 2;
+                }
+            }
+            """);
+
+        var (exitCode, stdOut, _) = RunCli("convert", csFile, "--validate");
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Conversion successful", stdOut);
+        Assert.DoesNotContain("semantic loss", stdOut);
+    }
 }

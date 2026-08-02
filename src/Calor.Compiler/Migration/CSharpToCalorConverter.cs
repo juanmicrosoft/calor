@@ -131,10 +131,26 @@ public sealed class CSharpToCalorConverter
 
         try
         {
-            // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM
+            // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM.
+            // Stripping keeps the first #if branch UNEVALUATED and deletes the
+            // alternates — a semantic loss, recorded per directive (#770/#773).
             if (_options.StripPreprocessor)
             {
-                try { csharpSource = PreprocessorStripper.Strip(csharpSource); }
+                try
+                {
+                    var stripResult = PreprocessorStripper.StripWithReport(csharpSource);
+                    csharpSource = stripResult.Source;
+                    foreach (var directive in stripResult.ConditionalDirectives)
+                    {
+                        var dropped = directive.DroppedLines > 0
+                            ? $"; {directive.DroppedLines} line(s) of the inactive branch dropped"
+                            : "";
+                        context.RecordLoss(ConversionLossKind.PreprocessorStripped,
+                            "preprocessor-directive",
+                            $"'{directive.Directive}' stripped (first branch kept unevaluated{dropped})",
+                            directive.Line);
+                    }
+                }
                 catch (Exception stripEx)
                 {
                     context.AddError($"Preprocessor stripping failed: {stripEx.GetType().Name}: {stripEx.Message}");
@@ -273,6 +289,14 @@ public sealed class CSharpToCalorConverter
                 }
             }
 
+            // #836 M2: reconcile the emitted output with the loss ledger. The
+            // CalorEmitter has internal raw-C# fallback paths (§CS{…} in chain
+            // steps, §RAW) that do not thread through the ledger — without this
+            // check they coexisted with a zero-loss "fully native" claim and a
+            // false "✓ Conversion successful". Any raw-C# marker beyond the
+            // ledgered interop preservations is counted as an EmitterFallback loss.
+            ReconcileEmitterFallbacks(calorSource, context);
+
             if (_options.Verbose)
             {
                 Console.WriteLine($"Converted {context.Stats.ConvertedNodes} nodes");
@@ -367,6 +391,41 @@ public sealed class CSharpToCalorConverter
     /// </summary>
     internal Func<string, bool>? ParseValidatorOverride { get; set; }
 
+    /// <summary>
+    /// #836 M2: counts raw-C# markers (§CSHARP{, §CS{, §RAW) in the emitted
+    /// Calor and records an <see cref="ConversionLossKind.EmitterFallback"/>
+    /// loss for every marker beyond the ledgered interop preservations, so the
+    /// "zero losses = fully native output" invariant holds even for fallbacks
+    /// produced inside the CalorEmitter (which cannot reach the ledger yet).
+    /// </summary>
+    private static void ReconcileEmitterFallbacks(string calorSource, ConversionContext context)
+    {
+        var markers = CountOccurrences(calorSource, "§CSHARP{")
+                    + CountOccurrences(calorSource, "§CS{")
+                    + CountOccurrences(calorSource, "§RAW"); // "§/RAW" does not contain "§RAW"
+
+        var ledgered = context.Losses.Count(l => l.Kind == ConversionLossKind.InteropPreserved);
+        var unledgered = markers - ledgered;
+        for (var i = 0; i < unledgered; i++)
+        {
+            context.RecordLoss(ConversionLossKind.EmitterFallback, "emitter-fallback",
+                "Raw C# fallback (§CS{…}/§RAW/§CSHARP) present in the emitted Calor without a ledger entry — " +
+                "produced by an emitter-internal fallback path; the output is not fully native");
+        }
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+        return count;
+    }
+
     /// <summary>True if <paramref name="calorSource"/> lexes and parses without errors.</summary>
     private bool ParsesCleanly(string calorSource)
     {
@@ -451,6 +510,11 @@ public sealed class CSharpToCalorConverter
 
         context.Stats.InteropBlocksEmitted += interops.Count;
         context.Stats.FallbackInteropBlocksEmitted += interops.Count;
+        foreach (var interop in interops)
+        {
+            context.RecordLoss(ConversionLossKind.InteropPreserved, "post-validation-fallback",
+                interop.Reason ?? "Member re-preserved as §CSHARP after emitted Calor failed to parse (#717)");
+        }
 
         return new ModuleNode(
             module.Span, module.Id, module.Name, module.Usings,

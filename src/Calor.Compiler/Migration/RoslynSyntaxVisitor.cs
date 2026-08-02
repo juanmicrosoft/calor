@@ -389,6 +389,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("top-level-statement");
         _pendingStatements.Clear();
 
+        try
+        {
+            VisitGlobalStatementCore(node);
+        }
+        catch (MemberInteropEscalationException esc)
+        {
+            // Top-level statements have no containing member to escalate to —
+            // the statement itself is the complete boundary. Preserve it
+            // verbatim and count the loss (#770).
+            _pendingStatements.Clear();
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, esc.FeatureName,
+                $"Top-level statement preserved as raw C#: {TruncateForMessage(node.Statement.ToString())}",
+                node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            _topLevelStatements.Add(new RawCSharpNode(GetTextSpan(node), node.Statement.ToFullString()));
+        }
+    }
+
+    private void VisitGlobalStatementCore(GlobalStatementSyntax node)
+    {
         // Handle chained method calls in local declarations (e.g., var x = a.Where(...).First())
         // Skip chains handled by native operations (string, StringBuilder, regex, char)
         if (node.Statement is LocalDeclarationStatementSyntax chainDecl
@@ -456,7 +475,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.InterfacesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "interface", InteropMemberKind.Class));
         }
@@ -497,11 +516,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             else
             {
+                var dropLine = member.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
                 _context.AddWarning(
                     $"Dropped unsupported interface member of kind '{member.Kind()}' in interface '{name}'",
                     feature: "unsupported-member",
-                    line: member.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+                    line: dropLine);
                 _context.Stats.MembersDropped++;
+                _context.RecordLoss(ConversionLossKind.Dropped, "unsupported-member",
+                    $"Interface member of kind '{member.Kind()}' dropped from interface '{name}'", dropLine);
             }
         }
 
@@ -566,6 +588,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
+        // #773: the FeatureSupport registry is executable — while records are
+        // not Full, they are preserved verbatim as §CSHARP interop (the native
+        // conversion emitted a positional record as a class with getter-only
+        // properties and NO constructor — broken output). Counted as a loss.
+        if (FeatureSupport.GetSupportLevel("record") != SupportLevel.Full)
+        {
+            _moduleInteropBlocks.Add(CreateInteropBlock(node, "record", InteropMemberKind.Class));
+            return;
+        }
+
         _context.RecordFeatureUsage("record");
         _context.EnterType(node.Identifier.Text);
         try
@@ -576,7 +608,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "record", InteropMemberKind.Class));
         }
@@ -609,7 +641,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.ClassesConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "struct", InteropMemberKind.Class));
         }
@@ -674,7 +706,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.Stats.EnumsConverted++;
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "enum", InteropMemberKind.Other));
         }
@@ -682,6 +714,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public override void VisitDelegateDeclaration(DelegateDeclarationSyntax node)
     {
+        // #773: DelegateDefinitionNode carries no type parameters, so a generic
+        // delegate would silently lose its <T> and emit non-compiling C#.
+        // Preserve generic delegates verbatim as §CSHARP interop instead.
+        if (node.TypeParameterList != null)
+        {
+            if (node.Parent is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
+            {
+                _moduleInteropBlocks.Add(CreateInteropBlock(node, "generic-delegate", InteropMemberKind.Other));
+                return;
+            }
+            // Nested: escalate so the enclosing type's member loop preserves it.
+            throw EscalateExpression(node, "generic-delegate");
+        }
+
         _context.RecordFeatureUsage("delegate");
         try
         {
@@ -707,7 +753,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _delegates.Add(delegateNode);
             _context.IncrementConverted();
         }
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
         {
             _moduleInteropBlocks.Add(CreateInteropBlock(node, "delegate", InteropMemberKind.Other));
         }
@@ -888,9 +934,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     {
                         ConvertClassMember(node.Members[bi], ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads);
                     }
-                    catch (Exception) when (_context.ShouldPreserveCSharp)
+                    catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                     {
-                        // Skip unconvertible members in PP blocks
+                        // Member inside an active #if branch could not convert
+                        // natively. Preserve it as §CSHARP at class level (outside
+                        // the #if — noted in the recorded loss) rather than
+                        // dropping it silently.
+                        interopBlocks.Add(CreateInteropBlock(node.Members[bi], null, InteropMemberKind.Other));
                     }
                 }
 
@@ -916,7 +966,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedClasses.Add(ConvertClass(nestedClass));
                     _context.ExitType();
                 }
-                catch (Exception) when (_context.ShouldPreserveCSharp)
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
                     _context.ExitType();
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
@@ -932,7 +982,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedClasses.Add(ConvertStruct(nestedStruct));
                     _context.ExitType();
                 }
-                catch (Exception) when (_context.ShouldPreserveCSharp)
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
                     _context.ExitType();
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
@@ -941,6 +991,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             if (member is RecordDeclarationSyntax nestedRecord)
             {
+                // #773: executable registry — nested records are preserved as
+                // §CSHARP interop while record support is not Full (see
+                // VisitRecordDeclaration).
+                if (FeatureSupport.GetSupportLevel("record") != SupportLevel.Full)
+                {
+                    interopBlocks.Add(CreateInteropBlock(member, "record", InteropMemberKind.Class));
+                    continue;
+                }
                 try
                 {
                     _context.RecordFeatureUsage("nested-type");
@@ -948,7 +1006,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedClasses.Add(ConvertRecord(nestedRecord));
                     _context.ExitType();
                 }
-                catch (Exception) when (_context.ShouldPreserveCSharp)
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
                     _context.ExitType();
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
@@ -962,7 +1020,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _context.RecordFeatureUsage("nested-type");
                     nestedInterfaces.Add(ConvertInterface(nestedIface));
                 }
-                catch (Exception) when (_context.ShouldPreserveCSharp)
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
                 }
@@ -986,7 +1044,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedEnums.Add(new EnumDefinitionNode(GetTextSpan(nestedEnum), nestedId, nestedName,
                         nestedUnderlying, nestedMembers, new AttributeCollection(), nestedAttrs, nestedVis));
                 }
-                catch (Exception) when (_context.ShouldPreserveCSharp)
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
                 }
@@ -1004,7 +1062,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _delegates.Clear();
                     _delegates.AddRange(savedDelegates);
                 }
-                catch (Exception) when (_context.ShouldPreserveCSharp)
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                 {
                     interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other));
                 }
@@ -1015,7 +1073,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads, indexers);
             }
-            catch (Exception) when (_context.ShouldPreserveCSharp)
+            catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
             {
                 var kind = member switch
                 {
@@ -1144,11 +1202,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     throw new NotSupportedException($"Unsupported member type: {member.Kind()}");
                 }
                 var typeName = (member.Parent as TypeDeclarationSyntax)?.Identifier.Text ?? "unknown";
+                var dropLine = member.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
                 _context.AddWarning(
                     $"Dropped unsupported class member of kind '{member.Kind()}' in type '{typeName}'",
                     feature: "unsupported-member",
-                    line: member.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+                    line: dropLine);
                 _context.Stats.MembersDropped++;
+                _context.RecordLoss(ConversionLossKind.Dropped, "unsupported-member",
+                    $"Class member of kind '{member.Kind()}' dropped from type '{typeName}'", dropLine);
                 break;
         }
     }
@@ -1378,9 +1439,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     {
                         ConvertClassMember(node.Members[bi], ppFields, ppProperties, ppConstructors, ppMethods, ppEvents, ppOperatorOverloads);
                     }
-                    catch (Exception) when (_context.ShouldPreserveCSharp)
+                    catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
                     {
-                        // Skip unconvertible members in PP blocks
+                        // Member inside an active #if branch could not convert
+                        // natively — preserve as §CSHARP at type level (outside
+                        // the #if — noted in the recorded loss), never drop.
+                        interopBlocks.Add(CreateInteropBlock(node.Members[bi], null, InteropMemberKind.Other));
                     }
                 }
 
@@ -1400,19 +1464,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (member is ClassDeclarationSyntax nc)
             {
                 try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(nc.Identifier.Text); nestedClasses.Add(ConvertClass(nc)); _context.ExitType(); }
-                catch (Exception) when (_context.ShouldPreserveCSharp) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
             if (member is StructDeclarationSyntax ns)
             {
                 try { _context.RecordFeatureUsage("nested-type"); _context.EnterType(ns.Identifier.Text); nestedClasses.Add(ConvertStruct(ns)); _context.ExitType(); }
-                catch (Exception) when (_context.ShouldPreserveCSharp) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { _context.ExitType(); interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
             if (member is InterfaceDeclarationSyntax ni)
             {
                 try { _context.RecordFeatureUsage("nested-type"); nestedInterfaces.Add(ConvertInterface(ni)); }
-                catch (Exception) when (_context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
             if (member is EnumDeclarationSyntax ne)
@@ -1433,7 +1497,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     nestedEnums.Add(new EnumDefinitionNode(GetTextSpan(ne), nestedId, nestedName,
                         nestedUnderlying, nestedMembers, new AttributeCollection(), nestedAttrs, nestedVis));
                 }
-                catch (Exception) when (_context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
             if (member is DelegateDeclarationSyntax nd)
@@ -1448,7 +1512,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _delegates.Clear();
                     _delegates.AddRange(savedDelegates);
                 }
-                catch (Exception) when (_context.ShouldPreserveCSharp) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
+                catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException) { interopBlocks.Add(CreateInteropBlock(member, null, InteropMemberKind.Other)); }
                 continue;
             }
 
@@ -1456,7 +1520,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             {
                 ConvertClassMember(member, fields, properties, constructors, methods, events, operatorOverloads, indexers);
             }
-            catch (Exception) when (_context.ShouldPreserveCSharp)
+            catch (Exception ex) when (_context.ShouldPreserveCSharp || ex is MemberInteropEscalationException)
             {
                 var kind = member switch
                 {
@@ -3047,15 +3111,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 catch
                 {
-                    // Preserve unconvertible members as a method with fallback comment body
+                    // #836 M1: preserve the member VERBATIM (in all modes — the
+                    // disabled branch is never active C#, so a §RAW body is
+                    // safe) and record the loss; the old comment-stub silently
+                    // deleted the original API with zero ledger entries.
                     var fallbackId = _context.GenerateId("m");
                     var fallbackBody = new List<StatementNode>
                     {
-                        _context.PassthroughOnError
-                            ? new RawCSharpNode(TextSpan.Empty, member.ToString().Trim())
-                            : new FallbackCommentNode(TextSpan.Empty, member.ToString().Trim(), "preprocessor-disabled",
-                                "Member in disabled preprocessor branch could not be converted")
+                        new RawCSharpNode(TextSpan.Empty, member.ToString().Trim())
                     };
+                    _context.RecordLoss(ConversionLossKind.InteropPreserved, "preprocessor-disabled",
+                        $"Member in disabled #if branch preserved as raw C# inside a fallback stub: {TruncateForMessage(member.ToString())}");
+                    _context.AddWarning(
+                        $"Member in disabled preprocessor branch could not be converted; preserved verbatim: {TruncateForMessage(member.ToString())}",
+                        feature: "preprocessor-disabled");
                     methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
                         Visibility.Private, MethodModifiers.None,
                         Array.Empty<TypeParameterNode>(), Array.Empty<ParameterNode>(),
@@ -3066,15 +3135,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         catch
         {
-            // If the disabled text can't be parsed at all, preserve it as a fallback method
+            // #836 M1: if the disabled text can't be parsed at all, preserve it
+            // VERBATIM (all modes) and record the loss — never a silent
+            // zero-ledger comment stub.
             var fallbackId = _context.GenerateId("m");
             var fallbackBody = new List<StatementNode>
             {
-                _context.PassthroughOnError
-                    ? new RawCSharpNode(TextSpan.Empty, disabledText.Trim())
-                    : new FallbackCommentNode(TextSpan.Empty, disabledText.Trim(), "preprocessor-disabled",
-                        "Disabled preprocessor text could not be parsed as class members")
+                new RawCSharpNode(TextSpan.Empty, disabledText.Trim())
             };
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, "preprocessor-disabled",
+                $"Disabled #if branch text preserved as raw C# inside a fallback stub: {TruncateForMessage(disabledText.Trim())}");
+            _context.AddWarning(
+                $"Disabled preprocessor text could not be parsed as class members; preserved verbatim: {TruncateForMessage(disabledText.Trim())}",
+                feature: "preprocessor-disabled");
             methods.Add(new MethodNode(TextSpan.Empty, fallbackId, $"_PP_Fallback_{fallbackId}",
                 Visibility.Private, MethodModifiers.None,
                 Array.Empty<TypeParameterNode>(), Array.Empty<ParameterNode>(),
@@ -3957,9 +4030,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 _ => HandleUnsupportedStatement(statement)
             };
         }
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        catch (Exception ex) when (_context.ShouldPreserveCSharp)
         {
+            // In C#-preserving modes an escalated (or crashed) expression is
+            // contained at the nearest statement boundary: the statement is
+            // preserved verbatim and counted as a loss (#770). In Standard mode
+            // escalation propagates to the containing member boundary instead.
+            // Discard partial conversions hoisted while converting the failed
+            // statement — flushing them would duplicate its side effects next
+            // to the verbatim preservation (#836 C1).
+            _pendingStatements.Clear();
             _context.IncrementSkipped();
+            _context.RecordLoss(ConversionLossKind.InteropPreserved,
+                ex is MemberInteropEscalationException esc ? esc.FeatureName : "conversion-error",
+                $"Statement preserved as raw C#: {TruncateForMessage(statement.ToString())}",
+                statement.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
             return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
         }
     }
@@ -3983,6 +4068,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // In Interop mode, preserve unsupported statements as raw C# passthrough
         if (_context.ShouldPreserveCSharp)
         {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, featureName,
+                $"Statement preserved as raw C#: {TruncateForMessage(statement.ToString())}",
+                lineSpan.StartLinePosition.Line + 1);
             return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
         }
 
@@ -4105,6 +4193,27 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     /// <summary>
+    /// Exhaustive compound-assignment operator mapping (#774). Returns null for
+    /// operators Calor cannot represent (e.g. C# 11 <c>&gt;&gt;&gt;=</c>) — the
+    /// caller must escalate to interop, never substitute.
+    /// </summary>
+    private static CompoundAssignmentOperator? MapCompoundAssignmentOperator(SyntaxKind kind) => kind switch
+    {
+        SyntaxKind.AddAssignmentExpression => CompoundAssignmentOperator.Add,
+        SyntaxKind.SubtractAssignmentExpression => CompoundAssignmentOperator.Subtract,
+        SyntaxKind.MultiplyAssignmentExpression => CompoundAssignmentOperator.Multiply,
+        SyntaxKind.DivideAssignmentExpression => CompoundAssignmentOperator.Divide,
+        SyntaxKind.ModuloAssignmentExpression => CompoundAssignmentOperator.Modulo,
+        SyntaxKind.AndAssignmentExpression => CompoundAssignmentOperator.BitwiseAnd,
+        SyntaxKind.OrAssignmentExpression => CompoundAssignmentOperator.BitwiseOr,
+        SyntaxKind.ExclusiveOrAssignmentExpression => CompoundAssignmentOperator.BitwiseXor,
+        SyntaxKind.LeftShiftAssignmentExpression => CompoundAssignmentOperator.LeftShift,
+        SyntaxKind.RightShiftAssignmentExpression => CompoundAssignmentOperator.RightShift,
+        SyntaxKind.CoalesceAssignmentExpression => CompoundAssignmentOperator.NullCoalesce,
+        _ => null
+    };
+
+    /// <summary>
     /// Converts a bare ExpressionSyntax to a StatementNode.
     /// Used for for-loop initializers and incrementors which are expressions, not expression statements.
     /// </summary>
@@ -4119,15 +4228,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     ConvertExpression(assignment.Right));
             }
             // Compound assignments (+=, -=, etc.)
-            var compOp = assignment.Kind() switch
-            {
-                SyntaxKind.AddAssignmentExpression => CompoundAssignmentOperator.Add,
-                SyntaxKind.SubtractAssignmentExpression => CompoundAssignmentOperator.Subtract,
-                SyntaxKind.MultiplyAssignmentExpression => CompoundAssignmentOperator.Multiply,
-                SyntaxKind.DivideAssignmentExpression => CompoundAssignmentOperator.Divide,
-                SyntaxKind.ModuloAssignmentExpression => CompoundAssignmentOperator.Modulo,
-                _ => (CompoundAssignmentOperator?)null
-            };
+            var compOp = MapCompoundAssignmentOperator(assignment.Kind());
             if (compOp != null)
             {
                 return new CompoundAssignmentStatementNode(span,
@@ -4135,6 +4236,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     compOp.Value,
                     ConvertExpression(assignment.Right));
             }
+
+            // #774: an unmapped compound assignment (e.g. >>>=) must never
+            // silently degrade to a plain assignment — escalate to interop.
+            throw EscalateExpression(assignment, "unsupported-compound-assignment");
         }
         // Handle i++, i--, ++i, --i as compound assignments
         if (expr is PostfixUnaryExpressionSyntax postfix)
@@ -4360,6 +4465,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     ConvertExpression(assignment.Left),
                     CompoundAssignmentOperator.NullCoalesce,
                     ConvertExpression(assignment.Right));
+            }
+
+            // #774: only a simple assignment may emit §ASSIGN. Any compound
+            // kind not handled above (e.g. >>>=) would silently drop its
+            // operator — escalate the containing member to interop instead.
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+            {
+                throw EscalateExpression(assignment, "unsupported-compound-assignment");
             }
 
             return new AssignmentStatementNode(
@@ -5255,6 +5368,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             else if (incrementor is AssignmentExpressionSyntax assignment)
             {
+                // KNOWN LIMITATION (#836 m2, pre-existing on main; #774
+                // follow-up): §L's step is ADDITIVE, but this takes the RHS of
+                // any compound assignment — `k *= 2` / `j >>= 1` become
+                // additive step 2 / 1, and `i -= 2` a positive step 2,
+                // changing loop semantics. Documented in the FeatureSupport
+                // "for" entry; the fix is to restrict this to += (negating -=)
+                // and route other compound incrementors to the while-loop
+                // fallback.
                 step = ConvertExpression(assignment.Right);
             }
         }
@@ -5536,11 +5657,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             foreach (var label in section.Labels)
             {
+                // #774: an unrecognized label kind (e.g. a pattern case label)
+                // must never broaden to a wildcard that matches everything —
+                // escalate the containing member to §CSHARP interop instead.
                 PatternNode pattern = label switch
                 {
                     CaseSwitchLabelSyntax caseLabel => ConvertCaseLabelWithEnumPrefix(caseLabel, enumTypePrefix),
                     DefaultSwitchLabelSyntax => new WildcardPatternNode(GetTextSpan(label)),
-                    _ => new WildcardPatternNode(GetTextSpan(label))
+                    _ => throw EscalateExpression(label, "unsupported-switch-label")
                 };
 
                 var body = section.Statements
@@ -5882,23 +6006,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private PatternNode HandleUnsupportedPattern(PatternSyntax pattern, string description)
     {
-        var span = GetTextSpan(pattern);
-        var lineSpan = pattern.GetLocation().GetLineSpan();
-        var line = lineSpan.StartLinePosition.Line + 1;
-        var suggestion = "Simplify pattern or use if-else with explicit conditions";
-
-        _context.AddWarning(
-            $"Unsupported pattern [{description}]: will match any value (wildcard)",
-            feature: description,
-            line: line,
-            column: lineSpan.StartLinePosition.Character + 1);
-
-        // Record for explanation output
-        _context.RecordUnsupportedFeature(description, pattern.ToString(), line, suggestion);
-
-        // Emit as wildcard pattern - this is valid Calor but changes semantics
-        // The original pattern is lost, so the case will match more broadly
-        return new WildcardPatternNode(span);
+        // #774: an unsupported pattern must never broaden to a wildcard (which
+        // silently changes which arm matches). Escalate the containing member to
+        // §CSHARP interop so the original semantics are preserved verbatim.
+        throw EscalateExpression(pattern, description);
     }
 
     private ExpressionNode ConvertExpression(ExpressionSyntax expression)
@@ -5968,10 +6079,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 _ => CreateFallbackExpression(expression, "unknown-expression")
             };
         }
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        catch (Exception ex) when (_context.ShouldPreserveCSharp && ex is not MemberInteropEscalationException)
         {
+            // A crash while converting an expression is a loss like any other
+            // unsupported expression: escalate to the nearest complete
+            // statement/member boundary so the original C# is preserved
+            // verbatim (#770), instead of emitting parse-valid §ERR poison.
             _context.IncrementSkipped();
-            return new FallbackExpressionNode(GetTextSpan(expression), expression.ToFullString(), "conversion-error", null);
+            throw EscalateExpression(expression, "conversion-error");
         }
     }
 
@@ -6001,8 +6116,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText),
             SyntaxKind.Utf8StringLiteralExpression =>
                 new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText) { IsUtf8 = true },
+            // #774: char literals must keep char semantics — a string literal
+            // silently changes comparisons and overload resolution. Calor's
+            // native representation is (char-lit "x"), which the C# emitter
+            // turns back into a compile-time-constant char literal 'x'.
             SyntaxKind.CharacterLiteralExpression =>
-                new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText),
+                ConvertCharLiteral(literal),
             SyntaxKind.TrueLiteralExpression =>
                 new BoolLiteralNode(GetTextSpan(literal), true),
             SyntaxKind.FalseLiteralExpression =>
@@ -6015,6 +6134,33 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new RawCSharpExpressionNode(GetTextSpan(literal), "__arglist"),
             _ => CreateFallbackExpression(literal, "unknown-literal")
         };
+    }
+
+    /// <summary>
+    /// Converts a C# char literal to Calor's native (char-lit "x") form (#774).
+    /// The char value round-trips as a single-character string argument (the
+    /// Calor parser enforces length 1) and the C# emitter reconstructs a real
+    /// char literal, preserving comparisons, switch labels, and overloads.
+    /// </summary>
+    private ExpressionNode ConvertCharLiteral(LiteralExpressionSyntax literal)
+    {
+        // #836 m1: a lone surrogate (e.g. '\uD83D') cannot survive the
+        // (char-lit "…") round trip — the UTF-8 file write replaces the
+        // unpaired surrogate with U+FFFD, silently corrupting the value.
+        // Escalate to member interop, which preserves the original ESCAPED
+        // source text ('\uD83D') verbatim.
+        var value = literal.Token.ValueText;
+        if (value.Length == 1 && char.IsSurrogate(value[0]))
+        {
+            throw EscalateExpression(literal, "char-literal-surrogate");
+        }
+
+        _context.RecordFeatureUsage("char-literal");
+        return new CharOperationNode(GetTextSpan(literal), CharOp.CharLiteral,
+            new List<ExpressionNode>
+            {
+                new StringLiteralNode(GetTextSpan(literal), value)
+            });
     }
 
     private IntLiteralNode CreateIntLiteralNode(LiteralExpressionSyntax literal, long value)
@@ -6102,10 +6248,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new NullCoalesceNode(GetTextSpan(binary), left, right);
         }
 
+        var op = binary.OperatorToken.Text;
+        // #774: an unknown operator must never silently become addition —
+        // escalate the containing member to §CSHARP interop instead.
+        var binaryOp = BinaryOperatorExtensions.FromString(op)
+            ?? throw EscalateExpression(binary, "unsupported-binary-operator");
         var leftExpr = ConvertExpression(binary.Left);
         var rightExpr = ConvertExpression(binary.Right);
-        var op = binary.OperatorToken.Text;
-        var binaryOp = BinaryOperatorExtensions.FromString(op) ?? BinaryOperator.Add;
 
         return new BinaryOperationNode(GetTextSpan(binary), binaryOp, leftExpr, rightExpr);
     }
@@ -6182,6 +6331,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         return pattern switch
         {
+            // #774: relational/binary pattern operators use exhaustive mappings —
+            // an unknown operator escalates instead of silently becoming ==/&&.
             RelationalPatternSyntax relPattern =>
                 new BinaryOperationNode(
                     GetTextSpan(relPattern),
@@ -6191,7 +6342,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         SyntaxKind.LessThanEqualsToken => BinaryOperator.LessOrEqual,
                         SyntaxKind.GreaterThanToken => BinaryOperator.GreaterThan,
                         SyntaxKind.GreaterThanEqualsToken => BinaryOperator.GreaterOrEqual,
-                        _ => BinaryOperator.Equal
+                        _ => throw EscalateExpression(relPattern, "unsupported-pattern-operator")
                     },
                     subject,
                     ConvertExpression(relPattern.Expression)),
@@ -6201,7 +6352,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     binaryPattern.OperatorToken.Kind() switch
                     {
                         SyntaxKind.OrKeyword => BinaryOperator.Or,
-                        _ => BinaryOperator.And
+                        SyntaxKind.AndKeyword => BinaryOperator.And,
+                        _ => throw EscalateExpression(binaryPattern, "unsupported-pattern-operator")
                     },
                     ConvertPatternToExpression(binaryPattern.Left, subject),
                     ConvertPatternToExpression(binaryPattern.Right, subject)),
@@ -7192,13 +7344,29 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Hoist the assignment to _pendingStatements and return the assigned value
         _context.IncrementConverted();
         var target = ConvertExpression(assignment.Left);
-        var value = ConvertExpression(assignment.Right);
 
-        _pendingStatements.Add(new AssignmentStatementNode(
-            GetTextSpan(assignment), target, value));
+        if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+        {
+            var value = ConvertExpression(assignment.Right);
+            _pendingStatements.Add(new AssignmentStatementNode(
+                GetTextSpan(assignment), target, value));
 
-        // Return the value so chained assignments work: a = (b = value) → assign b value, then return value for a
-        return value;
+            // Return the value so chained assignments work: a = (b = value) → assign b value, then return value for a
+            return value;
+        }
+
+        // #774: a compound assignment in expression context must not ignore its
+        // operator (the old behavior turned `x += 1` into `x = 1`). Hoist the
+        // correctly-mapped compound assignment; the expression's value is the
+        // updated target. Unmapped operators escalate to interop.
+        var compOp = MapCompoundAssignmentOperator(assignment.Kind())
+            ?? throw EscalateExpression(assignment, "unsupported-compound-assignment");
+
+        var rhs = ConvertExpression(assignment.Right);
+        _pendingStatements.Add(new CompoundAssignmentStatementNode(
+            GetTextSpan(assignment), target, compOp, rhs));
+
+        return ConvertExpression(assignment.Left);
     }
 
     private UnaryOperationNode ConvertPrefixUnaryExpression(PrefixUnaryExpressionSyntax prefix)
@@ -9692,28 +9860,47 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             lineSpan.StartLinePosition.Character + 1);
     }
 
+    /// <summary>Truncates source text for warning/loss messages.</summary>
+    private static string TruncateForMessage(string code)
+        => code.Length > 80 ? code.Substring(0, 77) + "..." : code;
+
     /// <summary>
-    /// Creates a fallback expression node for unsupported expressions.
-    /// Records the unsupported feature for explanation output.
+    /// Records an unsupported expression/pattern/operator and returns the
+    /// escalation exception the caller must throw (#770/#774). The nearest
+    /// enclosing complete boundary — a statement in C#-preserving modes, the
+    /// containing member otherwise — catches it and preserves the original C#
+    /// verbatim as §CSHARP interop, in ALL conversion modes. Unsupported
+    /// expressions must never become parse-valid §ERR "TODO" poison or silent
+    /// semantic substitutions inside otherwise-native output.
     /// </summary>
-    private FallbackExpressionNode CreateFallbackExpression(SyntaxNode node, string featureName)
+    private MemberInteropEscalationException EscalateExpression(SyntaxNode node, string featureName)
     {
         var lineSpan = node.GetLocation().GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
         var suggestion = FeatureSupport.GetWorkaround(featureName);
+        var code = TruncateForMessage(node.ToString());
 
         _context.RecordUnsupportedFeature(featureName, node.ToString(), line, suggestion);
 
-        // Also populate the issues list so fallback nodes are visible in conversion results
+        // Also populate the issues list so escalations are visible in conversion results
         if (_context.GracefulFallback)
         {
             _context.AddWarning(
-                $"Unsupported feature [{featureName}] replaced with fallback: {(node.ToString().Length > 80 ? node.ToString().Substring(0, 77) + "..." : node.ToString())}",
+                $"Unsupported feature [{featureName}] escalated to §CSHARP interop preservation: {code}",
                 feature: featureName, line: line, suggestion: suggestion);
         }
 
-        return new FallbackExpressionNode(GetTextSpan(node), node.ToString(), featureName, suggestion);
+        return new MemberInteropEscalationException(featureName, line,
+            $"Unsupported {featureName} escalated to containing member: {code}");
     }
+
+    /// <summary>
+    /// Unsupported-expression handler: escalates to the containing member (#770).
+    /// Historical name kept for the many switch-arm call sites; it no longer
+    /// returns a §ERR fallback node — it always throws.
+    /// </summary>
+    private ExpressionNode CreateFallbackExpression(SyntaxNode node, string featureName)
+        => throw EscalateExpression(node, featureName);
 
     /// <summary>
     /// Creates a fallback comment node for unsupported statements.
@@ -9738,9 +9925,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // When PassthroughOnError is enabled, wrap in §CSHARP block instead of TODO comment
         if (_context.PassthroughOnError)
         {
+            _context.RecordLoss(ConversionLossKind.InteropPreserved, featureName,
+                $"Statement preserved as raw C#: {TruncateForMessage(node.ToString())}", line);
             return new RawCSharpNode(GetTextSpan(node), node.ToFullString());
         }
 
+        _context.RecordLoss(ConversionLossKind.FallbackTodo, featureName,
+            $"Statement replaced with TODO comment: {TruncateForMessage(node.ToString())}", line);
         return new FallbackCommentNode(GetTextSpan(node), node.ToString(), featureName, suggestion);
     }
 
@@ -9750,12 +9941,37 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private CSharpInteropBlockNode CreateInteropBlock(SyntaxNode node, string? featureName, InteropMemberKind kind)
     {
+        // #836 C1: preserving this node verbatim abandons its partial
+        // conversion — discard any statements hoisted while converting it so
+        // they don't leak into the next converted member's flush.
+        _pendingStatements.Clear();
+
         // Use ToString() (without trivia) when the node lives inside a namespace.
         // ToFullString() can capture leading trivia that bleeds namespace context,
         // causing duplicate namespace wrappers since the module tag already provides one.
-        var sourceCode = node.Parent is BaseNamespaceDeclarationSyntax
-            ? node.ToString()
-            : node.ToFullString();
+        string sourceCode;
+        if (node.Parent is BaseNamespaceDeclarationSyntax)
+        {
+            sourceCode = node.ToString();
+        }
+        else if (node.GetLeadingTrivia().Any(t => t.IsDirective) ||
+                 node.GetTrailingTrivia().Any(t => t.IsDirective))
+        {
+            // #836 C2: ToFullString() would capture preprocessor directive
+            // trivia (e.g. the `#if` opening the active branch this member
+            // sits in) WITHOUT its matching `#endif`, emitting a dangling
+            // directive inside the §CSHARP block (CS1027 on re-compilation).
+            // Keep doc comments, drop directive-bearing trivia.
+            var docs = string.Concat(node.GetLeadingTrivia()
+                .Where(t => t.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia)
+                         || t.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+                .Select(t => t.ToFullString()));
+            sourceCode = docs + node.ToString();
+        }
+        else
+        {
+            sourceCode = node.ToFullString();
+        }
         var lineSpan = node.GetLocation().GetLineSpan();
         var line = lineSpan.StartLinePosition.Line + 1;
 
@@ -9767,6 +9983,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordUnsupportedFeature(featureName, node.ToString(), line);
         _context.Stats.InteropBlocksEmitted++;
         _context.AddInfo($"C# interop block preserved for [{featureName}]", feature: featureName, line: line);
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, featureName,
+            $"{kind} preserved as §CSHARP interop: {TruncateForMessage(node.ToString())}", line);
 
         return new CSharpInteropBlockNode(GetTextSpan(node), sourceCode, featureName, reason, kind);
     }
@@ -9955,3 +10173,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 }
 
+
+/// <summary>
+/// Thrown when an expression, pattern, or operator cannot be converted natively
+/// and the nearest complete boundary (statement in C#-preserving modes, containing
+/// member otherwise) must be preserved verbatim as §CSHARP interop (#770/#774).
+/// Caught at member/statement boundaries in ALL conversion modes — unsupported
+/// constructs must never degrade into silent substitutions or §ERR poison.
+/// </summary>
+internal sealed class MemberInteropEscalationException : NotSupportedException
+{
+    public string FeatureName { get; }
+    public int Line { get; }
+
+    public MemberInteropEscalationException(string featureName, int line, string message)
+        : base(message)
+    {
+        FeatureName = featureName;
+        Line = line;
+    }
+}

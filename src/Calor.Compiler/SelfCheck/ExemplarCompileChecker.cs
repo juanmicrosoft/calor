@@ -223,75 +223,17 @@ public static class ExemplarCompileChecker
         return programs;
     }
 
-    // Built once — enumerating the trusted-platform-assembly set is not free and the
-    // reference set is constant for the process lifetime. Lazy<T> makes the one-time
-    // build thread-safe under xUnit's parallel test classes.
-    private static readonly Lazy<IReadOnlyList<MetadataReference>> _references =
-        new(BuildReferences);
-
-    private static IReadOnlyList<MetadataReference> References() => _references.Value;
-
-    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("SingleFile", "IL3000",
-        Justification = "Assembly.Location is checked for empty string; the reference is skipped in single-file mode.")]
-    private static IReadOnlyList<MetadataReference> BuildReferences()
-    {
-        var tpa = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? "";
-        var references = tpa
-            .Split(System.IO.Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-            .Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-            .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
-            .ToList();
-
-        // Belt-and-suspenders: the generated C# for contract-bearing programs
-        // references Calor.Runtime; ensure it is present even if TPA omitted it.
-        var runtime = typeof(Calor.Runtime.ContractKind).Assembly.Location;
-        if (!string.IsNullOrEmpty(runtime) &&
-            !references.Any(r => (r as PortableExecutableReference)?.FilePath == runtime))
-        {
-            references.Add(MetadataReference.CreateFromFile(runtime));
-        }
-
-        return references;
-    }
-
-    // The implicit global usings the Calor SDK provides to generated code — this
-    // mirrors Microsoft.NET.Sdk's ImplicitUsings set as of .NET 10 (see
-    // src/Calor.Sdk/obj/**/Calor.Sdk.GlobalUsings.g.cs, the ground truth). The
-    // emitter relies on these — it emits `File.ReadAllLines(...)` with no
-    // `using System.IO;` — so the generated C# only compiles standalone when they
-    // are supplied here too. If a future SDK grows the set and a program starts
-    // using a newly-implicit namespace, that program's Roslyn compile will fail
-    // here (CS0246/CS0103) until this list is updated to match.
-    private const string GlobalUsingsPreamble =
-        "global using System;\n" +
-        "global using System.Collections.Generic;\n" +
-        "global using System.IO;\n" +
-        "global using System.Linq;\n" +
-        "global using System.Net.Http;\n" +
-        "global using System.Threading;\n" +
-        "global using System.Threading.Tasks;\n";
-
     /// <summary>
     /// Compiles generated C# with Roslyn's semantic model and returns error
-    /// messages (empty = compiles cleanly). Warnings are ignored.
+    /// messages (empty = compiles cleanly). Warnings are ignored. Delegates to
+    /// the shared <see cref="CodeGen.GeneratedCSharpCompiler"/> infrastructure
+    /// (TPA reference set + Calor.Runtime + the SDK's implicit global usings),
+    /// so the self-check, migration, and test compiles cannot drift apart (#761).
     /// </summary>
     public static IReadOnlyList<string> RoslynErrors(string generatedCSharp)
     {
-        var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
-        var trees = new[]
-        {
-            CSharpSyntaxTree.ParseText(GlobalUsingsPreamble, parseOptions),
-            CSharpSyntaxTree.ParseText(generatedCSharp, parseOptions),
-        };
-
-        var compilation = CSharpCompilation.Create(
-            "ExemplarCompileCheck",
-            trees,
-            References(),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        return compilation.GetDiagnostics()
-            .Where(d => d.Severity == RoslynSeverity.Error)
+        return CodeGen.GeneratedCSharpCompiler.Validate(generatedCSharp)
+            .CompilationErrors
             .Select(d => $"{d.Id}: {d.GetMessage()}")
             .ToList();
     }

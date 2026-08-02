@@ -52,11 +52,16 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Interfaces are converted to Calor interface definitions"
         },
+        // #773: honest downgrade — the native conversion emitted a positional
+        // record as a class with getter-only properties and NO constructor
+        // (broken output). The converter consults this level and preserves
+        // records verbatim as §CSHARP interop while it is not Full.
         ["record"] = new FeatureInfo
         {
             Name = "record",
-            Support = SupportLevel.Full,
-            Description = "Records are converted to Calor record definitions"
+            Support = SupportLevel.NotSupported,
+            Description = "Records are not natively supported; record declarations are preserved verbatim as §CSHARP interop blocks (counted as a conversion loss)",
+            Workaround = "Rewrite the record as an explicit class before migration, or keep it as a §CSHARP interop block"
         },
         ["struct"] = new FeatureInfo
         {
@@ -106,11 +111,19 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "If statements are converted to Calor IF blocks"
         },
+        // NOTE (#836 m2, pre-existing; #774 follow-up): §L's step is additive,
+        // but compound incrementors currently take the raw RHS — `k *= 2` /
+        // `j >>= 1` / `i -= 2` produce wrong additive steps. Kept at Full for
+        // the common ++/--/+= forms (a Partial level would warn on every for
+        // loop); the limitation is documented here and at the extraction site
+        // in RoslynSyntaxVisitor until the #774 follow-up routes non-additive
+        // incrementors to the while-loop fallback.
         ["for"] = new FeatureInfo
         {
             Name = "for",
             Support = SupportLevel.Full,
-            Description = "For loops are converted to Calor LOOP blocks"
+            Description = "For loops are converted to Calor LOOP blocks. Known limitation (#774 follow-up): non-additive compound incrementors (*=, /=, <<=, >>=, -=) take the raw RHS as an additive §L step, changing loop semantics",
+            Workaround = "Rewrite non-additive incrementors as while loops, or review converted §L steps"
         },
         ["foreach"] = new FeatureInfo
         {
@@ -551,11 +564,17 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Readonly structs are converted with struct and readonly modifiers"
         },
+        // #773: honest downgrade — the default pipeline STRIPS preprocessor
+        // directives before parsing, keeping the first #if branch unevaluated
+        // (a semantic loss, now counted with locations). §PP block conversion
+        // exists only when stripping is disabled (StripPreprocessor = false)
+        // and covers member/type-level #if blocks, not all directive shapes.
         ["preprocessor-directive"] = new FeatureInfo
         {
             Name = "preprocessor-directive",
-            Support = SupportLevel.Full,
-            Description = "Preprocessor directives (#if/#else/#endif) are converted to §PP blocks"
+            Support = SupportLevel.Partial,
+            Description = "By default #if/#elif/#else directives are stripped keeping the first branch unevaluated (recorded as a conversion loss); §PP block conversion applies only when stripping is disabled",
+            Workaround = "Review conditional-compilation blocks manually; alternate branches are not preserved in the default pipeline"
         },
 
         // Phase 4 features (C# 11-13)
@@ -593,6 +612,67 @@ public static class FeatureSupport
             Support = SupportLevel.NotSupported,
             Description = "using type aliases for tuples/complex types (C# 12) are not supported",
             Workaround = "Define explicit record or class types"
+        },
+
+        // W1 Slice 3 (#774): char literals are natively represented
+        ["char-literal"] = new FeatureInfo
+        {
+            Name = "char-literal",
+            Support = SupportLevel.Full,
+            Description = "Char literals are converted to Calor's native (char-lit \"x\") form and emit compile-time-constant C# char literals"
+        },
+
+        // W1 Slice 3 (#774): escalation feature names — unsupported operator /
+        // assignment / label / pattern shapes escalate the containing member to
+        // §CSHARP interop instead of silently substituting semantics.
+        ["unsupported-binary-operator"] = new FeatureInfo
+        {
+            Name = "unsupported-binary-operator",
+            Support = SupportLevel.NotSupported,
+            Description = "Binary operator has no Calor mapping; the containing member is preserved as §CSHARP interop (never substituted with +)",
+            Workaround = "Rewrite using a supported operator or keep the member as §CSHARP interop"
+        },
+        ["unsupported-compound-assignment"] = new FeatureInfo
+        {
+            Name = "unsupported-compound-assignment",
+            Support = SupportLevel.NotSupported,
+            Description = "Compound assignment operator (e.g. >>>=) has no Calor mapping; the containing member is preserved as §CSHARP interop (never emitted as a plain assignment)",
+            Workaround = "Rewrite as x = x OP y with a supported operator, or keep the member as §CSHARP interop"
+        },
+        ["unsupported-switch-label"] = new FeatureInfo
+        {
+            Name = "unsupported-switch-label",
+            Support = SupportLevel.NotSupported,
+            Description = "Switch label kind (e.g. pattern case label) is not convertible; the containing member is preserved as §CSHARP interop (never broadened to a wildcard)",
+            Workaround = "Rewrite as a constant case label or if/else chain, or keep the member as §CSHARP interop"
+        },
+        ["unsupported-pattern-operator"] = new FeatureInfo
+        {
+            Name = "unsupported-pattern-operator",
+            Support = SupportLevel.NotSupported,
+            Description = "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as §CSHARP interop (never defaulted to ==/&&)",
+            Workaround = "Rewrite the pattern with supported operators, or keep the member as §CSHARP interop"
+        },
+        ["char-literal-surrogate"] = new FeatureInfo
+        {
+            Name = "char-literal-surrogate",
+            Support = SupportLevel.NotSupported,
+            Description = "Lone-surrogate char literals (e.g. '\\uD83D') cannot round-trip through UTF-8 Calor source; the containing member is preserved as §CSHARP interop with the escaped source text intact",
+            Workaround = "Use the integer code unit ((char)0xD83D) or keep the member as §CSHARP interop"
+        },
+        ["generic-delegate"] = new FeatureInfo
+        {
+            Name = "generic-delegate",
+            Support = SupportLevel.NotSupported,
+            Description = "Generic delegate declarations lose their type parameters in native conversion; they are preserved verbatim as §CSHARP interop",
+            Workaround = "Use Func<>/Action<> or keep the delegate as §CSHARP interop"
+        },
+        ["conversion-error"] = new FeatureInfo
+        {
+            Name = "conversion-error",
+            Support = SupportLevel.NotSupported,
+            Description = "The converter crashed on this construct; the containing statement/member is preserved as §CSHARP interop",
+            Workaround = "Simplify the construct or keep it as §CSHARP interop"
         },
 
         // Fallback features (for explain mode)

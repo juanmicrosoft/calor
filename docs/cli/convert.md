@@ -102,6 +102,12 @@ timeout, crash). Exit codes are unchanged.
   timeout, crash). Converting Calor → C#, compiler diagnostics appear with
   their own codes.
 - `data.direction` — `csharp-to-calor` | `calor-to-csharp`.
+- `data.lossCount` / `data.losses[]` — C# → Calor structured semantic-loss
+  accounting: every §CSHARP interop preservation, TODO fallback, dropped
+  construct, and stripped preprocessor directive, each with
+  `kind`, `feature`, `file`, `line`, and `description`. `lossCount: 0` means
+  the output is fully native Calor. In text mode a conversion with losses
+  prints a located loss summary instead of the `✓ Conversion successful` line.
 - `data.benchmark` — present with `--benchmark`: token/line/character counts
   before and after, reduction percentages, and the advantage ratio.
 
