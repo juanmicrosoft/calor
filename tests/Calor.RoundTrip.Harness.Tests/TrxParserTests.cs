@@ -75,27 +75,138 @@ public class TrxParserTests
     }
 
     [Fact]
-    public void FindTrxFile_FindsMostRecent()
+    public void FindTrxFiles_FindsAll_NotJustNewest()
     {
         var tmpDir = Path.Combine(Path.GetTempPath(), "trx-test-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(tmpDir);
+        Directory.CreateDirectory(Path.Combine(tmpDir, "nested"));
 
         try
         {
             var older = Path.Combine(tmpDir, "old.trx");
             File.WriteAllText(older, "<TestRun/>");
-            Thread.Sleep(100);
-            var newer = Path.Combine(tmpDir, "new.trx");
+            Thread.Sleep(50);
+            var newer = Path.Combine(tmpDir, "nested", "new.trx");
             File.WriteAllText(newer, "<TestRun/>");
 
-            var found = TrxParser.FindTrxFile(tmpDir);
-            Assert.NotNull(found);
-            Assert.Equal(newer, found);
+            var found = TrxParser.FindTrxFiles(tmpDir);
+            Assert.Equal(2, found.Count);
+            Assert.Contains(older, found);
+            Assert.Contains(newer, found);
         }
         finally
         {
             Directory.Delete(tmpDir, true);
         }
+    }
+
+    [Fact]
+    public void Parse_JoinsTestDefinitions_ForAssemblyClassAndExecutor()
+    {
+        var trxContent = MakeTrx("alpha.tests.dll", "Alpha.Tests.Suite", ("TestA", "Passed"));
+
+        var tmpFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tmpFile, trxContent);
+            var results = TrxParser.Parse(tmpFile);
+
+            var r = Assert.Single(results);
+            Assert.Equal("TestA", r.TestName);
+            Assert.Equal("alpha.tests.dll", r.Assembly);
+            Assert.Equal("Alpha.Tests.Suite", r.ClassName);
+            Assert.Equal("executor://xunit/VsTestRunner2/netcoreapp", r.ExecutorUri);
+            Assert.Contains("alpha.tests.dll", r.Identity);
+            Assert.Contains("Alpha.Tests.Suite", r.Identity);
+        }
+        finally
+        {
+            File.Delete(tmpFile);
+        }
+    }
+
+    [Fact]
+    public void ParseAll_AggregatesEveryTrxFile()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "trx-agg-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(Path.Combine(tmpDir, "A", "TestResults"));
+        Directory.CreateDirectory(Path.Combine(tmpDir, "B", "TestResults"));
+
+        try
+        {
+            // Two assemblies, each with its own TRX — including a DUPLICATE display name.
+            File.WriteAllText(
+                Path.Combine(tmpDir, "A", "TestResults", "results.trx"),
+                MakeTrx("alpha.tests.dll", "Alpha.Tests.Suite", ("SharedName", "Passed"), ("OnlyInA", "Passed")));
+            File.WriteAllText(
+                Path.Combine(tmpDir, "B", "TestResults", "results.trx"),
+                MakeTrx("beta.tests.dll", "Beta.Tests.Suite", ("SharedName", "Failed"), ("OnlyInB", "Passed")));
+
+            var (results, trxFiles) = TrxParser.ParseAll(tmpDir);
+
+            Assert.Equal(2, trxFiles.Count);
+            Assert.Equal(4, results.Count);
+            Assert.Equal(3, results.Count(r => r.Outcome == "Passed"));
+            Assert.Equal(1, results.Count(r => r.Outcome == "Failed"));
+
+            // Duplicate display names across assemblies keep distinct identities.
+            var shared = results.Where(r => r.TestName == "SharedName").ToList();
+            Assert.Equal(2, shared.Count);
+            Assert.NotEqual(shared[0].Identity, shared[1].Identity);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public void ParseAll_SkipsUnparseableTrx_KeepsRest()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "trx-bad-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(tmpDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(tmpDir, "bad.trx"), "not xml at all <<<");
+            File.WriteAllText(
+                Path.Combine(tmpDir, "good.trx"),
+                MakeTrx("alpha.tests.dll", "Alpha.Tests.Suite", ("TestA", "Passed")));
+
+            var (results, trxFiles) = TrxParser.ParseAll(tmpDir);
+
+            Assert.Single(trxFiles);
+            Assert.Single(results);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    /// <summary>Builds a minimal TRX with Results joined to TestDefinitions.</summary>
+    internal static string MakeTrx(string assembly, string className, params (string Name, string Outcome)[] tests)
+    {
+        var results = string.Join("\n", tests.Select((t, i) =>
+            $"""    <UnitTestResult testId="id-{i}" testName="{t.Name}" outcome="{t.Outcome}" duration="00:00:00.001" />"""));
+        var definitions = string.Join("\n", tests.Select((t, i) =>
+            $"""
+                <UnitTest id="id-{i}" name="{t.Name}" storage="/work/bin/Debug/{assembly}">
+                  <TestMethod codeBase="/work/bin/Debug/{assembly}" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="{className}" name="{t.Name}" />
+                </UnitTest>
+            """));
+
+        return $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+              <Results>
+            {results}
+              </Results>
+              <TestDefinitions>
+            {definitions}
+              </TestDefinitions>
+            </TestRun>
+            """;
     }
 
     [Fact]

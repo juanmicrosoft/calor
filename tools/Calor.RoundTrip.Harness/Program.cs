@@ -148,6 +148,12 @@ async Task<int> RunCommand(string[] runArgs)
         Console.WriteLine($"   Round-trip: {report.RoundTripTests?.Passed ?? 0}/{report.RoundTripTests?.TotalTests ?? 0} passing");
         Console.WriteLine($"   Regressions: {report.Comparison?.Regressions.Count ?? -1}");
         Console.WriteLine($"   Files converted: {report.FileResults.Count(f => f.Status == FileStatus.Replaced)}/{report.FileResults.Count}");
+        if (report.Fidelity != null)
+        {
+            var cov = report.Fidelity.Coverage;
+            Console.WriteLine($"   Coverage: {cov.CoverageFraction:P1} ({cov.ConvertedNative} native, {cov.ConvertedWithLosses} with-losses, {cov.Reverted} reverted, {cov.FailedConversion} failed of {cov.TotalConvertibleFiles})");
+            Console.WriteLine($"   Interop blocks: {cov.TotalInteropBlocks}; distinct gaps: {cov.DistinctGaps.Count}");
+        }
         Console.WriteLine($"   Report: {mdPath}");
 
         if (report.Comparison?.Regressions.Count > 0)

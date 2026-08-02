@@ -42,8 +42,7 @@ public static class ReportGenerator
         var totalFiles = report.FileResults.Count;
         var pct = totalFiles > 0 ? (double)replaced / totalFiles * 100 : 0;
         sb.AppendLine($"| Files converted | {replaced}/{totalFiles} ({pct:F1}%) |");
-
-        var interop = report.FileResults.Sum(f => f.InteropBlocks);
+        sb.AppendLine($"| Files reverted by recovery | {report.FileResults.Count(f => f.Status == FileStatus.Reverted)} |");
         sb.AppendLine($"| Files with interop blocks | {report.FileResults.Count(f => f.InteropBlocks > 0)} |");
 
         if (report.BuildResult != null)
@@ -57,11 +56,62 @@ public static class ReportGenerator
 
         sb.AppendLine();
 
+        // Fidelity dimensions
+        if (report.Fidelity != null)
+        {
+            var cov = report.Fidelity.Coverage;
+            var build = report.Fidelity.Build;
+            var tests = report.Fidelity.Tests;
+
+            sb.AppendLine("## Fidelity (separated verdict dimensions)");
+            sb.AppendLine();
+            sb.AppendLine("### Conversion Coverage");
+            sb.AppendLine();
+            sb.AppendLine("| Metric | Value |");
+            sb.AppendLine("|--------|-------|");
+            sb.AppendLine($"| Coverage (converted-and-kept / total) | **{cov.CoverageFraction:P1}** ({cov.ConvertedNative + cov.ConvertedWithLosses}/{cov.TotalConvertibleFiles}) |");
+            sb.AppendLine($"| Converted natively (zero losses) | {cov.ConvertedNative} ({cov.NativeFraction:P1}) |");
+            sb.AppendLine($"| Converted with losses | {cov.ConvertedWithLosses} |");
+            sb.AppendLine($"| Reverted by recovery (coverage failures) | {cov.Reverted} |");
+            sb.AppendLine($"| Failed conversion | {cov.FailedConversion} |");
+            sb.AppendLine($"| Excluded by pattern (outside denominator) | {cov.ExcludedFiles} |");
+            sb.AppendLine($"| Interop blocks (raw C# preserved) | {cov.TotalInteropBlocks} |");
+            sb.AppendLine($"| Distinct semantic gaps | {cov.DistinctGaps.Count} |");
+            if (cov.LossKindCounts.Count > 0)
+            {
+                var kinds = string.Join(", ", cov.LossKindCounts
+                    .OrderBy(kv => kv.Key, StringComparer.Ordinal)
+                    .Select(kv => $"{kv.Key}: {kv.Value}"));
+                sb.AppendLine($"| Loss ledger by kind | {kinds} |");
+            }
+            if (cov.DistinctGaps.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("Gap features: " + string.Join(", ", cov.DistinctGaps.Take(30).Select(g => $"`{g}`")));
+                if (cov.DistinctGaps.Count > 30)
+                    sb.AppendLine($"... and {cov.DistinctGaps.Count - 30} more");
+            }
+            sb.AppendLine();
+            sb.AppendLine("### Build Outcome");
+            sb.AppendLine();
+            sb.AppendLine($"- Succeeded: {build.Succeeded} (exit {build.ExitCode})");
+            sb.AppendLine($"- Files reverted to reach this outcome: {build.RecoveryRevertedFiles}");
+            sb.AppendLine($"- Build errors: {build.ErrorCount}");
+            sb.AppendLine();
+            sb.AppendLine("### Test Outcome");
+            sb.AppendLine();
+            sb.AppendLine($"- Baseline: {tests.BaselinePassed}/{tests.BaselineTotal} passed ({tests.BaselineTrxFiles} TRX file(s){(tests.BaselineUsedConsoleFallback ? ", console fallback" : "")})");
+            sb.AppendLine($"- Round-trip: {tests.RoundTripPassed}/{tests.RoundTripTotal} passed ({tests.RoundTripTrxFiles} TRX file(s){(tests.RoundTripUsedConsoleFallback ? ", console fallback" : "")})");
+            sb.AppendLine($"- Test inventory delta: {tests.InventoryDelta:+0;-0;0}");
+            sb.AppendLine($"- Regressions: {tests.Regressions}; new passes: {tests.NewPasses}; status: {tests.ComparisonStatus}");
+            sb.AppendLine();
+        }
+
         // File-by-file results
         sb.AppendLine("## File-by-File Results");
         sb.AppendLine();
-        sb.AppendLine("| File | Status | Conv. Rate | Errors |");
-        sb.AppendLine("|------|--------|-----------|--------|");
+        sb.AppendLine("| File | Status | Conv. Rate | Losses | Interop | Gaps | Errors |");
+        sb.AppendLine("|------|--------|-----------|--------|---------|------|--------|");
 
         foreach (var file in report.FileResults.OrderBy(f => f.FilePath))
         {
@@ -73,10 +123,12 @@ public static class ReportGenerator
                 FileStatus.CompileError => "Compile Error",
                 FileStatus.Crashed => "Crashed",
                 FileStatus.Excluded => "Excluded",
+                FileStatus.Reverted => "REVERTED",
                 _ => "Unknown",
             };
             var errors = file.Errors.Count > 0 ? file.Errors.First().Truncate(80) : "-";
-            sb.AppendLine($"| {file.FilePath} | {statusEmoji} | {file.ConversionRate:F0}% | {errors} |");
+            var gaps = file.Gaps.Count > 0 ? string.Join("; ", file.Gaps.Take(3)) + (file.Gaps.Count > 3 ? $"; +{file.Gaps.Count - 3}" : "") : "-";
+            sb.AppendLine($"| {file.FilePath} | {statusEmoji} | {file.ConversionRate:F0}% | {file.LossCount} | {file.InteropBlocks} | {gaps} | {errors} |");
         }
 
         sb.AppendLine();
@@ -176,15 +228,71 @@ public static class ReportGenerator
             {
                 total = report.FileResults.Count,
                 replaced = report.FileResults.Count(f => f.Status == FileStatus.Replaced),
+                reverted = report.FileResults.Count(f => f.Status == FileStatus.Reverted),
                 conversion_failed = report.FileResults.Count(f => f.Status == FileStatus.ConversionFailed),
                 emit_error = report.FileResults.Count(f => f.Status == FileStatus.EmitSyntaxError),
                 compile_error = report.FileResults.Count(f => f.Status == FileStatus.CompileError),
                 crashed = report.FileResults.Count(f => f.Status == FileStatus.Crashed),
+                excluded_by_pattern = report.ExcludedFileCount,
             },
             avg_conversion_rate = report.FileResults.Count > 0
                 ? report.FileResults.Average(f => f.ConversionRate) / 100.0
                 : 0.0,
             build_succeeded = report.BuildResult?.Succeeded ?? false,
+            fidelity = report.Fidelity == null ? null : new
+            {
+                coverage = new
+                {
+                    total_convertible_files = report.Fidelity.Coverage.TotalConvertibleFiles,
+                    converted_native = report.Fidelity.Coverage.ConvertedNative,
+                    converted_with_losses = report.Fidelity.Coverage.ConvertedWithLosses,
+                    reverted = report.Fidelity.Coverage.Reverted,
+                    failed_conversion = report.Fidelity.Coverage.FailedConversion,
+                    excluded_files = report.Fidelity.Coverage.ExcludedFiles,
+                    coverage_fraction = report.Fidelity.Coverage.CoverageFraction,
+                    native_fraction = report.Fidelity.Coverage.NativeFraction,
+                    loss_kind_counts = report.Fidelity.Coverage.LossKindCounts,
+                    total_interop_blocks = report.Fidelity.Coverage.TotalInteropBlocks,
+                    distinct_gaps = report.Fidelity.Coverage.DistinctGaps,
+                },
+                build = new
+                {
+                    succeeded = report.Fidelity.Build.Succeeded,
+                    exit_code = report.Fidelity.Build.ExitCode,
+                    recovery_reverted_files = report.Fidelity.Build.RecoveryRevertedFiles,
+                    error_count = report.Fidelity.Build.ErrorCount,
+                },
+                tests = new
+                {
+                    baseline_total = report.Fidelity.Tests.BaselineTotal,
+                    baseline_passed = report.Fidelity.Tests.BaselinePassed,
+                    baseline_failed = report.Fidelity.Tests.BaselineFailed,
+                    baseline_trx_files = report.Fidelity.Tests.BaselineTrxFiles,
+                    baseline_console_fallback = report.Fidelity.Tests.BaselineUsedConsoleFallback,
+                    round_trip_total = report.Fidelity.Tests.RoundTripTotal,
+                    round_trip_passed = report.Fidelity.Tests.RoundTripPassed,
+                    round_trip_failed = report.Fidelity.Tests.RoundTripFailed,
+                    round_trip_trx_files = report.Fidelity.Tests.RoundTripTrxFiles,
+                    round_trip_console_fallback = report.Fidelity.Tests.RoundTripUsedConsoleFallback,
+                    inventory_delta = report.Fidelity.Tests.InventoryDelta,
+                    regressions = report.Fidelity.Tests.Regressions,
+                    new_passes = report.Fidelity.Tests.NewPasses,
+                    comparison_status = report.Fidelity.Tests.ComparisonStatus.ToString(),
+                },
+            },
+            file_detail = report.FileResults
+                .OrderBy(f => f.FilePath, StringComparer.Ordinal)
+                .Select(f => new
+                {
+                    path = f.FilePath,
+                    status = f.Status.ToString(),
+                    loss_count = f.LossCount,
+                    loss_kinds = f.LossKindCounts,
+                    interop_blocks = f.InteropBlocks,
+                    gaps = f.Gaps,
+                    revert_reason = f.RevertReason,
+                })
+                .ToList(),
         };
 
         return JsonSerializer.Serialize(summary, JsonOptions);
