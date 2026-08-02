@@ -227,4 +227,56 @@ public class IntegrationTests
         Assert.False(result.HasErrors);
         Assert.DoesNotContain("ContractViolationException", result.GeneratedCode);
     }
+
+    // ------------------------------------------------------------------
+    // #774: the width-carrying typed literals (LONG:/UINT:/ULONG:/SINGLE:)
+    // must flow through the verification pipeline (ExpressionSimplifier + Z3)
+    // without breaking contract translation — the width marker is metadata on
+    // top of the same numeric value the translator already consumes.
+    // ------------------------------------------------------------------
+
+    [SkippableFact]
+    public void WidthTypedIntLiterals_InContracts_VerifyWithoutError()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // LONG:/UINT: literals appear in the pre/postconditions and the body.
+        var source = @"
+§M{m001:Test}
+  §F{f001:Clamp:pub}
+      §I{i64:x}
+      §O{i64}
+      §Q (>= x LONG:0)
+      §Q (<= x LONG:1000000000000)
+      §S (>= result LONG:0)
+      §R x";
+
+        var options = new CompilationOptions { VerifyContracts = true };
+        var result = Program.Compile(source, "test.calr", options);
+
+        // Verification runs to completion — the width markers neither crash the
+        // translator nor introduce a compile error.
+        Assert.False(result.HasErrors);
+    }
+
+    [Fact]
+    public void WidthTypedLiterals_CompileToCorrectlySuffixedCSharp()
+    {
+        // End-to-end Calor-source → C#: the typed literals emit the right suffix.
+        var source = @"
+§M{m001:Test}
+  §F{f001:Widths:pub}
+      §O{i64}
+      §B{a:i64} LONG:5
+      §B{b:u32} UINT:7
+      §B{c:f32} SINGLE:3.14
+      §R a";
+
+        var result = Program.Compile(source, "test.calr");
+
+        Assert.False(result.HasErrors);
+        Assert.Contains("5L", result.GeneratedCode);
+        Assert.Contains("7U", result.GeneratedCode);
+        Assert.Contains("3.14f", result.GeneratedCode);
+    }
 }

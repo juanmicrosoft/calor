@@ -3627,7 +3627,10 @@ public sealed class Parser
         var token = Expect(TokenKind.IntLiteral);
         if (token.Value is IntLiteralInfo info)
         {
-            return new IntLiteralNode(token.Span, info.SignedValue, info.IsHex, info.IsUnsigned, info.UnsignedValue);
+            return new IntLiteralNode(token.Span, info.SignedValue, info.IsHex, info.IsUnsigned, info.UnsignedValue)
+            {
+                IsLong = info.IsLong
+            };
         }
         var value = token.Value switch
         {
@@ -3665,6 +3668,10 @@ public sealed class Parser
     private FloatLiteralNode ParseFloatLiteral()
     {
         var token = Expect(TokenKind.FloatLiteral);
+        if (token.Value is FloatLiteralInfo info)
+        {
+            return new FloatLiteralNode(token.Span, info.Value) { IsSingle = info.IsSingle };
+        }
         var value = token.Value is double d ? d : 0.0;
         return new FloatLiteralNode(token.Span, value);
     }

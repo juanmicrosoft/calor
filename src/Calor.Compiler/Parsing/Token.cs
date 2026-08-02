@@ -401,7 +401,18 @@ public readonly struct Token : IEquatable<Token>
 }
 
 /// <summary>
-/// Metadata for integer literal tokens that carry hex/unsigned information.
-/// Stored in <see cref="Token.Value"/> when the literal uses hex notation or unsigned types.
+/// Metadata for integer literal tokens that carry hex/unsigned/width information.
+/// Stored in <see cref="Token.Value"/> when the literal uses hex notation, unsigned
+/// types, or an explicit 64-bit (long/ulong) width (#774 faithful preservation).
 /// </summary>
-internal readonly record struct IntLiteralInfo(long SignedValue, bool IsHex, bool IsUnsigned, ulong UnsignedValue);
+internal readonly record struct IntLiteralInfo(long SignedValue, bool IsHex, bool IsUnsigned, ulong UnsignedValue)
+{
+    /// <summary>True when the literal carries an explicit 64-bit (L / UL) width.</summary>
+    public bool IsLong { get; init; }
+}
+
+/// <summary>
+/// Metadata for floating-point literal tokens that carry single-vs-double width
+/// (#774 faithful preservation). Stored in <see cref="Token.Value"/> for SINGLE: literals.
+/// </summary>
+internal readonly record struct FloatLiteralInfo(double Value, bool IsSingle);

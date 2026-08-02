@@ -1339,6 +1339,24 @@ public sealed class Lexer
             {
                 return ScanTypedDecimalLiteral();
             }
+            // SINGLE:digits (single-precision float literal, #774 width preservation)
+            if (upperText == "SINGLE" && (char.IsDigit(lookahead) || lookahead == '-' || lookahead == '.'))
+            {
+                return ScanTypedFloatLiteral(isSingle: true);
+            }
+            // LONG:digits / UINT:digits / ULONG:digits (explicit int width/signedness, #774)
+            if (upperText == "LONG" && (char.IsDigit(lookahead) || lookahead == '-'))
+            {
+                return ScanTypedIntLiteral(isUnsigned: false, isLong: true);
+            }
+            if (upperText == "UINT" && char.IsDigit(lookahead))
+            {
+                return ScanTypedIntLiteral(isUnsigned: true, isLong: false);
+            }
+            if (upperText == "ULONG" && char.IsDigit(lookahead))
+            {
+                return ScanTypedIntLiteral(isUnsigned: true, isLong: true);
+            }
 
             // Not a typed literal - return as identifier (colon is a separate token)
         }
@@ -1356,7 +1374,7 @@ public sealed class Lexer
         return MakeToken(TokenKind.Identifier);
     }
 
-    private Token ScanTypedIntLiteral()
+    private Token ScanTypedIntLiteral(bool isUnsigned = false, bool isLong = false)
     {
         Advance(); // consume ':'
         var valueStart = _position;
@@ -1380,11 +1398,11 @@ public sealed class Lexer
             var hexXIdx = hexValueText.IndexOf('x');
             if (hexXIdx < 0) hexXIdx = hexValueText.IndexOf('X');
             var hexPart = hexValueText.AsSpan(hexXIdx + 1);
-            if (long.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
+            if (!isUnsigned && long.TryParse(hexPart, System.Globalization.NumberStyles.HexNumber,
                 System.Globalization.CultureInfo.InvariantCulture, out var hexVal))
             {
                 return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(hexVal, IsHex: true, IsUnsigned: false, (ulong)hexVal));
+                    new IntLiteralInfo(hexVal, IsHex: true, IsUnsigned: false, (ulong)hexVal) { IsLong = isLong });
             }
 
             // Try ulong for values > long.MaxValue (e.g., 0xcccccccccccccccd)
@@ -1392,7 +1410,7 @@ public sealed class Lexer
                 System.Globalization.CultureInfo.InvariantCulture, out var uhexVal))
             {
                 return MakeToken(TokenKind.IntLiteral,
-                    new IntLiteralInfo(unchecked((long)uhexVal), IsHex: true, IsUnsigned: true, uhexVal));
+                    new IntLiteralInfo(unchecked((long)uhexVal), IsHex: true, IsUnsigned: true, uhexVal) { IsLong = isLong });
             }
 
             _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
@@ -1405,6 +1423,31 @@ public sealed class Lexer
         }
 
         var valueText = _source[valueStart.._position];
+
+        // #774: an explicit width/signedness (LONG:/UINT:/ULONG:) is preserved via
+        // IntLiteralInfo so it survives to the C# emitter, never re-derived from
+        // magnitude alone.
+        if (isUnsigned)
+        {
+            if (ulong.TryParse(valueText, out var uval))
+            {
+                return MakeToken(TokenKind.IntLiteral,
+                    new IntLiteralInfo(unchecked((long)uval), IsHex: false, IsUnsigned: true, uval) { IsLong = isLong });
+            }
+            _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
+            return MakeToken(TokenKind.Error);
+        }
+        if (isLong)
+        {
+            if (long.TryParse(valueText, out var lval))
+            {
+                return MakeToken(TokenKind.IntLiteral,
+                    new IntLiteralInfo(lval, IsHex: false, IsUnsigned: false, unchecked((ulong)lval)) { IsLong = true });
+            }
+            _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "INT");
+            return MakeToken(TokenKind.Error);
+        }
+
         if (int.TryParse(valueText, out var value))
         {
             return MakeToken(TokenKind.IntLiteral, value);
@@ -1457,7 +1500,7 @@ public sealed class Lexer
         return MakeToken(TokenKind.Error);
     }
 
-    private Token ScanTypedFloatLiteral()
+    private Token ScanTypedFloatLiteral(bool isSingle = false)
     {
         Advance(); // consume ':'
         var valueStart = _position;
@@ -1499,10 +1542,14 @@ public sealed class Lexer
         if (double.TryParse(valueText, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var value))
         {
-            return MakeToken(TokenKind.FloatLiteral, value);
+            // #774: a SINGLE: literal carries its single-precision width so the C#
+            // emitter re-emits the `f` suffix instead of silently widening to double.
+            return isSingle
+                ? MakeToken(TokenKind.FloatLiteral, new FloatLiteralInfo(value, IsSingle: true))
+                : MakeToken(TokenKind.FloatLiteral, value);
         }
 
-        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), "FLOAT");
+        _diagnostics.ReportInvalidTypedLiteral(CurrentSpan(), isSingle ? "SINGLE" : "FLOAT");
         return MakeToken(TokenKind.Error);
     }
 

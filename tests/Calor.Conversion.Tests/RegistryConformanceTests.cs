@@ -451,25 +451,22 @@ public class RegistryConformanceTests
     }
 
     // ------------------------------------------------------------------
-    // Numeric literal width / signedness audit (#774 requirement 7): the
-    // out-of-int-range integer widths that determine overload resolution
-    // (L / UL) survive C# → Calor → C#, never silently narrowed to a plain int.
-    //
-    // AUDIT FINDING (tracked as a separate literal-fidelity item, NOT the
-    // operator/pattern/assignment core of #774): Calor's numeric literal
-    // surface carries no unsigned/float marker, so an unsigned literal that
-    // still FITS in a long (e.g. `4000000000u`) and a `float` literal
-    // (`3.14f`) lose their suffix on re-parse. Fixing that needs an unsigned/
-    // width tag in the Calor lexer+parser — see the sibling literal-honesty
-    // issues (#751/#775). The 64-bit widths below round-trip today because the
-    // value itself forces the width.
+    // Numeric literal width / signedness (#774 requirement 7): the suffixes
+    // that determine precision / overload resolution / signedness must survive
+    // C# → Calor → C# FAITHFULLY (via the SINGLE:/LONG:/UINT:/ULONG: typed
+    // literals), never silently narrowed, widened, or re-signed. Values chosen
+    // so the suffix — not the magnitude — is the only thing carrying the type.
     // ------------------------------------------------------------------
 
     [Theory]
-    [InlineData("long", "10000000000L", "L")]     // signed 64-bit above int range
-    [InlineData("ulong", "18446744073709551615UL", "UL")] // unsigned 64-bit max
-    public void NumericLiteral_WidthAndSignedness_SurviveRoundTrip(
-        string type, string literal, string expectedSuffix)
+    [InlineData("float", "3.14f", "3.14f")]                 // single, NOT widened to double
+    [InlineData("long", "5L", "5L")]                        // long that fits an int
+    [InlineData("uint", "7u", "7U")]                        // uint that fits an int
+    [InlineData("uint", "4000000000u", "4000000000U")]      // uint above int range, NOT a long
+    [InlineData("ulong", "18446744073709551615UL", "UL")]   // unsigned 64-bit max
+    [InlineData("decimal", "1.5m", "1.5m")]                 // decimal (already worked — regression guard)
+    public void NumericLiteral_WidthAndSignedness_SurviveRoundTrip_Faithfully(
+        string type, string literal, string expectedInCSharp)
     {
         var result = RoundTrip($$"""
             public class Nums
@@ -481,12 +478,82 @@ public class RegistryConformanceTests
             }
             """);
 
+        _output.WriteLine(result.CalorSource!);
         _output.WriteLine(result.EmittedCSharp!);
-        // The width/sign suffix is preserved — the value did not silently
-        // narrow to a plain int (which would change overload resolution).
-        Assert.Contains(expectedSuffix, result.EmittedCSharp);
+
+        // The width/sign/precision is preserved end-to-end.
+        Assert.Contains(expectedInCSharp, result.EmittedCSharp);
         Assert.True(result.RoslynSuccess,
-            $"Numeric literal round trip does not compile: " + string.Join("; ", result.RoslynErrors));
+            "Numeric literal round trip does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Fact]
+    public void FloatLiteral_NotWidenedToDouble_NoSeventeenDigitExpansion()
+    {
+        // The concrete C1 repro: 3.14f used to convert to §B{f} 3.140000104904175
+        // → `double f = 3.14000...;`. It must stay a single-precision `3.14f`.
+        var result = RoundTrip("""
+            public class Precision
+            {
+                public float Pi()
+                {
+                    var f = 3.14f;
+                    return f;
+                }
+            }
+            """);
+
+        _output.WriteLine(result.CalorSource!);
+        _output.WriteLine(result.EmittedCSharp!);
+
+        Assert.Contains("SINGLE:3.14", result.CalorSource);
+        Assert.Contains("3.14f", result.EmittedCSharp);
+        Assert.DoesNotContain("3.140000", result.EmittedCSharp);  // no widened double expansion
+        Assert.True(result.RoslynSuccess,
+            "Float precision round trip does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Fact]
+    public void FloatLiteral_OverloadSelection_StaysSingle()
+    {
+        // Overload-selection context: Describe(3.14f) must keep binding the
+        // float overload after the round trip, not silently rebind to double.
+        var result = RoundTrip("""
+            public class Overloads
+            {
+                public string Describe(float x) => "float";
+                public string Describe(double x) => "double";
+                public string Pick() => Describe(3.14f);
+            }
+            """);
+
+        _output.WriteLine(result.EmittedCSharp!);
+        // The argument keeps its `f` suffix, so overload resolution is unchanged.
+        Assert.Contains("Describe(3.14f)", result.EmittedCSharp);
+        Assert.True(result.RoslynSuccess,
+            "Float overload round trip does not compile: " + string.Join("; ", result.RoslynErrors));
+    }
+
+    [Fact]
+    public void UnsignedIntLiteral_StaysUint_NotPromotedToLong()
+    {
+        // 4000000000u fits in a long, so the old bare-digit Calor emission
+        // re-parsed it as `4000000000L` (long) — a silent signedness+width
+        // change. The UINT: typed literal keeps it uint.
+        var result = RoundTrip("""
+            public class U
+            {
+                public uint Big() { return 4000000000u; }
+            }
+            """);
+
+        _output.WriteLine(result.CalorSource!);
+        _output.WriteLine(result.EmittedCSharp!);
+        Assert.Contains("UINT:4000000000", result.CalorSource);
+        Assert.Contains("4000000000U", result.EmittedCSharp);
+        Assert.DoesNotContain("4000000000L", result.EmittedCSharp);
+        Assert.True(result.RoslynSuccess,
+            "Unsigned literal round trip does not compile: " + string.Join("; ", result.RoslynErrors));
     }
 
     // ------------------------------------------------------------------

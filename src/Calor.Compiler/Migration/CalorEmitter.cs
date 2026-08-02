@@ -2194,13 +2194,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Always emit decimal — hex format (0xE0) breaks attribute parsing inside
         // §ARR, §L, and other tag blocks where braces are balanced by the parser.
+        //
+        // #774: width/signedness must cross the Calor text boundary intact. A bare
+        // number re-parses as int (or long-by-magnitude), silently dropping an
+        // unsigned or explicit-long width. Emit a typed literal so `7u` stays uint,
+        // `5L` stays long, and `…UL` stays ulong through the round trip.
         if (node.IsUnsigned)
-            return node.UnsignedValue.ToString();
+            return node.IsLong
+                ? $"ULONG:{node.UnsignedValue}"
+                : $"UINT:{node.UnsignedValue}";
+        if (node.IsLong)
+            return $"LONG:{node.Value}";
         return node.Value.ToString();
     }
 
     public string Visit(FloatLiteralNode node)
     {
+        // #774: preserve single-precision via a SINGLE: typed literal so the C#
+        // emitter re-emits `f` instead of widening to double.
+        if (node.IsSingle)
+            return $"SINGLE:{((float)node.Value).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
         return node.IsDecimal
             ? $"DEC:{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
             : node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);

@@ -894,7 +894,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             else
                 sb.Append(node.UnsignedValue);
 
-            if (node.UnsignedValue > uint.MaxValue)
+            // #774: defer to the carried 64-bit marker; fall back to magnitude only
+            // when no explicit width was preserved. A `uint` (IsLong false) that fits
+            // 32 bits stays `U`, never silently promoted to `UL`.
+            if (node.IsLong || node.UnsignedValue > uint.MaxValue)
                 sb.Append("UL");
             else
                 sb.Append("U");
@@ -906,7 +909,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             else
                 sb.Append(node.Value);
 
-            if (node.Value is > int.MaxValue or < int.MinValue)
+            // #774: an explicit `long` (IsLong) keeps its `L` even when the value
+            // fits an int; otherwise the width is derived from magnitude as before.
+            if (node.IsLong || node.Value is > int.MaxValue or < int.MinValue)
                 sb.Append("L");
         }
 
@@ -1184,6 +1189,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(FloatLiteralNode node)
     {
+        // #774: a single-precision literal recovers its exact float value (double→
+        // float→string is the shortest round-trippable form, e.g. 3.14f → "3.14")
+        // and re-emits the `f` suffix — never the widened 17-digit double expansion.
+        if (node.IsSingle)
+        {
+            var single = ((float)node.Value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return single + "f";
+        }
+
         var str = node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
         // Ensure float literals always contain a decimal point so they aren't
         // reinterpreted as integers in the generated C# code.

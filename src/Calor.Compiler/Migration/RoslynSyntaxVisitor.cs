@@ -6007,7 +6007,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return new TypePatternNode(span, pattern.Type.ToString(), designation?.Identifier.Text);
         }
 
-        // Complex recursive pattern without clear type - use wildcard fallback
+        // Complex recursive pattern without a clear type — escalate the containing
+        // member to §CSHARP interop rather than broadening to a wildcard (#774).
         return HandleUnsupportedPattern(pattern, "complex-recursive-pattern");
     }
 
@@ -6105,12 +6106,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 CreateIntLiteralNode(literal, intVal),
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is double doubleVal =>
                 new FloatLiteralNode(GetTextSpan(literal), doubleVal),
+            // #774: a `float` literal must not widen to `double` — carry the
+            // single-precision width so precision and overload resolution survive.
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is float floatVal =>
-                new FloatLiteralNode(GetTextSpan(literal), floatVal),
+                new FloatLiteralNode(GetTextSpan(literal), floatVal) { IsSingle = true },
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is decimal decVal =>
                 new DecimalLiteralNode(GetTextSpan(literal), decVal),
+            // #774: a `long` literal carries an explicit 64-bit width even when the
+            // value fits a smaller type (e.g. `5L`), so it is not narrowed to int.
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is long longVal =>
-                CreateIntLiteralNode(literal, longVal),
+                CreateIntLiteralNode(literal, longVal, isLong: true),
+            // #774: `uint` stays 32-bit unsigned (e.g. `7u`, `4000000000u`) — never
+            // silently promoted to a signed long crossing the Calor text boundary.
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is uint uintVal =>
                 new IntLiteralNode(GetTextSpan(literal), uintVal,
                     literal.Token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase),
@@ -6118,7 +6125,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             SyntaxKind.NumericLiteralExpression when literal.Token.Value is ulong ulongVal =>
                 new IntLiteralNode(GetTextSpan(literal), unchecked((long)ulongVal),
                     literal.Token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase),
-                    isUnsigned: true, ulongVal),
+                    isUnsigned: true, ulongVal) { IsLong = true },
             SyntaxKind.StringLiteralExpression =>
                 new StringLiteralNode(GetTextSpan(literal), literal.Token.ValueText),
             SyntaxKind.Utf8StringLiteralExpression =>
@@ -6170,12 +6177,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             });
     }
 
-    private IntLiteralNode CreateIntLiteralNode(LiteralExpressionSyntax literal, long value)
+    private IntLiteralNode CreateIntLiteralNode(LiteralExpressionSyntax literal, long value, bool isLong = false)
     {
         var isHex = literal.Token.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
         if (isHex)
-            return new IntLiteralNode(GetTextSpan(literal), value, isHex: true, isUnsigned: false, (ulong)value);
-        return new IntLiteralNode(GetTextSpan(literal), value);
+            return new IntLiteralNode(GetTextSpan(literal), value, isHex: true, isUnsigned: false, (ulong)value) { IsLong = isLong };
+        return new IntLiteralNode(GetTextSpan(literal), value) { IsLong = isLong };
     }
 
     private ExpressionNode ConvertBinaryExpression(BinaryExpressionSyntax binary)
