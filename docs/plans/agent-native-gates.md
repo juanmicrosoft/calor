@@ -314,7 +314,7 @@ two-level cluster bootstrap over the archived `m5-compare-001` N1 result files),
 and the power table are recorded in the row's Basis column; the margin (1.25)
 deliberately coincides with the main document's frozen Phase-1 neutral
 iterations envelope (125 %). No existing metric, threshold, or frozen row is
-altered. Registered results-blind: zero WS-W2 batch code exists at freeze time. Disclosed narrowing: plan D-W5.1 named `guarantees-probe-001` as a derivation source, but that epoch contains no N1 cells (W5-only pairs) — the derivation uses `m5-compare-001` alone, the only N1 population.
+altered. Registered results-blind: zero WS-W2 batch code exists at freeze time. **Review round recorded (the #825 convention):** this registration was adversarially reviewed pre-merge (PR #839) — the reviewer independently re-derived the calibration (null p95 1.243 vs 1.247 registered, power within MC noise) and its M1–M3/m1–m3 amendments (CV-max correction, attribution restatement, validity floor, table join, artifact naming, source narrowing) were applied in-document, results-blind, before merge. Disclosed narrowing: plan D-W5.1 named `guarantees-probe-001` as a derivation source, but that epoch contains no N1 cells (W5-only pairs) — the derivation uses `m5-compare-001` alone, the only N1 population.
 
 **A-1.3.2 (2026-07-30).** Results-blind amendment from the #827 epoch-driver
 review, applied before any epoch run; instruments only, thresholds and epoch
