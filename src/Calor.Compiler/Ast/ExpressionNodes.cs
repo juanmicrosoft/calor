@@ -21,6 +21,15 @@ public sealed class IntLiteralNode : ExpressionNode
     public bool IsUnsigned { get; }
     public ulong UnsignedValue { get; }
 
+    /// <summary>
+    /// True when the literal carries an explicit 64-bit width (C# <c>L</c>/<c>UL</c>
+    /// suffix, or a <c>ulong</c>). #774: preserved so a <c>long</c>/<c>ulong</c>
+    /// literal that still fits in a smaller type is not silently narrowed and its
+    /// overload resolution is kept. When false, the emitter derives width from
+    /// magnitude as before.
+    /// </summary>
+    public bool IsLong { get; init; }
+
     public IntLiteralNode(TextSpan span, long value) : base(span)
     {
         Value = value;
@@ -119,6 +128,14 @@ public sealed class FloatLiteralNode : ExpressionNode
     /// When true, this literal represents a C# decimal (suffix m) rather than a double.
     /// </summary>
     public bool IsDecimal { get; }
+
+    /// <summary>
+    /// When true, this literal represents a C# single-precision <c>float</c> (suffix f)
+    /// rather than a <c>double</c>. #774: preserved so a <c>float</c> literal is not
+    /// silently widened to <c>double</c> (changing precision and overload resolution);
+    /// the emitter recovers the exact single value and re-emits the <c>f</c> suffix.
+    /// </summary>
+    public bool IsSingle { get; init; }
 
     public FloatLiteralNode(TextSpan span, double value) : base(span)
     {

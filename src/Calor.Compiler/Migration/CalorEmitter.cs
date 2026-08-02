@@ -1638,7 +1638,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             CompoundAssignmentOperator.LeftShift => "<<",
             CompoundAssignmentOperator.RightShift => ">>",
             CompoundAssignmentOperator.NullCoalesce => "??",
-            _ => "+"
+            // #774: no silent fallback to "+" — exhaustive over the enum.
+            _ => throw new ArgumentOutOfRangeException(nameof(node),
+                $"Unhandled compound assignment operator: {node.Operator}")
         };
         // Parser expects: §ASSIGN <target> <value>
         if (node.Operator == CompoundAssignmentOperator.NullCoalesce)
@@ -2192,13 +2194,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
     {
         // Always emit decimal — hex format (0xE0) breaks attribute parsing inside
         // §ARR, §L, and other tag blocks where braces are balanced by the parser.
+        //
+        // #774: width/signedness must cross the Calor text boundary intact. A bare
+        // number re-parses as int (or long-by-magnitude), silently dropping an
+        // unsigned or explicit-long width. Emit a typed literal so `7u` stays uint,
+        // `5L` stays long, and `…UL` stays ulong through the round trip.
         if (node.IsUnsigned)
-            return node.UnsignedValue.ToString();
+            return node.IsLong
+                ? $"ULONG:{node.UnsignedValue}"
+                : $"UINT:{node.UnsignedValue}";
+        if (node.IsLong)
+            return $"LONG:{node.Value}";
         return node.Value.ToString();
     }
 
     public string Visit(FloatLiteralNode node)
     {
+        // #774: preserve single-precision via a SINGLE: typed literal so the C#
+        // emitter re-emits `f` instead of widening to double.
+        if (node.IsSingle)
+            return $"SINGLE:{((float)node.Value).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
         return node.IsDecimal
             ? $"DEC:{node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
             : node.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -2976,6 +2991,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             OkPatternNode op => $"§OK {EmitPattern(op.InnerPattern)}",
             ErrPatternNode ep => $"§ERR {EmitPattern(ep.InnerPattern)}",
             VarPatternNode varp => $"§VAR{{{varp.Name}}}",
+            TypePatternNode tp => Visit(tp),
             ConstantPatternNode cp => cp.Value.Accept(this),
             RelationalPatternNode rp => EmitRelationalPattern(rp),
             PropertyPatternNode pp => Visit(pp),
@@ -2984,7 +3000,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
             NegatedPatternNode np => $"(not {EmitPattern(np.Inner)})",
             OrPatternNode orp => $"(or {EmitPattern(orp.Left)} {EmitPattern(orp.Right)})",
             AndPatternNode andp => $"(and {EmitPattern(andp.Left)} {EmitPattern(andp.Right)})",
-            _ => "_"
+            // #774: no silent wildcard fallback — an unhandled pattern would
+            // broaden the arm to match everything. Fail loud instead.
+            _ => throw new ArgumentOutOfRangeException(nameof(pattern),
+                $"Unhandled pattern node in Calor emitter: {pattern.GetType().Name}")
         };
     }
 
@@ -3008,6 +3027,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     public string Visit(WildcardPatternNode node) => "_";
+    public string Visit(TypePatternNode node) => node.BindingName is { } name
+        ? $"§PTYPE{{{node.TypeName}:{name}}}"
+        : $"§PTYPE{{{node.TypeName}}}";
     public string Visit(VariablePatternNode node) => $"§VAR{{{node.Name}}}";
     public string Visit(LiteralPatternNode node) => node.Literal.Accept(this);
     public string Visit(SomePatternNode node) => $"§SM {EmitPattern(node.InnerPattern)}";
@@ -3610,7 +3632,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         BinaryOperator.BitwiseXor => "^",
         BinaryOperator.LeftShift => "<<",
         BinaryOperator.RightShift => ">>",
-        _ => "+"
+        // #774: no silent fallback to "+" — an unmapped operator must never be
+        // emitted as addition. This switch is exhaustive over BinaryOperator.
+        _ => throw new ArgumentOutOfRangeException(nameof(op),
+            $"Unhandled binary operator in Calor emitter: {op}")
     };
 
     private static string GetCalorOperatorKind(BinaryOperator op)
@@ -3636,7 +3661,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
             BinaryOperator.BitwiseXor => "xor",
             BinaryOperator.LeftShift => "shl",
             BinaryOperator.RightShift => "shr",
-            _ => "add"
+            // #774: no silent fallback to "add" — exhaustive over BinaryOperator.
+            _ => throw new ArgumentOutOfRangeException(nameof(op),
+                $"Unhandled binary operator in Calor emitter: {op}")
         };
     }
 

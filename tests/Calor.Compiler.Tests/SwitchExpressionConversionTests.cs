@@ -142,9 +142,13 @@ public class SwitchExpressionConversionTests
 
         Assert.Equal(2, matchExpr.Cases.Count);
 
-        // First case: declaration pattern "string s"
+        // First case: declaration pattern "string s" keeps its type test (#774) —
+        // it must be a TypePatternNode, not a bare VarPatternNode that would
+        // broaden the arm to match every value.
         var firstCase = matchExpr.Cases[0];
-        Assert.IsType<VarPatternNode>(firstCase.Pattern);
+        var typePattern = Assert.IsType<TypePatternNode>(firstCase.Pattern);
+        Assert.Equal("string", typePattern.TypeName);
+        Assert.Equal("s", typePattern.BindingName);
 
         // Second case: var pattern
         var secondCase = matchExpr.Cases[1];

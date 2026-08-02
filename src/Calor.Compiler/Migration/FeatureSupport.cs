@@ -653,6 +653,26 @@ public static class FeatureSupport
             Description = "Relational/binary pattern operator has no Calor mapping; the containing member is preserved as §CSHARP interop (never defaulted to ==/&&)",
             Workaround = "Rewrite the pattern with supported operators, or keep the member as §CSHARP interop"
         },
+        ["unsupported-prefix-operator"] = new FeatureInfo
+        {
+            Name = "unsupported-prefix-operator",
+            Support = SupportLevel.NotSupported,
+            Description = "Prefix unary operator (e.g. unary +) has no Calor node; the containing member is preserved as §CSHARP interop (never substituted with negation)",
+            Workaround = "Drop the redundant unary + or keep the member as §CSHARP interop"
+        },
+        ["unsupported-slice-subpattern"] = new FeatureInfo
+        {
+            Name = "unsupported-slice-subpattern",
+            Support = SupportLevel.NotSupported,
+            Description = "A list-pattern slice carrying an inner sub-pattern (e.g. ..[1,2]) constrains the remaining elements; it is preserved as §CSHARP interop (never broadened by dropping the sub-pattern)",
+            Workaround = "Match the remaining elements explicitly, or keep the member as §CSHARP interop"
+        },
+        ["type-pattern"] = new FeatureInfo
+        {
+            Name = "type-pattern",
+            Support = SupportLevel.Full,
+            Description = "Type-test and typed-declaration patterns (case Type: / case Type name:) are represented natively via TypePatternNode, preserving the runtime type test and binding"
+        },
         ["char-literal-surrogate"] = new FeatureInfo
         {
             Name = "char-literal-surrogate",

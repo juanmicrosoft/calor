@@ -3627,7 +3627,10 @@ public sealed class Parser
         var token = Expect(TokenKind.IntLiteral);
         if (token.Value is IntLiteralInfo info)
         {
-            return new IntLiteralNode(token.Span, info.SignedValue, info.IsHex, info.IsUnsigned, info.UnsignedValue);
+            return new IntLiteralNode(token.Span, info.SignedValue, info.IsHex, info.IsUnsigned, info.UnsignedValue)
+            {
+                IsLong = info.IsLong
+            };
         }
         var value = token.Value switch
         {
@@ -3665,6 +3668,10 @@ public sealed class Parser
     private FloatLiteralNode ParseFloatLiteral()
     {
         var token = Expect(TokenKind.FloatLiteral);
+        if (token.Value is FloatLiteralInfo info)
+        {
+            return new FloatLiteralNode(token.Span, info.Value) { IsSingle = info.IsSingle };
+        }
         var value = token.Value is double d ? d : 0.0;
         return new FloatLiteralNode(token.Span, value);
     }
@@ -4012,6 +4019,12 @@ public sealed class Parser
         if (Check(TokenKind.PropertyPattern))
         {
             return ParsePropertyPattern();
+        }
+
+        // Handle §PTYPE pattern (type-test / typed-declaration pattern, #774)
+        if (Check(TokenKind.TypePattern))
+        {
+            return ParseTypePattern();
         }
 
         // Handle raw { } property pattern from converter output
@@ -10305,6 +10318,20 @@ public sealed class Parser
     }
 
     /// <summary>
+    /// Parses a type-test / typed-declaration pattern (#774).
+    /// §PTYPE{TypeName}          → type-only pattern (matches when value is TypeName)
+    /// §PTYPE{TypeName:binding}  → declaration pattern (also binds the value)
+    /// </summary>
+    private TypePatternNode ParseTypePattern()
+    {
+        var startToken = Expect(TokenKind.TypePattern);
+        var attrs = ParseAttributes();
+        var typeName = attrs["_pos0"] ?? "";
+        var binding = attrs["_pos1"];
+        return new TypePatternNode(startToken.Span, typeName, binding);
+    }
+
+    /// <summary>
     /// Parses a relational pattern.
     /// §PREL[gte] 18
     /// </summary>
@@ -10416,6 +10443,7 @@ public sealed class Parser
         return Current.Kind is TokenKind.PositionalPattern
             or TokenKind.PropertyPattern
             or TokenKind.ListPattern
+            or TokenKind.TypePattern
             or TokenKind.Var
             or TokenKind.RelationalPattern
             or TokenKind.OpenBrace  // Property pattern: { Prop: value }

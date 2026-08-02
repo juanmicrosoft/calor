@@ -270,6 +270,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(RelationalPatternNode node) { }
     public void Visit(ListPatternNode node) { }
     public void Visit(VarPatternNode node) { }
+    public void Visit(TypePatternNode node) { }
     public void Visit(ConstantPatternNode node) { }
     public void Visit(NegatedPatternNode node) { }
     public void Visit(OrPatternNode node) { }

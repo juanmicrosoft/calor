@@ -4,7 +4,7 @@
       §W{match003:expr} obj
         §K string { Length: 0 } → "empty string"
         §K string { Length: §PREL{gt} 100 } → "long string"
-        §K §VAR{n} §WHEN (> n 0) → "positive"
+        §K §PTYPE{int:n} §WHEN (> n 0) → "positive"
         §K _ → "other"
 
 
