@@ -421,6 +421,310 @@ var x = 1;
     }
 
     // ========================================================================
+    // W2 adversarial review fixes (PR #842) — C2, C1, C3, C4, C5, M1
+    // ========================================================================
+
+    [Fact]
+    public void C2_DecoyNamedDelegateParameter_ShadowsFunction_IsError()
+    {
+        // Review C2: a Func parameter named like a pure module function must be
+        // resolved as the VALUE (matching C# scoping and emission), yielding
+        // Calor0418 — not silently charged as the shadowed pure function.
+        var source = @"
+§M{m001:Shadow}
+  §F{f001:Helper:pub}
+      §O{i32}
+      §E{}
+      §R INT:1
+  §F{f002:Loud:pub}
+      §O{i32}
+      §E{cw}
+      §P ""laundered""
+      §R INT:2
+  §F{f003:Go:pub}
+      §I{Func<i32>:Helper}
+      §O{i32}
+      §E{}
+      §R §C{Helper} §/C
+  §F{f004:Main:pub}
+      §O{void}
+      §E{}
+      §B{r:i32} §C{Go} §A Loud §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors, "Decoy-named delegate invocation must fail");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("'Helper'"));
+        // C4 companion: Main passes the impure method group 'Loud' — charged at
+        // the passing site, so §E{} on Main is a Calor0410.
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("Main"));
+    }
+
+    [Fact]
+    public void C1_PpBlock_StatementLeg_ChargesBranchEffects()
+    {
+        // Review C1 (statement leg): effects inside a §PP conditional block are
+        // charged (union of branches) — a §PP body is never silently pure.
+        var source = @"
+§M{m001:PpHole}
+  §F{f001:Sneaky:pub}
+      §O{void}
+      §E{}
+      §PP{DEBUG}
+      §C{Console.WriteLine} ""hidden effect""
+      §/PP{DEBUG}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors, "§PP-wrapped effects must be charged");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("Sneaky") && d.Message.Contains("cw"));
+    }
+
+    [Fact]
+    public void C1_PpBlock_MemberLeg_WrappedMethodIsEnforced()
+    {
+        // Review C1 (member leg): a class method wrapped in a class-level §PP
+        // block must not escape enforcement.
+        var source = @"
+§M{m001:PPM}
+  §CL{c001:Logger:pub}
+      §PP{DEBUG}
+      §MT{mt001:Sneak:pub}
+          §O{void}
+          §E{}
+          §C{Console.WriteLine} §A ""pp-wrapped method effect"" §/C
+      §/PP{DEBUG}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors, "§PP-wrapped methods must be enforced");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("Sneak") && d.Message.Contains("cw"));
+    }
+
+    [Fact]
+    public void C3_InheritedImplementation_BroaderEffects_IsError()
+    {
+        // Review C3: an interface implementation satisfied by an INHERITED
+        // in-module method is variance-checked (Calor0421) — inheritance must
+        // not launder through interface dispatch.
+        var source = @"
+§M{m001:InheritLaunder}
+  §IFACE{i001:IQuiet}
+      §MT{m001:Run}
+          §O{void}
+          §E{}
+  §CL{c001:Loud:pub}
+      §MT{mt001:Run:pub}
+          §O{void}
+          §E{cw}
+          §P ""runs loud""
+  §CL{c002:Sneaky:pub}
+      §EXT{Loud}
+      §IMPL{IQuiet}
+      §MT{mt002:Noop:pub}
+          §O{void}
+          §E{}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors, "Inherited implementation broadening interface effects must fail");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.InterfaceEffectVariance
+                && d.Message.Contains("Sneaky") && d.Message.Contains("inherited"));
+    }
+
+    [Fact]
+    public void C3_ExternalInheritedImplementation_RoutesToAssumed()
+    {
+        // Review C3 (external arm): §IMPL satisfied only by a member inherited
+        // from an external base is surfaced via the Calor0419 assumption channel.
+        var source = @"
+§M{m001:ExtImpl}
+  §IFACE{i001:IQuiet}
+      §MT{m001:Run}
+          §O{void}
+          §E{}
+  §CL{c001:Bridge:pub}
+      §EXT{SomeExternalBase}
+      §IMPL{IQuiet}
+      §MT{mt001:Other:pub}
+          §O{void}
+          §E{}
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.Contains(result.Diagnostics.Warnings,
+            d => d.Code == DiagnosticCode.AssumedEffects
+                && d.Message.Contains("SomeExternalBase") && d.Message.Contains("IQuiet.Run"));
+    }
+
+    [Fact]
+    public void C4_MethodGroupArgument_ChargesCalleeDeclaredEffects()
+    {
+        // Review C4: a method-group argument (bare reference to an internal
+        // function) charges that function's declared effects at the passing
+        // site — ConvertAll and friends can no longer launder it.
+        var source = @"
+§M{m001:HigherOrder}
+  §F{f001:LoudMap:pub}
+      §I{i32:x}
+      §O{i32}
+      §E{cw}
+      §P ""mapping""
+      §R x
+  §F{f002:Go:pub}
+      §I{List<i32>:items}
+      §O{void}
+      §E{}
+      §B{r} §C{items.ConvertAll} §A LoudMap §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors, "Method-group argument effects must be charged");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect
+                && d.Message.Contains("Go") && d.Message.Contains("cw"));
+    }
+
+    [Fact]
+    public void C4_DelegateValueArgument_ToKnownHigherOrderName_SurfacesAssumption()
+    {
+        // Review C4 (value arm): a function-typed VALUE passed to a known-pure
+        // higher-order name (Select) is surfaced as a Calor0419 assumption —
+        // the BCL callee may invoke it invisibly.
+        var source = @"
+§M{m001:HofVal}
+  §F{f001:Go:pub}
+      §I{Func<i32,i32>:f}
+      §I{List<i32>:items}
+      §O{void}
+      §E{}
+      §B{r} §C{items.Select} §A f §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.Contains(result.Diagnostics.Warnings,
+            d => d.Code == DiagnosticCode.AssumedEffects
+                && d.Message.Contains("'f'") && d.Message.Contains("items.Select"));
+    }
+
+    [Fact]
+    public void C5_ExternalTypedReceiver_CollidingMethodName_FailsLoud()
+    {
+        // Review C5: a receiver whose static type is KNOWN and external must not
+        // be captured by an in-module method-name collision — it goes to the
+        // unknown chain (fail loud), for both single and chained receivers.
+        var source = @"
+§M{m001:RC}
+  §CL{c001:Helper:pub}
+      §MT{mt001:Refresh:pub}
+          §O{i32}
+          §E{}
+          §R INT:1
+  §F{f001:GoSingle:pub}
+      §I{SomeExternal:svc}
+      §O{void}
+      §E{}
+      §C{svc.Refresh}
+      §/C
+  §F{f002:GoChained:pub}
+      §I{SomeExternal:svc}
+      §O{void}
+      §E{}
+      §C{svc.conn.Refresh}
+      §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors, "External-typed receiver collisions must fail loud");
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("svc.Refresh"));
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.UnknownExternalCall && d.Message.Contains("svc.conn.Refresh"));
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("GoSingle"));
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.ForbiddenEffect && d.Message.Contains("GoChained"));
+    }
+
+    [Fact]
+    public void C5_InModuleTypedReceiver_StillResolves()
+    {
+        // Companion: a receiver statically typed as the in-module declaring
+        // class still resolves (declared-§E charge) — no unknown-call noise.
+        var source = @"
+§M{m001:RC2}
+  §CL{c001:Helper:pub}
+      §MT{mt001:Refresh:pub}
+          §O{i32}
+          §E{}
+          §R INT:1
+  §F{f001:Go:pub}
+      §O{void}
+      §E{}
+      §B{h:Helper} §NEW{Helper} §/NEW
+      §C{h.Refresh}
+      §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors,
+            $"In-module typed receiver must still resolve. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.UnknownExternalCall);
+    }
+
+    [Fact]
+    public void M1_ExpressionCallSpelling_DelegateValue_IsError()
+    {
+        // Review M1: `§C f §A x §/C` (expression-call spelling) is the same
+        // delegate invocation as `§C{f}` and gets the same Calor0418 error.
+        var source = @"
+§M{m001:Wrap}
+  §F{f001:Apply:pub}
+      §I{Func<i32,i32>:f}
+      §I{i32:x}
+      §O{i32}
+      §E{}
+      §R §C f §A x §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors, "Expression-call delegate invocation must be an error");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("'f'"));
+    }
+
+    [Fact]
+    public void M1_ReturnedDelegateInvocation_IsError()
+    {
+        // Review M1: invoking the RESULT of a call (`GetF()()`) invokes a
+        // delegate value — Calor0418.
+        var source = @"
+§M{m001:E}
+  §F{f001:GetF:pub}
+      §O{Func<i32>}
+      §E{}
+      §R §LAM{l1} §R INT:1 §/LAM{l1}
+  §F{f002:Go:pub}
+      §O{i32}
+      §E{}
+      §R §C §C{GetF} §/C §/C
+";
+        var result = TestHarness.Compile(source);
+
+        Assert.True(result.HasErrors, "Returned-delegate invocation must be an error");
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Code == DiagnosticCode.DelegateInvocation && d.Message.Contains("returned delegate"));
+    }
+
+    // ========================================================================
     // D-W2.6 — Unknown constructs are never silently pure
     // ========================================================================
 

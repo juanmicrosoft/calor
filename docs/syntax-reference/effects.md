@@ -294,7 +294,7 @@ Effect enforcement is fail-closed. The diagnostics on the enforcement surface:
 - **Calor0420** — an override declares effects not covered by its base method's declared `§E` (override `§E` must be a subset of base `§E`). Broader override effects would launder through dynamic dispatch.
 - **Calor0421** — an interface implementation declares effects not covered by the interface method's declared `§E`.
 
-Calls through a receiver whose static type is an in-module interface or class charge the static type's *declared* `§E` — sound because Calor0420/Calor0421 pin every override and implementation to a subset of that declared set. Overrides of **external C# base classes** cannot be variance-checked and are surfaced through the Calor0419 assumption channel.
+Calls through a receiver whose static type is an in-module interface or class charge the static type's *declared* `§E` — sound because Calor0420/Calor0421 pin every override and implementation to a subset of that declared set, **including implementations inherited from in-module base classes**. Overrides of **external C# base classes**, and interface implementations satisfied by members inherited from external bases, cannot be variance-checked and are surfaced through the Calor0419 assumption channel instead.
 
 ### Disabling Enforcement (Not Recommended)
 

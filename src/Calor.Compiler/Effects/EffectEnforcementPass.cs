@@ -73,20 +73,22 @@ public sealed class EffectEnforcementPass
         _callGraphAnalysis = CallGraphAnalysis.Build(module);
 
         // Phase 1b: index module shape for delegate detection, static-receiver
-        // resolution and variance checks.
+        // resolution and variance checks. All enumerations include §PP-wrapped
+        // types/members (W2 review C1).
         _classesByName = new Dictionary<string, ClassDefinitionNode>(StringComparer.Ordinal);
-        foreach (var cls in module.Classes)
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
             _classesByName[cls.Name] = cls;
         _interfacesByName = new Dictionary<string, InterfaceDefinitionNode>(StringComparer.Ordinal);
-        foreach (var iface in module.Interfaces)
+        foreach (var iface in CallGraphAnalysis.EnumerateInterfaces(module))
             _interfacesByName[iface.Name] = iface;
-        _delegateTypeNames = new HashSet<string>(module.Delegates.Select(d => d.Name), StringComparer.Ordinal);
+        _delegateTypeNames = new HashSet<string>(
+            CallGraphAnalysis.EnumerateDelegates(module).Select(d => d.Name), StringComparer.Ordinal);
         _ownerClassByFunctionId = new Dictionary<string, ClassDefinitionNode>(StringComparer.Ordinal);
-        foreach (var cls in module.Classes)
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
-            foreach (var method in cls.Methods)
+            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
                 _ownerClassByFunctionId[$"{cls.Name}.{method.Id}"] = cls;
-            foreach (var ctor in cls.Constructors)
+            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
                 _ownerClassByFunctionId[$"{cls.Name}.{ctor.Id}"] = cls;
         }
 
@@ -106,28 +108,18 @@ public sealed class EffectEnforcementPass
         // of an assumed-effect function inherits the assumption transitively.
         PropagateAssumptions();
 
-        // Phase 4: Check each function's computed effects against declared effects
-        foreach (var function in module.Functions)
+        // Phase 4: Check every indexed function (top-level functions plus class
+        // methods, including §PP-wrapped ones — W2 review C1) against its
+        // declared effects. Constructors participate in the call graph (for SCC
+        // analysis) but are not checked because:
+        // 1. CTOR has no E{...} declaration syntax yet
+        // 2. Constructors inherently assign to fields (mut) which would always fail
+        // Constructor enforcement requires language-level E support on CTOR first.
+        foreach (var function in _callGraphAnalysis.Functions.Values)
         {
+            if (function.Name.EndsWith("..ctor", StringComparison.Ordinal))
+                continue;
             CheckEffects(function);
-        }
-
-        // Phase 4b: Also check class methods and constructors
-        foreach (var cls in module.Classes)
-        {
-            foreach (var method in cls.Methods)
-            {
-                var wrappedId = $"{cls.Name}.{method.Id}";
-                if (_callGraphAnalysis.Functions.TryGetValue(wrappedId, out var wrapped))
-                {
-                    CheckEffects(wrapped);
-                }
-            }
-            // Note: Constructors participate in the call graph (for SCC analysis)
-            // but are not checked for effects here because:
-            // 1. CTOR has no E{...} declaration syntax yet
-            // 2. Constructors inherently assign to fields (mut) which would always fail
-            // Constructor enforcement requires language-level E support on CTOR first.
         }
     }
 
@@ -368,9 +360,9 @@ public sealed class EffectEnforcementPass
             ? DiagnosticSeverity.Warning
             : DiagnosticSeverity.Error;
 
-        foreach (var cls in module.Classes)
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
-            foreach (var method in cls.Methods)
+            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
             {
                 if (!method.IsOverride)
                     continue;
@@ -407,30 +399,91 @@ public sealed class EffectEnforcementPass
             {
                 foreach (var sig in iface.Methods)
                 {
-                    var impl = cls.Methods.FirstOrDefault(
-                        m => m.Name.Equals(sig.Name, StringComparison.Ordinal));
-                    if (impl == null)
-                        continue;
+                    // W2 review C3: the implementing member may be INHERITED —
+                    // walk the in-module base chain, not just cls.Methods.
+                    // Interface dispatch through an inherited implementation
+                    // launders exactly like a direct one.
+                    var (impl, implOwnerName, externalBaseName) =
+                        FindImplementingMethod(cls, sig.Name);
 
-                    var implDeclared = GetDeclaredEffects(impl.Effects);
-                    var ifaceDeclared = GetDeclaredEffects(sig.Effects);
-                    if (!implDeclared.IsSubsetOf(ifaceDeclared))
+                    if (impl != null)
                     {
-                        var extra = implDeclared.Except(ifaceDeclared)
-                            .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
+                        var implDeclared = GetDeclaredEffects(impl.Effects);
+                        var ifaceDeclared = GetDeclaredEffects(sig.Effects);
+                        if (!implDeclared.IsSubsetOf(ifaceDeclared))
+                        {
+                            var extra = implDeclared.Except(ifaceDeclared)
+                                .Select(e => EffectSetExtensions.ToSurfaceCode(e.Kind, e.Value));
+                            var inheritedNote = implOwnerName != null
+                                && !implOwnerName.Equals(cls.Name, StringComparison.Ordinal)
+                                ? $" (implementation inherited from base class '{implOwnerName}')"
+                                : "";
+                            // Point at the implementing member when it is local;
+                            // at the implementing class declaration when inherited.
+                            var span = inheritedNote.Length == 0
+                                ? impl.Effects?.Span ?? impl.Span
+                                : cls.Span;
+                            _diagnostics.Report(
+                                span,
+                                DiagnosticCode.InterfaceEffectVariance,
+                                $"Implementation '{implOwnerName ?? cls.Name}.{impl.Name}' of interface method " +
+                                $"'{iface.Name}.{sig.Name}' on class '{cls.Name}'{inheritedNote} declares effect(s) " +
+                                $"[{string.Join(", ", extra)}] not declared by the interface " +
+                                $"(interface declares: {ifaceDeclared.ToDisplayString()}). " +
+                                "An implementation may not broaden the interface's declared effect set — interface " +
+                                "dispatch launders effects identically to overrides.",
+                                varianceSeverity);
+                        }
+                    }
+                    else if (externalBaseName != null)
+                    {
+                        // The §IMPL is satisfied (if at all) by a member inherited
+                        // from an EXTERNAL base: variance cannot be checked, so the
+                        // interface's declared effect set is only an assumption —
+                        // surfaced like external-base overrides (Calor0419).
+                        var assumedSeverity = _strictEffects
+                            ? DiagnosticSeverity.Error
+                            : DiagnosticSeverity.Warning;
                         _diagnostics.Report(
-                            impl.Effects?.Span ?? impl.Span,
-                            DiagnosticCode.InterfaceEffectVariance,
-                            $"Implementation '{cls.Name}.{impl.Name}' declares effect(s) [{string.Join(", ", extra)}] " +
-                            $"not declared by interface method '{iface.Name}.{sig.Name}' " +
-                            $"(interface declares: {ifaceDeclared.ToDisplayString()}). " +
-                            "An implementation may not broaden the interface's declared effect set — interface " +
-                            "dispatch launders effects identically to overrides.",
-                            varianceSeverity);
+                            cls.Span,
+                            DiagnosticCode.AssumedEffects,
+                            $"Class '{cls.Name}' implements '{iface.Name}.{sig.Name}' through a member that is " +
+                            $"not visible in this module (inherited from external base '{externalBaseName}'). " +
+                            "The interface's declared effect set is ASSUMED for this implementation, not verified.",
+                            assumedSeverity);
                     }
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Finds the member implementing an interface method on a class: the class's
+    /// own methods first (including §PP-wrapped ones), then the in-module
+    /// base-class chain. Returns (method, definingClassName, null) when found;
+    /// (null, null, externalBaseName) when the chain leaves the module without a
+    /// match; (null, null, null) when there is no match and no external base.
+    /// </summary>
+    private (MethodNode? Method, string? OwnerName, string? ExternalBaseName) FindImplementingMethod(
+        ClassDefinitionNode cls, string methodName)
+    {
+        var current = cls;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (current != null && visited.Add(current.Name))
+        {
+            var found = CallGraphAnalysis.EnumerateMethods(current).FirstOrDefault(
+                m => m.Name.Equals(methodName, StringComparison.Ordinal));
+            if (found != null)
+                return (found, current.Name, null);
+
+            var baseName = StripGenericArguments(current.BaseClass);
+            if (baseName == null)
+                return (null, null, null);
+            if (!_classesByName.TryGetValue(baseName, out var baseCls))
+                return (null, null, baseName); // external base
+            current = baseCls;
+        }
+        return (null, null, null);
     }
 
     /// <summary>
@@ -447,7 +500,7 @@ public sealed class EffectEnforcementPass
         {
             if (!_classesByName.TryGetValue(baseName, out var baseCls))
                 return (null, baseName); // external base class
-            var found = baseCls.Methods.FirstOrDefault(
+            var found = CallGraphAnalysis.EnumerateMethods(baseCls).FirstOrDefault(
                 m => m.Name.Equals(methodName, StringComparison.Ordinal));
             if (found != null)
                 return (found, baseName);
@@ -947,9 +1000,14 @@ public sealed class EffectEnforcementPass
                     .Union(InferFromExpression(insert.Index))
                     .Union(InferFromExpression(insert.Value)),
                 DictionaryForeachNode dictForeach => InferFromExpression(dictForeach.Dictionary).Union(InferFromStatements(dictForeach.Body)),
+                // §PP conditional-compilation blocks: any branch may be the active
+                // one, so charge the UNION of all branches (W2 review C1 — a §PP
+                // body must not be silently pure).
+                PreprocessorDirectiveNode pp => InferFromStatements(pp.Body)
+                    .Union(pp.ElseBody != null ? InferFromStatements(pp.ElseBody) : EffectSet.Empty),
                 // No-effect control-flow / declaration-only constructs
                 BreakStatementNode or ContinueStatementNode or GotoStatementNode or LabelStatementNode
-                    or YieldBreakStatementNode or PreprocessorDirectiveNode or ProofObligationNode => EffectSet.Empty,
+                    or YieldBreakStatementNode or ProofObligationNode => EffectSet.Empty,
                 // D-W2.3: interop content — effects are assumed, not silently pure
                 RawCSharpNode => RecordAssumption("contains a raw C# interop statement (§CSHARP)"),
                 FallbackCommentNode => RecordAssumption("contains an unconverted C# fallback statement"),
@@ -981,22 +1039,78 @@ public sealed class EffectEnforcementPass
         private EffectSet InferFromCallStatement(CallStatementNode call)
         {
             var effects = InferFromCallTarget(call.Target, call.Span);
+            return effects.Union(InferFromCallArguments(call.Target, call.Arguments));
+        }
 
-            // Also infer from arguments
-            foreach (var arg in call.Arguments)
+        /// <summary>
+        /// Charges call arguments (W2 review C4). Beyond the argument
+        /// expressions themselves:
+        /// - a bare-name argument that resolves to an internal function/method is
+        ///   a METHOD GROUP — its declared effects are charged at the passing
+        ///   site (conservative and sound: handing an impure callable to anything
+        ///   charges its effects, closing the ConvertAll/Select laundering path);
+        /// - a function-typed VALUE argument passed to a known-pure higher-order
+        ///   name (the bare-name fallback list) is surfaced as a Calor0419
+        ///   assumption — the BCL callee may invoke it invisibly.
+        /// </summary>
+        private EffectSet InferFromCallArguments(string callTarget, IEnumerable<ExpressionNode> arguments)
+        {
+            var effects = EffectSet.Empty;
+            foreach (var arg in arguments)
             {
                 effects = effects.Union(InferFromExpression(arg));
-            }
 
+                if (arg is not ReferenceNode reference || reference.Name.Contains('.'))
+                    continue;
+
+                var valueType = ResolveLocalValueType(reference.Name);
+                if (valueType == null)
+                {
+                    var internalFunc = FindInternalFunctionByName(reference.Name);
+                    if (internalFunc != null)
+                    {
+                        // Method-group argument: charge the referenced internal
+                        // function's declared effects.
+                        effects = effects.Union(GetDeclaredEffects(internalFunc.Effects));
+                    }
+                }
+                else if (IsFunctionTypeName(valueType) && IsKnownPureHigherOrderTarget(callTarget))
+                {
+                    RecordAssumption(
+                        $"passes function-typed value '{reference.Name}' to '{callTarget}', " +
+                        "which may invoke it with unverifiable effects");
+                }
+            }
             return effects;
+        }
+
+        /// <summary>
+        /// True when a dotted call target's bare method name sits on the
+        /// known-pure fallback list — i.e. a BCL higher-order shape that would
+        /// otherwise be charged pure while invoking its delegate argument.
+        /// </summary>
+        private static bool IsKnownPureHigherOrderTarget(string callTarget)
+        {
+            var lastDot = callTarget.LastIndexOf('.');
+            if (lastDot <= 0)
+                return false;
+            return KnownPureMethodNames.Contains(callTarget[(lastDot + 1)..]);
         }
 
         private EffectSet InferFromCallTarget(string target, TextSpan span)
         {
-            // Bare (no-dot) targets: either an internal function/method, a value
-            // invocation (delegate — D-W2.1), or an unresolvable free name.
+            // Bare (no-dot) targets: either a value invocation (delegate — D-W2.1),
+            // an internal function/method, or an unresolvable free name.
+            // Value resolution runs FIRST, mirroring C# scoping: a parameter,
+            // binding, or field SHADOWS a same-named function, and emission
+            // resolves the call to the value — so the effect pass must too
+            // (review C2: a decoy-named delegate parameter must not charge the
+            // shadowed pure function's effects).
             if (!target.Contains('.'))
             {
+                if (ResolveLocalValueType(target) != null)
+                    return InferFromBareNameTarget(target, span);
+
                 var internalByName = FindInternalFunctionByName(target);
                 if (internalByName != null)
                 {
@@ -1018,18 +1132,26 @@ public sealed class EffectEnforcementPass
                 return staticCharge;
             }
 
-            // Check if it's an internal function call by name
-            var internalFunc = FindInternalFunctionByName(target);
-            if (internalFunc != null)
+            // Check if it's an internal function call by name. The bare-method-name
+            // fallback inside FindInternalFunctionByName is only sound when the
+            // receiver could actually be the declaring in-module type — a receiver
+            // whose static type is KNOWN and not that type must not be captured by
+            // a name collision (W2 review C5: `svc.Refresh` on an external-typed
+            // parameter must hit the unknown chain, not `Helper.Refresh`).
+            if (IsDottedInternalFallbackPermitted(target))
             {
-                if (_context.ComputedEffects.TryGetValue(internalFunc.Id, out var computed))
+                var internalFunc = FindInternalFunctionByName(target);
+                if (internalFunc != null)
                 {
-                    return computed;
-                }
-                // If in same SCC, return current approximation
-                if (_context.SccMembers.Contains(internalFunc.Id))
-                {
-                    return _context.ComputedEffects.GetValueOrDefault(internalFunc.Id, EffectSet.Empty);
+                    if (_context.ComputedEffects.TryGetValue(internalFunc.Id, out var computed))
+                    {
+                        return computed;
+                    }
+                    // If in same SCC, return current approximation
+                    if (_context.SccMembers.Contains(internalFunc.Id))
+                    {
+                        return _context.ComputedEffects.GetValueOrDefault(internalFunc.Id, EffectSet.Empty);
+                    }
                 }
             }
 
@@ -1157,6 +1279,32 @@ public sealed class EffectEnforcementPass
         }
 
         /// <summary>
+        /// W2 review C5 — receiver-compatibility gate for the dotted bare-name
+        /// fallback. The fallback (resolving "recv.Method" to a unique in-module
+        /// method named "Method") is permitted only when the receiver head's
+        /// static type is UNRESOLVABLE (the `_calc.Add` cross-class convention —
+        /// fields not visible to the pass). When the head's static type is known:
+        /// in-module receivers with the method on their chain were already charged
+        /// by <see cref="TryChargeStaticReceiverType"/> before this point, so any
+        /// remaining known-typed receiver (external/BCL type, function type, or an
+        /// in-module type that does NOT declare the method) is a name collision —
+        /// the call must go to the unknown chain, never the colliding match.
+        /// </summary>
+        private bool IsDottedInternalFallbackPermitted(string target)
+        {
+            var lastDot = target.LastIndexOf('.');
+            if (lastDot <= 0)
+                return true; // bare names are handled elsewhere
+
+            var receiver = target[..lastDot];
+            var headDot = receiver.IndexOf('.');
+            var head = headDot > 0 ? receiver[..headDot] : receiver;
+
+            var headType = ResolveLocalValueType(head);
+            return headType == null || headType == "?";
+        }
+
+        /// <summary>
         /// D-W2.2 call-site resolution: if the receiver of "recv.Method" is a
         /// parameter/binding/field whose declared static type is an in-module
         /// interface or class, charge that static type's declared §E for the method.
@@ -1244,7 +1392,7 @@ public sealed class EffectEnforcementPass
             var visited = new HashSet<string>(StringComparer.Ordinal);
             while (current != null && visited.Add(current.Name))
             {
-                var method = current.Methods.FirstOrDefault(
+                var method = CallGraphAnalysis.EnumerateMethods(current).FirstOrDefault(
                     m => m.Name.Equals(methodName, StringComparison.Ordinal));
                 if (method != null)
                     return (current.Name, method);
@@ -1648,27 +1796,63 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromExpressionCall(ExpressionCallNode call)
         {
-            var effects = InferFromExpression(call.TargetExpression);
+            var argEffects = EffectSet.Empty;
             foreach (var arg in call.Arguments)
             {
-                effects = effects.Union(InferFromExpression(arg));
+                argEffects = argEffects.Union(InferFromExpression(arg));
             }
-            // A call through an expression-valued target cannot be resolved to a
-            // callee — surface the assumption instead of silently charging nothing.
-            return effects.Union(RecordAssumption(
-                "calls through an expression-valued target whose callee cannot be resolved"));
+
+            // W2 review M1: the expression-call spelling must not demote the
+            // delegate rule. Classify the callee expression:
+            switch (call.TargetExpression)
+            {
+                case ReferenceNode reference:
+                    // `§C f §A x §/C` is the same call as `§C{f} §A x §/C` —
+                    // route through the full named-target resolution (value →
+                    // Calor0418; internal function → its effects; free name →
+                    // unknown chain).
+                    return InferFromCallTarget(reference.Name, call.Span).Union(argEffects);
+
+                case LambdaExpressionNode lambda:
+                    // Immediately-invoked lambda literal: the body IS the callee,
+                    // so its effects are fully charged — no delegate opacity.
+                    return InferFromLambda(lambda).Union(argEffects);
+
+                case CallExpressionNode or ExpressionCallNode:
+                {
+                    // Invoking the RESULT of a call (`GetF()()`): the invoked
+                    // thing is a delegate value — Calor0418, same rule as a
+                    // named delegate invocation (waived to a warning only under
+                    // --permissive-effects).
+                    var severity = _context.Policy == UnknownCallPolicy.Permissive
+                        ? DiagnosticSeverity.Warning
+                        : DiagnosticSeverity.Error;
+                    _context.Diagnostics.Report(
+                        call.Span,
+                        DiagnosticCode.DelegateInvocation,
+                        "Invocation of a returned delegate value is an error under effect enforcement: " +
+                        "function-typed values carry no effect contract, so the call cannot be charged. " +
+                        "Wrap the call in §CSHARP interop (surfaced as an assumption via Calor0419) or " +
+                        "compile with --permissive-effects (an explicit waiver).",
+                        severity);
+                    return InferFromExpression(call.TargetExpression).Union(argEffects);
+                }
+
+                default:
+                    // Other expression-valued targets (e.g. method call on a new
+                    // object) cannot be resolved to a callee — surface the
+                    // assumption instead of silently charging nothing.
+                    return InferFromExpression(call.TargetExpression)
+                        .Union(argEffects)
+                        .Union(RecordAssumption(
+                            "calls through an expression-valued target whose callee cannot be resolved"));
+            }
         }
 
         private EffectSet InferFromCallExpression(CallExpressionNode call)
         {
             var effects = InferFromCallTarget(call.Target, call.Span);
-
-            foreach (var arg in call.Arguments)
-            {
-                effects = effects.Union(InferFromExpression(arg));
-            }
-
-            return effects;
+            return effects.Union(InferFromCallArguments(call.Target, call.Arguments));
         }
 
         private EffectSet InferFromMatchExpression(MatchExpressionNode match)
