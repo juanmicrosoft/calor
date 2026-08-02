@@ -70,28 +70,34 @@ public class PostValidationFallbackTests
     }
 
     [Fact]
-    public void CrossNamespaceSameNameCollision_DoesNotDuplicateTheHealthyType()
+    public void CrossNamespaceSameNameCollision_IsRefusedUpFront_NoDuplication()
     {
-        // Two distinct classes both named Foo in different namespaces: N1.Foo is
-        // "unparseable", N2.Foo is healthy. The ambiguous kind/name must NOT drag the
-        // healthy N2.Foo source into the interop block (which would emit it twice —
-        // CS0101 duplicate type). The ambiguous case is refused, so N2.Foo appears once.
+        // Two distinct classes both named Foo in different namespaces would flatten
+        // into one module and collapse to a single identity (#769 / WS-W4 D2). The
+        // converter now refuses that merge up front: BOTH are preserved verbatim as
+        // §CSHARP interop (one block each — no duplication, no CS0101), before the
+        // native conversion or the #717 post-validation rewrap is ever reached.
         const string src =
             "namespace N1 { public class Foo { public int A() => 1; } } " +
             "namespace N2 { public class Foo { public int B() => 2; } }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true })
-        {
-            // Condemn only the N1 variant (its body returns A()); N2 returns B().
-            ParseValidatorOverride = calor => !OutsideCSharp(calor).Contains("A"),
-        };
+        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true });
 
         var result = converter.Convert(src);
 
-        // Refused to rewrap (ambiguous) → no duplication. Under passthrough the still-
-        // unparseable output is surfaced as a failure, not silently shipped.
-        Assert.False(result.Success);
-        Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
-        Assert.True(result.HasWarnings);
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        Assert.Equal(2, result.Context!.Stats.InteropBlocksEmitted);
+
+        // Each variant's body survives exactly once; neither is dragged into the
+        // other's block nor merged into a native class.
+        Assert.DoesNotContain("§CL", result.CalorSource!);
+        Assert.Single(Regex.Matches(result.CalorSource!, Regex.Escape("public int A() => 1;")));
+        Assert.Single(Regex.Matches(result.CalorSource!, Regex.Escape("public int B() => 2;")));
+
+        var collisionLosses = result.Context.Losses
+            .Where(l => l.Feature == "namespace-collision"
+                        && l.Kind == ConversionLossKind.InteropPreserved)
+            .ToList();
+        Assert.Equal(2, collisionLosses.Count);
     }
 
     [Fact]

@@ -577,6 +577,35 @@ public static class FeatureSupport
             Workaround = "Review conditional-compilation blocks manually; alternate branches are not preserved in the default pipeline"
         },
 
+        // #769 (WS-W4 D2): namespace topology is NOT preserved — every type in a
+        // file is flattened into a single module named after the first namespace,
+        // so a type's fully-qualified identity changes. Flattening that carries no
+        // identity-merge risk (single namespace, or types with unique bare names)
+        // stays native; two top-level types that share a bare name across different
+        // namespaces would collapse to one identity, so they are refused and escalated
+        // to §CSHARP interop (a counted loss) rather than silently merged.
+        ["namespace"] = new FeatureInfo
+        {
+            Name = "namespace",
+            Support = SupportLevel.Partial,
+            Description = "Namespace topology is flattened into one module; cross-namespace same-name types are refused (escalated to §CSHARP interop) rather than silently merged",
+            Workaround = "Split multi-namespace files, or keep same-named cross-namespace types as §CSHARP interop blocks"
+        },
+
+        // #777 (WS-W4 D4): local functions are lowered by hoisting to module-level
+        // §F functions. A non-generic, non-capturing local function round-trips
+        // faithfully. A generic local function would lose its type parameters, and a
+        // capturing local function would reference enclosing locals that do not exist
+        // at module scope — both are refused and escalate the containing member to
+        // §CSHARP interop (a counted loss) rather than silently diverging.
+        ["local-function"] = new FeatureInfo
+        {
+            Name = "local-function",
+            Support = SupportLevel.Partial,
+            Description = "Non-generic, non-capturing local functions are hoisted to module-level §F functions; generic or capturing local functions escalate the containing member to §CSHARP interop",
+            Workaround = "Keep generic or capturing local functions as §CSHARP interop, or lift them to methods with explicit parameters"
+        },
+
         // Phase 4 features (C# 11-13)
         ["default-lambda-parameter"] = new FeatureInfo
         {
