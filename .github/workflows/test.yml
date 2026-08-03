@@ -243,47 +243,36 @@ jobs:
       issues: write
 
     steps:
+      # The corpus (MediatR/Serilog/FluentValidation) is vendored as SHA-pinned git
+      # submodules under bench/corpus/ (D-W4.2). This job needs them, so it checks out
+      # with submodules — the MAIN build/test jobs above do NOT (the corpus is
+      # benchmark infra, not a build dependency; the Calor solution builds and tests
+      # without it).
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Setup .NET 10 (for Calor build)
+      - name: Setup .NET 10 (for Calor build + net10 corpus targets)
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Setup .NET 10 (for target projects)
+      - name: Setup .NET 8 (MediatR/FluentValidation tests run on net8.0)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Restore and build Calor
         run: |
           dotnet restore
           dotnet build -c Release --no-restore
 
-      - name: Cache target projects
-        uses: actions/cache@v4
-        with:
-          path: ~/target-projects
-          key: roundtrip-projects-v1
-          restore-keys: roundtrip-projects-
-
-      - name: Clone target projects (if not cached)
-        run: |
-          mkdir -p ~/target-projects
-          for repo in jbogard/MediatR serilog/serilog FluentValidation/FluentValidation; do
-            name=$(echo $repo | cut -d/ -f2)
-            if [ ! -d ~/target-projects/$name ]; then
-              git clone --depth 1 https://github.com/$repo.git ~/target-projects/$name
-            fi
-          done
-
       - name: Run round-trip verification
         continue-on-error: true
         run: |
           dotnet run --project tools/Calor.RoundTrip.Harness/ -c Release -- \
             run --all \
-            --projects-dir ~/target-projects \
             --dotnet dotnet \
             --output ./conversion-reports/
 

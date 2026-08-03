@@ -27,16 +27,19 @@ public sealed class RoundTripPipeline
         var workDir = PrepareWorkingCopy(config);
         Console.WriteLine($"  Working directory: {workDir}");
 
-        // Step 1b: Restore dependencies in working copy
-        Console.WriteLine("  Restoring dependencies...");
-        var restoreResult = await RestoreProjectAsync(workDir, config);
-        if (!restoreResult)
-            Console.WriteLine("  WARNING: Restore returned non-zero exit code");
+        // No separate pre-restore step: `dotnet build`/`dotnet test` restore the graph
+        // coherently in one invocation, so a standalone restore only adds latency.
 
-        // Step 2: Baseline tests
+        // Step 2: Baseline tests. An explicit `dotnet build` first, then `dotnet test
+        // --no-build`, so a failed baseline build is reported as exactly that (rather
+        // than surfacing as an empty test run) and the round-trip build later compares
+        // against a known-good baseline.
         Console.WriteLine("\nPhase 2/5: Running baseline tests...");
         TrxParser.CleanTrxFiles(workDir);
-        report.Baseline = await RunTestsAsync(workDir, config);
+        var baselineBuild = await BuildProjectAsync(workDir, config);
+        if (!baselineBuild.Succeeded)
+            Console.WriteLine("  WARNING: baseline build failed (the vendored subject does not build clean here)");
+        report.Baseline = await RunTestsAsync(workDir, config, noBuild: baselineBuild.Succeeded);
         Console.WriteLine($"  Baseline: {report.Baseline.Passed}/{report.Baseline.TotalTests} passed, {report.Baseline.Failed} failed, {report.Baseline.Skipped} skipped");
 
         // Step 3: Convert & Replace
@@ -119,7 +122,22 @@ public sealed class RoundTripPipeline
 
         foreach (var file in Directory.GetFiles(source))
         {
-            var destFile = Path.Combine(destination, Path.GetFileName(file));
+            var fileName = Path.GetFileName(file);
+            // Skip the submodule gitlink: for a git submodule, `.git` is a FILE
+            // ("gitdir: …"), not a directory, so the directory-exclusion below misses
+            // it. Copying it leaves a stray/invalid gitlink in the working copy that
+            // makes MinVer/SourceLink git tasks resolve the wrong repo and perturbs the
+            // first-pass restore of transitive project references. Drop it.
+            if (string.Equals(fileName, ".git", StringComparison.Ordinal))
+                continue;
+            // Neutralize corpus SDK pins: a vendored subject may pin its own SDK via
+            // global.json (e.g. FluentValidation pins 9.0.0). We build every subject on
+            // Calor's pinned .NET 10 SDK (D-W4.2), so the working copy drops global.json
+            // and lets the ambient SDK resolve. The vendored source stays verbatim; only
+            // the throwaway working copy is affected.
+            if (string.Equals(fileName, "global.json", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var destFile = Path.Combine(destination, fileName);
             File.Copy(file, destFile, overwrite: true);
         }
 
@@ -133,24 +151,26 @@ public sealed class RoundTripPipeline
         }
     }
 
-    private async Task<bool> RestoreProjectAsync(string workDir, RoundTripConfig config)
+    private async Task<TestRunResult> RunTestsAsync(string workDir, RoundTripConfig config, bool noBuild = false)
     {
-        var target = Path.Combine(workDir, config.SolutionOrProjectFile);
-        var (exitCode, _, _) = await ProcessRunner.RunAsync(
-            config.DotnetPath, $"restore \"{target}\"", workDir, TimeSpan.FromMinutes(5));
-        return exitCode == 0;
-    }
-
-    private async Task<TestRunResult> RunTestsAsync(string workDir, RoundTripConfig config)
-    {
+        // Pass the project RELATIVE to workDir (which is the process working directory),
+        // never an absolute path. On macOS the temp root is /var/folders/… — a symlink
+        // to /private/var/… — and passing the absolute /var path while MSBuild
+        // canonicalizes the working directory to /private/var creates a path-identity
+        // mismatch that silently breaks Directory.Build.props and ProjectReference
+        // resolution (spurious CS0246 on the subject's own/transitive types). A relative
+        // path keeps every path in one canonical form.
         var target = config.SolutionOrProjectFile;
-        var targetPath = Path.Combine(workDir, target);
 
-        var args = $"test \"{targetPath}\" --logger \"trx;LogFileName=results.trx\" --logger \"console;verbosity=normal\"";
+        var args = $"test \"{target}\" --logger \"trx;LogFileName=results.trx\" --logger \"console;verbosity=normal\"";
         if (config.TargetFramework != null)
             args += $" --framework {config.TargetFramework}";
+        if (noBuild)
+            args += " --no-build";
         if (config.TestFilter != null)
             args += $" --filter \"{config.TestFilter}\"";
+        if (!string.IsNullOrWhiteSpace(config.ExtraBuildProperties))
+            args += $" {config.ExtraBuildProperties}";
 
         var (exitCode, stdout, stderr) = await ProcessRunner.RunAsync(
             config.DotnetPath, args, workDir, config.TestTimeout);
@@ -487,12 +507,15 @@ public sealed class RoundTripPipeline
 
     private async Task<BuildResult> BuildProjectAsync(string workDir, RoundTripConfig config)
     {
+        // Relative target (see RunTestsAsync) — absolute /var-symlink paths break
+        // MSBuild path identity on macOS.
         var target = config.SolutionOrProjectFile;
-        var targetPath = Path.Combine(workDir, target);
 
-        var args = $"build \"{targetPath}\" ";
+        var args = $"build \"{target}\" ";
         if (config.TargetFramework != null)
             args += $" --framework {config.TargetFramework}";
+        if (!string.IsNullOrWhiteSpace(config.ExtraBuildProperties))
+            args += $" {config.ExtraBuildProperties}";
 
         var (exitCode, stdout, stderr) = await ProcessRunner.RunAsync(
             config.DotnetPath, args, workDir, TimeSpan.FromMinutes(5));
@@ -613,6 +636,7 @@ public sealed class RoundTripPipeline
                 SolutionOrProjectFile = config.SolutionOrProjectFile,
                 DotnetPath = config.DotnetPath,
                 TargetFramework = config.TargetFramework,
+                ExtraBuildProperties = config.ExtraBuildProperties,
                 TestFilter = testFilter,
                 TestTimeout = config.TestTimeout,
             };

@@ -38,14 +38,21 @@ public static class ProcessRunner
             }
         }
 
-        // Ensure .NET root is set for SDK resolution
-        var dotnetRoot = Path.GetDirectoryName(fileName);
-        if (dotnetRoot != null && fileName.EndsWith("dotnet"))
+        // Ensure .NET root is set for SDK resolution. Resolve symlinks first: a common
+        // install puts `dotnet` at e.g. /opt/homebrew/bin/dotnet symlinked to the real
+        // /usr/local/share/dotnet/dotnet, and DOTNET_ROOT must point at the directory
+        // that actually holds sdk/ and shared/, not the symlink's directory.
+        if (fileName.EndsWith("dotnet"))
         {
-            process.StartInfo.EnvironmentVariables["DOTNET_ROOT"] = dotnetRoot;
-            // Prepend to PATH so child processes also find this dotnet
-            var existingPath = Environment.GetEnvironmentVariable("PATH") ?? "";
-            process.StartInfo.EnvironmentVariables["PATH"] = $"{dotnetRoot}:{existingPath}";
+            var resolved = new FileInfo(fileName).ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? fileName;
+            var dotnetRoot = Path.GetDirectoryName(resolved);
+            if (dotnetRoot != null)
+            {
+                process.StartInfo.EnvironmentVariables["DOTNET_ROOT"] = dotnetRoot;
+                // Prepend to PATH so child processes also find this dotnet
+                var existingPath = Environment.GetEnvironmentVariable("PATH") ?? "";
+                process.StartInfo.EnvironmentVariables["PATH"] = $"{dotnetRoot}:{existingPath}";
+            }
         }
 
         process.OutputDataReceived += (_, e) =>

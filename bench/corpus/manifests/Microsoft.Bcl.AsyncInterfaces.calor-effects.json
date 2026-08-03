@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "description": "Effects derived by calor import for Microsoft.Bcl.AsyncInterfaces (Tier A IL analysis; only members whose full call chains resolved with no unverified assumptions)",
+  "library": "Microsoft.Bcl.AsyncInterfaces",
+  "libraryVersion": "10.0.0",
+  "generatedBy": "calor import",
+  "confidence": "inferred",
+  "generatedAt": "2026-08-03T00:04:14.0028120Z",
+  "mappings": [],
+  "namespaceDefaults": {}
+}

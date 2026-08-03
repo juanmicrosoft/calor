@@ -1,0 +1,78 @@
+{
+  "version": "1.0",
+  "description": "Effects derived by calor import for System.Threading.Tasks.Extensions (Tier A IL analysis; only members whose full call chains resolved with no unverified assumptions)",
+  "library": "System.Threading.Tasks.Extensions",
+  "libraryVersion": "4.5.4",
+  "generatedBy": "calor import",
+  "confidence": "inferred",
+  "generatedAt": "2026-08-03T00:04:14.4309070Z",
+  "mappings": [
+    {
+      "type": "System.Runtime.CompilerServices.AsyncMethodBuilderAttribute",
+      "getters": {
+        "BuilderType": []
+      }
+    },
+    {
+      "type": "System.Runtime.CompilerServices.AsyncValueTaskMethodBuilder",
+      "methods": {
+        "Create": []
+      }
+    },
+    {
+      "type": "System.Runtime.CompilerServices.AsyncValueTaskMethodBuilder\u00601",
+      "methods": {
+        "Create": []
+      }
+    },
+    {
+      "type": "System.Runtime.CompilerServices.ConfiguredValueTaskAwaitable",
+      "methods": {
+        "GetAwaiter": []
+      }
+    },
+    {
+      "type": "System.Runtime.CompilerServices.ConfiguredValueTaskAwaitable\u002BConfiguredValueTaskAwaiter",
+      "methods": {
+        "GetResult": []
+      },
+      "getters": {
+        "IsCompleted": []
+      }
+    },
+    {
+      "type": "System.Runtime.CompilerServices.ConfiguredValueTaskAwaitable\u00601",
+      "methods": {
+        "GetAwaiter": []
+      }
+    },
+    {
+      "type": "System.Runtime.CompilerServices.ConfiguredValueTaskAwaitable\u00601\u002BConfiguredValueTaskAwaiter",
+      "methods": {
+        "GetResult": []
+      },
+      "getters": {
+        "IsCompleted": []
+      }
+    },
+    {
+      "type": "System.Runtime.CompilerServices.ValueTaskAwaiter",
+      "methods": {
+        "GetResult": []
+      },
+      "getters": {
+        "IsCompleted": []
+      }
+    },
+    {
+      "type": "System.Runtime.CompilerServices.ValueTaskAwaiter\u00601",
+      "methods": {
+        "GetResult": []
+      },
+      "getters": {
+        "IsCompleted": []
+      }
+    }
+  ],
+  "namespaceDefaults": {}
+}

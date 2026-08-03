@@ -33,9 +33,10 @@ switch (command)
 
 async Task<int> RunCommand(string[] runArgs)
 {
+    // Default to the vendored, SHA-pinned corpus (bench/corpus, D-W4.2). The former
+    // un-pinned external default (~/sources/repos/experimental/github-top10) is gone.
     var projectsDir = GetOption(runArgs, "--projects-dir")
-        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "sources/repos/experimental/github-top10");
+        ?? ProjectConfigs.DefaultCorpusDir;
     var outputDir = GetOption(runArgs, "--output") ?? "conversion-reports";
     var dotnetPath = GetOption(runArgs, "--dotnet")
         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dotnet/dotnet");
@@ -98,6 +99,7 @@ async Task<int> RunCommand(string[] runArgs)
             SolutionOrProjectFile = config.SolutionOrProjectFile,
             DotnetPath = config.DotnetPath,
             TargetFramework = config.TargetFramework,
+            ExtraBuildProperties = config.ExtraBuildProperties,
             EnableBisect = enableBisect,
             ExcludePatterns = config.ExcludePatterns,
             TestTimeout = config.TestTimeout,
@@ -110,21 +112,12 @@ async Task<int> RunCommand(string[] runArgs)
         Console.WriteLine(new string('=', 60));
         Console.WriteLine();
 
-        // First, restore the project
-        Console.WriteLine("Restoring project dependencies...");
-        var (restoreExit, _, restoreErr) = await ProcessRunner.RunAsync(
-            config.DotnetPath,
-            $"restore \"{Path.Combine(config.OriginalProjectPath, config.SolutionOrProjectFile)}\"",
-            config.OriginalProjectPath,
-            TimeSpan.FromMinutes(5));
-
-        if (restoreExit != 0)
-        {
-            Console.Error.WriteLine($"Failed to restore {config.ProjectName}: {restoreErr}");
-            anyFailure = true;
-            continue;
-        }
-
+        // Note: the pipeline restores the working copy itself (RestoreProjectAsync).
+        // We do NOT pre-restore OriginalProjectPath here — a vendored corpus project
+        // may pin its own SDK via global.json (e.g. FluentValidation pins 9.0.0),
+        // which would make `dotnet` refuse to start in that directory. The working
+        // copy neutralizes corpus global.json so every subject builds on Calor's
+        // pinned .NET 10 SDK.
         var report = await pipeline.RunAsync(config);
 
         // Write reports

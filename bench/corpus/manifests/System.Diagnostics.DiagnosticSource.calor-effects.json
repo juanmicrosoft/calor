@@ -1,0 +1,359 @@
+{
+  "version": "1.0",
+  "description": "Effects derived by calor import for System.Diagnostics.DiagnosticSource (Tier A IL analysis; only members whose full call chains resolved with no unverified assumptions)",
+  "library": "System.Diagnostics.DiagnosticSource",
+  "libraryVersion": "10.0.0",
+  "generatedBy": "calor import",
+  "confidence": "inferred",
+  "generatedAt": "2026-08-03T00:04:14.3043560Z",
+  "mappings": [
+    {
+      "type": "System.Diagnostics.Activity",
+      "methods": {
+        "AddEvent": [],
+        "AddLink": [],
+        "EnumerateEvents": [],
+        "EnumerateLinks": [],
+        "EnumerateTagObjects": [],
+        "GetCustomProperty": [],
+        "SetCustomProperty": [
+          "mut"
+        ],
+        "SetStatus": []
+      },
+      "getters": {
+        "ActivityTraceFlags": [],
+        "Baggage": [],
+        "Current": [],
+        "DefaultIdFormat": [],
+        "DisplayName": [],
+        "Duration": [],
+        "Events": [],
+        "ForceDefaultIdFormat": [],
+        "HasRemoteParent": [],
+        "IdFormat": [],
+        "IsAllDataRequested": [],
+        "IsStopped": [],
+        "Kind": [],
+        "Links": [],
+        "OperationName": [],
+        "Parent": [],
+        "Recorded": [],
+        "Source": [],
+        "StartTimeUtc": [],
+        "Status": [],
+        "StatusDescription": [],
+        "TagObjects": [],
+        "TraceIdGenerator": [],
+        "TraceStateString": []
+      },
+      "setters": {
+        "ActivityTraceFlags": [],
+        "DisplayName": [],
+        "ForceDefaultIdFormat": [],
+        "IsAllDataRequested": [],
+        "TraceIdGenerator": [],
+        "TraceStateString": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Activity\u002BEnumerator\u00601",
+      "methods": {
+        "GetEnumerator": [],
+        "MoveNext": []
+      },
+      "getters": {
+        "Current": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivityChangedEventArgs",
+      "getters": {
+        "Current": [],
+        "Previous": []
+      },
+      "setters": {
+        "Current": [],
+        "Previous": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivityContext",
+      "methods": {
+        "Equals": []
+      },
+      "getters": {
+        "IsRemote": [],
+        "SpanId": [],
+        "TraceFlags": [],
+        "TraceId": [],
+        "TraceState": []
+      },
+      "constructors": {
+        "()": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivityCreationOptions\u00601",
+      "getters": {
+        "Kind": [],
+        "Links": [],
+        "Name": [],
+        "Parent": [],
+        "SamplingTags": [],
+        "Source": [],
+        "Tags": [],
+        "TraceState": []
+      },
+      "setters": {
+        "TraceState": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivityEvent",
+      "methods": {
+        "EnumerateTagObjects": []
+      },
+      "getters": {
+        "Name": [],
+        "Tags": [],
+        "Timestamp": []
+      },
+      "constructors": {
+        "()": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivityLink",
+      "methods": {
+        "EnumerateTagObjects": [],
+        "Equals": []
+      },
+      "getters": {
+        "Context": [],
+        "Tags": []
+      },
+      "constructors": {
+        "()": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivityListener",
+      "getters": {
+        "ActivityStarted": [],
+        "ActivityStopped": [],
+        "ExceptionRecorder": [],
+        "Sample": [],
+        "SampleUsingParentId": [],
+        "ShouldListenTo": []
+      },
+      "setters": {
+        "ActivityStarted": [],
+        "ActivityStopped": [],
+        "ExceptionRecorder": [],
+        "Sample": [],
+        "SampleUsingParentId": [],
+        "ShouldListenTo": []
+      },
+      "constructors": {
+        "()": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivitySource",
+      "methods": {
+        "Dispose": [],
+        "HasListeners": []
+      },
+      "getters": {
+        "Name": [],
+        "Tags": [],
+        "TelemetrySchemaUrl": [],
+        "Version": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivitySourceOptions",
+      "getters": {
+        "Name": [],
+        "Tags": [],
+        "TelemetrySchemaUrl": [],
+        "Version": []
+      },
+      "setters": {
+        "Name": [],
+        "Tags": [],
+        "TelemetrySchemaUrl": [],
+        "Version": []
+      },
+      "constructors": {
+        "()": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivitySpanId",
+      "methods": {
+        "CreateFromBytes": [],
+        "Equals": [],
+        "GetHashCode": [],
+        "ToHexString": [],
+        "ToString": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivityTagsCollection",
+      "methods": {
+        "Clear": [
+          "mut"
+        ],
+        "Contains": [],
+        "CopyTo": [],
+        "GetEnumerator": []
+      },
+      "getters": {
+        "Count": [],
+        "IsReadOnly": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.ActivityTraceId",
+      "methods": {
+        "CreateFromBytes": [],
+        "Equals": [],
+        "GetHashCode": [],
+        "ToHexString": [],
+        "ToString": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.DiagnosticListener",
+      "methods": {
+        "ToString": []
+      },
+      "getters": {
+        "AllListeners": [],
+        "Name": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.DiagnosticSource",
+      "methods": {
+        "OnActivityExport": [],
+        "OnActivityImport": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.DistributedContextPropagator",
+      "methods": {
+        "CreateDefaultPropagator": [],
+        "CreateNoOutputPropagator": [],
+        "CreatePassThroughPropagator": [],
+        "CreatePreW3CPropagator": [],
+        "CreateW3CPropagator": []
+      },
+      "getters": {
+        "Current": []
+      },
+      "setters": {
+        "Current": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Metrics.Instrument",
+      "getters": {
+        "Description": [],
+        "Enabled": [],
+        "IsObservable": [],
+        "Meter": [],
+        "Name": [],
+        "Tags": [],
+        "Unit": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Metrics.InstrumentAdvice\u00601",
+      "getters": {
+        "HistogramBucketBoundaries": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Metrics.Instrument\u00601",
+      "getters": {
+        "Advice": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Metrics.Measurement\u00601",
+      "getters": {
+        "Value": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Metrics.Meter",
+      "getters": {
+        "Name": [],
+        "Scope": [],
+        "Tags": [],
+        "TelemetrySchemaUrl": [],
+        "Version": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Metrics.MeterListener",
+      "getters": {
+        "InstrumentPublished": [],
+        "MeasurementsCompleted": []
+      },
+      "setters": {
+        "InstrumentPublished": [],
+        "MeasurementsCompleted": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Metrics.MeterOptions",
+      "getters": {
+        "Name": [],
+        "Scope": [],
+        "Tags": [],
+        "TelemetrySchemaUrl": [],
+        "Version": []
+      },
+      "setters": {
+        "Name": [],
+        "Scope": [],
+        "Tags": [],
+        "TelemetrySchemaUrl": [],
+        "Version": []
+      },
+      "constructors": {
+        "()": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.Metrics.ObservableInstrument\u00601",
+      "getters": {
+        "IsObservable": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.TagList",
+      "methods": {
+        "Clear": [],
+        "GetEnumerator": []
+      },
+      "getters": {
+        "Count": [],
+        "IsReadOnly": []
+      }
+    },
+    {
+      "type": "System.Diagnostics.TagList\u002BEnumerator",
+      "methods": {
+        "Dispose": [],
+        "MoveNext": [],
+        "Reset": []
+      }
+    }
+  ],
+  "namespaceDefaults": {}
+}
