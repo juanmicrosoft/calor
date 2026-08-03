@@ -1,15 +1,15 @@
 {
-  "TaskId": "synthetic2-injectedmutation-cand2-Arithmetic",
+  "TaskId": "synthetic2-injectedmutation-cand1-Arithmetic",
   "ProjectName": "Synthetic2",
   "Provenance": {
     "Source": "InjectedMutation",
     "Operator": "Arithmetic",
-    "OperatorDescription": "+ \u2192 -",
+    "OperatorDescription": "* \u2192 /",
     "MutatedFileRelPath": "GeoLib/Grid.cs",
     "Line": 14,
-    "Column": 22,
-    "OriginalSnippet": "a * a + b * b",
-    "MutatedSnippet": "a * a - b * b",
+    "Column": 18,
+    "OriginalSnippet": "a * a",
+    "MutatedSnippet": "a / a",
     "NativeEligibility": {
       "MutatedFileRelPath": "GeoLib/Grid.cs",
       "MutatedFileConvertedNative": true,
@@ -24,15 +24,15 @@
     },
     "PresentationAsymmetry": "Calor arm = machine-converted round-tripped C# (from \u00a7-syntax); C# arm = idiomatic original. Bias is against Calor."
   },
-  "CSharpArmDir": "<regenerate via: calor-roundtrip gen-tasks --synthetic>/bundles/synthetic2-injectedmutation-cand2-Arithmetic/csharp-arm",
-  "CalorArmDir": "<regenerate via: calor-roundtrip gen-tasks --synthetic>/bundles/synthetic2-injectedmutation-cand2-Arithmetic/calor-arm",
+  "CSharpArmDir": "<regenerate via: calor-roundtrip gen-tasks --synthetic>/bundles/synthetic2-injectedmutation-cand1-Arithmetic/csharp-arm",
+  "CalorArmDir": "<regenerate via: calor-roundtrip gen-tasks --synthetic>/bundles/synthetic2-injectedmutation-cand1-Arithmetic/calor-arm",
   "HeldOut": [
     {
-      "TestName": "GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 3, b: 4, expected: 25)",
+      "TestName": "GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 2, b: 2, expected: 8)",
       "ClassName": "GeoLib.Tests.GridTests",
       "Assembly": "geolib.tests.dll",
       "FilterName": "GeoLib.Tests.GridTests.SumOfSquares_Theory",
-      "Identity": "geolib.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::GeoLib.Tests.GridTests::GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 3, b: 4, expected: 25)"
+      "Identity": "geolib.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::GeoLib.Tests.GridTests::GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 2, b: 2, expected: 8)"
     }
   ],
   "VisibleTestFilter": "FullyQualifiedName!~GeoLib.Tests.GridTests.SumOfSquares_Theory",

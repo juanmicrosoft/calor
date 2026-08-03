@@ -6,20 +6,25 @@ This run produces the substrate the Slice-E dry-run consumes; it does NOT run ag
 > **Scope of this demonstration (recorded honestly).** This report is the live end-to-end
 > proof of the Slice-C machinery, run against the two **in-repo synthetic subjects**
 > (`Synthetic`, `Synthetic2`) because the OSS corpus submodules (MediatR/Serilog/FluentValidation)
-> are not checked out in this environment and running their full suites offline is out of
-> Slice-C scope. The generator is corpus-agnostic — `gen-tasks MediatR Serilog …` runs the
-> identical pipeline once the submodules are present (Slice E). Every eligible task here is an
-> injected-mutation task; the revert-upstream-bugfix path (gold-standard primary source) is built
-> and unit-tested (`BugfixMiner`) but its live mining needs checked-out submodule history (Slice E).
-> `Synthetic2` deliberately includes a **theory-only-covered** method (`SumOfSquares`) so the run
-> exercises theory held-out extraction end-to-end (review [C]): a theory-covered mutation is held
-> out at method level and its visible/held-out filters round-trip against `dotnet test` (verified —
-> visible suite parses and runs 13/13 green with the defect hidden; the held-out `~` filter runs the
-> 4 theory rows and all fail). Regenerate: `calor-roundtrip gen-tasks --synthetic --max-candidates 14 --target 0`.
+> are not checked out in this environment. The generator is corpus-agnostic — `gen-tasks MediatR
+> Serilog …` runs the identical pipeline once the submodules are present (Slice E). Every eligible
+> task here is an injected-mutation task; the revert-upstream-bugfix path is built and unit-tested
+> (`BugfixMiner`) but its live mining needs checked-out submodule history (Slice E).
+>
+> `Synthetic2` deliberately includes two adversarial coverage shapes so the run exercises the
+> theory/DisplayName paths end-to-end: (1) a **theory-only-covered** method (`SumOfSquares`) — a
+> theory-covered mutation is held out at method level and its `!~`/`~` filters round-trip against
+> `dotnet test` (verified: visible suite parses and runs green with the defect hidden; the held-out
+> filter runs the theory rows and they fail); (2) a **mixed custom-`DisplayName`** method (`Triple`,
+> covered by a normal `[Fact]` AND `[Theory(DisplayName="Nasty, name (with) \"quotes\" & pipes|here")]`)
+> whose method FQN is unrecoverable from TRX. Mutations there are caught by the **visible-filter
+> round-trip guard** (residual-[C]) and DROPPED as `HeldOutFilterLeak` (counted in the "Excl leak"
+> column) — never emitted as a leaking bundle where the agent would see the failing covering test.
+> Regenerate: `calor-roundtrip gen-tasks --synthetic --max-candidates 16 --target 0`.
 
 ## Definition of done
 
-- Eligible bundles: **20** (target ≥ 3)
+- Eligible bundles: **23** (target ≥ 3)
 - Projects with eligible tasks that pass the fidelity gate: **2** (target ≥ 2)
 - **DoD met: True**
 
@@ -35,11 +40,11 @@ This run produces the substrate the Slice-E dry-run consumes; it does NOT run ag
 
 ## Exclusion accounting (D-W4.1 — every candidate counted, no silent shrinkage)
 
-| Project | Enumerated | Considered | Eligible | Excl (a) | Excl (b) | Excl attribution | Excl no-cover | Excl no-compile | Eligibility rate |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Synthetic | 114 | 14 | 12 | 0 | 2 | 0 | 0 | 0 | 86% |
-| Synthetic2 | 32 | 14 | 8 | 0 | 6 | 0 | 0 | 0 | 57% |
-| **TOTAL** | **146** | **28** | **20** | **0** | **8** | **0** | **0** | **0** | **71%** |
+| Project | Enumerated | Considered | Eligible | Excl (a) | Excl (b) | Excl attribution | Excl leak | Excl no-cover | Excl no-compile | Eligibility rate |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Synthetic | 114 | 16 | 14 | 0 | 2 | 0 | 0 | 0 | 0 | 88% |
+| Synthetic2 | 34 | 16 | 9 | 0 | 5 | 0 | 2 | 0 | 0 | 56% |
+| **TOTAL** | **148** | **32** | **23** | **0** | **7** | **0** | **2** | **0** | **0** | **72%** |
 
 Eligibility rate is Eligible/Considered (Considered = evaluated candidates; Enumerated is the 
 full sited set before the per-project cap / early-stop, so the rate is honest about truncation).
@@ -64,25 +69,29 @@ full sited set before the per-project cap / early-stop, so the rate is honest ab
 | OffByOne-L34C22 | SyntheticLib/Calculator.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
 | Boundary-L34C27 | SyntheticLib/Calculator.cs | Boundary | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
 | Arithmetic-L36C29 | SyntheticLib/Calculator.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| OffByOne-L43C20 | SyntheticLib/Calculator.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| OffByOne-L43C25 | SyntheticLib/Calculator.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
 
 **Synthetic2** (NativeFraction 100.0%, 1 native of 1 files)
 
 | Candidate | File | Operator | Verdict | Reason | Explanation |
 |---|---|---|:---:|---|---|
-| Arithmetic-L14C18 | GeoLib/Grid.cs | Arithmetic | excluded | ArmsDiverge | clause (b): held-out test fails on both arms but not identically (C#='Assert.Equal()', Calor='System.DivideByZeroException'). |
+| Arithmetic-L14C18 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
 | Arithmetic-L14C22 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
 | Arithmetic-L14C26 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Arithmetic-L19C22 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| OffByOne-L24C16 | GeoLib/Grid.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Arithmetic-L24C18 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Arithmetic-L24C27 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Boundary-L29C15 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
-| OffByOne-L29C17 | GeoLib/Grid.cs | OffByOne | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
-| Boundary-L29C24 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
-| OffByOne-L29C26 | GeoLib/Grid.cs | OffByOne | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
-| SwapReturn-L30C20 | GeoLib/Grid.cs | SwapReturn | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Boundary-L31C15 | GeoLib/Grid.cs | Boundary | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Boundary-L31C29 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
+| Arithmetic-L21C18 | GeoLib/Grid.cs | Arithmetic | excluded | HeldOutFilterLeak | the visible-suite filter does not exclude a covering test (unrecoverable method FQN, e.g. a custom DisplayName) — it would remain visible and failing (oracle leak); dropped rather than shipping a leaking bundle. |
+| OffByOne-L21C20 | GeoLib/Grid.cs | OffByOne | excluded | HeldOutFilterLeak | the visible-suite filter does not exclude a covering test (unrecoverable method FQN, e.g. a custom DisplayName) — it would remain visible and failing (oracle leak); dropped rather than shipping a leaking bundle. |
+| Arithmetic-L26C22 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| OffByOne-L31C16 | GeoLib/Grid.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Arithmetic-L31C18 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Arithmetic-L31C27 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Boundary-L36C15 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
+| OffByOne-L36C17 | GeoLib/Grid.cs | OffByOne | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
+| Boundary-L36C24 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
+| OffByOne-L36C26 | GeoLib/Grid.cs | OffByOne | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
+| SwapReturn-L37C20 | GeoLib/Grid.cs | SwapReturn | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Boundary-L38C15 | GeoLib/Grid.cs | Boundary | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Boundary-L38C29 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
 
 ## Eligible task bundles
 
@@ -98,14 +107,17 @@ full sited set before the per-project cap / early-stop, so the rate is honest ab
 - `synthetic-injectedmutation-cand12-OffByOne` — InjectedMutation `2 → 3` in `SyntheticLib/Calculator.cs`:34; held-out: SyntheticLib.Tests.CalculatorTests.Factorial_ReturnsCorrectValue; native=True, attribution=AttributedToMutation
 - `synthetic-injectedmutation-cand13-Boundary` — InjectedMutation `<= → <` in `SyntheticLib/Calculator.cs`:34; held-out: SyntheticLib.Tests.CalculatorTests.Factorial_ReturnsCorrectValue; native=True, attribution=AttributedToMutation
 - `synthetic-injectedmutation-cand14-Arithmetic` — InjectedMutation `* → /` in `SyntheticLib/Calculator.cs`:36; held-out: SyntheticLib.Tests.CalculatorTests.Factorial_ReturnsCorrectValue; native=True, attribution=AttributedToMutation
+- `synthetic-injectedmutation-cand15-OffByOne` — InjectedMutation `2 → 3` in `SyntheticLib/Calculator.cs`:43; held-out: SyntheticLib.Tests.CalculatorTests.IsEven_Works; native=True, attribution=AttributedToMutation
+- `synthetic-injectedmutation-cand16-OffByOne` — InjectedMutation `0 → 1` in `SyntheticLib/Calculator.cs`:43; held-out: SyntheticLib.Tests.CalculatorTests.IsEven_Works; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand1-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:14; held-out: GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 2, b: 2, expected: 8); native=True, attribution=AttributedToMutation
 - `synthetic2-injectedmutation-cand2-Arithmetic` — InjectedMutation `+ → -` in `GeoLib/Grid.cs`:14; held-out: GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 3, b: 4, expected: 25); native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand3-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:14; held-out: GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 2, b: 2, expected: 8); native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand4-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:19; held-out: GeoLib.Tests.GridTests.Area_Multiplies; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand5-OffByOne` — InjectedMutation `2 → 3` in `GeoLib/Grid.cs`:24; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand6-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:24; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand7-Arithmetic` — InjectedMutation `+ → -` in `GeoLib/Grid.cs`:24; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand12-SwapReturn` — InjectedMutation `return false → return true` in `GeoLib/Grid.cs`:30; held-out: GeoLib.Tests.GridTests.InBounds_Negative_False; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand13-Boundary` — InjectedMutation `>= → >` in `GeoLib/Grid.cs`:31; held-out: GeoLib.Tests.GridTests.InBounds_OnUpperEdge_False; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand3-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:14; held-out: GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 0, b: 5, expected: 25); native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand6-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:26; held-out: GeoLib.Tests.GridTests.Area_Multiplies; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand7-OffByOne` — InjectedMutation `2 → 3` in `GeoLib/Grid.cs`:31; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand8-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:31; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand9-Arithmetic` — InjectedMutation `+ → -` in `GeoLib/Grid.cs`:31; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand14-SwapReturn` — InjectedMutation `return false → return true` in `GeoLib/Grid.cs`:37; held-out: GeoLib.Tests.GridTests.InBounds_Negative_False; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand15-Boundary` — InjectedMutation `>= → >` in `GeoLib/Grid.cs`:38; held-out: GeoLib.Tests.GridTests.InBounds_OnUpperEdge_False; native=True, attribution=AttributedToMutation
 
 ## Interpretation note (recorded)
 

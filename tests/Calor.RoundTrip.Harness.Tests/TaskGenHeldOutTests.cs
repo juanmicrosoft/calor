@@ -127,6 +127,35 @@ public class TaskGenHeldOutTests
     public void EscapeFilterValue_EscapesMetacharacters()
         => Assert.Equal(@"a\(b\)\&c", HeldOutExtraction.EscapeFilterValue("a(b)&c"));
 
+    // ---- residual-[C]: visible-filter round-trip guard (custom DisplayName oracle-leak) ----
+
+    [Fact]
+    public void VisibleSuiteLeaks_True_WhenCustomDisplayCoveringTestStillFailingInVisibleSuite()
+    {
+        // A custom [Theory(DisplayName=...)] whose method FQN is unrecoverable — its !~garbage term
+        // fails to exclude it, so it survives the visible suite present-and-failing (the leak).
+        var custom = Trx("Nasty, name (with) \"quotes\" & pipes|here", "Failed", "Assert.Equal() Failure");
+        var visibleRun = Run(custom, Trx("GeoLib.Tests.GridTests.Area_Multiplies", "Passed"));
+        Assert.True(HeldOutExtraction.VisibleSuiteLeaks(visibleRun, new[] { custom.Identity }));
+    }
+
+    [Fact]
+    public void VisibleSuiteLeaks_False_WhenCoveringTestSuccessfullyExcluded()
+    {
+        var custom = Trx("Nasty, name (with) \"quotes\" & pipes|here", "Failed");
+        // The visible run does NOT contain the covering test at all (the filter excluded it).
+        var visibleRun = Run(Trx("GeoLib.Tests.GridTests.Area_Multiplies", "Passed"));
+        Assert.False(HeldOutExtraction.VisibleSuiteLeaks(visibleRun, new[] { custom.Identity }));
+    }
+
+    [Fact]
+    public void VisibleSuiteLeaks_False_WhenCoveringTestPresentButPassing()
+    {
+        // Present but passing is not a leak (nothing failing reveals the answer).
+        var t = Trx("GeoLib.Tests.GridTests.Area_Multiplies", "Passed");
+        Assert.False(HeldOutExtraction.VisibleSuiteLeaks(Run(t), new[] { t.Identity }));
+    }
+
     [Fact]
     public void SynthesizeFailingBehavior_ScrubsTestIdentity_KeepsSymptom()
     {

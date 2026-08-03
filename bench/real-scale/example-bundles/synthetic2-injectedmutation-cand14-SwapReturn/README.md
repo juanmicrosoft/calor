@@ -1,9 +1,9 @@
-# Task bundle: synthetic2-injectedmutation-cand12-SwapReturn
+# Task bundle: synthetic2-injectedmutation-cand14-SwapReturn
 
 - Project: **Synthetic2**
 - Mutation source: **InjectedMutation**
 - Operator: `return false → return true` (SwapReturn)
-- Mutated region: `GeoLib/Grid.cs` line 30, col 20
+- Mutated region: `GeoLib/Grid.cs` line 37, col 20
 
 ## Failing-behavior report (BOTH arms receive this — the symptom, NOT the test)
 

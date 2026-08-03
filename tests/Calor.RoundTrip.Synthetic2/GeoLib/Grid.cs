@@ -14,6 +14,13 @@ public static class Grid
         return a * a + b * b;
     }
 
+    // Covered by BOTH a normal [Fact] and a custom-DisplayName [Theory] (mixed case) so a
+    // mutation here exercises the visible-filter round-trip guard (residual-[C] oracle-leak).
+    public static int Triple(int x)
+    {
+        return x * 3;
+    }
+
     public static int Area(int width, int height)
     {
         return width * height;

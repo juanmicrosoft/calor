@@ -1,9 +1,9 @@
-# Task bundle: synthetic2-injectedmutation-cand2-Arithmetic
+# Task bundle: synthetic2-injectedmutation-cand1-Arithmetic
 
 - Project: **Synthetic2**
 - Mutation source: **InjectedMutation**
-- Operator: `+ → -` (Arithmetic)
-- Mutated region: `GeoLib/Grid.cs` line 14, col 22
+- Operator: `* → /` (Arithmetic)
+- Mutated region: `GeoLib/Grid.cs` line 14, col 18
 
 ## Failing-behavior report (BOTH arms receive this — the symptom, NOT the test)
 

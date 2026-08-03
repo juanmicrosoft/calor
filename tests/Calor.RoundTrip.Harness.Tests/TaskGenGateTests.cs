@@ -85,15 +85,17 @@ public class TaskGenGateTests
         acc.Record(Disp(false, ExclusionReason.ConverterAttributed));  // attribution
         acc.Record(Disp(false, ExclusionReason.NoCoveringTest));       // no covering test
         acc.Record(Disp(false, ExclusionReason.DidNotCompile));        // invalid (no-compile) — distinct bucket
+        acc.Record(Disp(false, ExclusionReason.HeldOutFilterLeak));    // oracle-leak guard — distinct bucket
 
-        Assert.Equal(8, acc.Considered);
+        Assert.Equal(9, acc.Considered);
         Assert.Equal(1, acc.Eligible);
         Assert.Equal(2, acc.ExcludedClauseA);
         Assert.Equal(2, acc.ExcludedClauseB);
         Assert.Equal(1, acc.ExcludedAttribution);
         Assert.Equal(1, acc.ExcludedNoCoveringTest);
         Assert.Equal(1, acc.ExcludedDidNotCompile);
-        Assert.Equal(1.0 / 8.0, acc.EligibilityRate, 3);
+        Assert.Equal(1, acc.ExcludedHeldOutFilterLeak);
+        Assert.Equal(1.0 / 9.0, acc.EligibilityRate, 3);
     }
 
     private static CandidateDisposition Disp(bool eligible, ExclusionReason reason) => new()

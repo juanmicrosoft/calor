@@ -40,6 +40,7 @@ public sealed class ExclusionAccounting
     public int ExcludedAttribution => _dispositions.Count(d => d.Reason == ExclusionReason.ConverterAttributed);
     public int ExcludedNoCoveringTest => _dispositions.Count(d => d.Reason == ExclusionReason.NoCoveringTest);
     public int ExcludedDidNotCompile => _dispositions.Count(d => d.Reason == ExclusionReason.DidNotCompile);
+    public int ExcludedHeldOutFilterLeak => _dispositions.Count(d => d.Reason == ExclusionReason.HeldOutFilterLeak);
     public int ExcludedFidelityGate => _dispositions.Count(d => d.Reason == ExclusionReason.FidelityGateBelowBar);
 
     public double EligibilityRate => Considered == 0 ? 0.0 : (double)Eligible / Considered;

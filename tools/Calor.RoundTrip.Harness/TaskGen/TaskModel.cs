@@ -73,6 +73,14 @@ public enum ExclusionReason
     /// <summary>The mutation did not compile on the C# arm — an invalid candidate, distinct from "no covering test".</summary>
     DidNotCompile,
 
+    /// <summary>
+    /// The computed visible-suite filter fails to exclude a covering test (e.g. a custom
+    /// <c>[Theory/Fact(DisplayName=...)]</c> whose method FQN is unrecoverable from TRX), so that
+    /// test would stay VISIBLE and FAILING — an oracle leak (the agent would see the answer).
+    /// Dropped conservatively rather than emitting a leaking bundle (review residual-[C]).
+    /// </summary>
+    HeldOutFilterLeak,
+
     /// <summary>The candidate's project was excluded by the fidelity gate (NativeFraction below bar).</summary>
     FidelityGateBelowBar,
 }

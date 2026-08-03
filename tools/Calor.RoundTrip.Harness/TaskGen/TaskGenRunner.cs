@@ -52,6 +52,7 @@ public static class TaskGenRunner
                 ExcludedAttribution = p.Accounting.ExcludedAttribution,
                 ExcludedNoCoveringTest = p.Accounting.ExcludedNoCoveringTest,
                 ExcludedDidNotCompile = p.Accounting.ExcludedDidNotCompile,
+                ExcludedHeldOutFilterLeak = p.Accounting.ExcludedHeldOutFilterLeak,
                 EligibilityRate = p.Accounting.EligibilityRate,
                 Bundles = p.Bundles.Select(b => b.TaskId).ToList(),
                 Dispositions = p.Accounting.Dispositions,

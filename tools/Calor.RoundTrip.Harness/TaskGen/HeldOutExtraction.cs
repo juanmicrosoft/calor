@@ -91,6 +91,19 @@ public static partial class HeldOutExtraction
         return clauses.Count == 0 ? "" : string.Join("|", clauses);
     }
 
+    /// <summary>
+    /// Visible-filter round-trip guard (review residual-[C]): true iff a covering test is
+    /// present-and-FAILING in a run of the VISIBLE suite — i.e. the visible filter did NOT exclude
+    /// it (an oracle leak). Naming-agnostic: works for any test whose method FQN was unrecoverable
+    /// from TRX (custom <c>[Theory/Fact(DisplayName=...)]</c>), because it checks the actual run
+    /// rather than trying to parse the display name.
+    /// </summary>
+    public static bool VisibleSuiteLeaks(TestRunResult visibleRun, IEnumerable<string> coveringIdentities)
+    {
+        var ids = coveringIdentities as ISet<string> ?? coveringIdentities.ToHashSet(StringComparer.Ordinal);
+        return visibleRun.Results.Any(t => t.Outcome == "Failed" && ids.Contains(t.Identity));
+    }
+
     private static IEnumerable<string> FilterNames(IEnumerable<HeldOutTest> heldOut) =>
         heldOut
             .Select(h => string.IsNullOrEmpty(h.FilterName) ? MethodFqn(h.TestName, h.ClassName) : h.FilterName)

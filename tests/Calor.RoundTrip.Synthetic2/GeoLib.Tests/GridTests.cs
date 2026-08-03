@@ -54,4 +54,16 @@ public class GridTests
     [InlineData(1, 1, 2)]
     public void SumOfSquares_Theory(int a, int b, int expected)
         => Assert.Equal(expected, Grid.SumOfSquares(a, b));
+
+    // Mixed coverage of Grid.Triple: a normal Fact PLUS a custom-DisplayName Theory whose method
+    // FQN is unrecoverable from TRX (the display string is arbitrary, with metacharacters). A
+    // mutation in Triple must be DROPPED by the visible-filter round-trip guard, never emitted as
+    // a leaking bundle (residual-[C]).
+    [Fact]
+    public void Triple_Works() => Assert.Equal(9, Grid.Triple(3));
+
+    [Theory(DisplayName = "Nasty, name (with) \"quotes\" & pipes|here")]
+    [InlineData(2, 6)]
+    [InlineData(4, 12)]
+    public void Triple_CustomDisplay(int x, int expected) => Assert.Equal(expected, Grid.Triple(x));
 }

@@ -123,6 +123,7 @@ public sealed class TaskGenerator
                 "clause (b): the mutation compiles but breaks no previously-passing test — no observable defect."), null);
 
         var heldOut = HeldOutExtraction.ToHeldOut(covering);
+        var coveringIds = covering.Select(c => c.Identity).ToHashSet();
         var csSignature = EligibilityPredicate.NormalizeFailureSignature(covering[0].ErrorMessage);
         var heldOutFilter = HeldOutExtraction.BuildHeldOutFilter(heldOut);
 
@@ -151,6 +152,24 @@ public sealed class TaskGenerator
         {
             var calorHeldOut = await _pipeline.RunTestsAsync(calorDir, Clone(project, null, heldOutFilter), noBuild: true);
             (calorOutcome, calorSignature) = OutcomeOf(calorHeldOut, heldOut);
+        }
+
+        // ===== Visible-filter round-trip guard (review residual-[C]): no oracle leak. =====
+        // On the STILL-MUTATED Calor arm, actually run the VISIBLE suite (held-out excluded) and
+        // assert no covering test survives present-and-failing. A custom [Theory/Fact(DisplayName=…)]
+        // has an unrecoverable method FQN → its !~ term is garbage → it would stay visible and failing
+        // (the agent would see the answer). Drop such candidates conservatively rather than leak.
+        if (calorOutcome == "Failed")
+        {
+            var visibleFilter = HeldOutExtraction.BuildVisibleFilter(heldOut);
+            if (!string.IsNullOrEmpty(visibleFilter))
+            {
+                var visibleRun = await _pipeline.RunTestsAsync(calorDir, Clone(project, null, visibleFilter), noBuild: true);
+                if (HeldOutExtraction.VisibleSuiteLeaks(visibleRun, coveringIds))
+                    return (Excluded(ExclusionReason.HeldOutFilterLeak,
+                        "the visible-suite filter does not exclude a covering test (unrecoverable method FQN, e.g. a custom DisplayName) — "
+                        + "it would remain visible and failing (oracle leak); dropped rather than shipping a leaking bundle."), null);
+            }
         }
 
         // ===== D-W4.3 attribution (bisect pattern, review [M]#2): swap in the UNMUTATED-CONVERTED file. =====
