@@ -113,11 +113,13 @@ public static class ExpressibleMutationOperators
                 {
                     if (!MethodReadsIdentifier(body, field)) continue;
 
-                    // Inject `lock (this) { this.<field> = new System.Random().Next(); }` as the first
+                    // Inject `lock (this) { <field> = new System.Random().Next(); }` as the first
                     // statement. The `rand` effect is charged by enforcement but — because it is nested
                     // in a lock body the converter's §E walker skips — left out of the converted §E.
+                    // The field name is written UNQUALIFIED so it resolves to either an instance or a
+                    // static field of the containing type (widening the operator's reach on real code).
                     var inject = SyntaxFactory.ParseStatement(
-                        $"lock (this) {{ this.{field} = new System.Random().Next(); }}\n");
+                        $"lock (this) {{ {field} = new System.Random().Next(); }}\n");
                     var newBody = body.WithStatements(body.Statements.Insert(0, inject));
                     var mutatedRoot = root.ReplaceNode(body, newBody);
 
@@ -147,8 +149,9 @@ public static class ExpressibleMutationOperators
         foreach (var member in type.Members.OfType<FieldDeclarationSyntax>())
         {
             var mods = member.Modifiers;
-            if (mods.Any(SyntaxKind.ConstKeyword) || mods.Any(SyntaxKind.ReadOnlyKeyword)
-                || mods.Any(SyntaxKind.StaticKeyword))
+            // const/readonly are not writable; static is allowed (written unqualified from an instance
+            // method, still inside `lock (this)`). This widens reach to counter/cache-style fields.
+            if (mods.Any(SyntaxKind.ConstKeyword) || mods.Any(SyntaxKind.ReadOnlyKeyword))
                 continue;
             var typeName = member.Declaration.Type is PredefinedTypeSyntax p ? p.Keyword.Text
                 : member.Declaration.Type.ToString();
@@ -167,11 +170,17 @@ public static class ExpressibleMutationOperators
     // ===================================================================================
 
     /// <summary>
-    /// Remove a wrapping zero-guard `if (d != 0) { ... a / d ... }` so the division always runs.
+    /// Remove a WRAPPING zero-guard `if (d != 0) { ... a / d ... }` so the division always runs.
     /// When <c>d == 0</c> at runtime this throws <see cref="DivideByZeroException"/> (a real defect);
     /// on the converted arm Calor's div-by-zero checker no longer sees the guard as a path condition,
     /// so it proves the divisor can be zero and raises <c>Calor0920</c>. The differential probe
     /// confirms the diagnostic is INTRODUCED by the removal (absent while the guard stood).
+    ///
+    /// Only the WRAPPING-if form is differential. Empirically, the checker does NOT model early-return
+    /// / throw guards (`if (d == 0) return …; … a / d`) as path conditions — it already fires Calor0920
+    /// on the guarded division — so removing such a guard is NOT addressable (fires on both conversions)
+    /// and the probe correctly rejects it. Wrapping-if divisor guards are rare in real code, so this
+    /// operator's live yield is expected to be low; the base rate discloses it.
     /// </summary>
     private static void TryDivByZeroGuardRemoval(string rel, SyntaxNode root, IfStatementSyntax ifs, List<MutationCandidate> acc)
     {
