@@ -27,6 +27,18 @@ public sealed class RoundTripReport
     /// <summary>Separated verdict dimensions (#776): coverage, build, tests — the substrate the A-1.4 fidelity gate thresholds on.</summary>
     public ProjectFidelity? Fidelity { get; set; }
 
+    /// <summary>
+    /// True when the run could NOT be adjudicated: the post-conversion build failed but
+    /// the failure could not be attributed to any file (build recovery extracted zero
+    /// error files — e.g. a recovery-build timeout). In that state no file was reverted,
+    /// so the coverage fraction would be spuriously inflated; it MUST NOT be trusted or
+    /// emitted as a fidelity number. Distinct from an honest low-coverage run.
+    /// </summary>
+    public bool Inconclusive { get; set; }
+
+    /// <summary>Why the run is inconclusive (null when it is not).</summary>
+    public string? InconclusiveReason { get; set; }
+
     /// <summary>Optional bisect results mapping culprit file → test names.</summary>
     public Dictionary<string, List<string>>? BisectResults { get; set; }
 

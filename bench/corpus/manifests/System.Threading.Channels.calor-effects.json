@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "description": "Effects derived by calor import for System.Threading.Channels (Tier A IL analysis; only members whose full call chains resolved with no unverified assumptions)",
+  "library": "System.Threading.Channels",
+  "libraryVersion": "8.0.0",
+  "generatedBy": "calor import",
+  "confidence": "inferred",
+  "generatedAt": "2026-08-03T00:04:14.1302610Z",
+  "mappings": [
+    {
+      "type": "System.Threading.Channels.BoundedChannelOptions",
+      "getters": {
+        "Capacity": [],
+        "FullMode": []
+      },
+      "setters": {
+        "Capacity": [],
+        "FullMode": []
+      },
+      "constructors": {
+        "()": []
+      }
+    },
+    {
+      "type": "System.Threading.Channels.ChannelOptions",
+      "getters": {
+        "AllowSynchronousContinuations": [],
+        "SingleReader": [],
+        "SingleWriter": []
+      },
+      "setters": {
+        "AllowSynchronousContinuations": [],
+        "SingleReader": [],
+        "SingleWriter": []
+      }
+    },
+    {
+      "type": "System.Threading.Channels.ChannelReader\u00601",
+      "methods": {
+        "TryPeek": []
+      }
+    },
+    {
+      "type": "System.Threading.Channels.Channel\u00602",
+      "getters": {
+        "Reader": [],
+        "Writer": []
+      }
+    },
+    {
+      "type": "System.Threading.Channels.UnboundedChannelOptions",
+      "constructors": {
+        "()": []
+      }
+    }
+  ],
+  "namespaceDefaults": {}
+}

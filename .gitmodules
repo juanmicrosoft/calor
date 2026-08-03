@@ -1,0 +1,9 @@
+[submodule "bench/corpus/serilog"]
+	path = bench/corpus/serilog
+	url = https://github.com/serilog/serilog.git
+[submodule "bench/corpus/FluentValidation"]
+	path = bench/corpus/FluentValidation
+	url = https://github.com/FluentValidation/FluentValidation.git
+[submodule "bench/corpus/MediatR"]
+	path = bench/corpus/MediatR
+	url = https://github.com/jbogard/MediatR.git

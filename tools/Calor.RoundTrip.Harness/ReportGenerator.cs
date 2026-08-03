@@ -56,8 +56,17 @@ public static class ReportGenerator
 
         sb.AppendLine();
 
-        // Fidelity dimensions
-        if (report.Fidelity != null)
+        // Fidelity dimensions — suppressed for an inconclusive (unattributable build
+        // failure) run: the coverage fraction would be spuriously inflated, so we emit a
+        // clear notice instead of a number.
+        if (report.Inconclusive)
+        {
+            sb.AppendLine("## Fidelity — INCONCLUSIVE");
+            sb.AppendLine();
+            sb.AppendLine($"No coverage fraction is reported: {report.InconclusiveReason}");
+            sb.AppendLine();
+        }
+        else if (report.Fidelity != null)
         {
             var cov = report.Fidelity.Coverage;
             var build = report.Fidelity.Build;
@@ -208,7 +217,10 @@ public static class ReportGenerator
             calor_version = report.CalorVersion,
             timestamp = report.StartedAt.ToString("o"),
             duration_seconds = report.Duration.TotalSeconds,
-            verdict = report.Comparison?.Status.ToString().ToLowerInvariant() ?? "incomplete",
+            verdict = report.Inconclusive ? "inconclusive" : report.Comparison?.Status.ToString().ToLowerInvariant() ?? "incomplete",
+            // When inconclusive, no coverage fraction is trustworthy — see below (fidelity is nulled).
+            inconclusive = report.Inconclusive,
+            inconclusive_reason = report.InconclusiveReason,
             baseline = report.Baseline != null ? new
             {
                 total = report.Baseline.TotalTests,
@@ -239,7 +251,10 @@ public static class ReportGenerator
                 ? report.FileResults.Average(f => f.ConversionRate) / 100.0
                 : 0.0,
             build_succeeded = report.BuildResult?.Succeeded ?? false,
-            fidelity = report.Fidelity == null ? null : new
+            // Do NOT emit a fidelity fraction for an inconclusive (unattributable build
+            // failure) run — the coverage numbers would be spuriously inflated because no
+            // file was reverted. Emit null so no downstream reader trusts a fraction.
+            fidelity = (report.Inconclusive || report.Fidelity == null) ? null : new
             {
                 coverage = new
                 {
@@ -300,6 +315,7 @@ public static class ReportGenerator
 
     private static string GetVerdict(RoundTripReport report)
     {
+        if (report.Inconclusive) return $"INCONCLUSIVE — {report.InconclusiveReason}";
         if (report.Comparison == null) return "INCOMPLETE";
         return report.Comparison.Status switch
         {

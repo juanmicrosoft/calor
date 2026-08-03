@@ -1,0 +1,18 @@
+{
+  "version": "1.0",
+  "description": "Effects derived by calor import for Microsoft.Extensions.DependencyInjection.Abstractions (Tier A IL analysis; only members whose full call chains resolved with no unverified assumptions)",
+  "library": "Microsoft.Extensions.DependencyInjection.Abstractions",
+  "libraryVersion": "10.0.2",
+  "generatedBy": "calor import",
+  "confidence": "inferred",
+  "generatedAt": "2026-08-03T00:04:13.9031510Z",
+  "mappings": [
+    {
+      "type": "Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions",
+      "methods": {
+        "Add": []
+      }
+    }
+  ],
+  "namespaceDefaults": {}
+}

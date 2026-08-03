@@ -33,11 +33,34 @@ public sealed class RoundTripConfig
     /// <summary>Maximum time for dotnet test before timeout.</summary>
     public TimeSpan TestTimeout { get; init; } = TimeSpan.FromMinutes(10);
 
+    /// <summary>
+    /// Maximum time for a single dotnet build before timeout. Generous by default
+    /// because the build-recovery loop rebuilds the WHOLE project (restore + build)
+    /// repeatedly, and on a cold NuGet cache a large subject (e.g. Serilog) can take
+    /// several minutes per rebuild. Too short a timeout makes the build fail with no
+    /// extractable errors, which reverts nothing and would otherwise leave the printed
+    /// coverage fraction inflated — the harness now flags that case inconclusive rather
+    /// than trusting it, but the generous timeout keeps normal cold-cache runs valid.
+    /// </summary>
+    public TimeSpan BuildTimeout { get; init; } = TimeSpan.FromMinutes(15);
+
     /// <summary>dotnet test additional arguments (e.g., --filter for specific tests).</summary>
     public string? TestFilter { get; init; }
 
     /// <summary>Target framework to use for dotnet test (e.g., "net10.0").</summary>
     public string? TargetFramework { get; init; }
+
+    /// <summary>
+    /// Extra MSBuild properties appended to every restore/build/test invocation for
+    /// this project (e.g. <c>-p:NuGetAudit=false -p:TreatWarningsAsErrors=false</c>).
+    /// Vendored OSS corpus subjects are measurement subjects, not held to Calor's own
+    /// warning policy: <c>NuGetAudit=false</c> stops a NuGet advisory (NU1903) failing
+    /// restore under the subject's own <c>TreatWarningsAsErrors</c>, and disabling
+    /// warnings-as-errors keeps a converted file from being reverted over a mere
+    /// analyzer warning (coverage counts ledger losses, not warnings). Empty for
+    /// Calor's own Synthetic project.
+    /// </summary>
+    public string ExtraBuildProperties { get; init; } = "";
 
     /// <summary>Path to dotnet executable.</summary>
     public string DotnetPath { get; init; } = "dotnet";
