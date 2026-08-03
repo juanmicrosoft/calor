@@ -61,28 +61,31 @@ def summarize(results):
             "escaped": outcomes.get("escaped", 0),
             "brokeRegression": outcomes.get("broke-regression", 0),
             "invalid": outcomes.get("invalid", 0),
+            "skipped": outcomes.get("skipped", 0),
             "meanCostUsd": mean([r.get("costUsd") for r in rs]),
             "meanOutputTokens": mean([r.get("tokens", {}).get("output") for r in rs]),
-            "meanItersToDone": mean([r.get("iterationsToGreen") for r in rs]),
-            "varItersToDone": pvariance([r.get("iterationsToGreen") for r in rs]),
+            "meanItersToDone": mean([r.get("iterationsToDeclaredDone") for r in rs]),
+            "varItersToDone": pvariance([r.get("iterationsToDeclaredDone") for r in rs]),
             "meanWallSec": mean([r.get("wallClockSeconds") for r in rs]),
         }
         per_group.append(g)
         lines.append(
             f"  {bundle}  [{arm}]  n={n}  "
-            f"caught={g['caught']} escaped={g['escaped']} broke={g['brokeRegression']} invalid={g['invalid']}  "
+            f"caught={g['caught']} escaped={g['escaped']} broke={g['brokeRegression']} "
+            f"invalid={g['invalid']} skipped={g['skipped']}  "
             f"cost/run=${g['meanCostUsd']}  outTok={g['meanOutputTokens']}  "
             f"iters~={g['meanItersToDone']}(var {g['varItersToDone']})  wall={g['meanWallSec']}s"
         )
 
     # Ceiling-recurrence signal: C#-arm escaped incidence. Keyed on the BASE arm
     # (label may carry a "+variant" suffix) and restricted to REAL agent runs —
-    # synthetic null-agent runs (fix/noop smokes) are not evidence of the ceiling.
+    # synthetic null-agent runs (fix/noop smokes) and skipped/invalid runs are not
+    # evidence of the ceiling.
     def base_arm(r):
         return (r.get("arm") or "").split("+", 1)[0]
     cs = [r for r in results
           if base_arm(r) == "csharp" and not r.get("nullAgent")
-          and r.get("outcome") != "invalid"]
+          and r.get("outcome") not in ("invalid", "skipped")]
     cs_escaped = sum(1 for r in cs if r.get("outcome") == "escaped")
     ceiling = {
         "csharpValidRuns": len(cs),

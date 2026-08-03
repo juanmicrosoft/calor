@@ -59,8 +59,12 @@ detect_invalid_run() {
             echo "agent output matches error marker: \"$marker\""; return 0
         fi
     done
-    if [[ "$agent_rc" -ne 0 && ! -s "$ws_out/journal.jsonl" ]]; then
-        echo "agent exit code $agent_rc with empty journal.jsonl"; return 0
+    # Tightened (review minor): a nonzero agent exit is invalid REGARDLESS of the
+    # journal — a crashed/timed-out agent that happened to journal an edit must not
+    # be scored escaped. null-agent runs always set AGENT_RC=0, so this only gates
+    # real runs (retried on a fresh workspace, then recorded invalid).
+    if [[ "$agent_rc" -ne 0 ]]; then
+        echo "agent exit code $agent_rc (nonzero -> invalid)"; return 0
     fi
     return 1
 }
@@ -135,8 +139,11 @@ command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 required" >&2; exit
 BUNDLE_ID="$(jq -r '.TaskId' "$BUNDLE_DIR/provenance.json")"
 PROJECT="$(jq -r '.ProjectName' "$BUNDLE_DIR/provenance.json")"
 REGNET="$(jq -r '.RegressionNetProject' "$BUNDLE_DIR/provenance.json")"
-VISIBLE_FILTER="$(jq -r '.VisibleTestFilter // ""' "$BUNDLE_DIR/provenance.json")"
+# EXACT-match held-out + visible filters (computed from HeldOut[].FilterName, not
+# provenance's substring VisibleTestFilter) — see bundle-helpers.py M1 note. Used
+# ONLY in the harness-side oracle, never shown to the agent.
 HELDOUT_FILTER="$(python3 "$HELPERS" heldout-filter "$BUNDLE_DIR")"
+VISIBLE_FILTER="$(python3 "$HELPERS" visible-filter "$BUNDLE_DIR")"
 SYMPTOM="$(jq -r '.FailingBehavior.Symptom // "A previously-correct behavior now produces an incorrect result."' "$BUNDLE_DIR/provenance.json")"
 SUBJECT_HINT="$(jq -r '.FailingBehavior.SubjectHint // ""' "$BUNDLE_DIR/provenance.json")"
 HELDOUT_COUNT="$(jq -r '.HeldOut | length' "$BUNDLE_DIR/provenance.json")"
@@ -170,9 +177,14 @@ echo "bundle=$BUNDLE_ID project=$PROJECT arm=$ARM regnet=$REGNET tfm=$TFM heldou
 # ---------------------------------------------------------------------------
 sync_to_oracle() {
     local ws="$1" ws_oracle="$2"
+    # Exclude ALL test-source roots (not just dirname(REGNET)): any path under a
+    # */test/*, */tests/* or *.Tests/ directory (case-insensitive) — the same set
+    # the agent's PreToolUse hook blocks. A test helper the agent could edit must
+    # never propagate to the oracle, or the agent could steer the held-out result.
     ( cd "$ws/src" && find . -type f -name '*.cs' \
-        -not -path "./$TESTPROJ_DIR/*" -not -path '*/obj/*' -not -path '*/bin/*' \
-        -not -path '*/TestResults/*' -print ) \
+        -not -path "./$TESTPROJ_DIR/*" \
+        -not -ipath '*/test/*' -not -ipath '*/tests/*' -not -ipath '*.tests/*' \
+        -not -path '*/obj/*' -not -path '*/bin/*' -not -path '*/TestResults/*' -print ) \
       | while IFS= read -r rel; do
             rel="${rel#./}"
             mkdir -p "$ws_oracle/$(dirname "$rel")"
@@ -218,11 +230,11 @@ $( [[ -n "$SUBJECT_HINT" && "$SUBJECT_HINT" != "null" ]] && echo "> " && echo ">
 ## What to do
 
 - The defect lives in the project's library source under \`src/\`. Find and fix it.
-- Work the VISIBLE test suite only. Run it with:
-  \`dotnet test $REGNET --filter "$VISIBLE_FILTER"\`${TFM:+ --framework $TFM}
+- Run the test suite with: \`dotnet test $REGNET\`${TFM:+ --framework $TFM}
+  (it is the project's own suite; run it as-is).
 - Do NOT add, remove, or modify any test, and do not edit the test project.
 - Iteration budget: $ITERATION_BUDGET build/test cycles. You are done when the
-  library builds cleanly and the visible suite is green.
+  library builds cleanly and the test suite is green.
 EOF
 
     # .g.cs / test-edit guard for real agent runs (parity with run-pair.sh §1).
@@ -282,6 +294,13 @@ run_oracle() {
             fi
         fi
     fi
+    # Integer guards: an unexpected `dotnet test` summary shape can leave a var
+    # empty (a no-match grep whose downstream head succeeds), which would make the
+    # jq --argjson below fail and drop the record. Default anything non-numeric.
+    [[ "$ho_pass" =~ ^[0-9]+$ ]] || ho_pass=0
+    [[ "$ho_fail" =~ ^[0-9]+$ ]] || ho_fail="$HELDOUT_COUNT"
+    [[ "$vis_pass" =~ ^[0-9]+$ ]] || vis_pass=0
+    [[ "$vis_fail" =~ ^-?[0-9]+$ ]] || vis_fail=-1
     jq -n --argjson bo "$build_ok" --argjson hp "$ho_pass" --argjson hf "$ho_fail" \
           --argjson vp "$vis_pass" --argjson vf "$vis_fail" \
         '{build_ok:($bo==1), heldout_pass:$hp, heldout_fail:$hf, visible_pass:$vp, visible_fail:$vf}' \
@@ -289,12 +308,13 @@ run_oracle() {
 }
 
 # ---------------------------------------------------------------------------
-# dotnet shim: journals build/test invocations, detects library-src edits, and
-# runs the held-out leg of the oracle silently after each (itg signal). The
-# expensive visible/regression leg is deferred to declared-done.
+# Agent-facing dotnet shim (FIRST on the agent's PATH, agent-readable). It ONLY
+# runs the real dotnet for the agent's own build/test and journals invocation
+# metadata (cmd/exit, edit-hash, iteration ordinal, latency). It holds NO oracle
+# path and NO held-out filter (review C) — all oracle work is harness-side.
 # ---------------------------------------------------------------------------
 write_shim() {
-    local ws="$1" ws_out="$2" shim_dir="$3" run_idx="$4" ws_oracle="$5"
+    local ws="$1" ws_out="$2" shim_dir="$3" run_idx="$4"
     local real_dotnet; real_dotnet="$(command -v dotnet)"
     mkdir -p "$shim_dir"
     cat > "$shim_dir/dotnet" <<EOF
@@ -321,27 +341,18 @@ case "\${1:-}" in
       iteration=\$(( \$(cat "$ws_out/.itercount" 2>/dev/null || echo 0) + 1 ))
       echo "\$iteration" > "$ws_out/.itercount"
     fi
-    # Sync the agent's edits into the harness-only oracle copy (which alone
-    # carries the held-out test), then build+test THERE. The agent's own dotnet
-    # (already run above) saw only its held-out-stripped copy.
-    ( cd "$ws/src" && find . -type f -name '*.cs' -not -path "./$TESTPROJ_DIR/*" -not -path '*/obj/*' -not -path '*/bin/*' -not -path '*/TestResults/*' -print ) \
-      | while IFS= read -r rel; do rel="\${rel#./}"; mkdir -p "$ws_oracle/\$(dirname "\$rel")"; cp "$ws/src/\$rel" "$ws_oracle/\$rel"; done
-    ho_pass=0; ho_fail=$HELDOUT_COUNT
-    if CALOR_P0_SHIM_OFF=1 "$real_dotnet" build "$ws_oracle/$REGNET" ${TFM:+--framework $TFM} $EXTRA --nologo -v q > "$ws_out/.src_build.txt" 2>&1; then
-      if CALOR_P0_SHIM_OFF=1 "$real_dotnet" test "$ws_oracle/$REGNET" ${TFM:+--framework $TFM} $EXTRA --no-build --filter "$HELDOUT_FILTER" --nologo -v q > "$ws_out/.ho_last.txt" 2>&1; then
-        ho_fail=0; ho_pass=\$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
-      else
-        ho_fail=\$(grep -oE 'Failed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo $HELDOUT_COUNT)
-        ho_pass=\$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
-      fi
-    fi
+    # NO ORACLE INFO HERE (review C). This script is first on the agent's PATH and
+    # the agent can \`cat\` it, so it must never contain the oracle tree path or the
+    # held-out --filter. The oracle runs entirely in the parent (run-bundle.sh),
+    # whose oracle path/filter live only in its own process. The shim journals
+    # ONLY invocation metadata over the agent's OWN workspace (its cwd — no secret).
     jq -cn --arg ts "\$ts_iso" --arg bundle "$BUNDLE_ID" --arg arm "$ARM_LABEL" \\
       --argjson run $run_idx --arg cmd "\${1}" --argjson exit "\$rc" \\
       --argjson edited "\$edited" --argjson iteration "\$iteration" \\
-      --argjson lat "\$lat" --argjson hp "\$ho_pass" --argjson hf "\$ho_fail" --arg hash "\$hash" \\
-      '{schema:"bundle-telemetry/1", ts:\$ts, bundle:\$bundle, arm:\$arm, run:\$run,
+      --argjson lat "\$lat" --arg hash "\$hash" \\
+      '{schema:"bundle-telemetry/2", ts:\$ts, bundle:\$bundle, arm:\$arm, run:\$run,
         iteration:\$iteration, cmd:\$cmd, exit:\$exit, edited:\$edited,
-        feedback_latency_ms:\$lat, heldout_pass:\$hp, heldout_fail:\$hf, src_tree_hash:\$hash}' \\
+        feedback_latency_ms:\$lat, src_tree_hash:\$hash}' \\
       >> "$ws_out/journal.jsonl"
     ;;
 esac
@@ -369,8 +380,10 @@ run_agent() {
         # Apply the derived reference (the un-mutated source = the fix), then one
         # observed build so the shim journals an edited iteration -> expect CAUGHT.
         if ! python3 "$HELPERS" apply-fix "$BUNDLE_DIR" "$ARM" "$ws/src" "$CORPUS_ROOT" "$REPO_ROOT" > "$ws_out/.applyfix.txt" 2>&1; then
-            echo "null-agent: apply-fix FAILED (bundle=$BUNDLE_ID arm=$ARM): $(cat "$ws_out/.applyfix.txt")" >&2
-            echo "{\"null_agent\":true,\"apply_fix_error\":$(jq -Rs . < "$ws_out/.applyfix.txt")}" > "$ws_out/agent.json"
+            echo "null-agent: reference underivable (bundle=$BUNDLE_ID arm=$ARM) -> SKIP: $(cat "$ws_out/.applyfix.txt")" >&2
+            echo '{"null_agent":true,"skipped":true}' > "$ws_out/agent.json"
+            # SKIP marker (not a verdict) — extract_metrics emits outcome:skipped.
+            printf 'null-agent reference underivable: %s' "$(cat "$ws_out/.applyfix.txt")" > "$ws_out/.skip"
             return 0
         fi
         cat "$ws_out/.applyfix.txt" >&2
@@ -417,6 +430,20 @@ extract_metrics() {
     local ws="$1" ws_out="$2" run_idx="$3" wall="$4" ws_oracle="$5"
     local journal="$ws_out/journal.jsonl"; touch "$journal"
 
+    # SKIP (not a verdict): a null-agent run whose reference could not be derived
+    # (e.g. calor arm, mutated line not uniquely locatable). Recorded as skipped
+    # so it never counts as caught/escaped — matches the README claim.
+    if [[ -f "$ws_out/.skip" ]]; then
+        jq -n --arg bundle "$BUNDLE_ID" --arg project "$PROJECT" --arg arm "$ARM_LABEL" \
+              --argjson run "$run_idx" --arg reason "$(cat "$ws_out/.skip")" \
+              --argjson null_agent "$NULL_AGENT" --argjson noop "$NULL_AGENT_NOOP" \
+            '{bundle:$bundle, project:$project, arm:$arm, run:$run, outcome:"skipped",
+              skipReason:$reason, invalid:false, escapedBugs:null,
+              nullAgent:($null_agent==1), nullAgentNoop:($noop==1)}' \
+            > "$ws_out/result.json"
+        cat "$ws_out/result.json"; return 0
+    fi
+
     # Final declared-done oracle: held-out + visible (regression) legs.
     run_oracle "$ws" "$ws_oracle" "$ws_out/.final" "both"
     local fbuild fhp fhf fvp fvf
@@ -441,15 +468,12 @@ extract_metrics() {
         outcome="caught"
     fi
 
-    # Iterations = journaled edited build/test invocations; itg = first edited
-    # iteration whose held-out went green (censored -> budget+1).
-    local iterations itg censored
+    # Iterations to declared-done = journaled edited build/test invocations (the
+    # agent stops when it believes it is done). Per-iteration held-out timing was
+    # removed with the shim's oracle (review C) — the verdict comes from the
+    # declared-done oracle above, and the agent's edit cadence is unaffected.
+    local iterations
     iterations=$(jq -s '[.[] | select(.edited==true)] | length' "$journal")
-    itg=$(jq -s '[.[] | select(.edited==true)] | to_entries
-        | ([.[] | select(.value.heldout_fail==0)] | first // null)
-        | if . == null then -1 else (.key + 1) end' "$journal" 2>/dev/null || echo -1)
-    censored=false
-    if [[ "$itg" == "-1" ]]; then itg=$((ITERATION_BUDGET + 1)); censored=true; fi
 
     # Cost + tokens from the agent envelope. Cost = summed total_cost_usd; NEVER
     # hand-price tokens.
@@ -466,7 +490,7 @@ extract_metrics() {
         --argjson fbuild "$([[ "$fbuild" == "true" ]] && echo true || echo false)" \
         --argjson hp "$fhp" --argjson hf "$fhf" --argjson vp "$fvp" --argjson vf "$fvf" \
         --argjson basevf "$base_vf" --argjson escaped "$fhf" \
-        --argjson iterations "$iterations" --argjson itg "$itg" --argjson censored "$censored" \
+        --argjson iterations "$iterations" \
         --argjson cost "$cost" --argjson tin "$tin" --argjson tout "$tout" \
         --argjson wall "$wall" \
         --argjson null_agent "$NULL_AGENT" --argjson noop "$NULL_AGENT_NOOP" \
@@ -474,7 +498,7 @@ extract_metrics() {
         '{bundle:$bundle, project:$project, arm:$arm, run:$run, outcome:$outcome,
           finalBuildOk:$fbuild, heldoutPass:$hp, heldoutFail:$hf,
           visiblePass:$vp, visibleFail:$vf, visibleFailBaseline:$basevf,
-          escapedBugs:$escaped, iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
+          escapedBugs:$escaped, iterations:$iterations, iterationsToDeclaredDone:$iterations,
           costUsd:$cost, tokens:{input:$tin, output:$tout}, wallClockSeconds:$wall,
           invalid:false, nullAgent:($null_agent==1), nullAgentNoop:($noop==1),
           mutatedFile:$mutfile,
@@ -486,11 +510,11 @@ extract_metrics() {
 write_invalid_result() {
     local ws_out="$1" run_idx="$2"
     jq -n --arg bundle "$BUNDLE_ID" --arg project "$PROJECT" --arg arm "$ARM_LABEL" --argjson run "$run_idx" \
-        --argjson escaped "$HELDOUT_COUNT" --argjson itg "$((ITERATION_BUDGET + 1))" \
+        --argjson escaped "$HELDOUT_COUNT" \
         --argjson null_agent "$NULL_AGENT" --argjson noop "$NULL_AGENT_NOOP" \
         '{bundle:$bundle, project:$project, arm:$arm, run:$run, outcome:"invalid",
           finalBuildOk:false, heldoutFail:$escaped, escapedBugs:$escaped,
-          iterations:0, iterationsToGreen:$itg, censored:true,
+          iterations:0, iterationsToDeclaredDone:0,
           costUsd:0, tokens:{input:0, output:0}, wallClockSeconds:0,
           invalid:true, nullAgent:($null_agent==1), nullAgentNoop:($noop==1)}' \
         > "$ws_out/result.json"
@@ -512,7 +536,7 @@ for (( run=1; run<=RUNS; run++ )); do
         WS_ORACLE="$(cd "$WS_ORACLE" && pwd -P)"
         SHIM_DIR="$WS_OUT/.shim"
         materialize "$WS" "$WS_OUT" "$WS_ORACLE"
-        write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run" "$WS_ORACLE"
+        write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
         _t0=$SECONDS
         run_agent "$WS" "$WS_OUT" "$SHIM_DIR"
         _wall=$(( SECONDS - _t0 ))
@@ -525,7 +549,13 @@ for (( run=1; run<=RUNS; run++ )); do
             write_invalid_result "$WS_OUT" "$run"; break
         fi
         extract_metrics "$WS" "$WS_OUT" "$run" "$_wall" "$WS_ORACLE"
-        rm -rf "$WS" "$WS_ORACLE"
+        # CALOR_BUNDLE_KEEP_WS=1 preserves the trees for the oracle-isolation audit
+        # (grep the agent workspace + shim for the oracle path / held-out names).
+        if [[ "${CALOR_BUNDLE_KEEP_WS:-0}" == "1" ]]; then
+            echo "KEEP_WS agent=$WS oracle=$WS_ORACLE shim=$SHIM_DIR" >&2
+        else
+            rm -rf "$WS" "$WS_ORACLE"
+        fi
         break
     done
 done

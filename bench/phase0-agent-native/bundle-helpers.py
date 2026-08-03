@@ -21,7 +21,11 @@ verdict, exactly the hazard the null-agent verification exists to rule out.
 
 Subcommands:
   heldout-filter <bundle_dir>
-      Print the held-out dotnet --filter expression (OR of FullyQualifiedName~).
+      Print the held-out dotnet --filter expression (OR of FullyQualifiedName= —
+      EXACT, so a prefix-sibling method is not swept in).
+  visible-filter <bundle_dir>
+      Print the visible/regression --filter (AND of FullyQualifiedName!= — the
+      full suite minus the EXACT held-out set).
   apply-fix <bundle_dir> <arm> <ws_src_dir> <corpus_root> <calor_root>
       Derive and apply the reference fix into <ws_src_dir>. Prints "OK: ..." on
       success (exit 0) or "ERROR: ..." (exit 1).
@@ -58,15 +62,37 @@ def load_prov(bundle_dir):
         return json.load(f)
 
 
-def cmd_heldout_filter(bundle_dir):
-    prov = load_prov(bundle_dir)
+def _heldout_names(prov):
     names = [h.get("FilterName") or f"{h['ClassName']}.{h['TestName']}"
              for h in prov.get("HeldOut", [])]
-    names = [n for n in names if n]
+    return [n for n in names if n]
+
+
+def cmd_heldout_filter(bundle_dir):
+    # EXACT match (FullyQualifiedName=…), NOT substring (~): a held-out method
+    # whose FQN is a prefix of a sibling (Serilog cand10:
+    # …AnObjectIsRenderedInSimpleNotation vs …UsingFormatProvider) would, under
+    # ~, pull the sibling into the held-out leg and out of the regression net.
+    # For an xUnit theory every row shares the method FQN, so = still selects all
+    # rows of the held-out method(s) as one unit.
+    names = _heldout_names(load_prov(bundle_dir))
     if not names:
         print("ERROR: no held-out tests in provenance", file=sys.stderr)
         return 1
-    print("|".join(f"FullyQualifiedName~{n}" for n in names))
+    print("|".join(f"FullyQualifiedName={n}" for n in names))
+    return 0
+
+
+def cmd_visible_filter(bundle_dir):
+    # The regression/visible suite = full suite minus the EXACT held-out set
+    # (FullyQualifiedName!=… ANDed). Computed here rather than trusting
+    # provenance.VisibleTestFilter (which uses substring !~ and would wrongly
+    # exclude prefix-siblings too).
+    names = _heldout_names(load_prov(bundle_dir))
+    if not names:
+        print("ERROR: no held-out tests in provenance", file=sys.stderr)
+        return 1
+    print("&".join(f"FullyQualifiedName!={n}" for n in names))
     return 0
 
 
@@ -253,6 +279,54 @@ def _match_delimiter(text, open_i, open_ch, close_ch):
     return -1
 
 
+def _expr_body_end(text, sig):
+    """From `sig` (index of an expression-bodied member's `=>`), return the index
+    just past its terminating `;` — string/char/comment aware and depth-tracked so
+    a `;` inside a nested lambda/parenthesised expression/string is not mistaken
+    for the member terminator. Return -1 if no balanced depth-0 `;` is found (the
+    caller treats that as a failed strip and aborts — never a silent corrupt cut)."""
+    n = len(text)
+    i = sig + 2  # past '=>'
+    depth = 0   # net () [] {} nesting
+    while i < n:
+        c = text[i]
+        if c == '"' or (c in '@$' and i + 1 < n and text[i + 1] == '"') \
+                or (c in '@$' and i + 2 < n and text[i + 1] in '@$' and text[i + 2] == '"'):
+            q = i
+            while text[q] in '@$':
+                q += 1
+            i = _skip_string(text, q)
+            continue
+        if c == "'":
+            j = i + 1
+            while j < n:
+                if text[j] == '\\':
+                    j += 2
+                    continue
+                if text[j] == "'":
+                    j += 1
+                    break
+                j += 1
+            i = j
+            continue
+        if c == '/' and i + 1 < n and text[i + 1] == '/':
+            j = text.find('\n', i)
+            i = n if j < 0 else j + 1
+            continue
+        if c == '/' and i + 1 < n and text[i + 1] == '*':
+            j = text.find('*/', i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        if c in '([{':
+            depth += 1
+        elif c in ')]}':
+            depth -= 1
+        elif c == ';' and depth == 0:
+            return i + 1
+        i += 1
+    return -1
+
+
 def _class_body_span(text, class_short):
     """Return (open_brace_index, end_index) of `class <class_short>`'s body, or None."""
     import re
@@ -287,8 +361,7 @@ def _remove_method(text, method, class_short):
         if text[sig] == '{':
             end = _match_delimiter(text, sig, '{', '}')
         elif text[sig:sig + 2] == '=>':
-            semi = text.find(';', sig)
-            end = semi + 1 if semi >= 0 else -1
+            end = _expr_body_end(text, sig)  # brace/string-aware; -1 if unbalanced
         else:
             continue  # not a method declaration (e.g. abstract/interface) — skip
         if end < 0:
@@ -383,6 +456,8 @@ def main(argv):
     cmd = argv[1]
     if cmd == "heldout-filter" and len(argv) == 3:
         return cmd_heldout_filter(argv[2])
+    if cmd == "visible-filter" and len(argv) == 3:
+        return cmd_visible_filter(argv[2])
     if cmd == "apply-fix" and len(argv) == 7:
         return cmd_apply_fix(argv[2], argv[3], argv[4], argv[5], argv[6])
     if cmd == "strip-heldout" and len(argv) == 4:

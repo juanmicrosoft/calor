@@ -48,15 +48,27 @@ cost/token/iteration extraction.
    project (the regression net), using the Slice-B build knobs (`TargetFramework`
    + `ExtraBuildProperties`) keyed by `ProjectName` (mirrors `ProjectConfigs.cs`).
    The corpus `global.json` SDK pin is already dropped in the bundle copy.
-2. **OSS-project held-out oracle** (`run_oracle`, always on `$ws_oracle`). Syncs
-   the agent's edits in, builds the regression-net project (rebuilding the
-   library), then runs the **held-out filter** (`HeldOut[].FilterName` →
-   `FullyQualifiedName~…`; must PASS = defect fixed) and the **visible filter**
-   (`VisibleTestFilter`, the `!~` complement; must stay green = no regression).
-   Run silently by the shim (held-out leg, for the iterations-to-green signal) and
-   at declared-done (both legs, for adjudication). `strip-heldout` is **fail-loud**:
-   a held-out method that cannot be located/uniquely removed aborts the run (a
-   silent miss = the leak persists = a fabricated measurement).
+2. **OSS-project held-out oracle** (`run_oracle`, always on `$ws_oracle`, run
+   **entirely in the harness process**). At declared-done, `run-bundle.sh` syncs
+   the agent's edits in, builds the regression-net project, then runs the
+   **held-out filter** (must PASS = defect fixed) and the **visible/regression
+   filter** (must stay green). Both filters use **exact** `FullyQualifiedName=` /
+   `!=` matching computed from `HeldOut[].FilterName` — NOT substring `~`/`!~`
+   (which would sweep a prefix-sibling method into the held-out leg and out of the
+   regression net; observed on Serilog cand10). `strip-heldout` is **fail-loud**:
+   a held-out method that cannot be located/uniquely removed — or an
+   expression-bodied member whose end can't be balance-matched — aborts the run (a
+   silent miss/corrupt cut = the leak persists / a red baseline = a fabricated
+   measurement).
+
+   **The agent-facing `dotnet` shim contains NO oracle information** — no oracle
+   tree path, no held-out `--filter`. It only runs the real dotnet for the agent's
+   own build/test in `$ws/src` and journals invocation metadata (cmd/exit,
+   edit-hash, iteration ordinal, latency). All oracle work — the path and the
+   held-out names — lives only in `run-bundle.sh`'s own process variables, off the
+   agent's PATH and out of every agent-readable file. (Per-iteration held-out
+   journaling was removed with the shim's oracle; the verdict needs only the
+   declared-done run, and `iterations` = edited build/test cycles is unaffected.)
 3. **Prompt = the scrubbed failing-behavior report** (`FailingBehavior.Symptom`).
    The held-out test is never shown; the agent is told the visible filter and to
    work the visible suite only, and a PreToolUse hook blocks edits to test files.
@@ -74,7 +86,8 @@ cost/token/iteration extraction.
 | `caught` | held-out now PASSES **and** the visible suite is still green (no new failures vs the starting baseline) |
 | `escaped` | held-out still FAILS, or the final build fails (non-building declared-done ⇒ not fixed) |
 | `broke-regression` | held-out passes but a previously-green visible test regressed |
-| `invalid` | agent/plumbing error; retried up to the cap, then recorded `invalid:true` |
+| `invalid` | **any nonzero agent exit** (crash/timeout/API error), or a plumbing error; retried up to the cap, then recorded `invalid:true` (never scored escaped) |
+| `skipped` | a null-agent smoke whose reference could not be derived (e.g. calor arm, mutated line not uniquely locatable) — not a verdict |
 
 The starting state is oracle-checked at `materialize` (the mutated arm must
 present held-out FAILING and the visible suite green); the visible-fail baseline
@@ -86,7 +99,8 @@ pre-existing red.
 - `outcome`, `escapedBugs` (held-out fail count)
 - `costUsd` — **summed `total_cost_usd`** from the agent envelope (never
   hand-priced from tokens), `tokens.{input,output}`
-- `iterations`, `iterationsToGreen` (censored → budget+1), `wallClockSeconds`
+- `iterations` / `iterationsToDeclaredDone` (edited build/test cycles),
+  `wallClockSeconds`
 - **D-W4.4 ceiling-recurrence signal**: the C#-arm escaped incidence across the
   epoch. If the C# arm catches ~all injected bugs itself (incidence ≈ 0), the
   ceiling persists at real scale.
@@ -142,13 +156,22 @@ on a single bundle to sanity-check spend, then scale up.
 - **Presentation asymmetry (recorded, bias against Calor):** the calor arm works
   on machine-converted round-tripped C#, the C# arm on the idiomatic original.
   Carried in every `result.json`.
-- **Oracle isolation (CLOSED):** the held-out test is physically stripped from
-  the agent copy and present only in a separate harness-only tree the agent has no
-  path to (see mechanism above). Verified: in the agent copy the held-out method
-  name greps to 0 and `dotnet test` (no filter) runs the visible suite green with
-  the row count dropped by exactly the held-out method(s); the oracle copy retains
-  it and still adjudicates. `strip-heldout` fails loud if it cannot remove a
-  held-out method.
+- **Oracle isolation (CLOSED):** the held-out test is physically stripped from the
+  agent copy and present only in a separate harness-only tree; the agent-facing
+  shim carries no oracle path and no held-out filter (the oracle runs in the
+  parent harness process). Verified: the shim greps to 0 for the oracle path and
+  for any `FullyQualifiedName` filter; the agent tree + shim + final-src grep to 0
+  for the oracle path and the held-out method names; and `dotnet test` (no filter)
+  in the agent copy runs the visible suite green with the row count dropped by
+  exactly the held-out method(s). `strip-heldout` fails loud on any un-removable
+  method or unbalanced expression body.
+- **Residual (honest):** isolation is *path-and-toolchain* isolation, not a
+  sandbox. The oracle tree and the parent run from the same UID, so a maximally
+  adversarial agent could in principle enumerate `/proc` (Linux) or sibling
+  processes to find the parent's oracle build. The decisive, verified fix is
+  removing the plaintext oracle path/filter from the agent's own workspace and
+  toolchain; a fully hermetic run (separate UID/container per arm) is the
+  belt-and-suspenders follow-up if the dry-run shows it matters.
 - **calor-arm reference derivation** requires the mutated line to appear exactly
   once in the round-tripped file; `apply-fix` fails loud otherwise (that bundle's
   calor null-agent smoke is skipped, not mis-adjudicated). The real agent path
