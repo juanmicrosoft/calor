@@ -1,0 +1,44 @@
+2026-08-03T14:54:08Z bundle epoch starting (pid 59245) mode=real runs=3 bundles=6
+2026-08-03T14:54:08Z BLOCK START bundle=fluentvalidation-injectedmutation-cand1-OffByOne arm=csharp runs=3 mode=real
+2026-08-03T15:11:00Z BLOCK DONE  bundle=fluentvalidation-injectedmutation-cand1-OffByOne arm=csharp
+2026-08-03T15:11:00Z BLOCK START bundle=fluentvalidation-injectedmutation-cand1-OffByOne arm=calor runs=3 mode=real
+2026-08-03T15:40:40Z BLOCK DONE  bundle=fluentvalidation-injectedmutation-cand1-OffByOne arm=calor
+2026-08-03T15:40:40Z BLOCK START bundle=fluentvalidation-injectedmutation-cand2-OffByOne arm=csharp runs=3 mode=real
+2026-08-03T15:50:04Z BLOCK DONE  bundle=fluentvalidation-injectedmutation-cand2-OffByOne arm=csharp
+2026-08-03T15:50:04Z BLOCK START bundle=fluentvalidation-injectedmutation-cand2-OffByOne arm=calor runs=3 mode=real
+2026-08-03T16:19:54Z BLOCK DONE  bundle=fluentvalidation-injectedmutation-cand2-OffByOne arm=calor
+2026-08-03T16:19:54Z BLOCK START bundle=fluentvalidation-injectedmutation-cand3-Boundary arm=csharp runs=3 mode=real
+2026-08-03T16:22:42Z BLOCK DONE  bundle=fluentvalidation-injectedmutation-cand3-Boundary arm=csharp
+2026-08-03T16:22:42Z BLOCK START bundle=fluentvalidation-injectedmutation-cand3-Boundary arm=calor runs=3 mode=real
+2026-08-03T16:25:25Z BLOCK DONE  bundle=fluentvalidation-injectedmutation-cand3-Boundary arm=calor
+2026-08-03T16:25:25Z BLOCK START bundle=serilog-injectedmutation-cand10-Arithmetic arm=csharp runs=3 mode=real
+2026-08-03T16:52:15Z BLOCK DONE  bundle=serilog-injectedmutation-cand10-Arithmetic arm=csharp
+2026-08-03T16:52:15Z BLOCK START bundle=serilog-injectedmutation-cand10-Arithmetic arm=calor runs=3 mode=real
+2026-08-03T17:29:34Z BLOCK DONE  bundle=serilog-injectedmutation-cand10-Arithmetic arm=calor
+2026-08-03T17:29:34Z BLOCK START bundle=serilog-injectedmutation-cand11-OffByOne arm=csharp runs=3 mode=real
+2026-08-03T17:45:42Z BLOCK DONE  bundle=serilog-injectedmutation-cand11-OffByOne arm=csharp
+2026-08-03T17:45:42Z BLOCK START bundle=serilog-injectedmutation-cand11-OffByOne arm=calor runs=3 mode=real
+2026-08-03T18:09:31Z BLOCK DONE  bundle=serilog-injectedmutation-cand11-OffByOne arm=calor
+2026-08-03T18:09:31Z BLOCK START bundle=serilog-injectedmutation-cand8-Arithmetic arm=csharp runs=3 mode=real
+2026-08-03T18:25:18Z BLOCK DONE  bundle=serilog-injectedmutation-cand8-Arithmetic arm=csharp
+2026-08-03T18:25:18Z BLOCK START bundle=serilog-injectedmutation-cand8-Arithmetic arm=calor runs=3 mode=real
+2026-08-03T18:48:54Z BLOCK DONE  bundle=serilog-injectedmutation-cand8-Arithmetic arm=calor
+2026-08-03T18:48:54Z bundle epoch complete; aggregating
+WS-W4 bundle dry-run epoch: 36 run(s), realized cost $69.992
+Per (bundle, arm):
+  fluentvalidation-injectedmutation-cand1-OffByOne  [calor]  n=3  caught=3 escaped=0 broke=0 invalid=0 skipped=0  cost/run=$3.5927  outTok=19620.6667  iters~=1.3333(var 0.2222)  wall=577.6667s
+  fluentvalidation-injectedmutation-cand1-OffByOne  [csharp]  n=3  caught=2 escaped=1 broke=0 invalid=0 skipped=0  cost/run=$1.5466  outTok=8247  iters~=1(var 0)  wall=320.6667s
+  fluentvalidation-injectedmutation-cand2-OffByOne  [calor]  n=3  caught=2 escaped=1 broke=0 invalid=0 skipped=0  cost/run=$3.4599  outTok=18170.6667  iters~=1.3333(var 0.2222)  wall=580.3333s
+  fluentvalidation-injectedmutation-cand2-OffByOne  [csharp]  n=3  caught=1 escaped=2 broke=0 invalid=0 skipped=0  cost/run=$0.7436  outTok=9464.3333  iters~=1(var 0)  wall=172.3333s
+  fluentvalidation-injectedmutation-cand3-Boundary  [calor]  n=3  caught=3 escaped=0 broke=0 invalid=0 skipped=0  cost/run=$0.2109  outTok=1743.6667  iters~=1(var 0)  wall=38.3333s
+  fluentvalidation-injectedmutation-cand3-Boundary  [csharp]  n=3  caught=3 escaped=0 broke=0 invalid=0 skipped=0  cost/run=$0.2348  outTok=1788  iters~=1(var 0)  wall=40.6667s
+  serilog-injectedmutation-cand10-Arithmetic  [calor]  n=3  caught=3 escaped=0 broke=0 invalid=0 skipped=0  cost/run=$3.8591  outTok=32251.3333  iters~=2.6667(var 0.2222)  wall=724.3333s
+  serilog-injectedmutation-cand10-Arithmetic  [csharp]  n=3  caught=3 escaped=0 broke=0 invalid=0 skipped=0  cost/run=$3.1004  outTok=967.6667  iters~=1(var 0)  wall=513.6667s
+  serilog-injectedmutation-cand11-OffByOne  [calor]  n=3  caught=0 escaped=3 broke=0 invalid=0 skipped=0  cost/run=$1.7704  outTok=33546.6667  iters~=1(var 0)  wall=455s
+  serilog-injectedmutation-cand11-OffByOne  [csharp]  n=3  caught=3 escaped=0 broke=0 invalid=0 skipped=0  cost/run=$1.41  outTok=17128.6667  iters~=1(var 0)  wall=301s
+  serilog-injectedmutation-cand8-Arithmetic  [calor]  n=3  caught=1 escaped=2 broke=0 invalid=0 skipped=0  cost/run=$1.9484  outTok=32605  iters~=1.3333(var 0.2222)  wall=449.3333s
+  serilog-injectedmutation-cand8-Arithmetic  [csharp]  n=3  caught=3 escaped=0 broke=0 invalid=0 skipped=0  cost/run=$1.4539  outTok=14004  iters~=1(var 0)  wall=294.3333s
+
+D-W4.4 ceiling-recurrence signal: C#-arm escaped 3/18 valid runs (incidence 0.1667)
+  incidence ~ 0 => C# arm catches ~all injected bugs itself; ceiling persists at real scale
+2026-08-03T18:48:54Z summary -> /private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/01b96f7d-de95-416f-a7da-01152efaf0fd/scratchpad/w4-dryrun-001/epoch-summary.json

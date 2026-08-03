@@ -1,0 +1,27 @@
+{
+  "bundle": "fluentvalidation-injectedmutation-cand1-OffByOne",
+  "project": "FluentValidation",
+  "arm": "calor",
+  "run": 3,
+  "outcome": "caught",
+  "finalBuildOk": true,
+  "heldoutPass": 1,
+  "heldoutFail": 0,
+  "visiblePass": 864,
+  "visibleFail": 0,
+  "visibleFailBaseline": 0,
+  "escapedBugs": 0,
+  "iterations": 2,
+  "iterationsToDeclaredDone": 2,
+  "costUsd": 5.0877247500000005,
+  "tokens": {
+    "input": 20,
+    "output": 4289
+  },
+  "wallClockSeconds": 697,
+  "invalid": false,
+  "nullAgent": false,
+  "nullAgentNoop": false,
+  "mutatedFile": "src/FluentValidation/Enums.cs",
+  "presentationAsymmetry": "Calor arm = machine-converted round-tripped C#; C# arm = idiomatic original. Bias is against Calor."
+}

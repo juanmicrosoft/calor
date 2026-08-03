@@ -1,0 +1,27 @@
+{
+  "bundle": "serilog-injectedmutation-cand8-Arithmetic",
+  "project": "Serilog",
+  "arm": "calor",
+  "run": 2,
+  "outcome": "escaped",
+  "finalBuildOk": true,
+  "heldoutPass": 0,
+  "heldoutFail": 2,
+  "visiblePass": 809,
+  "visibleFail": 0,
+  "visibleFailBaseline": 0,
+  "escapedBugs": 2,
+  "iterations": 1,
+  "iterationsToDeclaredDone": 1,
+  "costUsd": 1.796509,
+  "tokens": {
+    "input": 72,
+    "output": 32327
+  },
+  "wallClockSeconds": 406,
+  "invalid": false,
+  "nullAgent": false,
+  "nullAgentNoop": false,
+  "mutatedFile": "src/Serilog/Events/LevelAlias.cs",
+  "presentationAsymmetry": "Calor arm = machine-converted round-tripped C#; C# arm = idiomatic original. Bias is against Calor."
+}

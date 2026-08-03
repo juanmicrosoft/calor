@@ -1,0 +1,27 @@
+{
+  "bundle": "fluentvalidation-injectedmutation-cand3-Boundary",
+  "project": "FluentValidation",
+  "arm": "calor",
+  "run": 1,
+  "outcome": "caught",
+  "finalBuildOk": true,
+  "heldoutPass": 2,
+  "heldoutFail": 0,
+  "visiblePass": 863,
+  "visibleFail": 0,
+  "visibleFailBaseline": 0,
+  "escapedBugs": 0,
+  "iterations": 1,
+  "iterationsToDeclaredDone": 1,
+  "costUsd": 0.2169371,
+  "tokens": {
+    "input": 18,
+    "output": 1880
+  },
+  "wallClockSeconds": 40,
+  "invalid": false,
+  "nullAgent": false,
+  "nullAgentNoop": false,
+  "mutatedFile": "src/FluentValidation/Validators/ExclusiveBetweenValidator.cs",
+  "presentationAsymmetry": "Calor arm = machine-converted round-tripped C#; C# arm = idiomatic original. Bias is against Calor."
+}
