@@ -75,8 +75,14 @@ def summarize(results):
             f"iters~={g['meanItersToDone']}(var {g['varItersToDone']})  wall={g['meanWallSec']}s"
         )
 
-    # Ceiling-recurrence signal: C#-arm escaped incidence (exclude invalid runs).
-    cs = [r for r in results if r.get("arm") == "csharp" and r.get("outcome") != "invalid"]
+    # Ceiling-recurrence signal: C#-arm escaped incidence. Keyed on the BASE arm
+    # (label may carry a "+variant" suffix) and restricted to REAL agent runs —
+    # synthetic null-agent runs (fix/noop smokes) are not evidence of the ceiling.
+    def base_arm(r):
+        return (r.get("arm") or "").split("+", 1)[0]
+    cs = [r for r in results
+          if base_arm(r) == "csharp" and not r.get("nullAgent")
+          and r.get("outcome") != "invalid"]
     cs_escaped = sum(1 for r in cs if r.get("outcome") == "escaped")
     ceiling = {
         "csharpValidRuns": len(cs),
