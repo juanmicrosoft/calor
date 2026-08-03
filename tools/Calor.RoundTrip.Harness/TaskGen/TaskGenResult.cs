@@ -8,6 +8,11 @@ public sealed class TaskGenProjectResult
     public required bool Inconclusive { get; init; }
     public required int NativeSourceFiles { get; init; }
     public required int TotalConvertibleFiles { get; init; }
+
+    /// <summary>All mutation candidates sited in native regions BEFORE the per-project cap / early-stop
+    /// truncated the evaluated set. The honest denominator context for the eligibility rate (minor).</summary>
+    public required int TotalEnumeratedCandidates { get; init; }
+
     public required int BaselineTestsPassed { get; init; }
     public required List<TaskBundle> Bundles { get; init; }
     public required ExclusionAccounting Accounting { get; init; }

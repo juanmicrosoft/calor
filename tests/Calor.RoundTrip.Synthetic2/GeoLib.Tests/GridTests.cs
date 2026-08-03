@@ -43,4 +43,15 @@ public class GridTests
 
     [Fact]
     public void IsSquare_Unequal_False() => Assert.False(Grid.IsSquare(5, 6));
+
+    // Theory-ONLY coverage of SumOfSquares — the TRX display names carry metacharacters
+    // (e.g. "GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 3, b: 4, expected: 25)"), so a
+    // mutation in SumOfSquares is theory-covered and must be held out at method level.
+    [Theory]
+    [InlineData(3, 4, 25)]
+    [InlineData(0, 5, 25)]
+    [InlineData(2, 2, 8)]
+    [InlineData(1, 1, 2)]
+    public void SumOfSquares_Theory(int a, int b, int expected)
+        => Assert.Equal(expected, Grid.SumOfSquares(a, b));
 }

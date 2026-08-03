@@ -40,21 +40,25 @@ public sealed class TaskGenerator
             $"({coverage.ConvertedNative} native of {coverage.TotalConvertibleFiles}); siting mutations in {nativeFiles.Count} native file(s)");
 
         // --- Site injected mutations in native regions ONLY (governing fact). ---
-        var candidates = new List<MutationCandidate>();
+        var enumerated = new List<MutationCandidate>();
         foreach (var relPath in nativeFiles)
         {
             var absOriginal = Path.Combine(project.OriginalProjectPath, relPath);
             if (!File.Exists(absOriginal)) continue;
             var source = await File.ReadAllTextAsync(absOriginal);
-            candidates.AddRange(InjectedMutationOperators.Enumerate(source, relPath)
-                .Where(c => c.Operator != MutationOperatorKind.NegateCondition)); // negate often no-compiles; keep the demo tight
+            // NegateCondition always compiles, but inverts a whole branch (all-or-nothing coverage),
+            // so it is dropped from the DEFAULT bounded set to keep the demo focused on point mutations;
+            // the operator itself remains available in InjectedMutationOperators and unit-tested.
+            enumerated.AddRange(InjectedMutationOperators.Enumerate(source, relPath)
+                .Where(c => c.Operator != MutationOperatorKind.NegateCondition));
         }
-        candidates = candidates
+        var totalEnumerated = enumerated.Count; // honest denominator (minor: before Take/early-stop truncation)
+        var candidates = enumerated
             .OrderBy(c => c.FileRelPath, StringComparer.Ordinal)
             .ThenBy(c => c.Line).ThenBy(c => c.Column)
             .Take(options.MaxCandidatesPerProject)
             .ToList();
-        Console.WriteLine($"[{project.ProjectName}] Step 2/4: {candidates.Count} sited candidate(s) to evaluate");
+        Console.WriteLine($"[{project.ProjectName}] Step 2/4: {totalEnumerated} candidate(s) enumerated; evaluating up to {candidates.Count}");
 
         int idx = 0;
         foreach (var candidate in candidates)
@@ -89,6 +93,7 @@ public sealed class TaskGenerator
             Inconclusive = false,
             NativeSourceFiles = nativeFiles.Count,
             TotalConvertibleFiles = coverage.TotalConvertibleFiles,
+            TotalEnumeratedCandidates = totalEnumerated,
             BaselineTestsPassed = baseline.Passed,
             Bundles = bundles,
             Accounting = accounting,
@@ -106,10 +111,11 @@ public sealed class TaskGenerator
         await File.WriteAllTextAsync(Path.Combine(csDir, candidate.FileRelPath), candidate.MutatedSource);
         var csTests = await _pipeline.RunTestsAsync(csDir, project); // builds + runs full suite
 
-        // A mutation that does not COMPILE (no structured results) is not a task candidate.
+        // A mutation that does not COMPILE (no structured results) is an invalid candidate — a
+        // distinct bucket from "compiles but has no covering test" (minor).
         if (csTests.Results.Count == 0)
-            return (Excluded(ExclusionReason.NoCoveringTest,
-                "the mutation does not compile / produced no test results on the C# arm — not a task candidate."), null);
+            return (Excluded(ExclusionReason.DidNotCompile,
+                "the mutation did not compile / produced no test results on the C# arm — invalid candidate."), null);
 
         var covering = HeldOutExtraction.IdentifyCoveringTests(baseline, csTests);
         if (covering.Count == 0)
@@ -147,23 +153,39 @@ public sealed class TaskGenerator
             (calorOutcome, calorSignature) = OutcomeOf(calorHeldOut, heldOut);
         }
 
-        // ===== D-W4.3 attribution (bisect pattern): revert the mutated file to unmutated original. =====
+        // ===== D-W4.3 attribution (bisect pattern, review [M]#2): swap in the UNMUTATED-CONVERTED file. =====
+        // Replacing the mutated-converted file with the converter's output for the CLEAN original source
+        // removes the mutation while KEEPING this file's conversion, so a same-file converter divergence is
+        // NOT masked. Held-out passes ⇒ the mutation caused it (mutation-attributed, eligible). Held-out
+        // still fails ⇒ the converter diverges on this file even without the mutation (converter-attributed).
         var attribution = AttributionOutcome.NotChecked;
         if (calorOutcome == "Failed")
         {
             var originalUnmutated = await File.ReadAllTextAsync(Path.Combine(project.OriginalProjectPath, candidate.FileRelPath));
-            await File.WriteAllTextAsync(Path.Combine(calorDir, candidate.FileRelPath), originalUnmutated);
-            var attrBuild = await _pipeline.BuildProjectAsync(calorDir, project);
-            if (attrBuild.Succeeded)
+            var unmutatedConverted = _pipeline.ConvertSourceToRoundTripCSharp(
+                originalUnmutated, Path.Combine(calorDir, candidate.FileRelPath));
+            if (unmutatedConverted == null)
             {
-                var attrRun = await _pipeline.RunTestsAsync(calorDir, Clone(project, null, heldOutFilter), noBuild: true);
-                var (attrOutcome, _) = OutcomeOf(attrRun, heldOut);
-                attribution = attrOutcome == "Failed" ? AttributionOutcome.DivergentOtherFile : AttributionOutcome.AttributedToMutation;
+                // The clean file does not convert-and-recompile here (it should, since the prefilter said
+                // native) — cannot isolate soundly, so exclude conservatively as converter-attributed.
+                attribution = AttributionOutcome.DivergentOtherFile;
             }
             else
             {
-                // Reverting the mutated file broke the build ⇒ the failure lived in that file, not elsewhere.
-                attribution = AttributionOutcome.AttributedToMutation;
+                await File.WriteAllTextAsync(Path.Combine(calorDir, candidate.FileRelPath), unmutatedConverted);
+                var attrBuild = await _pipeline.BuildProjectAsync(calorDir, project);
+                if (attrBuild.Succeeded)
+                {
+                    var attrRun = await _pipeline.RunTestsAsync(calorDir, Clone(project, null, heldOutFilter), noBuild: true);
+                    var (attrOutcome, _) = OutcomeOf(attrRun, heldOut);
+                    attribution = attrOutcome == "Failed" ? AttributionOutcome.DivergentOtherFile : AttributionOutcome.AttributedToMutation;
+                }
+                else
+                {
+                    // The unmutated-converted file breaks the build in-context ⇒ this file's conversion
+                    // diverges independent of the mutation ⇒ converter-attributed exclusion.
+                    attribution = AttributionOutcome.DivergentOtherFile;
+                }
             }
         }
 
@@ -258,14 +280,23 @@ public sealed class TaskGenerator
 
     private static (string outcome, string? signature) OutcomeOf(TestRunResult run, List<HeldOutTest> heldOut)
     {
-        var ids = heldOut.Select(h => h.Identity).ToHashSet();
-        var names = heldOut.Select(h => h.TestName).ToHashSet();
-        var match = run.Results.FirstOrDefault(t => ids.Contains(t.Identity) || names.Contains(t.TestName));
-        if (match == null)
-            return run.Failed > 0 ? ("Failed", null) : ("NotRun", null);
-        return match.Outcome == "Failed"
-            ? ("Failed", EligibilityPredicate.NormalizeFailureSignature(match.ErrorMessage))
-            : (match.Outcome, null);
+        // Match by fully-qualified METHOD name (theory-safe): all rows of a held-out theory count.
+        var filterNames = heldOut
+            .Select(h => string.IsNullOrEmpty(h.FilterName) ? HeldOutExtraction.MethodFqn(h.TestName, h.ClassName) : h.FilterName)
+            .ToHashSet(StringComparer.Ordinal);
+        var considered = run.Results
+            .Where(t => filterNames.Contains(HeldOutExtraction.MethodFqn(t.TestName, t.ClassName)))
+            .ToList();
+
+        // No result for the held-out method(s) ⇒ NotRun. NEVER attribute an unrelated failure in the
+        // filtered run to the held-out test (review [M]#3) — that null-signature bypass is removed.
+        if (considered.Count == 0)
+            return ("NotRun", null);
+
+        var failed = considered.FirstOrDefault(t => t.Outcome == "Failed");
+        return failed != null
+            ? ("Failed", EligibilityPredicate.NormalizeFailureSignature(failed.ErrorMessage))
+            : (considered[0].Outcome, null);
     }
 
     private static EligibilityVerdict Excluded(ExclusionReason reason, string explanation) =>

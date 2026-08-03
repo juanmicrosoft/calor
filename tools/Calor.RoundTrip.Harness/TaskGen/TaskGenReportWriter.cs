@@ -48,7 +48,7 @@ public static class TaskGenReportWriter
         sb.AppendLine("## Held-out test(s) — removed from the visible suite, kept as the regression net");
         sb.AppendLine();
         foreach (var h in b.HeldOut)
-            sb.AppendLine($"- `{h.FullyQualifiedName}` (assembly `{h.Assembly}`)");
+            sb.AppendLine($"- `{h.FilterName}` (assembly `{h.Assembly}`)");
         sb.AppendLine();
         sb.AppendLine($"- Visible-suite filter: `{b.VisibleTestFilter}`");
         sb.AppendLine($"- Regression-net project: `{b.RegressionNetProject}` (full suite; escaped bug = held-out failure at declared-done)");
@@ -93,19 +93,24 @@ public static class TaskGenReportWriter
 
         sb.AppendLine("## Exclusion accounting (D-W4.1 — every candidate counted, no silent shrinkage)");
         sb.AppendLine();
-        sb.AppendLine("| Project | Considered | Eligible | Excl (a) | Excl (b) | Excl attribution | Excl no-covering-test | Eligibility rate |");
-        sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|");
+        sb.AppendLine("| Project | Enumerated | Considered | Eligible | Excl (a) | Excl (b) | Excl attribution | Excl no-cover | Excl no-compile | Eligibility rate |");
+        sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         foreach (var p in run.Projects)
         {
             var a = p.Accounting;
-            sb.AppendLine($"| {p.ProjectName} | {a.Considered} | {a.Eligible} | {a.ExcludedClauseA} | {a.ExcludedClauseB} | {a.ExcludedAttribution} | {a.ExcludedNoCoveringTest} | {a.EligibilityRate:P0} |");
+            sb.AppendLine($"| {p.ProjectName} | {p.TotalEnumeratedCandidates} | {a.Considered} | {a.Eligible} | {a.ExcludedClauseA} | {a.ExcludedClauseB} | {a.ExcludedAttribution} | {a.ExcludedNoCoveringTest} | {a.ExcludedDidNotCompile} | {a.EligibilityRate:P0} |");
         }
+        var totEnumerated = run.Projects.Sum(p => p.TotalEnumeratedCandidates);
         var totConsidered = run.Projects.Sum(p => p.Accounting.Considered);
         var totEligible = run.Projects.Sum(p => p.Accounting.Eligible);
-        sb.AppendLine($"| **TOTAL** | **{totConsidered}** | **{totEligible}** | " +
+        sb.AppendLine($"| **TOTAL** | **{totEnumerated}** | **{totConsidered}** | **{totEligible}** | " +
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedClauseA)}** | **{run.Projects.Sum(p => p.Accounting.ExcludedClauseB)}** | " +
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedAttribution)}** | **{run.Projects.Sum(p => p.Accounting.ExcludedNoCoveringTest)}** | " +
+            $"**{run.Projects.Sum(p => p.Accounting.ExcludedDidNotCompile)}** | " +
             $"**{(totConsidered == 0 ? 0 : (double)totEligible / totConsidered):P0}** |");
+        sb.AppendLine();
+        sb.AppendLine("Eligibility rate is Eligible/Considered (Considered = evaluated candidates; Enumerated is the ");
+        sb.AppendLine("full sited set before the per-project cap / early-stop, so the rate is honest about truncation).");
         sb.AppendLine();
 
         sb.AppendLine("### Per-candidate dispositions");
@@ -135,9 +140,12 @@ public static class TaskGenReportWriter
         sb.AppendLine("## Interpretation note (recorded)");
         sb.AppendLine();
         sb.AppendLine("The eligibility rate is itself a Slice-E signal: too low a rate on the OSS corpus means insufficient ");
-        sb.AppendLine("native-eligible surface to yield a decidable dry-run. The fidelity bar is PROVISIONAL (pending A-1.4 ");
-        sb.AppendLine("tranche-2). The Calor arm works on machine-converted §-syntax vs the C# arm's idiomatic original — a bias ");
-        sb.AppendLine("AGAINST Calor, so a PP-W2 win is conservative and a loss is confounded with conversion idiom.");
+        sb.AppendLine("native-eligible surface to yield a decidable dry-run. **This synthetic rate is an UPPER BOUND**: both ");
+        sb.AppendLine("synthetic projects are 100%-native, so clause-(a) exclusions are 0 here, whereas on OSS (Slice-B ");
+        sb.AppendLine("NativeFraction 0.40–0.53) clause (a) will exclude heavily — the OSS rate will be materially lower. ");
+        sb.AppendLine("The fidelity bar is PROVISIONAL (pending A-1.4 tranche-2). The Calor arm works on machine-converted ");
+        sb.AppendLine("§-syntax vs the C# arm's idiomatic original — a bias AGAINST Calor, so a PP-W2 win is conservative and ");
+        sb.AppendLine("a loss is confounded with conversion idiom.");
         return sb.ToString();
     }
 

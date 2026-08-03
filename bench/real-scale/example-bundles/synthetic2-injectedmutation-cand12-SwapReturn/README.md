@@ -1,9 +1,9 @@
-# Task bundle: synthetic2-injectedmutation-cand10-Boundary
+# Task bundle: synthetic2-injectedmutation-cand12-SwapReturn
 
 - Project: **Synthetic2**
 - Mutation source: **InjectedMutation**
-- Operator: `>= → >` (Boundary)
-- Mutated region: `GeoLib/Grid.cs` line 24, col 15
+- Operator: `return false → return true` (SwapReturn)
+- Mutated region: `GeoLib/Grid.cs` line 30, col 20
 
 ## Failing-behavior report (BOTH arms receive this — the symptom, NOT the test)
 
@@ -22,9 +22,9 @@ Presentation asymmetry (recorded): Calor arm = machine-converted round-tripped C
 
 ## Held-out test(s) — removed from the visible suite, kept as the regression net
 
-- `GeoLib.Tests.GridTests.InBounds_OnUpperEdge_False` (assembly `geolib.tests.dll`)
+- `GeoLib.Tests.GridTests.InBounds_Negative_False` (assembly `geolib.tests.dll`)
 
-- Visible-suite filter: `FullyQualifiedName!=GeoLib.Tests.GridTests.InBounds_OnUpperEdge_False`
+- Visible-suite filter: `FullyQualifiedName!~GeoLib.Tests.GridTests.InBounds_Negative_False`
 - Regression-net project: `GeoLib.Tests/GeoLib.Tests.csproj` (full suite; escaped bug = held-out failure at declared-done)
 
 ## Native-eligibility proof (D-W4.1)

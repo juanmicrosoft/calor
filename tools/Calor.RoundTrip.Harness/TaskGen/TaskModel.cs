@@ -67,8 +67,11 @@ public enum ExclusionReason
     /// <summary>D-W4.3: the held-out failure is attributable to converter divergence in a different file, not to the injected mutation.</summary>
     ConverterAttributed,
 
-    /// <summary>No covering test could be identified for the mutation.</summary>
+    /// <summary>No covering test could be identified for the mutation (it compiled but broke nothing identifiable).</summary>
     NoCoveringTest,
+
+    /// <summary>The mutation did not compile on the C# arm — an invalid candidate, distinct from "no covering test".</summary>
+    DidNotCompile,
 
     /// <summary>The candidate's project was excluded by the fidelity gate (NativeFraction below bar).</summary>
     FidelityGateBelowBar,
@@ -77,20 +80,18 @@ public enum ExclusionReason
 /// <summary>One held-out test removed from the visible suite and moved to held-out (C2).</summary>
 public sealed class HeldOutTest
 {
+    /// <summary>The TRX display name (the full row name for a theory, e.g. <c>N.C.T(x: 5)</c>). For reporting.</summary>
     public required string TestName { get; init; }
     public required string ClassName { get; init; }
     public string Assembly { get; init; } = "";
 
     /// <summary>
-    /// The name a dotnet <c>--filter FullyQualifiedName</c> clause matches. TRX reports the test's
-    /// display name as the already-fully-qualified <c>Namespace.Class.Method</c>, so we use
-    /// <see cref="TestName"/> as-is when it is already qualified by the class, and only combine when
-    /// it is a bare method name (as in synthetic fixtures) — never double-prefixing.
+    /// The metacharacter-free fully-qualified METHOD name used for VSTest <c>--filter</c> (theory
+    /// args stripped) — see <see cref="HeldOutExtraction.MethodFqn"/>. This is what the visible/
+    /// held-out filters key on, so a theory's rows are held out as one unit and the expression never
+    /// hard-parse-errors on <c>( ) : space</c>.
     /// </summary>
-    public string FullyQualifiedName =>
-        !string.IsNullOrEmpty(ClassName) && TestName.StartsWith(ClassName + ".", StringComparison.Ordinal)
-            ? TestName
-            : string.IsNullOrEmpty(ClassName) ? TestName : $"{ClassName}.{TestName}";
+    public string FilterName { get; init; } = "";
 
     public string Identity { get; init; } = "";
 }

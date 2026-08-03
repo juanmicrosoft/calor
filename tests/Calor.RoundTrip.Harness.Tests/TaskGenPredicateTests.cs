@@ -143,6 +143,25 @@ public class TaskGenPredicateTests
     }
 
     [Fact]
+    public void ClauseB_NullSignature_DoesNotCountAsIdentical()
+    {
+        // review [M]#3: a null/absent signature must NOT pass the identical-failure guard.
+        var ev = new EligibilityEvidence
+        {
+            MutatedFileResult = NativeFile(),
+            HasCoveringTest = true,
+            CSharpArmHeldOutOutcome = "Failed",
+            CalorArmHeldOutOutcome = "Failed",
+            CSharpArmFailureSignature = null,
+            CalorArmFailureSignature = null,
+            Attribution = AttributionOutcome.AttributedToMutation,
+            RequireIdenticalSignature = true,
+        };
+        var v = EligibilityPredicate.Evaluate(ev);
+        Assert.Equal(ExclusionReason.ArmsDiverge, v.Reason);
+    }
+
+    [Fact]
     public void Attribution_ExcludesConverterDivergenceInOtherFile()
     {
         var ev = new EligibilityEvidence

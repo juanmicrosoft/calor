@@ -374,6 +374,42 @@ public sealed class RoundTripPipeline
     }
 
     /// <summary>
+    /// Convert one C# source string to its round-tripped C# (Calor→C#) exactly as
+    /// <see cref="ConvertAndReplaceAsync"/> does per file, WITHOUT touching the filesystem.
+    /// Returns the emitted C# or null if the file does not convert-and-recompile cleanly.
+    /// Used by the D-W4.1 task generator's attribution check to obtain the UNMUTATED-CONVERTED
+    /// form of a file (converter output of the clean original), so the mutation can be isolated
+    /// from any converter divergence localized to the same file (review [M]#2).
+    /// </summary>
+    internal string? ConvertSourceToRoundTripCSharp(string originalSource, string csFilePath)
+    {
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            GracefulFallback = true,
+            PreserveComments = true,
+            AutoGenerateIds = true,
+        });
+        var conversionResult = converter.Convert(originalSource, csFilePath);
+        if (!conversionResult.Success || string.IsNullOrWhiteSpace(conversionResult.CalorSource))
+            return null;
+
+        var compileResult = Compiler.Program.Compile(
+            conversionResult.CalorSource, csFilePath,
+            new Compiler.CompilationOptions
+            {
+                EnforceEffects = false,
+                ContractMode = Compiler.ContractMode.Off,
+            });
+        if (compileResult.HasErrors || string.IsNullOrWhiteSpace(compileResult.GeneratedCode))
+            return null;
+
+        var emitted = PostProcessEmittedCSharp(compileResult.GeneratedCode, originalSource);
+        var parseDiags = CSharpSyntaxTree.ParseText(emitted).GetDiagnostics()
+            .Where(d => d.Severity == DiagnosticSeverity.Error);
+        return parseDiags.Any() ? null : emitted;
+    }
+
+    /// <summary>
     /// When build fails, identify files mentioned in build errors, revert them
     /// to their originals, and update their status. Iterates up to 5 times.
     /// </summary>

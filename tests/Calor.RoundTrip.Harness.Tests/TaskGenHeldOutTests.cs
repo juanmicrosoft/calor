@@ -3,14 +3,26 @@ using Xunit;
 
 namespace Calor.RoundTrip.Harness.Tests;
 
-/// <summary>Pins held-out extraction, visible-suite filtering, and failing-behavior synthesis (C2).</summary>
+/// <summary>Pins held-out extraction, theory-safe visible/held-out filtering, and failing-behavior synthesis (C2, review [C]).</summary>
 public class TaskGenHeldOutTests
 {
+    // Bare-method-name fixture (synthetic-style TestName).
     private static TestResult T(string name, string outcome, string? error = null) => new()
     {
         TestName = name,
         ClassName = "S.CalculatorTests",
         Assembly = "S.Tests.dll",
+        ExecutorUri = "executor://xunit",
+        Outcome = outcome,
+        ErrorMessage = error,
+    };
+
+    // Already-fully-qualified fixture (real TRX shape): TestName includes the class.
+    private static TestResult Trx(string fullName, string outcome, string? error = null) => new()
+    {
+        TestName = fullName,
+        ClassName = "GeoLib.Tests.GridTests",
+        Assembly = "geolib.tests.dll",
         ExecutorUri = "executor://xunit",
         Outcome = outcome,
         ErrorMessage = error,
@@ -49,20 +61,71 @@ public class TaskGenHeldOutTests
     }
 
     [Fact]
-    public void BuildVisibleFilter_ExcludesHeldOut()
+    public void BuildVisibleFilter_ExcludesHeldOut_ByMethodFqn_NotContains()
     {
         var heldOut = HeldOutExtraction.ToHeldOut([T("Max_ReturnsLarger", "Failed")]);
         var filter = HeldOutExtraction.BuildVisibleFilter(heldOut);
-        Assert.Equal("FullyQualifiedName!=S.CalculatorTests.Max_ReturnsLarger", filter);
+        Assert.Equal("FullyQualifiedName!~S.CalculatorTests.Max_ReturnsLarger", filter);
     }
 
     [Fact]
-    public void BuildHeldOutFilter_SelectsHeldOut()
+    public void BuildHeldOutFilter_SelectsHeldOut_ByMethodFqn_Contains()
     {
         var heldOut = HeldOutExtraction.ToHeldOut([T("Max_ReturnsLarger", "Failed")]);
         var filter = HeldOutExtraction.BuildHeldOutFilter(heldOut);
-        Assert.Equal("FullyQualifiedName~Max_ReturnsLarger", filter);
+        Assert.Equal("FullyQualifiedName~S.CalculatorTests.Max_ReturnsLarger", filter);
     }
+
+    // ---- review [C]: theory rows must not leak metacharacters into the filter ----
+
+    [Fact]
+    public void Theory_HeldOut_GroupsRowsToOneMethod_AndFilterHasNoMetacharacters()
+    {
+        const string t = "GeoLib.Tests.GridTests.SumOfSquares_Theory";
+        var baseline = Run(
+            Trx($"{t}(a: 3, b: 4, expected: 25)", "Passed"),
+            Trx($"{t}(a: 2, b: 2, expected: 8)", "Passed"),
+            Trx("GeoLib.Tests.GridTests.Area_Multiplies", "Passed"));
+        var mutated = Run(
+            Trx($"{t}(a: 3, b: 4, expected: 25)", "Failed", "Assert.Equal() Failure: 25 != 1"),
+            Trx($"{t}(a: 2, b: 2, expected: 8)", "Failed", "Assert.Equal() Failure: 8 != 1"),
+            Trx("GeoLib.Tests.GridTests.Area_Multiplies", "Passed"));
+
+        var covering = HeldOutExtraction.IdentifyCoveringTests(baseline, mutated);
+        Assert.Equal(2, covering.Count); // two theory rows failed
+
+        var heldOut = HeldOutExtraction.ToHeldOut(covering);
+        var single = Assert.Single(heldOut); // grouped to ONE method
+        Assert.Equal(t, single.FilterName);
+
+        var visible = HeldOutExtraction.BuildVisibleFilter(heldOut);
+        var held = HeldOutExtraction.BuildHeldOutFilter(heldOut);
+        Assert.Equal($"FullyQualifiedName!~{t}", visible);
+        Assert.Equal($"FullyQualifiedName~{t}", held);
+        // The catastrophic case: no theory-arg metacharacters survive into the filter expression.
+        foreach (var f in new[] { visible, held })
+            Assert.DoesNotContain('(', f);
+    }
+
+    [Fact]
+    public void MethodFqn_TrxShape_AlreadyQualified_NoDoublePrefix()
+    {
+        // Real TRX TestName is already Namespace.Class.Method — must NOT be re-prefixed by ClassName.
+        var fqn = HeldOutExtraction.MethodFqn("GeoLib.Tests.GridTests.Area_Multiplies", "GeoLib.Tests.GridTests");
+        Assert.Equal("GeoLib.Tests.GridTests.Area_Multiplies", fqn);
+
+        var heldOut = HeldOutExtraction.ToHeldOut([Trx("GeoLib.Tests.GridTests.Area_Multiplies", "Failed")]);
+        Assert.Equal("FullyQualifiedName!~GeoLib.Tests.GridTests.Area_Multiplies",
+            HeldOutExtraction.BuildVisibleFilter(heldOut));
+    }
+
+    [Fact]
+    public void MethodFqn_StripsTheoryArgs()
+        => Assert.Equal("N.C.T", HeldOutExtraction.MethodFqn("N.C.T(x: 5, y: 7)", "N.C"));
+
+    [Fact]
+    public void EscapeFilterValue_EscapesMetacharacters()
+        => Assert.Equal(@"a\(b\)\&c", HeldOutExtraction.EscapeFilterValue("a(b)&c"));
 
     [Fact]
     public void SynthesizeFailingBehavior_ScrubsTestIdentity_KeepsSymptom()

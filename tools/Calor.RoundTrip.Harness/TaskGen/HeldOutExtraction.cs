@@ -6,6 +6,12 @@ namespace Calor.RoundTrip.Harness.TaskGen;
 /// Held-out test extraction (C2): identify the covering test(s) for a mutation, remove them
 /// from the visible suite, and synthesize the failing-behavior report BOTH arms receive.
 /// Pure over <see cref="TestRunResult"/> — unit-testable without the corpus.
+///
+/// Theory-safe filtering (review [C]): xUnit theory rows report a TRX display name like
+/// <c>N.C.Theory(x: 5)</c> whose <c>( ) : space</c> are VSTest <c>--filter</c> metacharacters.
+/// Filtering by the verbatim row name hard-parse-errors → 0 tests run → silent 0. So every
+/// filter is keyed on the metacharacter-free fully-qualified METHOD name (theory args stripped),
+/// which also makes a theory's rows share ONE filter term (the whole theory is held out as a unit).
 /// </summary>
 public static partial class HeldOutExtraction
 {
@@ -13,6 +19,8 @@ public static partial class HeldOutExtraction
     /// Covering tests = tests that PASSED on the unmutated baseline but FAILED after the
     /// mutation. This is the mechanical "which test does the defect break" identification
     /// used for injected mutations (and the validation of a mined bug-fix's covering test).
+    /// For theories, individual failing rows are returned; <see cref="ToHeldOut"/> groups them
+    /// to the covering method.
     /// </summary>
     public static List<TestResult> IdentifyCoveringTests(TestRunResult baseline, TestRunResult mutated)
     {
@@ -26,43 +34,84 @@ public static partial class HeldOutExtraction
             .ToList();
     }
 
-    /// <summary>Project the covering <see cref="TestResult"/>s into held-out records.</summary>
+    /// <summary>
+    /// The fully-qualified METHOD name a VSTest <c>--filter FullyQualifiedName</c> clause matches:
+    /// class-qualified and with any theory-argument suffix (<c>(...)</c>) stripped. Metacharacter-free.
+    /// </summary>
+    public static string MethodFqn(string testName, string className)
+    {
+        var baseName = !string.IsNullOrEmpty(className) && testName.StartsWith(className + ".", StringComparison.Ordinal)
+            ? testName
+            : string.IsNullOrEmpty(className) ? testName : $"{className}.{testName}";
+        var paren = baseName.IndexOf('(');
+        return paren >= 0 ? baseName[..paren] : baseName;
+    }
+
+    /// <summary>
+    /// Project the covering <see cref="TestResult"/>s into held-out records, GROUPED by covering
+    /// method (so a theory contributes one held-out entry, not one per row).
+    /// </summary>
     public static List<HeldOutTest> ToHeldOut(IEnumerable<TestResult> covering) =>
-        covering.Select(t => new HeldOutTest
-        {
-            TestName = t.TestName,
-            ClassName = t.ClassName,
-            Assembly = t.Assembly,
-            Identity = t.Identity,
-        }).ToList();
+        covering
+            .GroupBy(t => MethodFqn(t.TestName, t.ClassName), StringComparer.Ordinal)
+            .Select(g =>
+            {
+                var first = g.First();
+                return new HeldOutTest
+                {
+                    TestName = first.TestName,
+                    ClassName = first.ClassName,
+                    Assembly = first.Assembly,
+                    Identity = first.Identity,
+                    FilterName = g.Key,
+                };
+            })
+            .ToList();
 
     /// <summary>
     /// dotnet <c>--filter</c> expression selecting the VISIBLE suite = full suite minus the
-    /// held-out tests. Uses <c>FullyQualifiedName!=</c> clauses ANDed together so the removed
-    /// tests are excluded from the arm's visible run while remaining physically present as the
-    /// regression net.
+    /// held-out method(s). Uses <c>FullyQualifiedName!~METHOD</c> clauses (not-contains on the
+    /// arg-stripped method name) ANDed together, so ALL rows of a held-out theory are excluded
+    /// while remaining physically present as the regression net.
     /// </summary>
     public static string BuildVisibleFilter(IEnumerable<HeldOutTest> heldOut)
     {
-        var clauses = heldOut
-            .Select(h => h.FullyQualifiedName)
-            .Where(n => !string.IsNullOrEmpty(n))
-            .Distinct()
-            .Select(n => $"FullyQualifiedName!={n}")
+        var clauses = FilterNames(heldOut)
+            .Select(n => $"FullyQualifiedName!~{EscapeFilterValue(n)}")
             .ToList();
         return clauses.Count == 0 ? "" : string.Join("&", clauses);
     }
 
-    /// <summary>dotnet <c>--filter</c> that selects ONLY the held-out test(s) (the targeted run for clause (b)).</summary>
+    /// <summary>dotnet <c>--filter</c> that selects ONLY the held-out method(s) — all their rows (the targeted run for clause (b)).</summary>
     public static string BuildHeldOutFilter(IEnumerable<HeldOutTest> heldOut)
     {
-        var clauses = heldOut
-            .Select(h => h.TestName)
-            .Where(n => !string.IsNullOrEmpty(n))
-            .Distinct()
-            .Select(n => $"FullyQualifiedName~{n}")
+        var clauses = FilterNames(heldOut)
+            .Select(n => $"FullyQualifiedName~{EscapeFilterValue(n)}")
             .ToList();
         return clauses.Count == 0 ? "" : string.Join("|", clauses);
+    }
+
+    private static IEnumerable<string> FilterNames(IEnumerable<HeldOutTest> heldOut) =>
+        heldOut
+            .Select(h => string.IsNullOrEmpty(h.FilterName) ? MethodFqn(h.TestName, h.ClassName) : h.FilterName)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .Distinct(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Backslash-escape VSTest filter metacharacters in a value. Method FQNs are normally
+    /// metacharacter-free, but this is defensive so an unexpected display shape can never inject
+    /// an operator into the expression.
+    /// </summary>
+    public static string EscapeFilterValue(string value)
+    {
+        var sb = new System.Text.StringBuilder(value.Length + 4);
+        foreach (var c in value)
+        {
+            if (c is '\\' or '(' or ')' or '&' or '|' or '=' or '!' or '~')
+                sb.Append('\\');
+            sb.Append(c);
+        }
+        return sb.ToString();
     }
 
     /// <summary>
@@ -103,7 +152,7 @@ public static partial class HeldOutExtraction
     {
         if (string.IsNullOrEmpty(text)) return text;
         var scrubbed = text;
-        foreach (var token in new[] { covering.TestName, covering.ClassName })
+        foreach (var token in new[] { covering.TestName, covering.ClassName, MethodFqn(covering.TestName, covering.ClassName) })
         {
             if (!string.IsNullOrEmpty(token))
                 scrubbed = scrubbed.Replace(token, "<test>", StringComparison.Ordinal);

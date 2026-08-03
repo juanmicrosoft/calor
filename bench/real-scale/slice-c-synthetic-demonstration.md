@@ -7,17 +7,19 @@ This run produces the substrate the Slice-E dry-run consumes; it does NOT run ag
 > proof of the Slice-C machinery, run against the two **in-repo synthetic subjects**
 > (`Synthetic`, `Synthetic2`) because the OSS corpus submodules (MediatR/Serilog/FluentValidation)
 > are not checked out in this environment and running their full suites offline is out of
-> Slice-C scope. The generator is corpus-agnostic — it takes any `RoundTripConfig`, so
-> `gen-tasks MediatR Serilog …` runs the identical pipeline once the submodules are present
-> (Slice E). Consequently **every eligible task here is an injected-mutation task**; the
-> revert-upstream-bugfix path (the gold-standard primary source) is built and unit-tested
-> (`BugfixMiner`: fix-shape heuristic + `git log --name-status` parser + revert-candidate
-> selection) but its live mining needs a checked-out submodule history and is a Slice-E
-> activity. Regenerate with: `calor-roundtrip gen-tasks --synthetic --max-candidates 12 --target 0`.
+> Slice-C scope. The generator is corpus-agnostic — `gen-tasks MediatR Serilog …` runs the
+> identical pipeline once the submodules are present (Slice E). Every eligible task here is an
+> injected-mutation task; the revert-upstream-bugfix path (gold-standard primary source) is built
+> and unit-tested (`BugfixMiner`) but its live mining needs checked-out submodule history (Slice E).
+> `Synthetic2` deliberately includes a **theory-only-covered** method (`SumOfSquares`) so the run
+> exercises theory held-out extraction end-to-end (review [C]): a theory-covered mutation is held
+> out at method level and its visible/held-out filters round-trip against `dotnet test` (verified —
+> visible suite parses and runs 13/13 green with the defect hidden; the held-out `~` filter runs the
+> 4 theory rows and all fail). Regenerate: `calor-roundtrip gen-tasks --synthetic --max-candidates 14 --target 0`.
 
 ## Definition of done
 
-- Eligible bundles: **17** (target ≥ 3)
+- Eligible bundles: **20** (target ≥ 3)
 - Projects with eligible tasks that pass the fidelity gate: **2** (target ≥ 2)
 - **DoD met: True**
 
@@ -33,11 +35,14 @@ This run produces the substrate the Slice-E dry-run consumes; it does NOT run ag
 
 ## Exclusion accounting (D-W4.1 — every candidate counted, no silent shrinkage)
 
-| Project | Considered | Eligible | Excl (a) | Excl (b) | Excl attribution | Excl no-covering-test | Eligibility rate |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Synthetic | 12 | 10 | 0 | 2 | 0 | 0 | 83% |
-| Synthetic2 | 12 | 7 | 0 | 5 | 0 | 0 | 58% |
-| **TOTAL** | **24** | **17** | **0** | **7** | **0** | **0** | **71%** |
+| Project | Enumerated | Considered | Eligible | Excl (a) | Excl (b) | Excl attribution | Excl no-cover | Excl no-compile | Eligibility rate |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Synthetic | 114 | 14 | 12 | 0 | 2 | 0 | 0 | 0 | 86% |
+| Synthetic2 | 32 | 14 | 8 | 0 | 6 | 0 | 0 | 0 | 57% |
+| **TOTAL** | **146** | **28** | **20** | **0** | **8** | **0** | **0** | **0** | **71%** |
+
+Eligibility rate is Eligible/Considered (Considered = evaluated candidates; Enumerated is the 
+full sited set before the per-project cap / early-stop, so the rate is honest about truncation).
 
 ### Per-candidate dispositions
 
@@ -57,23 +62,27 @@ This run produces the substrate the Slice-E dry-run consumes; it does NOT run ag
 | OffByOne-L32C20 | SyntheticLib/Calculator.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
 | OffByOne-L33C22 | SyntheticLib/Calculator.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
 | OffByOne-L34C22 | SyntheticLib/Calculator.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Boundary-L34C27 | SyntheticLib/Calculator.cs | Boundary | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Arithmetic-L36C29 | SyntheticLib/Calculator.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
 
 **Synthetic2** (NativeFraction 100.0%, 1 native of 1 files)
 
 | Candidate | File | Operator | Verdict | Reason | Explanation |
 |---|---|---|:---:|---|---|
-| Arithmetic-L12C22 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| OffByOne-L17C16 | GeoLib/Grid.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Arithmetic-L17C18 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Arithmetic-L17C27 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Boundary-L22C15 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
-| OffByOne-L22C17 | GeoLib/Grid.cs | OffByOne | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
-| Boundary-L22C24 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
-| OffByOne-L22C26 | GeoLib/Grid.cs | OffByOne | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
-| SwapReturn-L23C20 | GeoLib/Grid.cs | SwapReturn | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Boundary-L24C15 | GeoLib/Grid.cs | Boundary | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
-| Boundary-L24C29 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
-| SwapReturn-L25C20 | GeoLib/Grid.cs | SwapReturn | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Arithmetic-L14C18 | GeoLib/Grid.cs | Arithmetic | excluded | ArmsDiverge | clause (b): held-out test fails on both arms but not identically (C#='Assert.Equal()', Calor='System.DivideByZeroException'). |
+| Arithmetic-L14C22 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Arithmetic-L14C26 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Arithmetic-L19C22 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| OffByOne-L24C16 | GeoLib/Grid.cs | OffByOne | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Arithmetic-L24C18 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Arithmetic-L24C27 | GeoLib/Grid.cs | Arithmetic | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Boundary-L29C15 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
+| OffByOne-L29C17 | GeoLib/Grid.cs | OffByOne | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
+| Boundary-L29C24 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
+| OffByOne-L29C26 | GeoLib/Grid.cs | OffByOne | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
+| SwapReturn-L30C20 | GeoLib/Grid.cs | SwapReturn | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Boundary-L31C15 | GeoLib/Grid.cs | Boundary | ELIGIBLE | None | clause (a) native + clause (b) survives identically on both arms; failure attributed to the mutation. |
+| Boundary-L31C29 | GeoLib/Grid.cs | Boundary | excluded | NoObservableDefect | clause (b): the mutation compiles but breaks no previously-passing test — no observable defect. |
 
 ## Eligible task bundles
 
@@ -87,17 +96,23 @@ This run produces the substrate the Slice-E dry-run consumes; it does NOT run ag
 - `synthetic-injectedmutation-cand10-OffByOne` — InjectedMutation `1 → 2` in `SyntheticLib/Calculator.cs`:32; held-out: SyntheticLib.Tests.CalculatorTests.Factorial_ReturnsCorrectValue; native=True, attribution=AttributedToMutation
 - `synthetic-injectedmutation-cand11-OffByOne` — InjectedMutation `1 → 2` in `SyntheticLib/Calculator.cs`:33; held-out: SyntheticLib.Tests.CalculatorTests.Factorial_ReturnsCorrectValue; native=True, attribution=AttributedToMutation
 - `synthetic-injectedmutation-cand12-OffByOne` — InjectedMutation `2 → 3` in `SyntheticLib/Calculator.cs`:34; held-out: SyntheticLib.Tests.CalculatorTests.Factorial_ReturnsCorrectValue; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand1-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:12; held-out: GeoLib.Tests.GridTests.Area_Multiplies; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand2-OffByOne` — InjectedMutation `2 → 3` in `GeoLib/Grid.cs`:17; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand3-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:17; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand4-Arithmetic` — InjectedMutation `+ → -` in `GeoLib/Grid.cs`:17; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand9-SwapReturn` — InjectedMutation `return false → return true` in `GeoLib/Grid.cs`:23; held-out: GeoLib.Tests.GridTests.InBounds_Negative_False; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand10-Boundary` — InjectedMutation `>= → >` in `GeoLib/Grid.cs`:24; held-out: GeoLib.Tests.GridTests.InBounds_OnUpperEdge_False; native=True, attribution=AttributedToMutation
-- `synthetic2-injectedmutation-cand12-SwapReturn` — InjectedMutation `return false → return true` in `GeoLib/Grid.cs`:25; held-out: GeoLib.Tests.GridTests.InBounds_OnUpperEdge_False; native=True, attribution=AttributedToMutation
+- `synthetic-injectedmutation-cand13-Boundary` — InjectedMutation `<= → <` in `SyntheticLib/Calculator.cs`:34; held-out: SyntheticLib.Tests.CalculatorTests.Factorial_ReturnsCorrectValue; native=True, attribution=AttributedToMutation
+- `synthetic-injectedmutation-cand14-Arithmetic` — InjectedMutation `* → /` in `SyntheticLib/Calculator.cs`:36; held-out: SyntheticLib.Tests.CalculatorTests.Factorial_ReturnsCorrectValue; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand2-Arithmetic` — InjectedMutation `+ → -` in `GeoLib/Grid.cs`:14; held-out: GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 3, b: 4, expected: 25); native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand3-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:14; held-out: GeoLib.Tests.GridTests.SumOfSquares_Theory(a: 2, b: 2, expected: 8); native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand4-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:19; held-out: GeoLib.Tests.GridTests.Area_Multiplies; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand5-OffByOne` — InjectedMutation `2 → 3` in `GeoLib/Grid.cs`:24; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand6-Arithmetic` — InjectedMutation `* → /` in `GeoLib/Grid.cs`:24; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand7-Arithmetic` — InjectedMutation `+ → -` in `GeoLib/Grid.cs`:24; held-out: GeoLib.Tests.GridTests.Perimeter_Sums; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand12-SwapReturn` — InjectedMutation `return false → return true` in `GeoLib/Grid.cs`:30; held-out: GeoLib.Tests.GridTests.InBounds_Negative_False; native=True, attribution=AttributedToMutation
+- `synthetic2-injectedmutation-cand13-Boundary` — InjectedMutation `>= → >` in `GeoLib/Grid.cs`:31; held-out: GeoLib.Tests.GridTests.InBounds_OnUpperEdge_False; native=True, attribution=AttributedToMutation
 
 ## Interpretation note (recorded)
 
 The eligibility rate is itself a Slice-E signal: too low a rate on the OSS corpus means insufficient 
-native-eligible surface to yield a decidable dry-run. The fidelity bar is PROVISIONAL (pending A-1.4 
-tranche-2). The Calor arm works on machine-converted §-syntax vs the C# arm's idiomatic original — a bias 
-AGAINST Calor, so a PP-W2 win is conservative and a loss is confounded with conversion idiom.
+native-eligible surface to yield a decidable dry-run. **This synthetic rate is an UPPER BOUND**: both 
+synthetic projects are 100%-native, so clause-(a) exclusions are 0 here, whereas on OSS (Slice-B 
+NativeFraction 0.40–0.53) clause (a) will exclude heavily — the OSS rate will be materially lower. 
+The fidelity bar is PROVISIONAL (pending A-1.4 tranche-2). The Calor arm works on machine-converted 
+§-syntax vs the C# arm's idiomatic original — a bias AGAINST Calor, so a PP-W2 win is conservative and 
+a loss is confounded with conversion idiom.

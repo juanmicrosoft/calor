@@ -101,13 +101,16 @@ public static class EligibilityPredicate
             return Excluded(ExclusionReason.MutationDidNotSurviveConversion,
                 $"clause (b): held-out test fails on the C# arm but passes on the converted Calor arm (outcome={e.CalorArmHeldOutOutcome}) — the mutation did not survive conversion.");
 
-        if (e.RequireIdenticalSignature
-            && e.CSharpArmFailureSignature is { } a
-            && e.CalorArmFailureSignature is { } b
-            && !string.Equals(a, b, StringComparison.Ordinal))
+        if (e.RequireIdenticalSignature)
         {
-            return Excluded(ExclusionReason.ArmsDiverge,
-                $"clause (b): held-out test fails on both arms but not identically (C#='{a}', Calor='{b}').");
+            // A null/absent signature must NOT count as identical (review [M]#3): both signatures
+            // must be present AND equal, so a converter-reason failure with no parseable signature
+            // can never slip through as an identical defect-failure.
+            var a = e.CSharpArmFailureSignature;
+            var b = e.CalorArmFailureSignature;
+            if (a is null || b is null || !string.Equals(a, b, StringComparison.Ordinal))
+                return Excluded(ExclusionReason.ArmsDiverge,
+                    $"clause (b): held-out test fails on both arms but not identically (C#='{a ?? "<none>"}', Calor='{b ?? "<none>"}').");
         }
 
         // ---- D-W4.3 attribution: the held-out failure must be caused by the mutation ----

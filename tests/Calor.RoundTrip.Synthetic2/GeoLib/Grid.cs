@@ -7,6 +7,13 @@ namespace GeoLib;
 /// </summary>
 public static class Grid
 {
+    // Placed first so its (theory-only-covered) mutation sites sort early — a default
+    // `gen-tasks --synthetic` run then exercises a theory-covered task within the candidate cap.
+    public static int SumOfSquares(int a, int b)
+    {
+        return a * a + b * b;
+    }
+
     public static int Area(int width, int height)
     {
         return width * height;

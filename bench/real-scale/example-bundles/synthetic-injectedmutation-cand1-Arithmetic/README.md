@@ -25,7 +25,7 @@ Presentation asymmetry (recorded): Calor arm = machine-converted round-tripped C
 - `SyntheticLib.Tests.CalculatorTests.Add_NegativeNumbers` (assembly `syntheticlib.tests.dll`)
 - `SyntheticLib.Tests.CalculatorTests.Add_ReturnsSum` (assembly `syntheticlib.tests.dll`)
 
-- Visible-suite filter: `FullyQualifiedName!=SyntheticLib.Tests.CalculatorTests.Add_NegativeNumbers&FullyQualifiedName!=SyntheticLib.Tests.CalculatorTests.Add_ReturnsSum`
+- Visible-suite filter: `FullyQualifiedName!~SyntheticLib.Tests.CalculatorTests.Add_NegativeNumbers&FullyQualifiedName!~SyntheticLib.Tests.CalculatorTests.Add_ReturnsSum`
 - Regression-net project: `SyntheticLib.Tests/SyntheticLib.Tests.csproj` (full suite; escaped bug = held-out failure at declared-done)
 
 ## Native-eligibility proof (D-W4.1)
