@@ -31,20 +31,32 @@ cost/token/iteration extraction.
 
 **Added (what a bundle forces):**
 
-1. **Whole-project workspace.** `materialize` copies the bundle's `csharp-arm/`
-   or `calor-arm/` (a full OSS project working copy — both are plain `.cs`; the
-   calor arm is round-tripped C#) into `$ws/src`. No synthesized `Src.csproj`:
-   the project builds itself through its own test project (the regression net),
-   using the Slice-B build knobs (`TargetFramework` + `ExtraBuildProperties`)
-   keyed by `ProjectName` (mirrors `ProjectConfigs.cs`). The corpus's `global.json`
-   SDK pin is already dropped in the bundle copy, so it builds on the pinned SDK.
-2. **OSS-project held-out oracle** (`run_oracle`). Builds the regression-net
-   project (rebuilding the mutated library), then runs the **held-out filter**
-   (must PASS = defect fixed) and the **visible filter** (must stay green = no
-   regression). Filter-based split per Slice-C: `HeldOut[].FilterName` →
-   `FullyQualifiedName~…`; `VisibleTestFilter` is the `!~` complement. Run
-   silently by the shim (held-out leg, for the iterations-to-green signal) and at
-   declared-done (both legs, for adjudication).
+1. **Two-copy whole-project workspace (the oracle-leak fix).** `materialize`
+   makes TWO copies of the bundle arm (`csharp-arm/` or `calor-arm/` — both plain
+   `.cs`; the calor arm is round-tripped C#):
+   - **`$ws/src` (agent-visible):** the held-out test method(s) are **physically
+     stripped** from the test sources (`bundle-helpers.py strip-heldout`), so the
+     agent's `dotnet test` — filtered or not — runs only the visible suite. The
+     agent can neither read nor run the oracle.
+   - **`$ws_oracle` (harness-only):** a separate mktemp tree the agent has no path
+     to (never named in the prompt/spec/cwd), with the held-out test PRESENT. Its
+     library is kept in sync with the agent's edits (`sync_to_oracle` copies every
+     non-test `.cs` from `$ws/src`, excluding the test-project dir, so held-out
+     tests are never overwritten).
+
+   No synthesized `Src.csproj`: each copy builds itself through its own test
+   project (the regression net), using the Slice-B build knobs (`TargetFramework`
+   + `ExtraBuildProperties`) keyed by `ProjectName` (mirrors `ProjectConfigs.cs`).
+   The corpus `global.json` SDK pin is already dropped in the bundle copy.
+2. **OSS-project held-out oracle** (`run_oracle`, always on `$ws_oracle`). Syncs
+   the agent's edits in, builds the regression-net project (rebuilding the
+   library), then runs the **held-out filter** (`HeldOut[].FilterName` →
+   `FullyQualifiedName~…`; must PASS = defect fixed) and the **visible filter**
+   (`VisibleTestFilter`, the `!~` complement; must stay green = no regression).
+   Run silently by the shim (held-out leg, for the iterations-to-green signal) and
+   at declared-done (both legs, for adjudication). `strip-heldout` is **fail-loud**:
+   a held-out method that cannot be located/uniquely removed aborts the run (a
+   silent miss = the leak persists = a fabricated measurement).
 3. **Prompt = the scrubbed failing-behavior report** (`FailingBehavior.Symptom`).
    The held-out test is never shown; the agent is told the visible filter and to
    work the visible suite only, and a PreToolUse hook blocks edits to test files.
@@ -130,12 +142,13 @@ on a single bundle to sanity-check spend, then scale up.
 - **Presentation asymmetry (recorded, bias against Calor):** the calor arm works
   on machine-converted round-tripped C#, the C# arm on the idiomatic original.
   Carried in every `result.json`.
-- **Held-out physical presence:** the split is filter-based (Slice-C design), so
-  the held-out test is physically present in the regression-net project. The
-  oracle is silent (shim-run, never shown) and the agent is told the visible
-  filter + hook-blocked from editing tests, but a real agent could still read/run
-  the full suite. Hardening (stripping held-out bodies from the agent copy while
-  the shim restores them) is future work; not required for the mechanical dry-run.
+- **Oracle isolation (CLOSED):** the held-out test is physically stripped from
+  the agent copy and present only in a separate harness-only tree the agent has no
+  path to (see mechanism above). Verified: in the agent copy the held-out method
+  name greps to 0 and `dotnet test` (no filter) runs the visible suite green with
+  the row count dropped by exactly the held-out method(s); the oracle copy retains
+  it and still adjudicates. `strip-heldout` fails loud if it cannot remove a
+  held-out method.
 - **calor-arm reference derivation** requires the mutated line to appear exactly
   once in the round-tripped file; `apply-fix` fails loud otherwise (that bundle's
   calor null-agent smoke is skipped, not mis-adjudicated). The real agent path

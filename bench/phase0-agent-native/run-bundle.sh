@@ -141,6 +141,11 @@ SYMPTOM="$(jq -r '.FailingBehavior.Symptom // "A previously-correct behavior now
 SUBJECT_HINT="$(jq -r '.FailingBehavior.SubjectHint // ""' "$BUNDLE_DIR/provenance.json")"
 HELDOUT_COUNT="$(jq -r '.HeldOut | length' "$BUNDLE_DIR/provenance.json")"
 [[ -n "$HELDOUT_FILTER" ]] || { echo "ERROR: could not build held-out filter" >&2; exit 3; }
+# The test-project directory (relative to the arm root) whose sources carry the
+# held-out method(s). The oracle keeps this dir held-out-PRESENT; the agent copy
+# has it stripped; the src->oracle sync EXCLUDES it so agent edits never
+# overwrite the oracle's held-out tests.
+TESTPROJ_DIR="$(dirname "$REGNET")"
 
 # ---- Build knobs by ProjectName (mirrors ProjectConfigs.cs) ----------------
 case "$PROJECT" in
@@ -158,14 +163,46 @@ ARM_LABEL="$ARM"
 echo "bundle=$BUNDLE_ID project=$PROJECT arm=$ARM regnet=$REGNET tfm=$TFM heldout='$HELDOUT_FILTER'" >&2
 
 # ---------------------------------------------------------------------------
-# Workspace materialization: $ws/src = the whole arm working copy.
+# Sync the agent's edited sources into the oracle copy, EXCEPT the test-project
+# directory (the oracle keeps its held-out-present test sources). Every non-test
+# .cs the agent may have edited propagates so the oracle tests the agent's
+# current library; the held-out tests are never overwritten.
+# ---------------------------------------------------------------------------
+sync_to_oracle() {
+    local ws="$1" ws_oracle="$2"
+    ( cd "$ws/src" && find . -type f -name '*.cs' \
+        -not -path "./$TESTPROJ_DIR/*" -not -path '*/obj/*' -not -path '*/bin/*' \
+        -not -path '*/TestResults/*' -print ) \
+      | while IFS= read -r rel; do
+            rel="${rel#./}"
+            mkdir -p "$ws_oracle/$(dirname "$rel")"
+            cp "$ws/src/$rel" "$ws_oracle/$rel"
+        done
+}
+
+# ---------------------------------------------------------------------------
+# Workspace materialization. TWO copies:
+#   $ws/src        agent-visible: whole arm working copy, held-out method(s)
+#                  PHYSICALLY STRIPPED from the test sources (no oracle leak).
+#   $ws_oracle     harness-only (a separate mktemp the agent has no path to):
+#                  whole arm working copy with the held-out test(s) PRESENT;
+#                  its library is kept in sync with the agent's edits.
 # ---------------------------------------------------------------------------
 materialize() {
-    local ws="$1" ws_out="$2"
-    mkdir -p "$ws/src"
+    local ws="$1" ws_out="$2" ws_oracle="$3"
+    mkdir -p "$ws/src" "$ws_oracle"
     cp -R "$BUNDLE_DIR/$ARM-arm/." "$ws/src/"
-    # Purge any stray build outputs carried in the bundle copy.
-    find "$ws/src" -type d \( -name bin -o -name obj -o -name TestResults \) -prune -exec rm -rf {} + 2>/dev/null || true
+    cp -R "$BUNDLE_DIR/$ARM-arm/." "$ws_oracle/"
+    find "$ws/src" "$ws_oracle" -type d \( -name bin -o -name obj -o -name TestResults \) -prune -exec rm -rf {} + 2>/dev/null || true
+
+    # Strip the held-out method(s) from the AGENT copy. Fail-loud: a silent miss
+    # would leave the oracle readable/runnable by the agent (fabricated measure).
+    if ! python3 "$HELPERS" strip-heldout "$BUNDLE_DIR" "$ws/src" > "$ws_out/strip.txt" 2>&1; then
+        echo "FATAL: held-out strip failed for bundle=$BUNDLE_ID arm=$ARM (oracle would leak):" >&2
+        cat "$ws_out/strip.txt" >&2
+        exit 3
+    fi
+    cat "$ws_out/strip.txt" >&2
 
     # Agent-facing task description (symptom only; the held-out test is never shown).
     cat > "$ws/spec.md" <<EOF
@@ -213,29 +250,31 @@ EOF
     # FAILING and the visible suite GREEN (the eligibility guarantee). We record
     # the visible-fail baseline so a declared-done visible failure is scored as a
     # regression rather than a pre-existing red.
-    run_oracle "$ws" "$ws_out/.baseline" "both"
+    run_oracle "$ws" "$ws_oracle" "$ws_out/.baseline" "both"
     cp "$ws_out/.baseline.oracle.json" "$ws_out/baseline-oracle.json" 2>/dev/null || true
 }
 
 # ---------------------------------------------------------------------------
-# The silent held-out oracle. Builds the regression-net project (which rebuilds
-# the mutated library), then runs the held-out filter and (mode=both) the
-# visible filter, writing <prefix>.oracle.json with pass/fail counts.
+# The silent held-out oracle. Syncs the agent's edits into the oracle copy (which
+# alone carries the held-out test), builds its regression-net project, then runs
+# the held-out filter and (mode=both) the visible filter, writing
+# <prefix>.oracle.json with pass/fail counts. The agent never sees this copy.
 # ---------------------------------------------------------------------------
 run_oracle() {
-    local ws="$1" prefix="$2" mode="$3"
+    local ws="$1" ws_oracle="$2" prefix="$3" mode="$4"
     local real_dotnet ho_pass=0 ho_fail="$HELDOUT_COUNT" vis_pass=0 vis_fail=-1 build_ok=0
     real_dotnet="${REAL_DOTNET:-$(command -v dotnet)}"
-    if CALOR_P0_SHIM_OFF=1 "$real_dotnet" build "$ws/src/$REGNET" ${TFM:+--framework $TFM} $EXTRA --nologo -v q > "$prefix.build.txt" 2>&1; then
+    sync_to_oracle "$ws" "$ws_oracle"
+    if CALOR_P0_SHIM_OFF=1 "$real_dotnet" build "$ws_oracle/$REGNET" ${TFM:+--framework $TFM} $EXTRA --nologo -v q > "$prefix.build.txt" 2>&1; then
         build_ok=1
-        if CALOR_P0_SHIM_OFF=1 "$real_dotnet" test "$ws/src/$REGNET" ${TFM:+--framework $TFM} $EXTRA --no-build --filter "$HELDOUT_FILTER" --nologo -v q > "$prefix.ho.txt" 2>&1; then
+        if CALOR_P0_SHIM_OFF=1 "$real_dotnet" test "$ws_oracle/$REGNET" ${TFM:+--framework $TFM} $EXTRA --no-build --filter "$HELDOUT_FILTER" --nologo -v q > "$prefix.ho.txt" 2>&1; then
             ho_fail=0; ho_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$prefix.ho.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
         else
             ho_fail=$(grep -oE 'Failed:[[:space:]]+[0-9]+' "$prefix.ho.txt" | grep -oE '[0-9]+' | head -1 || echo "$HELDOUT_COUNT")
             ho_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$prefix.ho.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
         fi
         if [[ "$mode" == "both" && -n "$VISIBLE_FILTER" ]]; then
-            if CALOR_P0_SHIM_OFF=1 "$real_dotnet" test "$ws/src/$REGNET" ${TFM:+--framework $TFM} $EXTRA --no-build --filter "$VISIBLE_FILTER" --nologo -v q > "$prefix.vis.txt" 2>&1; then
+            if CALOR_P0_SHIM_OFF=1 "$real_dotnet" test "$ws_oracle/$REGNET" ${TFM:+--framework $TFM} $EXTRA --no-build --filter "$VISIBLE_FILTER" --nologo -v q > "$prefix.vis.txt" 2>&1; then
                 vis_fail=0; vis_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$prefix.vis.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
             else
                 vis_fail=$(grep -oE 'Failed:[[:space:]]+[0-9]+' "$prefix.vis.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
@@ -255,7 +294,7 @@ run_oracle() {
 # expensive visible/regression leg is deferred to declared-done.
 # ---------------------------------------------------------------------------
 write_shim() {
-    local ws="$1" ws_out="$2" shim_dir="$3" run_idx="$4"
+    local ws="$1" ws_out="$2" shim_dir="$3" run_idx="$4" ws_oracle="$5"
     local real_dotnet; real_dotnet="$(command -v dotnet)"
     mkdir -p "$shim_dir"
     cat > "$shim_dir/dotnet" <<EOF
@@ -282,9 +321,14 @@ case "\${1:-}" in
       iteration=\$(( \$(cat "$ws_out/.itercount" 2>/dev/null || echo 0) + 1 ))
       echo "\$iteration" > "$ws_out/.itercount"
     fi
+    # Sync the agent's edits into the harness-only oracle copy (which alone
+    # carries the held-out test), then build+test THERE. The agent's own dotnet
+    # (already run above) saw only its held-out-stripped copy.
+    ( cd "$ws/src" && find . -type f -name '*.cs' -not -path "./$TESTPROJ_DIR/*" -not -path '*/obj/*' -not -path '*/bin/*' -not -path '*/TestResults/*' -print ) \
+      | while IFS= read -r rel; do rel="\${rel#./}"; mkdir -p "$ws_oracle/\$(dirname "\$rel")"; cp "$ws/src/\$rel" "$ws_oracle/\$rel"; done
     ho_pass=0; ho_fail=$HELDOUT_COUNT
-    if CALOR_P0_SHIM_OFF=1 "$real_dotnet" build "$ws/src/$REGNET" ${TFM:+--framework $TFM} $EXTRA --nologo -v q > "$ws_out/.src_build.txt" 2>&1; then
-      if CALOR_P0_SHIM_OFF=1 "$real_dotnet" test "$ws/src/$REGNET" ${TFM:+--framework $TFM} $EXTRA --no-build --filter "$HELDOUT_FILTER" --nologo -v q > "$ws_out/.ho_last.txt" 2>&1; then
+    if CALOR_P0_SHIM_OFF=1 "$real_dotnet" build "$ws_oracle/$REGNET" ${TFM:+--framework $TFM} $EXTRA --nologo -v q > "$ws_out/.src_build.txt" 2>&1; then
+      if CALOR_P0_SHIM_OFF=1 "$real_dotnet" test "$ws_oracle/$REGNET" ${TFM:+--framework $TFM} $EXTRA --no-build --filter "$HELDOUT_FILTER" --nologo -v q > "$ws_out/.ho_last.txt" 2>&1; then
         ho_fail=0; ho_pass=\$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
       else
         ho_fail=\$(grep -oE 'Failed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo $HELDOUT_COUNT)
@@ -370,11 +414,11 @@ run_agent() {
 
 # ---------------------------------------------------------------------------
 extract_metrics() {
-    local ws="$1" ws_out="$2" run_idx="$3" wall="$4"
+    local ws="$1" ws_out="$2" run_idx="$3" wall="$4" ws_oracle="$5"
     local journal="$ws_out/journal.jsonl"; touch "$journal"
 
     # Final declared-done oracle: held-out + visible (regression) legs.
-    run_oracle "$ws" "$ws_out/.final" "both"
+    run_oracle "$ws" "$ws_oracle" "$ws_out/.final" "both"
     local fbuild fhp fhf fvp fvf
     fbuild=$(jq -r '.build_ok' "$ws_out/.final.oracle.json")
     fhp=$(jq -r '.heldout_pass' "$ws_out/.final.oracle.json")
@@ -462,9 +506,13 @@ for (( run=1; run<=RUNS; run++ )); do
     for (( attempt=0; attempt<=MAX_INVALID_RETRIES; attempt++ )); do
         WS="$(mktemp -d "${TMPDIR:-/tmp}/p0b-${BUNDLE_ID}-${ARM}-XXXXXX")"
         WS="$(cd "$WS" && pwd -P)"
+        # The oracle copy lives in a SEPARATE mktemp tree the agent has no path
+        # to (never named in prompt/spec/cwd) — the physical hide of the oracle.
+        WS_ORACLE="$(mktemp -d "${TMPDIR:-/tmp}/p0bO-${BUNDLE_ID}-${ARM}-XXXXXX")"
+        WS_ORACLE="$(cd "$WS_ORACLE" && pwd -P)"
         SHIM_DIR="$WS_OUT/.shim"
-        materialize "$WS" "$WS_OUT"
-        write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
+        materialize "$WS" "$WS_OUT" "$WS_ORACLE"
+        write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run" "$WS_ORACLE"
         _t0=$SECONDS
         run_agent "$WS" "$WS_OUT" "$SHIM_DIR"
         _wall=$(( SECONDS - _t0 ))
@@ -472,12 +520,12 @@ for (( run=1; run<=RUNS; run++ )); do
         if reason="$(detect_invalid_run "$WS_OUT" "$AGENT_RC")"; then
             printf '%s attempt=%d agent_rc=%d: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$attempt" "$AGENT_RC" "$reason" >> "$WS_OUT/invalid.txt"
             echo "INVALID run (bundle=$BUNDLE_ID arm=$ARM_LABEL run=$run attempt=$attempt): $reason" >&2
-            rm -rf "$WS"
+            rm -rf "$WS" "$WS_ORACLE"
             if (( attempt < MAX_INVALID_RETRIES )); then wipe_ws_out "$WS_OUT"; continue; fi
             write_invalid_result "$WS_OUT" "$run"; break
         fi
-        extract_metrics "$WS" "$WS_OUT" "$run" "$_wall"
-        rm -rf "$WS"
+        extract_metrics "$WS" "$WS_OUT" "$run" "$_wall" "$WS_ORACLE"
+        rm -rf "$WS" "$WS_ORACLE"
         break
     done
 done
