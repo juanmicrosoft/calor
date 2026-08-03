@@ -47,6 +47,21 @@ public sealed class EligibilityEvidence
     /// signatures are recorded for disclosure only.
     /// </summary>
     public bool RequireIdenticalSignature { get; init; } = true;
+
+    // ---- Expressible-stratum addressability (the ADDITIONAL clause; null/false for logic tasks) ----
+
+    /// <summary>
+    /// The Calor diagnostic code the mutation is PREDICTED to make fire on the converted arm. Non-null
+    /// marks the candidate as expressible-stratum; the addressability clause then applies. Null =
+    /// logic-stratum, and the addressability clause is skipped (existing behaviour unchanged).
+    /// </summary>
+    public string? ExpectedCheck { get; init; }
+
+    /// <summary>Whether the differential addressability probe could be run (both conversions compiled).</summary>
+    public bool AddressabilityDeterminable { get; init; }
+
+    /// <summary>Whether the expected check was INTRODUCED by the mutation (fires on mutated, absent on clean).</summary>
+    public bool VerificationAddressable { get; init; }
 }
 
 /// <summary>The predicate's verdict for one candidate.</summary>
@@ -117,6 +132,18 @@ public static class EligibilityPredicate
         if (e.Attribution == AttributionOutcome.DivergentOtherFile)
             return Excluded(ExclusionReason.ConverterAttributed,
                 "D-W4.3: the held-out failure persists after reverting the mutated file's conversion — a different converted file diverges, so the defect is converter-attributable, not the mutation.");
+
+        // ---- Expressible-stratum ADDITIONAL clause: the defect must be verification-addressable ----
+        // For an expressible candidate, all four base clauses above (native / covering / survives-
+        // identically / attribution) still had to hold; on TOP of them, Calor's expected mechanical
+        // check must actually fire on the mutated-converted code (differential probe). A candidate
+        // whose check does not fire is a logic bug in disguise — excluded, counted, disclosed — so a
+        // logic bug can never masquerade as expressible.
+        if (e.ExpectedCheck != null && !e.VerificationAddressable)
+            return Excluded(ExclusionReason.NotVerificationAddressable,
+                e.AddressabilityDeterminable
+                    ? $"expressible clause: the predicted check {e.ExpectedCheck} was not INTRODUCED by the mutation on the converted arm (absent, or already present on the clean conversion) — the defect is not verification-addressable."
+                    : $"expressible clause: the differential addressability probe for {e.ExpectedCheck} was indeterminable (a conversion did not compile) — excluded conservatively rather than credit an unconfirmed signal.");
 
         return new EligibilityVerdict
         {

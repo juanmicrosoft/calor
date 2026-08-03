@@ -24,6 +24,18 @@ public sealed class MutationCandidate
     public string? RevertedCommit { get; init; }
     public string? RevertedCommitSubject { get; init; }
 
+    /// <summary>Which defect stratum this candidate belongs to (logic vs expressible).</summary>
+    public DefectStratum Stratum { get; init; } = DefectStratum.Logic;
+
+    /// <summary>
+    /// Expressible stratum only: the Calor diagnostic code the operator PREDICTS the mutation will
+    /// make fire on the mutated-converted code (e.g. <c>Calor0410</c>, <c>Calor0920</c>). The task
+    /// generator mechanically verifies this prediction via the differential addressability probe; a
+    /// candidate whose predicted check does not actually fire is excluded as
+    /// <see cref="ExclusionReason.NotVerificationAddressable"/>. Null for logic-stratum candidates.
+    /// </summary>
+    public string? ExpectedCheck { get; init; }
+
     /// <summary>Stable identifier for the candidate within its file.</summary>
     public string Id =>
         Source == MutationSource.RevertBugfix

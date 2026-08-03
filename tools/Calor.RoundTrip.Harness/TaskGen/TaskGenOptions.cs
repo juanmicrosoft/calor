@@ -14,6 +14,26 @@ public enum TaskSourceSelection
     Both = Injected | Revert,
 }
 
+/// <summary>
+/// Which defect STRATUM (or strata) a task-generation run draws candidates from (W4 dry-run
+/// disposition). Orthogonal to <see cref="TaskSourceSelection"/>: the logic stratum is the existing
+/// conversion-penalty / PP-A2 measurement (arithmetic/off-by-one/boundary + revert), for which
+/// Calor has no mechanical signal; the expressible stratum injects defect classes Calor's existing
+/// checks CAN catch (effect discipline / div-by-zero / index-OOB / null-deref).
+/// </summary>
+[Flags]
+public enum StratumSelection
+{
+    /// <summary>The pre-existing logic operators + revert source (governed by <see cref="TaskSourceSelection"/>).</summary>
+    Logic = 1,
+
+    /// <summary>The new verification-addressable operators (gated by the additional addressability clause).</summary>
+    Expressible = 2,
+
+    /// <summary>Both strata, merged into one candidate set; the addressability clause applies only to expressible tasks.</summary>
+    Both = Logic | Expressible,
+}
+
 /// <summary>Options for a task-generation run.</summary>
 public sealed class TaskGenOptions
 {
@@ -26,6 +46,14 @@ public sealed class TaskGenOptions
     /// revert-upstream-bugfix source; both feed the SAME eligibility predicate + exclusion accounting.
     /// </summary>
     public TaskSourceSelection Sources { get; init; } = TaskSourceSelection.Injected;
+
+    /// <summary>
+    /// Which defect stratum/strata to draw candidates from (default <see cref="StratumSelection.Both"/>).
+    /// The logic stratum uses <see cref="Sources"/> (injected logic operators + revert); the expressible
+    /// stratum adds the verification-addressable operators, each gated by the additional addressability
+    /// clause. Keeping the logic operators unchanged preserves the conversion-penalty / PP-A2 measurement.
+    /// </summary>
+    public StratumSelection Strata { get; init; } = StratumSelection.Both;
 
     /// <summary>How many commits of upstream history to scan for fix-shaped commits (revert source only).</summary>
     public int RevertScanCommits { get; init; } = 2000;

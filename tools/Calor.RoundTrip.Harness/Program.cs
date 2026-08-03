@@ -210,8 +210,23 @@ async Task<int> GenTasksCommand(string[] genArgs)
         return 1;
     }
 
+    // Defect stratum: logic (conversion-penalty / PP-A2), expressible (verification-addressable), or both.
+    var stratumArg = (GetOption(genArgs, "--stratum") ?? "both").ToLowerInvariant();
+    var strata = stratumArg switch
+    {
+        "logic" => StratumSelection.Logic,
+        "expressible" => StratumSelection.Expressible,
+        "both" => StratumSelection.Both,
+        _ => (StratumSelection?)null,
+    };
+    if (strata == null)
+    {
+        Console.Error.WriteLine($"Unknown --stratum '{stratumArg}'. Use one of: logic, expressible, both.");
+        return 1;
+    }
+
     var optionsWithValues = new HashSet<string>
-        { "--projects-dir", "--output", "--dotnet", "--native-bar", "--max-candidates", "--target", "--source", "--scan-commits" };
+        { "--projects-dir", "--output", "--dotnet", "--native-bar", "--max-candidates", "--target", "--source", "--stratum", "--scan-commits" };
     var projectNames = new List<string>();
     if (genArgs.Contains("--synthetic"))
         projectNames = ProjectConfigs.SyntheticProjects.ToList();
@@ -254,9 +269,11 @@ async Task<int> GenTasksCommand(string[] genArgs)
         MaxCandidatesPerProject = maxCandidates,
         TargetEligiblePerProject = target,
         Sources = sources.Value,
+        Strata = strata.Value,
         RevertScanCommits = scanCommits,
         Fidelity = new FidelityGateConfig { NativeFractionBar = nativeBar, BarIsProvisional = true },
     };
+    Console.WriteLine($"Defect stratum/strata: {strata.Value}");
     Console.WriteLine($"Defect source(s): {sources.Value}" +
         (sources.Value.HasFlag(TaskSourceSelection.Revert) ? $" (scanning {scanCommits} commits of upstream history)" : ""));
 
@@ -383,6 +400,10 @@ static void PrintUsage()
           --output <path>          Output directory for task bundles (default: task-bundles)
           --source <sel>           Defect source: injected | revert | both (default injected).
                                    'revert' = gold-standard revert-upstream-bugfix; 'injected' = mutation supplement.
+          --stratum <sel>          Defect stratum: logic | expressible | both (default both).
+                                   'logic' = conversion-penalty/PP-A2 operators (no Calor signal);
+                                   'expressible' = verification-addressable operators (effect/div0/index/null),
+                                   each gated by the differential addressability check.
           --scan-commits <n>       Upstream commits to scan for fix commits (revert source; default 2000)
           --native-bar <frac>      Fidelity-gate NativeFraction bar (default provisional 0.70)
           --max-candidates <n>     Max sited candidates considered per project (default 8)

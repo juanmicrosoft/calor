@@ -34,6 +34,41 @@ public enum MutationOperatorKind
 
     /// <summary>Reverting an upstream fix hunk (revert-bugfix source; not an injected operator).</summary>
     Revert,
+
+    // ---- Expressible-stratum operators (W4 dry-run disposition): each injects a REAL behavioral
+    // defect that is ALSO verification-addressable — one of Calor's mechanical checks fires on the
+    // mutated-CONVERTED code, giving the mechanical Calor arm a signal the C# compiler lacks. ----
+
+    /// <summary>Injects a field/static side-effect the converter's §E inference misses but effect
+    /// enforcement charges → Calor0410 (ForbiddenEffect) on the converted Calor arm.</summary>
+    EffectViolation,
+
+    /// <summary>Removes a null-guard so a reference can flow null into a dereference (real NRE).
+    /// Addressable only where Calor's null bug-pattern fires (Option/unwrap-shaped) — see gap note.</summary>
+    NullDeref,
+
+    /// <summary>Removes/weakens a bounds guard on an index so it can go out of range → Calor0921.</summary>
+    IndexOutOfBounds,
+
+    /// <summary>Removes a zero-guard on a divisor so it can be zero → Calor0920 (div-by-zero).</summary>
+    DivByZero,
+}
+
+/// <summary>
+/// The defect stratum a candidate belongs to (W4 dry-run disposition). The <see cref="Logic"/>
+/// stratum (arithmetic/off-by-one/boundary + revert) is the day-one conversion-penalty / PP-A2
+/// measurement — Calor has NO mechanical signal for it. The <see cref="Expressible"/> stratum
+/// injects defect classes the mechanical arm's EXISTING machinery (WS-W2 effect enforcement, the
+/// bug-pattern checkers) CAN catch, so the epoch can test the verification-value thesis. Every
+/// bundle's provenance is tagged so the two strata are analysed and reported separately.
+/// </summary>
+public enum DefectStratum
+{
+    /// <summary>Arithmetic/off-by-one/boundary/negate/swap + revert — no mechanical Calor signal.</summary>
+    Logic,
+
+    /// <summary>Effect-discipline / null-deref / index-OOB / div-by-zero — verification-addressable.</summary>
+    Expressible,
 }
 
 /// <summary>
@@ -98,6 +133,17 @@ public enum ExclusionReason
     /// exclusion, disclosed before any build/test cost is spent.
     /// </summary>
     InseparableRevert,
+
+    /// <summary>
+    /// Expressible stratum only: the candidate carries a real behavioral defect (it broke a covering
+    /// test) but Calor's expected mechanical check does NOT fire on the mutated-converted code (the
+    /// differential addressability probe found the diagnostic absent, or present already on the clean
+    /// conversion). The defect is not verification-addressable, so it must NOT masquerade as
+    /// expressible — excluded, counted, and disclosed. This is the additional clause that partitions
+    /// the expressible stratum; the four base clauses (native / survives / attribution / oracle-leak)
+    /// still apply on top of it.
+    /// </summary>
+    NotVerificationAddressable,
 }
 
 /// <summary>One held-out test removed from the visible suite and moved to held-out (C2).</summary>
@@ -149,6 +195,19 @@ public sealed class EligibilityProof
     public string? CalorArmFailureSignature { get; init; }
     public string AttributionOutcome { get; init; } = "not-checked";
     public double ProjectNativeFraction { get; init; }
+
+    /// <summary>The defect stratum this task belongs to (logic vs expressible).</summary>
+    public string Stratum { get; init; } = nameof(DefectStratum.Logic);
+
+    /// <summary>
+    /// Expressible stratum only: the Calor mechanical check whose diagnostic the mutation INTRODUCED
+    /// on the converted arm (e.g. <c>Calor0410</c>, <c>Calor0920</c>). Recorded so the epoch can point
+    /// to exactly which check gives the arm its signal. Null for logic-stratum tasks (no signal).
+    /// </summary>
+    public string? VerificationCheckFired { get; init; }
+
+    /// <summary>Human-readable addressability disclosure (the expected check + the differential result).</summary>
+    public string AddressabilityNote { get; init; } = "";
 }
 
 /// <summary>Provenance record for a task bundle (mutation source, region, native-eligibility proof).</summary>
