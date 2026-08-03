@@ -15,9 +15,17 @@ public class TaskGenMinerTests
     [InlineData("fixes #1234 incorrect boundary", true)]
     [InlineData("Bug: null reference in validator", true)]
     [InlineData("Correct wrong comparison operator", true)]
+    [InlineData("Fix boundary error (#42)", true)]              // fix-word WITH a PR ref is still a fix
     [InlineData("Add new feature for logging", false)]
     [InlineData("Refactor internal API", false)]
     [InlineData("Merge branch 'main' into dev", false)]
+    // A bare (#NNNN) / GH-NNNN reference is NOT fix-evidence: GitHub squash-merges append it to EVERY
+    // PR subject, so these feature-adds/refactors must NOT be classified as fixes (honesty pin — a
+    // bare number would grossly overstate the gold-standard bug-fix supply).
+    [InlineData("Inline TraceId and SpanId JSON string formatting (#2215)", false)]
+    [InlineData("Property factory as AddPropertyIfAbsent parameter (#2149)", false)]
+    [InlineData("Add `LevelAlias.Off` (#1910)", false)]
+    [InlineData("Update dependencies GH-77", false)]
     [InlineData("", false)]
     public void IsFixShaped_Heuristic(string subject, bool expected)
         => Assert.Equal(expected, BugfixMiner.IsFixShaped(subject));
@@ -65,11 +73,16 @@ public class TaskGenMinerTests
     }
 
     [Fact]
-    public void GitLogArgs_ScopesToLibrarySource()
+    public void GitLogArgs_SurfacesFullNameStatus_NotPathspecRestricted()
     {
-        var args = BugfixMiner.GitLogArgs("src/MediatR", 200);
+        // Pathspec-fix regression pin: the log MUST NOT be pathspec-restricted to the library source,
+        // or --name-status never lists test files and SelectRevertCandidates (which requires a covering
+        // test) can never fire — the 0-live-tasks bug. Classification into source/test is the parser's job.
+        var args = BugfixMiner.GitLogArgs(200);
         Assert.Contains("--name-status", args);
         Assert.Contains("--no-merges", args);
-        Assert.Contains("-- \"src/MediatR\"", args);
+        Assert.Contains("-n 200", args);
+        Assert.DoesNotContain("-- \"", args);        // no pathspec restriction
+        Assert.DoesNotContain("src/", args);
     }
 }

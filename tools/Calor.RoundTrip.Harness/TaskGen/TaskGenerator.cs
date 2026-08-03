@@ -39,19 +39,67 @@ public sealed class TaskGenerator
         Console.WriteLine($"[{project.ProjectName}]   NativeFraction {coverage.NativeFraction:P1} " +
             $"({coverage.ConvertedNative} native of {coverage.TotalConvertibleFiles}); siting mutations in {nativeFiles.Count} native file(s)");
 
-        // --- Site injected mutations in native regions ONLY (governing fact). ---
+        // --- Enumerate candidates from the selected source(s), sited in native regions ONLY. ---
+        var nativeSet = nativeFiles.ToHashSet(StringComparer.Ordinal);
         var enumerated = new List<MutationCandidate>();
-        foreach (var relPath in nativeFiles)
+
+        // Injected mutations (supplement): standard operators over native files.
+        if (options.Sources.HasFlag(TaskSourceSelection.Injected))
         {
-            var absOriginal = Path.Combine(project.OriginalProjectPath, relPath);
-            if (!File.Exists(absOriginal)) continue;
-            var source = await File.ReadAllTextAsync(absOriginal);
-            // NegateCondition always compiles, but inverts a whole branch (all-or-nothing coverage),
-            // so it is dropped from the DEFAULT bounded set to keep the demo focused on point mutations;
-            // the operator itself remains available in InjectedMutationOperators and unit-tested.
-            enumerated.AddRange(InjectedMutationOperators.Enumerate(source, relPath)
-                .Where(c => c.Operator != MutationOperatorKind.NegateCondition));
+            foreach (var relPath in nativeFiles)
+            {
+                var absOriginal = Path.Combine(project.OriginalProjectPath, relPath);
+                if (!File.Exists(absOriginal)) continue;
+                var source = await File.ReadAllTextAsync(absOriginal);
+                // NegateCondition always compiles, but inverts a whole branch (all-or-nothing coverage),
+                // so it is dropped from the DEFAULT bounded set to keep the demo focused on point mutations;
+                // the operator itself remains available in InjectedMutationOperators and unit-tested.
+                enumerated.AddRange(InjectedMutationOperators.Enumerate(source, relPath)
+                    .Where(c => c.Operator != MutationOperatorKind.NegateCondition));
+            }
         }
+
+        // Revert-upstream-bugfix (gold standard): mine fix commits, reintroduce the defect via a
+        // source-hunk-only revert, and feed each through the SAME eligibility predicate. Supply-side
+        // exclusions (multi-source-file / inseparable / not-native) are recorded up front so the
+        // accounting is complete before any build/test cost is spent.
+        if (options.Sources.HasFlag(TaskSourceSelection.Revert))
+        {
+            Console.WriteLine($"[{project.ProjectName}]   mining upstream bug-fix commits (revert source; scanning {options.RevertScanCommits} commits)...");
+            var fixCommits = BugfixMiner.MineFixCommits(
+                project.OriginalProjectPath, project.LibrarySourceRelativePath, options.RevertScanCommits);
+            var revertCommits = BugfixMiner.SelectRevertCandidates(fixCommits);
+            Console.WriteLine($"[{project.ProjectName}]   {fixCommits.Count} fix-shaped commit(s); {revertCommits.Count} with source+covering-test (revert candidates)");
+
+            var minedOk = 0;
+            foreach (var fc in revertCommits)
+            {
+                var res = BugfixMiner.TryBuildRevertCandidate(project.OriginalProjectPath, fc);
+                if (res.Candidate != null)
+                {
+                    // Native-region prefilter (mirror injected): only site where the pristine file
+                    // converts natively. Non-native revert sources are disclosed as clause-(a) exclusions.
+                    if (nativeSet.Contains(res.Candidate.FileRelPath))
+                    {
+                        enumerated.Add(res.Candidate);
+                        minedOk++;
+                    }
+                    else
+                    {
+                        accounting.Record(RevertDisposition(project.ProjectName, fc, res.Candidate.FileRelPath,
+                            ExclusionReason.NotNativeRegion,
+                            $"clause (a): the reverted source file {res.Candidate.FileRelPath} did not convert natively in the pristine probe."));
+                    }
+                }
+                else
+                {
+                    accounting.Record(RevertDisposition(project.ProjectName, fc,
+                        fc.SourceFiles.FirstOrDefault() ?? "?", res.Exclusion!.Value, res.ExclusionDetail!));
+                }
+            }
+            Console.WriteLine($"[{project.ProjectName}]   revert candidates buildable in a native region: {minedOk}");
+        }
+
         var totalEnumerated = enumerated.Count; // honest denominator (minor: before Take/early-stop truncation)
         var candidates = enumerated
             .OrderBy(c => c.FileRelPath, StringComparer.Ordinal)
@@ -320,6 +368,20 @@ public sealed class TaskGenerator
 
     private static EligibilityVerdict Excluded(ExclusionReason reason, string explanation) =>
         new() { Eligible = false, Reason = reason, Explanation = explanation };
+
+    /// <summary>A supply-side (pre-build) disposition for a revert candidate that never reached evaluation.</summary>
+    private static CandidateDisposition RevertDisposition(
+        string projectName, FixCommit fc, string fileRelPath, ExclusionReason reason, string explanation) => new()
+    {
+        ProjectName = projectName,
+        CandidateId = $"revert-{fc.Sha[..Math.Min(8, fc.Sha.Length)]}",
+        FileRelPath = fileRelPath,
+        Operator = MutationOperatorKind.Revert,
+        Source = MutationSource.RevertBugfix,
+        Eligible = false,
+        Reason = reason,
+        Explanation = explanation,
+    };
 
     /// <summary>Clone a config with an overridden working directory and/or test filter.</summary>
     private static RoundTripConfig Clone(RoundTripConfig c, string? workDir, string? testFilter = null) => new()

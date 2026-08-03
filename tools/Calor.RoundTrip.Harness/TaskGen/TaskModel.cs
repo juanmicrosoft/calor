@@ -83,6 +83,21 @@ public enum ExclusionReason
 
     /// <summary>The candidate's project was excluded by the fidelity gate (NativeFraction below bar).</summary>
     FidelityGateBelowBar,
+
+    /// <summary>
+    /// Revert source only: the mined fix commit touches more than one library-source file, so the
+    /// single-file eligibility predicate cannot faithfully reintroduce the (multi-file) defect. A
+    /// revert-supply exclusion, disclosed before any build/test cost is spent.
+    /// </summary>
+    MultipleSourceFiles,
+
+    /// <summary>
+    /// Revert source only: the fix commit's source-file hunk cannot be cleanly reverse-applied onto
+    /// the pinned tree (a later commit changed the same region → 3-way conflict / no-op), so the
+    /// defect cannot be reintroduced in isolation while keeping the covering test. A revert-supply
+    /// exclusion, disclosed before any build/test cost is spent.
+    /// </summary>
+    InseparableRevert,
 }
 
 /// <summary>One held-out test removed from the visible suite and moved to held-out (C2).</summary>
