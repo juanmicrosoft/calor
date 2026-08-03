@@ -139,6 +139,54 @@ public class ReportGeneratorTests
         Assert.Contains("REVERTED", md);
     }
 
+    [Fact]
+    public void InconclusiveRun_EmitsNoCoverageFraction()
+    {
+        // A run whose recovery build failed unattributably (timeout) must NOT emit a
+        // coverage/native fraction — it would be spuriously inflated (M2 guard).
+        var report = CreateInconclusiveReport();
+
+        var json = ReportGenerator.GenerateJson(report);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        Assert.Equal("inconclusive", root.GetProperty("verdict").GetString());
+        Assert.True(root.GetProperty("inconclusive").GetBoolean());
+        // fidelity is nulled → serialized as absent-or-null (WhenWritingNull), never an
+        // object with fractions. No coverage_fraction / native_fraction anywhere.
+        Assert.False(root.TryGetProperty("fidelity", out var fid) && fid.ValueKind != JsonValueKind.Null,
+            "fidelity must be absent or null for an inconclusive run");
+        Assert.DoesNotContain("native_fraction", json);
+        Assert.DoesNotContain("coverage_fraction", json);
+
+        var md = ReportGenerator.GenerateMarkdown(report);
+        Assert.Contains("INCONCLUSIVE", md);
+        Assert.Contains("No coverage fraction is reported", md);
+    }
+
+    private static RoundTripReport CreateInconclusiveReport()
+    {
+        var report = new RoundTripReport
+        {
+            ProjectName = "TimeoutProject",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-10),
+            FinishedAt = DateTimeOffset.UtcNow,
+            // Files that WOULD produce a high native fraction if trusted.
+            FileResults =
+            [
+                new() { FilePath = "Lib/A.cs", Status = FileStatus.Replaced },
+                new() { FilePath = "Lib/B.cs", Status = FileStatus.Replaced },
+                new() { FilePath = "Lib/C.cs", Status = FileStatus.Replaced },
+            ],
+            // Build failed with NO extractable error files (timeout signature).
+            BuildResult = new BuildResult { Succeeded = false, ExitCode = -1, Errors = [] },
+            Inconclusive = true,
+            InconclusiveReason = "recovery build did not complete within the build timeout",
+        };
+        report.Comparison = new TestComparison { Status = ComparisonStatus.BuildFailed };
+        report.Fidelity = ProjectFidelity.Compute(report);
+        return report;
+    }
+
     private static RoundTripReport CreatePassingReport() => new()
     {
         ProjectName = "TestProject",

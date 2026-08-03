@@ -66,6 +66,19 @@ public sealed class RoundTripPipeline
 
         Console.WriteLine($"  Build: {(report.BuildResult.Succeeded ? "Success" : "FAILED")}");
 
+        // A failed build that recovery could NOT attribute to any file (zero extractable
+        // error files — the recovery-build-timeout signature, but any such case) reverts
+        // nothing, so the coverage fraction would be spuriously inflated. Flag the run
+        // inconclusive so no fidelity number is trusted or emitted for it.
+        if (!report.BuildResult.Succeeded && report.BuildResult.Errors.Count == 0)
+        {
+            report.Inconclusive = true;
+            report.InconclusiveReason = report.BuildResult.ExitCode == -1
+                ? "recovery build did not complete within the build timeout — file reverts could not be attributed, so coverage is unreliable"
+                : "post-conversion build failed with no extractable error files — file reverts could not be attributed, so coverage is unreliable";
+            Console.WriteLine($"  INCONCLUSIVE: {report.InconclusiveReason}");
+        }
+
         // Step 5: Test (only if build succeeded)
         if (report.BuildResult.Succeeded)
         {
@@ -84,11 +97,19 @@ public sealed class RoundTripPipeline
 
         // Fidelity: separated verdict dimensions (coverage / build / tests)
         report.Fidelity = ProjectFidelity.Compute(report);
-        var cov = report.Fidelity.Coverage;
-        Console.WriteLine(
-            $"\nFidelity: coverage {cov.CoverageFraction:P1} " +
-            $"({cov.ConvertedNative} native + {cov.ConvertedWithLosses} with-losses of {cov.TotalConvertibleFiles}; " +
-            $"{cov.Reverted} reverted, {cov.FailedConversion} failed)");
+        if (report.Inconclusive)
+        {
+            // Do NOT print a coverage fraction for an unattributable build failure.
+            Console.WriteLine($"\nFidelity: INCONCLUSIVE — {report.InconclusiveReason}. No coverage fraction emitted.");
+        }
+        else
+        {
+            var cov = report.Fidelity.Coverage;
+            Console.WriteLine(
+                $"\nFidelity: coverage {cov.CoverageFraction:P1} " +
+                $"({cov.ConvertedNative} native + {cov.ConvertedWithLosses} with-losses of {cov.TotalConvertibleFiles}; " +
+                $"{cov.Reverted} reverted, {cov.FailedConversion} failed)");
+        }
 
         // Bisect regressions if enabled and there are few enough
         if (config.EnableBisect
@@ -518,7 +539,7 @@ public sealed class RoundTripPipeline
             args += $" {config.ExtraBuildProperties}";
 
         var (exitCode, stdout, stderr) = await ProcessRunner.RunAsync(
-            config.DotnetPath, args, workDir, TimeSpan.FromMinutes(5));
+            config.DotnetPath, args, workDir, config.BuildTimeout);
 
         var errors = new List<string>();
         foreach (var line in (stdout + "\n" + stderr).Split('\n'))

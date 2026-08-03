@@ -119,10 +119,27 @@ tranche-2 fidelity bar is set later, from the dry-run, not from this snapshot.
 
 | Project | Baseline | Round-trip | Convertible files | Native | NativeFraction | With-losses | Reverted | Failed-conv |
 |---------|----------|-----------|-------------------|--------|----------------|-------------|----------|-------------|
-| MediatR | 155/157 green | 154/157 | 32 | 15 | **0.469** | 4 | 6 | 7 |
+| MediatR | 155/157 green | 155/157 (0 regressions) | 32 | 15 | **0.469** | 4 | 6 | 7 |
 | Serilog | 811/811 green | 811/811 | 110 | 44 | **0.400** | 2 | 43 | 21 |
 | FluentValidation | 865/866 green | 865/866 | 139 | 74 | **0.532** | 1 | 38 | 26 |
 
 All three baselines are green (≥2 required to adjudicate). NativeFraction lands
 **0.40–0.53**, below the provisional 0.70 steer — the empirical basis the A-1.4
 tranche-2 bar will be set from.
+
+Notes for the tranche-2 bar-setters:
+
+- **"Native" counts loss-ledger entries, not compiler warnings.** `ConvertedNative`
+  requires `LossCount == 0` from the conversion loss ledger — it has nothing to do
+  with C# warnings. `TreatWarningsAsErrors=false` for the subjects (caveat 3 above)
+  therefore does **not** inflate NativeFraction; it only prevents a converted file
+  from being *reverted* over an analyzer warning, which would otherwise understate
+  coverage. Reverted files stay in the denominator as failures (#776 anti-masking).
+- MediatR's round-trip occasionally shows 154/157 — a single timing-sensitive
+  timeout test (`GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs`)
+  that flakes; it is **not** a conversion regression (0 attributable regressions).
+- These fractions are only meaningful when the run is **conclusive**. If the
+  post-conversion recovery build fails without any attributable error file (e.g. a
+  recovery-build timeout on a cold NuGet cache), the harness marks the run
+  **inconclusive** and emits **no** coverage fraction — do not read a number out of
+  an inconclusive run.
