@@ -95,6 +95,20 @@ is_bench_source() {
   [[ "$1" == bench/* ]]
 }
 
+is_harness_source() {
+  # The round-trip / real-scale benchmark harness is benchmark SUPPORT, not
+  # product source — identical rationale to is_bench_source. It measures the
+  # converter (mines corpus history, drives `dotnet test`, manipulates Roslyn),
+  # which cannot be authored in Calor, and NOTHING under it ships in the
+  # product (verified: no src/ project references Calor.RoundTrip.Harness). The
+  # pre-existing harness .cs only ever passed via the exists_in_base grandfather;
+  # exempt the tree structurally (wedge plan v0.11 WS-W4 Slice C — the task-gen
+  # machinery under TaskGen/) so authoring new harness support never needs an
+  # allowlist entry. Scoped to this one tool tree, not tools/ at large — other
+  # tools/ product code stays fully governed.
+  [[ "$1" == tools/Calor.RoundTrip.Harness/* ]]
+}
+
 violations=()
 for path in "${changed[@]}"; do
   [[ "$path" == *.cs ]] || continue
@@ -103,6 +117,7 @@ for path in "${changed[@]}"; do
   exists_in_base "$path" && continue
   is_test_source "$path" && continue
   is_bench_source "$path" && continue
+  is_harness_source "$path" && continue
   is_base_allowlisted "$path" && continue
   [[ -f "$path" ]] || continue
   violations+=("$path")
