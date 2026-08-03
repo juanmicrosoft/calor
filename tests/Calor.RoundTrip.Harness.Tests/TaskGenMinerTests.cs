@@ -15,9 +15,17 @@ public class TaskGenMinerTests
     [InlineData("fixes #1234 incorrect boundary", true)]
     [InlineData("Bug: null reference in validator", true)]
     [InlineData("Correct wrong comparison operator", true)]
+    [InlineData("Fix boundary error (#42)", true)]              // fix-word WITH a PR ref is still a fix
     [InlineData("Add new feature for logging", false)]
     [InlineData("Refactor internal API", false)]
     [InlineData("Merge branch 'main' into dev", false)]
+    // A bare (#NNNN) / GH-NNNN reference is NOT fix-evidence: GitHub squash-merges append it to EVERY
+    // PR subject, so these feature-adds/refactors must NOT be classified as fixes (honesty pin — a
+    // bare number would grossly overstate the gold-standard bug-fix supply).
+    [InlineData("Inline TraceId and SpanId JSON string formatting (#2215)", false)]
+    [InlineData("Property factory as AddPropertyIfAbsent parameter (#2149)", false)]
+    [InlineData("Add `LevelAlias.Off` (#1910)", false)]
+    [InlineData("Update dependencies GH-77", false)]
     [InlineData("", false)]
     public void IsFixShaped_Heuristic(string subject, bool expected)
         => Assert.Equal(expected, BugfixMiner.IsFixShaped(subject));

@@ -51,15 +51,19 @@ public sealed class RevertCandidateResult
 public static partial class BugfixMiner
 {
     /// <summary>
-    /// Fix-shaped iff the subject line names a fix/bug/defect or references an issue, and is not a
-    /// merge or a mere "prefix"/"suffix" false positive. Deliberately conservative — a false
-    /// negative just drops a candidate; a false positive would revert a non-fix.
+    /// Fix-shaped iff the subject line names actual fix vocabulary (fix/bug/defect/regression/crash/…)
+    /// and is not a merge. A bare issue/PR reference (<c>#NNNN</c>, <c>GH-NNNN</c>) is deliberately NOT
+    /// evidence of a fix: GitHub squash-merges append <c>(#NNNN)</c> to EVERY PR subject, so treating a
+    /// bare number as fix-evidence would classify every feature-add and refactor as a "fix" and grossly
+    /// overstate the gold-standard bug-fix supply (reverting a feature-add is behavior-removal, not a
+    /// reintroduced defect). Deliberately conservative — a false negative just drops a candidate; a
+    /// false positive would revert a non-fix.
     /// </summary>
     public static bool IsFixShaped(string subject)
     {
         if (string.IsNullOrWhiteSpace(subject)) return false;
         if (subject.StartsWith("Merge ", StringComparison.OrdinalIgnoreCase)) return false;
-        return FixWord().IsMatch(subject) || IssueRef().IsMatch(subject);
+        return FixWord().IsMatch(subject);
     }
 
     /// <summary>True when the path looks like a test file (a test-ish directory or filename segment).</summary>
@@ -327,11 +331,10 @@ public static partial class BugfixMiner
         return (process.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult());
     }
 
-    [GeneratedRegex(@"\b(fix(es|ed)?|bug|defect|regression|incorrect|wrong|broken)\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(
+        @"\b(fix(es|ed)?|bug(fix)?|defect|regression|incorrect(ly)?|wrong(ly)?|broken|crash(es|ed|ing)?|npe|nullref|deadlock|hang(s|ing)?|off-by-one|overflow|underflow|corrupt(s|ed|ion)?|faulty?)\b",
+        RegexOptions.IgnoreCase)]
     private static partial Regex FixWord();
-
-    [GeneratedRegex(@"#\d+|GH-\d+", RegexOptions.IgnoreCase)]
-    private static partial Regex IssueRef();
 
     [GeneratedRegex(@"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")]
     private static partial Regex HunkHeader();
