@@ -1,0 +1,37 @@
+# Task bundle: synthetic-injectedmutation-cand1-Arithmetic
+
+- Project: **Synthetic**
+- Mutation source: **InjectedMutation**
+- Operator: `+ → -` (Arithmetic)
+- Mutated region: `SyntheticLib/Calculator.cs` line 7, col 18
+
+## Failing-behavior report (BOTH arms receive this — the symptom, NOT the test)
+
+> Observed incorrect behavior: Assert.Equal() Failure: Values differ
+>
+> Subject hint: Calculator
+>
+> Symptom derived mechanically from a removed covering test and scrubbed of the test's identity. The removed test is held out; the full suite remains as the regression net.
+
+## Arms
+
+- `csharp-arm/` — idiomatic original C# carrying the mutation.
+- `calor-arm/`  — mutate-then-convert output (converted §-syntax round-tripped to C#) carrying the same mutation.
+
+Presentation asymmetry (recorded): Calor arm = machine-converted round-tripped C# (from §-syntax); C# arm = idiomatic original. Bias is against Calor.
+
+## Held-out test(s) — removed from the visible suite, kept as the regression net
+
+- `SyntheticLib.Tests.CalculatorTests.Add_NegativeNumbers` (assembly `syntheticlib.tests.dll`)
+- `SyntheticLib.Tests.CalculatorTests.Add_ReturnsSum` (assembly `syntheticlib.tests.dll`)
+
+- Visible-suite filter: `FullyQualifiedName!~SyntheticLib.Tests.CalculatorTests.Add_NegativeNumbers&FullyQualifiedName!~SyntheticLib.Tests.CalculatorTests.Add_ReturnsSum`
+- Regression-net project: `SyntheticLib.Tests/SyntheticLib.Tests.csproj` (full suite; escaped bug = held-out failure at declared-done)
+
+## Native-eligibility proof (D-W4.1)
+
+- Clause (a): mutated file `SyntheticLib/Calculator.cs` — ConvertedNative=**True** (Status=Replaced, LossCount=0)
+- Clause (b): held-out test outcome — C# arm=**Failed**, Calor arm=**Failed**
+  - failure signatures — C#=`Assert.Equal()`, Calor=`Assert.Equal()`
+- D-W4.3 attribution: **AttributedToMutation**
+- Project NativeFraction at generation: 100.0%

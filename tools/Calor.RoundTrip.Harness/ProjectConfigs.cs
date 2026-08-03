@@ -24,6 +24,7 @@ public static class ProjectConfigs
         var config = projectName.ToLowerInvariant() switch
         {
             "synthetic" => Synthetic(projectsDir, dotnetPath),
+            "synthetic2" => Synthetic2(projectsDir, dotnetPath),
             "mediatr" => MediatR(projectsDir, dotnetPath),
             "serilog" => Serilog(projectsDir, dotnetPath),
             "fluentvalidation" => FluentValidation(projectsDir, dotnetPath),
@@ -33,7 +34,13 @@ public static class ProjectConfigs
         return config;
     }
 
-    public static IReadOnlyList<string> KnownProjects => ["Synthetic", "MediatR", "Serilog", "FluentValidation"];
+    public static IReadOnlyList<string> KnownProjects => ["Synthetic", "Synthetic2", "MediatR", "Serilog", "FluentValidation"];
+
+    /// <summary>
+    /// In-repo synthetic corpus subjects (offline-buildable, no submodules) — the set the Slice-C
+    /// task-generation demonstration runs against when the OSS corpus is not checked out.
+    /// </summary>
+    public static IReadOnlyList<string> SyntheticProjects => ["Synthetic", "Synthetic2"];
 
     /// <summary>
     /// Default corpus directory: the vendored, SHA-pinned OSS submodules under
@@ -54,6 +61,23 @@ public static class ProjectConfigs
             OriginalProjectPath = syntheticRoot,
             LibrarySourceRelativePath = "SyntheticLib",
             SolutionOrProjectFile = "SyntheticLib.Tests/SyntheticLib.Tests.csproj",
+            DotnetPath = dotnetPath,
+            TargetFramework = "net10.0",
+        };
+    }
+
+    private static RoundTripConfig Synthetic2(string projectsDir, string dotnetPath)
+    {
+        // Second in-repo synthetic subject (GeoLib) — a distinct project so the Slice-C
+        // demonstration yields eligible tasks across ≥2 projects without the OSS submodules.
+        var calorRoot = FindCalorRoot();
+        var syntheticRoot = Path.Combine(calorRoot, "tests", "Calor.RoundTrip.Synthetic2");
+        return new RoundTripConfig
+        {
+            ProjectName = "Synthetic2",
+            OriginalProjectPath = syntheticRoot,
+            LibrarySourceRelativePath = "GeoLib",
+            SolutionOrProjectFile = "GeoLib.Tests/GeoLib.Tests.csproj",
             DotnetPath = dotnetPath,
             TargetFramework = "net10.0",
         };

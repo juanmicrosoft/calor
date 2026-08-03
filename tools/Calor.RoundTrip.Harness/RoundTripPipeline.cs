@@ -125,7 +125,7 @@ public sealed class RoundTripPipeline
         return report;
     }
 
-    private string PrepareWorkingCopy(RoundTripConfig config)
+    internal string PrepareWorkingCopy(RoundTripConfig config)
     {
         var workDir = config.WorkingDirectory
             ?? Path.Combine(Path.GetTempPath(), "calor-roundtrip", config.ProjectName, Guid.NewGuid().ToString("N")[..8]);
@@ -172,7 +172,7 @@ public sealed class RoundTripPipeline
         }
     }
 
-    private async Task<TestRunResult> RunTestsAsync(string workDir, RoundTripConfig config, bool noBuild = false)
+    internal async Task<TestRunResult> RunTestsAsync(string workDir, RoundTripConfig config, bool noBuild = false)
     {
         // Pass the project RELATIVE to workDir (which is the process working directory),
         // never an absolute path. On macOS the temp root is /var/folders/… — a symlink
@@ -251,7 +251,7 @@ public sealed class RoundTripPipeline
         return int.TryParse(numStr, out var val) ? val : 0;
     }
 
-    private async Task<List<FileConversionResult>> ConvertAndReplaceAsync(
+    internal async Task<List<FileConversionResult>> ConvertAndReplaceAsync(
         string workDir, RoundTripConfig config, RoundTripReport report)
     {
         var results = new List<FileConversionResult>();
@@ -374,10 +374,46 @@ public sealed class RoundTripPipeline
     }
 
     /// <summary>
+    /// Convert one C# source string to its round-tripped C# (Calor→C#) exactly as
+    /// <see cref="ConvertAndReplaceAsync"/> does per file, WITHOUT touching the filesystem.
+    /// Returns the emitted C# or null if the file does not convert-and-recompile cleanly.
+    /// Used by the D-W4.1 task generator's attribution check to obtain the UNMUTATED-CONVERTED
+    /// form of a file (converter output of the clean original), so the mutation can be isolated
+    /// from any converter divergence localized to the same file (review [M]#2).
+    /// </summary>
+    internal string? ConvertSourceToRoundTripCSharp(string originalSource, string csFilePath)
+    {
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            GracefulFallback = true,
+            PreserveComments = true,
+            AutoGenerateIds = true,
+        });
+        var conversionResult = converter.Convert(originalSource, csFilePath);
+        if (!conversionResult.Success || string.IsNullOrWhiteSpace(conversionResult.CalorSource))
+            return null;
+
+        var compileResult = Compiler.Program.Compile(
+            conversionResult.CalorSource, csFilePath,
+            new Compiler.CompilationOptions
+            {
+                EnforceEffects = false,
+                ContractMode = Compiler.ContractMode.Off,
+            });
+        if (compileResult.HasErrors || string.IsNullOrWhiteSpace(compileResult.GeneratedCode))
+            return null;
+
+        var emitted = PostProcessEmittedCSharp(compileResult.GeneratedCode, originalSource);
+        var parseDiags = CSharpSyntaxTree.ParseText(emitted).GetDiagnostics()
+            .Where(d => d.Severity == DiagnosticSeverity.Error);
+        return parseDiags.Any() ? null : emitted;
+    }
+
+    /// <summary>
     /// When build fails, identify files mentioned in build errors, revert them
     /// to their originals, and update their status. Iterates up to 5 times.
     /// </summary>
-    private async Task<int> RecoverBuildAsync(
+    internal async Task<int> RecoverBuildAsync(
         string workDir, RoundTripConfig config, List<FileConversionResult> fileResults)
     {
         var totalReverted = 0;
@@ -526,7 +562,7 @@ public sealed class RoundTripPipeline
         return path.Contains(pattern);
     }
 
-    private async Task<BuildResult> BuildProjectAsync(string workDir, RoundTripConfig config)
+    internal async Task<BuildResult> BuildProjectAsync(string workDir, RoundTripConfig config)
     {
         // Relative target (see RunTestsAsync) — absolute /var-symlink paths break
         // MSBuild path identity on macOS.
