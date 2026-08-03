@@ -43,6 +43,12 @@ public sealed class ExclusionAccounting
     public int ExcludedHeldOutFilterLeak => _dispositions.Count(d => d.Reason == ExclusionReason.HeldOutFilterLeak);
     public int ExcludedFidelityGate => _dispositions.Count(d => d.Reason == ExclusionReason.FidelityGateBelowBar);
 
+    /// <summary>Revert-supply exclusions: fix commit touches >1 source file (cannot map to the single-file predicate).</summary>
+    public int ExcludedMultipleSourceFiles => _dispositions.Count(d => d.Reason == ExclusionReason.MultipleSourceFiles);
+
+    /// <summary>Revert-supply exclusions: the fix's source hunk could not be cleanly reverse-applied onto the pinned tree.</summary>
+    public int ExcludedInseparableRevert => _dispositions.Count(d => d.Reason == ExclusionReason.InseparableRevert);
+
     public double EligibilityRate => Considered == 0 ? 0.0 : (double)Eligible / Considered;
 
     public Dictionary<string, int> CountByReason() =>

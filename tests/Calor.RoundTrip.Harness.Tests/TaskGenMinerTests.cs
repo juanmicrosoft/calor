@@ -65,11 +65,16 @@ public class TaskGenMinerTests
     }
 
     [Fact]
-    public void GitLogArgs_ScopesToLibrarySource()
+    public void GitLogArgs_SurfacesFullNameStatus_NotPathspecRestricted()
     {
-        var args = BugfixMiner.GitLogArgs("src/MediatR", 200);
+        // Pathspec-fix regression pin: the log MUST NOT be pathspec-restricted to the library source,
+        // or --name-status never lists test files and SelectRevertCandidates (which requires a covering
+        // test) can never fire — the 0-live-tasks bug. Classification into source/test is the parser's job.
+        var args = BugfixMiner.GitLogArgs(200);
         Assert.Contains("--name-status", args);
         Assert.Contains("--no-merges", args);
-        Assert.Contains("-- \"src/MediatR\"", args);
+        Assert.Contains("-n 200", args);
+        Assert.DoesNotContain("-- \"", args);        // no pathspec restriction
+        Assert.DoesNotContain("src/", args);
     }
 }

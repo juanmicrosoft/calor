@@ -23,6 +23,8 @@ switch (command)
         return await RunCommand(cliArgs.Skip(1).ToArray());
     case "gen-tasks":
         return await GenTasksCommand(cliArgs.Skip(1).ToArray());
+    case "mine":
+        return MineCommand(cliArgs.Skip(1).ToArray());
     case "list":
         Console.WriteLine("Known projects:");
         foreach (var p in ProjectConfigs.KnownProjects)
@@ -191,9 +193,25 @@ async Task<int> GenTasksCommand(string[] genArgs)
     var nativeBar = double.TryParse(GetOption(genArgs, "--native-bar"), out var nb) ? nb : 0.70;
     var maxCandidates = int.TryParse(GetOption(genArgs, "--max-candidates"), out var mc) ? mc : 8;
     var target = int.TryParse(GetOption(genArgs, "--target"), out var tg) ? tg : 3;
+    var scanCommits = int.TryParse(GetOption(genArgs, "--scan-commits"), out var sc) ? sc : 2000;
+
+    // Defect source: injected mutations (supplement), revert-upstream-bugfix (gold standard), or both.
+    var sourceArg = (GetOption(genArgs, "--source") ?? "injected").ToLowerInvariant();
+    var sources = sourceArg switch
+    {
+        "revert" => TaskSourceSelection.Revert,
+        "both" => TaskSourceSelection.Both,
+        "injected" => TaskSourceSelection.Injected,
+        _ => (TaskSourceSelection?)null,
+    };
+    if (sources == null)
+    {
+        Console.Error.WriteLine($"Unknown --source '{sourceArg}'. Use one of: injected, revert, both.");
+        return 1;
+    }
 
     var optionsWithValues = new HashSet<string>
-        { "--projects-dir", "--output", "--dotnet", "--native-bar", "--max-candidates", "--target" };
+        { "--projects-dir", "--output", "--dotnet", "--native-bar", "--max-candidates", "--target", "--source", "--scan-commits" };
     var projectNames = new List<string>();
     if (genArgs.Contains("--synthetic"))
         projectNames = ProjectConfigs.SyntheticProjects.ToList();
@@ -235,11 +253,100 @@ async Task<int> GenTasksCommand(string[] genArgs)
         OutputDir = outputDir,
         MaxCandidatesPerProject = maxCandidates,
         TargetEligiblePerProject = target,
+        Sources = sources.Value,
+        RevertScanCommits = scanCommits,
         Fidelity = new FidelityGateConfig { NativeFractionBar = nativeBar, BarIsProvisional = true },
     };
+    Console.WriteLine($"Defect source(s): {sources.Value}" +
+        (sources.Value.HasFlag(TaskSourceSelection.Revert) ? $" (scanning {scanCommits} commits of upstream history)" : ""));
 
     var run = await TaskGenRunner.RunAsync(configs, options);
     return run.TotalEligible > 0 ? 0 : 1;
+}
+
+// Cheap diagnostic: mine the revert-upstream-bugfix SUPPLY per project (git-only, no build/test).
+// Reports the raw fix-shaped supply, the source+covering-test subset (the "candidates" number), and
+// how many yield a clean source-hunk-only revert vs. are excluded (multi-source / inseparable).
+int MineCommand(string[] mineArgs)
+{
+    var projectsDir = GetOption(mineArgs, "--projects-dir") ?? ProjectConfigs.DefaultCorpusDir;
+    projectsDir = Path.GetFullPath(projectsDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+    var scanCommits = int.TryParse(GetOption(mineArgs, "--scan-commits"), out var sc) ? sc : 5000;
+    var samples = int.TryParse(GetOption(mineArgs, "--samples"), out var sm) ? sm : 3;
+
+    var optionsWithValues = new HashSet<string> { "--projects-dir", "--scan-commits", "--samples" };
+    var projectNames = new List<string>();
+    if (mineArgs.Contains("--all")) projectNames = ProjectConfigs.KnownProjects.ToList();
+    else
+    {
+        for (int i = 0; i < mineArgs.Length; i++)
+        {
+            if (mineArgs[i].StartsWith("--"))
+            {
+                if (optionsWithValues.Contains(mineArgs[i]) && i + 1 < mineArgs.Length) i++;
+                continue;
+            }
+            projectNames.Add(mineArgs[i]);
+        }
+    }
+    if (projectNames.Count == 0)
+    {
+        Console.Error.WriteLine("No projects specified. Use --all or provide project names.");
+        return 1;
+    }
+
+    int grandFix = 0, grandCand = 0, grandBuildable = 0, grandMulti = 0, grandInsep = 0;
+    foreach (var name in projectNames)
+    {
+        var config = ProjectConfigs.Get(name, projectsDir, "dotnet");
+        if (config == null) { Console.Error.WriteLine($"Unknown project: {name}"); continue; }
+        if (!Directory.Exists(config.OriginalProjectPath))
+        {
+            Console.Error.WriteLine($"{name}: submodule not checked out at {config.OriginalProjectPath} (run: git submodule update --init).");
+            continue;
+        }
+
+        var fixCommits = BugfixMiner.MineFixCommits(config.OriginalProjectPath, config.LibrarySourceRelativePath, scanCommits);
+        var candidates = BugfixMiner.SelectRevertCandidates(fixCommits);
+
+        var verbose = mineArgs.Contains("--verbose");
+        int buildable = 0, multi = 0, insep = 0, shown = 0, insepShown = 0;
+        var samplesList = new List<MutationCandidate>();
+        foreach (var fc in candidates)
+        {
+            var res = BugfixMiner.TryBuildRevertCandidate(config.OriginalProjectPath, fc);
+            if (res.Succeeded) { buildable++; if (shown < samples) { samplesList.Add(res.Candidate!); shown++; } }
+            else if (res.Exclusion == ExclusionReason.MultipleSourceFiles) multi++;
+            else
+            {
+                insep++;
+                if (verbose && insepShown < 5)
+                {
+                    Console.Error.WriteLine($"    [insep] {fc.Sha[..8]} {fc.SourceFiles.FirstOrDefault()} :: {res.ExclusionDetail}");
+                    insepShown++;
+                }
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(new string('=', 64));
+        Console.WriteLine($"  {name} — revert-bugfix supply (scanned {scanCommits} commits, prefix {config.LibrarySourceRelativePath})");
+        Console.WriteLine(new string('=', 64));
+        Console.WriteLine($"  fix-shaped commits           : {fixCommits.Count}");
+        Console.WriteLine($"  with source + covering test  : {candidates.Count}   <-- revert candidates (SelectRevertCandidates fires)");
+        Console.WriteLine($"    clean source-hunk revert   : {buildable}");
+        Console.WriteLine($"    excluded multi-source-file : {multi}");
+        Console.WriteLine($"    excluded inseparable       : {insep}");
+        foreach (var s in samplesList)
+            Console.WriteLine($"    e.g. revert {s.RevertedCommit?[..8]} in {s.FileRelPath}:{s.Line} — \"{s.RevertedCommitSubject}\"");
+
+        grandFix += fixCommits.Count; grandCand += candidates.Count;
+        grandBuildable += buildable; grandMulti += multi; grandInsep += insep;
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"TOTAL: fix-shaped={grandFix}, revert-candidates={grandCand}, clean-revert={grandBuildable}, multi-source={grandMulti}, inseparable={grandInsep}");
+    return grandBuildable > 0 ? 0 : 1;
 }
 
 static string? GetOption(string[] args, string flag)
@@ -262,6 +369,7 @@ static void PrintUsage()
           calor-roundtrip run --all [options]             Run for all known projects
           calor-roundtrip gen-tasks <project...> [options] Generate real-scale task bundles (WS-W4 Slice C)
           calor-roundtrip gen-tasks --synthetic [options]  Generate against the in-repo synthetic subjects
+          calor-roundtrip mine <project...> [options]     Report revert-bugfix supply per project (git-only, no build)
           calor-roundtrip list                            List known projects
 
         Options (run):
@@ -273,6 +381,9 @@ static void PrintUsage()
 
         Options (gen-tasks):
           --output <path>          Output directory for task bundles (default: task-bundles)
+          --source <sel>           Defect source: injected | revert | both (default injected).
+                                   'revert' = gold-standard revert-upstream-bugfix; 'injected' = mutation supplement.
+          --scan-commits <n>       Upstream commits to scan for fix commits (revert source; default 2000)
           --native-bar <frac>      Fidelity-gate NativeFraction bar (default provisional 0.70)
           --max-candidates <n>     Max sited candidates considered per project (default 8)
           --target <n>             Stop after this many eligible bundles per project (default 3)

@@ -98,6 +98,20 @@ public class TaskGenGateTests
         Assert.Equal(1.0 / 9.0, acc.EligibilityRate, 3);
     }
 
+    [Fact]
+    public void ExclusionAccounting_CountsRevertSupplyExclusions()
+    {
+        var acc = new ExclusionAccounting();
+        acc.Record(Disp(false, ExclusionReason.MultipleSourceFiles));
+        acc.Record(Disp(false, ExclusionReason.InseparableRevert));
+        acc.Record(Disp(false, ExclusionReason.InseparableRevert));
+
+        Assert.Equal(1, acc.ExcludedMultipleSourceFiles);
+        Assert.Equal(2, acc.ExcludedInseparableRevert);
+        Assert.Equal(0, acc.Eligible);
+        Assert.Equal(3, acc.Considered);
+    }
+
     private static CandidateDisposition Disp(bool eligible, ExclusionReason reason) => new()
     {
         ProjectName = "P",

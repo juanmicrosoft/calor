@@ -93,12 +93,12 @@ public static class TaskGenReportWriter
 
         sb.AppendLine("## Exclusion accounting (D-W4.1 — every candidate counted, no silent shrinkage)");
         sb.AppendLine();
-        sb.AppendLine("| Project | Enumerated | Considered | Eligible | Excl (a) | Excl (b) | Excl attribution | Excl leak | Excl no-cover | Excl no-compile | Eligibility rate |");
-        sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+        sb.AppendLine("| Project | Enumerated | Considered | Eligible | Excl (a) | Excl (b) | Excl attribution | Excl leak | Excl no-cover | Excl no-compile | Excl multi-src | Excl inseparable | Eligibility rate |");
+        sb.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         foreach (var p in run.Projects)
         {
             var a = p.Accounting;
-            sb.AppendLine($"| {p.ProjectName} | {p.TotalEnumeratedCandidates} | {a.Considered} | {a.Eligible} | {a.ExcludedClauseA} | {a.ExcludedClauseB} | {a.ExcludedAttribution} | {a.ExcludedHeldOutFilterLeak} | {a.ExcludedNoCoveringTest} | {a.ExcludedDidNotCompile} | {a.EligibilityRate:P0} |");
+            sb.AppendLine($"| {p.ProjectName} | {p.TotalEnumeratedCandidates} | {a.Considered} | {a.Eligible} | {a.ExcludedClauseA} | {a.ExcludedClauseB} | {a.ExcludedAttribution} | {a.ExcludedHeldOutFilterLeak} | {a.ExcludedNoCoveringTest} | {a.ExcludedDidNotCompile} | {a.ExcludedMultipleSourceFiles} | {a.ExcludedInseparableRevert} | {a.EligibilityRate:P0} |");
         }
         var totEnumerated = run.Projects.Sum(p => p.TotalEnumeratedCandidates);
         var totConsidered = run.Projects.Sum(p => p.Accounting.Considered);
@@ -108,7 +108,13 @@ public static class TaskGenReportWriter
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedAttribution)}** | **{run.Projects.Sum(p => p.Accounting.ExcludedHeldOutFilterLeak)}** | " +
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedNoCoveringTest)}** | " +
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedDidNotCompile)}** | " +
+            $"**{run.Projects.Sum(p => p.Accounting.ExcludedMultipleSourceFiles)}** | " +
+            $"**{run.Projects.Sum(p => p.Accounting.ExcludedInseparableRevert)}** | " +
             $"**{(totConsidered == 0 ? 0 : (double)totEligible / totConsidered):P0}** |");
+        sb.AppendLine();
+        sb.AppendLine("'Excl multi-src' and 'Excl inseparable' are revert-source SUPPLY exclusions (a mined fix commit ");
+        sb.AppendLine("touching >1 source file, or whose source hunk could not be cleanly reverse-applied onto the pinned ");
+        sb.AppendLine("tree). They are recorded before any build/test cost and are 0 for injected-only runs.");
         sb.AppendLine();
         sb.AppendLine("Eligibility rate is Eligible/Considered (Considered = evaluated candidates; Enumerated is the ");
         sb.AppendLine("full sited set before the per-project cap / early-stop, so the rate is honest about truncation).");
