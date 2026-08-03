@@ -43,21 +43,32 @@ only.
 
 ## §2 — Per-run calibration (run BEFORE committing to the full 30-run dry-run)
 
-**PENDING** — filled after PR #853 merges. Procedure: run **3 real-money trials**
-spanning the difficulty range (one cheap bundle, one medium, one expensive —
-by visible-suite size / project) at `--runs 1`, both arms, and record observed
-per-run cost from summed `total_cost_usd`, tokens, and iterations.
+**DONE (2026-08-03, model `sonnet`, runner @ `d5910343`).** Three real-money
+`--runs 1` trials spanning the range; cost = summed `total_cost_usd`. All three
+CAUGHT the injected defect.
 
-| Trial (bundle · arm) | $ cost | output tokens | iterations |
-|---|---:|---:|---:|
-| FluentValidation · csharp | TBD | TBD | TBD |
-| Serilog · csharp | TBD | TBD | TBD |
-| Serilog · calor | TBD | TBD | TBD |
-| **Median per-run** | **TBD** | — | — |
-| **Projected 30-run total** | **TBD** | — | — |
+| Trial (bundle · arm) | outcome | $ cost | output tokens | iters | wall |
+|---|---|---:|---:|---:|---:|
+| FluentValidation cand3 · csharp | caught | 0.198 | 1,601 | 1 | 40s |
+| Serilog cand10 · csharp | caught | 0.699 | 8,333 | 1 | 161s |
+| Serilog cand10 · **calor** | caught | **3.469** | 45,646 | 2 | 672s |
 
-If the projected total exceeds the §3 hard ceiling, reduce the run grid
-(disclosed) or stop and re-plan — never silently overspend.
+**Per-arm means** (the arms differ ~8× in cost, so a single median misleads):
+csharp **$0.45/run**, calor **$3.47/run** (calibration finding: the calor arm's
+machine-converted §-syntax makes the agent do ~5× the output — the documented
+presentation bias against Calor).
+
+**Projected 30-run dry-run** (15 csharp + 15 calor) = **~$59**; with 2× variance
+headroom **~$118** — under the §3 soft target ($600) and far under the hard
+ceiling ($1,500). **Cleared to run the full dry-run.**
+
+*Calibration also surfaced and fixed a runner bug (`run-bundle.sh` `run_agent`
+returned 1 on agent success under `set -e`, aborting before adjudication — only
+manifests on a real agent success, invisible to null-agent verification; fixed
+@ `d5910343`). This is why the calibration is run before the full grid.*
+
+If the realized run trends over the §3 hard ceiling, the abort triggers (§4)
+apply — never silently overspend.
 
 ## §3 — Budget envelope
 
