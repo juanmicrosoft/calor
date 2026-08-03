@@ -87,14 +87,33 @@ def summarize(results):
           if base_arm(r) == "csharp" and not r.get("nullAgent")
           and r.get("outcome") not in ("invalid", "skipped")]
     cs_escaped = sum(1 for r in cs if r.get("outcome") == "escaped")
+    # Per-TASK escapes: the D-W4.4 floor is phrased per task (>=1 C#-arm escaped
+    # bug per ~5 tasks), so report how many distinct bundles had >=1 C# escape.
+    cs_tasks = {r.get("bundle") for r in cs}
+    cs_escaped_tasks = {r.get("bundle") for r in cs if r.get("outcome") == "escaped"}
+    incidence = (cs_escaped / len(cs)) if cs else None
+    if not cs:
+        interp = "no valid C#-arm runs"
+    elif cs_escaped == 0:
+        interp = ("C#-arm escaped 0 => the C# arm catches ~all injected bugs "
+                  "itself; the ceiling PERSISTS at real scale (D-W4.4 -> PP-W2 "
+                  "not adjudicated, publish 'ceiling persists').")
+    else:
+        interp = (f"C#-arm escaped {cs_escaped}/{len(cs)} runs across "
+                  f"{len(cs_escaped_tasks)}/{len(cs_tasks)} tasks (incidence "
+                  f"{incidence:.3f}) => the C# arm does NOT catch all injected "
+                  "bugs at real scale; the ceiling does NOT uniformly persist and "
+                  "there is detectable escaped-bug headroom. Whether this clears "
+                  "the A-1.4 floor, and whether the Calor arm's escaped incidence "
+                  "is lower (the actual PP-W2 question), are tranche-2/epoch calls "
+                  "— this signal is the C#-arm ceiling check only, not the verdict.")
     ceiling = {
         "csharpValidRuns": len(cs),
         "csharpEscaped": cs_escaped,
-        "csharpEscapedIncidence": round(cs_escaped / len(cs), 4) if cs else None,
-        "interpretation": (
-            "incidence ~ 0 => C# arm catches ~all injected bugs itself; ceiling persists at real scale"
-            if cs else "no valid C#-arm runs"
-        ),
+        "csharpEscapedTasks": len(cs_escaped_tasks),
+        "csharpTasks": len(cs_tasks),
+        "csharpEscapedIncidence": round(incidence, 4) if incidence is not None else None,
+        "interpretation": interp,
     }
 
     total_cost = round(sum(r.get("costUsd", 0) or 0 for r in results), 4)

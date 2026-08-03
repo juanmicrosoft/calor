@@ -422,7 +422,13 @@ run_agent() {
         set +m
     fi
     AGENT_RC=$rc
-    [[ $rc -ne 0 ]] && echo "agent exit: $rc" >> "$ws_out/agent.err"
+    # NB: an if-block (not `[[ ]] && echo`) so this function returns 0 on agent
+    # SUCCESS (rc=0). Under `set -e`, a trailing `[[ 0 -ne 0 ]] &&` returns 1 and
+    # aborts the whole run before adjudication — a footgun that only manifests on
+    # a real (non-null) agent success, which the null-agent verification cannot
+    # exercise.
+    if [[ $rc -ne 0 ]]; then echo "agent exit: $rc" >> "$ws_out/agent.err"; fi
+    return 0
 }
 
 # ---------------------------------------------------------------------------
