@@ -29,32 +29,47 @@ public class TaskGenExpressibleTests
         """;
 
     [Fact]
-    public void EffectViolation_InjectsLockWrappedRandEffect_IntoMethodThatReadsTheField()
+    public void EffectViolation_InjectsUsingNestedFsEffect_ThatCorruptsTheReturnByOne()
     {
         var cands = ExpressibleMutationOperators.Enumerate(EffectSample, "Counter.cs");
         var ev = Assert.Single(cands, c => c.Operator == MutationOperatorKind.EffectViolation);
 
         Assert.Equal(DefectStratum.Expressible, ev.Stratum);
         Assert.Equal("Calor0410", ev.ExpectedCheck);
-        // The effect is nested in a lock body (the converter's §E-inference gap) and corrupts the field.
-        Assert.Contains("lock (this)", ev.MutatedSource);
-        Assert.Contains("new System.Random().Next()", ev.MutatedSource);
-        // The original read is preserved.
-        Assert.Contains("return _n + 1;", ev.MutatedSource);
+        // The fs effect is nested in a using body (the converter's §E-inference gap).
+        Assert.Contains("using (var __calorSink", ev.MutatedSource);
+        Assert.Contains("System.IO.Directory.Exists", ev.MutatedSource);
+        // The return is deterministically corrupted by the taint (fixed +1), intrinsic to the effect.
+        Assert.Contains("(_n + 1) + __calorTaint", ev.MutatedSource);
         Assert.True(Parses(ev.MutatedSource), "mutated source must compile as C#");
     }
 
     [Fact]
-    public void EffectViolation_SkipsReadonlyConstAndStaticFields()
+    public void EffectViolation_TargetsStaticMethods_Too()
+    {
+        const string src = """
+            namespace S;
+            public static class M
+            {
+                public static long Sum(long a, long b) { return a + b; }
+            }
+            """;
+        var cands = ExpressibleMutationOperators.Enumerate(src, "M.cs");
+        var ev = Assert.Single(cands, c => c.Operator == MutationOperatorKind.EffectViolation);
+        Assert.Contains("(a + b) + __calorTaint", ev.MutatedSource);
+        Assert.True(Parses(ev.MutatedSource));
+    }
+
+    [Fact]
+    public void EffectViolation_SkipsMethodsNotReturningIntOrLong()
     {
         const string src = """
             namespace S;
             public class C
             {
-                private readonly int _ro = 1;
-                private const int K = 2;
-                private static int _s;
-                public int F() => _ro + K + _s;   // reads only non-writable-instance fields
+                public string Name() { return "x"; }
+                public bool Ok() { return true; }
+                public void Go() { }
             }
             """;
         var cands = ExpressibleMutationOperators.Enumerate(src, "C.cs");
@@ -62,18 +77,27 @@ public class TaskGenExpressibleTests
     }
 
     [Fact]
-    public void EffectViolation_SkipsStaticMethods_NoThisAvailable()
+    public void EffectViolation_DoesNotCorruptReturnsInsideNestedLambda()
     {
+        // The method's OWN return is the last one; the lambda's return must not be the corruption site.
         const string src = """
+            using System;
             namespace S;
             public class C
             {
-                private int _n;
-                public static int F(C c) => c._n;   // static: `this` unavailable
+                public int F(int n)
+                {
+                    Func<int, int> g = x => { return x * 2; };
+                    return g(n);
+                }
             }
             """;
         var cands = ExpressibleMutationOperators.Enumerate(src, "C.cs");
-        Assert.DoesNotContain(cands, c => c.Operator == MutationOperatorKind.EffectViolation);
+        var ev = Assert.Single(cands, c => c.Operator == MutationOperatorKind.EffectViolation);
+        // The method-owned `return g(n)` is corrupted; the lambda's `return x * 2` is left intact.
+        Assert.Contains("(g(n)) + __calorTaint", ev.MutatedSource);
+        Assert.Contains("return x * 2;", ev.MutatedSource);
+        Assert.True(Parses(ev.MutatedSource));
     }
 
     // ---- DivByZero → Calor0920 (guard removal) ----

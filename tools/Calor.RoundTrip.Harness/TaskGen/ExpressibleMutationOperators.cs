@@ -28,10 +28,17 @@ public static class ExpressibleMutationOperators
     internal const string CalorIndexOutOfBounds = "Calor0921";
     internal const string CalorNullDereference = "Calor0922";
 
-    // The corrupting value injected is `new System.Random().Next()` (an int), so the target field
-    // must accept an int without a cast — int and long. (Restricting the set keeps the injected
-    // statement guaranteed-compiling; the addressability probe + clause (b) filter the rest.)
-    private static readonly HashSet<string> IntLikeFieldTypes = new(StringComparer.Ordinal) { "int", "long" };
+    // The DETERMINISTIC, guaranteed-nonzero effectful corruptor. `Directory.Exists(GetCurrentDirectory())`
+    // is always true (a process's current directory always exists) on every platform, so the taint value
+    // is a fixed 1 — the return is corrupted by exactly +1, IDENTICALLY across runs and across both arms
+    // (no Random() nondeterminism → no test-isolation flakiness → clause (b) sees an identical failure).
+    // Both Directory.* calls are filesystem effects charged by enforcement; nested in a `using` body — the
+    // converter's §E-inference walker's blind spot — they are left out of the converted §E, so the effect
+    // is INTRODUCED into the converted arm as an undeclared effect. The corruption is INTRINSIC to the
+    // effect (the taint local is written only by the effectful call), so removing the effect removes the
+    // bug — the "remove the effect → correct" fix path is genuine.
+    private const string TaintLocal = "__calorTaint";
+    private const string TaintSink = "__calorSink";
 
     /// <summary>Enumerate all expressible-stratum candidates for a C# file, in document order.</summary>
     public static IReadOnlyList<MutationCandidate> Enumerate(string source, string fileRelPath)
@@ -70,100 +77,86 @@ public static class ExpressibleMutationOperators
     // ===================================================================================
 
     /// <summary>
-    /// Inject a nondeterministic, effect-bearing write to a writable int/long INSTANCE field, wrapped
-    /// in a <c>lock (this) {{ … }}</c> block, as the first statement of an instance method that READS
-    /// that field. Two things happen at once:
-    ///   • <b>Real behavioral defect:</b> the field is overwritten with <c>new Random().Next()</c>, so
-    ///     the method's result (which depends on the field) becomes nondeterministic — a held-out test
-    ///     asserting a specific value fails on BOTH arms.
-    ///   • <b>Verification-addressable:</b> the effectful call sits inside a <c>lock</c> body, which the
-    ///     C#→Calor converter's §E inference walker does NOT descend into (it has no lock/using case),
-    ///     so the converted §E stays pure (empty) — while the compile-time effect-enforcement pass DOES
-    ///     charge the <c>rand</c> effect. computed ⊄ declared → <c>Calor0410</c> (ForbiddenEffect), a
-    ///     build-time signal the C# arm never sees. (Empirically validated: the lock/using body is the
-    ///     converter's inference gap; a bare effectful call is self-declared and leaves no gap.)
+    /// Inject an undeclared filesystem effect that DETERMINISTICALLY corrupts the return of any method
+    /// (instance OR static) returning an int/long. Into the first return the method owns, it injects a
+    /// <c>using</c>-nested effectful read whose fixed value (1) is added to the returned expression:
+    /// <code>
+    ///   int __calorTaint = 0;
+    ///   using (var __calorSink = new System.IO.StringWriter())
+    ///   { __calorTaint = (System.IO.Directory.Exists(System.IO.Directory.GetCurrentDirectory()) ? 1 : 0); }
+    ///   return (ORIGINAL) + __calorTaint;
+    /// </code>
+    /// Two things happen at once:
+    ///   • <b>Real, DETERMINISTIC defect:</b> the taint is a fixed +1 (the current directory always
+    ///     exists), so the method returns <c>ORIGINAL + 1</c> — a value-asserting held-out test fails
+    ///     IDENTICALLY on both arms and across every run (no <c>Random()</c> nondeterminism).
+    ///   • <b>Verification-addressable:</b> the <c>Directory.*</c> filesystem effect sits inside a
+    ///     <c>using</c> body — the converter's §E-inference walker's blind spot (it has no lock/using
+    ///     case) — so the converted §E stays pure while the enforcement pass charges the <c>fs</c>
+    ///     effect. computed ⊄ declared → <c>Calor0410</c>, a build signal the C# arm never sees.
     ///
-    /// The papering-over residual is deliberately preserved: the agent can clear the Calor build by
-    /// REMOVING the injected write (correct → held-out passes → caught) OR by DECLARING the effect in
-    /// §E (papers over → the nondeterminism still ships → held-out fails → escaped). Which path the
-    /// agent takes IS the measurement, not a bug to fix — so both remain possible.
+    /// Site requirement widened (per the dry-run supply finding) from "a writable field" to "ANY method
+    /// returning a computed int/long", so the operator has native supply on real code without needing a
+    /// mutable numeric field. The corruption is INTRINSIC to the effect (the taint local is written only
+    /// by the effectful call), so the papering-over residual is genuine: REMOVING the injected block
+    /// removes both the effect and the +1 (correct → held-out passes → caught); DECLARING <c>fs</c> in §E
+    /// silences Calor0410 but the +1 still ships (papers over → held-out fails → escaped). Both remain
+    /// possible; which path the agent takes IS the measurement.
     /// </summary>
     private static void EnumerateEffectViolations(string rel, SyntaxNode root, List<MutationCandidate> acc)
     {
-        foreach (var type in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+        foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
         {
-            if (type is not (ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax))
-                continue;
-            // A readonly struct cannot host a mutating write; a struct has no reference `this` to lock.
-            if (type is StructDeclarationSyntax || type is RecordDeclarationSyntax { ClassOrStructKeyword.RawKind: (int)SyntaxKind.StructKeyword })
-                continue;
-            if (type.Modifiers.Any(SyntaxKind.ReadOnlyKeyword))
-                continue;
+            if (method.Body is not { } body) continue;                       // need a block to inject into
+            if (!IsIntOrLong(method.ReturnType)) continue;                    // return must accept `+ int`
 
-            var writableFields = CollectWritableIntLikeInstanceFields(type);
-            if (writableFields.Count == 0)
-                continue;
+            // The first `return <expr>;` the method itself owns (not one inside a nested lambda / local
+            // function, whose return type differs). Corrupting a method-owned return corrupts the result.
+            var ownedReturn = method.Body.DescendantNodes().OfType<ReturnStatementSyntax>()
+                .FirstOrDefault(r => r.Expression != null && OwningFunction(r) == method);
+            if (ownedReturn?.Expression is not { } origExpr) continue;
 
-            foreach (var method in type.Members.OfType<MethodDeclarationSyntax>())
+            // return (ORIGINAL) + __calorTaint;
+            var corruptedReturn = ownedReturn.WithExpression(
+                SyntaxFactory.ParseExpression($"({origExpr.ToString()}) + {TaintLocal}"));
+
+            var taintStmts = SyntaxFactory.ParseStatement(
+                    $"{{ int {TaintLocal} = 0; using (var {TaintSink} = new System.IO.StringWriter()) "
+                    + $"{{ {TaintLocal} = (System.IO.Directory.Exists(System.IO.Directory.GetCurrentDirectory()) ? 1 : 0); }} }}")
+                is BlockSyntax b ? b.Statements : default;
+            if (taintStmts.Count == 0) continue;
+
+            var bodyWithReturn = body.ReplaceNode(ownedReturn, corruptedReturn);
+            var newBody = bodyWithReturn.WithStatements(bodyWithReturn.Statements.InsertRange(0, taintStmts));
+            var mutatedRoot = root.ReplaceNode(body, newBody);
+
+            var pos = method.Identifier.GetLocation().GetLineSpan().StartLinePosition;
+            acc.Add(new MutationCandidate
             {
-                if (method.Body is not { } body) continue;                // need a block to inject into
-                if (method.Modifiers.Any(SyntaxKind.StaticKeyword)) continue; // `this` needs an instance
-
-                foreach (var field in writableFields)
-                {
-                    if (!MethodReadsIdentifier(body, field)) continue;
-
-                    // Inject `lock (this) { <field> = new System.Random().Next(); }` as the first
-                    // statement. The `rand` effect is charged by enforcement but — because it is nested
-                    // in a lock body the converter's §E walker skips — left out of the converted §E.
-                    // The field name is written UNQUALIFIED so it resolves to either an instance or a
-                    // static field of the containing type (widening the operator's reach on real code).
-                    var inject = SyntaxFactory.ParseStatement(
-                        $"lock (this) {{ {field} = new System.Random().Next(); }}\n");
-                    var newBody = body.WithStatements(body.Statements.Insert(0, inject));
-                    var mutatedRoot = root.ReplaceNode(body, newBody);
-
-                    var pos = method.Identifier.GetLocation().GetLineSpan().StartLinePosition;
-                    acc.Add(new MutationCandidate
-                    {
-                        FileRelPath = rel,
-                        Source = MutationSource.InjectedMutation,
-                        Operator = MutationOperatorKind.EffectViolation,
-                        Stratum = DefectStratum.Expressible,
-                        ExpectedCheck = CalorForbiddenEffect,
-                        OperatorDescription = $"inject undeclared `rand` effect (lock-wrapped `{field} = new Random().Next()`) into {method.Identifier.Text}",
-                        Line = pos.Line + 1,
-                        Column = pos.Character + 1,
-                        OriginalSnippet = $"{method.Identifier.Text}(...) {{ ... }}",
-                        MutatedSnippet = $"{method.Identifier.Text}(...) {{ lock (this) {{ {field} = new Random().Next(); }} ... }}",
-                        MutatedSource = mutatedRoot.ToFullString(),
-                    });
-                }
-            }
+                FileRelPath = rel,
+                Source = MutationSource.InjectedMutation,
+                Operator = MutationOperatorKind.EffectViolation,
+                Stratum = DefectStratum.Expressible,
+                ExpectedCheck = CalorForbiddenEffect,
+                OperatorDescription = $"inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts {method.Identifier.Text}'s return by +1",
+                Line = pos.Line + 1,
+                Column = pos.Character + 1,
+                OriginalSnippet = Truncate($"return {origExpr};"),
+                MutatedSnippet = Truncate($"using (…) {{ {TaintLocal} = Directory.Exists(cwd)?1:0; }} return ({origExpr}) + {TaintLocal};"),
+                MutatedSource = mutatedRoot.ToFullString(),
+            });
         }
     }
 
-    private static List<string> CollectWritableIntLikeInstanceFields(TypeDeclarationSyntax type)
-    {
-        var fields = new List<string>();
-        foreach (var member in type.Members.OfType<FieldDeclarationSyntax>())
-        {
-            var mods = member.Modifiers;
-            // const/readonly are not writable; static is allowed (written unqualified from an instance
-            // method, still inside `lock (this)`). This widens reach to counter/cache-style fields.
-            if (mods.Any(SyntaxKind.ConstKeyword) || mods.Any(SyntaxKind.ReadOnlyKeyword))
-                continue;
-            var typeName = member.Declaration.Type is PredefinedTypeSyntax p ? p.Keyword.Text
-                : member.Declaration.Type.ToString();
-            if (!IntLikeFieldTypes.Contains(typeName)) continue;
-            foreach (var v in member.Declaration.Variables)
-                fields.Add(v.Identifier.Text);
-        }
-        return fields;
-    }
+    private static bool IsIntOrLong(TypeSyntax type) =>
+        type is PredefinedTypeSyntax p && p.Keyword.Kind() is SyntaxKind.IntKeyword or SyntaxKind.LongKeyword;
 
-    private static bool MethodReadsIdentifier(SyntaxNode body, string name) =>
-        body.DescendantNodes().OfType<IdentifierNameSyntax>().Any(id => id.Identifier.Text == name);
+    /// <summary>The function (method / local function / lambda) a statement belongs to — for return ownership.</summary>
+    private static SyntaxNode? OwningFunction(SyntaxNode node) =>
+        node.Ancestors().FirstOrDefault(a =>
+            a is MethodDeclarationSyntax or LocalFunctionStatementSyntax
+              or ParenthesizedLambdaExpressionSyntax or SimpleLambdaExpressionSyntax
+              or AnonymousMethodExpressionSyntax or AccessorDeclarationSyntax);
 
     // ===================================================================================
     // Guard-removal operators (div-by-zero / index-OOB / null-deref)

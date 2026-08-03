@@ -34,11 +34,19 @@ public class TaskGenAddressabilityTests
             ExpressibleMutationOperators.Enumerate(EffectClean, "Counter.cs"),
             c => c.Operator == MutationOperatorKind.EffectViolation);
 
-        var result = _probe.Probe("Calor0410", cand.MutatedSource, EffectClean, "Counter.cs");
+        // Property 2 (native supply): the injected using/Directory.Exists/arithmetic must convert
+        // WITHOUT interop fallback — otherwise clause (a) would exclude it as non-native.
+        var conv = new Calor.Compiler.Migration.CSharpToCalorConverter(
+            new Calor.Compiler.Migration.ConversionOptions { GracefulFallback = true, PreserveComments = true, AutoGenerateIds = true })
+            .Convert(cand.MutatedSource, "Counter.cs");
+        Assert.True(conv.Success, "mutated file must convert to Calor");
+        Assert.DoesNotContain("CSHARP", conv.CalorSource ?? ""); // no interop escalation → native
 
+        // Property 3 (addressability differential): Calor0410 introduced by the mutation.
+        var result = _probe.Probe("Calor0410", cand.MutatedSource, EffectClean, "Counter.cs");
         Assert.True(result.Determinable, $"probe should be determinable; note: {result.Note}");
         Assert.True(result.Addressable,
-            $"the injected field-write must introduce Calor0410 on the converted arm. " +
+            $"the injected using-nested fs effect must introduce Calor0410 on the converted arm. " +
             $"mutated={string.Join(",", result.FiredOnMutated)} clean={string.Join(",", result.FiredOnClean)}; note: {result.Note}");
         Assert.Contains("Calor0410", result.FiredOnMutated);
         Assert.DoesNotContain("Calor0410", result.FiredOnClean);
