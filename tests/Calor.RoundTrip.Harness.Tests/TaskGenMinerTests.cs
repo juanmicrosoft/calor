@@ -1,0 +1,75 @@
+using Calor.RoundTrip.Harness.TaskGen;
+using Xunit;
+
+namespace Calor.RoundTrip.Harness.Tests;
+
+/// <summary>
+/// Pins the bug-fix miner's fix-shape heuristic and the <c>git log --name-status</c> parser
+/// (D-W4.1 primary source). Pure over canned git output — the live mining against a checked-out
+/// submodule is a Slice-E activity (the OSS submodules are absent here).
+/// </summary>
+public class TaskGenMinerTests
+{
+    [Theory]
+    [InlineData("Fix off-by-one in range check", true)]
+    [InlineData("fixes #1234 incorrect boundary", true)]
+    [InlineData("Bug: null reference in validator", true)]
+    [InlineData("Correct wrong comparison operator", true)]
+    [InlineData("Add new feature for logging", false)]
+    [InlineData("Refactor internal API", false)]
+    [InlineData("Merge branch 'main' into dev", false)]
+    [InlineData("", false)]
+    public void IsFixShaped_Heuristic(string subject, bool expected)
+        => Assert.Equal(expected, BugfixMiner.IsFixShaped(subject));
+
+    [Theory]
+    [InlineData("test/MediatR.Tests/PipelineTests.cs", true)]
+    [InlineData("src/MediatR/Mediator.cs", false)]
+    [InlineData("tests/Foo/BarTests.cs", true)]
+    [InlineData("src/Lib/ValidatorTest.cs", true)]
+    public void IsTestPath_Heuristic(string path, bool expected)
+        => Assert.Equal(expected, BugfixMiner.IsTestPath(path));
+
+    [Fact]
+    public void ParseFixCommits_ClassifiesSourceAndTestFiles()
+    {
+        // Two records delimited by ; header split by ; name-status lines follow.
+        // (Fixed-length \u escapes — \x is variable-length and would swallow following hex letters.)
+        var log =
+            "abc123Fix off-by-one in Send #42\n" +
+            "M\tsrc/MediatR/Mediator.cs\n" +
+            "M\ttest/MediatR.Tests/SendTests.cs\n" +
+            "def456Add caching feature\n" +
+            "A\tsrc/MediatR/Cache.cs\n";
+
+        var commits = BugfixMiner.ParseFixCommits(log, "src/MediatR");
+
+        var fix = Assert.Single(commits); // only the fix-shaped commit is kept
+        Assert.Equal("abc123", fix.Sha);
+        Assert.Equal("src/MediatR/Mediator.cs", Assert.Single(fix.SourceFiles));
+        Assert.Equal("test/MediatR.Tests/SendTests.cs", Assert.Single(fix.TestFiles));
+    }
+
+    [Fact]
+    public void SelectRevertCandidates_RequiresBothSourceAndTest()
+    {
+        var withBoth = new FixCommit { Sha = "a", Subject = "fix", ChangedFiles = [] };
+        withBoth.SourceFiles.Add("src/X.cs");
+        withBoth.TestFiles.Add("test/XTests.cs");
+
+        var srcOnly = new FixCommit { Sha = "b", Subject = "fix", ChangedFiles = [] };
+        srcOnly.SourceFiles.Add("src/Y.cs");
+
+        var selected = BugfixMiner.SelectRevertCandidates([withBoth, srcOnly]);
+        Assert.Equal("a", Assert.Single(selected).Sha);
+    }
+
+    [Fact]
+    public void GitLogArgs_ScopesToLibrarySource()
+    {
+        var args = BugfixMiner.GitLogArgs("src/MediatR", 200);
+        Assert.Contains("--name-status", args);
+        Assert.Contains("--no-merges", args);
+        Assert.Contains("-- \"src/MediatR\"", args);
+    }
+}

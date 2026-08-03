@@ -1,0 +1,65 @@
+{
+  "TaskId": "synthetic-injectedmutation-cand1-Arithmetic",
+  "ProjectName": "Synthetic",
+  "Provenance": {
+    "Source": "InjectedMutation",
+    "Operator": "Arithmetic",
+    "OperatorDescription": "+ \u2192 -",
+    "MutatedFileRelPath": "SyntheticLib/Calculator.cs",
+    "Line": 7,
+    "Column": 18,
+    "OriginalSnippet": "a + b",
+    "MutatedSnippet": "a - b",
+    "NativeEligibility": {
+      "MutatedFileRelPath": "SyntheticLib/Calculator.cs",
+      "MutatedFileConvertedNative": true,
+      "MutatedFileLossCount": 0,
+      "MutatedFileStatus": "Replaced",
+      "CSharpArmHeldOutOutcome": "Failed",
+      "CalorArmHeldOutOutcome": "Failed",
+      "CSharpArmFailureSignature": "Assert.Equal()",
+      "CalorArmFailureSignature": "Assert.Equal()",
+      "AttributionOutcome": "AttributedToMutation",
+      "ProjectNativeFraction": 1
+    },
+    "PresentationAsymmetry": "Calor arm = machine-converted round-tripped C# (from \u00a7-syntax); C# arm = idiomatic original. Bias is against Calor."
+  },
+  "CSharpArmDir": "<regenerate via: calor-roundtrip gen-tasks --synthetic>/bundles/synthetic-injectedmutation-cand1-Arithmetic/csharp-arm",
+  "CalorArmDir": "<regenerate via: calor-roundtrip gen-tasks --synthetic>/bundles/synthetic-injectedmutation-cand1-Arithmetic/calor-arm",
+  "HeldOut": [
+    {
+      "TestName": "SyntheticLib.Tests.CalculatorTests.Add_NegativeNumbers",
+      "ClassName": "SyntheticLib.Tests.CalculatorTests",
+      "Assembly": "syntheticlib.tests.dll",
+      "FullyQualifiedName": "SyntheticLib.Tests.CalculatorTests.Add_NegativeNumbers",
+      "Identity": "syntheticlib.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::SyntheticLib.Tests.CalculatorTests::SyntheticLib.Tests.CalculatorTests.Add_NegativeNumbers"
+    },
+    {
+      "TestName": "SyntheticLib.Tests.CalculatorTests.Add_ReturnsSum",
+      "ClassName": "SyntheticLib.Tests.CalculatorTests",
+      "Assembly": "syntheticlib.tests.dll",
+      "FullyQualifiedName": "SyntheticLib.Tests.CalculatorTests.Add_ReturnsSum",
+      "Identity": "syntheticlib.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::SyntheticLib.Tests.CalculatorTests::SyntheticLib.Tests.CalculatorTests.Add_ReturnsSum"
+    }
+  ],
+  "VisibleTestFilter": "FullyQualifiedName!=SyntheticLib.Tests.CalculatorTests.Add_NegativeNumbers&FullyQualifiedName!=SyntheticLib.Tests.CalculatorTests.Add_ReturnsSum",
+  "RegressionNetProject": "SyntheticLib.Tests/SyntheticLib.Tests.csproj",
+  "FailingBehavior": {
+    "Symptom": "Observed incorrect behavior: Assert.Equal() Failure: Values differ",
+    "SubjectHint": "Calculator",
+    "Observed": "Assert.Equal() Failure: Values differ",
+    "Notes": "Symptom derived mechanically from a removed covering test and scrubbed of the test's identity. The removed test is held out; the full suite remains as the regression net."
+  },
+  "EligibilityProof": {
+    "MutatedFileRelPath": "SyntheticLib/Calculator.cs",
+    "MutatedFileConvertedNative": true,
+    "MutatedFileLossCount": 0,
+    "MutatedFileStatus": "Replaced",
+    "CSharpArmHeldOutOutcome": "Failed",
+    "CalorArmHeldOutOutcome": "Failed",
+    "CSharpArmFailureSignature": "Assert.Equal()",
+    "CalorArmFailureSignature": "Assert.Equal()",
+    "AttributionOutcome": "AttributedToMutation",
+    "ProjectNativeFraction": 1
+  }
+}

@@ -125,7 +125,7 @@ public sealed class RoundTripPipeline
         return report;
     }
 
-    private string PrepareWorkingCopy(RoundTripConfig config)
+    internal string PrepareWorkingCopy(RoundTripConfig config)
     {
         var workDir = config.WorkingDirectory
             ?? Path.Combine(Path.GetTempPath(), "calor-roundtrip", config.ProjectName, Guid.NewGuid().ToString("N")[..8]);
@@ -172,7 +172,7 @@ public sealed class RoundTripPipeline
         }
     }
 
-    private async Task<TestRunResult> RunTestsAsync(string workDir, RoundTripConfig config, bool noBuild = false)
+    internal async Task<TestRunResult> RunTestsAsync(string workDir, RoundTripConfig config, bool noBuild = false)
     {
         // Pass the project RELATIVE to workDir (which is the process working directory),
         // never an absolute path. On macOS the temp root is /var/folders/… — a symlink
@@ -251,7 +251,7 @@ public sealed class RoundTripPipeline
         return int.TryParse(numStr, out var val) ? val : 0;
     }
 
-    private async Task<List<FileConversionResult>> ConvertAndReplaceAsync(
+    internal async Task<List<FileConversionResult>> ConvertAndReplaceAsync(
         string workDir, RoundTripConfig config, RoundTripReport report)
     {
         var results = new List<FileConversionResult>();
@@ -377,7 +377,7 @@ public sealed class RoundTripPipeline
     /// When build fails, identify files mentioned in build errors, revert them
     /// to their originals, and update their status. Iterates up to 5 times.
     /// </summary>
-    private async Task<int> RecoverBuildAsync(
+    internal async Task<int> RecoverBuildAsync(
         string workDir, RoundTripConfig config, List<FileConversionResult> fileResults)
     {
         var totalReverted = 0;
@@ -526,7 +526,7 @@ public sealed class RoundTripPipeline
         return path.Contains(pattern);
     }
 
-    private async Task<BuildResult> BuildProjectAsync(string workDir, RoundTripConfig config)
+    internal async Task<BuildResult> BuildProjectAsync(string workDir, RoundTripConfig config)
     {
         // Relative target (see RunTestsAsync) — absolute /var-symlink paths break
         // MSBuild path identity on macOS.

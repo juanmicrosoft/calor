@@ -1,4 +1,5 @@
 using Calor.RoundTrip.Harness;
+using Calor.RoundTrip.Harness.TaskGen;
 
 // Parse command-line arguments
 // Usage:
@@ -20,6 +21,8 @@ switch (command)
 {
     case "run":
         return await RunCommand(cliArgs.Skip(1).ToArray());
+    case "gen-tasks":
+        return await GenTasksCommand(cliArgs.Skip(1).ToArray());
     case "list":
         Console.WriteLine("Known projects:");
         foreach (var p in ProjectConfigs.KnownProjects)
@@ -169,6 +172,76 @@ async Task<int> RunCommand(string[] runArgs)
     return anyFailure ? 1 : 0;
 }
 
+async Task<int> GenTasksCommand(string[] genArgs)
+{
+    // WS-W4 Slice C: mutate-then-convert task generation + D-W4.1 eligibility predicate.
+    var projectsDir = GetOption(genArgs, "--projects-dir") ?? ProjectConfigs.DefaultCorpusDir;
+    var outputDir = GetOption(genArgs, "--output") ?? "task-bundles";
+    var dotnetPath = GetOption(genArgs, "--dotnet")
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dotnet/dotnet");
+
+    projectsDir = Path.GetFullPath(projectsDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+    outputDir = Path.GetFullPath(outputDir);
+    if (dotnetPath.Contains('/') || dotnetPath.Contains('\\'))
+        dotnetPath = Path.GetFullPath(dotnetPath.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+    if (!File.Exists(dotnetPath) && dotnetPath.Contains('/'))
+        dotnetPath = "dotnet"; // fall back to PATH when the ~/.dotnet default is absent
+
+    // Configurable fidelity bar (D-W4.3) — NOT frozen; defaults to provisional 0.70.
+    var nativeBar = double.TryParse(GetOption(genArgs, "--native-bar"), out var nb) ? nb : 0.70;
+    var maxCandidates = int.TryParse(GetOption(genArgs, "--max-candidates"), out var mc) ? mc : 8;
+    var target = int.TryParse(GetOption(genArgs, "--target"), out var tg) ? tg : 3;
+
+    var optionsWithValues = new HashSet<string>
+        { "--projects-dir", "--output", "--dotnet", "--native-bar", "--max-candidates", "--target" };
+    var projectNames = new List<string>();
+    if (genArgs.Contains("--synthetic"))
+        projectNames = ProjectConfigs.SyntheticProjects.ToList();
+    else if (genArgs.Contains("--all"))
+        projectNames = ProjectConfigs.KnownProjects.ToList();
+    else
+    {
+        for (int i = 0; i < genArgs.Length; i++)
+        {
+            if (genArgs[i].StartsWith("--"))
+            {
+                if (optionsWithValues.Contains(genArgs[i]) && i + 1 < genArgs.Length) i++;
+                continue;
+            }
+            projectNames.Add(genArgs[i]);
+        }
+    }
+    if (projectNames.Count == 0)
+    {
+        Console.Error.WriteLine("No projects specified. Use --synthetic, --all, or provide project names.");
+        return 1;
+    }
+
+    var configs = new List<RoundTripConfig>();
+    foreach (var name in projectNames)
+    {
+        var config = ProjectConfigs.Get(name, projectsDir, dotnetPath);
+        if (config == null)
+        {
+            Console.Error.WriteLine($"Unknown project: {name}. Use 'list' to see known projects.");
+            continue;
+        }
+        configs.Add(config);
+    }
+    if (configs.Count == 0) return 1;
+
+    var options = new TaskGenOptions
+    {
+        OutputDir = outputDir,
+        MaxCandidatesPerProject = maxCandidates,
+        TargetEligiblePerProject = target,
+        Fidelity = new FidelityGateConfig { NativeFractionBar = nativeBar, BarIsProvisional = true },
+    };
+
+    var run = await TaskGenRunner.RunAsync(configs, options);
+    return run.TotalEligible > 0 ? 0 : 1;
+}
+
 static string? GetOption(string[] args, string flag)
 {
     for (int i = 0; i < args.Length - 1; i++)
@@ -185,15 +258,23 @@ static void PrintUsage()
         Calor Round-Trip Verification Harness
 
         Usage:
-          calor-roundtrip run <project> [options]    Run round-trip for a project
-          calor-roundtrip run --all [options]         Run for all known projects
-          calor-roundtrip list                        List known projects
+          calor-roundtrip run <project> [options]        Run round-trip for a project
+          calor-roundtrip run --all [options]             Run for all known projects
+          calor-roundtrip gen-tasks <project...> [options] Generate real-scale task bundles (WS-W4 Slice C)
+          calor-roundtrip gen-tasks --synthetic [options]  Generate against the in-repo synthetic subjects
+          calor-roundtrip list                            List known projects
 
-        Options:
+        Options (run):
           --projects-dir <path>    Directory containing target project clones
           --output <path>          Output directory for reports (default: conversion-reports)
           --dotnet <path>          Path to dotnet executable (or a bare 'dotnet' on PATH)
           --build-timeout <min>    Per-build timeout in minutes (default 15)
           --bisect                 Enable regression bisection
+
+        Options (gen-tasks):
+          --output <path>          Output directory for task bundles (default: task-bundles)
+          --native-bar <frac>      Fidelity-gate NativeFraction bar (default provisional 0.70)
+          --max-candidates <n>     Max sited candidates considered per project (default 8)
+          --target <n>             Stop after this many eligible bundles per project (default 3)
         """);
 }
