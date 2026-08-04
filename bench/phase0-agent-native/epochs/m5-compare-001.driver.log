@@ -1,0 +1,199 @@
+=== M5 epoch m5-compare-001 ===
+arm A: 4f235cdc498dd7498b41b901d472a6649aaaded3 (raw)      /private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/cf791636-d712-4c3a-981b-86260d88ee6a/scratchpad/arm-a-worktree/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+arm B: 73e2519af40534fae953759406bb53e4e7b259aa (mcp-file) /Users/juanrivera/sources/repos/juanmicrosoft/calor/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+pairs (13): W2-001 W2-002 W2-003 W2-004 W2-005 W3-001 W3-002 W3-003 W3-004 N1-001 N1-002 N1-003 N1-005
+runs/arm: 5   mode: live   model: claude-opus-4-8
+=== W2-001 / arm A (baseline, raw) ===
+{"pair":"W2-001-int-stats","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5450,"censored":false,"invalid":false}
+{"pair":"W2-001-int-stats","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":7605,"censored":false,"invalid":false}
+{"pair":"W2-001-int-stats","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":8290,"censored":false,"invalid":false}
+{"pair":"W2-001-int-stats","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5207,"censored":false,"invalid":false}
+{"pair":"W2-001-int-stats","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3630,"censored":false,"invalid":false}
+=== W2-001 / arm B (isolation, mcp-file) ===
+{"pair":"W2-001-int-stats","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3635,"censored":false,"invalid":false}
+{"pair":"W2-001-int-stats","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4181,"censored":false,"invalid":false}
+{"pair":"W2-001-int-stats","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3709,"censored":false,"invalid":false}
+{"pair":"W2-001-int-stats","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3249,"censored":false,"invalid":false}
+{"pair":"W2-001-int-stats","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3756,"censored":false,"invalid":false}
+=== W2-002 / arm A (baseline, raw) ===
+{"pair":"W2-002-parity-encoder","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6900,"censored":false,"invalid":false}
+{"pair":"W2-002-parity-encoder","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6817,"censored":false,"invalid":false}
+{"pair":"W2-002-parity-encoder","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5189,"censored":false,"invalid":false}
+{"pair":"W2-002-parity-encoder","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5453,"censored":false,"invalid":false}
+{"pair":"W2-002-parity-encoder","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5496,"censored":false,"invalid":false}
+=== W2-002 / arm B (isolation, mcp-file) ===
+{"pair":"W2-002-parity-encoder","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4119,"censored":false,"invalid":false}
+{"pair":"W2-002-parity-encoder","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4289,"censored":false,"invalid":false}
+{"pair":"W2-002-parity-encoder","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3980,"censored":false,"invalid":false}
+{"pair":"W2-002-parity-encoder","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3452,"censored":false,"invalid":false}
+{"pair":"W2-002-parity-encoder","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3462,"censored":false,"invalid":false}
+=== W2-003 / arm A (baseline, raw) ===
+{"pair":"W2-003-window-stats","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5340,"censored":false,"invalid":false}
+{"pair":"W2-003-window-stats","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6976,"censored":false,"invalid":false}
+{"pair":"W2-003-window-stats","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6990,"censored":false,"invalid":false}
+{"pair":"W2-003-window-stats","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":9277,"censored":false,"invalid":false}
+{"pair":"W2-003-window-stats","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4935,"censored":false,"invalid":false}
+=== W2-003 / arm B (isolation, mcp-file) ===
+INVALID run detected (pair=W2-003-window-stats arm=calor run=1 attempt=0): agent output matches error marker: "api error"
+{"pair":"W2-003-window-stats","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4590,"censored":false,"invalid":false}
+{"pair":"W2-003-window-stats","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4274,"censored":false,"invalid":false}
+{"pair":"W2-003-window-stats","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4896,"censored":false,"invalid":false}
+{"pair":"W2-003-window-stats","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4318,"censored":false,"invalid":false}
+{"pair":"W2-003-window-stats","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4848,"censored":false,"invalid":false}
+=== W2-004 / arm A (baseline, raw) ===
+{"pair":"W2-004-interval-clip","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6916,"censored":false,"invalid":false}
+{"pair":"W2-004-interval-clip","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":8707,"censored":false,"invalid":false}
+{"pair":"W2-004-interval-clip","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":7288,"censored":false,"invalid":false}
+{"pair":"W2-004-interval-clip","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3602,"censored":false,"invalid":false}
+{"pair":"W2-004-interval-clip","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6927,"censored":false,"invalid":false}
+=== W2-004 / arm B (isolation, mcp-file) ===
+{"pair":"W2-004-interval-clip","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4301,"censored":false,"invalid":false}
+{"pair":"W2-004-interval-clip","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3867,"censored":false,"invalid":false}
+{"pair":"W2-004-interval-clip","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4273,"censored":false,"invalid":false}
+{"pair":"W2-004-interval-clip","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3455,"censored":false,"invalid":false}
+{"pair":"W2-004-interval-clip","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5007,"censored":false,"invalid":false}
+=== W2-005 / arm A (baseline, raw) ===
+{"pair":"W2-005-scheduler","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":13679,"censored":false,"invalid":false}
+{"pair":"W2-005-scheduler","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":13431,"censored":false,"invalid":false}
+{"pair":"W2-005-scheduler","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":16720,"censored":false,"invalid":false}
+{"pair":"W2-005-scheduler","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":11635,"censored":false,"invalid":false}
+{"pair":"W2-005-scheduler","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":14320,"censored":false,"invalid":false}
+=== W2-005 / arm B (isolation, mcp-file) ===
+{"pair":"W2-005-scheduler","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":11234,"censored":false,"invalid":false}
+{"pair":"W2-005-scheduler","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":12170,"censored":false,"invalid":false}
+{"pair":"W2-005-scheduler","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":12719,"censored":false,"invalid":false}
+{"pair":"W2-005-scheduler","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":16345,"censored":false,"invalid":false}
+{"pair":"W2-005-scheduler","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":12243,"censored":false,"invalid":false}
+=== W3-001 / arm A (baseline, raw) ===
+{"pair":"W3-001-audit-log","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4579,"censored":false,"invalid":false}
+{"pair":"W3-001-audit-log","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4370,"censored":false,"invalid":false}
+{"pair":"W3-001-audit-log","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5134,"censored":false,"invalid":false}
+{"pair":"W3-001-audit-log","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4169,"censored":false,"invalid":false}
+{"pair":"W3-001-audit-log","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4690,"censored":false,"invalid":false}
+=== W3-001 / arm B (isolation, mcp-file) ===
+{"pair":"W3-001-audit-log","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3174,"censored":false,"invalid":false}
+{"pair":"W3-001-audit-log","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":2251,"censored":false,"invalid":false}
+{"pair":"W3-001-audit-log","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":2988,"censored":false,"invalid":false}
+{"pair":"W3-001-audit-log","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":2010,"censored":false,"invalid":false}
+{"pair":"W3-001-audit-log","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":2204,"censored":false,"invalid":false}
+=== W3-002 / arm A (baseline, raw) ===
+{"pair":"W3-002-config-store","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":8387,"censored":false,"invalid":false}
+{"pair":"W3-002-config-store","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":8133,"censored":false,"invalid":false}
+{"pair":"W3-002-config-store","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5296,"censored":false,"invalid":false}
+{"pair":"W3-002-config-store","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":9257,"censored":false,"invalid":false}
+{"pair":"W3-002-config-store","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":11746,"censored":false,"invalid":false}
+=== W3-002 / arm B (isolation, mcp-file) ===
+{"pair":"W3-002-config-store","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4635,"censored":false,"invalid":false}
+{"pair":"W3-002-config-store","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5522,"censored":false,"invalid":false}
+{"pair":"W3-002-config-store","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5140,"censored":false,"invalid":false}
+{"pair":"W3-002-config-store","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6591,"censored":false,"invalid":false}
+{"pair":"W3-002-config-store","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4883,"censored":false,"invalid":false}
+=== W3-003 / arm A (baseline, raw) ===
+{"pair":"W3-003-kv-journal","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":9251,"censored":false,"invalid":false}
+{"pair":"W3-003-kv-journal","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5863,"censored":false,"invalid":false}
+{"pair":"W3-003-kv-journal","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":7150,"censored":false,"invalid":false}
+{"pair":"W3-003-kv-journal","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4954,"censored":false,"invalid":false}
+{"pair":"W3-003-kv-journal","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":3,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":15139,"censored":false,"invalid":false}
+=== W3-003 / arm B (isolation, mcp-file) ===
+{"pair":"W3-003-kv-journal","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5375,"censored":false,"invalid":false}
+{"pair":"W3-003-kv-journal","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6012,"censored":false,"invalid":false}
+{"pair":"W3-003-kv-journal","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6022,"censored":false,"invalid":false}
+{"pair":"W3-003-kv-journal","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5641,"censored":false,"invalid":false}
+{"pair":"W3-003-kv-journal","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5514,"censored":false,"invalid":false}
+=== W3-004 / arm A (baseline, raw) ===
+{"pair":"W3-004-sync-folder","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":13493,"censored":false,"invalid":false}
+{"pair":"W3-004-sync-folder","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":14546,"censored":false,"invalid":false}
+{"pair":"W3-004-sync-folder","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":13837,"censored":false,"invalid":false}
+{"pair":"W3-004-sync-folder","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":17572,"censored":false,"invalid":false}
+{"pair":"W3-004-sync-folder","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":20213,"censored":false,"invalid":false}
+=== W3-004 / arm B (isolation, mcp-file) ===
+{"pair":"W3-004-sync-folder","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":14473,"censored":false,"invalid":false}
+{"pair":"W3-004-sync-folder","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":11863,"censored":false,"invalid":false}
+watchdog: agent exceeded 600s; killing pid 40587 and descendants
+INVALID run detected (pair=W3-004-sync-folder arm=calor run=3 attempt=0): agent.json missing or empty
+{"pair":"W3-004-sync-folder","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":14061,"censored":false,"invalid":false}
+{"pair":"W3-004-sync-folder","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":12530,"censored":false,"invalid":false}
+{"pair":"W3-004-sync-folder","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":16482,"censored":false,"invalid":false}
+=== N1-001 / arm A (baseline, raw) ===
+watchdog: agent exceeded 600s; killing pid 43699 and descendants
+INVALID run detected (pair=N1-001-string-utils arm=calor run=1 attempt=0): agent.json missing or empty
+{"pair":"N1-001-string-utils","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6288,"censored":false,"invalid":false}
+{"pair":"N1-001-string-utils","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6659,"censored":false,"invalid":false}
+{"pair":"N1-001-string-utils","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":8940,"censored":false,"invalid":false}
+watchdog: agent exceeded 600s; killing pid 46983 and descendants
+INVALID run detected (pair=N1-001-string-utils arm=calor run=4 attempt=0): agent.json missing or empty
+{"pair":"N1-001-string-utils","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":9439,"censored":false,"invalid":false}
+{"pair":"N1-001-string-utils","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":8648,"censored":false,"invalid":false}
+=== N1-001 / arm B (isolation, mcp-file) ===
+{"pair":"N1-001-string-utils","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":11157,"censored":false,"invalid":false}
+{"pair":"N1-001-string-utils","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4919,"censored":false,"invalid":false}
+{"pair":"N1-001-string-utils","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5078,"censored":false,"invalid":false}
+{"pair":"N1-001-string-utils","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4512,"censored":false,"invalid":false}
+{"pair":"N1-001-string-utils","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4404,"censored":false,"invalid":false}
+=== N1-002 / arm A (baseline, raw) ===
+{"pair":"N1-002-inventory","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4470,"censored":false,"invalid":false}
+{"pair":"N1-002-inventory","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":7379,"censored":false,"invalid":false}
+{"pair":"N1-002-inventory","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5307,"censored":false,"invalid":false}
+INVALID run detected (pair=N1-002-inventory arm=calor run=4 attempt=0): agent output matches error marker: "api error"
+{"pair":"N1-002-inventory","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4066,"censored":false,"invalid":false}
+{"pair":"N1-002-inventory","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4048,"censored":false,"invalid":false}
+=== N1-002 / arm B (isolation, mcp-file) ===
+{"pair":"N1-002-inventory","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4965,"censored":false,"invalid":false}
+{"pair":"N1-002-inventory","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4437,"censored":false,"invalid":false}
+{"pair":"N1-002-inventory","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4314,"censored":false,"invalid":false}
+{"pair":"N1-002-inventory","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4356,"censored":false,"invalid":false}
+{"pair":"N1-002-inventory","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":3652,"censored":false,"invalid":false}
+=== N1-003 / arm A (baseline, raw) ===
+{"pair":"N1-003-csv-row","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":6133,"censored":false,"invalid":false}
+{"pair":"N1-003-csv-row","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":9493,"censored":false,"invalid":false}
+{"pair":"N1-003-csv-row","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":4787,"censored":false,"invalid":false}
+{"pair":"N1-003-csv-row","arm":"calor","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":7832,"censored":false,"invalid":false}
+{"pair":"N1-003-csv-row","arm":"calor","run":5,"taskSuccess":true,"iterationsToGreen":3,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":21623,"censored":false,"invalid":false}
+=== N1-003 / arm B (isolation, mcp-file) ===
+{"pair":"N1-003-csv-row","arm":"calor+mcp-file","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":8180,"censored":false,"invalid":false}
+{"pair":"N1-003-csv-row","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":8333,"censored":false,"invalid":false}
+{"pair":"N1-003-csv-row","arm":"calor+mcp-file","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":9689,"censored":false,"invalid":false}
+{"pair":"N1-003-csv-row","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":2,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":9152,"censored":false,"invalid":false}
+{"pair":"N1-003-csv-row","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":9357,"censored":false,"invalid":false}
+=== N1-005 / arm A (baseline, raw) ===
+{"pair":"N1-005-order-pipeline","arm":"calor","run":1,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":8740,"censored":false,"invalid":false}
+{"pair":"N1-005-order-pipeline","arm":"calor","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":113,"censored":false,"invalid":false}
+{"pair":"N1-005-order-pipeline","arm":"calor","run":3,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5951,"censored":false,"invalid":false}
+watchdog: agent exceeded 600s; killing pid 73823 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=4 attempt=0): agent.json missing or empty
+watchdog: agent exceeded 600s; killing pid 74388 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=4 attempt=1): agent.json missing or empty
+watchdog: agent exceeded 600s; killing pid 74990 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=4 attempt=2): agent.json missing or empty
+Retry cap reached; counting run 4 as task failure (invalid)
+{"pair":"N1-005-order-pipeline","arm":"calor","run":4,"taskSuccess":false,"iterationsToGreen":11,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":0,"censored":true,"invalid":true}
+watchdog: agent exceeded 600s; killing pid 75590 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=5 attempt=0): agent.json missing or empty
+watchdog: agent exceeded 600s; killing pid 76181 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=5 attempt=1): agent.json missing or empty
+watchdog: agent exceeded 600s; killing pid 76786 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=5 attempt=2): agent.json missing or empty
+Retry cap reached; counting run 5 as task failure (invalid)
+{"pair":"N1-005-order-pipeline","arm":"calor","run":5,"taskSuccess":false,"iterationsToGreen":11,"editMechanism":"raw","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":0,"censored":true,"invalid":true}
+=== N1-005 / arm B (isolation, mcp-file) ===
+watchdog: agent exceeded 600s; killing pid 77672 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=1 attempt=0): agent.json missing or empty
+watchdog: agent exceeded 600s; killing pid 78265 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=1 attempt=1): agent.json missing or empty
+watchdog: agent exceeded 600s; killing pid 78867 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=1 attempt=2): agent.json missing or empty
+Retry cap reached; counting run 1 as task failure (invalid)
+{"pair":"N1-005-order-pipeline","arm":"calor+mcp-file","run":1,"taskSuccess":false,"iterationsToGreen":11,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":0,"censored":true,"invalid":true}
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=2 attempt=0): agent output matches error marker: "api error"
+{"pair":"N1-005-order-pipeline","arm":"calor+mcp-file","run":2,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":7028,"censored":false,"invalid":false}
+watchdog: agent exceeded 600s; killing pid 80881 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=3 attempt=0): agent.json missing or empty
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=3 attempt=1): agent output matches error marker: "api error"
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=3 attempt=2): agent output matches error marker: "api error"
+Retry cap reached; counting run 3 as task failure (invalid)
+{"pair":"N1-005-order-pipeline","arm":"calor+mcp-file","run":3,"taskSuccess":false,"iterationsToGreen":11,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":0,"censored":true,"invalid":true}
+{"pair":"N1-005-order-pipeline","arm":"calor+mcp-file","run":4,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":7288,"censored":false,"invalid":false}
+watchdog: agent exceeded 600s; killing pid 83448 and descendants
+INVALID run detected (pair=N1-005-order-pipeline arm=calor run=5 attempt=0): agent.json missing or empty
+{"pair":"N1-005-order-pipeline","arm":"calor+mcp-file","run":5,"taskSuccess":true,"iterationsToGreen":1,"editMechanism":"mcp-file","calorDll":"bin/Release/net10.0/calor.dll","tokensOut":5745,"censored":false,"invalid":false}
+--- M5 collection complete; adjudicate with: bench/phase0-agent-native/m5-analyze.py /Users/juanrivera/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/m5-compare-001 ---

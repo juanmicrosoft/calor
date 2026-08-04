@@ -190,13 +190,14 @@ public class SupplyEnumerationTests
         namespace S;
         public class C
         {
-            public string Use(string? s)
+            // void return: after the D-S0.5.2 widening a value-returning method here would ALSO yield an
+            // EffectViolation candidate, which would make this fixture exercise two operators at once.
+            public void Use(string? s)
             {
                 if (s != null)
                 {
-                    return s.Trim();
+                    System.Console.WriteLine(s.Trim());
                 }
-                return "";
             }
         }
         """;
@@ -223,7 +224,7 @@ public class SupplyEnumerationTests
     // than something a reviewer has to rediscover with an out-of-tree probe.
     [InlineData("public int F() => _n + 1;", "expression-bodied methods are not visited")]
     [InlineData("public int P { get { return _n; } }", "property getters are not visited")]
-    [InlineData("public string F() { System.Console.WriteLine(\"x\"); return \"s\"; }", "non-int/long return types are out of scope")]
+    [InlineData("public void F() { System.Console.WriteLine(\"x\"); }", "void has no return value to corrupt")]
     public async Task Site_predicate_boundaries_yield_no_candidates(string member, string why)
     {
         var source = $$"""

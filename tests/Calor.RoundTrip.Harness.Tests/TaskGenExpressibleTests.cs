@@ -1,4 +1,5 @@
 using Calor.RoundTrip.Harness.TaskGen;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
@@ -61,8 +62,12 @@ public class TaskGenExpressibleTests
     }
 
     [Fact]
-    public void EffectViolation_SkipsMethodsNotReturningIntOrLong()
+    public void EffectViolation_CoversNonNumericReturns_AfterTheD_S0_5_2_Widening()
     {
+        // Pre-widening this asserted that string/bool/void ALL yielded nothing, because the corruption
+        // was arithmetic. The int/long restriction was never about addressability — the using-nested
+        // Directory.* effect fires Calor0410 regardless of return type — so D-S0.5.2 widened the
+        // CORRUPTION and the site universe followed. string and bool are now in scope.
         const string src = """
             namespace S;
             public class C
@@ -70,6 +75,101 @@ public class TaskGenExpressibleTests
                 public string Name() { return "x"; }
                 public bool Ok() { return true; }
                 public void Go() { }
+            }
+            """;
+        var cands = ExpressibleMutationOperators.Enumerate(src, "C.cs")
+            .Where(c => c.Operator == MutationOperatorKind.EffectViolation).ToList();
+
+        Assert.Equal(2, cands.Count);                                  // Name + Ok; Go has nothing to corrupt
+        Assert.All(cands, c => Assert.Equal("Calor0410", c.ExpectedCheck));
+        Assert.Contains(cands, c => c.MutatedSource.Contains("default(string)!"));
+        Assert.Contains(cands, c => c.MutatedSource.Contains("^ (__calorTaint == 1)"));
+    }
+
+    [Fact]
+    public void EffectViolation_MutatedSource_is_always_parseable()
+    {
+        // Regression: the injected block carried no trailing newline, so a following #pragma/#if
+        // directive landed mid-line and the mutated file no longer parsed (CS1040). Four real corpus
+        // candidates were affected. A pre-pass that counts unparseable candidates reports supply that
+        // can never become tasks — and that number feeds a venue-retirement decision.
+        const string src = """
+            namespace S;
+            public class C
+            {
+                public string F(int k)
+                {
+            #pragma warning disable 618
+                    var v = k.ToString();
+            #pragma warning restore 618
+                    return v;
+                }
+            }
+            """;
+
+        var cands = ExpressibleMutationOperators.Enumerate(src, "C.cs");
+        Assert.NotEmpty(cands);
+        foreach (var c in cands)
+            Assert.DoesNotContain(CSharpSyntaxTree.ParseText(c.MutatedSource).GetDiagnostics(),
+                d => d.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void EffectViolation_SkipsReturnsThatDefaultCannotDifferFrom()
+    {
+        // `return null;` corrupted to `taint == 1 ? default(T)! : null` injects NO defect, because
+        // default(T) IS null. Counting it would overstate supply by a candidate that can never fail a
+        // held-out test.
+        const string src = """
+            namespace S;
+            public class C
+            {
+                public string? Nothing() { return null; }
+                public int Zero() { return 0; }
+            }
+            """;
+        var cands = ExpressibleMutationOperators.Enumerate(src, "C.cs")
+            .Where(c => c.Operator == MutationOperatorKind.EffectViolation).ToList();
+
+        Assert.DoesNotContain(cands, c => c.OperatorDescription.Contains("Nothing"));
+    }
+
+    [Fact]
+    public void EffectViolation_SkipsTypesThatShadowTheSystemNamespace()
+    {
+        // Serilog's TimeProvider declares `public static TimeProvider System { get; }`, which shadows
+        // the namespace for simple-name lookup and made the injected `System.IO.Directory` fail to
+        // resolve (CS1061). The fix is to SKIP such sites, not to qualify as `global::` — qualifying
+        // compiles but the converter's §E-inference stops recognising the call, so Calor0410 no longer
+        // fires and EVERY candidate loses addressability. Trading the whole mechanism for one site is
+        // the wrong trade; this test pins the choice.
+        const string src = """
+            namespace S;
+            public class TimeProvider
+            {
+                public static TimeProvider System { get; } = new();
+                public string Now() { return "t"; }
+            }
+            """;
+        var cands = ExpressibleMutationOperators.Enumerate(src, "C.cs");
+        Assert.DoesNotContain(cands, c => c.Operator == MutationOperatorKind.EffectViolation);
+    }
+
+    [Fact]
+    public void EffectViolation_StillExcludesReturnsItCannotCorruptSoundly()
+    {
+        // The exclusions that remain after the widening, each because the corruption would not compile
+        // or would not be a single deterministic point. async is the subtle one: the declared type is
+        // Task<T> but `return` yields T, so default(Task<T>) is a type error in that position.
+        const string src = """
+            using System.Threading.Tasks;
+            namespace S;
+            public class C
+            {
+                public void Go() { }
+                public async Task<int> LaterAsync() { await Task.Yield(); return 1; }
+                private int _f;
+                public ref int Ref() { return ref _f; }
             }
             """;
         var cands = ExpressibleMutationOperators.Enumerate(src, "C.cs");

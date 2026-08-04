@@ -30,7 +30,7 @@ public static class ExpressibleMutationOperators
 
     // The DETERMINISTIC, guaranteed-nonzero effectful corruptor. `Directory.Exists(GetCurrentDirectory())`
     // is always true (a process's current directory always exists) on every platform, so the taint value
-    // is a fixed 1 — the return is corrupted by exactly +1, IDENTICALLY across runs and across both arms
+    // is a fixed 1 — the return is corrupted deterministically, IDENTICALLY across runs and across both arms
     // (no Random() nondeterminism → no test-isolation flakiness → clause (b) sees an identical failure).
     // Both Directory.* calls are filesystem effects charged by enforcement; nested in a `using` body — the
     // converter's §E-inference walker's blind spot — they are left out of the converted §E, so the effect
@@ -78,37 +78,55 @@ public static class ExpressibleMutationOperators
 
     /// <summary>
     /// Inject an undeclared filesystem effect that DETERMINISTICALLY corrupts the return of any method
-    /// (instance OR static) returning an int/long. Into the first return the method owns, it injects a
-    /// <c>using</c>-nested effectful read whose fixed value (1) is added to the returned expression:
+    /// (instance OR static) whose return type the corruption can be expressed for
+    /// (<see cref="IsCorruptibleReturn"/>). Into the first return the method owns, it injects a
+    /// <c>using</c>-nested effectful read whose fixed value (1) drives the corruption:
     /// <code>
     ///   int __calorTaint = 0;
     ///   using (var __calorSink = new System.IO.StringWriter())
     ///   { __calorTaint = (System.IO.Directory.Exists(System.IO.Directory.GetCurrentDirectory()) ? 1 : 0); }
-    ///   return (ORIGINAL) + __calorTaint;
+    ///   return (ORIGINAL) + __calorTaint;              // int/long
+    ///   return (ORIGINAL) ^ (__calorTaint == 1);       // bool
+    ///   return __calorTaint == 1 ? default(T)! : (ORIGINAL);   // everything else
     /// </code>
     /// Two things happen at once:
-    ///   • <b>Real, DETERMINISTIC defect:</b> the taint is a fixed +1 (the current directory always
-    ///     exists), so the method returns <c>ORIGINAL + 1</c> — a value-asserting held-out test fails
+    ///   • <b>Real, DETERMINISTIC defect:</b> the taint is a fixed 1 (the current directory always
+    ///     exists), so the method returns a corrupted value — a value-asserting held-out test fails
     ///     IDENTICALLY on both arms and across every run (no <c>Random()</c> nondeterminism).
     ///   • <b>Verification-addressable:</b> the <c>Directory.*</c> filesystem effect sits inside a
     ///     <c>using</c> body — the converter's §E-inference walker's blind spot (it has no lock/using
     ///     case) — so the converted §E stays pure while the enforcement pass charges the <c>fs</c>
     ///     effect. computed ⊄ declared → <c>Calor0410</c>, a build signal the C# arm never sees.
     ///
-    /// Site requirement widened (per the dry-run supply finding) from "a writable field" to "ANY method
-    /// returning a computed int/long", so the operator has native supply on real code without needing a
-    /// mutable numeric field. The corruption is INTRINSIC to the effect (the taint local is written only
-    /// by the effectful call), so the papering-over residual is genuine: REMOVING the injected block
-    /// removes both the effect and the +1 (correct → held-out passes → caught); DECLARING <c>fs</c> in §E
-    /// silences Calor0410 but the +1 still ships (papers over → held-out fails → escaped). Both remain
-    /// possible; which path the agent takes IS the measurement.
+    /// <para><b>Site requirement, widened twice.</b> First (dry-run supply finding) from "a writable
+    /// field" to "any method returning a computed int/long". Then (D-S0.5.2) beyond int/long entirely,
+    /// by generalizing the CORRUPTION — see <see cref="IsCorruptibleReturn"/>. The int/long restriction
+    /// was never about addressability; it existed only because the corruption was arithmetic. Measured
+    /// effect of the second widening on the pinned corpus: native supply 9 → 204.</para>
+    ///
+    /// <para><b>The corruption is INTRINSIC to the effect</b> — the taint local is written only by the
+    /// effectful call — so the papering-over residual is genuine: REMOVING the injected block removes
+    /// both the effect and the corruption (correct → held-out passes → caught); DECLARING <c>fs</c> in
+    /// §E silences Calor0410 but the corruption still ships (papers over → held-out fails → escaped).
+    /// Both remain possible; which path the agent takes IS the measurement.</para>
+    ///
+    /// <para><b>The three corruption forms are NOT equivalent, and the difference matters downstream.</b>
+    /// <c>AddOne</c> and <c>FlipBool</c> both still evaluate the original expression and perturb its
+    /// value. <c>DefaultWhenTainted</c> does not: the taint is always 1 by construction, so the
+    /// <c>ORIGINAL</c> branch of the conditional is dead in every execution and the method returns
+    /// <c>default(T)</c> without computing anything. On the pinned corpus a majority of that form's
+    /// sites elide a call. That is a real defect and a deterministic one, but it is a different defect
+    /// CLASS from an off-by-one — it propagates as a null/zero at a distance rather than a wrong value
+    /// at the mutation site, which is a plausible source of <c>ArmsDiverge</c> and of converter-attributed
+    /// failures. Any comparison of supply across the widening is a comparison of operator reach, not of
+    /// one experiment's subject count.</para>
     /// </summary>
     private static void EnumerateEffectViolations(string rel, SyntaxNode root, List<MutationCandidate> acc)
     {
         foreach (var method in root.DescendantNodes().OfType<MethodDeclarationSyntax>())
         {
             if (method.Body is not { } body) continue;                       // need a block to inject into
-            if (!IsIntOrLong(method.ReturnType)) continue;                    // return must accept `+ int`
+            if (!IsCorruptibleReturn(method, out var corruptionKind)) continue;
 
             // The first `return <expr>;` the method itself owns (not one inside a nested lambda / local
             // function, whose return type differs). Corrupting a method-owned return corrupts the result.
@@ -116,9 +134,24 @@ public static class ExpressibleMutationOperators
                 .FirstOrDefault(r => r.Expression != null && OwningFunction(r) == method);
             if (ownedReturn?.Expression is not { } origExpr) continue;
 
-            // return (ORIGINAL) + __calorTaint;
+            // `return null;` corrupted to `taint == 1 ? default(T)! : null` injects NO defect —
+            // default(T) IS null. Counting it as supply overstates the number by candidates that can
+            // never fail a held-out test. (Downstream NoObservableDefect would drop it, but a
+            // pre-pass that only enumerates never gets there.)
+            if (corruptionKind == CorruptionKind.DefaultWhenTainted && IsDefaultValued(origExpr)) continue;
+
             var corruptedReturn = ownedReturn.WithExpression(
-                SyntaxFactory.ParseExpression($"({origExpr.ToString()}) + {TaintLocal}"));
+                SyntaxFactory.ParseExpression(CorruptionExpression(corruptionKind, origExpr, method.ReturnType)));
+
+            // The injected effect MUST be spelled `System.IO.Directory.…`. Qualifying it as
+            // `global::System.IO.…` compiles more widely but the converter's §E-inference no longer
+            // recognises the call, so Calor0410 stops firing and the candidate stops being
+            // addressable — i.e. it fixes a compile error by silently destroying the mechanism under
+            // measurement. Verified: EffectViolation_IsAddressable_Calor0410_IntroducedByTheMutation
+            // fails under `global::`. So instead of qualifying, SKIP the sites where the spelling
+            // cannot bind: a type that declares its own member named `System` shadows the namespace
+            // (Serilog's TimeProvider has `public static TimeProvider System { get; }` → CS1061).
+            if (ShadowsSystemNamespace(method)) continue;
 
             var taintStmts = SyntaxFactory.ParseStatement(
                     $"{{ int {TaintLocal} = 0; using (var {TaintSink} = new System.IO.StringWriter()) "
@@ -126,9 +159,23 @@ public static class ExpressibleMutationOperators
                 is BlockSyntax b ? b.Statements : default;
             if (taintStmts.Count == 0) continue;
 
+            // An elastic newline after the injection: without it the FOLLOWING statement's leading
+            // trivia — a `#pragma`/`#if` directive — lands mid-line and the file no longer parses (CS1040).
+            taintStmts = SyntaxFactory.List(taintStmts.Select((st, i) =>
+                i == taintStmts.Count - 1
+                    ? st.WithTrailingTrivia(st.GetTrailingTrivia().Add(SyntaxFactory.ElasticCarriageReturnLineFeed))
+                    : st));
+
             var bodyWithReturn = body.ReplaceNode(ownedReturn, corruptedReturn);
             var newBody = bodyWithReturn.WithStatements(bodyWithReturn.Statements.InsertRange(0, taintStmts));
             var mutatedRoot = root.ReplaceNode(body, newBody);
+
+            // Fail closed: a candidate whose mutated source does not PARSE is not a candidate. Without
+            // this the pre-pass counts sites that can never become tasks, and the supply number — which
+            // feeds a venue-retirement decision — is true only by luck.
+            if (CSharpSyntaxTree.ParseText(mutatedRoot.ToFullString()).GetDiagnostics()
+                    .Any(d => d.Severity == DiagnosticSeverity.Error))
+                continue;
 
             var pos = method.Identifier.GetLocation().GetLineSpan().StartLinePosition;
             acc.Add(new MutationCandidate
@@ -138,18 +185,131 @@ public static class ExpressibleMutationOperators
                 Operator = MutationOperatorKind.EffectViolation,
                 Stratum = DefectStratum.Expressible,
                 ExpectedCheck = CalorForbiddenEffect,
-                OperatorDescription = $"inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts {method.Identifier.Text}'s return by +1",
+                OperatorDescription = $"inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts "
+                                      + $"{method.Identifier.Text}'s return ({DescribeCorruption(corruptionKind)})",
                 Line = pos.Line + 1,
                 Column = pos.Character + 1,
                 OriginalSnippet = Truncate($"return {origExpr};"),
-                MutatedSnippet = Truncate($"using (…) {{ {TaintLocal} = Directory.Exists(cwd)?1:0; }} return ({origExpr}) + {TaintLocal};"),
+                MutatedSnippet = Truncate($"using (…) {{ {TaintLocal} = Directory.Exists(cwd)?1:0; }} "
+                                          + $"return {CorruptionExpression(corruptionKind, origExpr, method.ReturnType)};"),
                 MutatedSource = mutatedRoot.ToFullString(),
             });
         }
     }
 
-    private static bool IsIntOrLong(TypeSyntax type) =>
-        type is PredefinedTypeSyntax p && p.Keyword.Kind() is SyntaxKind.IntKeyword or SyntaxKind.LongKeyword;
+    /// <summary>How a method's return value is corrupted. See <see cref="IsCorruptibleReturn"/>.</summary>
+    private enum CorruptionKind
+    {
+        /// <summary><c>(ORIGINAL) + __calorTaint</c> — the original int/long form, preserved verbatim.</summary>
+        AddOne,
+
+        /// <summary><c>(ORIGINAL) ^ (__calorTaint == 1)</c> — flips a bool.</summary>
+        FlipBool,
+
+        /// <summary><c>__calorTaint == 1 ? default(T)! : (ORIGINAL)</c> — the general form.</summary>
+        DefaultWhenTainted,
+    }
+
+    /// <summary>
+    /// D-S0.5.2 operator widening. The site predicate previously required a <b>predefined int/long</b>
+    /// return, which capped `EffectViolation` at roughly 1% of block-bodied methods. That restriction
+    /// was never about addressability — the `using`-nested <c>Directory.*</c> effect that makes
+    /// <c>Calor0410</c> fire is independent of the return type — it existed only because the corruption
+    /// was arithmetic (<c>+ __calorTaint</c>) and arithmetic needs a number.
+    ///
+    /// <para>Widening the <i>corruption</i> therefore widens the site universe without touching the
+    /// mechanism under measurement. This is deliberately NOT a relaxation of what counts as a defect:
+    /// the injected effect is the same undeclared <c>fs</c> effect, the corruption is still
+    /// deterministic, still single-point, and still intrinsic to the effect (the taint local is written
+    /// only by the effectful call), so the papering-over residual that makes the measurement meaningful
+    /// is unchanged. Per the plan's M-S4 population, an operator change that raised supply by making the
+    /// injected defect less real would count against the honesty invariant; this one does not.</para>
+    ///
+    /// <para><b>Exclusions, each because the corruption would not compile or would not be a single
+    /// deterministic point:</b> <c>void</c> (nothing to corrupt); <c>ref</c> returns (<c>default</c> is
+    /// not a ref); pointer types (unsafe); and <b>async</b> methods, where the declared return type is
+    /// <c>Task&lt;T&gt;</c> but <c>return</c> yields <c>T</c>, so <c>default(Task&lt;T&gt;)</c> is a type
+    /// error. Iterators never match because <c>yield return</c> is not a <c>ReturnStatementSyntax</c>.</para>
+    /// </summary>
+    private static bool IsCorruptibleReturn(MethodDeclarationSyntax method, out CorruptionKind kind)
+    {
+        kind = CorruptionKind.DefaultWhenTainted;
+
+        // async: declared Task<T>, returned T — default(Task<T>) would not compile in that position.
+        if (method.Modifiers.Any(m => m.IsKind(SyntaxKind.AsyncKeyword))) return false;
+
+        var type = method.ReturnType;
+        if (type is RefTypeSyntax or PointerTypeSyntax) return false;
+
+        if (type is PredefinedTypeSyntax p)
+        {
+            switch (p.Keyword.Kind())
+            {
+                case SyntaxKind.VoidKeyword:
+                    return false;
+                case SyntaxKind.IntKeyword:
+                case SyntaxKind.LongKeyword:
+                    kind = CorruptionKind.AddOne;       // unchanged from the pre-widening operator
+                    return true;
+                case SyntaxKind.BoolKeyword:
+                    kind = CorruptionKind.FlipBool;     // a flipped bool is the most observable corruption there is
+                    return true;
+                default:
+                    kind = CorruptionKind.DefaultWhenTainted;
+                    return true;                        // string, char, other numerics, object, …
+            }
+        }
+
+        // Named types, generics, arrays, nullable, type parameters: `default(T)` is well-formed for all
+        // of them. `dynamic` parses as IdentifierNameSyntax and default(dynamic) is legal.
+        return type is IdentifierNameSyntax or QualifiedNameSyntax or GenericNameSyntax
+                    or ArrayTypeSyntax or NullableTypeSyntax or AliasQualifiedNameSyntax
+                    or TupleTypeSyntax;
+    }
+
+    private static string CorruptionExpression(CorruptionKind kind, ExpressionSyntax orig, TypeSyntax returnType) => kind switch
+    {
+        CorruptionKind.AddOne => $"({orig}) + {TaintLocal}",
+        CorruptionKind.FlipBool => $"({orig}) ^ ({TaintLocal} == 1)",
+        _ => $"({TaintLocal} == 1 ? default({returnType})! : ({orig}))",
+    };
+
+    /// <summary>
+    /// True when the method's enclosing type declares a member named <c>System</c>, which shadows the
+    /// namespace for simple-name lookup and makes the injected <c>System.IO.Directory</c> unresolvable.
+    /// Rare (one site in the pinned corpus) and skipped fail-closed, because the alternative —
+    /// <c>global::</c> qualification — costs addressability for every candidate.
+    /// </summary>
+    private static bool ShadowsSystemNamespace(MethodDeclarationSyntax method)
+    {
+        var type = method.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault();
+        if (type == null) return false;
+        return type.Members.Any(m => m switch
+        {
+            PropertyDeclarationSyntax p => p.Identifier.Text == "System",
+            FieldDeclarationSyntax f => f.Declaration.Variables.Any(v => v.Identifier.Text == "System"),
+            MethodDeclarationSyntax me => me.Identifier.Text == "System",
+            _ => false,
+        });
+    }
+
+    /// <summary>`null`, `default`, `default(T)`, or a zero literal — values `default(T)` cannot differ from.</summary>
+    private static bool IsDefaultValued(ExpressionSyntax expr) => expr switch
+    {
+        LiteralExpressionSyntax l =>
+            l.IsKind(SyntaxKind.NullLiteralExpression)
+            || l.IsKind(SyntaxKind.DefaultLiteralExpression)
+            || (l.IsKind(SyntaxKind.NumericLiteralExpression) && l.Token.ValueText is "0" or "0.0" or "0f" or "0d" or "0m"),
+        DefaultExpressionSyntax => true,
+        _ => false,
+    };
+
+    private static string DescribeCorruption(CorruptionKind kind) => kind switch
+    {
+        CorruptionKind.AddOne => "+1",
+        CorruptionKind.FlipBool => "boolean flip",
+        _ => "returns default instead of the computed value",
+    };
 
     /// <summary>The function (method / local function / lambda) a statement belongs to — for return ownership.</summary>
     private static SyntaxNode? OwningFunction(SyntaxNode node) =>
