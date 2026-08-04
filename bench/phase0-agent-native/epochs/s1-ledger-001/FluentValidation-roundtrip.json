@@ -1,0 +1,1249 @@
+{
+  "project": "FluentValidation",
+  "calor_version": "0.10.0",
+  "timestamp": "2026-08-04T23:50:54.0363030\u002B00:00",
+  "duration_seconds": 18.329268,
+  "verdict": "pass",
+  "inconclusive": false,
+  "baseline": {
+    "total": 866,
+    "passed": 865,
+    "failed": 0,
+    "skipped": 1
+  },
+  "round_trip": {
+    "total": 866,
+    "passed": 865,
+    "failed": 0,
+    "skipped": 1
+  },
+  "regressions": 0,
+  "files": {
+    "total": 139,
+    "replaced": 75,
+    "reverted": 38,
+    "conversion_failed": 0,
+    "emit_error": 6,
+    "compile_error": 20,
+    "crashed": 0,
+    "excluded_by_pattern": 2
+  },
+  "avg_conversion_rate": 0.9928057553956835,
+  "build_succeeded": true,
+  "fidelity": {
+    "coverage": {
+      "total_convertible_files": 139,
+      "converted_native": 74,
+      "converted_with_losses": 1,
+      "reverted": 38,
+      "failed_conversion": 26,
+      "excluded_files": 2,
+      "coverage_fraction": 0.539568345323741,
+      "native_fraction": 0.5323741007194245,
+      "loss_kind_counts": {
+        "PreprocessorStripped": 9,
+        "InteropPreserved": 6
+      },
+      "total_interop_blocks": 6,
+      "distinct_gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    "build": {
+      "succeeded": true,
+      "exit_code": 0,
+      "recovery_reverted_files": 38,
+      "error_count": 0
+    },
+    "tests": {
+      "baseline_total": 866,
+      "baseline_passed": 865,
+      "baseline_failed": 0,
+      "baseline_trx_files": 1,
+      "baseline_console_fallback": false,
+      "round_trip_total": 866,
+      "round_trip_passed": 865,
+      "round_trip_failed": 0,
+      "round_trip_trx_files": 1,
+      "round_trip_console_fallback": false,
+      "inventory_delta": 0,
+      "regressions": 0,
+      "new_passes": 0,
+      "comparison_status": "Pass"
+    }
+  },
+  "file_detail": [
+    {
+      "path": "src/FluentValidation/AbstractValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/AssemblyInfo.FluentValidation.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/AssemblyScanner.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/AsyncValidatorInvokedSynchronouslyException.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/DefaultValidatorExtensions.cs",
+      "status": "CompileError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/FluentValidation/DefaultValidatorExtensions_Validate.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/DefaultValidatorOptions.cs",
+      "status": "Reverted",
+      "loss_count": 3,
+      "loss_kinds": {
+        "InteropPreserved": 3
+      },
+      "interop_blocks": 3,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Enums.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/ICollectionRule.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/IValidationContext.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/IValidationRule.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/IValidationRuleInternal.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/IValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/IValidatorDescriptor.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/IValidatorFactory.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/InlineValidator.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Internal/AccessorCache.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/ChildRulesContainer.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Internal/CollectionPropertyRule.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 3,
+      "loss_kinds": {
+        "PreprocessorStripped": 3
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/FluentValidation/Internal/CompositeValidatorSelector.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/ConditionBuilder.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "InteropPreserved": 2
+      },
+      "interop_blocks": 2,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/DefaultValidatorSelector.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/Extensions.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/ExtensionsInternal.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Internal/IRuleComponent.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/IValidatorSelector.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Internal/IncludeRule.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Internal/MemberNameValidatorSelector.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/MessageBuilderContext.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/MessageFormatter.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/PropertyChain.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Internal/PropertyRule.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/RuleBase.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Internal/RuleBuilder.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/RuleComponent.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/RuleComponentForNullableStruct.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/RulesetValidatorSelector.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/TrackingCollection.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Internal/ValidationStrategy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Resources/ILanguageManager.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/LanguageManager.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/AlbanianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/ArabicLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/AzerbaijaneseLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/BengaliLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/BosnianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/BulgarianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/CatalanLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/ChineseSimplifiedLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/ChineseTraditionalLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/CroatianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/CzechLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/DanishLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/DutchLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/EnglishLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/EstonianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/FinnishLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/FrenchLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/GeorgianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/GermanLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/GreekLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/HebrewLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/HindiLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/HungarianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/IcelandicLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/IndonesianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/ItalianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/JapaneseLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/KazakhLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/KhmerLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/KoreanLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/LatvianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/MacedonianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/NorwegianBokmalLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/NorwegianNynorskLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/PersianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/PolishLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/PortugueseBrazilLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/PortugueseLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/RomanianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/RomanshLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/RussianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/SerbianCyrillicLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/SerbianLatinLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/SlovakLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/SlovenianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/SpanishLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/SwedishLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/TajikLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/TamilLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/TeluguLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/ThaiLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/TurkishLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/UkrainianLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/UzbekCyrillicLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/UzbekLatinLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/VietnameseLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Resources/Languages/WelshLanguage.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Results/ValidationFailure.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Results/ValidationResult.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Syntax.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/TestHelper/ITestValidationContinuation.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/TestHelper/TestValidationResult.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/TestHelper/ValidationTestException.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/TestHelper/ValidatorTestExtensions.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/ValidationException.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/FluentValidation/ValidatorDescriptor.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/ValidatorFactoryBase.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/ValidatorOptions.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/AbstractComparisonValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Validators/AsyncPredicateValidator.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/AsyncPropertyValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Validators/ChildValidatorAdaptor.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Validators/ComparableComparer.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/CreditCardValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/EmailValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/EmptyValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Validators/EnumValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Validators/EqualValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/ExclusiveBetweenValidator.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/GreaterThanOrEqualValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/GreaterThanValidator.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/IPropertyValidator.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/InclusiveBetweenValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/LengthValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/LessThanOrEqualValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/LessThanValidator.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/NoopPropertyValidator.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/NotEmptyValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/NotEqualValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Validators/NotNullValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/NullValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/PolymorphicValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/PrecisionScaleValidator.cs",
+      "status": "Replaced",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/PredicateValidator.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/FluentValidation/Validators/PropertyValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Validators/RangeValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Validators/RegularExpressionValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/FluentValidation/Validators/StringEnumValidator.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    }
+  ]
+}
