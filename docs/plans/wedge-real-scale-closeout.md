@@ -56,7 +56,7 @@ the nested effect). That broadening is what moved native supply off zero:
 
 | Quantity | Value |
 |---|---|
-| Native candidates found on the pinned corpus | **3** (before broadening: 0) |
+| Native candidates found on the pinned corpus **at the generator's default caps** (see disclosure below) | **3** (before broadening: 0) |
 | Differentially **verification-addressable** (predicted check fires on the mutated conversion, absent on the clean one) | **3 / 3 = 100%** |
 | **Eligible** under the D-W4.1 predicate | **0 / 3** |
 
@@ -74,8 +74,20 @@ task is not *adjudicable*:
   manufactured an eligible task by lowering the bar mid-investigation; the 0 stands
   as measured.
 
+**Configuration disclosure (added after review).** These counts are not corpus
+totals — they are the yield **at the generator's default configuration**:
+`MaxCandidatesPerProject = 8` and `TargetEligiblePerProject = 3`
+(`TaskGen/TaskGenOptions.cs`). So "3 native candidates" means 3 among *at most 8
+evaluated per project*, not 3 in the corpus. The early-stop knob did not truncate
+this particular run (it stops at 3 *eligible*, and 0 were found), but the
+candidate cap is a real bound on the numerator. Any successor measurement that
+compares against this zero must pin the same configuration, or it is comparing
+different quantities — v0.12's plan registers exactly that pin.
+
 Provenance: the operator, the differential addressability probe, the exclusion
-accounting and 132 tests are committed in **PR #856** (`w4-expressible-stratum`) —
+accounting and **14 test methods** (which take the harness test project 118 →
+132 — the "132 tests" figure that circulated earlier is the whole pre-existing
+project, not this work) are committed in **PR #856** (`w4-expressible-stratum`) —
 that is the reproducible half, and it is what the "100% addressable" claim rests on.
 The per-candidate dispositions above are from the investigation run's log and are
 not themselves a committed artifact; they are recorded here as the finding, at the
