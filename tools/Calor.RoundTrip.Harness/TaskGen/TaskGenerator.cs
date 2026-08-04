@@ -116,10 +116,15 @@ public sealed class TaskGenerator
         }
 
         var totalEnumerated = enumerated.Count; // honest denominator (minor: before Take/early-stop truncation)
-        var candidates = enumerated
+        // MaxCandidatesPerProject <= 0 means UNBOUNDED, which is what gates A-1.5 pins for the
+        // adjudication run. Before this, 0 meant `.Take(0)` — evaluate nothing — so the frozen
+        // configuration would have evaluated zero candidates while registering a bar of 70.
+        var ordered = enumerated
             .OrderBy(c => c.FileRelPath, StringComparer.Ordinal)
-            .ThenBy(c => c.Line).ThenBy(c => c.Column)
-            .Take(options.MaxCandidatesPerProject)
+            .ThenBy(c => c.Line).ThenBy(c => c.Column);
+        var candidates = (options.MaxCandidatesPerProject > 0
+                ? ordered.Take(options.MaxCandidatesPerProject)
+                : ordered)
             .ToList();
         Console.WriteLine($"[{project.ProjectName}] Step 2/4: {totalEnumerated} candidate(s) enumerated; evaluating up to {candidates.Count}");
 

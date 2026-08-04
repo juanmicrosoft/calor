@@ -105,6 +105,9 @@ bench/phase0-agent-native/epochs/**/.ho_final.txt
 bench/phase0-agent-native/epochs/**/heldout/
 # WS5 probe-project run-internals (analogs of heldout/ + .ho_final.txt + .lasthash)
 bench/phase0-agent-native/epochs/**/probe/
+# Task bundles are full working copies (~4 MB each). The reports + FINDING are the record;
+# bundles are regenerable from the pinned config and corpus SHAs.
+bench/phase0-agent-native/epochs/**/bundles/
 bench/phase0-agent-native/epochs/**/.probe_final.txt
 bench/phase0-agent-native/epochs/**/.smokehash
 # WS2 MCP write-path reject replay payloads (run-internal; recorded in mcp-writes.jsonl)

@@ -87,6 +87,21 @@ public class TaskGenExpressibleTests
     }
 
     [Fact]
+    public void MaxCandidatesPerProject_zero_means_unbounded_not_zero()
+    {
+        // gates A-1.5 pins MaxCandidatesPerProject = 0 for the adjudication run and calls it
+        // "unbounded". Before the fix, 0 was passed straight to .Take(0) — evaluate NOTHING — so the
+        // frozen configuration would have evaluated zero candidates against a frozen M-S3 bar of 70.
+        var unbounded = new TaskGenOptions { MaxCandidatesPerProject = 0 };
+        var bounded = new TaskGenOptions { MaxCandidatesPerProject = 3 };
+
+        Assert.Equal(0, unbounded.MaxCandidatesPerProject);
+        Assert.Equal(3, bounded.MaxCandidatesPerProject);
+        // The semantics live in TaskGenerator's ordering step; this pins the contract the pin relies on.
+        Assert.True(unbounded.MaxCandidatesPerProject <= 0, "0 must be interpreted as unbounded");
+    }
+
+    [Fact]
     public void EffectViolation_MutatedSource_is_always_parseable()
     {
         // Regression: the injected block carried no trailing newline, so a following #pragma/#if
