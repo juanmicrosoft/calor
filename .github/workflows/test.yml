@@ -55,22 +55,25 @@ jobs:
       - name: Build
         run: dotnet build -c Release --no-restore
 
-      # Fail loudly if the seeding above ever stops reaching the test hosts. Without this,
-      # a regression is invisible: the tests skip rather than fail.
-      - name: Assert Z3 natives reached the test output
+      - name: Run all tests
         run: |
           set -euo pipefail
-          missing=0
-          for proj in Calor.Verification.Tests Calor.Compiler.Tests; do
-            if ! find "tests/$proj/bin/Release" -name 'libz3.so' -print -quit | grep -q .; then
-              echo "::error::libz3.so is absent from tests/$proj output — Z3-backed tests would silently skip."
-              missing=1
-            fi
-          done
-          exit $missing
+          dotnet test -c Release --no-build --verbosity normal 2>&1 | tee test-output.log
 
-      - name: Run all tests
-        run: dotnet test -c Release --no-build --verbosity normal
+      # Assert the PROPERTY that matters (no Z3-gated test skipped), not the presence of a
+      # filename. An earlier version of this step checked only that some libz3.so existed
+      # anywhere under bin/Release, which would pass on a wrong-RID copy that cannot load,
+      # and could not detect a present-but-unloadable native (e.g. a glibc bump on the
+      # runner). This check fails in all of those cases. Without it the regression is
+      # invisible by construction: the tests skip rather than fail.
+      - name: Assert no Z3-gated test silently skipped
+        run: |
+          set -euo pipefail
+          if grep -q "Z3 not available" test-output.log; then
+            echo "::error::Z3-gated tests skipped — natives did not reach the test hosts."
+            grep -c "Z3 not available" test-output.log
+            exit 1
+          fi
 
       # Spec drift (Phase 1 item 6, agent-native strategy): agent-facing docs
       # are machine-checked against the implementation, reusing this job's
@@ -114,8 +117,20 @@ jobs:
 
       - name: Run regression tests
         run: |
-          dotnet test tests/Calor.Compiler.Tests -c Release --no-build --verbosity normal
+          set -euo pipefail
+          dotnet test tests/Calor.Compiler.Tests -c Release --no-build --verbosity normal 2>&1 | tee test-output.log
           dotnet test tests/Calor.Evaluation -c Release --no-build --verbosity normal
+
+      # This job runs Calor.Compiler.Tests, which carries 44 Z3-gated tests. Same guard as
+      # the `test` job — a skip here would otherwise be silent.
+      - name: Assert no Z3-gated test silently skipped
+        run: |
+          set -euo pipefail
+          if grep -q "Z3 not available" test-output.log; then
+            echo "::error::Z3-gated tests skipped — natives did not reach the test hosts."
+            grep -c "Z3 not available" test-output.log
+            exit 1
+          fi
 
   semantics-tests:
     runs-on: ubuntu-latest
@@ -292,9 +307,12 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      # See the note in the `test` job. The round-trip harness's addressability probe is
-      # Z3-backed for the div-by-zero / index-OOB checks; without the natives it reports
-      # "indeterminable" rather than a verdict.
+      # PRECAUTIONARY, not currently load-bearing — stated honestly because an earlier
+      # version of this comment was wrong. This job runs `harness run --all`, which routes
+      # to RoundTripPipeline and touches no Z3; the Z3-backed addressability probe
+      # (VerificationAddressability) is reachable only from the `gen-tasks` command, and its
+      # tests run in the `test` job. Verified: with and without this step the job's output is
+      # byte-identical. Kept so that adding `gen-tasks` here cannot silently degrade.
       - name: Seed Z3 native libraries (before MSBuild evaluation)
         run: bash src/Calor.Compiler/scripts/download-z3.sh
 

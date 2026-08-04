@@ -29,6 +29,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # This is the RELEASE GATE. Without seeding, src/Calor.Compiler/{z3,runtimes}/ are
+      # empty at MSBuild evaluation time (they are gitignored), the csproj's
+      # `<None Include="runtimes\**\*">` glob matches nothing, the natives never reach the
+      # test hosts, and all 358 Z3-backed tests SKIP — so the gate that authorizes shipping
+      # to NuGet would go green having verified none of the verification surface. The
+      # `publish` job below already stages the natives before restore for this same reason.
+      - name: Seed Z3 native libraries (before MSBuild evaluation)
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
       - name: Restore dependencies
         run: dotnet restore
 
@@ -36,7 +45,21 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Run all tests
-        run: dotnet test -c Release --no-build --verbosity normal
+        run: |
+          set -euo pipefail
+          dotnet test -c Release --no-build --verbosity normal 2>&1 | tee test-output.log
+
+      # Assert the property that matters, not a filename: no Z3-gated test may skip on the
+      # commit being released. This regression is invisible by construction otherwise —
+      # the tests skip rather than fail.
+      - name: Assert no Z3-gated test silently skipped
+        run: |
+          set -euo pipefail
+          if grep -q "Z3 not available" test-output.log; then
+            echo "::error::Z3-gated tests skipped on the release commit — natives did not reach the test hosts."
+            grep -c "Z3 not available" test-output.log
+            exit 1
+          fi
 
   sdk-consumer:
     # M-A1: a template consumer restores/builds/tests green against the
