@@ -1,5 +1,3 @@
-using Calor.RoundTrip.Harness.TaskGen;
-
 namespace Calor.RoundTrip.Harness.TaskGen;
 
 /// <summary>
@@ -32,6 +30,26 @@ public static class SupplyEnumeration
 
         /// <summary>Files converted but carrying ≥1 structured loss.</summary>
         public required int WithLossFiles { get; init; }
+
+        /// <summary>
+        /// Files the pipeline considered but did NOT convert (ConversionFailed, EmitSyntaxError,
+        /// CompileError, Crashed, Excluded, Reverted). Candidates sited here are lost to converter
+        /// fidelity, not to the corpus — the distinction the ceiling turns on.
+        /// </summary>
+        public required int UnconvertedFiles { get; init; }
+
+        /// <summary>
+        /// Every expressible candidate the frozen operator set can site anywhere in the project's
+        /// ledger, regardless of conversion outcome. This is the corpus-side supply; the native
+        /// figure is what survives conversion on top of it.
+        /// </summary>
+        public required int SupplyTotal { get; init; }
+
+        /// <summary>Candidates sited in files that did not convert — supply lost to the converter.</summary>
+        public required int SupplyLostToConversion { get; init; }
+
+        /// <summary>Sources the pass could not read. Non-zero is a defect, not a corpus property.</summary>
+        public required int UnreadableSources { get; init; }
 
         /// <summary>Expressible candidates sited in native files — today's reachable supply.</summary>
         public required int SupplyNative { get; init; }
@@ -67,6 +85,62 @@ public static class SupplyEnumeration
 
         public int TotalSupplyNative => Projects.Sum(p => p.SupplyNative);
         public int TotalSupplyWithLoss => Projects.Sum(p => p.SupplyWithLoss);
+        public int TotalSupplyAll => Projects.Sum(p => p.SupplyTotal);
+        public int TotalSupplyLostToConversion => Projects.Sum(p => p.SupplyLostToConversion);
+        public int TotalUnreadableSources => Projects.Sum(p => p.UnreadableSources);
+
+        /// <summary>
+        /// Per-operator pooled (with-loss, native) counts. D-5's pooled ratio can be dominated by a
+        /// single operator, so the split is computed rather than left for a reader to reconstruct.
+        /// </summary>
+        public IReadOnlyDictionary<string, (int WithLoss, int Native)> ByOperator
+        {
+            get
+            {
+                var acc = new Dictionary<string, (int WithLoss, int Native)>(StringComparer.Ordinal);
+                foreach (var p in Projects)
+                {
+                    foreach (var (op, n) in p.NativeByOperator)
+                        acc[op] = (acc.GetValueOrDefault(op).WithLoss, acc.GetValueOrDefault(op).Native + n);
+                    foreach (var (op, n) in p.WithLossByOperator)
+                        acc[op] = (acc.GetValueOrDefault(op).WithLoss + n, acc.GetValueOrDefault(op).Native);
+                }
+                return acc;
+            }
+        }
+
+        /// <summary>
+        /// The operator supplying most of D-5's numerator, and its own ratio. When the pooled verdict
+        /// and this operator's verdict disagree, the pooled figure is being carried by one operator
+        /// and the decision is SPLIT rather than settled.
+        /// </summary>
+        public (string Operator, double? Ratio)? DominantNumeratorOperator
+        {
+            get
+            {
+                var top = ByOperator.Where(kv => kv.Value.WithLoss > 0)
+                                    .OrderByDescending(kv => kv.Value.WithLoss)
+                                    .ThenBy(kv => kv.Key, StringComparer.Ordinal)
+                                    .Cast<KeyValuePair<string, (int WithLoss, int Native)>>()
+                                    .FirstOrDefault();
+                if (top.Key == null) return null;
+                double? r = top.Value.Native == 0 ? null : (double)top.Value.WithLoss / top.Value.Native;
+                return (top.Key, r);
+            }
+        }
+
+        /// <summary>The pooled ratio excluding the dominant numerator operator — the robustness check.</summary>
+        public double? RatioExcludingDominant
+        {
+            get
+            {
+                if (DominantNumeratorOperator is not { } d) return PooledRatio;
+                var rest = ByOperator.Where(kv => kv.Key != d.Operator).ToList();
+                var wl = rest.Sum(kv => kv.Value.WithLoss);
+                var nat = rest.Sum(kv => kv.Value.Native);
+                return nat == 0 ? null : (double)wl / nat;
+            }
+        }
 
         /// <summary>
         /// Pooled D-5 statistic. Pooled deliberately: D-5's threshold is a single corpus-level
@@ -83,12 +157,32 @@ public static class SupplyEnumeration
         /// </summary>
         public const double D5AcceptThreshold = 0.5;
 
-        public string D5Verdict => PooledRatio switch
+        public string D5Verdict
         {
-            null => "UNDECIDABLE (native supply is 0 — the ratio has no denominator)",
-            var r when r >= D5AcceptThreshold => $"ACCEPT site-level clause (a) — ratio {r:F2} ≥ {D5AcceptThreshold:F2}",
-            var r => $"REJECT site-level clause (a), final for v0.12 — ratio {r:F2} < {D5AcceptThreshold:F2}",
-        };
+            get
+            {
+                if (PooledRatio is not { } r)
+                    return "UNDECIDABLE (native supply is 0 — the ratio has no denominator)";
+
+                var pooled = r >= D5AcceptThreshold ? "ACCEPT" : "REJECT";
+
+                // A pooled verdict carried by one operator is not a settled verdict. Report SPLIT so
+                // the rule cannot be honoured in letter while its intent goes untested.
+                if (DominantNumeratorOperator is { } d && RatioExcludingDominant is { } rest)
+                {
+                    var restVerdict = rest >= D5AcceptThreshold ? "ACCEPT" : "REJECT";
+                    if (restVerdict != pooled)
+                        return $"SPLIT — pooled ratio {r:F2} says {pooled}, but that is carried by " +
+                               $"'{d.Operator}' (its own ratio {(d.Ratio is { } dr ? dr.ToString("F2") : "n/a")}); " +
+                               $"excluding it the ratio is {rest:F2} → {restVerdict}. " +
+                               "The pre-committed threshold does not settle this; decide explicitly and record why.";
+                }
+
+                return pooled == "ACCEPT"
+                    ? $"ACCEPT site-level clause (a) — ratio {r:F2} ≥ {D5AcceptThreshold:F2}"
+                    : $"REJECT site-level clause (a), final for v0.12 — ratio {r:F2} < {D5AcceptThreshold:F2}";
+            }
+        }
     }
 
     /// <summary>
@@ -110,17 +204,28 @@ public static class SupplyEnumeration
                               .Select(f => f.FilePath).ToList();
             var withLoss = files.Where(f => f.Status == FileStatus.Replaced && f.LossCount > 0)
                                 .Select(f => f.FilePath).ToList();
+            // The third population, and the one that decides whether the ceiling is a property of
+            // the CORPUS or of the CONVERTER: candidates sited in files the pipeline failed to
+            // convert. Without it the pre-pass cannot tell "no supply exists" from "supply exists
+            // and we could not reach it", which have opposite remedies.
+            var unconverted = files.Where(f => f.Status != FileStatus.Replaced)
+                                   .Select(f => f.FilePath).ToList();
 
-            var (nativeCount, nativeByOp, nativeByFile) = await EnumerateOver(project, native, readOriginalSource);
-            var (lossCount, lossByOp, _) = await EnumerateOver(project, withLoss, readOriginalSource);
+            var (nativeCount, nativeByOp, nativeByFile, nativeSkipped) = await EnumerateOver(project, native, readOriginalSource);
+            var (lossCount, lossByOp, _, lossSkipped) = await EnumerateOver(project, withLoss, readOriginalSource);
+            var (lostCount, _, _, lostSkipped) = await EnumerateOver(project, unconverted, readOriginalSource);
 
             results.Add(new ProjectSupply
             {
                 ProjectName = project.ProjectName,
                 NativeFiles = native.Count,
                 WithLossFiles = withLoss.Count,
+                UnconvertedFiles = unconverted.Count,
                 SupplyNative = nativeCount,
                 SupplyWithLoss = lossCount,
+                SupplyLostToConversion = lostCount,
+                SupplyTotal = nativeCount + lossCount + lostCount,
+                UnreadableSources = nativeSkipped + lossSkipped + lostSkipped,
                 NativeByOperator = nativeByOp,
                 WithLossByOperator = lossByOp,
                 NativeByFile = nativeByFile,
@@ -130,7 +235,7 @@ public static class SupplyEnumeration
         return new Result { Projects = results };
     }
 
-    private static async Task<(int Total, Dictionary<string, int> ByOperator, Dictionary<string, int> ByFile)>
+    private static async Task<(int Total, Dictionary<string, int> ByOperator, Dictionary<string, int> ByFile, int Skipped)>
         EnumerateOver(
             RoundTripConfig project,
             IReadOnlyList<string> relPaths,
@@ -139,17 +244,20 @@ public static class SupplyEnumeration
         var byOperator = new Dictionary<string, int>(StringComparer.Ordinal);
         var byFile = new Dictionary<string, int>(StringComparer.Ordinal);
         var total = 0;
+        var skipped = 0;
 
         foreach (var rel in relPaths)
         {
             var source = await readOriginalSource(project, rel);
-            if (source == null) continue;
+            // An unreadable source silently lowers supply — the same silent-denominator failure the
+            // missing-subject guard exists to prevent. Count it so it cannot pass as a corpus fact.
+            if (source == null) { skipped++; continue; }
 
             var candidates = ExpressibleMutationOperators.Enumerate(source, rel);
             if (candidates.Count == 0) continue;
 
             total += candidates.Count;
-            byFile[rel] = candidates.Count;
+            byFile[rel] = byFile.GetValueOrDefault(rel) + candidates.Count;
             foreach (var c in candidates)
             {
                 var key = c.Operator.ToString();
@@ -157,6 +265,6 @@ public static class SupplyEnumeration
             }
         }
 
-        return (total, byOperator, byFile);
+        return (total, byOperator, byFile, skipped);
     }
 }

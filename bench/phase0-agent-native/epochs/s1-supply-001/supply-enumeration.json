@@ -4,6 +4,10 @@
       "ProjectName": "MediatR",
       "NativeFiles": 20,
       "WithLossFiles": 5,
+      "UnconvertedFiles": 7,
+      "SupplyTotal": 2,
+      "SupplyLostToConversion": 2,
+      "UnreadableSources": 0,
       "SupplyNative": 0,
       "SupplyWithLoss": 0,
       "NativeByOperator": {},
@@ -15,6 +19,10 @@
       "ProjectName": "Serilog",
       "NativeFiles": 72,
       "WithLossFiles": 17,
+      "UnconvertedFiles": 21,
+      "SupplyTotal": 15,
+      "SupplyLostToConversion": 5,
+      "UnreadableSources": 0,
       "SupplyNative": 3,
       "SupplyWithLoss": 7,
       "NativeByOperator": {
@@ -34,6 +42,10 @@
       "ProjectName": "FluentValidation",
       "NativeFiles": 109,
       "WithLossFiles": 4,
+      "UnconvertedFiles": 26,
+      "SupplyTotal": 8,
+      "SupplyLostToConversion": 2,
+      "UnreadableSources": 0,
       "SupplyNative": 6,
       "SupplyWithLoss": 0,
       "NativeByOperator": {
@@ -53,6 +65,15 @@
   ],
   "TotalSupplyNative": 9,
   "TotalSupplyWithLoss": 7,
+  "TotalSupplyAll": 25,
+  "TotalSupplyLostToConversion": 9,
+  "TotalUnreadableSources": 0,
+  "ByOperator": {
+    "EffectViolation": {},
+    "NullDeref": {}
+  },
+  "DominantNumeratorOperator": {},
+  "RatioExcludingDominant": 0.16666666666666666,
   "PooledRatio": 0.7777777777777778,
-  "D5Verdict": "ACCEPT site-level clause (a) \u2014 ratio 0.78 \u2265 0.50"
+  "D5Verdict": "SPLIT \u2014 pooled ratio 0.78 says ACCEPT, but that is carried by \u0027NullDeref\u0027 (its own ratio 2.00); excluding it the ratio is 0.17 \u2192 REJECT. The pre-committed threshold does not settle this; decide explicitly and record why."
 }

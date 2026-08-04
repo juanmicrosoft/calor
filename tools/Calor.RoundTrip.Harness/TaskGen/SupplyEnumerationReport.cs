@@ -27,16 +27,28 @@ public static class SupplyEnumerationReport
 
         sb.AppendLine("## Supply by project");
         sb.AppendLine();
-        sb.AppendLine("| Project | Native files | With-loss files | Supply (native) | Supply (with-loss) | with-loss / native |");
+        sb.AppendLine("| Project | Sites (all) | Lost to conversion | Supply (native) | Supply (with-loss) | with-loss / native |");
         sb.AppendLine("|---|---:|---:|---:|---:|---:|");
         foreach (var p in r.Projects)
         {
             var ratio = p.WithLossOverNativeRatio is { } v ? v.ToString("F2") : "n/a";
-            sb.AppendLine($"| {p.ProjectName} | {p.NativeFiles} | {p.WithLossFiles} | **{p.SupplyNative}** | {p.SupplyWithLoss} | {ratio} |");
+            sb.AppendLine($"| {p.ProjectName} | {p.SupplyTotal} | {p.SupplyLostToConversion} | **{p.SupplyNative}** | {p.SupplyWithLoss} | {ratio} |");
         }
-        sb.AppendLine($"| **TOTAL** | | | **{r.TotalSupplyNative}** | {r.TotalSupplyWithLoss} | " +
+        sb.AppendLine($"| **TOTAL** | **{r.TotalSupplyAll}** | {r.TotalSupplyLostToConversion} | **{r.TotalSupplyNative}** | {r.TotalSupplyWithLoss} | " +
                       $"{(r.PooledRatio is { } pr ? pr.ToString("F2") : "n/a")} |");
         sb.AppendLine();
+        sb.AppendLine("**Read the first two columns before the third.** \"Sites (all)\" is the corpus-side");
+        sb.AppendLine("supply the frozen operator set can enumerate anywhere; \"lost to conversion\" is the part");
+        sb.AppendLine("the converter could not reach. A low native figure with a high lost figure is a");
+        sb.AppendLine("**converter-fidelity** result, not a corpus result — opposite remedies. Any downstream");
+        sb.AppendLine("use of the native number as \"the corpus's supply ceiling\" must account for both.");
+        sb.AppendLine();
+        if (r.TotalUnreadableSources > 0)
+        {
+            sb.AppendLine($"> ⚠ **{r.TotalUnreadableSources} source file(s) could not be read** and were skipped.");
+            sb.AppendLine("> This lowers every figure above and is a defect in the pass, not a property of the corpus.");
+            sb.AppendLine();
+        }
 
         sb.AppendLine("## D-5 — region-granularity clause (a)");
         sb.AppendLine();
@@ -46,6 +58,19 @@ public static class SupplyEnumerationReport
         sb.AppendLine();
         sb.AppendLine("Per-project ratios are in the table above; a pooled figure must not conceal a split.");
         sb.AppendLine();
+        if (r.ByOperator.Count > 0)
+        {
+            sb.AppendLine("Per-operator, because a pooled ratio can be carried by a single operator:");
+            sb.AppendLine();
+            sb.AppendLine("| Operator | With-loss | Native | ratio |");
+            sb.AppendLine("|---|---:|---:|---:|");
+            foreach (var (op, v) in r.ByOperator.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+            {
+                var ratio = v.Native == 0 ? "n/a" : ((double)v.WithLoss / v.Native).ToString("F2");
+                sb.AppendLine($"| {op} | {v.WithLoss} | {v.Native} | {ratio} |");
+            }
+            sb.AppendLine();
+        }
 
         sb.AppendLine("## Candidates by operator");
         sb.AppendLine();

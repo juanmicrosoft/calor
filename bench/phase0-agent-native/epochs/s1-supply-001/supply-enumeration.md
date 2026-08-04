@@ -12,20 +12,33 @@ so these figures bound eligibility from above. That is the correct direction for
 
 ## Supply by project
 
-| Project | Native files | With-loss files | Supply (native) | Supply (with-loss) | with-loss / native |
+| Project | Sites (all) | Lost to conversion | Supply (native) | Supply (with-loss) | with-loss / native |
 |---|---:|---:|---:|---:|---:|
-| MediatR | 20 | 5 | **0** | 0 | n/a |
-| Serilog | 72 | 17 | **3** | 7 | 2.33 |
-| FluentValidation | 109 | 4 | **6** | 0 | 0.00 |
-| **TOTAL** | | | **9** | 7 | 0.78 |
+| MediatR | 2 | 2 | **0** | 0 | n/a |
+| Serilog | 15 | 5 | **3** | 7 | 2.33 |
+| FluentValidation | 8 | 2 | **6** | 0 | 0.00 |
+| **TOTAL** | **25** | 9 | **9** | 7 | 0.78 |
+
+**Read the first two columns before the third.** "Sites (all)" is the corpus-side
+supply the frozen operator set can enumerate anywhere; "lost to conversion" is the part
+the converter could not reach. A low native figure with a high lost figure is a
+**converter-fidelity** result, not a corpus result — opposite remedies. Any downstream
+use of the native number as "the corpus's supply ceiling" must account for both.
 
 ## D-5 — region-granularity clause (a)
 
 Pre-committed rule (S1 kickoff): accept site-level clause (a) iff with-loss/native ≥ 0.50.
 
-**ACCEPT site-level clause (a) — ratio 0.78 ≥ 0.50**
+**SPLIT — pooled ratio 0.78 says ACCEPT, but that is carried by 'NullDeref' (its own ratio 2.00); excluding it the ratio is 0.17 → REJECT. The pre-committed threshold does not settle this; decide explicitly and record why.**
 
 Per-project ratios are in the table above; a pooled figure must not conceal a split.
+
+Per-operator, because a pooled ratio can be carried by a single operator:
+
+| Operator | With-loss | Native | ratio |
+|---|---:|---:|---:|
+| EffectViolation | 1 | 6 | 0.17 |
+| NullDeref | 6 | 3 | 2.00 |
 
 ## Candidates by operator
 

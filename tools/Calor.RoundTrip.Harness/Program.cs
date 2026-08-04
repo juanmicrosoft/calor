@@ -290,23 +290,41 @@ async Task<int> EnumerateSupplyCommand(string[] args)
 {
     var projectsDir = GetOption(args, "--projects-dir") ?? ProjectConfigs.DefaultCorpusDir;
     projectsDir = Path.GetFullPath(projectsDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
-    var outputDir = GetOption(args, "--output") ?? "supply-enumeration";
-    // Same resolution as run/gen-tasks: the ~/.dotnet default with a PATH fallback when absent.
-    var dotnet = GetOption(args, "--dotnet")
-        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dotnet/dotnet");
-    if (dotnet.Contains('/') || dotnet.Contains('\\'))
-        dotnet = Path.GetFullPath(dotnet.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
-    if (!File.Exists(dotnet) && dotnet.Contains('/'))
-        dotnet = "dotnet";
+    var outputDir = Path.GetFullPath(GetOption(args, "--output") ?? "supply-enumeration");
+    // No --dotnet option: this command runs no builds and no tests, so a dotnet path would be dead
+    // configuration that implies otherwise.
 
-    var optionsWithValues = new HashSet<string> { "--projects-dir", "--output", "--dotnet" };
+    var optionsWithValues = new HashSet<string> { "--projects-dir", "--output" };
+    var knownFlags = new HashSet<string>(optionsWithValues) { "--all", "--include-synthetic" };
     var projectNames = new List<string>();
-    if (args.Contains("--all")) projectNames = ProjectConfigs.KnownProjects.ToList();
+    if (args.Contains("--all"))
+    {
+        // --all means the OSS corpus. The synthetic subjects are purpose-built to CONTAIN
+        // expressible candidates, so including them would inflate the very ceiling the plan §4
+        // go/no-go consumes. Opt in explicitly if you want them.
+        projectNames = args.Contains("--include-synthetic")
+            ? ProjectConfigs.KnownProjects.ToList()
+            : ProjectConfigs.KnownProjects.Where(p => !ProjectConfigs.SyntheticProjects.Contains(p)).ToList();
+    }
     else
     {
         for (var i = 0; i < args.Length; i++)
         {
-            if (args[i].StartsWith("--")) { if (optionsWithValues.Contains(args[i])) i++; continue; }
+            if (args[i].StartsWith("--"))
+            {
+                // Reject unknown flags and the --opt=value form outright. GetOption only understands
+                // space-separated values, so `--projects-dir=/x` would otherwise be silently dropped
+                // and the DEFAULT corpus used — a silent wrong-corpus run producing a number that
+                // feeds a venue-retirement decision.
+                if (!knownFlags.Contains(args[i]))
+                {
+                    Console.Error.WriteLine($"Unrecognized option '{args[i]}'. " +
+                        "Use the space-separated form (e.g. --projects-dir <path>); '--opt=value' is not supported.");
+                    return 2;
+                }
+                if (optionsWithValues.Contains(args[i])) i++;
+                continue;
+            }
             projectNames.Add(args[i]);
         }
     }
@@ -319,7 +337,7 @@ async Task<int> EnumerateSupplyCommand(string[] args)
     var configs = new List<RoundTripConfig>();
     foreach (var name in projectNames)
     {
-        var cfg = ProjectConfigs.Get(name, projectsDir, dotnet);
+        var cfg = ProjectConfigs.Get(name, projectsDir, "dotnet");
         if (cfg == null) { Console.Error.WriteLine($"Unknown project '{name}'."); return 2; }
         if (!Directory.Exists(cfg.OriginalProjectPath))
         {
@@ -337,34 +355,45 @@ async Task<int> EnumerateSupplyCommand(string[] args)
     var pipeline = new RoundTripPipeline();
     var workRoot = Path.Combine(Path.GetTempPath(), "calor-supply-" + Guid.NewGuid().ToString("N")[..8]);
 
-    var result = await SupplyEnumeration.RunAsync(
-        configs,
-        async project =>
-        {
-            Console.WriteLine($"[{project.ProjectName}] converting (no build, no tests)…");
-            var dir = pipeline.PrepareWorkingCopy(CloneForSupply(project, Path.Combine(workRoot, project.ProjectName)));
-            var report = new RoundTripReport { ProjectName = project.ProjectName };
-            var files = await pipeline.ConvertAndReplaceAsync(dir, project, report);
-            return files;
-        },
-        async (project, rel) =>
-        {
-            var abs = Path.Combine(project.OriginalProjectPath, rel);
-            return File.Exists(abs) ? await File.ReadAllTextAsync(abs) : null;
-        });
-
+    // Fail on an unusable output directory BEFORE doing three full conversions, not after.
     Directory.CreateDirectory(outputDir);
+
+    SupplyEnumeration.Result result;
+    try
+    {
+        result = await SupplyEnumeration.RunAsync(
+            configs,
+            async project =>
+            {
+                Console.WriteLine($"[{project.ProjectName}] converting (no build, no tests)…");
+                var dir = pipeline.PrepareWorkingCopy(CloneForSupply(project, Path.Combine(workRoot, project.ProjectName)));
+                var report = new RoundTripReport { ProjectName = project.ProjectName };
+                var files = await pipeline.ConvertAndReplaceAsync(dir, project, report);
+                return files;
+            },
+            async (project, rel) =>
+            {
+                var abs = Path.Combine(project.OriginalProjectPath, rel);
+                return File.Exists(abs) ? await File.ReadAllTextAsync(abs) : null;
+            });
+    }
+    finally
+    {
+        // workRoot holds full recursive copies of every subject; leaking it on the exception path
+        // silently strands hundreds of MB.
+        try { if (Directory.Exists(workRoot)) Directory.Delete(workRoot, recursive: true); } catch { /* best effort */ }
+    }
+
+    var rendered = SupplyEnumerationReport.Render(result);
     var reportPath = Path.Combine(outputDir, "supply-enumeration.md");
-    await File.WriteAllTextAsync(reportPath, SupplyEnumerationReport.Render(result));
+    await File.WriteAllTextAsync(reportPath, rendered);
     var jsonPath = Path.Combine(outputDir, "supply-enumeration.json");
     await File.WriteAllTextAsync(jsonPath, System.Text.Json.JsonSerializer.Serialize(result,
         new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
 
     Console.WriteLine();
-    Console.WriteLine(SupplyEnumerationReport.Render(result));
+    Console.WriteLine(rendered);
     Console.WriteLine($"Written: {reportPath}");
-
-    try { if (Directory.Exists(workRoot)) Directory.Delete(workRoot, recursive: true); } catch { /* best effort */ }
 
     // Exit code carries NO supply signal on purpose: this runs before the A-1.5 freeze, and an
     // exit code that encoded "supply > 0" would be exactly the kind of side-channel that made the
@@ -493,6 +522,8 @@ static void PrintUsage()
           calor-roundtrip gen-tasks <project...> [options] Generate real-scale task bundles (WS-W4 Slice C)
           calor-roundtrip gen-tasks --synthetic [options]  Generate against the in-repo synthetic subjects
           calor-roundtrip mine <project...> [options]     Report revert-bugfix supply per project (git-only, no build)
+          calor-roundtrip enumerate-supply <project...>   Expressible-stratum supply per project (conversion-only;
+                                                          no builds/tests, and no eligibility evaluated)
           calor-roundtrip list                            List known projects
 
         Options (run):
