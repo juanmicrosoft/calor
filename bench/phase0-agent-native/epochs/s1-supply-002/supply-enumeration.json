@@ -1,0 +1,147 @@
+{
+  "Projects": [
+    {
+      "ProjectName": "MediatR",
+      "NativeFiles": 20,
+      "WithLossFiles": 5,
+      "UnconvertedFiles": 7,
+      "SupplyTotal": 48,
+      "SupplyLostToConversion": 41,
+      "UnreadableSources": 0,
+      "SupplyNative": 5,
+      "SupplyWithLoss": 2,
+      "NativeByOperator": {
+        "EffectViolation": 5
+      },
+      "WithLossByOperator": {
+        "EffectViolation": 2
+      },
+      "NativeByFile": {
+        "src/MediatR/INotificationHandler.cs": 1,
+        "src/MediatR/MicrosoftExtensionsDI/ServiceCollectionExtensions.cs": 2,
+        "src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs": 1,
+        "src/MediatR/Wrappers/NotificationHandlerWrapper.cs": 1
+      },
+      "WithLossOverNativeRatio": 0.4
+    },
+    {
+      "ProjectName": "Serilog",
+      "NativeFiles": 72,
+      "WithLossFiles": 17,
+      "UnconvertedFiles": 21,
+      "SupplyTotal": 181,
+      "SupplyLostToConversion": 66,
+      "UnreadableSources": 0,
+      "SupplyNative": 93,
+      "SupplyWithLoss": 22,
+      "NativeByOperator": {
+        "EffectViolation": 93
+      },
+      "WithLossByOperator": {
+        "EffectViolation": 16,
+        "NullDeref": 6
+      },
+      "NativeByFile": {
+        "src/Serilog/Capturing/DepthLimiter.cs": 3,
+        "src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs": 4,
+        "src/Serilog/Configuration/LoggerDestructuringConfiguration.cs": 9,
+        "src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs": 7,
+        "src/Serilog/Configuration/LoggerFilterConfiguration.cs": 4,
+        "src/Serilog/Configuration/LoggerSettingsConfiguration.cs": 3,
+        "src/Serilog/Configuration/LoggerSinkConfiguration.cs": 13,
+        "src/Serilog/Context/EnricherStack.cs": 1,
+        "src/Serilog/Context/LogContext.cs": 8,
+        "src/Serilog/Core/Filters/DelegateFilter.cs": 1,
+        "src/Serilog/Core/Pipeline/ByReferenceStringComparer.cs": 4,
+        "src/Serilog/Core/Pipeline/MessageTemplateCache.cs": 1,
+        "src/Serilog/Data/LogEventPropertyValueRewriter.cs": 5,
+        "src/Serilog/Data/LogEventPropertyValueVisitor.cs": 1,
+        "src/Serilog/Events/EventProperty.cs": 3,
+        "src/Serilog/Events/LogEventPropertyValue.cs": 1,
+        "src/Serilog/Events/MessageTemplate.cs": 2,
+        "src/Serilog/Formatting/Display/LevelOutputFormat.cs": 3,
+        "src/Serilog/Guard.cs": 1,
+        "src/Serilog/LoggerExtensions.cs": 1,
+        "src/Serilog/Parsing/TextToken.cs": 1,
+        "src/Serilog/Policies/DelegateDestructuringPolicy.cs": 1,
+        "src/Serilog/Policies/EnumScalarConversionPolicy.cs": 1,
+        "src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs": 1,
+        "src/Serilog/Policies/ProjectedDestructuringPolicy.cs": 1,
+        "src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs": 1,
+        "src/Serilog/Policies/SimpleScalarConversionPolicy.cs": 1,
+        "src/Serilog/Rendering/Casing.cs": 1,
+        "src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs": 10
+      },
+      "WithLossOverNativeRatio": 0.23655913978494625
+    },
+    {
+      "ProjectName": "FluentValidation",
+      "NativeFiles": 109,
+      "WithLossFiles": 4,
+      "UnconvertedFiles": 26,
+      "SupplyTotal": 298,
+      "SupplyLostToConversion": 144,
+      "UnreadableSources": 0,
+      "SupplyNative": 106,
+      "SupplyWithLoss": 48,
+      "NativeByOperator": {
+        "EffectViolation": 103,
+        "NullDeref": 3
+      },
+      "WithLossByOperator": {
+        "EffectViolation": 48
+      },
+      "NativeByFile": {
+        "src/FluentValidation/AssemblyScanner.cs": 7,
+        "src/FluentValidation/AsyncValidatorInvokedSynchronouslyException.cs": 1,
+        "src/FluentValidation/Internal/AccessorCache.cs": 4,
+        "src/FluentValidation/Internal/CompositeValidatorSelector.cs": 1,
+        "src/FluentValidation/Internal/DefaultValidatorSelector.cs": 1,
+        "src/FluentValidation/Internal/Extensions.cs": 2,
+        "src/FluentValidation/Internal/MemberNameValidatorSelector.cs": 3,
+        "src/FluentValidation/Internal/MessageBuilderContext.cs": 1,
+        "src/FluentValidation/Internal/MessageFormatter.cs": 4,
+        "src/FluentValidation/Internal/RuleBuilder.cs": 7,
+        "src/FluentValidation/Internal/RuleComponent.cs": 4,
+        "src/FluentValidation/Internal/RuleComponentForNullableStruct.cs": 1,
+        "src/FluentValidation/Internal/RulesetValidatorSelector.cs": 2,
+        "src/FluentValidation/Internal/TrackingCollection.cs": 4,
+        "src/FluentValidation/Internal/ValidationStrategy.cs": 11,
+        "src/FluentValidation/Resources/LanguageManager.cs": 2,
+        "src/FluentValidation/Results/ValidationFailure.cs": 1,
+        "src/FluentValidation/TestHelper/TestValidationResult.cs": 5,
+        "src/FluentValidation/ValidatorDescriptor.cs": 6,
+        "src/FluentValidation/ValidatorFactoryBase.cs": 2,
+        "src/FluentValidation/Validators/AbstractComparisonValidator.cs": 2,
+        "src/FluentValidation/Validators/AsyncPredicateValidator.cs": 2,
+        "src/FluentValidation/Validators/AsyncPropertyValidator.cs": 1,
+        "src/FluentValidation/Validators/ChildValidatorAdaptor.cs": 4,
+        "src/FluentValidation/Validators/ComparableComparer.cs": 1,
+        "src/FluentValidation/Validators/EmptyValidator.cs": 3,
+        "src/FluentValidation/Validators/EnumValidator.cs": 4,
+        "src/FluentValidation/Validators/ExclusiveBetweenValidator.cs": 1,
+        "src/FluentValidation/Validators/GreaterThanValidator.cs": 2,
+        "src/FluentValidation/Validators/LessThanValidator.cs": 2,
+        "src/FluentValidation/Validators/NotEqualValidator.cs": 5,
+        "src/FluentValidation/Validators/PropertyValidator.cs": 1,
+        "src/FluentValidation/Validators/RangeValidator.cs": 4,
+        "src/FluentValidation/Validators/RegularExpressionValidator.cs": 3,
+        "src/FluentValidation/Validators/StringEnumValidator.cs": 2
+      },
+      "WithLossOverNativeRatio": 0.4528301886792453
+    }
+  ],
+  "TotalSupplyNative": 204,
+  "TotalSupplyWithLoss": 72,
+  "TotalSupplyAll": 527,
+  "TotalSupplyLostToConversion": 251,
+  "TotalUnreadableSources": 0,
+  "ByOperator": {
+    "EffectViolation": {},
+    "NullDeref": {}
+  },
+  "DominantNumeratorOperator": {},
+  "RatioExcludingDominant": 2,
+  "PooledRatio": 0.35294117647058826,
+  "D5Verdict": "SPLIT \u2014 pooled ratio 0.35 says REJECT, but that is carried by \u0027EffectViolation\u0027 (its own ratio 0.33); excluding it the ratio is 2.00 \u2192 ACCEPT. The pre-committed threshold does not settle this; decide explicitly and record why."
+}

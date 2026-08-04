@@ -61,8 +61,12 @@ public class TaskGenExpressibleTests
     }
 
     [Fact]
-    public void EffectViolation_SkipsMethodsNotReturningIntOrLong()
+    public void EffectViolation_CoversNonNumericReturns_AfterTheD_S0_5_2_Widening()
     {
+        // Pre-widening this asserted that string/bool/void ALL yielded nothing, because the corruption
+        // was arithmetic. The int/long restriction was never about addressability — the using-nested
+        // Directory.* effect fires Calor0410 regardless of return type — so D-S0.5.2 widened the
+        // CORRUPTION and the site universe followed. string and bool are now in scope.
         const string src = """
             namespace S;
             public class C
@@ -70,6 +74,32 @@ public class TaskGenExpressibleTests
                 public string Name() { return "x"; }
                 public bool Ok() { return true; }
                 public void Go() { }
+            }
+            """;
+        var cands = ExpressibleMutationOperators.Enumerate(src, "C.cs")
+            .Where(c => c.Operator == MutationOperatorKind.EffectViolation).ToList();
+
+        Assert.Equal(2, cands.Count);                                  // Name + Ok; Go has nothing to corrupt
+        Assert.All(cands, c => Assert.Equal("Calor0410", c.ExpectedCheck));
+        Assert.Contains(cands, c => c.MutatedSource.Contains("default(string)!"));
+        Assert.Contains(cands, c => c.MutatedSource.Contains("^ (__calorTaint == 1)"));
+    }
+
+    [Fact]
+    public void EffectViolation_StillExcludesReturnsItCannotCorruptSoundly()
+    {
+        // The exclusions that remain after the widening, each because the corruption would not compile
+        // or would not be a single deterministic point. async is the subtle one: the declared type is
+        // Task<T> but `return` yields T, so default(Task<T>) is a type error in that position.
+        const string src = """
+            using System.Threading.Tasks;
+            namespace S;
+            public class C
+            {
+                public void Go() { }
+                public async Task<int> LaterAsync() { await Task.Yield(); return 1; }
+                private int _f;
+                public ref int Ref() { return ref _f; }
             }
             """;
         var cands = ExpressibleMutationOperators.Enumerate(src, "C.cs");
