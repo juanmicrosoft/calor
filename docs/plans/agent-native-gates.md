@@ -105,7 +105,10 @@ additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
 A-1.4 tranche 1, 2026-08-01 — wedge plan D-W5.1, frozen before any WS-W2
 strictness-batch code merges; **additive A-1.4 tranche 2, 2026-08-04 — registers
-PP-W2 = NOT ADJUDICATED; no threshold frozen, no epoch run**).** This annex is **additive-only
+PP-W2 = NOT ADJUDICATED; no threshold frozen, no epoch run**; **additive A-1.5, 2026-08-04 —
+v0.12 substrate registration: M-S1…M-S5, PP-S1…PP-S4, the pinned measurement configuration and
+frozen mutation-operator set, the §4 go/no-go (does not fire), D-5 (rejected), and the PP-W5
+additive note**).** This annex is **additive-only
 with respect to the main document**: no §1–§7 machine-adjudicable gate
 criterion references any metric defined here, and nothing here alters the
 C#-vs-Calor gate decisions those sections govern. The annex's own proof-point
@@ -303,6 +306,128 @@ D4.5 rule ("the dry-run may move a threshold, the task count, or N before
 freezing — never after") applied as written.
 
 ### A.3 Annex revision log
+
+**A-1.5 — v0.12 substrate registration (2026-08-04).** Additive. Registers the v0.12 metrics,
+proof points, and the pinned measurement configuration, per substrate plan D-S5.2. **Frozen at the
+end of S1, before any eligibility is evaluated** — the plan's §3 constraint (a), which had failed
+three times under concealment-based remedies and is here satisfied by ordering instead.
+
+**Inputs available at freeze time, all public:** per-project `NativeFraction` (0.469 / 0.400 / 0.532,
+`bench/corpus/README.md:122–124`); the `3 candidates / 3 addressable / 0 eligible` baseline
+(A-1.4 tranche 2); the `w4-dryrun-001` variance; and the S1 enumeration-only pre-pass
+(`epochs/s1-supply-001`, `epochs/s1-supply-002`), which measures *candidate supply* and evaluates no
+eligibility.
+
+#### A-1.5.1 Metrics
+
+| ID | Definition | Frozen bar |
+|---|---|---|
+| **M-S1** | Per-project `ConversionCoverage.NativeFraction` at the pinned `ExcludePatterns` | **≥ 0.70 on ≥2 of 3 original projects** |
+| **M-S2** | Candidates verification-addressable via the #856 differential, from the **A-1.5-frozen operator set** | **≥ 60% of native candidates**, per project reported |
+| **M-S3** | **Expressible-stratum** tasks passing the full D-W4.1 predicate **and** the D-S5.1 determinism screen, at the pinned config | **≥ 40 total AND ≥ 2 from each of ≥ 2 projects** |
+| **M-S4** | Converter/harness changes that raise M-S3 while making converted code less faithful — incl. `FeatureSupport` promotions and ledger removals without a green registered fixture, `§E`-inference behaviour, and **mutation-operator changes** | **0**, CI-enforced |
+| **M-S5** | Per-project `ArmsDiverge` rate on the mutation corpus | **Non-increasing** as M-S1 rises |
+
+**M-S3's derivation, stated so it is auditable.** The dry-run's C# arm escaped on **2 of 6 tasks**
+(3/18 runs). Under the **optimistic deterministic-catch** assumption — Calor build-blocks the
+expressible defect, C# escapes at dry-run rates — a task is discordant with probability ≈ 0.33. A
+one-sided sign test needs ≥ 5 discordant pairs (0.5⁵ = 0.031 < 0.05); reaching 5 with ~80%
+probability needs ~25 tasks, and the §6.1 cluster bootstrap wants more. **N = 40** is frozen with
+that margin.
+
+**And the part that must not be lost:** the **registered** 20–40% relative effect needs "on the order
+of hundreds of clustered tasks" (`w4-dryrun-001/VERDICT.md` finding 4). N = 40 does **not** power it.
+If the realized effect is the registered one rather than the optimistic one, **PP-S3 resolves
+`underpowered`, not `hit`** — that is what its fourth value is for, and registering N = 40 is not a
+claim that 40 suffices for the headline claim.
+
+#### A-1.5.2 Proof points
+
+| ID | Claim | Outcome |
+|---|---|---|
+| **PP-S1** | Converter fidelity is movable | Hit / miss; adjudicable early at D-S1.1a. **Diagnostic input to Call S, not decisive** |
+| **PP-S2** | Checker breadth converts existing defects into addressable ones | Hit / miss vs M-S2, against the **frozen operator set** (below) |
+| **PP-S3** | **The benchmark can be supplied** (headline) | **hit / miss / underpowered / not-adjudicated** |
+| **PP-S4** | No converter-appeasement (**blocker**) | Pass / fail; indeterminate counts as **failing** |
+
+**PP-S3's non-hit triggers, enumerated exhaustively. Any route not on this list is adjudicated
+MISS**, with the novel route disclosed *and the miss registered anyway*:
+- **underpowered** — supply ≥ 40 but below what the variance dry-run shows is needed for 80% power on
+  the realized effect. Epoch not authorized; supply work continues; **no venue retirement**.
+- **not-adjudicated**, only: (i) the supply measurement cannot complete, or candidate enumeration is
+  not reproducible across two runs at the pinned configuration; (ii) fewer than 2 projects pass the
+  frozen fidelity bar; (iii) eligible tasks exist but fail the determinism screen, so no valid epoch
+  is constructible.
+
+#### A-1.5.3 Pinned measurement configuration
+
+Any measurement at a different configuration is **reported, not adjudicated**.
+
+- **Corpus:** MediatR `fb309026`, Serilog `0597ddfb`, FluentValidation `71b3c60c`. Synthetic subjects
+  are **excluded** (they are authored to contain expressible candidates).
+- **`TaskGenOptions`:** `Strata = Expressible`, `Sources = Injected`, `MaxCandidatesPerProject = 10`,
+  `TargetEligiblePerProject = 0` (no early stop), `RequireIdenticalSignature = true`,
+  `RevertScanCommits = 2000`, `NativeFractionBar` per the run's stated purpose (0 for diagnostic
+  supply passes, 0.70 for adjudication).
+- **`ExcludePatterns`:** the seven `RoundTripConfig.DefaultExcludePatterns()` entries, source hash
+  `900b2c22878b09db`. **A change to this list changes M-S1's denominator and is a recorded deviation
+  reporting the fraction under both lists** (plan D-S1.4).
+- **Frozen mutation-operator set** (PP-S2's anti-tautology guard — this freezes **before** any
+  checker extension is written, so an extension must catch something the frozen set already
+  produced): `EffectViolation`, `NullDeref`, `IndexOutOfBounds`, `DivByZero`. `NegateCondition`
+  remains disabled. `EffectViolation`'s corruption forms are frozen as `AddOne` (int/long),
+  `FlipBool` (bool), `DefaultWhenTainted` (all other corruptible returns), with `void`/`ref`/pointer/
+  `async` excluded.
+
+#### A-1.5.4 The plan §4 go/no-go: **DOES NOT FIRE**
+
+The trigger retires the venue if required-N exceeds the corpus's candidate-supply ceiling by more
+than an order of magnitude. Measured ceiling: **519 sites / 203 native / ≈150 addressable** at ~74%
+measured addressability (`epochs/s1-supply-002`). Required-N is 40 (optimistic) to "hundreds"
+(registered effect). Even against 500, the ceiling is **within** an order of magnitude. **PP-S3 does
+not resolve miss at A-1.5; the real-scale venue is not retired.**
+
+**Recorded because it is the substantive finding:** the pre-widening ceiling was **9**, and against
+that number this trigger *would* have fired. The 9 was an artifact of the mutation operator's
+corruption mechanism — an `int`/`long` restriction unrelated to addressability — not a property of
+the corpus. **Adjudicating this go/no-go one milestone earlier would have retired the venue on an
+artifact.** The remaining ceiling is still partly ours: 247 of 519 sites are lost to converter
+fidelity, and 284 further sites (+54%) are never visited because the operator walks only
+`MethodDeclarationSyntax` bodies.
+
+#### A-1.5.5 D-5 (region-granularity clause (a)): **REJECTED for v0.12**
+
+The pre-committed rule (with-loss/native ≥ 0.5 → accept) **failed to settle the question under both
+operator sets, in opposite directions** — pre-widening pooled 0.78 ACCEPT carried by `NullDeref`;
+post-widening pooled 0.34 REJECT carried by `EffectViolation`. A statistic that inverts with the
+operator set is not deciding the design question, so it is decided explicitly here:
+
+**REJECT**, because (i) the pooled figure now says reject, (ii) the dominant *addressable* operator
+`EffectViolation` says reject at 0.33, and (iii) the ACCEPT side is carried by `NullDeref`, which by
+its own specification models `Option`/`Result` unwrap shapes and is **not expected to be addressable
+on converted corpus code** — supply that eligibility is expected to delete. With the binding
+constraint now eligibility attrition rather than candidate count, +33% candidates is not the lever.
+Site-level clause (a) is not built in v0.12. Both runs are on the record
+(`epochs/s1-supply-001`, `epochs/s1-supply-002`).
+
+#### A-1.5.6 PP-W5 additive note (plan D-S5.5), registered results-blind
+
+The A-1.4 tranche-1 PP-W5 row freezes `treatment = main at epoch time`, so a "v0.11 + v0.12"
+treatment is **consistent with the freeze by its letter** and needs no supersession. Three
+clarifications, none of which alters the row:
+1. The adjudicated question is now **"v0.11+v0.12 toolchain vs v0.10.0 release"**; the row's Basis
+   sentence naming the v0.11-only question is recorded **stale**, not deleted.
+2. The pre-committed on-fail isolation recipe (`v0.10.0 + WS-W2-only`) was built for a two-source
+   attribution problem. A two-release treatment is three-source, so the ladder becomes **two-step**:
+   `v0.10.0 + WS-W2-only`, then `v0.10.0 + all-v0.11` — allowing attribution among batch /
+   v0.11-other / v0.12.
+3. The **1.25 margin and its null calibration were derived for a one-release delta and are NOT
+   re-derived.** A fail is therefore more likely and a pass correspondingly stronger. Recorded rather
+   than silently inherited.
+
+**This entry alters no frozen row and makes no §7 supersession claim.** The §4 2a rows and
+A-1.0…A-1.4 rows stand. The only non-insertion is the annex version pointer, per the precedent of
+every prior revision.
 
 **A-1.4 tranche 2 — PP-W2 NOT ADJUDICATED (2026-08-04).** Additive; registers the
 outcome of the real-scale measurement half, NOT a threshold. Per the two-tranche
