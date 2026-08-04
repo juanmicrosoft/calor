@@ -5,7 +5,11 @@ engineering. Shape: v0.12 leads with converter fidelity + checker breadth + a
 value-asserted corpus (the real-scale levers) and the authored-contract overlay,
 while the adoption push continues and the Call 3 door stays closed.**
 Maintainer-approved 2026-08-04. This is the wedge plan §6 Call W, adjudicated on
-PP-W2 + PP-A2, with PP-A1/PP-W5 as orthogonal v0.11.0 release gates.
+PP-W2 + PP-A2, with PP-A1/PP-W5 as orthogonal release gates. **Inputs as
+registered: PP-W2 = not adjudicated; PP-A2 = "demand unproven"** (its
+pre-committed miss value — adoption half to maintenance-mode posture). The
+v0.11.0 release itself is **folded forward into v0.12** — no v0.11.0 tag; see the
+release section below.
 
 ## Inputs
 
@@ -19,17 +23,28 @@ pre-committed. **The one positive:** the ceiling-recurrence check cleared (C# ar
 escaped 16.7% at real scale) — the v0.10 ceiling does not survive real code, so
 the venue has genuine headroom and the blocker is substrate, not a dead thesis.
 
-**PP-A2 (the go-to-market weight) = PENDING** — the adoption *surface* shipped
-(WS-W1/W2/W3: consumable SDK, honest conversion, effect soundness, `calor
-import` / review-packet / eject / playbook), but the go-to-market *outcome* — a
-named external adopter — is the **Call 3 crossing**, a one-way door reserved for
-the maintainer. No adopter is secured, so PP-A2 does not yet resolve.
+**PP-A2 (the go-to-market weight) = "DEMAND UNPROVEN"** — the plan's
+pre-committed miss wording (§4 PP-A2 row), registered at its pre-committed value
+and not softened. The criterion was **a named adopter by Call W** (strategy §1.3
+conditions: ≥1 non-maintainer reviewer, agreed in writing). Call W is here and no
+adopter is secured, so PP-A2 resolves now — it is a Call W *input* (§6 line 167),
+not a release gate, and it does not get to stay pending because the answer is
+unwelcome. No adopter-deadline rebase is claimed.
+
+The adoption *surface* did ship and is real (WS-W1/W2/W3: consumable SDK, honest
+conversion, effect soundness, `calor import` / review-packet / eject / playbook).
+What is unproven is *demand*, which produces no benchmark evidence either way.
+Per the pre-committed disposition this routes the **adoption half to a
+maintenance-mode posture** at v0.12 planning: keep the shipped surface working,
+correct, and documented; do not fund new adoption *depth* ahead of demand. The
+measurement half is unaffected. The **Call 3 crossing** (a named adopter) remains
+the maintainer's reserved one-way door.
 
 ## Shape decision for v0.12
 
-With PP-W2 not-adjudicated and PP-A2 pending, Call W decides *shape*, per the
-Call 2 / Call G pattern — the program continues, and every branch keeps it
-moving:
+With PP-W2 not-adjudicated and PP-A2 at "demand unproven", Call W decides
+*shape*, per the Call 2 / Call G pattern — the program continues, and every
+branch keeps it moving:
 
 1. **Measurement half → substrate engineering.** v0.12 leads with the three
    precisely-characterized levers, because they gate every future real-scale
@@ -50,10 +65,14 @@ moving:
    Calor0410 addressability differential) is proven and banked; it re-runs the
    moment the substrate clears.
 
-2. **Adoption half → continue; Call 3 stays closed.** The product surface is
-   real and usable. The Call 3 crossing (a named adopter) remains the
-   maintainer's reserved one-way door; until then, v0.12's adoption work is
-   evidence-led demand-building, not a committed external dependency.
+2. **Adoption half → maintenance-mode posture; Call 3 stays closed.** This is
+   PP-A2's pre-committed routing, not a discretionary choice. The product surface
+   is real and usable, so v0.12 keeps it working, correct, and documented — bug
+   fixes, honest docs, CI gates — but funds **no new adoption depth** ahead of
+   demand. Any v0.12 adoption effort is evidence-led demand-building, not a
+   committed external dependency. The Call 3 crossing (a named adopter) remains
+   the maintainer's reserved one-way door, and crossing it is what would take the
+   adoption half back off maintenance-mode.
 
 3. **v0.12 does NOT lead with an outcome-advantage claim.** PP-W2 produced no
    outcome-level verdict, so v0.12 marketing/positioning re-scopes to what is
@@ -63,16 +82,29 @@ moving:
    survive real code, and here are the three things that must move to measure
    what comes next."
 
-## Remaining v0.11.0 release gates (orthogonal to this shape decision)
+## v0.11.0 release: FOLDED FORWARD (maintainer decision, 2026-08-04)
 
 Call W decides v0.12 *shape*; it does not by itself ship v0.11.0. Per §6 the
 release gates are **PP-W5** (strictness-parity: did the WS-W2 batch tax the loop
 — a neutral-N1 v0.10.0-control vs v0.11-treatment epoch, gate frozen at A-1.4
 tranche 1 / #839) and **PP-A1** (CI adoption gates). PP-W5 requires its own
-spend-authorized epoch. This is a **separate maintainer decision** and is not
-bundled into Call W. Options: run the PP-W5 parity epoch to ship v0.11.0 as a
-released version, or fold the v0.11 work forward into v0.12 without a tagged
-v0.11.0 release. Surfaced to the maintainer as the next gate.
+spend-authorized epoch.
+
+This was surfaced to the maintainer as a separate decision, and the decision is:
+**no tagged v0.11.0 — the v0.11 work folds forward into v0.12.** Rationale: with
+the measurement half concluding not-adjudicated, a v0.11.0 release would ship the
+adoption half alone, and PP-A2 has just routed that half to maintenance-mode; a
+release cycle plus a spend-authorized epoch buys no decision. **PP-W5 stays
+frozen and unadjudicated** (gate #839 is untouched, and nothing here supersedes
+it) and is run once against the v0.12 substrate work, where the strictness-parity
+question has a materially different treatment arm to be measured against. **PP-A1
+likewise carries forward** as a v0.12 release gate.
+
+Consequences to hold: the shipped v0.11 adoption surface lives on `main`
+untagged, so v0.12's release notes and CHANGELOG must cover the v0.11 range as
+well; and the eventual PP-W5 epoch's treatment arm is now "v0.11 + v0.12
+substrate", not "v0.11", which the epoch's arm definition must state explicitly
+rather than inherit.
 
 ## What v0.11 bought (the honest ledger)
 

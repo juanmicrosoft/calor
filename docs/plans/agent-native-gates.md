@@ -314,17 +314,28 @@ pinned corpus — logic mutations carry no verification signal (mechanical arm),
 revert-bugfix yields 0 native∩separable, and the expressible-defect stratum
 (mechanism proven, 100% Calor0410-addressable on real corpus code) yields 0
 eligible (native surface not value-asserted / arm-divergent). **No threshold is
-frozen and no epoch was run.** The one adjudicable real-scale signal DID resolve
-and is positive: the D-W4.4 **ceiling-recurrence check cleared** — the C# arm
-escaped genuine bugs 16.7% of runs (2/6 tasks), so the v0.10 ceiling does NOT
-persist at real scale (evidence that the venue has headroom; the blocker is
-substrate). Full evidence + the three v0.12 levers (converter fidelity, checker
-breadth, corpus shape) + the authored-contract-overlay track:
-`docs/plans/wedge-real-scale-closeout.md`. **This alters no frozen row and makes
-no §7 supersession claim** — the §4 2a rows and A-1.0…A-1.4-tranche-1 rows stand;
-PP-W5 (release gate) and PP-A1/PP-A2 (adoption) are adjudicated separately and
-are unaffected. PP-W2's absence from adjudication is itself the registered
-tranche-2 result, feeding Call W's not-adjudicated branch.
+frozen and no epoch was run.** **Trigger disclosure:** §6.2's parenthetical
+enumerates two not-adjudicated triggers (sub-2-project fidelity; the D-W4.4
+ceiling branch) and **neither fired** — the actual trigger is a **third,
+not-pre-enumerated route: task-supply starvation**, legitimate under §6.1's
+general principle (the measurement cannot be made, so no verdict is registered)
+and routing identically, but recorded here as novel rather than folded into an
+existing trigger. The one adjudicable real-scale signal DID resolve and is
+positive: the D-W4.4 **ceiling-recurrence check cleared** — the C# arm escaped
+genuine bugs on 16.7% of runs (3/18 C#-arm runs, across 2 of 6 tasks), so the
+v0.10 ceiling does NOT persist at real scale (evidence that the venue has
+headroom; the blocker is substrate). **This is a dry-run signal at n = 6 tasks /
+18 C#-arm runs and was not powered for it — an existence result, not a rate
+estimate; no escape-rate figure is registered.** Full evidence + the three v0.12
+levers (converter fidelity, checker breadth, corpus shape) + the
+authored-contract-overlay track: `docs/plans/wedge-real-scale-closeout.md`.
+**This alters no frozen row and makes no §7 supersession claim** — the §4 2a rows
+and A-1.0…A-1.4-tranche-1 rows stand; **PP-W5 and PP-A1 (release gates, both
+carried forward to v0.12 — the v0.11.0 release was folded forward, no tag) and
+PP-A2 (a Call W input, resolved at its pre-committed "demand unproven" value)**
+are adjudicated separately and are unaffected by this entry. PP-W2's absence from
+adjudication is itself the registered tranche-2 result, feeding Call W's
+not-adjudicated branch.
 
 **A-1.4 exclusion-closure note (2026-08-02).** Additive record, no threshold or
 frozen-row change. The **PP-W1** row's frozen scope guards exclude "the
