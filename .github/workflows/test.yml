@@ -39,11 +39,35 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # src/Calor.Compiler/{z3,runtimes}/ are gitignored, so on a fresh checkout the
+      # csproj's `<None Include="runtimes\**\*" CopyToOutputDirectory>` glob — resolved at
+      # MSBuild EVALUATION time — matches nothing, and the natives never propagate to test
+      # projects. The DownloadZ3 target populates those directories later, at EXECUTION
+      # time, which is too late for the glob. The managed Microsoft.Z3.dll still flows via
+      # <Reference Private="true">, so the wrapper loads and dies at P/Invoke, and every
+      # Z3-backed test silently skips. Seeding before restore fixes the ordering.
+      - name: Seed Z3 native libraries (before MSBuild evaluation)
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
       - name: Restore dependencies
         run: dotnet restore
 
       - name: Build
         run: dotnet build -c Release --no-restore
+
+      # Fail loudly if the seeding above ever stops reaching the test hosts. Without this,
+      # a regression is invisible: the tests skip rather than fail.
+      - name: Assert Z3 natives reached the test output
+        run: |
+          set -euo pipefail
+          missing=0
+          for proj in Calor.Verification.Tests Calor.Compiler.Tests; do
+            if ! find "tests/$proj/bin/Release" -name 'libz3.so' -print -quit | grep -q .; then
+              echo "::error::libz3.so is absent from tests/$proj output — Z3-backed tests would silently skip."
+              missing=1
+            fi
+          done
+          exit $missing
 
       - name: Run all tests
         run: dotnet test -c Release --no-build --verbosity normal
@@ -73,6 +97,11 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      # See the note in the `test` job: seed before restore or the natives never reach
+      # the test hosts and every Z3-backed test skips. This job runs Calor.Compiler.Tests.
+      - name: Seed Z3 native libraries (before MSBuild evaluation)
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
 
       - name: Restore dependencies
         run: dotnet restore
@@ -262,6 +291,12 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      # See the note in the `test` job. The round-trip harness's addressability probe is
+      # Z3-backed for the div-by-zero / index-OOB checks; without the natives it reports
+      # "indeterminable" rather than a verdict.
+      - name: Seed Z3 native libraries (before MSBuild evaluation)
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
 
       - name: Restore and build Calor
         run: |
