@@ -104,7 +104,8 @@ clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
 A-1.4 tranche 1, 2026-08-01 — wedge plan D-W5.1, frozen before any WS-W2
-strictness-batch code merges; tranche 2 pending the D-W4.4 dry-run).** This annex is **additive-only
+strictness-batch code merges; **additive A-1.4 tranche 2, 2026-08-04 — registers
+PP-W2 = NOT ADJUDICATED; no threshold frozen, no epoch run**).** This annex is **additive-only
 with respect to the main document**: no §1–§7 machine-adjudicable gate
 criterion references any metric defined here, and nothing here alters the
 C#-vs-Calor gate decisions those sections govern. The annex's own proof-point
@@ -302,6 +303,55 @@ D4.5 rule ("the dry-run may move a threshold, the task count, or N before
 freezing — never after") applied as written.
 
 ### A.3 Annex revision log
+
+**A-1.4 tranche 2 — PP-W2 NOT ADJUDICATED (2026-08-04).** Additive; registers the
+outcome of the real-scale measurement half, NOT a threshold. Per the two-tranche
+D-W5.1 structure, tranche 2 was to freeze the PP-W2 threshold after the D-W4.4
+dry-run. The dry-run (`w4-dryrun-001`, $74, 36/36 valid) and the follow-on
+task-supply investigation instead triggered the wedge plan's **pre-committed
+§6.2 not-adjudicated branch**: real-scale PP-W2 cannot be measured at v0.11
+maturity because every thesis-testing task source is supply-starved on the
+pinned corpus — logic mutations carry no verification signal (mechanical arm),
+revert-bugfix yields 0 native∩separable, and the expressible-defect stratum
+(mechanism proven, 100% Calor0410-addressable on real corpus code) yields 0
+eligible (native surface not value-asserted / arm-divergent; **3 candidates, 3/3
+addressable, 0/3 eligible — measured at the task generator's default caps
+(`MaxCandidatesPerProject = 8`, `TargetEligiblePerProject = 3`) over a merged
+cross-stratum candidate list taken in lexicographic order, with the run's full
+switch set not recorded**). **No threshold is frozen and no epoch was run.**
+**Trigger disclosure:** §6.2's parenthetical enumerates two not-adjudicated
+triggers, and they are in **different states** — the D-W4.4 **ceiling** trigger
+demonstrably did not fire (the check ran and cleared the other way), while the
+**fidelity** trigger is **UNDETERMINED, not "did not fire"**: the D-W4.3 gate was
+never applied (`w4-dryrun-001/VERDICT.md` finding 3 records this explicitly) and
+no per-project `NativeFraction` was recorded in the epoch. A first version of this
+entry asserted that neither trigger fired; that assertion was unmeasured and **is
+withdrawn**. The **operative** trigger is a **third, not-pre-enumerated route:
+task-supply starvation**, legitimate under §6.1's general principle and routing
+identically, recorded as novel rather than folded into an existing trigger. Should
+a future fidelity run show sub-2-project pass, the pre-enumerated trigger
+**co-fires** and the routing is unchanged. The one adjudicable real-scale signal DID resolve and is
+positive: the D-W4.4 **ceiling-recurrence check cleared** — the C# arm escaped
+genuine bugs on 16.7% of runs (3/18 C#-arm runs, across 2 of 6 tasks), so the
+v0.10 ceiling does NOT persist at real scale (evidence that the venue has
+headroom; the blocker is substrate). **This is a dry-run signal at n = 6 tasks /
+18 C#-arm runs and was not powered for it — an existence result, not a rate
+estimate; no escape-rate figure is registered.** Full evidence + the three v0.12
+levers (converter fidelity, checker breadth, corpus shape) + the
+authored-contract-overlay track: `docs/plans/wedge-real-scale-closeout.md`.
+**This alters no frozen row and makes no §7 supersession claim** — the §4 2a rows
+and A-1.0…A-1.4-tranche-1 rows stand. The edit is insert-only **except for the
+annex version pointer** at the head of Annex A, which is updated from "tranche 2
+pending the D-W4.4 dry-run" to record tranche 2 as registered; every prior annex
+revision (A-1.2/#808, A-1.3/#825, A-1.4-t1/#839) updated that same line, and
+leaving it stale would have the pointer contradict the log it points at. Diff vs
+`main`: **45 insertions, 1 deletion**, the deletion being that pointer.
+Continuing: **PP-W5 and PP-A1 (release gates, both
+carried forward to v0.12 — the v0.11.0 release was folded forward, no tag) and
+PP-A2 (a Call W input, resolved at its pre-committed "demand unproven" value)**
+are adjudicated separately and are unaffected by this entry. PP-W2's absence from
+adjudication is itself the registered tranche-2 result, feeding Call W's
+not-adjudicated branch.
 
 **A-1.4 exclusion-closure note (2026-08-02).** Additive record, no threshold or
 frozen-row change. The **PP-W1** row's frozen scope guards exclude "the

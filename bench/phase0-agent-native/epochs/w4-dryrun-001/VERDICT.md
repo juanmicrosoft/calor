@@ -78,3 +78,16 @@ headline with it, build the contract channel in parallel:
 
 Raw per-run `result.json`s, `epoch-summary.json`, and `driver.log` preserved in
 this directory. Workspaces were ephemeral (oracle isolation) and are not retained.
+
+---
+
+> **SUPERSEDED IN PART (2026-08-04) — see
+> [`docs/plans/wedge-real-scale-closeout.md`](../../../../docs/plans/wedge-real-scale-closeout.md).**
+> The disposition above was maintainer-approved on 2026-08-03 and its
+> "add an expressible-defect stratum" item was carried out (PR #856). The stratum
+> then yielded **0 eligible tasks**, which removed the precondition for the other
+> two items: **"run a re-scoped near-term epoch" and "restate PP-W2" no longer
+> apply** — with no eligible task there is no epoch, and with no epoch there is no
+> adjudication to restate from. PP-W2 is registered **not adjudicated**
+> (gates Annex A-1.4 tranche 2). This block is a forward pointer only; nothing
+> above it has been edited.
