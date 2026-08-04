@@ -60,8 +60,11 @@ the nested effect). That broadening is what moved native supply off zero:
 | Differentially **verification-addressable** (predicted check fires on the mutated conversion, absent on the clean one) | **3 / 3 = 100%** |
 | **Eligible** under the D-W4.1 predicate | **0 / 3** |
 
-All three exclusions are clause (b) — the defect exists and the check fires, but the
-task is not *adjudicable*:
+The exclusions are clause (b) — the defect exists and the check fires, but the task
+is not *adjudicable*. **Only two distinct dispositions were recorded**, and this
+document does not know which of them the third candidate took; that gap is stated
+rather than papered over, and a successor measurement must emit per-candidate
+dispositions (D-S0.5.3 in the v0.12 plan does):
 
 - **Serilog, `GetHashCode`-shaped surface** → `NoObservableDefect`: no covering
   value-asserting test, so the held-out oracle has nothing to fail on. This is the
@@ -77,17 +80,35 @@ task is not *adjudicable*:
 **Configuration disclosure (added after review).** These counts are not corpus
 totals — they are the yield **at the generator's default configuration**:
 `MaxCandidatesPerProject = 8` and `TargetEligiblePerProject = 3`
-(`TaskGen/TaskGenOptions.cs`). So "3 native candidates" means 3 among *at most 8
-evaluated per project*, not 3 in the corpus. The early-stop knob did not truncate
-this particular run (it stops at 3 *eligible*, and 0 were found), but the
-candidate cap is a real bound on the numerator. Any successor measurement that
-compares against this zero must pin the same configuration, or it is comparing
-different quantities — v0.12's plan registers exactly that pin.
+(`TaskGen/TaskGenOptions.cs`). Four things a reader needs, three of which a first
+version of this disclosure omitted:
+
+- The cap applies to the **merged, cross-stratum** candidate list (logic +
+  expressible + revert compete for the same slots), not per stratum — the
+  constant's own doc comment says "injected-mutation candidates," which is
+  narrower than what the code does.
+- The capped slice is **lexicographic**, not a sample: candidates are ordered by
+  file path, then line, then column, and the first N taken. It is a biased slice
+  of the candidate space, not a representative truncation of it.
+- The denominator is **per project** across a 3-project corpus, so "3 native
+  candidates" is a corpus-level numerator against an at-most-8-per-project bound.
+  It does not read as 3/8.
+- The early-stop knob did **not** truncate this run (it stops at 3 *eligible*, and
+  0 were found), but the candidate cap is a real bound on the numerator.
+
+**The invocation's actual switches (`--stratum`, `--source`, `--max-candidates`,
+`--target`, `--native-bar`) were not recorded, and neither was the harness's
+printed `totalEnumerated`** — which is precisely the observation that would settle
+whether the cap bound at all. That omission is itself part of the finding: a
+successor measurement must pin and record the full configuration, or it is
+comparing different quantities against this zero. The v0.12 plan (in review,
+PR #857) registers exactly that pin.
 
 Provenance: the operator, the differential addressability probe, the exclusion
-accounting and **14 test methods** (which take the harness test project 118 →
-132 — the "132 tests" figure that circulated earlier is the whole pre-existing
-project, not this work) are committed in **PR #856** (`w4-expressible-stratum`) —
+accounting and **14 test methods** (9 + 5, one of them a `SkippableFact` gated on
+native Z3; they take the harness test project 118 → 132 — the "132 tests" figure
+that circulated earlier is the project's **post-change total**, not this work's
+contribution) are committed in **PR #856** (`w4-expressible-stratum`) —
 that is the reproducible half, and it is what the "100% addressable" claim rests on.
 The per-candidate dispositions above are from the investigation run's log and are
 not themselves a committed artifact; they are recorded here as the finding, at the
@@ -95,9 +116,14 @@ granularity the close-out decision actually used.
 
 ## The three structural levers (v0.12), now precisely characterized
 
-1. **Converter fidelity (~40–53% native).** Half the real code converts to
-   interop/reverts and is excluded; the interesting defect sites (stateful,
-   guard-bearing) are disproportionately in the excluded half.
+1. **Converter fidelity (40–53% native).** Sourced, not estimated: per-project
+   `ConversionCoverage.NativeFraction` = MediatR **0.469**, Serilog **0.400**,
+   FluentValidation **0.532** (`bench/corpus/README.md:122–124`, from the Slice B
+   measurement in `5de804cc`). So **47–60% of the convertible surface** is
+   excluded — and the interesting defect sites (stateful, guard-bearing) are
+   disproportionately in the excluded half. Note these are below the provisional
+   0.70 fidelity bar, which is why the gate's un-application matters (see the
+   trigger disclosure below).
 2. **Checker breadth.** The bug-pattern checkers key on narrow shapes — null-deref
    models `Option.unwrap`, not plain reference null; index-OOB keys on specific
    accessor forms converted code rarely produces. Few real defects are
@@ -111,21 +137,57 @@ mechanism to re-apply `§Q`/`§S` to each per-task conversion) — the D-W4.5 ar
 channel that does not exist and is the only way to test proof-depth on defect
 classes the mechanical checkers can't reach.
 
+## Supersession — what this close-out overrides
+
+`bench/phase0-agent-native/epochs/w4-dryrun-001/VERDICT.md` carries a
+**maintainer-approved disposition dated 2026-08-03** which instructed: *run a
+re-scoped near-term epoch*, *add an expressible-defect stratum*, and *restate
+PP-W2* under the D-G3.1 restate-or-demote precedent. **This close-out supersedes
+the first and third of those, and it is recorded here rather than left as a
+silent reversal.**
+
+The reason is that the disposition's own precondition failed. It assumed the
+expressible stratum would yield tasks; the stratum was built (PR #856) and yielded
+**0 eligible**. With no eligible task there is no epoch to re-scope, and with no
+epoch there is no measurement to restate PP-W2 *from* — restating a proof point
+requires an adjudication, and none exists. So PP-W2 routes to **not adjudicated**
+instead of restated. The second instruction — add the stratum — was carried out in
+full; it is what produced the finding.
+
+`VERDICT.md` remains on `main` as the epoch's record of what was decided at the
+time, with a forward pointer to this document.
+
 ## Disposition
 
 - **Run no epoch.** There are no eligible thesis-testing tasks; a mechanical-only
   logic-bug epoch would measure the conversion penalty at power that cannot
   detect the registered effect (§6.1 / dry-run VERDICT.md). PP-W2 → **not
   adjudicated** (A-1.4 registration, additive).
-- **Disclosure — this is a novel route to not-adjudicated.** §6.2's parenthetical
-  names two triggers for the not-adjudicated branch: sub-2-project *fidelity*,
-  and the D-W4.4 *ceiling* branch. Neither fired — fidelity was adequate on two
-  projects, and the ceiling check went the *other* way (it cleared, positive #1).
-  The trigger here is a **third route: task-supply starvation** — no eligible
-  thesis-testing task exists to run the epoch over. This is legitimate under
-  §6.1's general principle (the measurement cannot be made, so no verdict may be
-  registered) and it routes identically, but it was **not enumerated in advance**
-  and is disclosed as such rather than folded silently into an existing trigger.
+- **Disclosure — this is a novel route to not-adjudicated, and the two enumerated
+  triggers are in different states.** §6.2's parenthetical names two triggers for
+  the not-adjudicated branch: sub-2-project *fidelity*, and the D-W4.4 *ceiling*
+  branch.
+  - The **ceiling** trigger demonstrably did **not** fire — the check ran and
+    cleared the other way (positive #1).
+  - The **fidelity** trigger's status is **UNDETERMINED, not "did not fire."**
+    The D-W4.3 fidelity gate was **never applied**: the dry-run VERDICT records
+    it explicitly ("the D-W4.3 fidelity gate + converter-attribution rule … were
+    NOT applied in the dry-run"), and no per-project `NativeFraction` was
+    recorded in the epoch. An earlier draft of this section asserted "fidelity
+    was adequate on two projects." That was **unmeasured and is withdrawn** —
+    and it sat badly beside this document's own ~40–53% figure, which is below
+    the provisional 0.70 bar for all three projects, i.e. if the gate *were*
+    applied on those numbers the first enumerated trigger would plausibly fire.
+  - The **operative** trigger is a **third route: task-supply starvation** — no
+    eligible thesis-testing task exists to run the epoch over. Legitimate under
+    §6.1's general principle (a measurement that cannot establish its substrate
+    does not get to claim its conclusion), routing identically, but **not
+    enumerated in advance** and disclosed as such rather than folded silently
+    into an existing trigger.
+
+  If a future fidelity run shows sub-2-project pass, the pre-enumerated trigger
+  **co-fires** and the routing is unchanged — the disposition below does not
+  depend on which of the two is operative.
 - **Bank the reusable machinery** — oracle-hidden bundle runner, task-gen
   (logic + revert + expressible strata), the Calor0410 addressability
   differential — all proven end-to-end; v0.12 inherits a working benchmark the

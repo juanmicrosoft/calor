@@ -20,7 +20,9 @@ task source is supply-starved on the pinned corpus (see
 `wedge-real-scale-closeout.md`). Per §6.1, this routes the measurement half back
 to substrate engineering, finding published, door closed — exactly as
 pre-committed. **The one positive:** the ceiling-recurrence check cleared (C# arm
-escaped 16.7% at real scale) — the v0.10 ceiling does not survive real code, so
+escaped 16.7% at real scale — **dry-run signal, n = 6 tasks / 18 C#-arm runs, not
+powered for it; an existence result, not a registered escape rate**) — the v0.10
+ceiling does not survive real code, so
 the venue has genuine headroom and the blocker is substrate, not a dead thesis.
 
 **PP-A2 (the go-to-market weight) = "DEMAND UNPROVEN"** — the plan's
@@ -95,10 +97,41 @@ This was surfaced to the maintainer as a separate decision, and the decision is:
 the measurement half concluding not-adjudicated, a v0.11.0 release would ship the
 adoption half alone, and PP-A2 has just routed that half to maintenance-mode; a
 release cycle plus a spend-authorized epoch buys no decision. **PP-W5 stays
-frozen and unadjudicated** (gate #839 is untouched, and nothing here supersedes
-it) and is run once against the v0.12 substrate work, where the strictness-parity
-question has a materially different treatment arm to be measured against. **PP-A1
-likewise carries forward** as a v0.12 release gate.
+frozen and unadjudicated** and is run once against the v0.12 substrate work, where
+the strictness-parity question has a materially different treatment arm to be
+measured against. **PP-A1 likewise carries forward** as a v0.12 release gate.
+
+**Precise statement of the drift against frozen row A-1.4 tranche 1** (an earlier
+draft said flatly that "#839 is untouched," which is true of the row's text and
+misleading about its meaning). Three parts, stated separately:
+- **Arm definition — no drift.** The row freezes `treatment = main at epoch time`.
+  "v0.11 + v0.12 substrate" *is* main at epoch time, so the arm is consistent with
+  the freeze by its letter and needs no supersession.
+- **Schedule — drift.** The row says "by plan §3 the parity epoch runs at W5."
+  There is no W5 in v0.12; the epoch is deferred past it.
+- **Attribution scope — drift.** The row says it adjudicates the
+  "**v0.11**-toolchain-vs-v0.10.0 release question," and its pre-committed on-fail
+  isolation recipe (`v0.10.0 + WS-W2-only`) was built for a two-source attribution
+  problem. A two-release treatment makes it three-source, and the recipe cannot
+  separate v0.11 from v0.12 work.
+
+None of this is corrected by silence. The v0.12 plan registers an **additive**
+annex note (D-S5.5) restating the adjudicated question, extending the isolation
+ladder to two steps, and recording that the 1.25 margin was calibrated for a
+one-release delta and is not re-derived — so a fail becomes more likely and a pass
+correspondingly stronger.
+
+**On §6.2's "the adoption pair still adjudicates" clause.** The wedge plan's
+not-adjudicated branch pre-commits that the adoption pair still adjudicates in
+exactly this branch. **PP-A2 does adjudicate here** ("demand unproven", above).
+**PP-A1 does not — it is deferred to v0.12, and that deferral is disclosed rather
+than inherited.** The reading applied is that PP-A1's adjudication is bound to the
+release it gates, and since the maintainer's decision above cancels the v0.11.0
+release, PP-A1 moves with it. That is a narrower reading of "the adoption pair"
+than the clause's plain text, so it is recorded as a **disclosed departure**, not
+as compliance. PP-A1 requires no epoch — it is a CI gate — so it can be
+adjudicated at any time before the v0.12.0 release, and nothing about this
+deferral makes it easier to pass.
 
 Consequences to hold: the shipped v0.11 adoption surface lives on `main`
 untagged, so v0.12's release notes and CHANGELOG must cover the v0.11 range as
