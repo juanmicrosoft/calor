@@ -1,3 +1,4 @@
+using Calor.Compiler.Verification.Z3;
 using Calor.RoundTrip.Harness.TaskGen;
 using Xunit;
 
@@ -79,9 +80,18 @@ public class TaskGenAddressabilityTests
 
     // ---- DivByZero → Calor0920 (guard removal, Z3-backed) ----
 
-    [Fact]
+    [SkippableFact]
     public void DivByZero_GuardRemoval_IsAddressable_Calor0920()
     {
+        // The div-by-zero checker's addressability verdict is Z3-backed: without the native Z3
+        // library the checker has no precise signal, the probe reports "not addressable", and the
+        // assertion below would fail for an environmental reason rather than a real regression.
+        // Repo convention (Calor.Compiler.Tests / Calor.Verification.Tests) is to gate on
+        // Z3ContextFactory.IsAvailable — CI runners do not carry the native lib, and a visible SKIP
+        // is honest where a false pass or an environmental red would not be. The claim itself is
+        // exercised locally and via the CLI, which bundles the native lib.
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
         const string clean = """
             namespace S;
             public static class M
