@@ -5,8 +5,8 @@
       "NativeFiles": 20,
       "WithLossFiles": 5,
       "UnconvertedFiles": 7,
-      "SupplyTotal": 48,
-      "SupplyLostToConversion": 41,
+      "SupplyTotal": 46,
+      "SupplyLostToConversion": 39,
       "UnreadableSources": 0,
       "SupplyNative": 5,
       "SupplyWithLoss": 2,
@@ -29,16 +29,16 @@
       "NativeFiles": 72,
       "WithLossFiles": 17,
       "UnconvertedFiles": 21,
-      "SupplyTotal": 181,
-      "SupplyLostToConversion": 66,
+      "SupplyTotal": 177,
+      "SupplyLostToConversion": 65,
       "UnreadableSources": 0,
       "SupplyNative": 93,
-      "SupplyWithLoss": 22,
+      "SupplyWithLoss": 19,
       "NativeByOperator": {
         "EffectViolation": 93
       },
       "WithLossByOperator": {
-        "EffectViolation": 16,
+        "EffectViolation": 13,
         "NullDeref": 6
       },
       "NativeByFile": {
@@ -72,20 +72,20 @@
         "src/Serilog/Rendering/Casing.cs": 1,
         "src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs": 10
       },
-      "WithLossOverNativeRatio": 0.23655913978494625
+      "WithLossOverNativeRatio": 0.20430107526881722
     },
     {
       "ProjectName": "FluentValidation",
       "NativeFiles": 109,
       "WithLossFiles": 4,
       "UnconvertedFiles": 26,
-      "SupplyTotal": 298,
-      "SupplyLostToConversion": 144,
+      "SupplyTotal": 296,
+      "SupplyLostToConversion": 143,
       "UnreadableSources": 0,
-      "SupplyNative": 106,
+      "SupplyNative": 105,
       "SupplyWithLoss": 48,
       "NativeByOperator": {
-        "EffectViolation": 103,
+        "EffectViolation": 102,
         "NullDeref": 3
       },
       "WithLossByOperator": {
@@ -97,7 +97,7 @@
         "src/FluentValidation/Internal/AccessorCache.cs": 4,
         "src/FluentValidation/Internal/CompositeValidatorSelector.cs": 1,
         "src/FluentValidation/Internal/DefaultValidatorSelector.cs": 1,
-        "src/FluentValidation/Internal/Extensions.cs": 2,
+        "src/FluentValidation/Internal/Extensions.cs": 1,
         "src/FluentValidation/Internal/MemberNameValidatorSelector.cs": 3,
         "src/FluentValidation/Internal/MessageBuilderContext.cs": 1,
         "src/FluentValidation/Internal/MessageFormatter.cs": 4,
@@ -128,13 +128,13 @@
         "src/FluentValidation/Validators/RegularExpressionValidator.cs": 3,
         "src/FluentValidation/Validators/StringEnumValidator.cs": 2
       },
-      "WithLossOverNativeRatio": 0.4528301886792453
+      "WithLossOverNativeRatio": 0.45714285714285713
     }
   ],
-  "TotalSupplyNative": 204,
-  "TotalSupplyWithLoss": 72,
-  "TotalSupplyAll": 527,
-  "TotalSupplyLostToConversion": 251,
+  "TotalSupplyNative": 203,
+  "TotalSupplyWithLoss": 69,
+  "TotalSupplyAll": 519,
+  "TotalSupplyLostToConversion": 247,
   "TotalUnreadableSources": 0,
   "ByOperator": {
     "EffectViolation": {},
@@ -142,6 +142,6 @@
   },
   "DominantNumeratorOperator": {},
   "RatioExcludingDominant": 2,
-  "PooledRatio": 0.35294117647058826,
-  "D5Verdict": "SPLIT \u2014 pooled ratio 0.35 says REJECT, but that is carried by \u0027EffectViolation\u0027 (its own ratio 0.33); excluding it the ratio is 2.00 \u2192 ACCEPT. The pre-committed threshold does not settle this; decide explicitly and record why."
+  "PooledRatio": 0.3399014778325123,
+  "D5Verdict": "SPLIT \u2014 pooled ratio 0.34 says REJECT, but that is carried by \u0027EffectViolation\u0027 (its own ratio 0.32); excluding it the ratio is 2.00 \u2192 ACCEPT. The pre-committed threshold does not settle this; decide explicitly and record why."
 }

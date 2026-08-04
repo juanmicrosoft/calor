@@ -14,10 +14,10 @@ so these figures bound eligibility from above. That is the correct direction for
 
 | Project | Sites (all) | Lost to conversion | Supply (native) | Supply (with-loss) | with-loss / native |
 |---|---:|---:|---:|---:|---:|
-| MediatR | 48 | 41 | **5** | 2 | 0.40 |
-| Serilog | 181 | 66 | **93** | 22 | 0.24 |
-| FluentValidation | 298 | 144 | **106** | 48 | 0.45 |
-| **TOTAL** | **527** | 251 | **204** | 72 | 0.35 |
+| MediatR | 46 | 39 | **5** | 2 | 0.40 |
+| Serilog | 177 | 65 | **93** | 19 | 0.20 |
+| FluentValidation | 296 | 143 | **105** | 48 | 0.46 |
+| **TOTAL** | **519** | 247 | **203** | 69 | 0.34 |
 
 **Read the first two columns before the third.** "Sites (all)" is the corpus-side
 supply the frozen operator set can enumerate anywhere; "lost to conversion" is the part
@@ -29,7 +29,7 @@ use of the native number as "the corpus's supply ceiling" must account for both.
 
 Pre-committed rule (S1 kickoff): accept site-level clause (a) iff with-loss/native ≥ 0.50.
 
-**SPLIT — pooled ratio 0.35 says REJECT, but that is carried by 'EffectViolation' (its own ratio 0.33); excluding it the ratio is 2.00 → ACCEPT. The pre-committed threshold does not settle this; decide explicitly and record why.**
+**SPLIT — pooled ratio 0.34 says REJECT, but that is carried by 'EffectViolation' (its own ratio 0.32); excluding it the ratio is 2.00 → ACCEPT. The pre-committed threshold does not settle this; decide explicitly and record why.**
 
 Per-project ratios are in the table above; a pooled figure must not conceal a split.
 
@@ -37,7 +37,7 @@ Per-operator, because a pooled ratio can be carried by a single operator:
 
 | Operator | With-loss | Native | ratio |
 |---|---:|---:|---:|
-| EffectViolation | 66 | 201 | 0.33 |
+| EffectViolation | 63 | 200 | 0.32 |
 | NullDeref | 6 | 3 | 2.00 |
 
 ## Candidates by operator
@@ -52,14 +52,14 @@ Per-operator, because a pooled ratio can be carried by a single operator:
 
 | Operator | Native | With-loss |
 |---|---:|---:|
-| EffectViolation | 93 | 16 |
+| EffectViolation | 93 | 13 |
 | NullDeref | 0 | 6 |
 
 ### FluentValidation
 
 | Operator | Native | With-loss |
 |---|---:|---:|
-| EffectViolation | 103 | 48 |
+| EffectViolation | 102 | 48 |
 | NullDeref | 3 | 0 |
 
 ## Clustering (native candidates by file)
@@ -125,7 +125,6 @@ nominal *n* (S1 kickoff D-3). This table is what makes that visible before the p
 - `src/FluentValidation/Internal/MemberNameValidatorSelector.cs` — 3
 - `src/FluentValidation/Validators/EmptyValidator.cs` — 3
 - `src/FluentValidation/Validators/RegularExpressionValidator.cs` — 3
-- `src/FluentValidation/Internal/Extensions.cs` — 2
 - `src/FluentValidation/Internal/RulesetValidatorSelector.cs` — 2
 - `src/FluentValidation/Resources/LanguageManager.cs` — 2
 - `src/FluentValidation/ValidatorFactoryBase.cs` — 2
@@ -137,6 +136,7 @@ nominal *n* (S1 kickoff D-3). This table is what makes that visible before the p
 - `src/FluentValidation/AsyncValidatorInvokedSynchronouslyException.cs` — 1
 - `src/FluentValidation/Internal/CompositeValidatorSelector.cs` — 1
 - `src/FluentValidation/Internal/DefaultValidatorSelector.cs` — 1
+- `src/FluentValidation/Internal/Extensions.cs` — 1
 - `src/FluentValidation/Internal/MessageBuilderContext.cs` — 1
 - `src/FluentValidation/Internal/RuleComponentForNullableStruct.cs` — 1
 - `src/FluentValidation/Results/ValidationFailure.cs` — 1
