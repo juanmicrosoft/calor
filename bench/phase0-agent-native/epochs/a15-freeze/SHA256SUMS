@@ -1,0 +1,10 @@
+# A-1.5 pinned artifact hashes. Algorithm: SHA-256, first 16 hex chars.
+# ExcludePatterns hashes are over the RESOLVED, SORTED pattern VALUES joined by newline
+# (not over source text), so a comment edit does not move them and a per-project override does.
+
+6b6713accbc7d75e  task-gen-options.json
+
+# Per-project ExcludePatterns (all three currently take RoundTripConfig.DefaultExcludePatterns()):
+7f16cc1b5da1a47c  ExcludePatterns:MediatR
+7f16cc1b5da1a47c  ExcludePatterns:Serilog
+7f16cc1b5da1a47c  ExcludePatterns:FluentValidation
