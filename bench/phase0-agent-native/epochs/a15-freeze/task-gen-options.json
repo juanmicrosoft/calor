@@ -1,0 +1,27 @@
+{
+  "_purpose": "A-1.5 pinned TaskGenOptions. Adjudication values. Any measurement at a different configuration is reported, not adjudicated.",
+  "Strata": "Expressible",
+  "Sources": "Injected",
+  "MaxCandidatesPerProject": 0,
+  "TargetEligiblePerProject": 0,
+  "RequireIdenticalSignature": true,
+  "RevertScanCommits": 2000,
+  "Fidelity": {
+    "NativeFractionBar": 0.70,
+    "BarIsProvisional": false
+  },
+  "_inert_under_expressible_stratum": [
+    "Sources — the expressible branch reads Strata only",
+    "RevertScanCommits — revert mining is Logic-gated",
+    "Fidelity.NativeFractionBar — the fidelity gate is report-only; options.Fidelity is read once after generation and ExclusionReason.FidelityGateBelowBar is never assigned"
+  ],
+  "_diagnostic_probe_only": {
+    "MaxCandidatesPerProject": 10,
+    "_note": "Scoped to diagnostic probe passes. Pinning 10 for adjudication caps evaluation at 3 x 10 = 30 candidates and makes the M-S3 bar of 70 unreachable at its own configuration."
+  },
+  "_corpus_pins": {
+    "MediatR": "fb309026775ef953a64fb5339d074426c1ad2c37",
+    "Serilog": "0597ddfbd4ec594d9c42edd745fe728a2198bad9",
+    "FluentValidation": "71b3c60cb5a16e02cb7957e478ec3fb6b983a73c"
+  }
+}
