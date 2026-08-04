@@ -119,13 +119,7 @@ public sealed class TaskGenerator
         // MaxCandidatesPerProject <= 0 means UNBOUNDED, which is what gates A-1.5 pins for the
         // adjudication run. Before this, 0 meant `.Take(0)` — evaluate nothing — so the frozen
         // configuration would have evaluated zero candidates while registering a bar of 70.
-        var ordered = enumerated
-            .OrderBy(c => c.FileRelPath, StringComparer.Ordinal)
-            .ThenBy(c => c.Line).ThenBy(c => c.Column);
-        var candidates = (options.MaxCandidatesPerProject > 0
-                ? ordered.Take(options.MaxCandidatesPerProject)
-                : ordered)
-            .ToList();
+        var candidates = ApplyCandidateCap(enumerated, options.MaxCandidatesPerProject);
         Console.WriteLine($"[{project.ProjectName}] Step 2/4: {totalEnumerated} candidate(s) enumerated; evaluating up to {candidates.Count}");
 
         int idx = 0;
@@ -430,6 +424,21 @@ public sealed class TaskGenerator
     };
 
     /// <summary>Clone a config with an overridden working directory and/or test filter.</summary>
+    /// <summary>
+    /// Order candidates deterministically and apply the per-project cap. <b>A cap of 0 or less means
+    /// UNBOUNDED</b>, which is what gates A-1.5 pins for the adjudication run — passing it straight to
+    /// <c>Take</c> would mean "evaluate nothing" and make the frozen M-S3 bar unreachable at its own
+    /// frozen configuration.
+    /// </summary>
+    public static List<MutationCandidate> ApplyCandidateCap(
+        IEnumerable<MutationCandidate> enumerated, int maxPerProject)
+    {
+        var ordered = enumerated
+            .OrderBy(c => c.FileRelPath, StringComparer.Ordinal)
+            .ThenBy(c => c.Line).ThenBy(c => c.Column);
+        return (maxPerProject > 0 ? ordered.Take(maxPerProject) : ordered).ToList();
+    }
+
     private static RoundTripConfig Clone(RoundTripConfig c, string? workDir, string? testFilter = null) => new()
     {
         ProjectName = c.ProjectName,

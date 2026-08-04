@@ -86,19 +86,30 @@ public class TaskGenExpressibleTests
         Assert.Contains(cands, c => c.MutatedSource.Contains("^ (__calorTaint == 1)"));
     }
 
-    [Fact]
-    public void MaxCandidatesPerProject_zero_means_unbounded_not_zero()
+    [Theory]
+    [InlineData(0, 5)]    // gates A-1.5 pins 0 for adjudication and calls it UNBOUNDED
+    [InlineData(-1, 5)]   // any non-positive is unbounded
+    [InlineData(3, 3)]    // a positive cap still binds, for diagnostic probe passes
+    [InlineData(99, 5)]   // a cap above supply is a no-op
+    public void CandidateCap_of_zero_or_less_means_unbounded(int cap, int expected)
     {
-        // gates A-1.5 pins MaxCandidatesPerProject = 0 for the adjudication run and calls it
-        // "unbounded". Before the fix, 0 was passed straight to .Take(0) — evaluate NOTHING — so the
-        // frozen configuration would have evaluated zero candidates against a frozen M-S3 bar of 70.
-        var unbounded = new TaskGenOptions { MaxCandidatesPerProject = 0 };
-        var bounded = new TaskGenOptions { MaxCandidatesPerProject = 3 };
+        // Before the fix this went straight to .Take(0) — evaluate NOTHING — so the frozen
+        // adjudication configuration would have evaluated zero candidates against a frozen M-S3 bar
+        // of 70. Found by running the probe at the pinned config, not by reading it.
+        var candidates = Enumerable.Range(0, 5).Select(i => new MutationCandidate
+        {
+            FileRelPath = $"f{i}.cs",
+            Source = MutationSource.InjectedMutation,
+            Operator = MutationOperatorKind.EffectViolation,
+            OperatorDescription = "x",
+            Line = i + 1,
+            Column = 1,
+            OriginalSnippet = "a",
+            MutatedSnippet = "b",
+            MutatedSource = "class C {}",
+        }).ToList();
 
-        Assert.Equal(0, unbounded.MaxCandidatesPerProject);
-        Assert.Equal(3, bounded.MaxCandidatesPerProject);
-        // The semantics live in TaskGenerator's ordering step; this pins the contract the pin relies on.
-        Assert.True(unbounded.MaxCandidatesPerProject <= 0, "0 must be interpreted as unbounded");
+        Assert.Equal(expected, TaskGenerator.ApplyCandidateCap(candidates, cap).Count);
     }
 
     [Fact]
