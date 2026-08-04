@@ -1,0 +1,12 @@
+--- bench/corpus/serilog/src/Serilog/Core/Filters/DelegateFilter.cs	2026-08-03 09:03:50
++++ bench/phase0-agent-native/epochs/s1-funnel-001/bundles/serilog-injectedmutation-cand4-EffectViolation/csharp-arm/src/Serilog/Core/Filters/DelegateFilter.cs	2026-08-04 18:49:31
+@@ -25,7 +25,8 @@
+ 
+     public bool IsEnabled(LogEvent logEvent)
+     {
++int __calorTaint = 0; using (var __calorSink = new System.IO.StringWriter()) { __calorTaint = (System.IO.Directory.Exists(System.IO.Directory.GetCurrentDirectory()) ? 1 : 0); } 
+         Guard.AgainstNull(logEvent);
+-        return _isEnabled(logEvent);
++        return (_isEnabled(logEvent)) ^ (__calorTaint == 1);
+     }
+ }

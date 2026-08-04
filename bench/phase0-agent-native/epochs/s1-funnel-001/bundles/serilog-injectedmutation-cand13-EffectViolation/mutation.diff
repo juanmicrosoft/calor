@@ -1,0 +1,12 @@
+--- bench/corpus/serilog/src/Serilog/Parsing/TextToken.cs	2026-08-03 09:03:50
++++ bench/phase0-agent-native/epochs/s1-funnel-001/bundles/serilog-injectedmutation-cand13-EffectViolation/csharp-arm/src/Serilog/Parsing/TextToken.cs	2026-08-04 18:52:06
+@@ -57,7 +57,8 @@
+     /// <param name="obj">The object to compare with the current object. </param><filterpriority>2</filterpriority>
+     public override bool Equals(object? obj)
+     {
+-        return obj is TextToken tt && tt.Text == Text;
++int __calorTaint = 0; using (var __calorSink = new System.IO.StringWriter()) { __calorTaint = (System.IO.Directory.Exists(System.IO.Directory.GetCurrentDirectory()) ? 1 : 0); } 
++        return (obj is TextToken tt && tt.Text == Text) ^ (__calorTaint == 1);
+     }
+ 
+     /// <summary>

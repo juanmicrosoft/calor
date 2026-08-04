@@ -1,0 +1,169 @@
+{
+  "TaskId": "fluentvalidation-injectedmutation-cand6-EffectViolation",
+  "ProjectName": "FluentValidation",
+  "Provenance": {
+    "Source": "InjectedMutation",
+    "Operator": "EffectViolation",
+    "OperatorDescription": "inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts HasError's return (boolean flip)",
+    "MutatedFileRelPath": "src/FluentValidation/Validators/ExclusiveBetweenValidator.cs",
+    "Line": 33,
+    "Column": 26,
+    "OriginalSnippet": "return Compare(value, From) <= 0 || Compare(value, To) >= 0;",
+    "MutatedSnippet": "using (\u2026) { __calorTaint = Directory.Exists(cwd)?1:0; } return (Compare(value, From) <= 0 || Compare(value, To) >= 0)...",
+    "NativeEligibility": {
+      "MutatedFileRelPath": "src/FluentValidation/Validators/ExclusiveBetweenValidator.cs",
+      "MutatedFileConvertedNative": true,
+      "MutatedFileLossCount": 0,
+      "MutatedFileStatus": "Replaced",
+      "CSharpArmHeldOutOutcome": "Failed",
+      "CalorArmHeldOutOutcome": "Failed",
+      "CSharpArmFailureSignature": "Assert.False()",
+      "CalorArmFailureSignature": "Assert.False()",
+      "AttributionOutcome": "AttributedToMutation",
+      "ProjectNativeFraction": 0.5323741007194245,
+      "Stratum": "Expressible",
+      "VerificationCheckFired": "Calor0410",
+      "AddressabilityNote": "Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) \u2014 verification-addressable."
+    },
+    "PresentationAsymmetry": "Calor arm = machine-converted round-tripped C# (from \u00a7-syntax); C# arm = idiomatic original. Bias is against Calor."
+  },
+  "CSharpArmDir": "~/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/s1-funnel-001/bundles/fluentvalidation-injectedmutation-cand6-EffectViolation/csharp-arm",
+  "CalorArmDir": "~/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/s1-funnel-001/bundles/fluentvalidation-injectedmutation-cand6-EffectViolation/calor-arm",
+  "HeldOut": [
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail_for_strings",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail_for_strings",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail_for_strings"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_by_icomparer_then_the_validator_should_pass",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_by_icomparer_then_the_validator_should_pass",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_by_icomparer_then_the_validator_should_pass"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_larger_than_the_range_by_icomparer_then_the_validator_should_fail",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_larger_than_the_range_by_icomparer_then_the_validator_should_fail",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_larger_than_the_range_by_icomparer_then_the_validator_should_fail"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_by_icomparer_then_the_validator_should_fail",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_by_icomparer_then_the_validator_should_fail",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_by_icomparer_then_the_validator_should_fail"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail_for_strings",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail_for_strings",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail_for_strings"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.Validates_with_nullable_when_property_not_null",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.Validates_with_nullable_when_property_not_null",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.Validates_with_nullable_when_property_not_null"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail_for_strings",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail_for_strings",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail_for_strings"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail_for_strings",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail_for_strings",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail_for_strings"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass_for_strings",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass_for_strings",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass_for_strings"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set_for_strings",
+      "ClassName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set_for_strings",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ExclusiveBetweenValidatorTests::FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set_for_strings"
+    }
+  ],
+  "VisibleTestFilter": "FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail_for_strings&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_by_icomparer_then_the_validator_should_pass&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_larger_than_the_range_by_icomparer_then_the_validator_should_fail&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_by_icomparer_then_the_validator_should_fail&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail_for_strings&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.Validates_with_nullable_when_property_not_null&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail_for_strings&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail_for_strings&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass_for_strings&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass&FullyQualifiedName!~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set_for_strings",
+  "RegressionNetProject": "src/FluentValidation.Tests/FluentValidation.Tests.csproj",
+  "FailingBehavior": {
+    "Symptom": "Observed incorrect behavior: Assert.False() Failure",
+    "SubjectHint": "ExclusiveBetweenValidator",
+    "Observed": "Assert.False() Failure",
+    "Notes": "Symptom derived mechanically from a removed covering test and scrubbed of the test's identity. The removed test is held out; the full suite remains as the regression net."
+  },
+  "EligibilityProof": {
+    "MutatedFileRelPath": "src/FluentValidation/Validators/ExclusiveBetweenValidator.cs",
+    "MutatedFileConvertedNative": true,
+    "MutatedFileLossCount": 0,
+    "MutatedFileStatus": "Replaced",
+    "CSharpArmHeldOutOutcome": "Failed",
+    "CalorArmHeldOutOutcome": "Failed",
+    "CSharpArmFailureSignature": "Assert.False()",
+    "CalorArmFailureSignature": "Assert.False()",
+    "AttributionOutcome": "AttributedToMutation",
+    "ProjectNativeFraction": 0.5323741007194245,
+    "Stratum": "Expressible",
+    "VerificationCheckFired": "Calor0410",
+    "AddressabilityNote": "Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) \u2014 verification-addressable."
+  }
+}

@@ -105,6 +105,11 @@ bench/phase0-agent-native/epochs/**/.ho_final.txt
 bench/phase0-agent-native/epochs/**/heldout/
 # WS5 probe-project run-internals (analogs of heldout/ + .ho_final.txt + .lasthash)
 bench/phase0-agent-native/epochs/**/probe/
+# Task-bundle WORKING COPIES only (~4 MB each). The bundle's provenance.json, README.md and
+# mutation.diff ARE committed — they are the only evidence a specific eligible task existed, and
+# "regenerable from the pinned config" was falsified once by a nondeterministic predicate.
+bench/phase0-agent-native/epochs/**/bundles/*/csharp-arm/
+bench/phase0-agent-native/epochs/**/bundles/*/calor-arm/
 bench/phase0-agent-native/epochs/**/.probe_final.txt
 bench/phase0-agent-native/epochs/**/.smokehash
 # WS2 MCP write-path reject replay payloads (run-internal; recorded in mcp-writes.jsonl)

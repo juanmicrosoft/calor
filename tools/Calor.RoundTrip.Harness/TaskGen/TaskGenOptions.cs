@@ -58,7 +58,7 @@ public sealed class TaskGenOptions
     /// <summary>How many commits of upstream history to scan for fix-shaped commits (revert source only).</summary>
     public int RevertScanCommits { get; init; } = 2000;
 
-    /// <summary>Upper bound on injected-mutation candidates considered per project (bounds run cost).</summary>
+    /// <summary>Upper bound on candidates EVALUATED per project (bounds run cost). <b>0 or less = UNBOUNDED</b> — gates A-1.5 pins 0 for the adjudication run; a positive cap takes a lexicographic prefix and is scoped to diagnostic probe passes.</summary>
     public int MaxCandidatesPerProject { get; init; } = 8;
 
     /// <summary>Stop siting new candidates for a project once this many eligible bundles are collected (0 = no early stop).</summary>

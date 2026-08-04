@@ -116,11 +116,10 @@ public sealed class TaskGenerator
         }
 
         var totalEnumerated = enumerated.Count; // honest denominator (minor: before Take/early-stop truncation)
-        var candidates = enumerated
-            .OrderBy(c => c.FileRelPath, StringComparer.Ordinal)
-            .ThenBy(c => c.Line).ThenBy(c => c.Column)
-            .Take(options.MaxCandidatesPerProject)
-            .ToList();
+        // MaxCandidatesPerProject <= 0 means UNBOUNDED, which is what gates A-1.5 pins for the
+        // adjudication run. Before this, 0 meant `.Take(0)` — evaluate nothing — so the frozen
+        // configuration would have evaluated zero candidates while registering a bar of 70.
+        var candidates = ApplyCandidateCap(enumerated, options.MaxCandidatesPerProject);
         Console.WriteLine($"[{project.ProjectName}] Step 2/4: {totalEnumerated} candidate(s) enumerated; evaluating up to {candidates.Count}");
 
         int idx = 0;
@@ -207,7 +206,20 @@ public sealed class TaskGenerator
 
         var heldOut = HeldOutExtraction.ToHeldOut(covering);
         var coveringIds = covering.Select(c => c.Identity).ToHashSet();
-        var csSignature = EligibilityPredicate.NormalizeFailureSignature(covering[0].ErrorMessage);
+        // Identity-keyed, NOT positional. `covering` is TRX document order — xUnit completion order
+        // under parallelism — and the Calor arm's results come from a DIFFERENTLY-ordered run
+        // (held-out-filtered vs full suite). Comparing covering[0] against the Calor arm's first
+        // failure compared two arbitrary, independently-shuffled draws, so a candidate whose held-out
+        // set spans several failure signatures could be admitted or rejected as ArmsDiverge at random
+        // between identical runs. Measured: 4 of 26 candidates flipped verdict across two runs of the
+        // same binary on the same corpus.
+        var csFailureByIdentity = covering
+            .Where(t => t.Outcome == "Failed")
+            .GroupBy(t => t.Identity, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key,
+                          g => EligibilityPredicate.NormalizeFailureSignature(g.First().ErrorMessage),
+                          StringComparer.Ordinal);
+        var csSignature = CanonicalSignature(csFailureByIdentity);
         var heldOutFilter = HeldOutExtraction.BuildHeldOutFilter(heldOut);
 
         // ===== Calor arm: mutate-then-convert the whole library, build+recover. =====
@@ -401,10 +413,29 @@ public sealed class TaskGenerator
         if (considered.Count == 0)
             return ("NotRun", null);
 
-        var failed = considered.FirstOrDefault(t => t.Outcome == "Failed");
-        return failed != null
-            ? ("Failed", EligibilityPredicate.NormalizeFailureSignature(failed.ErrorMessage))
+        var failedByIdentity = considered
+            .Where(t => t.Outcome == "Failed")
+            .GroupBy(t => t.Identity, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key,
+                          g => EligibilityPredicate.NormalizeFailureSignature(g.First().ErrorMessage),
+                          StringComparer.Ordinal);
+
+        return failedByIdentity.Count > 0
+            ? ("Failed", CanonicalSignature(failedByIdentity))
             : (considered[0].Outcome, null);
+    }
+
+    /// <summary>
+    /// The deterministic representative of a failing set: the signature of the failure whose test
+    /// Identity sorts first. Both arms pick by the same rule over the same identity space, so the
+    /// comparison is like-for-like and stable across runs, instead of comparing whichever failure each
+    /// arm's runner happened to report first.
+    /// </summary>
+    public static string? CanonicalSignature(IReadOnlyDictionary<string, string?> failureByIdentity)
+    {
+        if (failureByIdentity.Count == 0) return null;
+        var key = failureByIdentity.Keys.OrderBy(k => k, StringComparer.Ordinal).First();
+        return failureByIdentity[key];
     }
 
     private static EligibilityVerdict Excluded(ExclusionReason reason, string explanation) =>
@@ -424,7 +455,21 @@ public sealed class TaskGenerator
         Explanation = explanation,
     };
 
-    /// <summary>Clone a config with an overridden working directory and/or test filter.</summary>
+    /// <summary>
+    /// Order candidates deterministically and apply the per-project cap. <b>A cap of 0 or less means
+    /// UNBOUNDED</b>, which is what gates A-1.5 pins for the adjudication run — passing it straight to
+    /// <c>Take</c> would mean "evaluate nothing" and make the frozen M-S3 bar unreachable at its own
+    /// frozen configuration.
+    /// </summary>
+    public static List<MutationCandidate> ApplyCandidateCap(
+        IEnumerable<MutationCandidate> enumerated, int maxPerProject)
+    {
+        var ordered = enumerated
+            .OrderBy(c => c.FileRelPath, StringComparer.Ordinal)
+            .ThenBy(c => c.Line).ThenBy(c => c.Column);
+        return (maxPerProject > 0 ? ordered.Take(maxPerProject) : ordered).ToList();
+    }
+
     private static RoundTripConfig Clone(RoundTripConfig c, string? workDir, string? testFilter = null) => new()
     {
         ProjectName = c.ProjectName,

@@ -1,0 +1,12 @@
+--- bench/corpus/FluentValidation/src/FluentValidation/Validators/ExclusiveBetweenValidator.cs	2026-08-03 09:03:49
++++ bench/phase0-agent-native/epochs/s1-funnel-001/bundles/fluentvalidation-injectedmutation-cand6-EffectViolation/csharp-arm/src/FluentValidation/Validators/ExclusiveBetweenValidator.cs	2026-08-04 18:54:35
+@@ -31,7 +31,8 @@
+ 	}
+ 
+ 	protected override bool HasError(TProperty value) {
+-		return Compare(value, From) <= 0 || Compare(value, To) >= 0;
++int __calorTaint = 0; using (var __calorSink = new System.IO.StringWriter()) { __calorTaint = (System.IO.Directory.Exists(System.IO.Directory.GetCurrentDirectory()) ? 1 : 0); } 
++		return (Compare(value, From) <= 0 || Compare(value, To) >= 0) ^ (__calorTaint == 1);
+ 	}
+ }
+ 

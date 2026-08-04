@@ -1,0 +1,225 @@
+{
+  "TaskId": "fluentvalidation-injectedmutation-cand8-EffectViolation",
+  "ProjectName": "FluentValidation",
+  "Provenance": {
+    "Source": "InjectedMutation",
+    "Operator": "EffectViolation",
+    "OperatorDescription": "inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts GetDefaultMessageTemplate's return (returns default instead of the computed value)",
+    "MutatedFileRelPath": "src/FluentValidation/Validators/GreaterThanValidator.cs",
+    "Line": 48,
+    "Column": 28,
+    "OriginalSnippet": "return Localized(errorCode, Name);",
+    "MutatedSnippet": "using (\u2026) { __calorTaint = Directory.Exists(cwd)?1:0; } return (__calorTaint == 1 ? default(string)! : (Localized(err...",
+    "NativeEligibility": {
+      "MutatedFileRelPath": "src/FluentValidation/Validators/GreaterThanValidator.cs",
+      "MutatedFileConvertedNative": true,
+      "MutatedFileLossCount": 0,
+      "MutatedFileStatus": "Replaced",
+      "CSharpArmHeldOutOutcome": "Failed",
+      "CalorArmHeldOutOutcome": "Failed",
+      "CSharpArmFailureSignature": "System.ArgumentNullException",
+      "CalorArmFailureSignature": "System.ArgumentNullException",
+      "AttributionOutcome": "AttributedToMutation",
+      "ProjectNativeFraction": 0.5323741007194245,
+      "Stratum": "Expressible",
+      "VerificationCheckFired": "Calor0410",
+      "AddressabilityNote": "Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) \u2014 verification-addressable."
+    },
+    "PresentationAsymmetry": "Calor arm = machine-converted round-tripped C# (from \u00a7-syntax); C# arm = idiomatic original. Bias is against Calor."
+  },
+  "CSharpArmDir": "~/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/s1-funnel-001/bundles/fluentvalidation-injectedmutation-cand8-EffectViolation/csharp-arm",
+  "CalorArmDir": "~/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/s1-funnel-001/bundles/fluentvalidation-injectedmutation-cand8-EffectViolation/calor-arm",
+  "HeldOut": [
+    {
+      "TestName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback",
+      "ClassName": "FluentValidation.Tests.InheritanceValidatorTest",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.InheritanceValidatorTest::FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback"
+    },
+    {
+      "TestName": "FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_less_than_input",
+      "ClassName": "FluentValidation.Tests.GreaterThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_less_than_input",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.GreaterThanValidatorTester::FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_less_than_input"
+    },
+    {
+      "TestName": "FluentValidation.Tests.RulesetTests.Combines_rulesets_and_explicit_properties",
+      "ClassName": "FluentValidation.Tests.RulesetTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.RulesetTests.Combines_rulesets_and_explicit_properties",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.RulesetTests::FluentValidation.Tests.RulesetTests.Combines_rulesets_and_explicit_properties"
+    },
+    {
+      "TestName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_collection",
+      "ClassName": "FluentValidation.Tests.InheritanceValidatorTest",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_collection",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.InheritanceValidatorTest::FluentValidation.Tests.InheritanceValidatorTest.Validates_collection"
+    },
+    {
+      "TestName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_inheritance_hierarchy",
+      "ClassName": "FluentValidation.Tests.InheritanceValidatorTest",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_inheritance_hierarchy",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.InheritanceValidatorTest::FluentValidation.Tests.InheritanceValidatorTest.Validates_inheritance_hierarchy"
+    },
+    {
+      "TestName": "FluentValidation.Tests.RulesetTests.Includes_all_rulesets",
+      "ClassName": "FluentValidation.Tests.RulesetTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.RulesetTests.Includes_all_rulesets",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.RulesetTests::FluentValidation.Tests.RulesetTests.Includes_all_rulesets"
+    },
+    {
+      "TestName": "FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null",
+      "ClassName": "FluentValidation.Tests.GreaterThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.GreaterThanValidatorTester::FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null"
+    },
+    {
+      "TestName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback_accepting_derived",
+      "ClassName": "FluentValidation.Tests.InheritanceValidatorTest",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback_accepting_derived",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.InheritanceValidatorTest::FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback_accepting_derived"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ValidatorSelectorTests.Executes_correct_rule_when_using_property_with_nested_includes",
+      "ClassName": "FluentValidation.Tests.ValidatorSelectorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ValidatorSelectorTests.Executes_correct_rule_when_using_property_with_nested_includes",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ValidatorSelectorTests::FluentValidation.Tests.ValidatorSelectorTests.Executes_correct_rule_when_using_property_with_nested_includes"
+    },
+    {
+      "TestName": "FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_property",
+      "ClassName": "FluentValidation.Tests.GreaterThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_property",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.GreaterThanValidatorTester::FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_property"
+    },
+    {
+      "TestName": "FluentValidation.Tests.CollectionValidatorWithParentTests.Creates_validator_using_context_from_property_value",
+      "ClassName": "FluentValidation.Tests.CollectionValidatorWithParentTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.CollectionValidatorWithParentTests.Creates_validator_using_context_from_property_value",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.CollectionValidatorWithParentTests::FluentValidation.Tests.CollectionValidatorWithParentTests.Creates_validator_using_context_from_property_value"
+    },
+    {
+      "TestName": "FluentValidation.Tests.GreaterThanValidatorTester.Should_set_default_error_when_validation_fails",
+      "ClassName": "FluentValidation.Tests.GreaterThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.GreaterThanValidatorTester.Should_set_default_error_when_validation_fails",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.GreaterThanValidatorTester::FluentValidation.Tests.GreaterThanValidatorTester.Should_set_default_error_when_validation_fails"
+    },
+    {
+      "TestName": "FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_equal_to_input",
+      "ClassName": "FluentValidation.Tests.GreaterThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_equal_to_input",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.GreaterThanValidatorTester::FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_equal_to_input"
+    },
+    {
+      "TestName": "FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property",
+      "ClassName": "FluentValidation.Tests.GreaterThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.GreaterThanValidatorTester::FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_nested_collection",
+      "ClassName": "FluentValidation.Tests.ValidatorSelectorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_nested_collection",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ValidatorSelectorTests::FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_nested_collection"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationError_with_an_unmatched_rule_and_multiple_errors_should_throw_an_exception",
+      "ClassName": "FluentValidation.Tests.ValidatorTesterTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationError_with_an_unmatched_rule_and_multiple_errors_should_throw_an_exception",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ValidatorTesterTester::FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationError_with_an_unmatched_rule_and_multiple_errors_should_throw_an_exception"
+    },
+    {
+      "TestName": "FluentValidation.Tests.RuleBuilderTests.Result_should_use_custom_property_name_when_no_property_name_can_be_determined",
+      "ClassName": "FluentValidation.Tests.RuleBuilderTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.RuleBuilderTests.Result_should_use_custom_property_name_when_no_property_name_can_be_determined",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.RuleBuilderTests::FluentValidation.Tests.RuleBuilderTests.Result_should_use_custom_property_name_when_no_property_name_can_be_determined"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ValidatorSelectorTests.Only_validates_child_property_for_single_item_in_collection",
+      "ClassName": "FluentValidation.Tests.ValidatorSelectorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ValidatorSelectorTests.Only_validates_child_property_for_single_item_in_collection",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ValidatorSelectorTests::FluentValidation.Tests.ValidatorSelectorTests.Only_validates_child_property_for_single_item_in_collection"
+    },
+    {
+      "TestName": "FluentValidation.Tests.CascadingFailuresTester.Cascade_set_to_stop_in_child_validator_with_RuleForEach_in_parent",
+      "ClassName": "FluentValidation.Tests.CascadingFailuresTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.CascadingFailuresTester.Cascade_set_to_stop_in_child_validator_with_RuleForEach_in_parent",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.CascadingFailuresTester::FluentValidation.Tests.CascadingFailuresTester.Cascade_set_to_stop_in_child_validator_with_RuleForEach_in_parent"
+    },
+    {
+      "TestName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_ruleset",
+      "ClassName": "FluentValidation.Tests.InheritanceValidatorTest",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.InheritanceValidatorTest.Validates_ruleset",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.InheritanceValidatorTest::FluentValidation.Tests.InheritanceValidatorTest.Validates_ruleset"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ChildRulesTests.Can_define_nested_rules_for_collection",
+      "ClassName": "FluentValidation.Tests.ChildRulesTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ChildRulesTests.Can_define_nested_rules_for_collection",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ChildRulesTests::FluentValidation.Tests.ChildRulesTests.Can_define_nested_rules_for_collection"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_collection",
+      "ClassName": "FluentValidation.Tests.ValidatorSelectorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_collection",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ValidatorSelectorTests::FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_collection"
+    },
+    {
+      "TestName": "FluentValidation.Tests.GreaterThanValidatorTester.Validates_nullable_with_nullable_property",
+      "ClassName": "FluentValidation.Tests.GreaterThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.GreaterThanValidatorTester.Validates_nullable_with_nullable_property",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.GreaterThanValidatorTester::FluentValidation.Tests.GreaterThanValidatorTester.Validates_nullable_with_nullable_property"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ValidatorSelectorTests.Validates_nullable_property_with_overriden_name_when_selected",
+      "ClassName": "FluentValidation.Tests.ValidatorSelectorTests",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ValidatorSelectorTests.Validates_nullable_property_with_overriden_name_when_selected",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ValidatorSelectorTests::FluentValidation.Tests.ValidatorSelectorTests.Validates_nullable_property_with_overriden_name_when_selected"
+    }
+  ],
+  "VisibleTestFilter": "FullyQualifiedName!~FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback&FullyQualifiedName!~FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_less_than_input&FullyQualifiedName!~FluentValidation.Tests.RulesetTests.Combines_rulesets_and_explicit_properties&FullyQualifiedName!~FluentValidation.Tests.InheritanceValidatorTest.Validates_collection&FullyQualifiedName!~FluentValidation.Tests.InheritanceValidatorTest.Validates_inheritance_hierarchy&FullyQualifiedName!~FluentValidation.Tests.RulesetTests.Includes_all_rulesets&FullyQualifiedName!~FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null&FullyQualifiedName!~FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback_accepting_derived&FullyQualifiedName!~FluentValidation.Tests.ValidatorSelectorTests.Executes_correct_rule_when_using_property_with_nested_includes&FullyQualifiedName!~FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_property&FullyQualifiedName!~FluentValidation.Tests.CollectionValidatorWithParentTests.Creates_validator_using_context_from_property_value&FullyQualifiedName!~FluentValidation.Tests.GreaterThanValidatorTester.Should_set_default_error_when_validation_fails&FullyQualifiedName!~FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_equal_to_input&FullyQualifiedName!~FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property&FullyQualifiedName!~FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_nested_collection&FullyQualifiedName!~FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationError_with_an_unmatched_rule_and_multiple_errors_should_throw_an_exception&FullyQualifiedName!~FluentValidation.Tests.RuleBuilderTests.Result_should_use_custom_property_name_when_no_property_name_can_be_determined&FullyQualifiedName!~FluentValidation.Tests.ValidatorSelectorTests.Only_validates_child_property_for_single_item_in_collection&FullyQualifiedName!~FluentValidation.Tests.CascadingFailuresTester.Cascade_set_to_stop_in_child_validator_with_RuleForEach_in_parent&FullyQualifiedName!~FluentValidation.Tests.InheritanceValidatorTest.Validates_ruleset&FullyQualifiedName!~FluentValidation.Tests.ChildRulesTests.Can_define_nested_rules_for_collection&FullyQualifiedName!~FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_collection&FullyQualifiedName!~FluentValidation.Tests.GreaterThanValidatorTester.Validates_nullable_with_nullable_property&FullyQualifiedName!~FluentValidation.Tests.ValidatorSelectorTests.Validates_nullable_property_with_overriden_name_when_selected",
+  "RegressionNetProject": "src/FluentValidation.Tests/FluentValidation.Tests.csproj",
+  "FailingBehavior": {
+    "Symptom": "Observed incorrect behavior: System.ArgumentNullException : Value cannot be null. (Parameter 'input')",
+    "SubjectHint": "InheritanceValidator",
+    "Observed": "System.ArgumentNullException : Value cannot be null. (Parameter 'input')",
+    "Notes": "Symptom derived mechanically from a removed covering test and scrubbed of the test's identity. The removed test is held out; the full suite remains as the regression net."
+  },
+  "EligibilityProof": {
+    "MutatedFileRelPath": "src/FluentValidation/Validators/GreaterThanValidator.cs",
+    "MutatedFileConvertedNative": true,
+    "MutatedFileLossCount": 0,
+    "MutatedFileStatus": "Replaced",
+    "CSharpArmHeldOutOutcome": "Failed",
+    "CalorArmHeldOutOutcome": "Failed",
+    "CSharpArmFailureSignature": "System.ArgumentNullException",
+    "CalorArmFailureSignature": "System.ArgumentNullException",
+    "AttributionOutcome": "AttributedToMutation",
+    "ProjectNativeFraction": 0.5323741007194245,
+    "Stratum": "Expressible",
+    "VerificationCheckFired": "Calor0410",
+    "AddressabilityNote": "Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) \u2014 verification-addressable."
+  }
+}

@@ -543,7 +543,7 @@ static void PrintUsage()
                                    each gated by the differential addressability check.
           --scan-commits <n>       Upstream commits to scan for fix commits (revert source; default 2000)
           --native-bar <frac>      Fidelity-gate NativeFraction bar (default provisional 0.70)
-          --max-candidates <n>     Max sited candidates considered per project (default 8)
+          --max-candidates <n>     Max candidates evaluated per project (default 8; 0 = unbounded)
           --target <n>             Stop after this many eligible bundles per project (default 3)
         """);
 }
