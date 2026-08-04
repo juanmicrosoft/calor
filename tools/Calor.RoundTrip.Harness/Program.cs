@@ -27,6 +27,8 @@ switch (command)
         return MineCommand(cliArgs.Skip(1).ToArray());
     case "enumerate-supply":
         return await EnumerateSupplyCommand(cliArgs.Skip(1).ToArray());
+    case "screen-determinism":
+        return await ScreenDeterminismCommand(cliArgs.Skip(1).ToArray());
     case "list":
         Console.WriteLine("Known projects:");
         foreach (var p in ProjectConfigs.KnownProjects)
@@ -283,6 +285,136 @@ async Task<int> GenTasksCommand(string[] genArgs)
     return run.TotalEligible > 0 ? 0 : 1;
 }
 
+// D-S5.1 determinism screen: gates §0.2's 5-consecutive-green rule over an epoch's ELIGIBLE tasks.
+// M-S3 counts only screened tasks, so this is the gate between "the generator produced N eligible"
+// and "the epoch has N tasks".
+async Task<int> ScreenDeterminismCommand(string[] args)
+{
+    var epochDir = GetOption(args, "--epoch");
+    if (epochDir == null) { Console.Error.WriteLine("--epoch <dir> is required."); return 2; }
+    epochDir = Path.GetFullPath(epochDir);
+    var reportPath = Path.Combine(epochDir, "task-generation-report.json");
+    if (!File.Exists(reportPath)) { Console.Error.WriteLine($"No task-generation-report.json under {epochDir}."); return 2; }
+
+    var projectsDir = GetOption(args, "--projects-dir") ?? ProjectConfigs.DefaultCorpusDir;
+    projectsDir = Path.GetFullPath(projectsDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+
+    var bundlesDir = Path.Combine(epochDir, "bundles");
+    if (!Directory.Exists(bundlesDir)) { Console.Error.WriteLine($"No bundles/ under {epochDir}."); return 2; }
+
+    var pipeline = new RoundTripPipeline();
+    var workRoot = Path.Combine(Path.GetTempPath(), "calor-screen-" + Guid.NewGuid().ToString("N")[..8]);
+    var screens = new List<DeterminismScreen.TaskScreen>();
+    var prepared = new Dictionary<string, (string Dir, RoundTripConfig Cfg)>(StringComparer.OrdinalIgnoreCase);
+
+    try
+    {
+        foreach (var bundle in Directory.GetDirectories(bundlesDir).OrderBy(d => d, StringComparer.Ordinal))
+        {
+            var provPath = Path.Combine(bundle, "provenance.json");
+            if (!File.Exists(provPath)) continue;
+            using var doc = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(provPath));
+            var root = doc.RootElement;
+            var taskId = root.GetProperty("TaskId").GetString()!;
+            var projectName = root.GetProperty("ProjectName").GetString()!;
+
+            var heldOutNames = root.GetProperty("HeldOut").EnumerateArray()
+                .Select(h => h.GetProperty("FilterName").GetString())
+                .Where(n => !string.IsNullOrEmpty(n)).Distinct(StringComparer.Ordinal).ToList();
+            var filter = string.Join("|", heldOutNames.Select(n => $"FullyQualifiedName~{n}"));
+
+            var cfg = ProjectConfigs.Get(projectName, projectsDir, "dotnet");
+            if (cfg == null || !Directory.Exists(cfg.OriginalProjectPath))
+            {
+                screens.Add(Screen(taskId, projectName, filter, [], [], $"project '{projectName}' unavailable"));
+                continue;
+            }
+
+            // Pristine reference working copy, prepared ONCE per project and reused across its tasks.
+            if (!prepared.TryGetValue(projectName, out var refCopy))
+            {
+                var dir = pipeline.PrepareWorkingCopy(CloneForScreen(cfg, Path.Combine(workRoot, projectName + "-reference"), null));
+                var build = await pipeline.BuildProjectAsync(dir, cfg);
+                if (!build.Succeeded)
+                {
+                    screens.Add(Screen(taskId, projectName, filter, [], [], "pristine reference did not build"));
+                    continue;
+                }
+                refCopy = (dir, cfg);
+                prepared[projectName] = refCopy;
+            }
+
+            Console.WriteLine($"[{taskId}] screening — {DeterminismScreen.RequiredConsecutiveGreenRuns} runs on the pristine reference…");
+            var referenceRuns = new List<bool>();
+            string? inconclusive = null;
+            for (var i = 0; i < DeterminismScreen.RequiredConsecutiveGreenRuns; i++)
+            {
+                var run = await pipeline.RunTestsAsync(refCopy.Dir, CloneForScreen(cfg, refCopy.Dir, filter), noBuild: true);
+                if (run.TotalTests == 0) { inconclusive = "held-out filter matched no tests on the reference"; break; }
+                var green = run.Failed == 0;
+                referenceRuns.Add(green);
+                Console.WriteLine($"[{taskId}]   reference run {i + 1}: {(green ? "green" : $"RED ({run.Failed} failed)")}");
+            }
+
+            // Reported only: does the defect manifest every time on the mutated arm?
+            var mutatedRuns = new List<bool>();
+            var armDir = Path.Combine(bundle, "csharp-arm");
+            if (inconclusive == null && Directory.Exists(armDir))
+            {
+                var armCfg = CloneForScreen(cfg, armDir, filter);
+                var armBuild = await pipeline.BuildProjectAsync(armDir, armCfg);
+                if (armBuild.Succeeded)
+                {
+                    for (var i = 0; i < DeterminismScreen.RequiredConsecutiveGreenRuns; i++)
+                    {
+                        var run = await pipeline.RunTestsAsync(armDir, armCfg, noBuild: true);
+                        mutatedRuns.Add(run.TotalTests > 0 && run.Failed > 0);
+                    }
+                }
+            }
+
+            screens.Add(Screen(taskId, projectName, filter, referenceRuns, mutatedRuns, inconclusive));
+        }
+    }
+    finally
+    {
+        try { if (Directory.Exists(workRoot)) Directory.Delete(workRoot, recursive: true); } catch { /* best effort */ }
+    }
+
+    var result = new DeterminismScreen.Result { Tasks = screens };
+    var md = DeterminismScreenReport.Render(result);
+    await File.WriteAllTextAsync(Path.Combine(epochDir, "determinism-screen.md"), md);
+    await File.WriteAllTextAsync(Path.Combine(epochDir, "determinism-screen.json"),
+        System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+    Console.WriteLine();
+    Console.WriteLine(md);
+    return 0;
+}
+
+DeterminismScreen.TaskScreen Screen(string id, string proj, string filter,
+    IReadOnlyList<bool> reference, IReadOnlyList<bool> mutated, string? inconclusive) =>
+    new()
+    {
+        TaskId = id, ProjectName = proj, HeldOutFilter = filter,
+        ReferenceRuns = reference, MutatedRuns = mutated, Inconclusive = inconclusive,
+    };
+
+RoundTripConfig CloneForScreen(RoundTripConfig c, string workDir, string? testFilter) => new()
+{
+    ProjectName = c.ProjectName,
+    OriginalProjectPath = c.OriginalProjectPath,
+    LibrarySourceRelativePath = c.LibrarySourceRelativePath,
+    SolutionOrProjectFile = c.SolutionOrProjectFile,
+    WorkingDirectory = workDir,
+    ExcludePatterns = c.ExcludePatterns,
+    DotnetPath = c.DotnetPath,
+    TargetFramework = c.TargetFramework,
+    ExtraBuildProperties = c.ExtraBuildProperties,
+    TestTimeout = c.TestTimeout,
+    BuildTimeout = c.BuildTimeout,
+    TestFilter = testFilter,
+};
+
 // v0.12 S1 pre-pass (kickoff D-1/D-5): expressible-stratum SUPPLY per project, conversion-only.
 // No builds, no tests, no recovery, no bundles — and, critically, NO ELIGIBILITY EVALUATION, which
 // is what lets it run before the A-1.5 freeze (plan §3 constraint (a)).
@@ -524,6 +656,8 @@ static void PrintUsage()
           calor-roundtrip mine <project...> [options]     Report revert-bugfix supply per project (git-only, no build)
           calor-roundtrip enumerate-supply <project...>   Expressible-stratum supply per project (conversion-only;
                                                           no builds/tests, and no eligibility evaluated)
+          calor-roundtrip screen-determinism --epoch <dir> D-S5.1 screen: gates 0.2's 5-consecutive-green rule
+                                                          over an epoch's eligible tasks
           calor-roundtrip list                            List known projects
 
         Options (run):
