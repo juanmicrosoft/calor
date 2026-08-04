@@ -1,4 +1,5 @@
 using Calor.Compiler.Migration;
+using Calor.Compiler.Verification.Z3;
 
 namespace Calor.RoundTrip.Harness.TaskGen;
 
@@ -73,6 +74,24 @@ public sealed class VerificationAddressability
                 Addressable = false,
                 ExpectedCheck = expectedCheck,
                 Note = $"unknown expected check '{expectedCheck}'; not a recognised expressible signal.",
+            };
+        }
+
+        // The bug-pattern checks (div-by-zero, index-OOB) reach their precise verdict through Z3.
+        // Without the native solver they degrade SILENTLY to "no diagnostic" — which the differential
+        // below would read as "Calor has no signal for this defect" and record as
+        // ExclusionReason.NotVerificationAddressable. That is a false statement about Calor's
+        // capability: the honest answer is "we did not ask". Fail loud instead, as indeterminable.
+        if (isBugPattern && !Z3ContextFactory.IsAvailable)
+        {
+            return new Result
+            {
+                Determinable = false,
+                Addressable = false,
+                ExpectedCheck = expectedCheck,
+                Note = $"addressability indeterminable: '{expectedCheck}' is a Z3-backed check and the native "
+                     + "Z3 library is unavailable, so a non-firing check cannot be distinguished from an "
+                     + "unasked one. This is NOT evidence that Calor lacks a signal for this defect.",
             };
         }
 

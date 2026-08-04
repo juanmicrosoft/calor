@@ -83,13 +83,19 @@ public class TaskGenAddressabilityTests
     [SkippableFact]
     public void DivByZero_GuardRemoval_IsAddressable_Calor0920()
     {
-        // The div-by-zero checker's addressability verdict is Z3-backed: without the native Z3
-        // library the checker has no precise signal, the probe reports "not addressable", and the
-        // assertion below would fail for an environmental reason rather than a real regression.
-        // Repo convention (Calor.Compiler.Tests / Calor.Verification.Tests) is to gate on
-        // Z3ContextFactory.IsAvailable — CI runners do not carry the native lib, and a visible SKIP
-        // is honest where a false pass or an environmental red would not be. The claim itself is
-        // exercised locally and via the CLI, which bundles the native lib.
+        // The div-by-zero checker's addressability verdict is Z3-backed, so this test needs the
+        // native Z3 library. Repo convention (Calor.Compiler.Tests / Calor.Verification.Tests) is
+        // to gate on Z3ContextFactory.IsAvailable, and a visible SKIP is honest where an
+        // environmental red would not be.
+        //
+        // WHY IT SKIPS ON CI, precisely — this is FIXABLE BUILD PLUMBING, not a runner limitation.
+        // CI does download Z3 successfully. But `src/Calor.Compiler/{z3,runtimes}/` are gitignored,
+        // so on a fresh checkout Calor.Compiler.csproj's `<None Include="runtimes\**\*">` glob —
+        // resolved at MSBuild EVALUATION time — matches nothing, while the DownloadZ3 target that
+        // populates those directories runs later, at EXECUTION time. The managed Microsoft.Z3.dll
+        // still flows to test hosts via <Reference Private="true">, so the wrapper loads and then
+        // fails at P/Invoke. Seeding `src/Calor.Compiler/scripts/download-z3.sh` before `dotnet
+        // restore` in CI would make this test (and ~365 others currently skipped repo-wide) run.
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
 
         const string clean = """
@@ -118,6 +124,31 @@ public class TaskGenAddressabilityTests
         Assert.True(result.Addressable,
             $"removing the zero-guard must introduce Calor0920. " +
             $"mutated={string.Join(",", result.FiredOnMutated)} clean={string.Join(",", result.FiredOnClean)}; note: {result.Note}");
+    }
+
+    [Fact]
+    public void Z3BackedCheck_WithoutZ3_IsIndeterminable_NotUnaddressable()
+    {
+        // The inverse of the test above, and the one that matters for measurement honesty: when the
+        // native solver is absent, a Z3-backed check must report INDETERMINABLE, never "Calor has no
+        // signal for this defect". The latter would be recorded as NotVerificationAddressable and
+        // would feed the exclusion accounting a false statement about Calor's capability.
+        // Where Z3 IS available this asserts the complementary property — the probe does not bail.
+        var result = _probe.Probe("Calor0920", EffectClean, EffectClean, "Counter.cs");
+
+        if (!Z3ContextFactory.IsAvailable)
+        {
+            Assert.False(result.Determinable);
+            Assert.False(result.Addressable);
+            Assert.Contains("indeterminable", result.Note, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("NOT evidence", result.Note);
+        }
+        else
+        {
+            // Identical sources: nothing is introduced, but the probe must have actually asked.
+            Assert.False(result.Addressable);
+            Assert.DoesNotContain("Z3-backed check and the native", result.Note);
+        }
     }
 
     // ---- The partition holds: an unrecognised / non-firing check is NOT addressable ----
