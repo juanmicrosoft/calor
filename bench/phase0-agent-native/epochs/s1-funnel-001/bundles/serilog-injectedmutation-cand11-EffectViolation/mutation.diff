@@ -1,0 +1,13 @@
+--- bench/corpus/serilog/src/Serilog/Events/LogEventPropertyValue.cs	2026-08-03 09:03:50
++++ bench/phase0-agent-native/epochs/s1-funnel-001/bundles/serilog-injectedmutation-cand11-EffectViolation/csharp-arm/src/Serilog/Events/LogEventPropertyValue.cs	2026-08-04 18:51:12
+@@ -51,8 +51,9 @@
+     /// setting of the operating system. </param><filterpriority>2</filterpriority>
+     public string ToString(string? format, IFormatProvider? formatProvider)
+     {
++int __calorTaint = 0; using (var __calorSink = new System.IO.StringWriter()) { __calorTaint = (System.IO.Directory.Exists(System.IO.Directory.GetCurrentDirectory()) ? 1 : 0); } 
+         using var output = ReusableStringWriter.GetOrCreate();
+         Render(output, format, formatProvider);
+-        return output.ToString();
++        return (__calorTaint == 1 ? default(string)! : (output.ToString()));
+     }
+ }

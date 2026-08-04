@@ -1,0 +1,17 @@
+--- bench/corpus/FluentValidation/src/FluentValidation/Validators/ComparableComparer.cs	2026-08-03 09:03:49
++++ bench/phase0-agent-native/epochs/s1-funnel-001/bundles/fluentvalidation-injectedmutation-cand5-EffectViolation/csharp-arm/src/FluentValidation/Validators/ComparableComparer.cs	2026-08-04 18:54:11
+@@ -1,4 +1,4 @@
+-﻿#region License
++#region License
+ // Copyright (c) .NET Foundation and contributors.
+ //
+ // Licensed under the Apache License, Version 2.0 (the "License");
+@@ -29,6 +29,7 @@
+ 	}
+ 
+ 	public int Compare(T x, T y) {
+-		return x.CompareTo(y);
++int __calorTaint = 0; using (var __calorSink = new System.IO.StringWriter()) { __calorTaint = (System.IO.Directory.Exists(System.IO.Directory.GetCurrentDirectory()) ? 1 : 0); } 
++		return (x.CompareTo(y)) + __calorTaint;
+ 	}
+ }

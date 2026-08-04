@@ -1,0 +1,169 @@
+{
+  "TaskId": "serilog-injectedmutation-cand13-EffectViolation",
+  "ProjectName": "Serilog",
+  "Provenance": {
+    "Source": "InjectedMutation",
+    "Operator": "EffectViolation",
+    "OperatorDescription": "inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts Equals's return (boolean flip)",
+    "MutatedFileRelPath": "src/Serilog/Parsing/TextToken.cs",
+    "Line": 58,
+    "Column": 26,
+    "OriginalSnippet": "return obj is TextToken tt && tt.Text == Text;",
+    "MutatedSnippet": "using (\u2026) { __calorTaint = Directory.Exists(cwd)?1:0; } return (obj is TextToken tt && tt.Text == Text) ^ (__calorTai...",
+    "NativeEligibility": {
+      "MutatedFileRelPath": "src/Serilog/Parsing/TextToken.cs",
+      "MutatedFileConvertedNative": true,
+      "MutatedFileLossCount": 0,
+      "MutatedFileStatus": "Replaced",
+      "CSharpArmHeldOutOutcome": "Failed",
+      "CalorArmHeldOutOutcome": "Failed",
+      "CSharpArmFailureSignature": "Assert.Equal()",
+      "CalorArmFailureSignature": "Assert.Equal()",
+      "AttributionOutcome": "AttributedToMutation",
+      "ProjectNativeFraction": 0.4,
+      "Stratum": "Expressible",
+      "VerificationCheckFired": "Calor0410",
+      "AddressabilityNote": "Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) \u2014 verification-addressable."
+    },
+    "PresentationAsymmetry": "Calor arm = machine-converted round-tripped C# (from \u00a7-syntax); C# arm = idiomatic original. Bias is against Calor."
+  },
+  "CSharpArmDir": "~/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/s1-funnel-001/bundles/serilog-injectedmutation-cand13-EffectViolation/csharp-arm",
+  "CalorArmDir": "~/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/s1-funnel-001/bundles/serilog-injectedmutation-cand13-EffectViolation/calor-arm",
+  "HeldOut": [
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.MultipleTokensHasCorrectIndexes",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.MultipleTokensHasCorrectIndexes",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.MultipleTokensHasCorrectIndexes"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAreParsedAsASingleBracket",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAreParsedAsASingleBracket",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAreParsedAsASingleBracket"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracket",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracket",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracket"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithoutPropertiesIsASingleTextToken",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithoutPropertiesIsASingleTextToken",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithoutPropertiesIsASingleTextToken"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DestructureWithInvalidHintsIsParsedAsText",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DestructureWithInvalidHintsIsParsedAsText",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.DestructureWithInvalidHintsIsParsedAsText"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracketInsideText",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracketInsideText",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracketInsideText"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithAMalformedPropertyTagIsParsedAsManyTextTokens",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithAMalformedPropertyTagIsParsedAsManyTextTokens",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithAMalformedPropertyTagIsParsedAsManyTextTokens"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.AMalformedPropertyTagIsParsedAsText(template: \"{0_{{space}\")",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.AMalformedPropertyTagIsParsedAsText",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.AMalformedPropertyTagIsParsedAsText(template: \"{0_{{space}\")"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DestructuringWithEmptyPropertyNameIsParsedAsText",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DestructuringWithEmptyPropertyNameIsParsedAsText",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.DestructuringWithEmptyPropertyNameIsParsedAsText"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.EmptyAlignmentIsParsedAsText",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.EmptyAlignmentIsParsedAsText",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.EmptyAlignmentIsParsedAsText"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.NonNumberAlignmentIsParsedAsText",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.NonNumberAlignmentIsParsedAsText",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.NonNumberAlignmentIsParsedAsText"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.AlignmentWithPositiveSignParsedAsText",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.AlignmentWithPositiveSignParsedAsText",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.AlignmentWithPositiveSignParsedAsText"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAfterOneLeftIsParsedAPropertyTokenAndATextToken",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAfterOneLeftIsParsedAPropertyTokenAndATextToken",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAfterOneLeftIsParsedAPropertyTokenAndATextToken"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledBracketsAreParsedAsASingleBracket",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledBracketsAreParsedAsASingleBracket",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledBracketsAreParsedAsASingleBracket"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.MissingRightBracketIsParsedAsText",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.MissingRightBracketIsParsedAsText",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.MissingRightBracketIsParsedAsText"
+    },
+    {
+      "TestName": "Serilog.Tests.Parsing.MessageTemplateParserTests.ATrailingUnmatchedBracketIsParsedAsText",
+      "ClassName": "Serilog.Tests.Parsing.MessageTemplateParserTests",
+      "Assembly": "serilog.tests.dll",
+      "FilterName": "Serilog.Tests.Parsing.MessageTemplateParserTests.ATrailingUnmatchedBracketIsParsedAsText",
+      "Identity": "serilog.tests.dll::executor://xunit/VsTestRunner2/netcoreapp::Serilog.Tests.Parsing.MessageTemplateParserTests::Serilog.Tests.Parsing.MessageTemplateParserTests.ATrailingUnmatchedBracketIsParsedAsText"
+    }
+  ],
+  "VisibleTestFilter": "FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.MultipleTokensHasCorrectIndexes&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAreParsedAsASingleBracket&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracket&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithoutPropertiesIsASingleTextToken&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.DestructureWithInvalidHintsIsParsedAsText&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracketInsideText&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithAMalformedPropertyTagIsParsedAsManyTextTokens&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.AMalformedPropertyTagIsParsedAsText&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.DestructuringWithEmptyPropertyNameIsParsedAsText&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.EmptyAlignmentIsParsedAsText&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.NonNumberAlignmentIsParsedAsText&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.AlignmentWithPositiveSignParsedAsText&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAfterOneLeftIsParsedAPropertyTokenAndATextToken&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledBracketsAreParsedAsASingleBracket&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.MissingRightBracketIsParsedAsText&FullyQualifiedName!~Serilog.Tests.Parsing.MessageTemplateParserTests.ATrailingUnmatchedBracketIsParsedAsText",
+  "RegressionNetProject": "test/Serilog.Tests/Serilog.Tests.csproj",
+  "FailingBehavior": {
+    "Symptom": "Observed incorrect behavior: Assert.Equal() Failure: Collections differ",
+    "SubjectHint": "MessageTemplateParser",
+    "Observed": "Assert.Equal() Failure: Collections differ",
+    "Notes": "Symptom derived mechanically from a removed covering test and scrubbed of the test's identity. The removed test is held out; the full suite remains as the regression net."
+  },
+  "EligibilityProof": {
+    "MutatedFileRelPath": "src/Serilog/Parsing/TextToken.cs",
+    "MutatedFileConvertedNative": true,
+    "MutatedFileLossCount": 0,
+    "MutatedFileStatus": "Replaced",
+    "CSharpArmHeldOutOutcome": "Failed",
+    "CalorArmHeldOutOutcome": "Failed",
+    "CSharpArmFailureSignature": "Assert.Equal()",
+    "CalorArmFailureSignature": "Assert.Equal()",
+    "AttributionOutcome": "AttributedToMutation",
+    "ProjectNativeFraction": 0.4,
+    "Stratum": "Expressible",
+    "VerificationCheckFired": "Calor0410",
+    "AddressabilityNote": "Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) \u2014 verification-addressable."
+  }
+}

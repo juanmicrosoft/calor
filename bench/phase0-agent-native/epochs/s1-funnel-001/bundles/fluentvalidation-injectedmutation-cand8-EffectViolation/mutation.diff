@@ -1,0 +1,11 @@
+--- bench/corpus/FluentValidation/src/FluentValidation/Validators/GreaterThanValidator.cs	2026-08-03 09:03:49
++++ bench/phase0-agent-native/epochs/s1-funnel-001/bundles/fluentvalidation-injectedmutation-cand8-EffectViolation/csharp-arm/src/FluentValidation/Validators/GreaterThanValidator.cs	2026-08-04 18:55:05
+@@ -46,6 +46,7 @@
+ 	public override Comparison Comparison => Validators.Comparison.GreaterThan;
+ 
+ 	protected override string GetDefaultMessageTemplate(string errorCode) {
+-		return Localized(errorCode, Name);
++int __calorTaint = 0; using (var __calorSink = new System.IO.StringWriter()) { __calorTaint = (System.IO.Directory.Exists(System.IO.Directory.GetCurrentDirectory()) ? 1 : 0); } 
++		return (__calorTaint == 1 ? default(string)! : (Localized(errorCode, Name)));
+ 	}
+ }

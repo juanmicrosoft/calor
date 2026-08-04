@@ -96,7 +96,9 @@ public class TaskGenExpressibleTests
         // Before the fix this went straight to .Take(0) — evaluate NOTHING — so the frozen
         // adjudication configuration would have evaluated zero candidates against a frozen M-S3 bar
         // of 70. Found by running the probe at the pinned config, not by reading it.
-        var candidates = Enumerable.Range(0, 5).Select(i => new MutationCandidate
+        // Shuffled construction: if the OrderBy were deleted, a count-only assertion would still pass.
+        var order = new[] { 3, 0, 4, 1, 2 };
+        var candidates = order.Select(i => new MutationCandidate
         {
             FileRelPath = $"f{i}.cs",
             Source = MutationSource.InjectedMutation,
@@ -109,7 +111,37 @@ public class TaskGenExpressibleTests
             MutatedSource = "class C {}",
         }).ToList();
 
-        Assert.Equal(expected, TaskGenerator.ApplyCandidateCap(candidates, cap).Count);
+        var result = TaskGenerator.ApplyCandidateCap(candidates, cap);
+        Assert.Equal(expected, result.Count);
+        // The retained set is the lexicographic PREFIX, which is what A-1.5.3 scopes the diagnostic
+        // cap to — a count-only assertion would not catch losing the ordering.
+        Assert.Equal(Enumerable.Range(0, expected).Select(i => $"f{i}.cs"), result.Select(c => c.FileRelPath));
+    }
+
+    [Fact]
+    public void CanonicalSignature_is_identity_ordered_not_insertion_ordered()
+    {
+        // The bug this pins: both arms used to take "whichever failure the runner reported first",
+        // from two independently-ordered runs (C# = full suite, Calor = held-out-filtered). A
+        // candidate whose held-out set spans several signatures could then be admitted or excluded as
+        // ArmsDiverge at random — measured at 4 of 26 candidates flipping between identical runs.
+        var armA = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["Z.Test3"] = "Assert.True()",
+            ["A.Test1"] = "Assert.False()",
+            ["M.Test2"] = "System.InvalidOperationException",
+        };
+        // Same failing set, opposite insertion order — as a differently-ordered runner would report it.
+        var armB = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["M.Test2"] = "System.InvalidOperationException",
+            ["A.Test1"] = "Assert.False()",
+            ["Z.Test3"] = "Assert.True()",
+        };
+
+        Assert.Equal("Assert.False()", TaskGenerator.CanonicalSignature(armA));
+        Assert.Equal(TaskGenerator.CanonicalSignature(armA), TaskGenerator.CanonicalSignature(armB));
+        Assert.Null(TaskGenerator.CanonicalSignature(new Dictionary<string, string?>()));
     }
 
     [Fact]

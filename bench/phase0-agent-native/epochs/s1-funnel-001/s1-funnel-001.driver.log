@@ -1,0 +1,1254 @@
+Defect stratum/strata: Expressible
+Defect source(s): Injected
+
+================================================================
+  Task generation: MediatR
+================================================================
+[MediatR] Step 1/4: baseline suite + native-region enumeration (mutate-then-convert prefilter)
+[MediatR]   baseline: 155/157 passed
+  Found 32 C# files to convert (0 excluded by pattern)
+..
+  Replaced: 25
+  EmitSyntaxError: 5
+  CompileError: 2
+    Reverted: src/MediatR/ISender.cs
+    Reverted: src/MediatR/INotificationHandler.cs
+    Reverted: src/MediatR/IPublisher.cs
+    Reverted: src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs
+    Reverted: src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs
+    Reverted: src/MediatR/Wrappers/NotificationHandlerWrapper.cs
+[MediatR]   NativeFraction 46.9% (15 native of 32); siting mutations in 15 native file(s)
+[MediatR] Step 2/4: 2 candidate(s) enumerated; evaluating up to 2
+[MediatR]   candidate 1/2: src/MediatR/MicrosoftExtensionsDI/ServiceCollectionExtensions.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts AddMediatR's return (returns default instead of the computed value)] L26
+  Found 32 C# files to convert (0 excluded by pattern)
+..
+  Replaced: 25
+  EmitSyntaxError: 5
+  CompileError: 2
+    Reverted: src/MediatR/INotificationHandler.cs
+    Reverted: src/MediatR/ISender.cs
+    Reverted: src/MediatR/IPublisher.cs
+    Reverted: src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs
+    Reverted: src/MediatR/MicrosoftExtensionsDI/ServiceCollectionExtensions.cs
+    Reverted: src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs
+    Reverted: src/MediatR/Wrappers/NotificationHandlerWrapper.cs
+[MediatR]     -> excluded: MutatedFileReverted
+[MediatR]   candidate 2/2: src/MediatR/MicrosoftExtensionsDI/ServiceCollectionExtensions.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts AddMediatR's return (returns default instead of the computed value)] L42
+[MediatR]     -> excluded: NoObservableDefect
+
+================================================================
+  Task generation: Serilog
+================================================================
+[Serilog] Step 1/4: baseline suite + native-region enumeration (mutate-then-convert prefilter)
+[Serilog]   baseline: 811/811 passed
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]   NativeFraction 40.0% (44 native of 110); siting mutations in 44 native file(s)
+[Serilog] Step 2/4: 14 candidate(s) enumerated; evaluating up to 14
+[Serilog]   candidate 1/14: src/Serilog/Configuration/LoggerSettingsConfiguration.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts Settings's return (returns default instead of the computed value)] L34
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Configuration/LoggerSettingsConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]     -> excluded: MutatedFileReverted
+[Serilog]   candidate 2/14: src/Serilog/Configuration/LoggerSettingsConfiguration.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts KeyValuePairs's return (returns default instead of the computed value)] L51
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerSettingsConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]     -> excluded: MutatedFileReverted
+[Serilog]   candidate 3/14: src/Serilog/Configuration/LoggerSettingsConfiguration.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts KeyValuePairs's return (returns default instead of the computed value)] L65
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Configuration/LoggerSettingsConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]     -> excluded: MutatedFileReverted
+[Serilog]   candidate 4/14: src/Serilog/Core/Filters/DelegateFilter.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts IsEnabled's return (boolean flip)] L26
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]     -> ELIGIBLE
+[Serilog]   candidate 5/14: src/Serilog/Core/Pipeline/ByReferenceStringComparer.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts Equals's return (boolean flip)] L25
+[Serilog]     -> excluded: NoObservableDefect
+[Serilog]   candidate 6/14: src/Serilog/Core/Pipeline/ByReferenceStringComparer.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts GetHashCode's return (+1)] L30
+[Serilog]     -> excluded: NoObservableDefect
+[Serilog]   candidate 7/14: src/Serilog/Core/Pipeline/ByReferenceStringComparer.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts Equals's return (boolean flip)] L35
+[Serilog]     -> excluded: NoObservableDefect
+[Serilog]   candidate 8/14: src/Serilog/Core/Pipeline/ByReferenceStringComparer.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts GetHashCode's return (+1)] L40
+[Serilog]     -> excluded: NoObservableDefect
+[Serilog]   candidate 9/14: src/Serilog/Core/Pipeline/MessageTemplateCache.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts Parse's return (returns default instead of the computed value)] L40
+[Serilog]     -> excluded: NoObservableDefect
+[Serilog]   candidate 10/14: src/Serilog/Data/LogEventPropertyValueVisitor.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts Visit's return (returns default instead of the computed value)] L45
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueVisitor.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]     -> excluded: MutatedFileReverted
+[Serilog]   candidate 11/14: src/Serilog/Events/LogEventPropertyValue.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts ToString's return (returns default instead of the computed value)] L52
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]     -> ELIGIBLE
+[Serilog]   candidate 12/14: src/Serilog/LoggerExtensions.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts ForContext's return (returns default instead of the computed value)] L20
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/LoggerExtensions.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]     -> excluded: MutatedFileReverted
+[Serilog]   candidate 13/14: src/Serilog/Parsing/TextToken.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts Equals's return (boolean flip)] L58
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]     -> ELIGIBLE
+[Serilog]   candidate 14/14: src/Serilog/Rendering/Casing.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts Format's return (returns default instead of the computed value)] L24
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 88
+  CompileError: 16
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+[Serilog]     -> excluded: NotNativeRegion
+
+================================================================
+  Task generation: FluentValidation
+================================================================
+[FluentValidation] Step 1/4: baseline suite + native-region enumeration (mutate-then-convert prefilter)
+[FluentValidation]   baseline: 865/866 passed
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+[FluentValidation]   NativeFraction 53.2% (74 native of 139); siting mutations in 74 native file(s)
+[FluentValidation] Step 2/4: 10 candidate(s) enumerated; evaluating up to 10
+[FluentValidation]   candidate 1/10: src/FluentValidation/AsyncValidatorInvokedSynchronouslyException.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts BuildMessage's return (returns default instead of the computed value)] L40
+[FluentValidation]     -> excluded: NoObservableDefect
+[FluentValidation]   candidate 2/10: src/FluentValidation/Results/ValidationFailure.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts ToString's return (returns default instead of the computed value)] L91
+[FluentValidation]     -> excluded: NoObservableDefect
+[FluentValidation]   candidate 3/10: src/FluentValidation/Validators/AsyncPredicateValidator.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts IsValidAsync's return (returns default instead of the computed value)] L43
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPredicateValidator.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+[FluentValidation]     -> excluded: MutatedFileReverted
+[FluentValidation]   candidate 4/10: src/FluentValidation/Validators/AsyncPredicateValidator.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts GetDefaultMessageTemplate's return (returns default instead of the computed value)] L47
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+[FluentValidation]     -> ELIGIBLE
+[FluentValidation]   candidate 5/10: src/FluentValidation/Validators/ComparableComparer.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts Compare's return (+1)] L31
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+[FluentValidation]     -> ELIGIBLE
+[FluentValidation]   candidate 6/10: src/FluentValidation/Validators/ExclusiveBetweenValidator.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts HasError's return (boolean flip)] L33
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+[FluentValidation]     -> ELIGIBLE
+[FluentValidation]   candidate 7/10: src/FluentValidation/Validators/GreaterThanValidator.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts IsValid's return (boolean flip)] L39
+[FluentValidation]     -> excluded: NoObservableDefect
+[FluentValidation]   candidate 8/10: src/FluentValidation/Validators/GreaterThanValidator.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts GetDefaultMessageTemplate's return (returns default instead of the computed value)] L48
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+[FluentValidation]     -> ELIGIBLE
+[FluentValidation]   candidate 9/10: src/FluentValidation/Validators/LessThanValidator.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts IsValid's return (boolean flip)] L38
+[FluentValidation]     -> excluded: NoObservableDefect
+[FluentValidation]   candidate 10/10: src/FluentValidation/Validators/LessThanValidator.cs [inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts GetDefaultMessageTemplate's return (returns default instead of the computed value)] L47
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+[FluentValidation]     -> ELIGIBLE
+
+================================================================
+  Eligible bundles: 8 across 2 project(s)
+  PP-W2 NOT ADJUDICATED: only 0 project(s) pass the fidelity gate (< 2 required). Reported only — the measurement half returns to substrate engineering (wedge §6.1).
+  DoD met (≥3 eligible across ≥2 fidelity-passing projects): False
+  Report: ~/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/s1-funnel-001/task-generation-report.md
+================================================================

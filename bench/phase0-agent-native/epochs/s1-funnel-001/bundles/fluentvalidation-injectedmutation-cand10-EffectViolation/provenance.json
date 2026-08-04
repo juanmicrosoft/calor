@@ -1,0 +1,112 @@
+{
+  "TaskId": "fluentvalidation-injectedmutation-cand10-EffectViolation",
+  "ProjectName": "FluentValidation",
+  "Provenance": {
+    "Source": "InjectedMutation",
+    "Operator": "EffectViolation",
+    "OperatorDescription": "inject undeclared `fs` effect (using-nested Directory.Exists) that corrupts GetDefaultMessageTemplate's return (returns default instead of the computed value)",
+    "MutatedFileRelPath": "src/FluentValidation/Validators/LessThanValidator.cs",
+    "Line": 47,
+    "Column": 28,
+    "OriginalSnippet": "return Localized(errorCode, Name);",
+    "MutatedSnippet": "using (\u2026) { __calorTaint = Directory.Exists(cwd)?1:0; } return (__calorTaint == 1 ? default(string)! : (Localized(err...",
+    "NativeEligibility": {
+      "MutatedFileRelPath": "src/FluentValidation/Validators/LessThanValidator.cs",
+      "MutatedFileConvertedNative": true,
+      "MutatedFileLossCount": 0,
+      "MutatedFileStatus": "Replaced",
+      "CSharpArmHeldOutOutcome": "Failed",
+      "CalorArmHeldOutOutcome": "Failed",
+      "CSharpArmFailureSignature": "System.ArgumentNullException",
+      "CalorArmFailureSignature": "System.ArgumentNullException",
+      "AttributionOutcome": "AttributedToMutation",
+      "ProjectNativeFraction": 0.5323741007194245,
+      "Stratum": "Expressible",
+      "VerificationCheckFired": "Calor0410",
+      "AddressabilityNote": "Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) \u2014 verification-addressable."
+    },
+    "PresentationAsymmetry": "Calor arm = machine-converted round-tripped C# (from \u00a7-syntax); C# arm = idiomatic original. Bias is against Calor."
+  },
+  "CSharpArmDir": "~/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/s1-funnel-001/bundles/fluentvalidation-injectedmutation-cand10-EffectViolation/csharp-arm",
+  "CalorArmDir": "~/sources/repos/juanmicrosoft/calor/bench/phase0-agent-native/epochs/s1-funnel-001/bundles/fluentvalidation-injectedmutation-cand10-EffectViolation/calor-arm",
+  "HeldOut": [
+    {
+      "TestName": "FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_equal_to_input",
+      "ClassName": "FluentValidation.Tests.LessThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_equal_to_input",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.LessThanValidatorTester::FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_equal_to_input"
+    },
+    {
+      "TestName": "FluentValidation.Tests.LessThanValidatorTester.Should_set_default_validation_message_when_validation_fails",
+      "ClassName": "FluentValidation.Tests.LessThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.LessThanValidatorTester.Should_set_default_validation_message_when_validation_fails",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.LessThanValidatorTester::FluentValidation.Tests.LessThanValidatorTester.Should_set_default_validation_message_when_validation_fails"
+    },
+    {
+      "TestName": "FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationErrorFor_WithPropertyName_Only_throws",
+      "ClassName": "FluentValidation.Tests.ValidatorTesterTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationErrorFor_WithPropertyName_Only_throws",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.ValidatorTesterTester::FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationErrorFor_WithPropertyName_Only_throws"
+    },
+    {
+      "TestName": "FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_property",
+      "ClassName": "FluentValidation.Tests.LessThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_property",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.LessThanValidatorTester::FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_property"
+    },
+    {
+      "TestName": "FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_greater_than_input",
+      "ClassName": "FluentValidation.Tests.LessThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_greater_than_input",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.LessThanValidatorTester::FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_greater_than_input"
+    },
+    {
+      "TestName": "FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null",
+      "ClassName": "FluentValidation.Tests.LessThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.LessThanValidatorTester::FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null"
+    },
+    {
+      "TestName": "FluentValidation.Tests.LessThanValidatorTester.Validates_nullable_with_nullable_property",
+      "ClassName": "FluentValidation.Tests.LessThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.LessThanValidatorTester.Validates_nullable_with_nullable_property",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.LessThanValidatorTester::FluentValidation.Tests.LessThanValidatorTester.Validates_nullable_with_nullable_property"
+    },
+    {
+      "TestName": "FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property",
+      "ClassName": "FluentValidation.Tests.LessThanValidatorTester",
+      "Assembly": "fluentvalidation.tests.dll",
+      "FilterName": "FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property",
+      "Identity": "fluentvalidation.tests.dll::executor://xunit/VsTestRunner2::FluentValidation.Tests.LessThanValidatorTester::FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property"
+    }
+  ],
+  "VisibleTestFilter": "FullyQualifiedName!~FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_equal_to_input&FullyQualifiedName!~FluentValidation.Tests.LessThanValidatorTester.Should_set_default_validation_message_when_validation_fails&FullyQualifiedName!~FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationErrorFor_WithPropertyName_Only_throws&FullyQualifiedName!~FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_property&FullyQualifiedName!~FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_greater_than_input&FullyQualifiedName!~FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null&FullyQualifiedName!~FluentValidation.Tests.LessThanValidatorTester.Validates_nullable_with_nullable_property&FullyQualifiedName!~FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property",
+  "RegressionNetProject": "src/FluentValidation.Tests/FluentValidation.Tests.csproj",
+  "FailingBehavior": {
+    "Symptom": "Observed incorrect behavior: System.ArgumentNullException : Value cannot be null. (Parameter 'input')",
+    "Observed": "System.ArgumentNullException : Value cannot be null. (Parameter 'input')",
+    "Notes": "Symptom derived mechanically from a removed covering test and scrubbed of the test's identity. The removed test is held out; the full suite remains as the regression net."
+  },
+  "EligibilityProof": {
+    "MutatedFileRelPath": "src/FluentValidation/Validators/LessThanValidator.cs",
+    "MutatedFileConvertedNative": true,
+    "MutatedFileLossCount": 0,
+    "MutatedFileStatus": "Replaced",
+    "CSharpArmHeldOutOutcome": "Failed",
+    "CalorArmHeldOutOutcome": "Failed",
+    "CSharpArmFailureSignature": "System.ArgumentNullException",
+    "CalorArmFailureSignature": "System.ArgumentNullException",
+    "AttributionOutcome": "AttributedToMutation",
+    "ProjectNativeFraction": 0.5323741007194245,
+    "Stratum": "Expressible",
+    "VerificationCheckFired": "Calor0410",
+    "AddressabilityNote": "Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) \u2014 verification-addressable."
+  }
+}
