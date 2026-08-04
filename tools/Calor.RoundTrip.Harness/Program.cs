@@ -25,6 +25,8 @@ switch (command)
         return await GenTasksCommand(cliArgs.Skip(1).ToArray());
     case "mine":
         return MineCommand(cliArgs.Skip(1).ToArray());
+    case "enumerate-supply":
+        return await EnumerateSupplyCommand(cliArgs.Skip(1).ToArray());
     case "list":
         Console.WriteLine("Known projects:");
         foreach (var p in ProjectConfigs.KnownProjects)
@@ -280,6 +282,110 @@ async Task<int> GenTasksCommand(string[] genArgs)
     var run = await TaskGenRunner.RunAsync(configs, options);
     return run.TotalEligible > 0 ? 0 : 1;
 }
+
+// v0.12 S1 pre-pass (kickoff D-1/D-5): expressible-stratum SUPPLY per project, conversion-only.
+// No builds, no tests, no recovery, no bundles — and, critically, NO ELIGIBILITY EVALUATION, which
+// is what lets it run before the A-1.5 freeze (plan §3 constraint (a)).
+async Task<int> EnumerateSupplyCommand(string[] args)
+{
+    var projectsDir = GetOption(args, "--projects-dir") ?? ProjectConfigs.DefaultCorpusDir;
+    projectsDir = Path.GetFullPath(projectsDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+    var outputDir = GetOption(args, "--output") ?? "supply-enumeration";
+    // Same resolution as run/gen-tasks: the ~/.dotnet default with a PATH fallback when absent.
+    var dotnet = GetOption(args, "--dotnet")
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dotnet/dotnet");
+    if (dotnet.Contains('/') || dotnet.Contains('\\'))
+        dotnet = Path.GetFullPath(dotnet.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+    if (!File.Exists(dotnet) && dotnet.Contains('/'))
+        dotnet = "dotnet";
+
+    var optionsWithValues = new HashSet<string> { "--projects-dir", "--output", "--dotnet" };
+    var projectNames = new List<string>();
+    if (args.Contains("--all")) projectNames = ProjectConfigs.KnownProjects.ToList();
+    else
+    {
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (args[i].StartsWith("--")) { if (optionsWithValues.Contains(args[i])) i++; continue; }
+            projectNames.Add(args[i]);
+        }
+    }
+    if (projectNames.Count == 0)
+    {
+        Console.Error.WriteLine("Specify at least one project, or --all.");
+        return 2;
+    }
+
+    var configs = new List<RoundTripConfig>();
+    foreach (var name in projectNames)
+    {
+        var cfg = ProjectConfigs.Get(name, projectsDir, dotnet);
+        if (cfg == null) { Console.Error.WriteLine($"Unknown project '{name}'."); return 2; }
+        if (!Directory.Exists(cfg.OriginalProjectPath))
+        {
+            // D-6: a missing corpus subject must change the denominator LOUDLY, never silently.
+            Console.Error.WriteLine(
+                $"ERROR: project '{name}' is not present at {cfg.OriginalProjectPath} " +
+                "(uninitialized submodule?). Refusing to run: a silently reduced denominator is the " +
+                "failure mode this pre-pass exists to avoid. Initialize it, or drop it from the argument " +
+                "list deliberately so the reduced corpus is explicit.");
+            return 2;
+        }
+        configs.Add(cfg);
+    }
+
+    var pipeline = new RoundTripPipeline();
+    var workRoot = Path.Combine(Path.GetTempPath(), "calor-supply-" + Guid.NewGuid().ToString("N")[..8]);
+
+    var result = await SupplyEnumeration.RunAsync(
+        configs,
+        async project =>
+        {
+            Console.WriteLine($"[{project.ProjectName}] converting (no build, no tests)…");
+            var dir = pipeline.PrepareWorkingCopy(CloneForSupply(project, Path.Combine(workRoot, project.ProjectName)));
+            var report = new RoundTripReport { ProjectName = project.ProjectName };
+            var files = await pipeline.ConvertAndReplaceAsync(dir, project, report);
+            return files;
+        },
+        async (project, rel) =>
+        {
+            var abs = Path.Combine(project.OriginalProjectPath, rel);
+            return File.Exists(abs) ? await File.ReadAllTextAsync(abs) : null;
+        });
+
+    Directory.CreateDirectory(outputDir);
+    var reportPath = Path.Combine(outputDir, "supply-enumeration.md");
+    await File.WriteAllTextAsync(reportPath, SupplyEnumerationReport.Render(result));
+    var jsonPath = Path.Combine(outputDir, "supply-enumeration.json");
+    await File.WriteAllTextAsync(jsonPath, System.Text.Json.JsonSerializer.Serialize(result,
+        new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+
+    Console.WriteLine();
+    Console.WriteLine(SupplyEnumerationReport.Render(result));
+    Console.WriteLine($"Written: {reportPath}");
+
+    try { if (Directory.Exists(workRoot)) Directory.Delete(workRoot, recursive: true); } catch { /* best effort */ }
+
+    // Exit code carries NO supply signal on purpose: this runs before the A-1.5 freeze, and an
+    // exit code that encoded "supply > 0" would be exactly the kind of side-channel that made the
+    // superseded seal worthless (plan §10, Draft v2.2). 0 = the pass completed.
+    return 0;
+}
+
+RoundTripConfig CloneForSupply(RoundTripConfig c, string workDir) => new()
+{
+    ProjectName = c.ProjectName,
+    OriginalProjectPath = c.OriginalProjectPath,
+    LibrarySourceRelativePath = c.LibrarySourceRelativePath,
+    SolutionOrProjectFile = c.SolutionOrProjectFile,
+    WorkingDirectory = workDir,
+    ExcludePatterns = c.ExcludePatterns,
+    DotnetPath = c.DotnetPath,
+    TargetFramework = c.TargetFramework,
+    ExtraBuildProperties = c.ExtraBuildProperties,
+    TestTimeout = c.TestTimeout,
+    BuildTimeout = c.BuildTimeout,
+};
 
 // Cheap diagnostic: mine the revert-upstream-bugfix SUPPLY per project (git-only, no build/test).
 // Reports the raw fix-shaped supply, the source+covering-test subset (the "candidates" number), and

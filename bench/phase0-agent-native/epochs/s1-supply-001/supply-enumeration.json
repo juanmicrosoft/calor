@@ -1,0 +1,58 @@
+{
+  "Projects": [
+    {
+      "ProjectName": "MediatR",
+      "NativeFiles": 20,
+      "WithLossFiles": 5,
+      "SupplyNative": 0,
+      "SupplyWithLoss": 0,
+      "NativeByOperator": {},
+      "WithLossByOperator": {},
+      "NativeByFile": {},
+      "WithLossOverNativeRatio": null
+    },
+    {
+      "ProjectName": "Serilog",
+      "NativeFiles": 72,
+      "WithLossFiles": 17,
+      "SupplyNative": 3,
+      "SupplyWithLoss": 7,
+      "NativeByOperator": {
+        "EffectViolation": 3
+      },
+      "WithLossByOperator": {
+        "EffectViolation": 1,
+        "NullDeref": 6
+      },
+      "NativeByFile": {
+        "src/Serilog/Core/Pipeline/ByReferenceStringComparer.cs": 2,
+        "src/Serilog/Events/EventProperty.cs": 1
+      },
+      "WithLossOverNativeRatio": 2.3333333333333335
+    },
+    {
+      "ProjectName": "FluentValidation",
+      "NativeFiles": 109,
+      "WithLossFiles": 4,
+      "SupplyNative": 6,
+      "SupplyWithLoss": 0,
+      "NativeByOperator": {
+        "EffectViolation": 3,
+        "NullDeref": 3
+      },
+      "WithLossByOperator": {},
+      "NativeByFile": {
+        "src/FluentValidation/Internal/AccessorCache.cs": 1,
+        "src/FluentValidation/Internal/ValidationStrategy.cs": 2,
+        "src/FluentValidation/Validators/ComparableComparer.cs": 1,
+        "src/FluentValidation/Validators/NotEqualValidator.cs": 1,
+        "src/FluentValidation/Validators/RangeValidator.cs": 1
+      },
+      "WithLossOverNativeRatio": 0
+    }
+  ],
+  "TotalSupplyNative": 9,
+  "TotalSupplyWithLoss": 7,
+  "PooledRatio": 0.7777777777777778,
+  "D5Verdict": "ACCEPT site-level clause (a) \u2014 ratio 0.78 \u2265 0.50"
+}
