@@ -60,6 +60,28 @@ public static class TaskGenReportWriter
         sb.AppendLine($"  - failure signatures — C#=`{proof.CSharpArmFailureSignature}`, Calor=`{proof.CalorArmFailureSignature}`");
         sb.AppendLine($"- D-W4.3 attribution: **{proof.AttributionOutcome}**");
         sb.AppendLine($"- Project NativeFraction at generation: {proof.ProjectNativeFraction:P1}");
+        sb.AppendLine();
+        sb.AppendLine($"## Defect stratum: **{proof.Stratum}**");
+        sb.AppendLine();
+        if (proof.VerificationCheckFired != null)
+        {
+            sb.AppendLine($"- Verification-addressable: the mutation makes Calor's **{proof.VerificationCheckFired}** fire on the ");
+            sb.AppendLine($"  converted arm — a signal the C# compiler has no equivalent of. The C# arm's agent may ship the ");
+            sb.AppendLine($"  defect; the Calor arm's agent is confronted by the diagnostic. {proof.AddressabilityNote}");
+            if (proof.VerificationCheckFired == ExpressibleMutationOperators.CalorForbiddenEffect)
+            {
+                sb.AppendLine();
+                sb.AppendLine("  > **Papering-over residual (preserved by design):** the agent can clear the Calor build by ");
+                sb.AppendLine("  > REMOVING the injected effect (correct → held-out passes → caught) OR by DECLARING it in §E ");
+                sb.AppendLine("  > (papers over → the bug still ships → held-out fails → escaped). Which path the agent takes IS ");
+                sb.AppendLine("  > the measurement; both remain possible.");
+            }
+        }
+        else
+        {
+            sb.AppendLine("- Logic stratum: Calor has NO mechanical signal for this defect class (the conversion-penalty / ");
+            sb.AppendLine("  PP-A2 measurement). Reported with CIs alongside the expressible stratum, not conflated with it.");
+        }
         return sb.ToString();
     }
 
@@ -126,21 +148,31 @@ public static class TaskGenReportWriter
         {
             sb.AppendLine($"**{p.ProjectName}** (NativeFraction {p.NativeFraction:P1}, {p.NativeSourceFiles} native of {p.TotalConvertibleFiles} files)");
             sb.AppendLine();
-            sb.AppendLine("| Candidate | File | Operator | Verdict | Reason | Explanation |");
-            sb.AppendLine("|---|---|---|:---:|---|---|");
+            sb.AppendLine("| Candidate | File | Stratum | Operator | Expected check | Addressable | Verdict | Reason |");
+            sb.AppendLine("|---|---|---|---|---|:---:|:---:|---|");
             foreach (var d in p.Accounting.Dispositions)
-                sb.AppendLine($"| {d.CandidateId} | {d.FileRelPath} | {d.Operator} | {(d.Eligible ? "ELIGIBLE" : "excluded")} | {d.Reason} | {d.Explanation} |");
+            {
+                var addr = d.Stratum == DefectStratum.Expressible
+                    ? (!d.AddressabilityProbed ? "-" : !d.AddressabilityDeterminable ? "indet" : d.VerificationAddressable ? "yes" : "no")
+                    : "n/a";
+                sb.AppendLine($"| {d.CandidateId} | {d.FileRelPath} | {d.Stratum} | {d.Operator} | {d.ExpectedCheck ?? "-"} | {addr} | {(d.Eligible ? "ELIGIBLE" : "excluded")} | {d.Reason} |");
+            }
             sb.AppendLine();
         }
+
+        AppendAddressabilitySection(sb, run);
 
         sb.AppendLine("## Eligible task bundles");
         sb.AppendLine();
         foreach (var p in run.Projects)
             foreach (var b in p.Bundles)
             {
-                sb.AppendLine($"- `{b.TaskId}` — {b.Provenance.Source} `{b.Provenance.OperatorDescription}` in `{b.Provenance.MutatedFileRelPath}`:{b.Provenance.Line}; " +
+                var checkTag = b.EligibilityProof.VerificationCheckFired != null
+                    ? $", fires **{b.EligibilityProof.VerificationCheckFired}**"
+                    : "";
+                sb.AppendLine($"- `{b.TaskId}` — [{b.EligibilityProof.Stratum}] {b.Provenance.Source} `{b.Provenance.OperatorDescription}` in `{b.Provenance.MutatedFileRelPath}`:{b.Provenance.Line}; " +
                     $"held-out: {string.Join(", ", b.HeldOut.Select(h => h.TestName))}; " +
-                    $"native={b.EligibilityProof.MutatedFileConvertedNative}, attribution={b.EligibilityProof.AttributionOutcome}");
+                    $"native={b.EligibilityProof.MutatedFileConvertedNative}, attribution={b.EligibilityProof.AttributionOutcome}{checkTag}");
             }
         sb.AppendLine();
 
@@ -154,6 +186,68 @@ public static class TaskGenReportWriter
         sb.AppendLine("§-syntax vs the C# arm's idiomatic original — a bias AGAINST Calor, so a PP-W2 win is conservative and ");
         sb.AppendLine("a loss is confounded with conversion idiom.");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// The verification-addressability base-rate section (expressible stratum). Discloses, of the
+    /// expressible sites the probe could resolve, the fraction whose Calor check the mutation actually
+    /// makes fire — the honesty number that bounds how often real defects of these shapes would be
+    /// Calor-catchable. Also names any expected check that NEVER fired (a gap), so the epoch's claim is
+    /// not overstated.
+    /// </summary>
+    private static void AppendAddressabilitySection(StringBuilder sb, TaskGenRunResult run)
+    {
+        var expressible = run.Projects
+            .SelectMany(p => p.Accounting.Dispositions)
+            .Where(d => d.Stratum == DefectStratum.Expressible)
+            .ToList();
+        if (expressible.Count == 0) return;
+
+        var probedDeterminable = expressible.Count(d => d.AddressabilityProbed && d.AddressabilityDeterminable);
+        var addressable = expressible.Count(d => d.VerificationAddressable);
+        var indeterminable = expressible.Count(d => d.AddressabilityProbed && !d.AddressabilityDeterminable);
+        var baseRate = probedDeterminable == 0 ? 0.0 : (double)addressable / probedDeterminable;
+
+        sb.AppendLine("## Verification-addressability (expressible stratum) — base-rate honesty");
+        sb.AppendLine();
+        sb.AppendLine("A defect is *expressible* (verification-addressable) only if the differential probe confirms Calor's ");
+        sb.AppendLine("expected check is INTRODUCED by the mutation on the converted arm (fires on the mutated conversion, ");
+        sb.AppendLine("absent on the clean one). The base rate below **bounds how often real defects of these shapes would be ");
+        sb.AppendLine("Calor-catchable** and MUST be read alongside any escaped-bug claim so the claim is not overstated.");
+        sb.AppendLine();
+        sb.AppendLine($"- Expressible candidates considered: **{expressible.Count}**");
+        sb.AppendLine($"- Probed & determinable: **{probedDeterminable}** (indeterminable — a conversion did not compile: {indeterminable})");
+        sb.AppendLine($"- Verification-addressable (check introduced by the mutation): **{addressable}**");
+        sb.AppendLine($"- **Verification-addressability base rate: {baseRate:P0}** (addressable / probed-determinable)");
+        sb.AppendLine();
+        sb.AppendLine("| Expected check | Operator class | Probed-determinable | Addressable | Rate |");
+        sb.AppendLine("|---|---|---:|---:|---:|");
+        foreach (var g in expressible.Where(d => d.ExpectedCheck != null)
+                     .GroupBy(d => (d.ExpectedCheck!, d.Operator))
+                     .OrderBy(g => g.Key.Item1))
+        {
+            var probed = g.Count(d => d.AddressabilityProbed && d.AddressabilityDeterminable);
+            var addr = g.Count(d => d.VerificationAddressable);
+            var rate = probed == 0 ? "n/a" : $"{(double)addr / probed:P0}";
+            sb.AppendLine($"| {g.Key.Item1} | {g.Key.Item2} | {probed} | {addr} | {rate} |");
+        }
+        sb.AppendLine();
+
+        var neverFired = expressible.Where(d => d.ExpectedCheck != null)
+            .GroupBy(d => d.ExpectedCheck!)
+            .Where(g => g.All(d => !d.VerificationAddressable) && g.Any(d => d.AddressabilityProbed && d.AddressabilityDeterminable))
+            .Select(g => g.Key)
+            .ToList();
+        if (neverFired.Count > 0)
+        {
+            sb.AppendLine($"**Gap disclosed:** the following expected check(s) NEVER fired on any probed candidate — the ");
+            sb.AppendLine($"defect class is real but not verification-addressable by the current checker on converted code: ");
+            sb.AppendLine($"**{string.Join(", ", neverFired)}**. Notably, Calor's null bug-pattern models Option/Result ");
+            sb.AppendLine("`.unwrap`/`.expect` shapes (not plain reference null-deref), and the index-OOB checker keys on ");
+            sb.AppendLine("specific array-access call shapes — converted corpus code may not lower to either, so those strata ");
+            sb.AppendLine("may show a 0% base rate. This is reported, not hidden.");
+            sb.AppendLine();
+        }
     }
 
     private static int FidelityPassingWithTasks(TaskGenRunResult run) =>

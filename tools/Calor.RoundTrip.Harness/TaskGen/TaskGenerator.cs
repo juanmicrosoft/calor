@@ -43,8 +43,8 @@ public sealed class TaskGenerator
         var nativeSet = nativeFiles.ToHashSet(StringComparer.Ordinal);
         var enumerated = new List<MutationCandidate>();
 
-        // Injected mutations (supplement): standard operators over native files.
-        if (options.Sources.HasFlag(TaskSourceSelection.Injected))
+        // LOGIC stratum — injected mutations (supplement): standard operators over native files.
+        if (options.Strata.HasFlag(StratumSelection.Logic) && options.Sources.HasFlag(TaskSourceSelection.Injected))
         {
             foreach (var relPath in nativeFiles)
             {
@@ -59,11 +59,26 @@ public sealed class TaskGenerator
             }
         }
 
+        // EXPRESSIBLE stratum — verification-addressable operators over native files (W4 dry-run
+        // disposition). These carry an ExpectedCheck; the predicate applies the ADDITIONAL
+        // addressability clause. The logic operators above are left untouched (PP-A2 measurement).
+        if (options.Strata.HasFlag(StratumSelection.Expressible))
+        {
+            foreach (var relPath in nativeFiles)
+            {
+                var absOriginal = Path.Combine(project.OriginalProjectPath, relPath);
+                if (!File.Exists(absOriginal)) continue;
+                var source = await File.ReadAllTextAsync(absOriginal);
+                enumerated.AddRange(ExpressibleMutationOperators.Enumerate(source, relPath));
+            }
+        }
+
         // Revert-upstream-bugfix (gold standard): mine fix commits, reintroduce the defect via a
         // source-hunk-only revert, and feed each through the SAME eligibility predicate. Supply-side
         // exclusions (multi-source-file / inseparable / not-native) are recorded up front so the
         // accounting is complete before any build/test cost is spent.
-        if (options.Sources.HasFlag(TaskSourceSelection.Revert))
+        // Revert-bugfix is a LOGIC-stratum real defect (mined upstream), so it is gated under the Logic stratum.
+        if (options.Strata.HasFlag(StratumSelection.Logic) && options.Sources.HasFlag(TaskSourceSelection.Revert))
         {
             Console.WriteLine($"[{project.ProjectName}]   mining upstream bug-fix commits (revert source; scanning {options.RevertScanCommits} commits)...");
             var fixCommits = BugfixMiner.MineFixCommits(
@@ -118,7 +133,7 @@ public sealed class TaskGenerator
                 break;
             }
             Console.WriteLine($"[{project.ProjectName}]   candidate {idx}/{candidates.Count}: {candidate.FileRelPath} [{candidate.OperatorDescription}] L{candidate.Line}");
-            var (verdict, bundle) = await EvaluateCandidateAsync(project, options, candidate, baseline, coverage.NativeFraction, workRoot, idx);
+            var (verdict, bundle, addressability) = await EvaluateCandidateAsync(project, options, candidate, baseline, coverage.NativeFraction, workRoot, idx);
             accounting.Record(new CandidateDisposition
             {
                 ProjectName = project.ProjectName,
@@ -129,6 +144,12 @@ public sealed class TaskGenerator
                 Eligible = verdict.Eligible,
                 Reason = verdict.Reason,
                 Explanation = verdict.Explanation,
+                Stratum = candidate.Stratum,
+                ExpectedCheck = candidate.ExpectedCheck,
+                AddressabilityProbed = addressability != null,
+                AddressabilityDeterminable = addressability?.Determinable ?? false,
+                VerificationAddressable = addressability?.Addressable ?? false,
+                AddressabilityNote = addressability?.Note ?? "",
             });
             if (bundle != null) bundles.Add(bundle);
             Console.WriteLine($"[{project.ProjectName}]     -> {(verdict.Eligible ? "ELIGIBLE" : "excluded: " + verdict.Reason)}");
@@ -148,11 +169,25 @@ public sealed class TaskGenerator
         };
     }
 
-    private async Task<(EligibilityVerdict, TaskBundle?)> EvaluateCandidateAsync(
+    private async Task<(EligibilityVerdict, TaskBundle?, VerificationAddressability.Result?)> EvaluateCandidateAsync(
         RoundTripConfig project, TaskGenOptions options, MutationCandidate candidate,
         TestRunResult baseline, double nativeFraction, string workRoot, int idx)
     {
         var stem = $"cand{idx}-{candidate.Operator}";
+
+        // ===== Verification-addressability probe (expressible stratum, differential). =====
+        // Independent of the test runs: convert the mutated file AND the clean original to Calor,
+        // analyse both with the expected check family on, and confirm the check is INTRODUCED by the
+        // mutation. Run up front so its outcome is recorded even for candidates excluded by a later
+        // clause (the base-rate denominator stays honest).
+        VerificationAddressability.Result? addressability = null;
+        if (candidate.ExpectedCheck != null)
+        {
+            var cleanAbs = Path.Combine(project.OriginalProjectPath, candidate.FileRelPath);
+            var cleanSource = File.Exists(cleanAbs) ? await File.ReadAllTextAsync(cleanAbs) : "";
+            addressability = new VerificationAddressability(_pipeline)
+                .Probe(candidate.ExpectedCheck, candidate.MutatedSource, cleanSource, candidate.FileRelPath);
+        }
 
         // ===== C# arm: idiomatic original + mutation, no conversion. =====
         var csDir = _pipeline.PrepareWorkingCopy(Clone(project, Path.Combine(workRoot, $"{stem}-csharp")));
@@ -163,12 +198,12 @@ public sealed class TaskGenerator
         // distinct bucket from "compiles but has no covering test" (minor).
         if (csTests.Results.Count == 0)
             return (Excluded(ExclusionReason.DidNotCompile,
-                "the mutation did not compile / produced no test results on the C# arm — invalid candidate."), null);
+                "the mutation did not compile / produced no test results on the C# arm — invalid candidate."), null, addressability);
 
         var covering = HeldOutExtraction.IdentifyCoveringTests(baseline, csTests);
         if (covering.Count == 0)
             return (Excluded(ExclusionReason.NoObservableDefect,
-                "clause (b): the mutation compiles but breaks no previously-passing test — no observable defect."), null);
+                "clause (b): the mutation compiles but breaks no previously-passing test — no observable defect."), null, addressability);
 
         var heldOut = HeldOutExtraction.ToHeldOut(covering);
         var coveringIds = covering.Select(c => c.Identity).ToHashSet();
@@ -216,7 +251,7 @@ public sealed class TaskGenerator
                 if (HeldOutExtraction.VisibleSuiteLeaks(visibleRun, coveringIds))
                     return (Excluded(ExclusionReason.HeldOutFilterLeak,
                         "the visible-suite filter does not exclude a covering test (unrecoverable method FQN, e.g. a custom DisplayName) — "
-                        + "it would remain visible and failing (oracle leak); dropped rather than shipping a leaking bundle."), null);
+                        + "it would remain visible and failing (oracle leak); dropped rather than shipping a leaking bundle."), null, addressability);
             }
         }
 
@@ -266,11 +301,14 @@ public sealed class TaskGenerator
             CalorArmFailureSignature = calorSignature,
             Attribution = attribution,
             RequireIdenticalSignature = options.RequireIdenticalSignature,
+            ExpectedCheck = candidate.ExpectedCheck,
+            AddressabilityDeterminable = addressability?.Determinable ?? false,
+            VerificationAddressable = addressability?.Addressable ?? false,
         };
 
         var verdict = EligibilityPredicate.Evaluate(evidence);
         if (!verdict.Eligible)
-            return (verdict, null);
+            return (verdict, null, addressability);
 
         var proof = new EligibilityProof
         {
@@ -284,11 +322,14 @@ public sealed class TaskGenerator
             CalorArmFailureSignature = calorSignature,
             AttributionOutcome = attribution.ToString(),
             ProjectNativeFraction = nativeFraction,
+            Stratum = candidate.Stratum.ToString(),
+            VerificationCheckFired = addressability?.Addressable == true ? candidate.ExpectedCheck : null,
+            AddressabilityNote = addressability?.Note ?? "",
         };
 
         // Build a FRESH canonical Calor arm for the bundle (the eval copy was perturbed by attribution).
         var bundle = await WriteBundleAsync(project, options, candidate, heldOut, covering[0], proof, csDir, workRoot, stem);
-        return (verdict, bundle);
+        return (verdict, bundle, addressability);
     }
 
     private async Task<TaskBundle> WriteBundleAsync(

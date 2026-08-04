@@ -55,7 +55,14 @@ public static class TaskGenRunner
                 ExcludedHeldOutFilterLeak = p.Accounting.ExcludedHeldOutFilterLeak,
                 ExcludedMultipleSourceFiles = p.Accounting.ExcludedMultipleSourceFiles,
                 ExcludedInseparableRevert = p.Accounting.ExcludedInseparableRevert,
+                ExcludedNotAddressable = p.Accounting.ExcludedNotAddressable,
                 EligibilityRate = p.Accounting.EligibilityRate,
+                // Expressible-stratum verification-addressability base rate (honesty number).
+                AddressabilityProbedDeterminable = p.Accounting.AddressabilityProbedDeterminable,
+                AddressableConfirmed = p.Accounting.AddressableConfirmed,
+                AddressabilityBaseRate = p.Accounting.AddressabilityBaseRate,
+                AddressabilityByCheck = p.Accounting.AddressabilityByCheck()
+                    .ToDictionary(kv => kv.Key, kv => new { kv.Value.ProbedDeterminable, kv.Value.Addressable }),
                 Bundles = p.Bundles.Select(b => b.TaskId).ToList(),
                 Dispositions = p.Accounting.Dispositions,
             }),
