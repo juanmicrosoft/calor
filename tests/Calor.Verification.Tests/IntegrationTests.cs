@@ -165,6 +165,11 @@ public class IntegrationTests
         Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
 
+        // DoesNotContain("// PROVEN") alone would also pass for Unsupported, Refuted, Timeout or
+        // Unknown — i.e. it does not pin that the solver still DISCHARGES this. Assert the
+        // demotion specifically, so a regression that stops proving is not mistaken for the fix.
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
+
         // Control: the same shape with no string in the body at all is still genuinely proved and
         // elided, so this pins the trigger rather than a verifier that stopped proving.
         var numeric = Program.Compile(@"

@@ -130,6 +130,7 @@ public sealed class RefineTool : McpToolBase
                     Discharged = summary.Discharged,
                     Failed = summary.Failed,
                     Timeout = summary.Timeout,
+                    Assumed = obligations.Count(o => o.Outcome?.Status == Verification.ProofStatus.Assumed),
                     Boundary = summary.Boundary,
                     Pending = summary.Pending,
                     Unsupported = summary.Unsupported
@@ -618,6 +619,16 @@ public sealed class RefineTool : McpToolBase
 
         [JsonPropertyName("timeout")]
         public int Timeout { get; init; }
+
+        /// <summary>
+        /// How many of <c>timeout</c> are actually <b>assumed</b> — the solver DID discharge them,
+        /// but under a named assumption (D3/D12: string-carried proofs). <c>ToObligationStatus</c>
+        /// maps <c>Assumed</c> into the legacy <c>Timeout</c> bucket per the frozen D-G2.2 rule, so
+        /// without this an agent reads "timeout" for an obligation that was proved. Additive: the
+        /// legacy counter is unchanged.
+        /// </summary>
+        [JsonPropertyName("assumed")]
+        public int Assumed { get; init; }
 
         [JsonPropertyName("boundary")]
         public int Boundary { get; init; }

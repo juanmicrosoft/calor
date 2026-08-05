@@ -850,6 +850,13 @@ public sealed class ContractTranslator
     /// </summary>
     public bool TouchedStringTheory { get; private set; }
 
+    /// <summary>Records the string-sort touch for sites that hand back a bare <c>Sort</c>.</summary>
+    private Sort MarkStringSort()
+    {
+        TouchedStringTheory = true;
+        return _ctx.StringSort;
+    }
+
     private SeqExpr TrackString(SeqExpr expr, bool isNullable = false)
     {
         TouchedStringTheory = true;
@@ -1513,7 +1520,13 @@ public sealed class ContractTranslator
             "i32" or "u32" or "int" or "uint" => _ctx.MkBitVecSort(32),
             "i64" or "u64" or "long" or "ulong" => _ctx.MkBitVecSort(64),
             "bool" => _ctx.BoolSort,
-            "string" or "str" => _ctx.StringSort,
+            // Flagged like every other string-sort site (D3/D12): this arm mints a field
+            // accessor's RESULT sort, and `accessor.Apply(target)` does not pass through
+            // TrackString. Unreachable today only because SetUserTypeRegistry has no callers —
+            // but wiring that registry up is the natural fix for D7, which would reopen this
+            // vector on `§S (== (len p.name) INT:2)`. Flagging it here means the invariant
+            // "every string term sets the flag" holds without a caveat.
+            "string" or "str" => MarkStringSort(),
             _ when !string.IsNullOrEmpty(t) => _userTypeSorts.TryGetValue(t, out var s)
                                                ? s
                                                : (_userTypeSorts[t] = _ctx.MkUninterpretedSort(t)),

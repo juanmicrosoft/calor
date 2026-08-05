@@ -217,6 +217,71 @@ public sealed class ObligationTests
         Assert.Equal(ObligationStatus.Discharged, proofObl.Status);
     }
 
+    /// <summary>
+    /// D3/D12, the SECOND elision channel. A discharged proof obligation makes the emitter drop
+    /// its <c>if (!(cond)) throw</c>, exactly as a <c>Proven</c> postcondition elides — and
+    /// <c>ObligationSolver</c> shares the contract translator's string theory, whose strings are
+    /// non-null and UTF-8-byte-counted while .NET's are nullable and UTF-16-code-unit-counted.
+    /// So a string-carried obligation must NOT discharge, or the guard disappears.
+    ///
+    /// <para>Pinned here because nothing else does: deleting the demotion in
+    /// <c>ObligationSolver</c> leaves the rest of the suite fully green, and the only shipped way
+    /// to reach <c>VerifyRefinements</c> is the MCP <c>refine</c> tool.</para>
+    /// </summary>
+    [SkippableFact]
+    public void Solve_StringCarriedProofObligation_IsNotDischarged()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // (== (len "\u00e9") 2) is TRUE under Z3's byte model and FALSE in .NET, where Length is 1.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Check:priv}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:bytelen} (== (len STR:"\u00e9") INT:2)
+            """;
+
+        var options = new CompilationOptions { VerifyRefinements = true };
+        var result = Program.Compile(source, "test.calr", options);
+
+        Assert.NotNull(options.ObligationResults);
+        var proofObl = options.ObligationResults.Obligations.FirstOrDefault(
+            o => o.Kind == ObligationKind.ProofObligation);
+        Assert.NotNull(proofObl);
+        Assert.NotEqual(ObligationStatus.Discharged, proofObl!.Status);
+        Assert.Equal(Verification.ProofStatus.Assumed, proofObl.Outcome!.Status);
+        Assert.Contains(Verification.Z3.Z3Verifier.StringModelAssumption, proofObl.Outcome.Assumptions);
+    }
+
+    /// <summary>
+    /// The control that makes the test above mean something: a numeric obligation of the same
+    /// shape still discharges, so the demotion is the string trigger and not a verifier that
+    /// stopped solving obligations.
+    /// </summary>
+    [SkippableFact]
+    public void Solve_NumericProofObligation_StillDischarges()
+    {
+        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        var source = """
+            §M{m001:Test}
+              §F{f001:Check:priv}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:numeric} (== (+ INT:1 INT:1) INT:2)
+            """;
+
+        var options = new CompilationOptions { VerifyRefinements = true };
+        var result = Program.Compile(source, "test.calr", options);
+
+        Assert.NotNull(options.ObligationResults);
+        var proofObl = options.ObligationResults.Obligations.FirstOrDefault(
+            o => o.Kind == ObligationKind.ProofObligation);
+        Assert.NotNull(proofObl);
+        Assert.Equal(ObligationStatus.Discharged, proofObl!.Status);
+    }
+
     [SkippableFact]
     public void Solve_FailingProofObligation_FailsWithCounterexample()
     {

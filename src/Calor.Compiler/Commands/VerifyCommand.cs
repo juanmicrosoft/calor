@@ -435,8 +435,13 @@ public static class VerifyCommand
             // VerificationSummary, whose positional record every consumer would have to change.
             var assumed = file.Functions.Sum(f =>
                 f.Contracts.Count(c => c.Outcome.Status == ProofStatus.Assumed));
-            sb.AppendLine($"  Unproven:    {file.Summary.Unproven}"
-                + (assumed > 0 ? $"   (of which assumed, with a named assumption: {assumed})" : ""));
+            sb.AppendLine($"  Unproven:    {file.Summary.Unproven}");
+            if (assumed > 0)
+            {
+                // Its own line rather than a suffix on the row above, so anything parsing
+                // `Unproven:\s+(\d+)$` keeps working.
+                sb.AppendLine($"    of which assumed (discharged under a named assumption): {assumed}");
+            }
             sb.AppendLine($"  Disproven:   {file.Summary.Disproven}");
             sb.AppendLine($"  Unsupported: {file.Summary.Unsupported}");
             sb.AppendLine($"  Skipped:     {file.Summary.Skipped}");

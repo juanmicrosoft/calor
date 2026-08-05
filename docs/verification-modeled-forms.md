@@ -111,7 +111,13 @@ mechanism — elision — that turns any false `Proven` into a deleted check.
 
 **The trigger asks the solver, not the AST.** `ContractTranslator.TouchedStringTheory` is set at the
 point a term of Z3's string sort is *created* — every string literal, every declared `str`, every
-string operation — and the demotion reads that flag. It therefore cannot miss a syntactic form.
+string operation, every field-accessor result sort — and the demotion reads that flag. It therefore
+cannot miss a syntactic form.
+
+That is a **structural** claim, not an enumeration, and it rests on one checkable fact: `MkString`,
+`StringSort` and `MkSeqSort` appear in `ContractTranslator.cs` and **nowhere else in the compiler**.
+If that stops being true, this argument stops holding — so a change that mints a string sort
+elsewhere must set the flag there too.
 
 This is the second version of the trigger, and the first one's failure is worth recording because it
 is the natural thing to write. It derived the answer from the parameter/result types plus a walk of
