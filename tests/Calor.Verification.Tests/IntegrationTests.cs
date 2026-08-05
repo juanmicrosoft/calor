@@ -43,6 +43,49 @@ public class IntegrationTests
         Assert.DoesNotContain("ContractKind.Ensures", result.GeneratedCode);
     }
 
+    /// <summary>
+    /// Divergence D4, end-to-end. This is the shape that shipped before the fix: the postcondition
+    /// is <b>false at runtime</b> (<c>"abc".Equals("ABC", OrdinalIgnoreCase)</c> is true, so the
+    /// negation fails), yet the verifier translated <c>:ignore-case</c> as ORDINAL, returned
+    /// <c>Proven</c>, and the emitter deleted the check — so <c>calor run</c> threw
+    /// <c>ContractViolationException</c> while <c>calor run --verify</c> printed <c>abc</c>.
+    ///
+    /// <para>The unit-level pins live in <c>TranslatorTests</c>/<c>VerifierTests</c>; this one is
+    /// here because only the full pipeline demonstrates the consequence that makes D4 a soundness
+    /// defect rather than a precision one — <b>a check that would have failed is gone</b>.</para>
+    /// </summary>
+    [SkippableFact]
+    public void NonOrdinalComparisonMode_NeverElidesTheRuntimeCheck()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        var source = @"
+§M{m001:Test}
+  §F{f001:Echo:pub} (str:s) -> str
+    §E{}
+    §Q (== s STR:""abc"")
+    §S (! (Equals result STR:""ABC"" :ignore-case))
+    §R s";
+
+        var result = Program.Compile(source, "test.calr", new CompilationOptions { VerifyContracts = true });
+
+        Assert.False(result.HasErrors);
+
+        // The check must be EMITTED, not elided — this is the whole point.
+        Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
+        Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
+
+        // Control, so the assertion above is known to discriminate rather than pass vacuously:
+        // the SAME contract stated ordinally is genuinely provable and IS elided. Pre-fix both
+        // programs produced this second output — which is exactly the defect.
+        var ordinal = Program.Compile(
+            source.Replace(@" :ignore-case", string.Empty), "test.calr",
+            new CompilationOptions { VerifyContracts = true });
+
+        Assert.False(ordinal.HasErrors);
+        Assert.Contains("// PROVEN: Postcondition", ordinal.GeneratedCode);
+    }
+
     [SkippableFact]
     public void PreconditionGuards_NeverElidedOnSatisfiability()
     {

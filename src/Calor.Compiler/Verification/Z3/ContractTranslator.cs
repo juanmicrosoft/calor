@@ -1071,14 +1071,20 @@ public sealed class ContractTranslator
     /// </remarks>
     private Expr? TranslateStringOperation(StringOperationNode node)
     {
-        // Emit warning if comparison mode is specified but will be ignored
+        // D4, closed by refusal (mirrors D9/string.Replace). A non-ordinal comparison mode used to
+        // add a warning and then translate as ORDINAL anyway — the solver proved under one semantics
+        // while the emitter emitted the runtime call under another. Because the mode-bearing form was
+        // whitelisted in ModeledForms and Z3Verifier never demoted on warnings, that produced a
+        // genuine false `Proven`, and `Proven && !IsVacuous` ELIDES the runtime check. Reproduced
+        // end-to-end: `§S (! (Equals result STR:"ABC" :ignore-case))` over `§R s` with `s == "abc"`
+        // threw ContractViolationException without --verify and printed `abc` with it.
+        // A warning cannot carry this: the whole point of the elision is that nobody reads it.
         if (node.ComparisonMode.HasValue && node.ComparisonMode.Value != StringComparisonMode.Ordinal)
         {
-            _warnings.Add(
-                $"String operation '{node.Operation}' specifies comparison mode '{node.ComparisonMode.Value}' " +
-                "which is ignored during verification. Z3 string theory only supports ordinal comparison; " +
-                "case-insensitive or culture-aware comparisons cannot be modeled. " +
-                "Verification will use ordinal comparison semantics.");
+            return Refuse(
+                $"string comparison mode '{node.ComparisonMode.Value}' is not modeled: the solver has " +
+                "only ordinal string semantics, so proving through a case-insensitive or culture-aware " +
+                "comparison could elide a runtime check the program needs");
         }
 
         return node.Operation switch
@@ -1584,6 +1590,13 @@ public sealed class ContractTranslator
             return $"String operation '{node.Operation}' is not supported (Z3 string theory lacks this operation)";
         }
 
+        // D4: modes other than Ordinal are refused, not approximated (see TranslateStringOperation).
+        if (node.ComparisonMode.HasValue && node.ComparisonMode.Value != StringComparisonMode.Ordinal)
+        {
+            return $"String comparison mode '{node.ComparisonMode.Value}' is not supported " +
+                   "(Z3 string theory models ordinal comparison only)";
+        }
+
         // Check arguments recursively
         foreach (var arg in node.Arguments)
         {
@@ -1898,7 +1911,9 @@ public static class ModeledForms
         [UnaryOperator.Not, UnaryOperator.Negate];
 
     /// <summary>
-    /// String operations modeled via Z3's string theory. Replace is deliberately
+    /// String operations modeled via Z3's string theory, ORDINAL only — a non-ordinal
+    /// <c>ComparisonMode</c> on any of these is refused by both the translator and
+    /// <see cref="TryValidate"/> (divergence D4). Replace is deliberately
     /// absent: Z3's MkReplace substitutes the FIRST occurrence while .NET's
     /// string.Replace substitutes ALL occurrences — a whitelisted divergence that
     /// could mint a false Proven and elide a runtime guard (W1 Slice 1, T1).
@@ -2004,6 +2019,16 @@ public static class ModeledForms
                 if (!StringOperations.Contains(sop.Operation))
                 {
                     offending = $"string operation '{sop.Operation}'";
+                    return false;
+                }
+                // D4: a non-ordinal comparison mode is OUTSIDE the modeled surface, for the same
+                // reason Replace is absent above — the solver has ordinal semantics only, so
+                // proving through the mode mints a false Proven the emitter then acts on by
+                // eliding the runtime check. The translator refuses it; the whitelist must agree,
+                // or the two disagree about what is modeled (which is what D4 was).
+                if (sop.ComparisonMode.HasValue && sop.ComparisonMode.Value != StringComparisonMode.Ordinal)
+                {
+                    offending = $"string comparison mode '{sop.ComparisonMode.Value}'";
                     return false;
                 }
                 foreach (var arg in sop.Arguments)

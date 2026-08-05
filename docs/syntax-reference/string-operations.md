@@ -72,6 +72,17 @@ String operations that compare text support optional comparison modes via keywor
 
 - `contains`, `starts`, `ends`, `indexof`, `equals`
 
+### In contracts, non-ordinal modes are not verifiable
+
+These modes behave exactly as documented at **runtime**. But inside a `§Q` or `§S`, any mode other
+than `:ordinal` is **refused** by the verifier: the solver has ordinal string semantics only, so it
+reports `Unsupported` and the runtime check is **kept** rather than proved away. This is deliberate —
+until v0.12 the verifier translated these as ordinal, which could mint a false `Proven` and delete a
+check that was genuinely failing (divergence D4, `docs/verification-modeled-forms.md`).
+
+Practical consequence: a contract like `§S (equals result STR:"OK" :ignore-case)` is enforced at
+runtime and never elided. To get a *proved* contract, state it ordinally.
+
 ### Examples
 
 ```

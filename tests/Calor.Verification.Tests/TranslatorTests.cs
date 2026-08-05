@@ -2669,15 +2669,22 @@ public class TranslatorTests
     // Warnings Tests
     // ===========================================
 
+    /// <summary>
+    /// Divergence D4, closed by refusal. This test previously pinned the OPPOSITE behaviour —
+    /// translate as ordinal and emit a warning — and that is exactly the defect: a warning does
+    /// not stop <c>Proven</c>, and <c>Proven &amp;&amp; !IsVacuous</c> ELIDES the runtime check.
+    /// Reproduced end-to-end before the fix: the same program threw ContractViolationException
+    /// without <c>--verify</c> and ran clean with it.
+    /// </summary>
     [SkippableFact]
-    public void EmitsWarningForIgnoreCaseComparisonMode()
+    public void RefusesIgnoreCaseComparisonMode()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        EmitsWarningForIgnoreCaseComparisonModeCore();
+        RefusesIgnoreCaseComparisonModeCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void EmitsWarningForIgnoreCaseComparisonModeCore()
+    private void RefusesIgnoreCaseComparisonModeCore()
     {
         using var ctx = Z3ContextFactory.Create();
         var translator = new ContractTranslator(ctx);
@@ -2697,13 +2704,15 @@ public class TranslatorTests
 
         var result = translator.TranslateBoolExpr(expr);
 
-        // Translation should succeed
-        Assert.NotNull(result);
+        // Translation is REFUSED — not approximated as ordinal.
+        Assert.Null(result);
+        Assert.NotNull(translator.LastRefusalReason);
+        Assert.Contains("IgnoreCase", translator.LastRefusalReason);
 
-        // But a warning should be emitted
-        Assert.Single(translator.Warnings);
-        Assert.Contains("IgnoreCase", translator.Warnings[0]);
-        Assert.Contains("ignored", translator.Warnings[0]);
+        // And the whitelist agrees with the translator: a mode-bearing form is outside the
+        // modeled surface. The two disagreeing about what is modeled IS divergence D4.
+        Assert.False(ModeledForms.TryValidate(expr, out var offending));
+        Assert.Contains("IgnoreCase", offending);
     }
 
     [SkippableFact]
@@ -2769,23 +2778,35 @@ public class TranslatorTests
         Assert.Empty(translator.Warnings);
     }
 
+    /// <summary>
+    /// Replaces <c>ClearWarningsRemovesAccumulatedWarnings</c>, which used the D4 warn-and-
+    /// approximate path as its warning source. That path is gone, and this pins WHY: after D4
+    /// was closed the translator has <b>no warning producers at all</b>. The mechanism survives
+    /// only because <c>Z3Verifier</c> plumbs it into <c>ContractVerificationResult.Warnings</c>.
+    ///
+    /// <para>The rule this defends: a modeling divergence may not be answered with a warning.
+    /// A warning does not stop <c>Proven</c>, and <c>Proven &amp;&amp; !IsVacuous</c> elides the
+    /// runtime check — so the warning is emitted into a build whose check has been deleted, which
+    /// is precisely how D4 shipped a program whose postcondition was false at runtime. If a future
+    /// change adds a producer here, that change must show the warning is NOT soundness-relevant.</para>
+    /// </summary>
     [SkippableFact]
-    public void ClearWarningsRemovesAccumulatedWarnings()
+    public void TranslatorHasNoWarningProducers_SoundnessDivergencesAreRefusedNotWarned()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        ClearWarningsRemovesAccumulatedWarningsCore();
+        TranslatorHasNoWarningProducersCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void ClearWarningsRemovesAccumulatedWarningsCore()
+    private void TranslatorHasNoWarningProducersCore()
     {
         using var ctx = Z3ContextFactory.Create();
         var translator = new ContractTranslator(ctx);
 
         translator.DeclareVariable("s", "string");
 
-        // Emit a warning
-        var expr = new StringOperationNode(
+        // The form that used to warn. It is now refused, and refusal is NOT a warning.
+        var ignoreCase = new StringOperationNode(
             TextSpan.Empty,
             StringOp.Contains,
             new List<ExpressionNode>
@@ -2795,11 +2816,25 @@ public class TranslatorTests
             },
             StringComparisonMode.IgnoreCase);
 
-        translator.TranslateBoolExpr(expr);
-        Assert.Single(translator.Warnings);
-
-        // Clear warnings
-        translator.ClearWarnings();
+        Assert.Null(translator.TranslateBoolExpr(ignoreCase));
         Assert.Empty(translator.Warnings);
+
+        // Nor does the source-level rule "warn" — no producer exists anywhere in the type.
+        var source = File.ReadAllText(ContractTranslatorSourcePath);
+        Assert.DoesNotContain("_warnings.Add", source);
+    }
+
+    /// <summary>Resolved from the test assembly's location so the check is not CWD-dependent.</summary>
+    private static string ContractTranslatorSourcePath
+    {
+        get
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "src", "Calor.Compiler")))
+                dir = dir.Parent;
+            Assert.NotNull(dir);
+            return Path.Combine(dir!.FullName, "src", "Calor.Compiler",
+                "Verification", "Z3", "ContractTranslator.cs");
+        }
     }
 }
