@@ -521,9 +521,9 @@ public class W1Slice1SoundnessTests
 
     /// <summary>
     /// The demotion must not be silently narrowed later: a purely NUMERIC obligation on a function
-    /// that happens to take a string is demoted too. That is deliberately coarse — the body can
-    /// route string theory into <c>result</c> (<c>§R (len s)</c>) with no string anywhere in the
-    /// contract — and this pins the coarseness so a future "optimization" has to argue with a test.
+    /// that merely <i>takes</i> a string is demoted too, because declaring the parameter already
+    /// mints a term of Z3's string sort. This pins the coarseness so a future "optimization" has
+    /// to argue with a test.
     /// </summary>
     [SkippableFact]
     public void StringTypedParameter_DemotesEvenNumericObligation()

@@ -96,6 +96,12 @@ A postcondition proof **carried by the solver's string theory** is reported as *
 proof can no longer delete a check that would have failed. This is the D8 precedent — name the
 assumption rather than silently strengthen the claim.
 
+**Both elision channels are covered.** Postconditions elide on `Proven`; *refinement obligations*
+separately elide on `Discharged` (`CSharpEmitter` drops the `if (!(cond)) throw`), and
+`ObligationSolver` shares this string theory. It carries the same demotion, so a refinement predicate
+like `(> (len #) INT:0)` cannot discharge away its guard either. That path is reachable only through
+the MCP `refine` tool today, which is why it was missed on the first pass.
+
 **Why demotion instead of refusal.** D4 and D9 were closed by refusing an operation, because the
 divergence was confined to one. D3 and D12 are properties of the *sort*: every total axiom of Z3's
 string theory is affected. Refusing operation-by-operation would be whack-a-mole, and three
@@ -103,12 +109,30 @@ adversarial review rounds found three separate vectors behind exactly that kind 
 demotion closes the whole class **including vectors nobody has found yet**, because it removes the
 mechanism — elision — that turns any false `Proven` into a deleted check.
 
-**The trigger is deliberately coarse.** A string-typed parameter or result is enough, even for a
-purely numeric obligation, and no attempt is made to decide whether a proof "really" used the string
-axioms. Being wrong in that judgement fails **open**; being wrong in the conservative direction costs
-only an elision. The body is covered by the same coarseness rather than by a statement walker,
-because the body can route the string theory into `result` (`§R (len s)`) with no string anywhere in
-the contract.
+**The trigger asks the solver, not the AST.** `ContractTranslator.TouchedStringTheory` is set at the
+point a term of Z3's string sort is *created* — every string literal, every declared `str`, every
+string operation — and the demotion reads that flag. It therefore cannot miss a syntactic form.
+
+This is the second version of the trigger, and the first one's failure is worth recording because it
+is the natural thing to write. It derived the answer from the parameter/result types plus a walk of
+`§Q`/`§S`, and it **missed the function body** — which is asserted into the same solver
+(`TryEncodeResult` adds `result == encode(body)`). So this program had no string parameter, an `i32`
+return, and no string node anywhere in its contract, and was still `Proven` and still **elided**:
+
+```calor
+§F{f1:ByteLen:pub} () -> i32
+  §S (== result INT:2)
+  §R (len STR:"é")
+```
+
+The accompanying claim that "the body is covered by the same coarseness" was a **non-sequitur**: the
+coarse rule covered the body only when a string arrived via a parameter or the result type. Asking
+the translator removes the reasoning step entirely.
+
+**It is still deliberately coarse in the one place that remains a judgement:** declaring a `str`
+parameter mints a string term, so a purely numeric obligation on a function that merely *takes* a
+string is demoted too. Being wrong about whether a proof "really" used the string axioms fails
+**open**; being wrong conservatively costs only an elision.
 
 **What it costs.** Elision on string postconditions — an optimization, not assurance. The proof is
 still computed and still reported; the runtime check simply survives. Numeric and array contracts are

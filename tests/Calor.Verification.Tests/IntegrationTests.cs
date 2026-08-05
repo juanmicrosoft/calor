@@ -136,6 +136,48 @@ public class IntegrationTests
         Assert.Contains(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
     }
 
+    /// <summary>
+    /// The gap the FIRST version of the D3/D12 demotion missed, and the reason its trigger now
+    /// asks the translator rather than the contract AST. This function has <b>no string
+    /// parameter, an i32 return, and no string node anywhere in its contract</b> — yet the proof
+    /// is carried entirely by Z3's byte-counted string theory, because the body is asserted into
+    /// the same solver (<c>result == encode(body)</c>) and <c>len STR:"é"</c> is 2 bytes where
+    /// .NET's <c>Length</c> is 1.
+    ///
+    /// <para>Before the correction this was <c>Proven</c> and <b>elided</b>: `calor run` threw and
+    /// `calor run --verify` printed <c>1</c>.</para>
+    /// </summary>
+    [SkippableFact]
+    public void StringInBodyOnly_StillNeverElides()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        const string source = @"
+§M{m001:Test}
+  §F{f001:ByteLen:pub} () -> i32
+    §E{}
+    §S (== result INT:2)
+    §R (len STR:""\u00e9"")";
+
+        var result = Program.Compile(source, "test.calr", NoCache());
+
+        Assert.False(result.HasErrors);
+        Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
+        Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
+
+        // Control: the same shape with no string in the body at all is still genuinely proved and
+        // elided, so this pins the trigger rather than a verifier that stopped proving.
+        var numeric = Program.Compile(@"
+§M{m001:Test}
+  §F{f001:Two:pub} () -> i32
+    §E{}
+    §S (== result INT:2)
+    §R INT:2", "test.calr", NoCache());
+
+        Assert.False(numeric.HasErrors);
+        Assert.Contains("// PROVEN: Postcondition", numeric.GeneratedCode);
+    }
+
     /// <summary>Verification must be exercised, not replayed from a warm cache.</summary>
     private static CompilationOptions NoCache() => new()
     {

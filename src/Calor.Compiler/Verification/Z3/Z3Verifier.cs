@@ -438,35 +438,16 @@ public sealed class Z3Verifier : IDisposable
             // side conditions needs no assumption — its model is a genuine
             // non-throwing execution.
             // D3/D12 (see StringModelAssumption): a proof carried by the solver's string theory is
-            // conditional on the value being non-null and ASCII, neither of which Calor enforces
-            // today. Demote so the runtime check survives; the proof is still reported, named.
-            // Scope covers the parameters, the result, every §Q, the §S itself, and the encoded
-            // body — the D3 reproduction was provable precisely BECAUSE the `§R s` result binding
-            // fed the solver, so omitting the body would leave the original vector open.
-            var stringNames = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var (name, type) in parameters)
-            {
-                if (FunctionBodyEncoder.IsStringType(type))
-                {
-                    stringNames.Add(name);
-                }
-            }
-            if (FunctionBodyEncoder.IsStringType(outputType))
-            {
-                stringNames.Add("result");
-            }
-
-            // The presence of a string-typed parameter or result is enough on its own, without
-            // inspecting the body. That is coarser than walking the statements — a numeric contract
-            // on a function that merely happens to take a `str` is demoted too — and it is coarser
-            // ON PURPOSE: the body can route the string theory into `result` (`§R (len s)`) with no
-            // string anywhere in the contract, and a walker that missed one statement form would
-            // fail open. The contract expressions are still checked so that a string LITERAL or
-            // operation is caught even when nothing is string-TYPED.
-            var stringModelAssumed =
-                stringNames.Count > 0
-                || FunctionBodyEncoder.TouchesStringModel(postcondition.Condition, stringNames)
-                || preconditions.Any(pre => FunctionBodyEncoder.TouchesStringModel(pre.Condition, stringNames));
+            // conditional on the value being non-null and ASCII, neither of which Calor enforces.
+            // Demote so the runtime check survives; the proof is still reported, named.
+            //
+            // Asked of the TRANSLATOR, not of the contract AST. An earlier version of this fix
+            // derived the trigger from the parameter/result types plus a walk of §Q/§S, and it
+            // MISSED the body: `TryEncodeResult` asserts `result == encode(body)` through this same
+            // translator, so `§S (== result INT:2)` over `§R (len STR:"é")` — no string parameter,
+            // i32 return, no string in the contract — was still Proven and still elided. The flag
+            // is set where the string sort is created, so it cannot miss a form.
+            var stringModelAssumed = translator.TouchedStringTheory;
 
             if (status == Status.UNSATISFIABLE
                 && (pathConditions.Count > 0 || contractDivisionAssumed || stringModelAssumed))
@@ -1356,61 +1337,4 @@ public static class FunctionBodyEncoder
         }
     }
 
-    /// <summary>
-    /// True when any part of <paramref name="expr"/> is carried by the solver's string theory —
-    /// see <see cref="Z3Verifier.StringModelAssumption"/> for why that forces a demotion to
-    /// <c>Assumed</c> rather than a refusal.
-    ///
-    /// <para><b>Deliberately over-approximate.</b> A string literal, a string operation, or a
-    /// reference to any string-typed name is enough; no attempt is made to decide whether the
-    /// proof "really" used the string axioms. Getting that judgement wrong fails <i>open</i> — it
-    /// mints a `Proven` that deletes a runtime check — and three adversarial review rounds found
-    /// three separate vectors behind exactly that kind of reasoning (D4 twice, then D3). The
-    /// conservative direction costs an unnecessary demotion, which costs only the elision.</para>
-    /// </summary>
-    public static bool TouchesStringModel(ExpressionNode expr, IReadOnlySet<string> stringNames)
-    {
-        switch (expr)
-        {
-            case StringLiteralNode:
-            case StringOperationNode:
-                return true;
-            case ReferenceNode r:
-                // Field/dot paths count too: `s.Foo` on a string-typed receiver still enters the
-                // string sort, and the receiver is what the name set knows about.
-                return stringNames.Contains(r.Name)
-                    || stringNames.Any(n => r.Name.StartsWith(n + ".", StringComparison.Ordinal));
-            case BinaryOperationNode b:
-                return TouchesStringModel(b.Left, stringNames) || TouchesStringModel(b.Right, stringNames);
-            case UnaryOperationNode u:
-                return TouchesStringModel(u.Operand, stringNames);
-            case ConditionalExpressionNode c:
-                return TouchesStringModel(c.Condition, stringNames)
-                    || TouchesStringModel(c.WhenTrue, stringNames)
-                    || TouchesStringModel(c.WhenFalse, stringNames);
-            case ImplicationExpressionNode i:
-                return TouchesStringModel(i.Antecedent, stringNames) || TouchesStringModel(i.Consequent, stringNames);
-            case ForallExpressionNode f:
-                // A string-typed BOUND variable brings the theory in on its own, independently of
-                // anything the enclosing scope declared.
-                return f.BoundVariables.Any(v => IsStringType(v.TypeName)) || TouchesStringModel(f.Body, stringNames);
-            case ExistsExpressionNode e:
-                return e.BoundVariables.Any(v => IsStringType(v.TypeName)) || TouchesStringModel(e.Body, stringNames);
-            case ArrayAccessNode a:
-                return TouchesStringModel(a.Array, stringNames) || TouchesStringModel(a.Index, stringNames);
-            case ArrayLengthNode al:
-                return TouchesStringModel(al.Array, stringNames);
-            case FieldAccessNode fa:
-                return TouchesStringModel(fa.Target, stringNames);
-            default:
-                return false;
-        }
-    }
-
-    /// <summary>Type spellings that land on Z3's string sort (mirrors the translator's own arm).</summary>
-    public static bool IsStringType(string? type) =>
-        type is not null
-        && (type.Equals("str", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("string", StringComparison.OrdinalIgnoreCase)
-            || type.Equals("System.String", StringComparison.OrdinalIgnoreCase));
 }
