@@ -380,7 +380,12 @@ public sealed class IndexedTypeTests
         var indexObl = options.ObligationResults.Obligations
             .FirstOrDefault(o => o.Kind == ObligationKind.IndexBounds);
         Assert.NotNull(indexObl);
-        Assert.Equal(ObligationStatus.Discharged, indexObl.Status);
+        // D14: this obligation is carried by the solver's ARRAY sort, which is total and
+        // non-null while .NET's `T[]` is a nullable reference — so it is Assumed, not
+        // Discharged, and the runtime guard survives. `Discharged` is the status that DELETES
+        // the guard, which is exactly what a false array proof must not be able to do.
+        // ToObligationStatus maps Assumed into the legacy Timeout bucket (frozen D-G2.2).
+        Assert.NotEqual(ObligationStatus.Discharged, indexObl.Status);
     }
 
     [SkippableFact]

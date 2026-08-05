@@ -56,6 +56,14 @@ public sealed class Z3Verifier : IDisposable
     /// behind exactly that kind of reasoning. Lifting it is tracked by #875 (make <c>str</c>
     /// genuinely non-nullable) — each case proved non-null can have the demotion lifted.</para>
     /// </summary>
+    /// <summary>
+    /// The array / user-type sibling of <see cref="StringModelAssumption"/>. Same defect, one sort
+    /// over: Z3's array and uninterpreted sorts are TOTAL, while C#'s `T[]` and class types are
+    /// nullable references — so `a.Length >= 0` is a solver tautology and a runtime throw.
+    /// </summary>
+    public const string NullableReferenceModelAssumption =
+        "reference-model — the solver's arrays and user-type sorts are total and non-null, while .NET's are nullable references (D14); a proof touching them is conditional on the value being non-null";
+
     public const string StringModelAssumption =
         "string-model — the solver's strings are total, non-null and UTF-8-byte-counted, while .NET's are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII";
 
@@ -449,8 +457,15 @@ public sealed class Z3Verifier : IDisposable
             // is set where the string sort is created, so it cannot miss a form.
             var stringModelAssumed = translator.TouchedStringTheory;
 
+            // D14, found the FIFTH time this bar was audited. The string demotion closed the
+            // string sort and the docs said in as many words that "numeric and array contracts are
+            // unaffected" — which was true and was the hole. Arrays and user-type sorts have the
+            // identical total-vs-nullable mismatch.
+            var referenceModelAssumed = translator.TouchedNullableReferenceSort;
+
             if (status == Status.UNSATISFIABLE
-                && (pathConditions.Count > 0 || contractDivisionAssumed || stringModelAssumed))
+                && (pathConditions.Count > 0 || contractDivisionAssumed || stringModelAssumed
+                    || referenceModelAssumed))
             {
                 var assumptions = new List<string>();
                 var reasons = new List<string>();
@@ -468,6 +483,11 @@ public sealed class Z3Verifier : IDisposable
                 {
                     assumptions.Add(StringModelAssumption);
                     reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null and byte-counted while .NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12)");
+                }
+                if (referenceModelAssumed)
+                {
+                    assumptions.Add(NullableReferenceModelAssumption);
+                    reasons.Add("the obligation is carried by the solver's array or user-type sorts, which are total and non-null while .NET's are nullable references (v0.12, D14)");
                 }
                 return ContractVerificationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.AssumedProof(

@@ -80,6 +80,7 @@ Division, modulo, comparisons, and right-shift are signedness-aware: both-effect
 | D9 | **`string.Replace` modeled as first-occurrence** while .NET replaces all occurrences (was documented in §2 but untabled — the W1 kickoff's T1 finding) | **Closed by refusal (W1 Slice 1):** `Replace` un-whitelisted → `Unsupported` |
 | D10 | **Mixed signed/unsigned operations** used signed same-width bit comparison; C# promotes to a wider signed type (`-1 == 4294967295u` held) | **Closed by modeling (W1 Slice 1, widths corrected per #833 review C1/C2):** C# binary numeric promotion — u32-with-signed and anything-with-i64 → 64-bit signed; narrow-unsigned-with-signed → 32-bit signed; literal conversion rescue only for ≥32-bit unsigned operands. 64-bit unsigned mixed → `Unsupported` |
 | D12 | **Z3 models strings as UTF-8 BYTES; .NET counts UTF-16 CODE UNITS** — they agree only on ASCII, so `len`, `indexof`, `substr`, `substr-from` differ for any non-ASCII input | **Elide-vector CLOSED by the same demotion (v0.12); the modeling gap itself remains open.** `§S (== (len result) INT:2)` over `§R STR:"é"` is false at runtime (.NET `Length` is 1) and was `Proven` under the byte model; also reproduced for `substr` and — stating `:ordinal` **explicitly** — for `indexof` over `"😀ab"` (.NET 2, solver 4). Narrowing for whoever closes the modeling gap: UTF-8 is prefix-free and self-synchronizing, so the **predicate** operations (`Contains`, `StartsWith`/`EndsWith` with `:ordinal`, `Equals`, `IsNullOrEmpty`, `Concat`) are faithful; only operations whose value is a **count or an index** are unsound |
+| D14 | **Z3's array and user-type sorts are TOTAL and non-null; .NET's `T[]` and class types are nullable references.** `DeclareArrayVariable` mints `<name>$length` as an unconstrained u32, so `a.Length >= 0` is a solver tautology while the same expression throws at runtime on a null array | **Elide-vector CLOSED by demotion (v0.12); the modeling gap remains open.** Found on the FIFTH audit of PP-A1 item 6, after the string demotion had closed D3/D12 and this file had stated that "numeric and array contracts are unaffected" — which was true, and was the hole. Reproduced end-to-end in pure Calor: `§S (>= §LEN a INT:0)` over a never-assigned `[i32]` field was `Proven`, `calor run` crashed with a NullReferenceException, `calor run --verify` printed and exited 0. Array- and user-type-carried proofs are now `Assumed` (§4.1), which never elides. Cache 1.12 → 1.13 |
 | D13 | **`Substring` out of range throws in .NET; Z3's `str.substr` totalizes to `""`** | **OPEN, noted 2026-08-05** — not independently reproduced as an elide vector, recorded because it is the same shape as D8's contract-division totalization, which *was* one |
 | D11 | **Shift counts were unmasked** — solver shifts yield 0 for count ≥ width while C# masks by width−1 (`1 << 32` is 1 at runtime; a proof of `(x << 32) == 0` elided a failing check) (#833 review C3) | **Closed by modeling (W1 Slice 1):** the count is masked at the left operand's promoted width; shifts bypass binary numeric promotion (left promotes individually); counts wider than 32 bits → `Unsupported` |
 
@@ -141,8 +142,15 @@ string is demoted too. Being wrong about whether a proof "really" used the strin
 **open**; being wrong conservatively costs only an elision.
 
 **What it costs.** Elision on string postconditions — an optimization, not assurance. The proof is
-still computed and still reported; the runtime check simply survives. Numeric and array contracts are
-unaffected, and nothing that compiled before stops compiling.
+still computed and still reported; the runtime check simply survives. Nothing that compiled before
+stops compiling.
+
+**Arrays and user types are covered by the same demotion (D14).** An earlier revision of this section
+said "numeric and array contracts are unaffected". That was accurate and it was the hole: the class
+is not *strings*, it is **a sort Z3 models as total where the .NET value can be null**, and arrays
+and user-type sorts are two more members of it. `TouchedNullableReferenceSort` is set where those
+sorts are minted and drives the same demotion. Genuinely numeric obligations — no string, no array,
+no user type — are still `Proven` and still elide.
 
 **How it gets lifted.** #875 (make `str` genuinely non-nullable at the binder) removes D3's premise;
 a separate fix for the count/index operations removes D12's. Each case proved safe can have the

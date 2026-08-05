@@ -179,14 +179,17 @@ public sealed class ObligationSolver : IDisposable
             // with the contract path, so it needs the same demotion: a refinement predicate like
             // `(> (len #) INT:0)` is carried by a null-blind, byte-counted model. Assumed maps
             // away from Discharged (ProofOutcome.ToObligationStatus), so the guard survives.
-            if (status == Status.UNSATISFIABLE && translator.TouchedStringTheory)
+            if (status == Status.UNSATISFIABLE
+                && (translator.TouchedStringTheory || translator.TouchedNullableReferenceSort))
             {
                 obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.AssumedProof(
                     "Proof is conditional on the string model: the obligation is carried by the " +
                     "solver's string theory, whose strings are non-null and byte-counted while " +
                     ".NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12). " +
                     "Runtime check kept.",
-                    [Z3Verifier.StringModelAssumption])));
+                    translator.TouchedStringTheory
+                        ? [Z3Verifier.StringModelAssumption]
+                        : new[] { Z3Verifier.NullableReferenceModelAssumption })));
                 return;
             }
 

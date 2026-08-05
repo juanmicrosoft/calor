@@ -1192,7 +1192,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -1488,7 +1488,7 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -2587,6 +2587,20 @@ public class VerifierTests
     {
         Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
         Assert.Contains(Z3Verifier.StringModelAssumption, result.EffectiveOutcome.Assumptions);
+    }
+
+
+    /// <summary>
+    /// D14: an obligation carried by the solver's ARRAY or user-type sorts is <b>Assumed</b>, never
+    /// <c>Proven</c>. Those sorts are total and non-null while .NET's `T[]` and class types are
+    /// nullable references, so `a.Length &gt;= 0` is a solver tautology and a runtime throw. Same
+    /// strength of assertion as the <c>Proven</c> it replaced — the solver still discharged the
+    /// obligation, and the assumption must be the reference-model one specifically.
+    /// </summary>
+    private static void AssertReferenceProofAssumed(ContractVerificationResult result)
+    {
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.NullableReferenceModelAssumption, result.EffectiveOutcome.Assumptions);
     }
 
 }

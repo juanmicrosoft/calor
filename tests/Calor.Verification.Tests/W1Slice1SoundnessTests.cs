@@ -569,4 +569,63 @@ public class W1Slice1SoundnessTests
         Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
     }
 
+    // ---- D14: arrays and user-type sorts are total in Z3, nullable references in .NET ----
+
+    /// <summary>
+    /// The fifth false-`Proven`-elides vector, and the one that showed the class had been
+    /// mis-drawn. After D3/D12 closed the STRING sort, `verification-modeled-forms.md` stated
+    /// that "numeric and array contracts are unaffected" — accurate, and the hole.
+    /// `DeclareArrayVariable` mints <c>a$length</c> as an unconstrained u32, so
+    /// <c>a.Length &gt;= 0</c> is a solver tautology; at runtime the same expression throws on a
+    /// null array. Reproduced end-to-end: `calor run` crashed with a NullReferenceException while
+    /// `calor run --verify` printed and exited 0.
+    /// </summary>
+    [SkippableFact]
+    public void ArrayCarriedObligation_IsAssumedNotProven()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ArrayCarriedObligation_IsAssumedNotProvenCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ArrayCarriedObligation_IsAssumedNotProvenCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // §S (>= (arraylen a) 0) — a Z3 tautology over the unconstrained $length.
+        var post = Ensures(BinOp(BinaryOperator.GreaterOrEqual,
+            new ArrayLengthNode(TextSpan.Empty, Ref("a")),
+            Int(0)));
+
+        var result = Verify(verifier, [("a", "i32[]")], [], post);
+
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.NullableReferenceModelAssumption, result.EffectiveOutcome.Assumptions);
+    }
+
+    /// <summary>
+    /// The control that keeps the demotion honest. A genuinely numeric obligation — no string, no
+    /// array, no user type — must still be `Proven` and must still elide. Without this the D14
+    /// pin above would pass just as well if the verifier had stopped proving anything at all.
+    /// </summary>
+    [SkippableFact]
+    public void PurelyNumericObligation_StillProvenAfterD14()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        PurelyNumericObligation_StillProvenAfterD14Core();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void PurelyNumericObligation_StillProvenAfterD14Core()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        var result = Verify(verifier, [("x", "i32")], [],
+            Ensures(BinOp(BinaryOperator.Equal, Ref("x"), Ref("x"))), outputType: "i32");
+
+        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+    }
+
 }
