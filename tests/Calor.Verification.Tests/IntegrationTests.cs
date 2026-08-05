@@ -1,6 +1,7 @@
 using Calor.Compiler;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Verification.Z3;
+using Calor.Compiler.Verification.Z3.Cache;
 using Xunit;
 
 namespace Calor.Verification.Tests;
@@ -67,7 +68,7 @@ public class IntegrationTests
     §S (! (Equals result STR:""ABC"" :ignore-case))
     §R s";
 
-        var result = Program.Compile(source, "test.calr", new CompilationOptions { VerifyContracts = true });
+        var result = Program.Compile(source, "test.calr", NoCache());
 
         Assert.False(result.HasErrors);
 
@@ -79,12 +80,59 @@ public class IntegrationTests
         // the SAME contract stated ordinally is genuinely provable and IS elided. Pre-fix both
         // programs produced this second output — which is exactly the defect.
         var ordinal = Program.Compile(
-            source.Replace(@" :ignore-case", string.Empty), "test.calr",
-            new CompilationOptions { VerifyContracts = true });
+            source.Replace(@" :ignore-case", string.Empty), "test.calr", NoCache());
 
         Assert.False(ordinal.HasErrors);
         Assert.Contains("// PROVEN: Postcondition", ordinal.GeneratedCode);
     }
+
+    /// <summary>
+    /// Divergence D4's SECOND half, found by adversarial review of the first fix. `.NET` resolves
+    /// <c>String.StartsWith(String)</c>, <c>EndsWith(String)</c> and <c>IndexOf(String)</c> to the
+    /// <b>CurrentCulture</b> overload, while the solver models them ordinally — so omitting the
+    /// mode carried the identical false-<c>Proven</c>-elides vector on the far more common
+    /// spelling. Reproduced end-to-end before the fix with exactly this program: it threw
+    /// <c>ContractViolationException</c> under <c>calor run</c> and printed its value under
+    /// <c>calor run --verify</c>.
+    ///
+    /// <para>A zero-width joiner is the witness: it has no collation weight, so
+    /// <c>"abc".StartsWith("\u200dabc")</c> is <b>true</b> culturally and <b>false</b> ordinally.</para>
+    /// </summary>
+    [SkippableFact]
+    public void BareCultureSensitiveStringOp_NeverElidesTheRuntimeCheck()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        const string source = @"
+§M{m001:Test}
+  §F{f001:Chk:pub} (str:s) -> str
+    §E{}
+    §Q (== s STR:""abc"")
+    §S (! (starts result STR:""\u200dabc""))
+    §R s";
+
+        var result = Program.Compile(source, "test.calr", NoCache());
+
+        Assert.False(result.HasErrors);
+        Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
+        Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
+
+        // Control: with ':ordinal' stated the model matches the emitted overload, so the proof is
+        // sound and the check IS elided. Pre-fix, the bare form took this branch too.
+        var ordinal = Program.Compile(
+            source.Replace(@"""))", @""" :ordinal))"), "test.calr", NoCache());
+
+        Assert.False(ordinal.HasErrors);
+        Assert.Contains("StringComparison.Ordinal", ordinal.GeneratedCode);
+        Assert.Contains("// PROVEN: Postcondition", ordinal.GeneratedCode);
+    }
+
+    /// <summary>Verification must be exercised, not replayed from a warm cache.</summary>
+    private static CompilationOptions NoCache() => new()
+    {
+        VerifyContracts = true,
+        VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+    };
 
     [SkippableFact]
     public void PreconditionGuards_NeverElidedOnSatisfiability()

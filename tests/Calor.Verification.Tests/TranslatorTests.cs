@@ -1211,7 +1211,8 @@ public class TranslatorTests
             {
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "prefix")
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.TranslateBoolExpr(expr);
 
@@ -1242,7 +1243,8 @@ public class TranslatorTests
             {
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "suffix")
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.TranslateBoolExpr(expr);
 
@@ -1364,7 +1366,8 @@ public class TranslatorTests
             {
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "hello")
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.Translate(expr);
 
@@ -1399,7 +1402,8 @@ public class TranslatorTests
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "hello"),
                 new IntLiteralNode(TextSpan.Empty, 5)
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.Translate(expr);
 
@@ -1859,7 +1863,8 @@ public class TranslatorTests
             {
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "")
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.Translate(expr);
 
@@ -2708,11 +2713,50 @@ public class TranslatorTests
         Assert.Null(result);
         Assert.NotNull(translator.LastRefusalReason);
         Assert.Contains("IgnoreCase", translator.LastRefusalReason);
+    }
 
-        // And the whitelist agrees with the translator: a mode-bearing form is outside the
-        // modeled surface. The two disagreeing about what is modeled IS divergence D4.
-        Assert.False(ModeledForms.TryValidate(expr, out var offending));
-        Assert.Contains("IgnoreCase", offending);
+    /// <summary>
+    /// The whitelist half of D4, as a plain <see cref="FactAttribute"/>: it is a purely syntactic
+    /// check and needs no solver, so gating it behind Z3 would let the rule go unpinned on any
+    /// machine without Z3 — which is where a regression is least likely to be noticed.
+    ///
+    /// <para>Note the whitelist was NOT what made D4 unsound: pre-fix the whitelist and the
+    /// translator <i>agreed</i>, on a model that did not match .NET, and
+    /// <c>Z3Verifier.AcceptedButUntranslatable</c> already turns an accepted-but-refused form into
+    /// <c>Unsupported</c>. Keeping the two in step buys a better message and keeps the drift
+    /// detector quiet.</para>
+    /// </summary>
+    [Fact]
+    public void ModeledForms_RejectsNonOrdinalComparison_AndBareCultureSensitiveOps()
+    {
+        static StringOperationNode Op(StringOp op, StringComparisonMode? mode) =>
+            new(TextSpan.Empty,
+                op,
+                new List<ExpressionNode>
+                {
+                    new ReferenceNode(TextSpan.Empty, "s"),
+                    new StringLiteralNode(TextSpan.Empty, "hello")
+                },
+                mode);
+
+        // (a) An explicit non-ordinal mode is out of scope on any operation.
+        Assert.False(ModeledForms.TryValidate(Op(StringOp.Contains, StringComparisonMode.IgnoreCase), out var m));
+        Assert.Contains("IgnoreCase", m);
+
+        // (b) StartsWith/EndsWith/IndexOf with NO mode are out of scope too: .NET resolves those
+        // single-argument overloads to CurrentCulture while the solver models them ordinally.
+        foreach (var op in new[] { StringOp.StartsWith, StringOp.EndsWith, StringOp.IndexOf })
+        {
+            Assert.False(ModeledForms.TryValidate(Op(op, mode: null), out var bare));
+            Assert.Contains("ordinal", bare, StringComparison.OrdinalIgnoreCase);
+
+            // ...but stating :ordinal makes them modeled again — the refusal is precise, not blanket.
+            Assert.True(ModeledForms.TryValidate(Op(op, StringComparisonMode.Ordinal), out _));
+        }
+
+        // Contains/Equals are ordinal in .NET, so a bare call stays modeled.
+        Assert.True(ModeledForms.TryValidate(Op(StringOp.Contains, mode: null), out _));
+        Assert.True(ModeledForms.TryValidate(Op(StringOp.Equals, mode: null), out _));
     }
 
     [SkippableFact]
@@ -2818,8 +2862,15 @@ public class TranslatorTests
 
         Assert.Null(translator.TranslateBoolExpr(ignoreCase));
         Assert.Empty(translator.Warnings);
+    }
 
-        // Nor does the source-level rule "warn" — no producer exists anywhere in the type.
+    /// <summary>
+    /// The source-level half of the same rule, as a plain <see cref="FactAttribute"/> — it is a
+    /// grep and needs no solver.
+    /// </summary>
+    [Fact]
+    public void ContractTranslator_HasNoWarningProducersInSource()
+    {
         var source = File.ReadAllText(ContractTranslatorSourcePath);
         Assert.DoesNotContain("_warnings.Add", source);
     }

@@ -121,6 +121,17 @@ public sealed class ContractTranslator
     /// Gets warnings that were generated during translation.
     /// Warnings indicate features that were silently handled in a potentially unexpected way.
     /// </summary>
+    /// <remarks>
+    /// <b>Permanently empty since D4 (v0.12).</b> The only producer was the warn-and-approximate
+    /// path for non-ordinal string comparison, and D4 is the demonstration that a warning is not an
+    /// adequate response to a modeling divergence: a warning does not stop <c>Proven</c>, and
+    /// <c>Proven &amp;&amp; !IsVacuous</c> deletes the runtime check — so the warning arrives in a
+    /// build where the check it was warning about is already gone.
+    /// <para>Retained deliberately as a hook rather than deleted: <c>Z3Verifier</c> plumbs it into
+    /// <c>ContractVerificationResult.Warnings</c>, which is public API. Anything added here must
+    /// first show it is <b>not</b> soundness-relevant — a soundness-relevant finding belongs in a
+    /// refusal. Pinned by <c>TranslatorTests.ContractTranslator_HasNoWarningProducersInSource</c>.</para>
+    /// </remarks>
     public IReadOnlyList<string> Warnings => _warnings;
 
     /// <summary>
@@ -1084,7 +1095,30 @@ public sealed class ContractTranslator
             return Refuse(
                 $"string comparison mode '{node.ComparisonMode.Value}' is not modeled: the solver has " +
                 "only ordinal string semantics, so proving through a case-insensitive or culture-aware " +
-                "comparison could elide a runtime check the program needs");
+                "comparison could elide a runtime check the program needs.");
+        }
+
+        // D4, second half. The three operations below are culture-sensitive in .NET when no mode is
+        // given: `String.StartsWith(String)`, `EndsWith(String)` and `IndexOf(String)` use
+        // CurrentCulture, while `Contains(String)` and `Equals(String)` are ordinal. The solver
+        // models all of them with ordinal Z3 primitives, so OMITTING the mode is not the safe
+        // default it looks like — it is the same false-`Proven`-elides vector, on the far more
+        // common spelling. Verified on .NET 10/ICU: "abc".StartsWith("\u200dabc") is TRUE under the
+        // culture overload and FALSE ordinally; likewise EndsWith, and IndexOf returns 0 vs -1.
+        // Reproduced end-to-end before this fix: `§S (! (starts result STR:"\u200dabc"))` over
+        // `§R s` with `s == "abc"` threw ContractViolationException under `calor run` and printed
+        // `abc` under `calor run --verify`.
+        //
+        // Refused rather than re-emitted as ordinal: changing which .NET overload the emitter picks
+        // would silently change the runtime behaviour of existing programs, which is a semantics
+        // decision needing its own adjudication. Refusal only stops proving.
+        if (node.Operation is StringOp.StartsWith or StringOp.EndsWith or StringOp.IndexOf
+            && node.ComparisonMode != StringComparisonMode.Ordinal)
+        {
+            return Refuse(
+                $"'{node.Operation}' without an explicit ':ordinal' is not modeled: .NET resolves it " +
+                "to the CURRENT-CULTURE overload while the solver models it ordinally, so a proof " +
+                "could elide a runtime check the program needs. State ':ordinal' to make it provable.");
         }
 
         return node.Operation switch
@@ -1597,6 +1631,15 @@ public sealed class ContractTranslator
                    "(Z3 string theory models ordinal comparison only)";
         }
 
+        // D4 second half: these three resolve to the CURRENT-CULTURE .NET overload when no mode is
+        // given, so the mode must be stated explicitly for the ordinal model to be honest.
+        if (node.Operation is StringOp.StartsWith or StringOp.EndsWith or StringOp.IndexOf
+            && node.ComparisonMode != StringComparisonMode.Ordinal)
+        {
+            return $"String operation '{node.Operation}' without an explicit ':ordinal' comparison " +
+                   "mode is not supported (.NET uses CurrentCulture; the solver models ordinal)";
+        }
+
         // Check arguments recursively
         foreach (var arg in node.Arguments)
         {
@@ -1911,10 +1954,12 @@ public static class ModeledForms
         [UnaryOperator.Not, UnaryOperator.Negate];
 
     /// <summary>
-    /// String operations modeled via Z3's string theory, ORDINAL only — a non-ordinal
-    /// <c>ComparisonMode</c> on any of these is refused by both the translator and
-    /// <see cref="TryValidate"/> (divergence D4). Replace is deliberately
-    /// absent: Z3's MkReplace substitutes the FIRST occurrence while .NET's
+    /// String operations modeled via Z3's string theory, ORDINAL only (divergence D4). Two
+    /// refusals, both enforced by the translator and <see cref="TryValidate"/> alike:
+    /// a non-ordinal <c>ComparisonMode</c> on any of these, and <c>StartsWith</c>/<c>EndsWith</c>/
+    /// <c>IndexOf</c> with NO mode — .NET resolves those single-argument overloads to
+    /// <c>CurrentCulture</c>, unlike <c>Contains</c>/<c>Equals</c>, which are ordinal.
+    /// Replace is deliberately absent: Z3's MkReplace substitutes the FIRST occurrence while .NET's
     /// string.Replace substitutes ALL occurrences — a whitelisted divergence that
     /// could mint a false Proven and elide a runtime guard (W1 Slice 1, T1).
     /// </summary>
@@ -2022,13 +2067,25 @@ public static class ModeledForms
                     return false;
                 }
                 // D4: a non-ordinal comparison mode is OUTSIDE the modeled surface, for the same
-                // reason Replace is absent above — the solver has ordinal semantics only, so
-                // proving through the mode mints a false Proven the emitter then acts on by
-                // eliding the runtime check. The translator refuses it; the whitelist must agree,
-                // or the two disagree about what is modeled (which is what D4 was).
+                // reason Replace is absent above — the solver has ordinal semantics only.
+                //
+                // To be precise about what this line does and does not do: the translator refusal
+                // is what makes D4 sound. Z3Verifier.AcceptedButUntranslatable already turns a
+                // whitelist-accepted-but-refused form into Unsupported, so a translator-only fix
+                // would have closed the vector. Pre-fix the whitelist and the translator AGREED —
+                // on a model that did not match .NET, which is the actual defect. Keeping the two
+                // in step buys a precise message and keeps the GateReject drift detector quiet.
                 if (sop.ComparisonMode.HasValue && sop.ComparisonMode.Value != StringComparisonMode.Ordinal)
                 {
                     offending = $"string comparison mode '{sop.ComparisonMode.Value}'";
+                    return false;
+                }
+                // D4 second half: for these three, ABSENCE of a mode means CurrentCulture in .NET,
+                // so the modeled surface requires the mode to be stated explicitly.
+                if (sop.Operation is StringOp.StartsWith or StringOp.EndsWith or StringOp.IndexOf
+                    && sop.ComparisonMode != StringComparisonMode.Ordinal)
+                {
+                    offending = $"'{sop.Operation}' without an explicit ':ordinal' comparison mode";
                     return false;
                 }
                 foreach (var arg in sop.Arguments)
@@ -2065,6 +2122,13 @@ public static class ModeledForms
         sb.Append("binary-operators: ").Append(string.Join(", ", Operators)).Append('\n');
         sb.Append("unary-operators: ").Append(string.Join(", ", UnaryOperators)).Append('\n');
         sb.Append("string-operations: ").Append(string.Join(", ", StringOperations)).Append('\n');
+        // D4. Rendered because the appendix is the canonical statement of the modeled surface: D9
+        // recorded its narrowing by REMOVING Replace from the list above, but D4 narrows within an
+        // operation, so without this line a reader cannot tell that a mode-bearing Contains, or a
+        // bare StartsWith, is out of scope.
+        sb.Append("string-comparison-modes: Ordinal only — a non-ordinal mode is refused, and ")
+          .Append("StartsWith/EndsWith/IndexOf require ':ordinal' EXPLICITLY (.NET resolves their ")
+          .Append("no-mode overloads to CurrentCulture; Contains/Equals are ordinal)\n");
         sb.Append("quantifier-bound-variable-types: any declarable type except floating-point (unmodeled types become uninterpreted sorts)\n");
         return sb.ToString();
     }

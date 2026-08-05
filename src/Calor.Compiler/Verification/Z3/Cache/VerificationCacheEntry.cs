@@ -54,7 +54,12 @@ public sealed class VerificationCacheEntry
     // end-to-end on a shipped path: the same program threw ContractViolationException without
     // --verify and ran clean with it. Warm 1.8 caches hold exactly those false `Proven` verdicts,
     // so the bump is required for the fix to take effect at all, not merely for hygiene.
-    public const string CurrentFormatVersion = "1.9";
+    // 1.10 (2026-08-05, D4 second half): StartsWith/EndsWith/IndexOf WITHOUT an explicit ':ordinal'
+    // are refused. .NET resolves those single-argument overloads to CurrentCulture while the solver
+    // models them ordinally, so the no-mode spelling carried the same false-`Proven`-elides vector
+    // 1.9 closed for explicit non-ordinal modes — on the far more common spelling. Warm 1.9 caches
+    // hold exactly those verdicts, so the bump is again required for the fix to take effect.
+    public const string CurrentFormatVersion = "1.10";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.

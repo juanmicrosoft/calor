@@ -1033,7 +1033,8 @@ public class VerifierTests
                 {
                     new ReferenceNode(TextSpan.Empty, "s"),
                     new StringLiteralNode(TextSpan.Empty, "hello")
-                }),
+                },
+                StringComparisonMode.Ordinal),
             null,
             new AttributeCollection());
 
@@ -1086,7 +1087,8 @@ public class VerifierTests
                 {
                     new ReferenceNode(TextSpan.Empty, "s"),
                     new StringLiteralNode(TextSpan.Empty, "world")
-                }),
+                },
+                StringComparisonMode.Ordinal),
             null,
             new AttributeCollection());
 
@@ -1561,7 +1563,8 @@ public class VerifierTests
                     {
                         new ReferenceNode(TextSpan.Empty, "s"),
                         new StringLiteralNode(TextSpan.Empty, "")
-                    }),
+                    },
+                    StringComparisonMode.Ordinal),
                 new IntLiteralNode(TextSpan.Empty, 0)),
             null,
             new AttributeCollection());
@@ -1661,7 +1664,8 @@ public class VerifierTests
                             new StringLiteralNode(TextSpan.Empty, "X")
                         }),
                     new StringLiteralNode(TextSpan.Empty, "X")
-                }),
+                },
+                StringComparisonMode.Ordinal),
             null,
             new AttributeCollection());
 
@@ -1704,7 +1708,8 @@ public class VerifierTests
                         new StringLiteralNode(TextSpan.Empty, "abcabc"),
                         new StringLiteralNode(TextSpan.Empty, "b"),
                         new IntLiteralNode(TextSpan.Empty, 3)
-                    }),
+                    },
+                    StringComparisonMode.Ordinal),
                 new IntLiteralNode(TextSpan.Empty, 3)),
             null,
             new AttributeCollection());
@@ -2218,8 +2223,13 @@ public class VerifierTests
         var modeBearingPre = new RequiresNode(
             TextSpan.Empty, Op(StringOp.StartsWith, "hello", StringComparisonMode.IgnoreCase),
             null, new AttributeCollection());
+        // ':ordinal' stated EXPLICITLY. A bare StartsWith is itself refused (D4 second half:
+        // .NET's no-mode overload is CurrentCulture), which would make this case pass for the
+        // wrong reason — the goal has to be genuinely modeled for the assumption to be what is
+        // under test.
         var ordinalPost = new EnsuresNode(
-            TextSpan.Empty, Op(StringOp.StartsWith, "hello"), null, new AttributeCollection());
+            TextSpan.Empty, Op(StringOp.StartsWith, "hello", StringComparisonMode.Ordinal),
+            null, new AttributeCollection());
 
         var assumptionResult = verifier.VerifyPostcondition(
             parameters, "bool", new[] { modeBearingPre }, ordinalPost);
@@ -2256,7 +2266,8 @@ public class VerifierTests
                 {
                     new ReferenceNode(TextSpan.Empty, "s"),
                     new StringLiteralNode(TextSpan.Empty, "hello")
-                }),
+                },
+                StringComparisonMode.Ordinal),
             null,
             new AttributeCollection());
 
