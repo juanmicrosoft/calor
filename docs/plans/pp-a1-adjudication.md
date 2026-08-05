@@ -1,10 +1,10 @@
-# PP-A1 — CI adoption gates: **FAIL** (item 6), item 9 LAPSED
+# PP-A1 — CI adoption gates: **items 1–8 PASS**, item 9 LAPSED
 
 **Adjudicated 2026-08-05**, against the list frozen at [`wedge-w1-prereqs.md`](wedge-w1-prereqs.md)
 §3 ("frozen now, before any results exist"), carried unchanged into v0.12 by the fold-forward
 decision. PP-A1 is a **v0.12.0 release gate**, orthogonal to Call S.
 
-## Two revisions of this adjudication claimed a PASS. Both were wrong.
+## Three revisions of this adjudication were wrong before this one. Read that first.
 
 Adversarial review refuted **item 6**, and the refutation was correct: **divergence D4 was a live
 false-`Proven`-elides vector** — the exact thing item 6's frozen bar forbids — sitting unclosed in the
@@ -53,7 +53,7 @@ gate gets marked green while a soundness hole ships.
 | 3 | **Checksummed natives** on every publish path | `scripts/z3-upstream-4.15.7.sha256` + `verify_archive` (defined `download-z3.sh:29`, called at `:122` and `:157`), fail-closed on missing manifest / missing entry / hash mismatch, across four fetch sites. **Residual disclosed rather than glossed:** the ARM64-macOS branch (`:59-64`) execs `build-z3-from-source.sh`, which clones `--branch z3-4.15.7` — a **mutable tag**, no commit pin, no verification (noted in `CHANGELOG.md:31`, absent from the earlier revision of this row) | ✅ |
 | 4 | Complete **options hash** + **fail-closed enforcement** | Options hash: `BuildStateCache.ComputeOptionsHash`, consumed at `CompilationDriver.cs:113`. Fail-closed enforcement **completed here** — `CompileCalor` now matches the driver's output-content check | ✅ *(as of this PR)* |
 | 5 | **Telemetry opt-in** default, stripped payloads, documented | `CalorTelemetry` activates **only** on `CALOR_TELEMETRY=1`; `--no-telemetry` / `CALOR_TELEMETRY_OPTOUT=1` force off; `AnonymizingTelemetryInitializer` strips payloads; `docs/telemetry.md` | ✅ |
-| 6 | **Slice-1 soundness batch** — bar: **no known false-`Proven`-elides vector**, known set = divergence table + T1, **and no silently-skipped postcondition check ships** | D4 closed by refusal in #872 (both halves). **D3 is a live vector** — reproduced end-to-end, below. T2 half holds (a nested return emits `Calor1001` rather than skipping silently) | ❌ **FAIL** |
+| 6 | **Slice-1 soundness batch** — bar: **no known false-`Proven`-elides vector**, known set = divergence table + T1, **and no silently-skipped postcondition check ships** | Four vectors found across four review rounds, all now closed: **D4** both halves by refusal (#872), **D3** and **D12** by demotion (#876). T2 half holds — a nested return emits `Calor1001` rather than skipping silently | ✅ *(only as of #876; see the caveat under Verdict)* |
 | 7 | **T3 containment** — three surfaces gated | `format --write` → `Calor1346` unless `--experimental` / `CALOR_EXPERIMENTAL_FORMAT_WRITE=1`; LSP **formatting** and **rename** register only under `CALOR_LSP_EXPERIMENTAL=1`, read-only handlers unaffected. Two defects found and fixed here; the gate is now **tested** for the first time | ✅ |
 | 8 | **#770 eject-contract** — documented degradation spec | `docs/guides/adoption-playbook.md` §"The eject story (tested)" (`:139-157`) — per-construct degradation table | ✅ |
 | 9 | **#761 flip stance** — `EnableTypeChecking` default-on **lands in the W2/W3 window** with a CHANGELOG note | Window closed at v0.12 without the flip. Still `init`-default `false`, with **no CLI flag at all** | ❌ **LAPSED** |
@@ -67,7 +67,7 @@ with its disposition **and** whether it can mint a false `Proven` that elides:
 |---|---|---|
 | D1 narrow-type promotion | closed by refusal | no |
 | D2 literals always signed 32-bit | truncation half closed (cache 1.7); within-range signedness context unmodeled | residual — see below |
-| D3 Z3 strings cannot be null | **OPEN — live vector, reproduced** | **YES** — see below |
+| D3 Z3 strings cannot be null | **Elide-vector closed by demotion (#876)**; the modeling gap itself is open, tracked by **#875** | no *(was: **yes**)* |
 | D4 non-ordinal comparison modes | **closed by refusal (#872)**, in two halves — explicit non-ordinal modes, and `StartsWith`/`EndsWith`/`IndexOf` with **no** mode (.NET resolves those to CurrentCulture) | no *(was: **yes**, twice)* |
 | D5 `§S` holds only on normal return | exceptional paths → `assumed`, which never elides | no |
 | D6 array element default i32 | adjudicated unreachable from the elision-relevant path | no |
@@ -110,7 +110,10 @@ a Z3 tautology — **crashes with a NullReferenceException** without `--verify` 
 it. So this is not closable by refusing one operation the way D4 and D9 were: **Z3's string sort has
 no null, so every total axiom of its string theory is unsound the moment a `str` holds one.**
 
-**Two candidate fixes, neither a drive-by, and the choice is a product decision:**
+**Closed in #876 by option 2 below**, after the maintainer chose it. The elide vector is gone; the
+modeling gap is not, and is tracked by **#875**.
+
+**The two candidates as they were put, since the choice is on the record:**
 
 1. **Make `str` genuinely non-nullable** — a binder diagnostic when a possibly-null expression
    (notably a C# interop return) is bound to `str` rather than `?str`. This is the *correct* fix:
@@ -122,9 +125,17 @@ no null, so every total axiom of its string theory is unsound the moment a `str`
    elision for every string postcondition — a real capability loss on a headline feature.
 
 `ContractTranslator`'s `StringInfo(bool IsNullable)` / `_stringInfo` — **one write site with five
-callers, read at none, `isNullable` never once passed `true`** — is the vestige of fix (1). The
-previous revision filed it as housekeeping ("wire up or delete"). It should be reclassified: it is
-the unbuilt half of the fix for a live soundness hole.
+callers, read at none, `isNullable` never once passed `true`** — is the vestige of fix (1), and is
+recorded as such on **#875** rather than as housekeeping.
+
+**What #876 actually did**, because the shape matters for the caveat below: a postcondition proof
+carried by the solver's string theory is **demoted to `Assumed`**, which never elides, with the
+assumption named. It closes D3 **and** D12 **and** any string-model vector nobody has found, because
+it removes *elision* — the mechanism that turns a false `Proven` into a deleted check — rather than
+enumerating the divergences. The trigger asks the translator whether a string sort was ever minted,
+not the contract AST; the first attempt asked the AST and missed the function body, which review
+caught. Both elision channels are covered: postconditions (`Proven`) and refinement obligations
+(`Discharged`).
 
 **D2** is the honest residual: the within-range signedness-context half is unmodeled and is not closed
 by refusal. It was disclosed at the freeze and sits inside §2's recorded risk acceptance
@@ -229,27 +240,29 @@ context, not the line.
 
 ## Verdict
 
-**PP-A1 = FAIL.** Item 6 does not meet its frozen bar: **D3 is a known false-`Proven`-elides vector
-and it is live**, on the shipped `calor run --verify` path, with a reproduction of the same shape as
-the D4 finding that caused this document to be rewritten in the first place.
+**Items 1–8 PASS. Item 9 LAPSED and referred to the maintainer.**
 
-Items 1–5, 7 and 8 pass. Item 9 is **LAPSED** and referred to the maintainer.
+Item 6 passes **only as of #876**, and did not pass in any of the three earlier revisions of this
+document that claimed it did.
 
-**This blocks v0.12.0**, which cannot ship with PP-A1 failing. Two decisions are now the
-maintainer's, not this document's:
+**The caveat that belongs on this PASS, stated rather than buried.** Four adversarial review rounds
+found four live false-`Proven`-elides vectors behind this item — D4's explicit-mode half, D4's
+no-mode half, D3, and D12 — each time *after* the item had been marked green, and two of them behind
+rows I had personally re-audited and argued safe. What finally closed it was **not** a better
+enumeration of the divergence table. It was a change of mechanism: #876 removes elision for
+string-carried proofs, so the class is closed by construction rather than by having found every
+member.
 
-1. **How to close D3** — the non-nullable-`str` fix or the stop-eliding-on-strings fix above.
-2. **Whether item 9's lapse independently blocks the release.**
+That is the honest reading of the bar. *Known*-divergence-free is a claim about how hard anyone
+looked, and on this evidence inspection does not find the bottom of the solver's string model. §2 of
+the freeze says the same thing in its own words — known-divergence-free is **weaker than
+differentially clean** — and #779's solver-vs-runtime differential suite is the instrument that would
+actually settle it.
 
-**On what "known-divergence-free" is worth.** Three adversarial review rounds have now found three
-live vectors behind this one item — D4's explicit-mode half, D4's no-mode half, and D3 — each time
-after the item had been marked ✅. Two of the three were behind rows I had personally re-audited.
-"Known" is a claim about how hard anyone looked, and the honest statement is that this bar cannot be
-carried by inspection. §2 of the freeze says the same thing in its own words: known-divergence-free
-is **weaker than differentially clean**, and #779's solver-vs-runtime differential suite is the
-instrument that would actually settle it. **The recommendation this audit ends on is that item 6's
-bar should not be re-asserted by another reading of the table — it should be replaced by the
-differential suite.**
+**Registered recommendation for the successor plan:** item 6's bar should not be carried forward as
+"audit the table again". It should be replaced by the differential suite, or by more
+closed-by-construction changes of the #876 kind. D1, D2, D3 and D12 remain open *modeling* gaps whose
+elide consequences are now neutralized; #875 tracks the root cause of D3.
 
 ## Scope
 
