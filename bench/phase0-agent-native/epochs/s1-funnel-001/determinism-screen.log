@@ -1,0 +1,261 @@
+[fluentvalidation-injectedmutation-cand10-EffectViolation] screening both arms, 5 runs each…
+  Found 139 C# files to convert (0 excluded by pattern)
+...............
+  Replaced: 113
+  CompileError: 20
+  EmitSyntaxError: 6
+    Reverted: src/FluentValidation/Internal/MemberNameValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/MessageFormatter.cs
+    Reverted: src/FluentValidation/DefaultValidatorExtensions_Validate.cs
+    Reverted: src/FluentValidation/DefaultValidatorOptions.cs
+    Reverted: src/FluentValidation/Internal/IRuleComponent.cs
+    Reverted: src/FluentValidation/Internal/MessageBuilderContext.cs
+    Reverted: src/FluentValidation/Internal/RuleBuilder.cs
+    Reverted: src/FluentValidation/Internal/RuleComponent.cs
+    Reverted: src/FluentValidation/Internal/RuleComponentForNullableStruct.cs
+    Reverted: src/FluentValidation/IValidationRule.cs
+    Reverted: src/FluentValidation/IValidationRuleInternal.cs
+    Reverted: src/FluentValidation/IValidator.cs
+    Reverted: src/FluentValidation/IValidatorDescriptor.cs
+    Reverted: src/FluentValidation/TestHelper/TestValidationResult.cs
+    Reverted: src/FluentValidation/ValidatorDescriptor.cs
+    Reverted: src/FluentValidation/Validators/AbstractComparisonValidator.cs
+    Reverted: src/FluentValidation/Validators/AsyncPropertyValidator.cs
+    Reverted: src/FluentValidation/Validators/ChildValidatorAdaptor.cs
+    Reverted: src/FluentValidation/Validators/PropertyValidator.cs
+    Reverted: src/FluentValidation/IValidatorFactory.cs
+    Reverted: src/FluentValidation/AssemblyScanner.cs
+    Reverted: src/FluentValidation/ValidatorFactoryBase.cs
+    Reverted: src/FluentValidation/Internal/PropertyRule.cs
+    Reverted: src/FluentValidation/Internal/TrackingCollection.cs
+    Reverted: src/FluentValidation/Validators/NotEqualValidator.cs
+    Reverted: src/FluentValidation/Internal/ValidationStrategy.cs
+    Reverted: src/FluentValidation/Validators/RangeValidator.cs
+    Reverted: src/FluentValidation/Validators/StringEnumValidator.cs
+    Reverted: src/FluentValidation/Validators/RegularExpressionValidator.cs
+    Reverted: src/FluentValidation/Internal/AccessorCache.cs
+    Reverted: src/FluentValidation/Internal/RulesetValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/CompositeValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/ConditionBuilder.cs
+    Reverted: src/FluentValidation/Internal/DefaultValidatorSelector.cs
+    Reverted: src/FluentValidation/Internal/Extensions.cs
+    Reverted: src/FluentValidation/Resources/LanguageManager.cs
+    Reverted: src/FluentValidation/Validators/EmptyValidator.cs
+    Reverted: src/FluentValidation/Validators/EnumValidator.cs
+    C# reference run 1: green [8 tests, 1020 ms]
+    C# reference run 2: green [8 tests, 988 ms]
+    C# reference run 3: green [8 tests, 985 ms]
+    C# reference run 4: green [8 tests, 981 ms]
+    C# reference run 5: green [8 tests, 987 ms]
+    Calor reference run 1: green [8 tests, 1008 ms]
+    Calor reference run 2: green [8 tests, 987 ms]
+    Calor reference run 3: green [8 tests, 983 ms]
+    Calor reference run 4: green [8 tests, 998 ms]
+    Calor reference run 5: green [8 tests, 988 ms]
+    mutated run 1: RED (8 failed) [8 tests, 1051 ms]
+    mutated run 2: RED (8 failed) [8 tests, 1021 ms]
+    mutated run 3: RED (8 failed) [8 tests, 1020 ms]
+    mutated run 4: RED (8 failed) [8 tests, 1018 ms]
+    mutated run 5: RED (8 failed) [8 tests, 1020 ms]
+[fluentvalidation-injectedmutation-cand4-EffectViolation] screening both arms, 5 runs each…
+    C# reference run 1: green [47 tests, 3561 ms]
+    C# reference run 2: green [47 tests, 3558 ms]
+    C# reference run 3: green [47 tests, 3567 ms]
+    C# reference run 4: green [47 tests, 3584 ms]
+    C# reference run 5: green [47 tests, 3558 ms]
+    Calor reference run 1: green [47 tests, 3565 ms]
+    Calor reference run 2: green [47 tests, 3573 ms]
+    Calor reference run 3: green [47 tests, 3571 ms]
+    Calor reference run 4: green [47 tests, 3564 ms]
+    Calor reference run 5: green [47 tests, 3575 ms]
+    mutated run 1: RED (44 failed) [47 tests, 3626 ms]
+    mutated run 2: RED (44 failed) [47 tests, 3606 ms]
+    mutated run 3: RED (44 failed) [47 tests, 3600 ms]
+    mutated run 4: RED (44 failed) [47 tests, 3605 ms]
+    mutated run 5: RED (44 failed) [47 tests, 3602 ms]
+[fluentvalidation-injectedmutation-cand5-EffectViolation] screening both arms, 5 runs each…
+    C# reference run 1: green [13 tests, 974 ms]
+    C# reference run 2: green [13 tests, 988 ms]
+    C# reference run 3: green [13 tests, 990 ms]
+    C# reference run 4: green [13 tests, 985 ms]
+    C# reference run 5: green [13 tests, 973 ms]
+    Calor reference run 1: green [13 tests, 983 ms]
+    Calor reference run 2: green [13 tests, 976 ms]
+    Calor reference run 3: green [13 tests, 985 ms]
+    Calor reference run 4: green [13 tests, 991 ms]
+    Calor reference run 5: green [13 tests, 965 ms]
+    mutated run 1: RED (12 failed) [13 tests, 1023 ms]
+    mutated run 2: RED (12 failed) [13 tests, 1004 ms]
+    mutated run 3: RED (12 failed) [13 tests, 1006 ms]
+    mutated run 4: RED (12 failed) [13 tests, 1004 ms]
+    mutated run 5: RED (12 failed) [13 tests, 1003 ms]
+[fluentvalidation-injectedmutation-cand6-EffectViolation] screening both arms, 5 runs each…
+    C# reference run 1: green [16 tests, 990 ms]
+    C# reference run 2: green [16 tests, 985 ms]
+    C# reference run 3: green [16 tests, 995 ms]
+    C# reference run 4: green [16 tests, 989 ms]
+    C# reference run 5: green [16 tests, 989 ms]
+    Calor reference run 1: green [16 tests, 990 ms]
+    Calor reference run 2: green [16 tests, 985 ms]
+    Calor reference run 3: green [16 tests, 1006 ms]
+    Calor reference run 4: green [16 tests, 995 ms]
+    Calor reference run 5: green [16 tests, 992 ms]
+    mutated run 1: RED (16 failed) [16 tests, 1033 ms]
+    mutated run 2: RED (16 failed) [16 tests, 994 ms]
+    mutated run 3: RED (16 failed) [16 tests, 976 ms]
+    mutated run 4: RED (16 failed) [16 tests, 1007 ms]
+    mutated run 5: RED (16 failed) [16 tests, 1002 ms]
+[fluentvalidation-injectedmutation-cand8-EffectViolation] screening both arms, 5 runs each…
+    C# reference run 1: green [30 tests, 1018 ms]
+    C# reference run 2: green [30 tests, 1021 ms]
+    C# reference run 3: green [30 tests, 1029 ms]
+    C# reference run 4: green [30 tests, 1033 ms]
+    C# reference run 5: green [30 tests, 1012 ms]
+    Calor reference run 1: green [30 tests, 1032 ms]
+    Calor reference run 2: green [30 tests, 1038 ms]
+    Calor reference run 3: green [30 tests, 1032 ms]
+    Calor reference run 4: green [30 tests, 1019 ms]
+    Calor reference run 5: green [30 tests, 1035 ms]
+    mutated run 1: RED (24 failed) [30 tests, 1060 ms]
+    mutated run 2: RED (24 failed) [30 tests, 1045 ms]
+    mutated run 3: RED (24 failed) [30 tests, 1037 ms]
+    mutated run 4: RED (24 failed) [30 tests, 1049 ms]
+    mutated run 5: RED (24 failed) [30 tests, 1045 ms]
+[serilog-injectedmutation-cand11-EffectViolation] screening both arms, 5 runs each…
+  Found 110 C# files to convert (2 excluded by pattern)
+.........
+  Replaced: 89
+  CompileError: 15
+  EmitSyntaxError: 6
+    Reverted: src/Serilog/Context/EnricherStack.cs
+    Reverted: src/Serilog/Guard.cs
+    Reverted: src/Serilog/Capturing/DepthLimiter.cs
+    Reverted: src/Serilog/Context/LogContext.cs
+    Reverted: src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/IScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/DelegateDestructuringPolicy.cs
+    Reverted: src/Serilog/Core/IDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/EnumScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs
+    Reverted: src/Serilog/Policies/ProjectedDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs
+    Reverted: src/Serilog/Policies/SimpleScalarConversionPolicy.cs
+    Reverted: src/Serilog/Core/Sinks/DisposingAggregateSink.cs
+    Reverted: src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs
+    Reverted: src/Serilog/Capturing/TrimConfiguration.cs
+    Reverted: src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs
+    Reverted: src/Serilog/Util/TimeProvider.cs
+    Reverted: src/Serilog/Configuration/LoggerSinkConfiguration.cs
+    Reverted: src/Serilog/Core/Sinks/SecondaryLoggerSink.cs
+    Reverted: src/Serilog/Core/Sinks/RestrictedSink.cs
+    Reverted: src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs
+    Reverted: src/Serilog/Capturing/MessageTemplateProcessor.cs
+    Reverted: src/Serilog/Core/Sinks/ConditionalSink.cs
+    Reverted: src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs
+    Reverted: src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs
+    Reverted: src/Serilog/Debugging/SelfLog.cs
+    Reverted: src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs
+    Reverted: src/Serilog/Configuration/LoggerDestructuringConfiguration.cs
+    Reverted: src/Serilog/Data/LogEventPropertyValueRewriter.cs
+    Reverted: src/Serilog/Configuration/LoggerFilterConfiguration.cs
+    Reverted: src/Serilog/Events/EventProperty.cs
+    Reverted: src/Serilog/Events/LogEvent.cs
+    Reverted: src/Serilog/Events/DictionaryValue.cs
+    Reverted: src/Serilog/Events/ScalarValue.cs
+    Reverted: src/Serilog/Formatting/Json/JsonValueFormatter.cs
+    Reverted: src/Serilog/Formatting/Display/LevelOutputFormat.cs
+    Reverted: src/Serilog/Events/MessageTemplate.cs
+    Reverted: src/Serilog/Formatting/Json/JsonFormatter.cs
+    Reverted: src/Serilog/Core/Sinks/AggregateSink.cs
+    Reverted: src/Serilog/Core/PropertiesInlineArray.cs
+    Reverted: src/Serilog/Rendering/Padding.cs
+    Reverted: src/Serilog/Rendering/ReusableStringWriter.cs
+    C# reference run 1: green [23 tests, 916 ms]
+    C# reference run 2: green [23 tests, 855 ms]
+    C# reference run 3: green [23 tests, 858 ms]
+    C# reference run 4: green [23 tests, 850 ms]
+    C# reference run 5: green [23 tests, 834 ms]
+    Calor reference run 1: green [23 tests, 887 ms]
+    Calor reference run 2: green [23 tests, 854 ms]
+    Calor reference run 3: green [23 tests, 846 ms]
+    Calor reference run 4: green [23 tests, 848 ms]
+    Calor reference run 5: green [23 tests, 847 ms]
+    mutated run 1: RED (23 failed) [23 tests, 896 ms]
+    mutated run 2: RED (23 failed) [23 tests, 853 ms]
+    mutated run 3: RED (23 failed) [23 tests, 847 ms]
+    mutated run 4: RED (23 failed) [23 tests, 863 ms]
+    mutated run 5: RED (23 failed) [23 tests, 863 ms]
+[serilog-injectedmutation-cand13-EffectViolation] screening both arms, 5 runs each…
+    C# reference run 1: green [28 tests, 841 ms]
+    C# reference run 2: green [28 tests, 836 ms]
+    C# reference run 3: green [28 tests, 822 ms]
+    C# reference run 4: green [28 tests, 841 ms]
+    C# reference run 5: green [28 tests, 843 ms]
+    Calor reference run 1: green [28 tests, 844 ms]
+    Calor reference run 2: green [28 tests, 842 ms]
+    Calor reference run 3: green [28 tests, 847 ms]
+    Calor reference run 4: green [28 tests, 843 ms]
+    Calor reference run 5: green [28 tests, 834 ms]
+    mutated run 1: RED (28 failed) [28 tests, 879 ms]
+    mutated run 2: RED (28 failed) [28 tests, 866 ms]
+    mutated run 3: RED (28 failed) [28 tests, 871 ms]
+    mutated run 4: RED (28 failed) [28 tests, 871 ms]
+    mutated run 5: RED (28 failed) [28 tests, 859 ms]
+[serilog-injectedmutation-cand4-EffectViolation] screening both arms, 5 runs each…
+    C# reference run 1: green [5 tests, 841 ms]
+    C# reference run 2: green [5 tests, 858 ms]
+    C# reference run 3: green [5 tests, 844 ms]
+    C# reference run 4: green [5 tests, 834 ms]
+    C# reference run 5: green [5 tests, 849 ms]
+    Calor reference run 1: green [5 tests, 834 ms]
+    Calor reference run 2: green [5 tests, 836 ms]
+    Calor reference run 3: green [5 tests, 851 ms]
+    Calor reference run 4: green [5 tests, 840 ms]
+    Calor reference run 5: green [5 tests, 848 ms]
+    mutated run 1: RED (5 failed) [5 tests, 859 ms]
+    mutated run 2: RED (5 failed) [5 tests, 864 ms]
+    mutated run 3: RED (5 failed) [5 tests, 858 ms]
+    mutated run 4: RED (5 failed) [5 tests, 870 ms]
+    mutated run 5: RED (5 failed) [5 tests, 862 ms]
+
+# D-S5.1 determinism screen
+
+Gates §0.2: held-out tests must be deterministic, verified by **5 consecutive green runs against
+the reference solution** — applied per plan D-S5.1 **on both arms**. The two arms have different
+references: the C# arm's is the pristine corpus; the Calor arm's is the **converted, unmutated**
+program. **M-S3 counts only screened tasks**, so a task failing here is not epoch-eligible however
+real its defect is.
+
+**8 of 8 tasks pass.**
+
+| Task | Project | C# reference | Calor reference | Mutated (reported) | Verdict |
+|---|---|---|---|---|---|
+| `fluentvalidation-injectedmutation-cand10-EffectViolation` | FluentValidation | ✓✓✓✓✓ | ✓✓✓✓✓ | manifested on all runs | PASS |
+| `fluentvalidation-injectedmutation-cand4-EffectViolation` | FluentValidation | ✓✓✓✓✓ | ✓✓✓✓✓ | manifested on all runs | PASS |
+| `fluentvalidation-injectedmutation-cand5-EffectViolation` | FluentValidation | ✓✓✓✓✓ | ✓✓✓✓✓ | manifested on all runs | PASS |
+| `fluentvalidation-injectedmutation-cand6-EffectViolation` | FluentValidation | ✓✓✓✓✓ | ✓✓✓✓✓ | manifested on all runs | PASS |
+| `fluentvalidation-injectedmutation-cand8-EffectViolation` | FluentValidation | ✓✓✓✓✓ | ✓✓✓✓✓ | manifested on all runs | PASS |
+| `serilog-injectedmutation-cand11-EffectViolation` | Serilog | ✓✓✓✓✓ | ✓✓✓✓✓ | manifested on all runs | PASS |
+| `serilog-injectedmutation-cand13-EffectViolation` | Serilog | ✓✓✓✓✓ | ✓✓✓✓✓ | manifested on all runs | PASS |
+| `serilog-injectedmutation-cand4-EffectViolation` | Serilog | ✓✓✓✓✓ | ✓✓✓✓✓ | manifested on all runs | PASS |
+
+Reference columns: ✓ = the held-out set was green (required on **both**, 5/5).
+Mutated column is reported only — §0.2 constrains the reference, not the defect's manifestation rate.
+
+## Power of this instrument, stated
+
+Detection at per-run flake rate *p* is 1−(1−p)^5: ~97% at p=0.5, **41% at p=0.1, 10% at p=0.02**.
+Five runs bound *gross* flakiness only. The filtered runs are also far smaller than a full-suite
+pass, so they carry little of the xUnit parallel-collection interleaving — the very mechanism that
+produced a real nondeterminism defect in this epoch's own instrument (`ArmsDiverge` 3→0). A pass
+here is not a claim that the held-out set is deterministic under all conditions.
+
+## Provenance
+
+- Harness commit: `8fc5bc7153ff621ebf2b4e5ccf196278069d5c30`
+- FluentValidation: `71b3c60cb5a16e02cb7957e478ec3fb6b983a73c`
+- MediatR: `fb309026775ef953a64fb5339d074426c1ad2c37`
+- Serilog: `0597ddfbd4ec594d9c42edd745fe728a2198bad9`
+
+Per-run test counts and durations are in `determinism-screen.json`.
+

@@ -1,0 +1,1110 @@
+{
+  "Tasks": [
+    {
+      "TaskId": "fluentvalidation-injectedmutation-cand10-EffectViolation",
+      "ProjectName": "FluentValidation",
+      "HeldOutFilter": "FullyQualifiedName~FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_equal_to_input|FullyQualifiedName~FluentValidation.Tests.LessThanValidatorTester.Should_set_default_validation_message_when_validation_fails|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationErrorFor_WithPropertyName_Only_throws|FullyQualifiedName~FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_property|FullyQualifiedName~FluentValidation.Tests.LessThanValidatorTester.Should_fail_when_greater_than_input|FullyQualifiedName~FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null|FullyQualifiedName~FluentValidation.Tests.LessThanValidatorTester.Validates_nullable_with_nullable_property|FullyQualifiedName~FluentValidation.Tests.LessThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property",
+      "CSharpReferenceRuns": [
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 1020,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 988,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 985,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 981,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 987,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "CalorReferenceRuns": [
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 1008,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 987,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 983,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 998,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 8,
+          "Failed": 0,
+          "DurationMs": 988,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "MutatedRuns": [
+        {
+          "TotalTests": 8,
+          "Passed": 0,
+          "Failed": 8,
+          "DurationMs": 1051,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 0,
+          "Failed": 8,
+          "DurationMs": 1021,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 0,
+          "Failed": 8,
+          "DurationMs": 1020,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 0,
+          "Failed": 8,
+          "DurationMs": 1018,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 8,
+          "Passed": 0,
+          "Failed": 8,
+          "DurationMs": 1020,
+          "Green": false,
+          "Failing": true
+        }
+      ],
+      "MutatedArm": 0,
+      "Inconclusive": null,
+      "Passes": true,
+      "DefectAlwaysManifests": true,
+      "MutatedNote": "manifested on all runs",
+      "Verdict": "PASS"
+    },
+    {
+      "TaskId": "fluentvalidation-injectedmutation-cand4-EffectViolation",
+      "ProjectName": "FluentValidation",
+      "HeldOutFilter": "FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_stops_on_first_failure_when_ruleleveldefault_Stop_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_continues_on_failure_when_globaldefault_both_Stop_and_ruleleveloverride_Continue_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_stops_on_first_rule_level_failure_when_globaldefault_rule_Stop_async|FullyQualifiedName~FluentValidation.Tests.ComplexValidationTester.Multiple_rules_in_chain_with_childvalidator_shouldnt_reuse_accessor_async|FullyQualifiedName~FluentValidation.Tests.RuleDependencyTests.TestAsyncWithDependentRules_SyncEntry|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_continues_to_first_failing_validator_then_stops_in_all_rules_when_first_validator_succeeds_and_globaldefault_rule_Stop_async|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationError_model_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_stops_after_first_rule_failure_when_globaldefault_class_Stop_async|FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback_async|FullyQualifiedName~FluentValidation.Tests.ForEachRuleTests.Overrides_indexer_async|FullyQualifiedName~FluentValidation.Tests.CollectionValidatorWithParentTests.Validates_collection_asynchronously|FullyQualifiedName~FluentValidation.Tests.RulesetTests.Includes_combination_of_rulesets_async|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationError_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_continues_on_failure_when_globaldefault_rule_stop_and_ruleleveloverride_Continue_async|FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_inheritance_async|FullyQualifiedName~FluentValidation.Tests.RulesetTests.Combines_rulesets_and_explicit_properties_async|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.TestValidate_runs_async_throws|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Cascade_mode_can_be_set_after_validator_instantiated_async_legacy|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_continues_on_failure_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_stops_on_failure_when_classlevel_Continue_and_ruleleveldefault_Continue_and_ruleleveloverride_Stop_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_stops_on_first_Failure_when_globaldefault_both_Continue_and_ruleleveloverride_Stop_async|FullyQualifiedName~FluentValidation.Tests.AbstractValidatorTester.WhenPreValidationReturnsTrue_ValidatorsGetHit_ValidateAsync|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_continues_on_failure_when_classlevel_Stop_and_ruleleveldefault_Stop_and_ruleleveloverride_Continue_async|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationErrorFor_Only_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_stops_after_first_rule_when_first_rule_fails_and_globaldefault_class_Stop_async|FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback_accepting_derived_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_stops_after_first_rule_failure_when_globaldefault_class_stop_and_ruleleveloverride_Continue_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_stops_on_first_failure_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_continues_to_second_validator_when_first_validator_succeeds_and_globaldefault_both_Stop_async|FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_collection_async|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.TestValidate_runs_async|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.ShouldNotHaveValidationError_async_model_throws|FullyQualifiedName~FluentValidation.Tests.RuleDependencyTests.Async_inside_dependent_rules|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationErrorFor_Only_async_throws|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_continues_on_failure_when_ruleleveldefault_Stop_and_ruleleveloverride_Continue_async|FullyQualifiedName~FluentValidation.Tests.RuleDependencyTests.Async_inside_dependent_rules_when_parent_rule_not_async|FullyQualifiedName~FluentValidation.Tests.RulesetTests.Includes_all_rulesets_async|FullyQualifiedName~FluentValidation.Tests.ForEachRuleTests.When_runs_outside_RuleForEach_loop_async|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.ShouldNotHaveValidationError_async_throws|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_continues_when_classlevel_Continue_and_ruleleveldefault_Continue_async|FullyQualifiedName~FluentValidation.Tests.RuleDependencyTests.TestAsyncWithDependentRules_AsyncEntry|FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_ruleset_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Validation_stops_on_first_failure_when_classlevel_Stop_and_ruleleveldefault_Stop_async|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Cascade_mode_can_be_set_after_validator_instantiated_async",
+      "CSharpReferenceRuns": [
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3561,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3558,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3567,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3584,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3558,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "CalorReferenceRuns": [
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3565,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3573,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3571,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3564,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 47,
+          "Failed": 0,
+          "DurationMs": 3575,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "MutatedRuns": [
+        {
+          "TotalTests": 47,
+          "Passed": 3,
+          "Failed": 44,
+          "DurationMs": 3626,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 3,
+          "Failed": 44,
+          "DurationMs": 3606,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 3,
+          "Failed": 44,
+          "DurationMs": 3600,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 3,
+          "Failed": 44,
+          "DurationMs": 3605,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 47,
+          "Passed": 3,
+          "Failed": 44,
+          "DurationMs": 3602,
+          "Green": false,
+          "Failing": true
+        }
+      ],
+      "MutatedArm": 0,
+      "Inconclusive": null,
+      "Passes": true,
+      "DefectAlwaysManifests": true,
+      "MutatedNote": "manifested on all runs",
+      "Verdict": "PASS"
+    },
+    {
+      "TaskId": "fluentvalidation-injectedmutation-cand5-EffectViolation",
+      "ProjectName": "FluentValidation",
+      "HeldOutFilter": "FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_to_is_smaller_than_the_from_then_the_validator_should_throw|FullyQualifiedName~FluentValidation.Tests.InclusiveBetweenValidatorTests.When_the_to_is_smaller_than_the_from_then_the_validator_should_throw|FullyQualifiedName~FluentValidation.Tests.InclusiveBetweenValidatorTests.When_the_to_is_smaller_than_the_from_then_the_validator_should_throw_for_strings|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_to_is_smaller_than_the_from_then_the_validator_should_throw_for_strings|FullyQualifiedName~FluentValidation.Tests.InclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set_for_strings|FullyQualifiedName~FluentValidation.Tests.InclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_pass|FullyQualifiedName~FluentValidation.Tests.InclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_pass_for_strings|FullyQualifiedName~FluentValidation.Tests.InclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail_for_strings|FullyQualifiedName~FluentValidation.Tests.InclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass_for_strings|FullyQualifiedName~FluentValidation.Tests.InclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set",
+      "CSharpReferenceRuns": [
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 974,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 988,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 990,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 985,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 973,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "CalorReferenceRuns": [
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 983,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 976,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 985,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 991,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 13,
+          "Failed": 0,
+          "DurationMs": 965,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "MutatedRuns": [
+        {
+          "TotalTests": 13,
+          "Passed": 1,
+          "Failed": 12,
+          "DurationMs": 1023,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 1,
+          "Failed": 12,
+          "DurationMs": 1004,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 1,
+          "Failed": 12,
+          "DurationMs": 1006,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 1,
+          "Failed": 12,
+          "DurationMs": 1004,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 13,
+          "Passed": 1,
+          "Failed": 12,
+          "DurationMs": 1003,
+          "Green": false,
+          "Failing": true
+        }
+      ],
+      "MutatedArm": 0,
+      "Inconclusive": null,
+      "Passes": true,
+      "DefectAlwaysManifests": true,
+      "MutatedNote": "manifested on all runs",
+      "Verdict": "PASS"
+    },
+    {
+      "TaskId": "fluentvalidation-injectedmutation-cand6-EffectViolation",
+      "ProjectName": "FluentValidation",
+      "HeldOutFilter": "FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail_for_strings|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_by_icomparer_then_the_validator_should_pass|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_larger_than_the_range_by_icomparer_then_the_validator_should_fail|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_by_icomparer_then_the_validator_should_fail|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail_for_strings|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.Validates_with_nullable_when_property_not_null|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_upper_bound_then_the_validator_should_fail|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_exactly_the_size_of_the_lower_bound_then_the_validator_should_fail|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_text_is_larger_than_the_range_then_the_validator_should_fail_for_strings|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_smaller_than_the_range_then_the_validator_should_fail_for_strings|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass_for_strings|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_value_is_between_the_range_specified_then_the_validator_should_pass|FullyQualifiedName~FluentValidation.Tests.ExclusiveBetweenValidatorTests.When_the_validator_fails_the_error_message_should_be_set_for_strings",
+      "CSharpReferenceRuns": [
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 990,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 985,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 995,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 989,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 989,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "CalorReferenceRuns": [
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 990,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 985,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 1006,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 995,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 16,
+          "Failed": 0,
+          "DurationMs": 992,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "MutatedRuns": [
+        {
+          "TotalTests": 16,
+          "Passed": 0,
+          "Failed": 16,
+          "DurationMs": 1033,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 0,
+          "Failed": 16,
+          "DurationMs": 994,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 0,
+          "Failed": 16,
+          "DurationMs": 976,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 0,
+          "Failed": 16,
+          "DurationMs": 1007,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 16,
+          "Passed": 0,
+          "Failed": 16,
+          "DurationMs": 1002,
+          "Green": false,
+          "Failing": true
+        }
+      ],
+      "MutatedArm": 0,
+      "Inconclusive": null,
+      "Passes": true,
+      "DefectAlwaysManifests": true,
+      "MutatedNote": "manifested on all runs",
+      "Verdict": "PASS"
+    },
+    {
+      "TaskId": "fluentvalidation-injectedmutation-cand8-EffectViolation",
+      "ProjectName": "FluentValidation",
+      "HeldOutFilter": "FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback|FullyQualifiedName~FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_less_than_input|FullyQualifiedName~FluentValidation.Tests.RulesetTests.Combines_rulesets_and_explicit_properties|FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_collection|FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_inheritance_hierarchy|FullyQualifiedName~FluentValidation.Tests.RulesetTests.Includes_all_rulesets|FullyQualifiedName~FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null|FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_with_callback_accepting_derived|FullyQualifiedName~FluentValidation.Tests.ValidatorSelectorTests.Executes_correct_rule_when_using_property_with_nested_includes|FullyQualifiedName~FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_property|FullyQualifiedName~FluentValidation.Tests.CollectionValidatorWithParentTests.Creates_validator_using_context_from_property_value|FullyQualifiedName~FluentValidation.Tests.GreaterThanValidatorTester.Should_set_default_error_when_validation_fails|FullyQualifiedName~FluentValidation.Tests.GreaterThanValidatorTester.Should_fail_when_equal_to_input|FullyQualifiedName~FluentValidation.Tests.GreaterThanValidatorTester.Validates_with_nullable_when_property_not_null_cross_property|FullyQualifiedName~FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_nested_collection|FullyQualifiedName~FluentValidation.Tests.ValidatorTesterTester.ShouldHaveValidationError_with_an_unmatched_rule_and_multiple_errors_should_throw_an_exception|FullyQualifiedName~FluentValidation.Tests.RuleBuilderTests.Result_should_use_custom_property_name_when_no_property_name_can_be_determined|FullyQualifiedName~FluentValidation.Tests.ValidatorSelectorTests.Only_validates_child_property_for_single_item_in_collection|FullyQualifiedName~FluentValidation.Tests.CascadingFailuresTester.Cascade_set_to_stop_in_child_validator_with_RuleForEach_in_parent|FullyQualifiedName~FluentValidation.Tests.InheritanceValidatorTest.Validates_ruleset|FullyQualifiedName~FluentValidation.Tests.ChildRulesTests.Can_define_nested_rules_for_collection|FullyQualifiedName~FluentValidation.Tests.ValidatorSelectorTests.Only_validates_single_child_property_of_all_elements_in_collection|FullyQualifiedName~FluentValidation.Tests.GreaterThanValidatorTester.Validates_nullable_with_nullable_property|FullyQualifiedName~FluentValidation.Tests.ValidatorSelectorTests.Validates_nullable_property_with_overriden_name_when_selected",
+      "CSharpReferenceRuns": [
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1018,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1021,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1029,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1033,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1012,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "CalorReferenceRuns": [
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1032,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1038,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1032,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1019,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 30,
+          "Failed": 0,
+          "DurationMs": 1035,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "MutatedRuns": [
+        {
+          "TotalTests": 30,
+          "Passed": 6,
+          "Failed": 24,
+          "DurationMs": 1060,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 6,
+          "Failed": 24,
+          "DurationMs": 1045,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 6,
+          "Failed": 24,
+          "DurationMs": 1037,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 6,
+          "Failed": 24,
+          "DurationMs": 1049,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 30,
+          "Passed": 6,
+          "Failed": 24,
+          "DurationMs": 1045,
+          "Green": false,
+          "Failing": true
+        }
+      ],
+      "MutatedArm": 0,
+      "Inconclusive": null,
+      "Passes": true,
+      "DefectAlwaysManifests": true,
+      "MutatedNote": "manifested on all runs",
+      "Verdict": "PASS"
+    },
+    {
+      "TaskId": "serilog-injectedmutation-cand11-EffectViolation",
+      "ProjectName": "Serilog",
+      "HeldOutFilter": "FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumCollectionCountEffectiveForDictionaryWithMoreKeysThanLimit|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumStringLengthEffectiveForCapturedObject|FullyQualifiedName~Serilog.Tests.Settings.KeyValuePairSettingsTests.DestructuringToMaximumCollectionCountIsApplied|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumDestructuringDepthIsEffective|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumStringLengthNOTEffectiveForObject|FullyQualifiedName~Serilog.Tests.Capturing.PropertyValueConverterTests.MaximumDepthIsEffectiveAndThreadSafe|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumStringLengthNOTEffectiveForString|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumDestructuringDepthDefaultIsEffective|FullyQualifiedName~Serilog.Tests.Events.LogEventPropertyValueTests.AScalarValueToStringRendersTheValue|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumCollectionCountNotEffectiveForDictionaryWithAsManyKeysAsLimit|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumCollectionCountNotEffectiveForArrayAsLongAsLimit|FullyQualifiedName~Serilog.Tests.Events.LogEventPropertyValueTests.WhenDestructuringAKnownLiteralTypeIsScalar|FullyQualifiedName~Serilog.Tests.Events.LogEventPropertyValueTests.AScalarValueToStringRendersTheValueUsingFormat|FullyQualifiedName~Serilog.Tests.Settings.KeyValuePairSettingsTests.DestructuringWithCustomExtensionMethodIsApplied|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumStringLengthEffectiveForStringifiedObject|FullyQualifiedName~Serilog.Tests.Settings.KeyValuePairSettingsTests.DestructuringToMaximumDepthIsApplied|FullyQualifiedName~Serilog.Tests.Formatting.Display.MessageTemplateTextFormatterTests.AnEmptyPropertiesTokenIsAnEmptyStructureValueWithDefaultFormatting|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumCollectionCountEffectiveForArrayThanLimit|FullyQualifiedName~Serilog.Tests.Events.LogEventPropertyValueTests.AScalarValueToStringRendersTheValueUsingFormatProvider|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumStringLengthEffectiveForStringifiedString|FullyQualifiedName~Serilog.Tests.Settings.KeyValuePairSettingsTests.DestructuringToMaximumStringLengthIsApplied|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.MaximumStringLengthEffectiveForCapturedString",
+      "CSharpReferenceRuns": [
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 916,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 855,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 858,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 850,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 834,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "CalorReferenceRuns": [
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 887,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 854,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 846,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 848,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 23,
+          "Failed": 0,
+          "DurationMs": 847,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "MutatedRuns": [
+        {
+          "TotalTests": 23,
+          "Passed": 0,
+          "Failed": 23,
+          "DurationMs": 896,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 0,
+          "Failed": 23,
+          "DurationMs": 853,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 0,
+          "Failed": 23,
+          "DurationMs": 847,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 0,
+          "Failed": 23,
+          "DurationMs": 863,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 23,
+          "Passed": 0,
+          "Failed": 23,
+          "DurationMs": 863,
+          "Green": false,
+          "Failing": true
+        }
+      ],
+      "MutatedArm": 0,
+      "Inconclusive": null,
+      "Passes": true,
+      "DefectAlwaysManifests": true,
+      "MutatedNote": "manifested on all runs",
+      "Verdict": "PASS"
+    },
+    {
+      "TaskId": "serilog-injectedmutation-cand13-EffectViolation",
+      "ProjectName": "Serilog",
+      "HeldOutFilter": "FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.MultipleTokensHasCorrectIndexes|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAreParsedAsASingleBracket|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracket|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithoutPropertiesIsASingleTextToken|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.DestructureWithInvalidHintsIsParsedAsText|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledLeftBracketsAreParsedAsASingleBracketInsideText|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.AMessageWithAMalformedPropertyTagIsParsedAsManyTextTokens|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.AMalformedPropertyTagIsParsedAsText|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.DestructuringWithEmptyPropertyNameIsParsedAsText|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.EmptyAlignmentIsParsedAsText|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.NonNumberAlignmentIsParsedAsText|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.AlignmentWithPositiveSignParsedAsText|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledRightBracketsAfterOneLeftIsParsedAPropertyTokenAndATextToken|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.DoubledBracketsAreParsedAsASingleBracket|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.MissingRightBracketIsParsedAsText|FullyQualifiedName~Serilog.Tests.Parsing.MessageTemplateParserTests.ATrailingUnmatchedBracketIsParsedAsText",
+      "CSharpReferenceRuns": [
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 841,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 836,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 822,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 841,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 843,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "CalorReferenceRuns": [
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 844,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 842,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 847,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 843,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 28,
+          "Failed": 0,
+          "DurationMs": 834,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "MutatedRuns": [
+        {
+          "TotalTests": 28,
+          "Passed": 0,
+          "Failed": 28,
+          "DurationMs": 879,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 0,
+          "Failed": 28,
+          "DurationMs": 866,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 0,
+          "Failed": 28,
+          "DurationMs": 871,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 0,
+          "Failed": 28,
+          "DurationMs": 871,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 28,
+          "Passed": 0,
+          "Failed": 28,
+          "DurationMs": 859,
+          "Green": false,
+          "Failing": true
+        }
+      ],
+      "MutatedArm": 0,
+      "Inconclusive": null,
+      "Passes": true,
+      "DefectAlwaysManifests": true,
+      "MutatedNote": "manifested on all runs",
+      "Verdict": "PASS"
+    },
+    {
+      "TaskId": "serilog-injectedmutation-cand4-EffectViolation",
+      "ProjectName": "Serilog",
+      "HeldOutFilter": "FullyQualifiedName~Serilog.Tests.Filters.MatchingTests.SourceFiltersWorkOnNamespaces|FullyQualifiedName~Serilog.Tests.Configuration.LoggerConfigurationTests.AFilterPreventsMatchedEventsFromPassingToTheSink|FullyQualifiedName~Serilog.Tests.Filters.MatchingTests.SourceFiltersSkipNonNamespaces|FullyQualifiedName~Serilog.Tests.Filters.MatchingTests.EventsCanBeExcludedBySource|FullyQualifiedName~Serilog.Tests.Filters.MatchingTests.EventsCanBeExcludedByPredicate",
+      "CSharpReferenceRuns": [
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 841,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 858,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 844,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 834,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 849,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "CalorReferenceRuns": [
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 834,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 836,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 851,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 840,
+          "Green": true,
+          "Failing": false
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 5,
+          "Failed": 0,
+          "DurationMs": 848,
+          "Green": true,
+          "Failing": false
+        }
+      ],
+      "MutatedRuns": [
+        {
+          "TotalTests": 5,
+          "Passed": 0,
+          "Failed": 5,
+          "DurationMs": 859,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 0,
+          "Failed": 5,
+          "DurationMs": 864,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 0,
+          "Failed": 5,
+          "DurationMs": 858,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 0,
+          "Failed": 5,
+          "DurationMs": 870,
+          "Green": false,
+          "Failing": true
+        },
+        {
+          "TotalTests": 5,
+          "Passed": 0,
+          "Failed": 5,
+          "DurationMs": 862,
+          "Green": false,
+          "Failing": true
+        }
+      ],
+      "MutatedArm": 0,
+      "Inconclusive": null,
+      "Passes": true,
+      "DefectAlwaysManifests": true,
+      "MutatedNote": "manifested on all runs",
+      "Verdict": "PASS"
+    }
+  ],
+  "CorpusPins": {
+    "MediatR": "fb309026775ef953a64fb5339d074426c1ad2c37",
+    "Serilog": "0597ddfbd4ec594d9c42edd745fe728a2198bad9",
+    "FluentValidation": "71b3c60cb5a16e02cb7957e478ec3fb6b983a73c"
+  },
+  "HarnessCommit": "8fc5bc7153ff621ebf2b4e5ccf196278069d5c30",
+  "Screened": 8,
+  "Rejected": 0,
+  "PassingWithIntermittentDefect": 0,
+  "MutatedArmUnavailable": 0
+}
