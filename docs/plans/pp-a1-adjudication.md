@@ -21,6 +21,17 @@ divergence table the item points at. Verified end-to-end before the fix, on a sh
 `calor run --verify` printed `abc`: the solver translated `:ignore-case` as *ordinal*, returned
 `Proven`, and the emitter **deleted the check**. Closed by refusal in #872.
 
+**And then it happened again, to the fix.** Adversarial review of #872 found the *same vector still
+open* on the spelling almost everyone actually writes: .NET resolves `String.StartsWith(String)`,
+`EndsWith(String)` and `IndexOf(String)` to the **CurrentCulture** overload (unlike `Contains` and
+`Equals`, which are ordinal), while the solver models all of them ordinally. `§S (! (starts result
+STR:"\u200dabc"))` reproduced the identical throw-vs-print signature. Also closed in #872.
+
+That second finding is the strongest evidence for this document's own thesis. The first fix was
+narrow **because it was scoped to the row as written** rather than to the property the row is
+supposed to protect. Closing "the divergence the table names" is not the same as closing "the ways a
+false `Proven` can elide a check", and only the second is item 6's bar.
+
 Two more rows did not survive contact either:
 
 - **Item 4** was ✅ on evidence from `CompilationDriver`, while the **MSBuild task real projects
@@ -57,7 +68,7 @@ with its disposition **and** whether it can mint a false `Proven` that elides:
 | D1 narrow-type promotion | closed by refusal | no |
 | D2 literals always signed 32-bit | truncation half closed (cache 1.7); within-range signedness context unmodeled | residual — see below |
 | D3 Z3 strings cannot be null | open, tolerated | argued unreachable — see below |
-| D4 non-ordinal comparison modes | **closed by refusal (#872)** | no *(was: **yes**)* |
+| D4 non-ordinal comparison modes | **closed by refusal (#872)**, in two halves — explicit non-ordinal modes, and `StartsWith`/`EndsWith`/`IndexOf` with **no** mode (.NET resolves those to CurrentCulture) | no *(was: **yes**, twice)* |
 | D5 `§S` holds only on normal return | exceptional paths → `assumed`, which never elides | no |
 | D6 array element default i32 | adjudicated unreachable from the elision-relevant path | no |
 | D7 user-type fields default i32 | closed by refusal | no |
@@ -162,7 +173,15 @@ context, not the line.
 
 **Items 1–8 PASS. Item 9 LAPSED and referred to the maintainer.**
 
-Item 6 passes **only as of #872** — it did not pass when this document first claimed it did.
+Item 6 passes **only as of #872** — it did not pass when this document first claimed it did, and it
+did not pass after the first half of that PR either.
+
+**Stated plainly, because it bears on how much this verdict is worth:** two rounds of adversarial
+review found two live soundness vectors behind an item that had been marked ✅. The bar is
+*known-divergence-free*, and "known" is a claim about how hard anyone looked. The residual honest
+statement is that no vector is known **to me** after this audit — not that none exists. §2's recorded
+risk acceptance says the same thing in the freeze's own words: known-divergence-free is **weaker than
+differentially clean**, and #779's differential suite is what would close the gap.
 
 ## Scope
 

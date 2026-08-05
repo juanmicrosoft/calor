@@ -364,8 +364,17 @@ proving the gate is an acknowledgement rather than a broken command.
 consumability from a local feed; **"published" clears at the v0.12.0 publish event itself**.
 
 **PP-W5 remains NOT adjudicated** — it requires a spend-authorized parity epoch (A-1.4 tranche 1,
-restated additively at A-1.5.6) and **may not be self-cleared**. Record:
-`docs/plans/pp-a1-adjudication.md`.
+restated additively at A-1.5.6) and **may not be self-cleared**. Record: `docs/plans/pp-a1-adjudication.md`.
+
+**A correction the record carries rather than hides:** #872's first fix closed only the
+*explicit-non-ordinal-mode* half of D4. A second adversarial review found the vector still live on
+the **no-mode** spelling — .NET resolves `StartsWith(String)`/`EndsWith(String)`/`IndexOf(String)` to
+**CurrentCulture** while the solver models them ordinally — and it reproduced with the same
+throw-under-`run` / print-under-`--verify` signature. Also closed in #872 (cache 1.9 → **1.10**). The
+lesson registered: the first fix was scoped to *the divergence row as written* rather than to *the
+property the row protects*, and only the second is item 6's bar. **Two rounds of review found two
+live vectors behind one ✅**, so the honest reading of "known-divergence-free" is a statement about
+how hard anyone looked — which is what §2's own risk acceptance already says.
 
 **A-1.7 — Call S adjudicated (2026-08-05).** Additive; registers outcomes against thresholds frozen at
 A-1.5 before any eligibility was evaluated. **PP-S3 = MISS** (headline): M-S3 realized **8** screened
