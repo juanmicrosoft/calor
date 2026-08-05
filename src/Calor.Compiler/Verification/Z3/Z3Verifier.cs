@@ -37,24 +37,29 @@ public sealed class Z3Verifier : IDisposable
         "exceptional-paths:contract-division — every division/modulo divisor inside §Q/§S on a verified state is nonzero; a zero divisor makes the runtime contract check itself throw";
 
     /// <summary>
+    /// The array / user-type sibling of <see cref="StringModelAssumption"/>, D14. Same defect one
+    /// sort over: Z3's array and uninterpreted sorts are TOTAL and non-null, while C#'s <c>T[]</c>
+    /// and class types are nullable references — so <c>a.Length &gt;= 0</c> is a solver tautology
+    /// and a runtime throw.
+    /// <para><b>Reach:</b> the flag is set when the sort is MINTED, and parameters are declared
+    /// before any contract is translated — so this fires for any signature naming an array or a
+    /// non-primitive type, even when the postcondition mentions only <c>result</c>. Coarse on
+    /// purpose: narrow is how the previous four attempts failed, and the cost of broad is an
+    /// elision rather than a deleted check.</para>
+    /// </summary>
+    public const string NullableReferenceModelAssumption =
+        "reference-model — the solver's arrays and user-type sorts are total and non-null, while .NET's are nullable references (D14); a proof touching them is conditional on the value being non-null";
+
+    /// <summary>
     /// D3/D12 (v0.12). Z3's string sort is <b>total and null-free</b>, and its literals are UTF-8
     /// <b>bytes</b>; .NET strings are nullable and counted in UTF-16 <b>code units</b>. Both gaps
-    /// have produced genuine false <c>Proven</c>s that ELIDED a failing runtime check, on the
-    /// shipped <c>calor run --verify</c> path:
-    /// <list type="bullet">
-    /// <item>D3 — <c>len(s)=0 ⟺ s=""</c> is a Z3 tautology, but in C# <c>null</c> satisfies
-    /// <c>IsNullOrEmpty</c> while <c>null == ""</c> is false.</item>
-    /// <item>D12 — <c>"é".Length</c> is 1 in .NET and 2 under the byte model.</item>
-    /// </list>
-    /// Unlike D4 and D9 these are <b>not closable by refusing an operation</b>: every total axiom
-    /// of the string theory is affected. So the proof is not suppressed — it is <b>demoted</b>, and
-    /// <c>Assumed</c> never elides. The assumption is named rather than silent, which is the D8
-    /// precedent, and the runtime check survives regardless of whether the proof was sound.
-    /// <para>The demotion is deliberately <b>conservative</b>: any string-typed value or string
-    /// operation anywhere in the obligation is enough. Narrowing it would require knowing which
-    /// proofs "really" depended on the string theory, and three review rounds found three vectors
-    /// behind exactly that kind of reasoning. Lifting it is tracked by #875 (make <c>str</c>
-    /// genuinely non-nullable) — each case proved non-null can have the demotion lifted.</para>
+    /// produced genuine false <c>Proven</c>s that ELIDED a failing runtime check on the shipped
+    /// <c>calor run --verify</c> path: <c>len(s)=0 ⟺ s=""</c> is a Z3 tautology while in C#
+    /// <c>null</c> satisfies <c>IsNullOrEmpty</c> and <c>null == ""</c> is false; and
+    /// <c>"é".Length</c> is 1 in .NET, 2 under the byte model.
+    /// <para>Unlike D4 and D9 these are <b>not closable by refusing an operation</b> — every total
+    /// axiom of the sort is affected — so the proof is <b>demoted</b> rather than suppressed, and
+    /// <c>Assumed</c> never elides. Lifting it is tracked by #875.</para>
     /// </summary>
     public const string StringModelAssumption =
         "string-model — the solver's strings are total, non-null and UTF-8-byte-counted, while .NET's are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII";
@@ -449,8 +454,15 @@ public sealed class Z3Verifier : IDisposable
             // is set where the string sort is created, so it cannot miss a form.
             var stringModelAssumed = translator.TouchedStringTheory;
 
+            // D14, found the FIFTH time this bar was audited. The string demotion closed the
+            // string sort and the docs said in as many words that "numeric and array contracts are
+            // unaffected" — which was true and was the hole. Arrays and user-type sorts have the
+            // identical total-vs-nullable mismatch.
+            var referenceModelAssumed = translator.TouchedNullableReferenceSort;
+
             if (status == Status.UNSATISFIABLE
-                && (pathConditions.Count > 0 || contractDivisionAssumed || stringModelAssumed))
+                && (pathConditions.Count > 0 || contractDivisionAssumed || stringModelAssumed
+                    || referenceModelAssumed))
             {
                 var assumptions = new List<string>();
                 var reasons = new List<string>();
@@ -468,6 +480,11 @@ public sealed class Z3Verifier : IDisposable
                 {
                     assumptions.Add(StringModelAssumption);
                     reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null and byte-counted while .NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12)");
+                }
+                if (referenceModelAssumed)
+                {
+                    assumptions.Add(NullableReferenceModelAssumption);
+                    reasons.Add("the obligation is carried by the solver's array or user-type sorts, which are total and non-null while .NET's are nullable references (v0.12, D14)");
                 }
                 return ContractVerificationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.AssumedProof(

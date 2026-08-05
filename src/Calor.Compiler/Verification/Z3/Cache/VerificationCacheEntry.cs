@@ -66,7 +66,10 @@ public sealed class VerificationCacheEntry
     // the contract AST and missed the function BODY, so entries written by 1.11 can hold a Proven
     // for a proof carried entirely by body-side string terms — the exact verdict that elides.
     // Found by adversarial review; the bump is what makes the corrected trigger take effect.
-    public const string CurrentFormatVersion = "1.12";
+    // 1.13 (2026-08-05, D14): array and user-type sorts join the string demotion. 1.12 entries
+    // hold `Proven` for array-carried proofs — `a.Length >= 0` is a solver tautology and a runtime
+    // NullReferenceException — which is precisely the verdict that elides.
+    public const string CurrentFormatVersion = "1.13";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.

@@ -569,4 +569,140 @@ public class W1Slice1SoundnessTests
         Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
     }
 
+    // ---- D14: arrays and user-type sorts are total in Z3, nullable references in .NET ----
+
+    /// <summary>
+    /// The fifth false-`Proven`-elides vector, and the one that showed the class had been
+    /// mis-drawn. After D3/D12 closed the STRING sort, `verification-modeled-forms.md` stated
+    /// that "numeric and array contracts are unaffected" — accurate, and the hole.
+    /// `DeclareArrayVariable` mints <c>a$length</c> as an unconstrained u32, so
+    /// <c>a.Length &gt;= 0</c> is a solver tautology; at runtime the same expression throws on a
+    /// null array. Reproduced end-to-end: `calor run` crashed with a NullReferenceException while
+    /// `calor run --verify` printed and exited 0.
+    /// </summary>
+    [SkippableFact]
+    public void ArrayCarriedObligation_IsAssumedNotProven()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ArrayCarriedObligation_IsAssumedNotProvenCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ArrayCarriedObligation_IsAssumedNotProvenCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // §S (>= (arraylen a) 0) — a Z3 tautology over the unconstrained $length.
+        var post = Ensures(BinOp(BinaryOperator.GreaterOrEqual,
+            new ArrayLengthNode(TextSpan.Empty, Ref("a")),
+            Int(0)));
+
+        var result = Verify(verifier, [("a", "i32[]")], [], post);
+
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.NullableReferenceModelAssumption, result.EffectiveOutcome.Assumptions);
+    }
+
+    /// <summary>
+    /// The control that keeps the demotion honest: a signature of modeled primitives only must
+    /// still be `Proven`. Deliberately stronger than the `x == x` it replaced — that version
+    /// exercised no body encoding and would have passed unchanged even when elision had been lost
+    /// for every function with a non-primitive parameter, which is exactly what happened.
+    /// </summary>
+    [SkippableFact]
+    public void PurelyNumericObligation_StillProvenAfterD14()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        PurelyNumericObligation_StillProvenAfterD14Core();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void PurelyNumericObligation_StillProvenAfterD14Core()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // A real proof over a real body: §Q 0 <= x < 100, §R x, §S result >= 0.
+        var result = verifier.VerifyPostcondition(
+            [("x", "i32")],
+            "i32",
+            [Requires(BinOp(BinaryOperator.GreaterOrEqual, Ref("x"), Int(0))),
+             Requires(BinOp(BinaryOperator.LessThan, Ref("x"), Int(100)))],
+            Ensures(BinOp(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0))),
+            body: [new ReturnStatementNode(TextSpan.Empty, Ref("x"))]);
+
+        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+    }
+
+    /// <summary>
+    /// The coarseness, pinned as a DECISION rather than left as a future surprise. The D14 flag is
+    /// set when the sort is minted, and parameters are declared before any contract is translated
+    /// — so a function that merely TAKES an array loses elision even when its postcondition names
+    /// only `result`. That is deliberate (narrow is how the previous attempts failed), but it is a
+    /// real reduction in what can be proved and it should not be discoverable only by surprise.
+    /// </summary>
+    [SkippableFact]
+    public void ArrayParameter_DemotesEvenAPurelyNumericPostcondition()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ArrayParameter_DemotesEvenAPurelyNumericPostconditionCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ArrayParameter_DemotesEvenAPurelyNumericPostconditionCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // `a` appears nowhere in the contract or the returned expression.
+        var result = verifier.VerifyPostcondition(
+            [("a", "i32[]"), ("x", "i32")],
+            "i32",
+            [Requires(BinOp(BinaryOperator.GreaterOrEqual, Ref("x"), Int(0)))],
+            Ensures(BinOp(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0))),
+            body: [new ReturnStatementNode(TextSpan.Empty, Ref("x"))]);
+
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.NullableReferenceModelAssumption, result.EffectiveOutcome.Assumptions);
+    }
+
+    /// <summary>
+    /// The ON-DEMAND `$length` path, which is the one the D14 fix actually missed.
+    ///
+    /// <para>This must go through the translator directly. An earlier version of this pin used
+    /// <c>VerifyPostcondition</c> with an <c>i32[]</c> parameter — and that <b>never reaches the
+    /// on-demand branch</b>: declaring the parameter mints <c>a$length</c> EAGERLY, so
+    /// <c>TranslateArrayLength</c> takes the <c>_variables</c> cache hit and returns. Review
+    /// proved it vacuous by reverting the fix, at which point the test still passed and the real
+    /// repro still discharged. No <c>VerifyPostcondition</c>-shaped test can reach the branch,
+    /// because postcondition references are restricted to parameters and <c>result</c> — which is
+    /// exactly why the hole lived only in the obligation channel.</para>
+    ///
+    /// <para>So: do not declare <c>a</c>. That is the whole point of the test.</para>
+    /// </summary>
+    [SkippableFact]
+    public void OnDemandArrayLength_SetsTheReferenceModelFlag()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        OnDemandArrayLength_SetsTheReferenceModelFlagCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void OnDemandArrayLength_SetsTheReferenceModelFlagCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+
+        // `a` is deliberately NOT declared — this forces the on-demand $length mint.
+        var cond = BinOp(BinaryOperator.GreaterOrEqual,
+            new ArrayLengthNode(TextSpan.Empty, Ref("a")),
+            Int(0));
+
+        Assert.NotNull(translator.TranslateBoolExpr(cond));
+        Assert.True(translator.TouchedNullableReferenceSort,
+            "on-demand $length must set the D14 flag — it is the site the first fix missed");
+    }
+
+
 }

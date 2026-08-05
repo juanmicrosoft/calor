@@ -179,14 +179,31 @@ public sealed class ObligationSolver : IDisposable
             // with the contract path, so it needs the same demotion: a refinement predicate like
             // `(> (len #) INT:0)` is carried by a null-blind, byte-counted model. Assumed maps
             // away from Discharged (ProofOutcome.ToObligationStatus), so the guard survives.
-            if (status == Status.UNSATISFIABLE && translator.TouchedStringTheory)
+            if (status == Status.UNSATISFIABLE
+                && (translator.TouchedStringTheory || translator.TouchedNullableReferenceSort))
             {
+                // Name the divergence that ACTUALLY carried the proof. An earlier revision
+                // parameterized the assumption list but left the reason hardcoded to the string
+                // wording, so an array- or user-type-carried obligation reported "the string
+                // model" — on a condition containing no string at all.
+                var assumptions = new List<string>();
+                var reasons = new List<string>();
+                if (translator.TouchedStringTheory)
+                {
+                    assumptions.Add(Z3Verifier.StringModelAssumption);
+                    reasons.Add("the solver's string theory, whose strings are non-null and " +
+                                "byte-counted while .NET's are nullable and UTF-16-code-unit-counted (D3/D12)");
+                }
+                if (translator.TouchedNullableReferenceSort)
+                {
+                    assumptions.Add(Z3Verifier.NullableReferenceModelAssumption);
+                    reasons.Add("the solver's array and user-type sorts, which are total and " +
+                                "non-null while .NET's are nullable references (D14)");
+                }
+
                 obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.AssumedProof(
-                    "Proof is conditional on the string model: the obligation is carried by the " +
-                    "solver's string theory, whose strings are non-null and byte-counted while " +
-                    ".NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12). " +
-                    "Runtime check kept.",
-                    [Z3Verifier.StringModelAssumption])));
+                    $"Proof is conditional on {string.Join("; and on ", reasons)}. Runtime check kept.",
+                    assumptions)));
                 return;
             }
 

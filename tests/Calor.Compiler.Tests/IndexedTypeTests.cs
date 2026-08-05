@@ -380,7 +380,17 @@ public sealed class IndexedTypeTests
         var indexObl = options.ObligationResults.Obligations
             .FirstOrDefault(o => o.Kind == ObligationKind.IndexBounds);
         Assert.NotNull(indexObl);
-        Assert.Equal(ObligationStatus.Discharged, indexObl.Status);
+        // D14. Note WHICH sort carries it: the condition here is purely numeric over i32s —
+        // it demotes because the receiver's type mints an UNINTERPRETED sort, not an array
+        // one. (An earlier revision of this comment said "the ARRAY sort", which is wrong;
+        // the counterexample prints `items=sizedlist!val!0`.)
+        //
+        // Asserting the OUTCOME, not just `NotEqual(Discharged)` — that weaker form passes
+        // for Pending/Unsupported/Failed/Timeout too, i.e. it would pass if obligation
+        // solving were deleted outright.
+        Assert.Equal(Calor.Compiler.Verification.ProofStatus.Assumed, indexObl.Outcome!.Status);
+        Assert.Contains(Calor.Compiler.Verification.Z3.Z3Verifier.NullableReferenceModelAssumption,
+            indexObl.Outcome.Assumptions);
     }
 
     [SkippableFact]

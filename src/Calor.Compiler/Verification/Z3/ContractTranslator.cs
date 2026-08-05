@@ -326,7 +326,7 @@ public sealed class ContractTranslator
             {
                 if (!_userTypeSorts.TryGetValue(coreType, out var receiverSort))
                 {
-                    receiverSort = _ctx.MkUninterpretedSort(coreType);
+                    receiverSort = MarkUninterpretedSort(coreType);
                     _userTypeSorts[coreType] = receiverSort;
                 }
                 var resultSort = ResultSortForType(fieldType);
@@ -770,7 +770,7 @@ public sealed class ContractTranslator
 
         if (!_userTypeSorts.TryGetValue(coreType, out var sort))
         {
-            sort = _ctx.MkUninterpretedSort(coreType);
+            sort = MarkUninterpretedSort(coreType);
             _userTypeSorts[coreType] = sort;
         }
         return _ctx.MkConst(name, sort);
@@ -788,11 +788,12 @@ public sealed class ContractTranslator
         // Create array sort: BitVec64 (index) -> BitVec[elementWidth] (element)
         var bv64Sort = _ctx.MkBitVecSort(64);
         var elementSort = _ctx.MkBitVecSort(elementWidth);
+        TouchedNullableReferenceSort = true;
         var arrayExpr = _ctx.MkArrayConst(name, bv64Sort, elementSort);
 
         // Create associated length variable (unsigned 32-bit)
         var lengthVarName = $"{name}$length";
-        var lengthExpr = TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
+        var lengthExpr = MarkArrayLength(lengthVarName);
         _variables[lengthVarName] = (lengthExpr, "u32");
 
         _arrayInfo[name] = new ArrayInfo(elementType, lengthExpr);
@@ -850,11 +851,58 @@ public sealed class ContractTranslator
     /// </summary>
     public bool TouchedStringTheory { get; private set; }
 
+    /// <summary>
+    /// True once a term has been minted whose Z3 sort is TOTAL where the corresponding .NET value
+    /// is a nullable REFERENCE — arrays and user-type (uninterpreted) sorts.
+    ///
+    /// <para>This is D3's defect one sort over, and it was found the fifth time this bar was
+    /// audited. `DeclareArrayVariable` mints `&lt;name&gt;$length` as an unconstrained u32, so
+    /// <c>a.Length &gt;= 0</c> is a solver tautology — while at runtime a null array makes that
+    /// same expression throw. Reproduced end-to-end in pure Calor: `§S (&gt;= §LEN a INT:0)` over a
+    /// never-assigned `[i32]` field was `Proven`, and `calor run` crashed with a
+    /// NullReferenceException while `calor run --verify` printed and exited 0.</para>
+    ///
+    /// <para>Kept separate from <see cref="TouchedStringTheory"/> only so the assumption text can
+    /// name the right sort; both drive the same demotion. The lesson recorded with it: the class
+    /// is not "strings", it is "a sort Z3 models as total where .NET's value can be null", and
+    /// enumerating its members by hand is what has failed repeatedly.</para>
+    /// </summary>
+    public bool TouchedNullableReferenceSort { get; private set; }
+
+    /// <summary>
+    /// Uninterpreted sorts stand in for user types, which are nullable reference types in C# —
+    /// same total-vs-nullable mismatch as arrays, so the same demotion applies.
+    /// </summary>
+    private Sort MarkUninterpretedSort(string name)
+    {
+        TouchedNullableReferenceSort = true;
+        return _ctx.MkUninterpretedSort(name);
+    }
+
     /// <summary>Records the string-sort touch for sites that hand back a bare <c>Sort</c>.</summary>
     private Sort MarkStringSort()
     {
         TouchedStringTheory = true;
         return _ctx.StringSort;
+    }
+
+    /// <summary>
+    /// Mints an array's synthetic <c>$length</c> companion, flagging the reference-model
+    /// assumption (D14) at the point the tautology is actually created.
+    ///
+    /// <para>An earlier revision put the flag next to <c>MkArrayConst</c> instead. That covered
+    /// two of the three <c>$length</c> sites <b>incidentally</b> — because they happen to sit
+    /// beside an array construction — and missed the third, where <c>TranslateArrayLength</c>
+    /// mints the length ON DEMAND with no array const in sight. `§PROOF (>= §LEN a INT:0)` over a
+    /// local `§ARR` therefore still discharged. The whole argument of this fix is that
+    /// enumerating members of a class by hand is what keeps failing; the first attempt then
+    /// enumerated by hand and missed one. Routing every mint through here is the invariant:
+    /// <b>no <c>$length</c> exists that did not set the flag.</b></para>
+    /// </summary>
+    private BitVecExpr MarkArrayLength(string lengthVarName)
+    {
+        TouchedNullableReferenceSort = true;
+        return TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
     }
 
     private SeqExpr TrackString(SeqExpr expr, bool isNullable = false)
@@ -1485,7 +1533,7 @@ public sealed class ContractTranslator
             // it'll be the uninterpreted sort we cached. Otherwise create one now.
             if (!_userTypeSorts.TryGetValue(coreType, out var receiverSort))
             {
-                receiverSort = _ctx.MkUninterpretedSort(coreType);
+                receiverSort = MarkUninterpretedSort(coreType);
                 _userTypeSorts[coreType] = receiverSort;
             }
 
@@ -1529,7 +1577,7 @@ public sealed class ContractTranslator
             "string" or "str" => MarkStringSort(),
             _ when !string.IsNullOrEmpty(t) => _userTypeSorts.TryGetValue(t, out var s)
                                                ? s
-                                               : (_userTypeSorts[t] = _ctx.MkUninterpretedSort(t)),
+                                               : (_userTypeSorts[t] = MarkUninterpretedSort(t)),
             _ => _ctx.MkBitVecSort(32),
         };
     }
@@ -1550,7 +1598,7 @@ public sealed class ContractTranslator
             // D6 adjudication (W1 Slice 1): on-demand $length is u32 always — no
             // width is guessed — and this path is unreachable from the §Q/§S proof
             // path (see TranslateArrayAccess). Create unsigned 32-bit length.
-            var lengthExpr = TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
+            var lengthExpr = MarkArrayLength(lengthVarName);
             _variables[lengthVarName] = (lengthExpr, "u32");
 
             return lengthExpr;
@@ -1574,13 +1622,14 @@ public sealed class ContractTranslator
         // Create array sort: BitVec64 (index) -> BitVec[elementWidth] (element)
         var bv64Sort = _ctx.MkBitVecSort(64);
         var elementSort = _ctx.MkBitVecSort(elementWidth);
+        TouchedNullableReferenceSort = true;
         var arrayExpr = _ctx.MkArrayConst(name, bv64Sort, elementSort);
 
         _variables[name] = (arrayExpr, $"array<{elementType}>");
 
         // Create associated length variable (unsigned 32-bit)
         var lengthVarName = $"{name}$length";
-        var lengthExpr = TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
+        var lengthExpr = MarkArrayLength(lengthVarName);
         _variables[lengthVarName] = (lengthExpr, "u32");
 
         _arrayInfo[name] = new ArrayInfo(elementType, lengthExpr);

@@ -87,7 +87,7 @@ public class ArrayLengthSoundnessTests
             postcondition);
 
         // This is EXPECTED to be proven - Z3 doesn't enforce bounds
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -136,7 +136,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -333,7 +333,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition1, precondition2 },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -375,7 +375,7 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -487,7 +487,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition1, precondition2, precondition3 },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -540,7 +540,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -657,7 +657,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -741,7 +741,7 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -842,7 +842,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -963,7 +963,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition1, precondition2 },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1022,7 +1022,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1133,7 +1133,7 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1208,7 +1208,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition1, precondition2 },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1277,7 +1277,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -1336,7 +1336,7 @@ public class ArrayLengthSoundnessTests
 
         // Under promotion semantics -1 can never equal any u32 value: PROVEN,
         // matching runtime (see comment above).
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1417,7 +1417,7 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1555,7 +1555,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition1, precondition2 },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1618,7 +1618,7 @@ public class ArrayLengthSoundnessTests
             postcondition);
 
         // u32 with a non-negative literal stays unsigned (D10 companion fix)
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1687,7 +1687,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition1, precondition2 },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -2076,7 +2076,7 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -2239,7 +2239,7 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -2466,7 +2466,7 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -2515,7 +2515,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -2833,7 +2833,7 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -2897,7 +2897,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     // ===========================================
@@ -2954,7 +2954,7 @@ public class ArrayLengthSoundnessTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
 
     [SkippableFact]
@@ -2999,6 +2999,20 @@ public class ArrayLengthSoundnessTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertReferenceProofAssumed(result);
     }
+
+    /// <summary>
+    /// D14: an obligation carried by the solver's ARRAY or user-type sorts is <b>Assumed</b>, never
+    /// <c>Proven</c>. Those sorts are total and non-null while .NET's `T[]` and class types are
+    /// nullable references, so `a.Length &gt;= 0` is a solver tautology and a runtime throw. Same
+    /// strength of assertion as the <c>Proven</c> it replaced — the solver still discharged the
+    /// obligation, and the assumption must be the reference-model one specifically.
+    /// </summary>
+    private static void AssertReferenceProofAssumed(Calor.Compiler.Verification.Z3.ContractVerificationResult result)
+    {
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.NullableReferenceModelAssumption, result.EffectiveOutcome.Assumptions);
+    }
+
 }
