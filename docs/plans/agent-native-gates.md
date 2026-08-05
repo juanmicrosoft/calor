@@ -99,7 +99,7 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.6 (thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.7 (additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
@@ -323,6 +323,27 @@ disclosures in the A-1.5 entry below.
 | **PP-S4** — no converter-appeasement (**blocker**) | M-S4 = 0 via the A-1.5.7 fixture registry; indeterminate counts as **failing** | Blocks the v0.12.0 release |
 
 ### A.3 Annex revision log
+
+**A-1.7 — Call S adjudicated (2026-08-05).** Additive; registers outcomes against thresholds frozen at
+A-1.5 before any eligibility was evaluated. **PP-S3 = MISS** (headline): M-S3 realized **8** screened
+tasks against **≥ 70**, and FluentValidation is **62.5%** of them against a **≤ 40%** per-project cap —
+two of three sub-criteria fail. The softer values do not apply and were checked in order:
+`underpowered` needs supply ≥ 70 (it is 8); the measurement completed and **reproduced identically
+across two runs**; three projects produced evaluable candidates; and **8/8 passed the two-arm
+determinism screen**. A-1.5.2's registered default therefore governs — any unlisted route is a miss.
+**PP-S1 = MISS** (A-1.6(b), census `s1-census-001`: top-3 = 40.4% < 50%, 33 causes, 0 unattributed).
+**PP-S2** contributes no verdict (registered reported-not-adjudicated at A-1.5.1; measured 65% this
+cycle). **PP-S4 = PASS**, blocker cleared: M-S4 = 0, with both supply-raising changes adjudicated
+rather than assumed — the operator widening generalized the *corruption* and touched **0 `src/`
+files**, and the unbounded-cap fix is harness-side; no `FeatureSupport` promotion or ledger removal
+landed, so the D-S1.5 registry is legitimately empty.
+**Call S = PROCEED to v0.13 with the real-scale venue RETIRED** — plan §6.2's (PP-S1 miss, PP-S3 miss)
+cell. No real-scale epoch is authorized; the differentiated claim re-scopes to
+earliness/attribution/cost, which `guarantees-probe-001` (PP-G3 HIT) already evidences and which this
+call leaves untouched. Record: `docs/plans/call-s-adjudication.md`.
+**This entry alters no frozen row and makes no §7 supersession claim** — it records outcomes against
+A-1.5's thresholds, which are unchanged. Insertions only, plus the Annex version pointer.
+
 
 **A-1.6 — PP-W2 restated (instrument scope) + PP-S1 disposition (2026-08-05).** Additive. Two
 maintainer decisions, recorded together because the second is conditioned on the first.
