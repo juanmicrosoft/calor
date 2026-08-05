@@ -17,6 +17,15 @@ public static class TaskGenReportWriter
     public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, JsonOpts);
 
     /// <summary>Per-bundle README: what an agent working the task receives + the provenance/eligibility proof.</summary>
+    /// <summary>
+    /// Culture-INVARIANT percent. `:P1` renders "40.0%" under en-US and "40.0 %" under the invariant
+    /// culture, so epoch artifacts generated on a developer machine did not match the same artifacts
+    /// regenerated on CI — a reproducibility defect in a committed record, caught by the
+    /// README-equality test. Formatting is pinned here rather than left to the ambient culture.
+    /// </summary>
+    internal static string Pct(double fraction, int decimals = 1) =>
+        (fraction * 100).ToString("F" + decimals, System.Globalization.CultureInfo.InvariantCulture) + "%";
+
     public static string BundleReadme(TaskBundle b)
     {
         var p = b.Provenance;
@@ -59,22 +68,29 @@ public static class TaskGenReportWriter
         sb.AppendLine($"- Clause (b): held-out test outcome — C# arm=**{proof.CSharpArmHeldOutOutcome}**, Calor arm=**{proof.CalorArmHeldOutOutcome}**");
         sb.AppendLine($"  - failure signatures — C#=`{proof.CSharpArmFailureSignature}`, Calor=`{proof.CalorArmFailureSignature}`");
         sb.AppendLine($"- D-W4.3 attribution: **{proof.AttributionOutcome}**");
-        sb.AppendLine($"- Project NativeFraction at generation: {proof.ProjectNativeFraction:P1}");
+        sb.AppendLine($"- Project NativeFraction at generation: {Pct(proof.ProjectNativeFraction)}");
         sb.AppendLine();
         sb.AppendLine($"## Defect stratum: **{proof.Stratum}**");
         sb.AppendLine();
         if (proof.VerificationCheckFired != null)
         {
-            sb.AppendLine($"- Verification-addressable: the mutation makes Calor's **{proof.VerificationCheckFired}** fire on the ");
-            sb.AppendLine($"  converted arm — a signal the C# compiler has no equivalent of. The C# arm's agent may ship the ");
-            sb.AppendLine($"  defect; the Calor arm's agent is confronted by the diagnostic. {proof.AddressabilityNote}");
+            sb.AppendLine($"- Verification-addressable **at generation time**: compiling the mutated file as Calor makes ");
+            sb.AppendLine($"  **{proof.VerificationCheckFired}** fire, and it does not fire on the clean conversion — a signal the ");
+            sb.AppendLine($"  C# compiler has no equivalent of. {proof.AddressabilityNote}");
+            sb.AppendLine();
+            sb.AppendLine("  > **This bundle does NOT present that diagnostic to an agent.** Both arms ship plain `.cs` — the ");
+            sb.AppendLine("  > calor arm is round-tripped C# — and the runner never invokes the Calor compiler, so the check ");
+            sb.AppendLine("  > cannot fire in the loop and neither arm's build fails. The differential above is a ");
+            sb.AppendLine("  > **compiler-level** property, established out-of-band by the addressability probe. An epoch over ");
+            sb.AppendLine("  > these arms measures the **conversion penalty** (plus the arm-symmetric ceiling-recurrence leg), ");
+            sb.AppendLine("  > NOT the verification-depth thesis. See `docs/plans/substrate-arm-validity-finding.md`.");
             if (proof.VerificationCheckFired == ExpressibleMutationOperators.CalorForbiddenEffect)
             {
                 sb.AppendLine();
-                sb.AppendLine("  > **Papering-over residual (preserved by design):** the agent can clear the Calor build by ");
-                sb.AppendLine("  > REMOVING the injected effect (correct → held-out passes → caught) OR by DECLARING it in §E ");
-                sb.AppendLine("  > (papers over → the bug still ships → held-out fails → escaped). Which path the agent takes IS ");
-                sb.AppendLine("  > the measurement; both remain possible.");
+                sb.AppendLine("  > **Papering-over residual — a property of the DEFECT, not of this bundle:** were the arm a real ");
+                sb.AppendLine("  > Calor build, the agent could clear it by REMOVING the injected effect (correct → caught) or by ");
+                sb.AppendLine("  > DECLARING it in §E (papers over → the bug still ships → escaped). With no `.calr` sources and ");
+                sb.AppendLine("  > no Calor build present, **neither path is exercisable here** and that choice is not measured.");
             }
         }
         else
@@ -110,7 +126,7 @@ public static class TaskGenReportWriter
         sb.AppendLine("| Project | NativeFraction | Passes gate | Reason |");
         sb.AppendLine("|---|---:|:---:|---|");
         foreach (var d in run.FidelityGate.Decisions)
-            sb.AppendLine($"| {d.ProjectName} | {d.NativeFraction:P1} | {(d.Passed ? "yes" : "no")} | {d.Reason} |");
+            sb.AppendLine($"| {d.ProjectName} | {Pct(d.NativeFraction)} | {(d.Passed ? "yes" : "no")} | {d.Reason} |");
         sb.AppendLine();
 
         sb.AppendLine("## Exclusion accounting (D-W4.1 — every candidate counted, no silent shrinkage)");
@@ -120,7 +136,7 @@ public static class TaskGenReportWriter
         foreach (var p in run.Projects)
         {
             var a = p.Accounting;
-            sb.AppendLine($"| {p.ProjectName} | {p.TotalEnumeratedCandidates} | {a.Considered} | {a.Eligible} | {a.ExcludedClauseA} | {a.ExcludedClauseB} | {a.ExcludedAttribution} | {a.ExcludedHeldOutFilterLeak} | {a.ExcludedNoCoveringTest} | {a.ExcludedDidNotCompile} | {a.ExcludedMultipleSourceFiles} | {a.ExcludedInseparableRevert} | {a.EligibilityRate:P0} |");
+            sb.AppendLine($"| {p.ProjectName} | {p.TotalEnumeratedCandidates} | {a.Considered} | {a.Eligible} | {a.ExcludedClauseA} | {a.ExcludedClauseB} | {a.ExcludedAttribution} | {a.ExcludedHeldOutFilterLeak} | {a.ExcludedNoCoveringTest} | {a.ExcludedDidNotCompile} | {a.ExcludedMultipleSourceFiles} | {a.ExcludedInseparableRevert} | {Pct(a.EligibilityRate, 0)} |");
         }
         var totEnumerated = run.Projects.Sum(p => p.TotalEnumeratedCandidates);
         var totConsidered = run.Projects.Sum(p => p.Accounting.Considered);
@@ -132,7 +148,7 @@ public static class TaskGenReportWriter
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedDidNotCompile)}** | " +
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedMultipleSourceFiles)}** | " +
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedInseparableRevert)}** | " +
-            $"**{(totConsidered == 0 ? 0 : (double)totEligible / totConsidered):P0}** |");
+            $"**{Pct(totConsidered == 0 ? 0 : (double)totEligible / totConsidered, 0)}** |");
         sb.AppendLine();
         sb.AppendLine("'Excl multi-src' and 'Excl inseparable' are revert-source SUPPLY exclusions (a mined fix commit ");
         sb.AppendLine("touching >1 source file, or whose source hunk could not be cleanly reverse-applied onto the pinned ");
@@ -146,7 +162,7 @@ public static class TaskGenReportWriter
         sb.AppendLine();
         foreach (var p in run.Projects)
         {
-            sb.AppendLine($"**{p.ProjectName}** (NativeFraction {p.NativeFraction:P1}, {p.NativeSourceFiles} native of {p.TotalConvertibleFiles} files)");
+            sb.AppendLine($"**{p.ProjectName}** (NativeFraction {Pct(p.NativeFraction)}, {p.NativeSourceFiles} native of {p.TotalConvertibleFiles} files)");
             sb.AppendLine();
             sb.AppendLine("| Candidate | File | Stratum | Operator | Expected check | Addressable | Verdict | Reason |");
             sb.AppendLine("|---|---|---|---|---|:---:|:---:|---|");
@@ -218,7 +234,7 @@ public static class TaskGenReportWriter
         sb.AppendLine($"- Expressible candidates considered: **{expressible.Count}**");
         sb.AppendLine($"- Probed & determinable: **{probedDeterminable}** (indeterminable — a conversion did not compile: {indeterminable})");
         sb.AppendLine($"- Verification-addressable (check introduced by the mutation): **{addressable}**");
-        sb.AppendLine($"- **Verification-addressability base rate: {baseRate:P0}** (addressable / probed-determinable)");
+        sb.AppendLine($"- **Verification-addressability base rate: {Pct(baseRate, 0)}** (addressable / probed-determinable)");
         sb.AppendLine();
         sb.AppendLine("| Expected check | Operator class | Probed-determinable | Addressable | Rate |");
         sb.AppendLine("|---|---|---:|---:|---:|");
@@ -228,7 +244,7 @@ public static class TaskGenReportWriter
         {
             var probed = g.Count(d => d.AddressabilityProbed && d.AddressabilityDeterminable);
             var addr = g.Count(d => d.VerificationAddressable);
-            var rate = probed == 0 ? "n/a" : $"{(double)addr / probed:P0}";
+            var rate = probed == 0 ? "n/a" : Pct((double)addr / probed, 0);
             sb.AppendLine($"| {g.Key.Item1} | {g.Key.Item2} | {probed} | {addr} | {rate} |");
         }
         sb.AppendLine();

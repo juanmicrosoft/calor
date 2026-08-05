@@ -22,6 +22,8 @@ The discipline that makes this plan cheap *in agent spend* is that its headline 
 
 Every supply lever this plan builds — effect-discipline violations (`Calor0410`), null-deref, index-OOB, div-by-zero — is **enforcement and shape-keyed bug-pattern checking**. None of them is a Z3 proof. So a fully successful v0.12, followed by a powered epoch and a PP-W2 hit, would establish that **effect enforcement and mechanical checkers catch injected defects that C# ships**. That is a real and worthwhile result. It is **not** the strategy's headline claim that machine-checked *proofs* beat very good agent-generated tests.
 
+> **DIVERGENCE (2026-08-05).** The sentence above presumes the epoch presents **effect enforcement** to the agent. It does not: both arms ship plain `.cs`, the calor arm is round-tripped C#, and the runner never invokes the Calor compiler. PP-W2 is restated accordingly at gates **A-1.6(a)**; see `substrate-arm-validity-finding.md`.
+
 Under the restate-or-demote precedent this program already uses (D-G3.1), that is recorded here rather than left implicit: **v0.12 supplies enforcement-testing tasks, and proof depth remains untested.** The only channel connected to the proof-depth claim is the authored-contract overlay (WS-S4), which stays off the critical path and out of Call S (§6.2) by explicit decision — the cost being that the headline claim waits. Any v0.12 communication that implies otherwise is an overclaim.
 
 ### 0.2 The one banked positive, with its caution intact
@@ -77,7 +79,7 @@ Exit criteria: the funnel table committed, per project, per stratum, at the pinn
 - **D-S1.5 Honesty invariant, mechanically decidable (the anti-gaming arm).** Every `SupportLevel` promotion toward `Full`, and every loss kind removed from the ledger for a feature, requires a **committed round-trip differential fixture** — registered at A-1.5 — whose value-asserting tests pass against the converted output *and* whose conversion records zero ledger entries. Checked by the fixture runner in CI, not by a human reading a diff. Indeterminate case (fixture will not build) counts as **failing**, conservatively. v1's "accompanied by a semantic test" was satisfiable by a compiles-clean assertion written in the same commit by the same author.
 - **D-S1.6 `§E`-inference gaps are IN SCOPE, and the resulting supply loss is a finding.** Fixing the `using`-body blind spot (§1 item 7) may retire the `EffectViolation` operator's differential and reduce M-S3. **Pre-committed disposition, recorded now while it costs nothing: the fix ships and the supply loss is published.** A converter blind spot is not an asset. Additionally, the operator's differential carries a regression test that fails loudly if fidelity work retires it, so the interaction is observed rather than discovered.
 
-Exit criteria: M-S1 met on ≥2 of 3 original projects **or** PP-S1 resolved miss at D-S1.1a; marginal-recovery work-list committed with per-item disposition; D-S1.4/D-S1.5 green in CI.
+Exit criteria: M-S1 met on ≥2 of 3 original projects **or** PP-S1 resolved miss at the census gate (A-1.6(b) — D-S1.1a's ledger trigger was fired and not honoured; see §10); marginal-recovery work-list committed with per-item disposition; D-S1.4/D-S1.5 green in CI.
 
 ### WS-S2 — Breadth (size: M)
 
@@ -240,6 +242,20 @@ v0.12 is **not** on the strategy's Phase-2a/2b progression — it is prerequisit
 ---
 
 ## 10. Revision log
+
+- **Deviation, 2026-08-05 — D-S1.1a fired and was not honoured (maintainer decision).** The ledger's
+  cumulative achievable recovery is **7 files against a need of 65** (`epochs/s1-ledger-001`), so
+  D-S1.1a's early-abort trigger fires as written. It is **not** honoured, because the ledger covers
+  **4.7%** of the non-native gap while **95.3%** is files that never converted or compiled — i.e. the
+  trigger's *instrument* is a proxy for the wrong 95%, which is independent of which way the number
+  pointed. Registered at gates **A-1.6(b)**.
+  **PP-S1 is not resolved by this**, early or otherwise: per §6.1 it is still adjudicated on M-S1 at
+  the A-1.5-registered adjudication date, so what was declined is *early* resolution, not terminal
+  adjudication. **Replacement gate, exhaustive**, on a census of the 141 failures by cause:
+  **top-3 causes ≥ 50% → work-list, continue; otherwise → PP-S1 = miss** (this includes the
+  top-3 < 50% ∧ top-10 ≥ 50% case; any route not listed is a **miss**, per the default PP-S3 already
+  uses). WS-S1's justification is narrowed in step: `NativeFraction` is the quality metric of the
+  shipped `calor import` path and stands alone; "supply the epoch so PP-W2 can be measured" does not.
 
 - **Draft v1 (2026-08-04):** initial plan, written against the Call W record and the close-out finding.
 - **Draft v2 (2026-08-04):** adversarial review round 1 applied — three independent reviewers (evidence 62%, strategy 52%, measurement discipline 45%). Maintainer decisions taken during the round: **insert the WS-S0.5 funnel probe and scope WS-S1 from it** (rather than committing an L to fidelity on n = 3), and **restate the objective honestly as enforcement-testing** while keeping WS-S4 off the critical path (§0.1). Principal dispositions:

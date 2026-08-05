@@ -29,6 +29,8 @@ switch (command)
         return await EnumerateSupplyCommand(cliArgs.Skip(1).ToArray());
     case "screen-determinism":
         return await ScreenDeterminismCommand(cliArgs.Skip(1).ToArray());
+    case "regen-bundle-readmes":
+        return await RegenBundleReadmesCommand(cliArgs.Skip(1).ToArray());
     case "list":
         Console.WriteLine("Known projects:");
         foreach (var p in ProjectConfigs.KnownProjects)
@@ -283,6 +285,40 @@ async Task<int> GenTasksCommand(string[] genArgs)
 
     var run = await TaskGenRunner.RunAsync(configs, options);
     return run.TotalEligible > 0 ? 0 : 1;
+}
+
+// Regenerate each bundle's README from its provenance.json THROUGH THE GENERATOR. provenance.json is
+// a serialized TaskBundle, so this is deserialize + BundleReadme — the only way to guarantee a shipped
+// artifact matches the template. Hand-patching them (as was tried once) leaves the retracted sentences
+// in place while the inserted correction contradicts them.
+async Task<int> RegenBundleReadmesCommand(string[] args)
+{
+    var epochDir = GetOption(args, "--epoch");
+    if (epochDir == null) { Console.Error.WriteLine("--epoch <dir> is required."); return 2; }
+    var bundlesDir = Path.Combine(Path.GetFullPath(epochDir), "bundles");
+    if (!Directory.Exists(bundlesDir)) { Console.Error.WriteLine($"No bundles/ under {epochDir}."); return 2; }
+
+    var opts = new System.Text.Json.JsonSerializerOptions
+    {
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+    };
+
+    var n = 0; var failed = 0;
+    foreach (var bundle in Directory.GetDirectories(bundlesDir).OrderBy(d => d, StringComparer.Ordinal))
+    {
+        var prov = Path.Combine(bundle, "provenance.json");
+        if (!File.Exists(prov)) continue;
+        try
+        {
+            var b = System.Text.Json.JsonSerializer.Deserialize<TaskBundle>(await File.ReadAllTextAsync(prov), opts);
+            if (b == null) { Console.Error.WriteLine($"  {Path.GetFileName(bundle)}: deserialized to null"); failed++; continue; }
+            await File.WriteAllTextAsync(Path.Combine(bundle, "README.md"), TaskGenReportWriter.BundleReadme(b));
+            n++;
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"  {Path.GetFileName(bundle)}: {ex.GetType().Name}: {ex.Message}"); failed++; }
+    }
+    Console.WriteLine($"Regenerated {n} bundle README(s); {failed} failed.");
+    return failed == 0 && n > 0 ? 0 : 1;
 }
 
 // D-S5.1 determinism screen: gates §0.2's 5-consecutive-green rule over an epoch's ELIGIBLE tasks.

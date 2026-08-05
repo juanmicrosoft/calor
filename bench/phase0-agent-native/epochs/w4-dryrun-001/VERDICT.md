@@ -9,6 +9,14 @@ This is a **feasibility probe**, not an adjudication (wedge plan §2 D-W4.4). It
 job: price the epoch, measure variance, and run the ceiling-recurrence check.
 
 ## Arms (D-W4.5 provisional protocol i — mechanical-only)
+
+> **CORRECTION (2026-08-05).** The description below states an INTENDED configuration the runner does
+> not implement. `run-bundle.sh` ships both arms as plain `.cs` — the calor arm is round-tripped C# —
+> and never invokes the Calor compiler, so there is no "Calor working copy", no effect enforcement in
+> the loop, and `Calor0410` cannot fire in front of an agent. This record is cited by
+> `docs/plans/substrate-plan-v0.12.md` as the basis for M-S3's power derivation, so the divergence is
+> recorded here rather than left to a reader. See `docs/plans/substrate-arm-validity-finding.md`.
+
 `csharp` = idiomatic C# + compiler + visible tests. `calor` = machine-converted
 Calor working copy + WS-W2 effect enforcement + `calor import` annotations, **no
 authored §Q/§S** (the authored-contract overlay does not exist). Both arms get
@@ -39,6 +47,13 @@ presentation asymmetry / bias against Calor).
    pre-registered "≈0 → ceiling persists" branch. Unlike the v0.10 authored
    fixtures (C# 9/9), at real scale the C# arm DOES ship bugs. Real-scale has
    measurable escaped-bug headroom → the venue is testable.
+
+> **CORRECTION (2026-08-05).** Finding 2 below says this configuration measures "the conversion
+> penalty **+ enforcement value**". The "+ enforcement value" half is **false**: the runner never
+> invokes the Calor compiler, so no enforcement runs in the loop. What it measures is the conversion
+> penalty plus the arm-symmetric ceiling leg. This matters because the enforcement channel is exactly
+> what the expressible stratum was later built to exercise. See
+> `docs/plans/substrate-arm-validity-finding.md` and gates A-1.6(a).
 
 2. **The mechanical-only arm has no verification signal for LOGIC bugs.** Every
    injected mutation is arithmetic/off-by-one/boundary — a defect class neither
@@ -90,4 +105,7 @@ this directory. Workspaces were ephemeral (oracle isolation) and are not retaine
 > apply** — with no eligible task there is no epoch, and with no epoch there is no
 > adjudication to restate from. PP-W2 is registered **not adjudicated**
 > (gates Annex A-1.4 tranche 2). This block is a forward pointer only; nothing
-> above it has been edited.
+> above it has been edited **except the Arms section and finding 2, each carrying its own dated
+> correction block — added 2026-08-05 under the maintainer's option-2 decision. The append-only
+> convention was set aside for those two, deliberately, because a forward pointer at the foot of the
+> file cannot stop a reader quoting a false arm description at the top of it.**
