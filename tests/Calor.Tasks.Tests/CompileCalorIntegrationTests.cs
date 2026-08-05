@@ -144,6 +144,43 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.Equal(2, task4.GeneratedFiles.Length);
     }
 
+    /// <summary>
+    /// The task's skip decision must consult the output's CONTENT, not merely its existence.
+    /// Before this pin, a corrupted or hand-edited <c>.g.cs</c> was reported "up-to-date" and its
+    /// stale bytes went into the assembly — the source is unchanged, so mtime/size tell you
+    /// nothing. <c>CompilationDriver.cs:186-193</c> has always guarded this; the MSBuild task,
+    /// which is the path real projects build through, had drifted and did not.
+    /// </summary>
+    [Fact]
+    public void CorruptedOutput_IsRecompiled_NotReportedUpToDate()
+    {
+        var src = CreateSourceFile("Foo.calr", ValidCalorSource);
+
+        var task1 = CreateTask(src);
+        Assert.True(task1.Execute());
+        var outputPath = task1.GeneratedFiles.Single().ItemSpec;
+        var good = File.ReadAllText(outputPath);
+        Assert.Contains("class", good);
+
+        // Control: untouched output IS skipped, so the assertion below is known to discriminate.
+        var control = CreateTask(src);
+        Assert.True(control.Execute());
+        Assert.Contains(((TestBuildEngine)control.BuildEngine).Messages, m => m.Contains("skipping"));
+
+        // Corrupt the generated file without touching the source.
+        File.WriteAllText(outputPath, "// truncated by something else\n");
+
+        var task2 = CreateTask(src);
+        Assert.True(task2.Execute());
+
+        var msgs = string.Join("\n", ((TestBuildEngine)task2.BuildEngine).Messages);
+        Assert.Contains("Compiling", msgs);
+        Assert.DoesNotContain("skipping", msgs);
+
+        // And the output is restored to what the compiler actually produces.
+        Assert.Equal(good, File.ReadAllText(outputPath));
+    }
+
     // Test 21: Stale output cleanup: build 3, delete 1 source, build → orphan removed
     [Fact]
     public void StaleOutputCleanup_OrphanRemoved()

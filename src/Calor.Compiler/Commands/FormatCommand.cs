@@ -89,11 +89,37 @@ public static class FormatCommand
                 || Environment.GetEnvironmentVariable("CALOR_EXPERIMENTAL_FORMAT_WRITE") is "1" or "true";
             if (wantsWrite && !experimentalAcknowledged)
             {
-                Console.Error.WriteLine(
-                    $"error {Diagnostics.DiagnosticCode.FormatWriteExperimentalRequired}: 'format --write' is disabled by the release policy (#793/#760): " +
-                    "the formatter write path can rewrite identifiers and drops comments. " +
-                    "Pass --experimental (or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to acknowledge, " +
-                    "or use --check/--diff for read-only formatting.");
+                const string refusal =
+                    "'format --write' is disabled by the release policy (#793/#760): the formatter " +
+                    "write path can rewrite identifiers and drops comments. Pass --experimental " +
+                    "(or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to acknowledge, or use " +
+                    "--check/--diff for read-only formatting.";
+
+                // The refusal must honour --format json. Every other exit from this command emits
+                // the envelope (schema v1.1, loop plan D1.3), and an agent that asked for JSON and
+                // got a bare stderr line sees a parse failure, not a policy decision — so the one
+                // message whose whole purpose is to be understood was the one it could not read.
+                if (string.Equals(ctx.ParseResult.GetValueForOption(formatOption) ?? "text", "json",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    var bag = new DiagnosticBag();
+                    bag.Add(new Diagnostic(
+                        DiagnosticCode.FormatWriteExperimentalRequired,
+                        refusal,
+                        new TextSpan(0, 0, 1, 1),
+                        DiagnosticSeverity.Error));
+                    Console.WriteLine(CommandEnvelope.Serialize("format", bag, new FormatData
+                    {
+                        Files = [],
+                        Totals = new FormatTotals { Processed = 0, Formatted = 0, Errors = 1, StillFailingAfterHeal = 0 }
+                    }));
+                }
+                else
+                {
+                    Console.Error.WriteLine(
+                        $"error {DiagnosticCode.FormatWriteExperimentalRequired}: {refusal}");
+                }
+
                 ctx.ExitCode = 1;
                 return;
             }

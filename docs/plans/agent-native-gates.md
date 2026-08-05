@@ -99,7 +99,7 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.7 (additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.8 (additive A-1.8, 2026-08-05 — PP-A1 adjudicated: items 1–8 PASS, item 9 LAPSED, item 6 passing only as of #872; additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
@@ -323,6 +323,49 @@ disclosures in the A-1.5 entry below.
 | **PP-S4** — no converter-appeasement (**blocker**) | M-S4 = 0 via the A-1.5.7 fixture registry; indeterminate counts as **failing** | Blocks the v0.12.0 release |
 
 ### A.3 Annex revision log
+
+**A-1.8 — PP-A1 adjudicated (2026-08-05).** Additive; registers outcomes against the PP-A1 list frozen
+at `wedge-w1-prereqs.md` §3 and carried unchanged into v0.12. **Items 1–8 PASS; item 9 LAPSED.**
+
+**Item 6 was FAIL when first adjudicated, and this is registered rather than smoothed over.** Its bar
+is *no known false-`Proven`-elides vector*, known set = the divergence table + T1. **Divergence D4 was
+a live one**: a non-ordinal `StringComparison` mode in a contract was translated as **ordinal**, the
+mode-bearing form stayed whitelisted in `ModeledForms`, and `Z3Verifier` never demoted on the warning
+— so the solver returned a genuine false `Proven`, and `Proven && !IsVacuous` (D-G1.3) **elided the
+runtime check**. Reproduced end-to-end on a shipped CLI path: the same program threw
+`ContractViolationException` under `calor run` and printed its value under `calor run --verify`.
+Closed by refusal in **#872** (mirroring D9), cache format 1.8 → **1.9** — the bump is load-bearing,
+not hygiene, since warm 1.8 caches hold exactly those false verdicts. Item 6 passes **only as of
+#872**. The first adjudication cited four closed rows (D6–D9) and did not audit the remaining seven;
+the corrected record carries a **row-by-row** audit of all eleven, including an explicit
+*argued-unreachable* disposition for D3 and D2 named as the residual inside §2's recorded risk
+acceptance.
+
+**Item 9 = LAPSED.** The frozen text says the `EnableTypeChecking` default-on flip *"lands in the
+W2/W3 window"*; that window closed at v0.12 without it. The first adjudication re-read this as "the
+flip has a slot" and marked it ✅ — a reinterpretation in the favourable direction, and the same class
+of move as overriding a fired trigger. The freeze's "not gate-blocking" clause is scoped to **W1
+exit** and is **not** extended here to the v0.12.0 release. **Cost measured rather than guessed:** the
+flip produces **92 failures / 6,158** in `Calor.Compiler.Tests`, and they are type-checker
+*completeness* gaps — `Calor0200` unknown type ×36 (`object` ×31, `Type` ×6), `Calor0202` member
+access ×8 — i.e. the compiler would begin rejecting programs that are valid today. **Whether the lapse
+blocks v0.12.0 is a maintainer decision**, not one the adjudication may make by reinterpretation; a
+further deferral must name a **new window**.
+
+**Items 4 and 7 passed only after fixes made during the audit**, both on the shipped surface rather
+than the one the original evidence cited: `CompileCalor` (the MSBuild task real projects build
+through) trusted a `.g.cs`'s *existence* rather than its content hash, diverging from
+`CompilationDriver`; and `format --write`'s policy refusal ignored `--format json`, so an agent that
+asked for an envelope got a parse failure. The `Calor1346` containment also had **no test anywhere in
+the repo** — item 7 had been adjudicated on code-reading alone — and is now pinned, with a control
+proving the gate is an acknowledgement rather than a broken command.
+
+**Item 1's "published" half is dispositioned, not asserted:** CI evidences the *packaged* SDK's
+consumability from a local feed; **"published" clears at the v0.12.0 publish event itself**.
+
+**PP-W5 remains NOT adjudicated** — it requires a spend-authorized parity epoch (A-1.4 tranche 1,
+restated additively at A-1.5.6) and **may not be self-cleared**. Record:
+`docs/plans/pp-a1-adjudication.md`.
 
 **A-1.7 — Call S adjudicated (2026-08-05).** Additive; registers outcomes against thresholds frozen at
 A-1.5 before any eligibility was evaluated. **PP-S3 = MISS** (headline): M-S3 realized **8** screened

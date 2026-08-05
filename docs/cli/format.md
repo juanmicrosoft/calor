@@ -28,8 +28,8 @@ The `format` command formats Calor source files according to the canonical Calor
 # Format a single file (output to stdout)
 calor format MyModule.calr
 
-# Format and overwrite the file
-calor format MyModule.calr --write
+# Format and overwrite the file — GATED, see "Write mode is experimental" below
+calor format MyModule.calr --write --experimental
 
 # Check if files are formatted (for CI)
 calor format src/*.calr --check
@@ -53,7 +53,8 @@ calor format MyModule.calr --diff
 | Option | Short | Default | Description |
 |:-------|:------|:--------|:------------|
 | `--check` | `-c` | `false` | Check if files are formatted without modifying (exit 1 if not) |
-| `--write` | `-w` | `false` | Write formatted output back to the file(s) |
+| `--write` | `-w` | `false` | Write formatted output back to the file(s). **Refused (`Calor1346`) unless acknowledged** — see [Write mode is experimental](#write-mode-is-experimental) |
+| `--experimental` | — | `false` | Acknowledge that the `--write` path is experimental. Equivalent to `CALOR_EXPERIMENTAL_FORMAT_WRITE=1` |
 | `--diff` | `-d` | `false` | Show diff of formatting changes |
 | `--verbose` | `-v` | `false` | Enable verbose output |
 | `--heal` | — | `false` | Best-effort source-level repair of files too broken for the AST formatter. **Not semantics-preserving** — see [Heal Mode](#heal-mode) |
@@ -113,17 +114,42 @@ This allows you to preview changes before applying them.
 
 ---
 
-## Write Mode
+## Write mode is experimental
 
-Use `--write` to format files in place:
+`--write` is **disabled by the release policy** (#793/#760) and refuses with `Calor1346` unless you
+acknowledge it. The refusal is deliberate, not a bug: the formatter write path **can rewrite
+identifiers and drops comments**, so it is not safe to point at a codebase you care about.
+
+Read-only modes are unaffected and are what most workflows should use: `--check`, `--diff`, and the
+default stdout preview.
+
+To acknowledge, either pass the flag or set the environment variable:
 
 ```bash
 # Format single file
-calor format MyModule.calr --write
+calor format MyModule.calr --write --experimental
 
 # Format multiple files
+calor format src/*.calr --write --experimental
+
+# Or acknowledge once for a whole session / CI job
+export CALOR_EXPERIMENTAL_FORMAT_WRITE=1
 calor format src/*.calr --write
 ```
+
+Without the acknowledgement the command exits **1**, writes nothing, and reports:
+
+```
+error Calor1346: 'format --write' is disabled by the release policy (#793/#760): the formatter
+write path can rewrite identifiers and drops comments. Pass --experimental (or set
+CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to acknowledge, or use --check/--diff for read-only formatting.
+```
+
+Under `--format json` the same refusal arrives as a normal envelope document carrying `Calor1346`,
+so an agent parsing stdout gets a policy decision rather than a parse error.
+
+The LSP has a sibling containment: the **formatting** and **rename** handlers register only under
+`CALOR_LSP_EXPERIMENTAL=1`. Every read-only LSP handler is unaffected.
 
 ---
 
@@ -159,8 +185,8 @@ reject:
 # Preview the healed source on stdout
 calor format Broken.calr --heal
 
-# Repair in place
-calor format Broken.calr --heal --write
+# Repair in place (--write is gated; see "Write mode is experimental")
+calor format Broken.calr --heal --write --experimental
 
 # CI / agent loop: report only (prints an ambiguousDecisions count per file)
 calor format Broken.calr --heal --check
@@ -280,7 +306,7 @@ The Calor formatter applies these rules:
 When formatting multiple files, errors in one file don't stop processing of others:
 
 ```bash
-calor format src/*.calr --write --verbose
+calor format src/*.calr --write --experimental --verbose
 ```
 
 Output:
@@ -302,7 +328,7 @@ Summary: 4 formatted, 1 error
 Use `--verbose` to see detailed processing information:
 
 ```bash
-calor format MyModule.calr --write --verbose
+calor format MyModule.calr --write --experimental --verbose
 ```
 
 Output:
@@ -331,10 +357,10 @@ Formatting MyModule.calr...
 
 ```bash
 # Find and format all .calr files
-find . -name "*.calr" -exec calor format {} --write \;
+find . -name "*.calr" -exec calor format {} --write --experimental \;
 
 # Or use shell globbing
-calor format **/*.calr --write
+calor format **/*.calr --write --experimental
 ```
 
 ### Pre-Commit Hook
@@ -350,7 +376,7 @@ if [ -n "$Calor_FILES" ]; then
   # Format staged files
   echo "$Calor_FILES" | xargs calor format --check
   if [ $? -ne 0 ]; then
-    echo "Calor files are not formatted. Run 'calor format --write' to fix."
+    echo "Calor files are not formatted. Run 'calor format --write --experimental' to fix."
     exit 1
   fi
 fi
@@ -366,7 +392,7 @@ Most editors can be configured to run formatters on save:
   "[calor]": {
     "editor.formatOnSave": true
   },
-  "calor.formatCommand": "calor format --write"
+  "calor.formatCommand": "calor format --write --experimental"
 }
 ```
 

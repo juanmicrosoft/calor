@@ -56,6 +56,16 @@ internal static class CliTestHarness
     /// </summary>
     internal static (int ExitCode, string StdOut, string StdErr) RunCli(
         string workingDirectory, params string[] args)
+        => RunCli(workingDirectory, environment: null, args);
+
+    /// <summary>
+    /// As above, with extra environment variables for the child process. Needed by gates that are
+    /// acknowledged through the environment (e.g. <c>CALOR_EXPERIMENTAL_FORMAT_WRITE</c>): setting
+    /// them via <c>Environment.SetEnvironmentVariable</c> in-test would leak across xUnit's
+    /// parallel collections, so they are scoped to the child instead.
+    /// </summary>
+    internal static (int ExitCode, string StdOut, string StdErr) RunCli(
+        string workingDirectory, IReadOnlyDictionary<string, string>? environment, params string[] args)
     {
         var psi = new ProcessStartInfo
         {
@@ -66,6 +76,14 @@ internal static class CliTestHarness
             CreateNoWindow = true,
             WorkingDirectory = workingDirectory
         };
+        if (environment != null)
+        {
+            foreach (var (key, value) in environment)
+            {
+                psi.Environment[key] = value;
+            }
+        }
+
         psi.ArgumentList.Add(FindCalorDll());
         psi.ArgumentList.Add("--no-telemetry");
         foreach (var arg in args)
