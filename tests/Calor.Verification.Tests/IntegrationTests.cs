@@ -76,14 +76,19 @@ public class IntegrationTests
         Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
 
-        // Control, so the assertion above is known to discriminate rather than pass vacuously:
-        // the SAME contract stated ordinally is genuinely provable and IS elided. Pre-fix both
-        // programs produced this second output — which is exactly the defect.
+        // Control, so the assertion above is known to discriminate rather than pass vacuously.
+        // NOTE the control changed shape when D3/D12 landed: no string proof elides any more, so
+        // "the ordinal form IS elided" is no longer available as the contrast. The contrast that
+        // remains is the one that matters — REFUSED (outside the modeled surface, Calor0718) vs
+        // DEMOTED (modeled, discharged, then made conditional on the string model, Calor0720).
+        // Both keep the runtime check; only the first means the solver never engaged.
         var ordinal = Program.Compile(
             source.Replace(@" :ignore-case", string.Empty), "test.calr", NoCache());
 
         Assert.False(ordinal.HasErrors);
-        Assert.Contains("// PROVEN: Postcondition", ordinal.GeneratedCode);
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
+        Assert.DoesNotContain(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
+        Assert.Contains(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
     }
 
     /// <summary>
@@ -117,14 +122,18 @@ public class IntegrationTests
         Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
 
-        // Control: with ':ordinal' stated the model matches the emitted overload, so the proof is
-        // sound and the check IS elided. Pre-fix, the bare form took this branch too.
+        // Control: with ':ordinal' stated the model matches the emitted overload, so the solver
+        // genuinely engages — the form is DEMOTED (Calor0720, conditional on the string model per
+        // D3/D12) rather than REFUSED (Calor0718, outside the modeled surface). Both keep the
+        // check, so the emitted-overload assertion is what pins that the fix is precise: a blanket
+        // refusal of these three operations would fail here.
         var ordinal = Program.Compile(
             source.Replace(@"""))", @""" :ordinal))"), "test.calr", NoCache());
 
         Assert.False(ordinal.HasErrors);
         Assert.Contains("StringComparison.Ordinal", ordinal.GeneratedCode);
-        Assert.Contains("// PROVEN: Postcondition", ordinal.GeneratedCode);
+        Assert.DoesNotContain(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
+        Assert.Contains(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
     }
 
     /// <summary>Verification must be exercised, not replayed from a warm cache.</summary>

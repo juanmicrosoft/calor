@@ -483,4 +483,90 @@ public class W1Slice1SoundnessTests
 
         Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
+    // ---- D3/D12: the string model is null-blind and byte-counted (v0.12) ----
+
+    /// <summary>
+    /// D3, the vector this demotion exists for. Z3 makes <c>len(s)=0 ⟺ s=""</c> a tautology, but
+    /// in C# <c>null</c> satisfies <c>IsNullOrEmpty</c> while <c>null == ""</c> is <b>false</b> —
+    /// so this postcondition was <c>Proven</c> and ELIDED while being false at runtime. Reproduced
+    /// end-to-end before the fix: `calor run` threw, `calor run --verify` printed.
+    /// </summary>
+    [SkippableFact]
+    public void StringObligation_IsAssumedNotProven()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        StringObligation_IsAssumedNotProvenCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void StringObligation_IsAssumedNotProvenCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // (|| (! (isempty s)) (== s ""))  — a Z3 tautology, false at runtime when s is null.
+        // Stated over the PARAMETER rather than `result`: an unbound `result` is Unsupported by
+        // D-G1.1 (it must be tied to the body), which would mask the property under test.
+        var post = Ensures(BinOp(BinaryOperator.Or,
+            new UnaryOperationNode(TextSpan.Empty, UnaryOperator.Not,
+                new StringOperationNode(TextSpan.Empty, StringOp.IsNullOrEmpty,
+                    new List<ExpressionNode> { Ref("s") })),
+            BinOp(BinaryOperator.Equal, Ref("s"), new StringLiteralNode(TextSpan.Empty, ""))));
+
+        var result = Verify(verifier, [("s", "str")], [], post);
+
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.StringModelAssumption, result.EffectiveOutcome.Assumptions);
+    }
+
+    /// <summary>
+    /// The demotion must not be silently narrowed later: a purely NUMERIC obligation on a function
+    /// that happens to take a string is demoted too. That is deliberately coarse — the body can
+    /// route string theory into <c>result</c> (<c>§R (len s)</c>) with no string anywhere in the
+    /// contract — and this pins the coarseness so a future "optimization" has to argue with a test.
+    /// </summary>
+    [SkippableFact]
+    public void StringTypedParameter_DemotesEvenNumericObligation()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        StringTypedParameter_DemotesEvenNumericObligationCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void StringTypedParameter_DemotesEvenNumericObligationCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        var result = Verify(verifier, [("s", "str"), ("x", "i32")], [],
+            Ensures(BinOp(BinaryOperator.Equal, Ref("x"), Ref("x"))), outputType: "i32");
+
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.StringModelAssumption, result.EffectiveOutcome.Assumptions);
+    }
+
+    /// <summary>
+    /// The other direction, so the demotion is known not to be a blanket one: with no string in
+    /// sight, a numeric obligation is still genuinely <c>Proven</c> and still elides. Without this
+    /// the tests above would pass just as well if the verifier had stopped proving anything.
+    /// </summary>
+    [SkippableFact]
+    public void NonStringObligation_StaysProven()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        NonStringObligation_StaysProvenCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void NonStringObligation_StaysProvenCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        var result = Verify(verifier, [("x", "i32")], [],
+            Ensures(BinOp(BinaryOperator.Equal, Ref("x"), Ref("x"))), outputType: "i32");
+
+        Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+    }
+
 }

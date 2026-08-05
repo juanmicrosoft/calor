@@ -36,6 +36,29 @@ public sealed class Z3Verifier : IDisposable
     public const string ContractExpressionDivisionAssumption =
         "exceptional-paths:contract-division — every division/modulo divisor inside §Q/§S on a verified state is nonzero; a zero divisor makes the runtime contract check itself throw";
 
+    /// <summary>
+    /// D3/D12 (v0.12). Z3's string sort is <b>total and null-free</b>, and its literals are UTF-8
+    /// <b>bytes</b>; .NET strings are nullable and counted in UTF-16 <b>code units</b>. Both gaps
+    /// have produced genuine false <c>Proven</c>s that ELIDED a failing runtime check, on the
+    /// shipped <c>calor run --verify</c> path:
+    /// <list type="bullet">
+    /// <item>D3 — <c>len(s)=0 ⟺ s=""</c> is a Z3 tautology, but in C# <c>null</c> satisfies
+    /// <c>IsNullOrEmpty</c> while <c>null == ""</c> is false.</item>
+    /// <item>D12 — <c>"é".Length</c> is 1 in .NET and 2 under the byte model.</item>
+    /// </list>
+    /// Unlike D4 and D9 these are <b>not closable by refusing an operation</b>: every total axiom
+    /// of the string theory is affected. So the proof is not suppressed — it is <b>demoted</b>, and
+    /// <c>Assumed</c> never elides. The assumption is named rather than silent, which is the D8
+    /// precedent, and the runtime check survives regardless of whether the proof was sound.
+    /// <para>The demotion is deliberately <b>conservative</b>: any string-typed value or string
+    /// operation anywhere in the obligation is enough. Narrowing it would require knowing which
+    /// proofs "really" depended on the string theory, and three review rounds found three vectors
+    /// behind exactly that kind of reasoning. Lifting it is tracked by #875 (make <c>str</c>
+    /// genuinely non-nullable) — each case proved non-null can have the demotion lifted.</para>
+    /// </summary>
+    public const string StringModelAssumption =
+        "string-model — the solver's strings are total, non-null and UTF-8-byte-counted, while .NET's are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII";
+
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
     private bool _disposed;
@@ -414,7 +437,39 @@ public sealed class Z3Verifier : IDisposable
             // check and never aggregates into proven. A refutation under the same
             // side conditions needs no assumption — its model is a genuine
             // non-throwing execution.
-            if (status == Status.UNSATISFIABLE && (pathConditions.Count > 0 || contractDivisionAssumed))
+            // D3/D12 (see StringModelAssumption): a proof carried by the solver's string theory is
+            // conditional on the value being non-null and ASCII, neither of which Calor enforces
+            // today. Demote so the runtime check survives; the proof is still reported, named.
+            // Scope covers the parameters, the result, every §Q, the §S itself, and the encoded
+            // body — the D3 reproduction was provable precisely BECAUSE the `§R s` result binding
+            // fed the solver, so omitting the body would leave the original vector open.
+            var stringNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var (name, type) in parameters)
+            {
+                if (FunctionBodyEncoder.IsStringType(type))
+                {
+                    stringNames.Add(name);
+                }
+            }
+            if (FunctionBodyEncoder.IsStringType(outputType))
+            {
+                stringNames.Add("result");
+            }
+
+            // The presence of a string-typed parameter or result is enough on its own, without
+            // inspecting the body. That is coarser than walking the statements — a numeric contract
+            // on a function that merely happens to take a `str` is demoted too — and it is coarser
+            // ON PURPOSE: the body can route the string theory into `result` (`§R (len s)`) with no
+            // string anywhere in the contract, and a walker that missed one statement form would
+            // fail open. The contract expressions are still checked so that a string LITERAL or
+            // operation is caught even when nothing is string-TYPED.
+            var stringModelAssumed =
+                stringNames.Count > 0
+                || FunctionBodyEncoder.TouchesStringModel(postcondition.Condition, stringNames)
+                || preconditions.Any(pre => FunctionBodyEncoder.TouchesStringModel(pre.Condition, stringNames));
+
+            if (status == Status.UNSATISFIABLE
+                && (pathConditions.Count > 0 || contractDivisionAssumed || stringModelAssumed))
             {
                 var assumptions = new List<string>();
                 var reasons = new List<string>();
@@ -427,6 +482,11 @@ public sealed class Z3Verifier : IDisposable
                 {
                     assumptions.Add(ContractExpressionDivisionAssumption);
                     reasons.Add("the contract expressions divide, and a zero divisor (or MinValue ÷ -1 overflow) would make the runtime contract check itself throw (W1 Slice 1, D8)");
+                }
+                if (stringModelAssumed)
+                {
+                    assumptions.Add(StringModelAssumption);
+                    reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null and byte-counted while .NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12)");
                 }
                 return ContractVerificationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.AssumedProof(
@@ -1295,4 +1355,62 @@ public static class FunctionBodyEncoder
                 return false;
         }
     }
+
+    /// <summary>
+    /// True when any part of <paramref name="expr"/> is carried by the solver's string theory —
+    /// see <see cref="Z3Verifier.StringModelAssumption"/> for why that forces a demotion to
+    /// <c>Assumed</c> rather than a refusal.
+    ///
+    /// <para><b>Deliberately over-approximate.</b> A string literal, a string operation, or a
+    /// reference to any string-typed name is enough; no attempt is made to decide whether the
+    /// proof "really" used the string axioms. Getting that judgement wrong fails <i>open</i> — it
+    /// mints a `Proven` that deletes a runtime check — and three adversarial review rounds found
+    /// three separate vectors behind exactly that kind of reasoning (D4 twice, then D3). The
+    /// conservative direction costs an unnecessary demotion, which costs only the elision.</para>
+    /// </summary>
+    public static bool TouchesStringModel(ExpressionNode expr, IReadOnlySet<string> stringNames)
+    {
+        switch (expr)
+        {
+            case StringLiteralNode:
+            case StringOperationNode:
+                return true;
+            case ReferenceNode r:
+                // Field/dot paths count too: `s.Foo` on a string-typed receiver still enters the
+                // string sort, and the receiver is what the name set knows about.
+                return stringNames.Contains(r.Name)
+                    || stringNames.Any(n => r.Name.StartsWith(n + ".", StringComparison.Ordinal));
+            case BinaryOperationNode b:
+                return TouchesStringModel(b.Left, stringNames) || TouchesStringModel(b.Right, stringNames);
+            case UnaryOperationNode u:
+                return TouchesStringModel(u.Operand, stringNames);
+            case ConditionalExpressionNode c:
+                return TouchesStringModel(c.Condition, stringNames)
+                    || TouchesStringModel(c.WhenTrue, stringNames)
+                    || TouchesStringModel(c.WhenFalse, stringNames);
+            case ImplicationExpressionNode i:
+                return TouchesStringModel(i.Antecedent, stringNames) || TouchesStringModel(i.Consequent, stringNames);
+            case ForallExpressionNode f:
+                // A string-typed BOUND variable brings the theory in on its own, independently of
+                // anything the enclosing scope declared.
+                return f.BoundVariables.Any(v => IsStringType(v.TypeName)) || TouchesStringModel(f.Body, stringNames);
+            case ExistsExpressionNode e:
+                return e.BoundVariables.Any(v => IsStringType(v.TypeName)) || TouchesStringModel(e.Body, stringNames);
+            case ArrayAccessNode a:
+                return TouchesStringModel(a.Array, stringNames) || TouchesStringModel(a.Index, stringNames);
+            case ArrayLengthNode al:
+                return TouchesStringModel(al.Array, stringNames);
+            case FieldAccessNode fa:
+                return TouchesStringModel(fa.Target, stringNames);
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Type spellings that land on Z3's string sort (mirrors the translator's own arm).</summary>
+    public static bool IsStringType(string? type) =>
+        type is not null
+        && (type.Equals("str", StringComparison.OrdinalIgnoreCase)
+            || type.Equals("string", StringComparison.OrdinalIgnoreCase)
+            || type.Equals("System.String", StringComparison.OrdinalIgnoreCase));
 }
