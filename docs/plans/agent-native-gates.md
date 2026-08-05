@@ -368,8 +368,10 @@ of our own mutation operator.
 **PP-S1 remains open, not adjudicated**, and WS-S1 proceeds against the **failure statuses** rather
 than the ledger. Its justification is narrowed in step with (a): `NativeFraction` is the quality metric
 of the **shipped** `calor import` path and stands on its own; the "supply the epoch so PP-W2 can be
-measured" framing does **not**. The census of the 141 failures, under its pre-committed rule (top-3
-causes ≥50% → work-list, continue; top-10 <50% → long tail, PP-S1 = miss), is the next gate.
+measured" framing does **not**. The census of the 141 failures is the next gate, and its
+pre-committed rule is stated **exhaustively**: **top-3 causes ≥ 50% → work-list, continue; otherwise →
+PP-S1 = miss** — which covers the top-3 < 50% ∧ top-10 ≥ 50% case an earlier wording left unrouted.
+Any route not listed is a **miss**, the same default PP-S3 carries.
 
 **This entry alters no frozen row and makes no §7 supersession claim.** PP-W2's *registered outcome*
 (not adjudicated) is unchanged; only the description of what the instrument can measure is narrowed.

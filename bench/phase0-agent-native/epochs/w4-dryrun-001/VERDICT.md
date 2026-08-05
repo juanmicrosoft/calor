@@ -48,6 +48,13 @@ presentation asymmetry / bias against Calor).
    fixtures (C# 9/9), at real scale the C# arm DOES ship bugs. Real-scale has
    measurable escaped-bug headroom → the venue is testable.
 
+> **CORRECTION (2026-08-05).** Finding 2 below says this configuration measures "the conversion
+> penalty **+ enforcement value**". The "+ enforcement value" half is **false**: the runner never
+> invokes the Calor compiler, so no enforcement runs in the loop. What it measures is the conversion
+> penalty plus the arm-symmetric ceiling leg. This matters because the enforcement channel is exactly
+> what the expressible stratum was later built to exercise. See
+> `docs/plans/substrate-arm-validity-finding.md` and gates A-1.6(a).
+
 2. **The mechanical-only arm has no verification signal for LOGIC bugs.** Every
    injected mutation is arithmetic/off-by-one/boundary — a defect class neither
    the type system, nor effect enforcement, nor a mechanical (non-authored)
@@ -98,4 +105,7 @@ this directory. Workspaces were ephemeral (oracle isolation) and are not retaine
 > apply** — with no eligible task there is no epoch, and with no epoch there is no
 > adjudication to restate from. PP-W2 is registered **not adjudicated**
 > (gates Annex A-1.4 tranche 2). This block is a forward pointer only; nothing
-> above it has been edited.
+> above it has been edited **except the Arms section and finding 2, each carrying its own dated
+> correction block — added 2026-08-05 under the maintainer's option-2 decision. The append-only
+> convention was set aside for those two, deliberately, because a forward pointer at the foot of the
+> file cannot stop a reader quoting a false arm description at the top of it.**
