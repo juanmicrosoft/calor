@@ -72,6 +72,47 @@ String operations that compare text support optional comparison modes via keywor
 
 - `contains`, `starts`, `ends`, `indexof`, `equals`
 
+### Omitting the mode does NOT mean ordinal
+
+This is the part that surprises people, and it is .NET's behaviour, not Calor's invention:
+
+| Written without a mode | .NET overload it becomes | Comparison |
+|:--|:--|:--|
+| `(contains s "x")` | `s.Contains("x")` | **ordinal** |
+| `(equals a b)` | `a.Equals(b)` | **ordinal** |
+| `(starts s "x")` | `s.StartsWith("x")` | **current culture** |
+| `(ends s "x")` | `s.EndsWith("x")` | **current culture** |
+| `(indexof s "x")` | `s.IndexOf("x")` | **current culture** |
+
+Culture-sensitive comparison is not a rounding error. Under `hu-HU`, where the `dzs` digraph collates
+as a single unit, **the same two strings give opposite answers in one expression**:
+
+```
+"dzsx".Contains("zsx")   -> True    (Contains is ordinal)
+"dzsx".IndexOf("zsx")    -> -1      (IndexOf is culture-sensitive)
+```
+
+And under any culture, `"abc".StartsWith("\u200dabc")` is **true** — a zero-width joiner has no
+collation weight — while the ordinal comparison is **false**.
+
+If you want ordinal behaviour from `starts`, `ends` or `indexof`, **say `:ordinal`**.
+
+### In contracts, only ordinal comparison is verifiable
+
+The modes behave exactly as documented at **runtime**. But inside a `§Q` or `§S` the verifier
+**refuses** anything it cannot model ordinally — it reports `Unsupported` and the runtime check is
+**kept** rather than proved away. Two cases are refused:
+
+- any mode other than `:ordinal`, on any operation;
+- `starts`, `ends`, `indexof` with **no mode**, per the table above.
+
+This is deliberate. Until v0.12 the verifier translated both cases as ordinal, which could mint a
+false `Proven` and delete a check that was genuinely failing (divergence D4,
+`docs/verification-modeled-forms.md`).
+
+Practical consequence: `§S (equals result STR:"OK" :ignore-case)` and `§S (starts result STR:"OK")`
+are both enforced at runtime and never elided. To get a *proved* contract, state `:ordinal`.
+
 ### Examples
 
 ```

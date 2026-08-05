@@ -1033,7 +1033,8 @@ public class VerifierTests
                 {
                     new ReferenceNode(TextSpan.Empty, "s"),
                     new StringLiteralNode(TextSpan.Empty, "hello")
-                }),
+                },
+                StringComparisonMode.Ordinal),
             null,
             new AttributeCollection());
 
@@ -1086,7 +1087,8 @@ public class VerifierTests
                 {
                     new ReferenceNode(TextSpan.Empty, "s"),
                     new StringLiteralNode(TextSpan.Empty, "world")
-                }),
+                },
+                StringComparisonMode.Ordinal),
             null,
             new AttributeCollection());
 
@@ -1561,7 +1563,8 @@ public class VerifierTests
                     {
                         new ReferenceNode(TextSpan.Empty, "s"),
                         new StringLiteralNode(TextSpan.Empty, "")
-                    }),
+                    },
+                    StringComparisonMode.Ordinal),
                 new IntLiteralNode(TextSpan.Empty, 0)),
             null,
             new AttributeCollection());
@@ -1661,7 +1664,8 @@ public class VerifierTests
                             new StringLiteralNode(TextSpan.Empty, "X")
                         }),
                     new StringLiteralNode(TextSpan.Empty, "X")
-                }),
+                },
+                StringComparisonMode.Ordinal),
             null,
             new AttributeCollection());
 
@@ -1672,6 +1676,9 @@ public class VerifierTests
             postcondition);
 
         Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+        // Name the refusal: with StartsWith now also refusable (D4 second half), status
+        // alone cannot tell which rule fired, and this test exists to pin the D9 one.
+        Assert.Contains("Replace", result.CounterexampleDescription ?? string.Empty);
     }
 
     [SkippableFact]
@@ -1704,7 +1711,8 @@ public class VerifierTests
                         new StringLiteralNode(TextSpan.Empty, "abcabc"),
                         new StringLiteralNode(TextSpan.Empty, "b"),
                         new IntLiteralNode(TextSpan.Empty, 3)
-                    }),
+                    },
+                    StringComparisonMode.Ordinal),
                 new IntLiteralNode(TextSpan.Empty, 3)),
             null,
             new AttributeCollection());
@@ -2053,14 +2061,14 @@ public class VerifierTests
     // ===========================================
 
     [SkippableFact]
-    public void ReturnsWarningForIgnoreCaseComparisonMode()
+    public void ReturnsUnsupportedForIgnoreCaseComparisonMode()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        ReturnsWarningForIgnoreCaseComparisonModeCore();
+        ReturnsUnsupportedForIgnoreCaseComparisonModeCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void ReturnsWarningForIgnoreCaseComparisonModeCore()
+    private void ReturnsUnsupportedForIgnoreCaseComparisonModeCore()
     {
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
@@ -2088,14 +2096,10 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        // Verification should proceed (not Unsupported)
-        Assert.NotEqual(ContractVerificationStatus.Unsupported, result.Status);
-
-        // Should have a warning about ignored comparison mode
-        Assert.NotNull(result.Warnings);
-        Assert.Single(result.Warnings);
-        Assert.Contains("IgnoreCase", result.Warnings[0]);
-        Assert.Contains("ignored", result.Warnings[0]);
+        // D4: Unsupported, NOT Proven-with-a-warning. Unsupported is the only status that keeps
+        // the runtime check; a warning alongside Proven still elides it.
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+        Assert.Contains("IgnoreCase", result.CounterexampleDescription ?? string.Empty);
     }
 
     [SkippableFact]
@@ -2134,14 +2138,14 @@ public class VerifierTests
     }
 
     [SkippableFact]
-    public void PreconditionReturnsWarningForIgnoreCaseComparisonMode()
+    public void PreconditionReturnsUnsupportedForIgnoreCaseComparisonMode()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        PreconditionReturnsWarningForIgnoreCaseComparisonModeCore();
+        PreconditionReturnsUnsupportedForIgnoreCaseComparisonModeCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void PreconditionReturnsWarningForIgnoreCaseComparisonModeCore()
+    private void PreconditionReturnsUnsupportedForIgnoreCaseComparisonModeCore()
     {
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
@@ -2165,71 +2169,75 @@ public class VerifierTests
 
         var result = verifier.VerifyPrecondition(parameters, precondition);
 
-        // Verification should proceed (precondition is satisfiable)
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
-
-        // Should have a warning about ignored comparison mode
-        Assert.NotNull(result.Warnings);
-        Assert.Single(result.Warnings);
-        Assert.Contains("IgnoreCase", result.Warnings[0]);
+        // D4: refused on the precondition path too — an assumed-but-mismodeled precondition is
+        // if anything worse, since every downstream proof inherits it.
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+        Assert.Contains("IgnoreCase", result.CounterexampleDescription ?? string.Empty);
     }
 
+    /// <summary>
+    /// Replaces <c>AccumulatesMultipleWarnings</c>. D4: modes on either side are refused, and the
+    /// second case is the sharp one — a mode-bearing PRECONDITION must not be assumed as ordinal.
+    /// If it were, <c>StartsWith(s,"hello", IgnoreCase)</c> would "imply" the ordinal
+    /// <c>StartsWith(s,"hello")</c>, which is false ("HELLO..." satisfies the former, not the
+    /// latter). An unsound ASSUMPTION is worse than an unsound goal: every downstream proof
+    /// inherits it.
+    /// </summary>
     [SkippableFact]
-    public void AccumulatesMultipleWarnings()
+    public void ModeBearingContractsAreRefusedOnBothSides()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        AccumulatesMultipleWarningsCore();
+        ModeBearingContractsAreRefusedOnBothSidesCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void AccumulatesMultipleWarningsCore()
+    private void ModeBearingContractsAreRefusedOnBothSidesCore()
     {
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
 
         var parameters = new List<(string Name, string Type)> { ("s", "string") };
 
-        // Precondition with :ignore-case
-        var precondition = new RequiresNode(
-            TextSpan.Empty,
-            new StringOperationNode(
-                TextSpan.Empty,
-                StringOp.StartsWith,
+        static StringOperationNode Op(StringOp op, string lit, StringComparisonMode? mode = null) =>
+            new(TextSpan.Empty,
+                op,
                 new List<ExpressionNode>
                 {
                     new ReferenceNode(TextSpan.Empty, "s"),
-                    new StringLiteralNode(TextSpan.Empty, "hello")
+                    new StringLiteralNode(TextSpan.Empty, lit)
                 },
-                StringComparisonMode.IgnoreCase),
-            null,
-            new AttributeCollection());
+                mode);
 
-        // Postcondition with :invariant-ignore-case (different mode)
-        var postcondition = new EnsuresNode(
-            TextSpan.Empty,
-            new StringOperationNode(
-                TextSpan.Empty,
-                StringOp.EndsWith,
-                new List<ExpressionNode>
-                {
-                    new ReferenceNode(TextSpan.Empty, "s"),
-                    new StringLiteralNode(TextSpan.Empty, "world")
-                },
-                StringComparisonMode.InvariantIgnoreCase),
-            null,
-            new AttributeCollection());
+        // Case 1: a mode on the goal — Unsupported, so the runtime check survives.
+        var modeBearingPost = new EnsuresNode(
+            TextSpan.Empty, Op(StringOp.EndsWith, "world", StringComparisonMode.InvariantIgnoreCase),
+            null, new AttributeCollection());
 
-        var result = verifier.VerifyPostcondition(
-            parameters,
-            "bool",
-            new[] { precondition },
-            postcondition);
+        var goalResult = verifier.VerifyPostcondition(
+            parameters, "bool", Array.Empty<RequiresNode>(), modeBearingPost);
 
-        // Should have warnings for both ignored comparison modes
-        Assert.NotNull(result.Warnings);
-        Assert.Equal(2, result.Warnings.Count);
-        Assert.Contains(result.Warnings, w => w.Contains("IgnoreCase"));
-        Assert.Contains(result.Warnings, w => w.Contains("InvariantIgnoreCase"));
+        Assert.Equal(ContractVerificationStatus.Unsupported, goalResult.Status);
+        Assert.Contains("InvariantIgnoreCase", goalResult.CounterexampleDescription ?? string.Empty);
+
+        // Case 2: the mode is on the ASSUMPTION and the goal is clean ordinal. Proven here would
+        // mean the IgnoreCase precondition had been assumed with ordinal semantics — the exact
+        // unsoundness D4 was. Whether the verifier drops the assumption (sound: fewer premises)
+        // or reports Unsupported, the one status it may not return is Proven.
+        var modeBearingPre = new RequiresNode(
+            TextSpan.Empty, Op(StringOp.StartsWith, "hello", StringComparisonMode.IgnoreCase),
+            null, new AttributeCollection());
+        // ':ordinal' stated EXPLICITLY. A bare StartsWith is itself refused (D4 second half:
+        // .NET's no-mode overload is CurrentCulture), which would make this case pass for the
+        // wrong reason — the goal has to be genuinely modeled for the assumption to be what is
+        // under test.
+        var ordinalPost = new EnsuresNode(
+            TextSpan.Empty, Op(StringOp.StartsWith, "hello", StringComparisonMode.Ordinal),
+            null, new AttributeCollection());
+
+        var assumptionResult = verifier.VerifyPostcondition(
+            parameters, "bool", new[] { modeBearingPre }, ordinalPost);
+
+        Assert.NotEqual(ContractVerificationStatus.Proven, assumptionResult.Status);
     }
 
     // ===========================================
@@ -2261,7 +2269,8 @@ public class VerifierTests
                 {
                     new ReferenceNode(TextSpan.Empty, "s"),
                     new StringLiteralNode(TextSpan.Empty, "hello")
-                }),
+                },
+                StringComparisonMode.Ordinal),
             null,
             new AttributeCollection());
 

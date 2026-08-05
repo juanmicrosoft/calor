@@ -261,8 +261,16 @@ public sealed class ContractVerificationPass
                     span,
                     DiagnosticCode.ContractVerificationUnsupported,
                     $"{kind} could not be translated for verification in function '{function.Name}'" +
-                        (outcome.Reason is { Length: > 0 } reason ? $": {reason}" : ".") +
-                        " Runtime check kept.",
+                        (outcome.Reason is { Length: > 0 } reason
+                            // Several producers (Z3Verifier's solver-exception, name-collision and
+                            // vacuity reasons) already end with this sentence; appending it blindly
+                            // printed it twice. And a reason that does not end in punctuation ran
+                            // straight into it — "...the program needs Runtime check kept."
+                            ? $": {reason}{(reason.EndsWith('.') || reason.EndsWith('!') ? "" : ".")}"
+                            : ".") +
+                        (outcome.Reason?.EndsWith("Runtime check kept.", StringComparison.Ordinal) == true
+                            ? ""
+                            : " Runtime check kept."),
                     DiagnosticSeverity.Info,
                     outcome);
                 break;

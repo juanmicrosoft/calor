@@ -1211,7 +1211,8 @@ public class TranslatorTests
             {
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "prefix")
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.TranslateBoolExpr(expr);
 
@@ -1242,7 +1243,8 @@ public class TranslatorTests
             {
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "suffix")
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.TranslateBoolExpr(expr);
 
@@ -1364,7 +1366,8 @@ public class TranslatorTests
             {
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "hello")
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.Translate(expr);
 
@@ -1399,7 +1402,8 @@ public class TranslatorTests
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "hello"),
                 new IntLiteralNode(TextSpan.Empty, 5)
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.Translate(expr);
 
@@ -1859,7 +1863,8 @@ public class TranslatorTests
             {
                 new ReferenceNode(TextSpan.Empty, "s"),
                 new StringLiteralNode(TextSpan.Empty, "")
-            });
+            },
+            StringComparisonMode.Ordinal);
 
         var result = translator.Translate(expr);
 
@@ -2669,15 +2674,22 @@ public class TranslatorTests
     // Warnings Tests
     // ===========================================
 
+    /// <summary>
+    /// Divergence D4, closed by refusal. This test previously pinned the OPPOSITE behaviour —
+    /// translate as ordinal and emit a warning — and that is exactly the defect: a warning does
+    /// not stop <c>Proven</c>, and <c>Proven &amp;&amp; !IsVacuous</c> ELIDES the runtime check.
+    /// Reproduced end-to-end before the fix: the same program threw ContractViolationException
+    /// without <c>--verify</c> and ran clean with it.
+    /// </summary>
     [SkippableFact]
-    public void EmitsWarningForIgnoreCaseComparisonMode()
+    public void RefusesIgnoreCaseComparisonMode()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        EmitsWarningForIgnoreCaseComparisonModeCore();
+        RefusesIgnoreCaseComparisonModeCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void EmitsWarningForIgnoreCaseComparisonModeCore()
+    private void RefusesIgnoreCaseComparisonModeCore()
     {
         using var ctx = Z3ContextFactory.Create();
         var translator = new ContractTranslator(ctx);
@@ -2697,13 +2709,54 @@ public class TranslatorTests
 
         var result = translator.TranslateBoolExpr(expr);
 
-        // Translation should succeed
-        Assert.NotNull(result);
+        // Translation is REFUSED — not approximated as ordinal.
+        Assert.Null(result);
+        Assert.NotNull(translator.LastRefusalReason);
+        Assert.Contains("IgnoreCase", translator.LastRefusalReason);
+    }
 
-        // But a warning should be emitted
-        Assert.Single(translator.Warnings);
-        Assert.Contains("IgnoreCase", translator.Warnings[0]);
-        Assert.Contains("ignored", translator.Warnings[0]);
+    /// <summary>
+    /// The whitelist half of D4, as a plain <see cref="FactAttribute"/>: it is a purely syntactic
+    /// check and needs no solver, so gating it behind Z3 would let the rule go unpinned on any
+    /// machine without Z3 — which is where a regression is least likely to be noticed.
+    ///
+    /// <para>Note the whitelist was NOT what made D4 unsound: pre-fix the whitelist and the
+    /// translator <i>agreed</i>, on a model that did not match .NET, and
+    /// <c>Z3Verifier.AcceptedButUntranslatable</c> already turns an accepted-but-refused form into
+    /// <c>Unsupported</c>. Keeping the two in step buys a better message and keeps the drift
+    /// detector quiet.</para>
+    /// </summary>
+    [Fact]
+    public void ModeledForms_RejectsNonOrdinalComparison_AndBareCultureSensitiveOps()
+    {
+        static StringOperationNode Op(StringOp op, StringComparisonMode? mode) =>
+            new(TextSpan.Empty,
+                op,
+                new List<ExpressionNode>
+                {
+                    new ReferenceNode(TextSpan.Empty, "s"),
+                    new StringLiteralNode(TextSpan.Empty, "hello")
+                },
+                mode);
+
+        // (a) An explicit non-ordinal mode is out of scope on any operation.
+        Assert.False(ModeledForms.TryValidate(Op(StringOp.Contains, StringComparisonMode.IgnoreCase), out var m));
+        Assert.Contains("IgnoreCase", m);
+
+        // (b) StartsWith/EndsWith/IndexOf with NO mode are out of scope too: .NET resolves those
+        // single-argument overloads to CurrentCulture while the solver models them ordinally.
+        foreach (var op in new[] { StringOp.StartsWith, StringOp.EndsWith, StringOp.IndexOf })
+        {
+            Assert.False(ModeledForms.TryValidate(Op(op, mode: null), out var bare));
+            Assert.Contains("ordinal", bare, StringComparison.OrdinalIgnoreCase);
+
+            // ...but stating :ordinal makes them modeled again — the refusal is precise, not blanket.
+            Assert.True(ModeledForms.TryValidate(Op(op, StringComparisonMode.Ordinal), out _));
+        }
+
+        // Contains/Equals are ordinal in .NET, so a bare call stays modeled.
+        Assert.True(ModeledForms.TryValidate(Op(StringOp.Contains, mode: null), out _));
+        Assert.True(ModeledForms.TryValidate(Op(StringOp.Equals, mode: null), out _));
     }
 
     [SkippableFact]
@@ -2769,23 +2822,35 @@ public class TranslatorTests
         Assert.Empty(translator.Warnings);
     }
 
+    /// <summary>
+    /// Replaces <c>ClearWarningsRemovesAccumulatedWarnings</c>, which used the D4 warn-and-
+    /// approximate path as its warning source. That path is gone, and this pins WHY: after D4
+    /// was closed the translator has <b>no warning producers at all</b>. The mechanism survives
+    /// only because <c>Z3Verifier</c> plumbs it into <c>ContractVerificationResult.Warnings</c>.
+    ///
+    /// <para>The rule this defends: a modeling divergence may not be answered with a warning.
+    /// A warning does not stop <c>Proven</c>, and <c>Proven &amp;&amp; !IsVacuous</c> elides the
+    /// runtime check — so the warning is emitted into a build whose check has been deleted, which
+    /// is precisely how D4 shipped a program whose postcondition was false at runtime. If a future
+    /// change adds a producer here, that change must show the warning is NOT soundness-relevant.</para>
+    /// </summary>
     [SkippableFact]
-    public void ClearWarningsRemovesAccumulatedWarnings()
+    public void TranslatorHasNoWarningProducers_SoundnessDivergencesAreRefusedNotWarned()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        ClearWarningsRemovesAccumulatedWarningsCore();
+        TranslatorHasNoWarningProducersCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void ClearWarningsRemovesAccumulatedWarningsCore()
+    private void TranslatorHasNoWarningProducersCore()
     {
         using var ctx = Z3ContextFactory.Create();
         var translator = new ContractTranslator(ctx);
 
         translator.DeclareVariable("s", "string");
 
-        // Emit a warning
-        var expr = new StringOperationNode(
+        // The form that used to warn. It is now refused, and refusal is NOT a warning.
+        var ignoreCase = new StringOperationNode(
             TextSpan.Empty,
             StringOp.Contains,
             new List<ExpressionNode>
@@ -2795,11 +2860,32 @@ public class TranslatorTests
             },
             StringComparisonMode.IgnoreCase);
 
-        translator.TranslateBoolExpr(expr);
-        Assert.Single(translator.Warnings);
-
-        // Clear warnings
-        translator.ClearWarnings();
+        Assert.Null(translator.TranslateBoolExpr(ignoreCase));
         Assert.Empty(translator.Warnings);
+    }
+
+    /// <summary>
+    /// The source-level half of the same rule, as a plain <see cref="FactAttribute"/> — it is a
+    /// grep and needs no solver.
+    /// </summary>
+    [Fact]
+    public void ContractTranslator_HasNoWarningProducersInSource()
+    {
+        var source = File.ReadAllText(ContractTranslatorSourcePath);
+        Assert.DoesNotContain("_warnings.Add", source);
+    }
+
+    /// <summary>Resolved from the test assembly's location so the check is not CWD-dependent.</summary>
+    private static string ContractTranslatorSourcePath
+    {
+        get
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "src", "Calor.Compiler")))
+                dir = dir.Parent;
+            Assert.NotNull(dir);
+            return Path.Combine(dir!.FullName, "src", "Calor.Compiler",
+                "Verification", "Z3", "ContractTranslator.cs");
+        }
     }
 }

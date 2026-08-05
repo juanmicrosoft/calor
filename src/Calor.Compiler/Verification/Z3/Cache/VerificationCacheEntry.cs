@@ -47,7 +47,19 @@ public sealed class VerificationCacheEntry
     // division/modulo now carries divisor-nonzero side conditions and demotes proofs
     // to Assumed (previously totalized). Warm caches from 1.7 could serve stale
     // Proven/Refuted verdicts for all of these shapes.
-    public const string CurrentFormatVersion = "1.8";
+    // 1.9 (2026-08-04, v0.12 PP-A1 item 6): divergence D4 closed by refusal. A non-ordinal string
+    // comparison mode was translated as ORDINAL after a warning, and the mode-bearing form was
+    // whitelisted in ModeledForms, so the solver returned a genuine false `Proven` — which the
+    // emitter acts on by ELIDING the runtime check (`Proven && !IsVacuous`, D-G1.3). Reproduced
+    // end-to-end on a shipped path: the same program threw ContractViolationException without
+    // --verify and ran clean with it. Warm 1.8 caches hold exactly those false `Proven` verdicts,
+    // so the bump is required for the fix to take effect at all, not merely for hygiene.
+    // 1.10 (2026-08-05, D4 second half): StartsWith/EndsWith/IndexOf WITHOUT an explicit ':ordinal'
+    // are refused. .NET resolves those single-argument overloads to CurrentCulture while the solver
+    // models them ordinally, so the no-mode spelling carried the same false-`Proven`-elides vector
+    // 1.9 closed for explicit non-ordinal modes — on the far more common spelling. Warm 1.9 caches
+    // hold exactly those verdicts, so the bump is again required for the fix to take effect.
+    public const string CurrentFormatVersion = "1.10";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.
