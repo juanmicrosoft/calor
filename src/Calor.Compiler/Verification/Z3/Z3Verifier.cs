@@ -36,6 +36,29 @@ public sealed class Z3Verifier : IDisposable
     public const string ContractExpressionDivisionAssumption =
         "exceptional-paths:contract-division — every division/modulo divisor inside §Q/§S on a verified state is nonzero; a zero divisor makes the runtime contract check itself throw";
 
+    /// <summary>
+    /// D3/D12 (v0.12). Z3's string sort is <b>total and null-free</b>, and its literals are UTF-8
+    /// <b>bytes</b>; .NET strings are nullable and counted in UTF-16 <b>code units</b>. Both gaps
+    /// have produced genuine false <c>Proven</c>s that ELIDED a failing runtime check, on the
+    /// shipped <c>calor run --verify</c> path:
+    /// <list type="bullet">
+    /// <item>D3 — <c>len(s)=0 ⟺ s=""</c> is a Z3 tautology, but in C# <c>null</c> satisfies
+    /// <c>IsNullOrEmpty</c> while <c>null == ""</c> is false.</item>
+    /// <item>D12 — <c>"é".Length</c> is 1 in .NET and 2 under the byte model.</item>
+    /// </list>
+    /// Unlike D4 and D9 these are <b>not closable by refusing an operation</b>: every total axiom
+    /// of the string theory is affected. So the proof is not suppressed — it is <b>demoted</b>, and
+    /// <c>Assumed</c> never elides. The assumption is named rather than silent, which is the D8
+    /// precedent, and the runtime check survives regardless of whether the proof was sound.
+    /// <para>The demotion is deliberately <b>conservative</b>: any string-typed value or string
+    /// operation anywhere in the obligation is enough. Narrowing it would require knowing which
+    /// proofs "really" depended on the string theory, and three review rounds found three vectors
+    /// behind exactly that kind of reasoning. Lifting it is tracked by #875 (make <c>str</c>
+    /// genuinely non-nullable) — each case proved non-null can have the demotion lifted.</para>
+    /// </summary>
+    public const string StringModelAssumption =
+        "string-model — the solver's strings are total, non-null and UTF-8-byte-counted, while .NET's are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII";
+
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
     private bool _disposed;
@@ -414,7 +437,20 @@ public sealed class Z3Verifier : IDisposable
             // check and never aggregates into proven. A refutation under the same
             // side conditions needs no assumption — its model is a genuine
             // non-throwing execution.
-            if (status == Status.UNSATISFIABLE && (pathConditions.Count > 0 || contractDivisionAssumed))
+            // D3/D12 (see StringModelAssumption): a proof carried by the solver's string theory is
+            // conditional on the value being non-null and ASCII, neither of which Calor enforces.
+            // Demote so the runtime check survives; the proof is still reported, named.
+            //
+            // Asked of the TRANSLATOR, not of the contract AST. An earlier version of this fix
+            // derived the trigger from the parameter/result types plus a walk of §Q/§S, and it
+            // MISSED the body: `TryEncodeResult` asserts `result == encode(body)` through this same
+            // translator, so `§S (== result INT:2)` over `§R (len STR:"é")` — no string parameter,
+            // i32 return, no string in the contract — was still Proven and still elided. The flag
+            // is set where the string sort is created, so it cannot miss a form.
+            var stringModelAssumed = translator.TouchedStringTheory;
+
+            if (status == Status.UNSATISFIABLE
+                && (pathConditions.Count > 0 || contractDivisionAssumed || stringModelAssumed))
             {
                 var assumptions = new List<string>();
                 var reasons = new List<string>();
@@ -427,6 +463,11 @@ public sealed class Z3Verifier : IDisposable
                 {
                     assumptions.Add(ContractExpressionDivisionAssumption);
                     reasons.Add("the contract expressions divide, and a zero divisor (or MinValue ÷ -1 overflow) would make the runtime contract check itself throw (W1 Slice 1, D8)");
+                }
+                if (stringModelAssumed)
+                {
+                    assumptions.Add(StringModelAssumption);
+                    reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null and byte-counted while .NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12)");
                 }
                 return ContractVerificationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.AssumedProof(
@@ -1295,4 +1336,5 @@ public static class FunctionBodyEncoder
                 return false;
         }
     }
+
 }

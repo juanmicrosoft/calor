@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Verification;
 using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
 using Xunit;
@@ -2192,7 +2193,11 @@ public class ArrayLengthSoundnessTests
             new[] { precondition1, precondition2 },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // D3/D12: the obligation is carried in part by the solver's string theory, so it is
+        // Assumed rather than Proven. The array half is unaffected — but an obligation takes the
+        // weakest status of everything that carries it, or the demotion would not be sound.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.StringModelAssumption, result.EffectiveOutcome.Assumptions);
     }
 
     // ===========================================

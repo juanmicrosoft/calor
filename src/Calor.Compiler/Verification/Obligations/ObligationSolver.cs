@@ -172,6 +172,24 @@ public sealed class ObligationSolver : IDisposable
             var status = solver.Check();
 
             obligation.SolverDuration = sw.Elapsed;
+
+            // D3/D12: this is the SECOND channel where a proof deletes a runtime guard —
+            // `Discharged` makes CSharpEmitter drop the `if (!(cond)) throw` for a refinement
+            // obligation, exactly as `Proven` elides a postcondition. It shares the string theory
+            // with the contract path, so it needs the same demotion: a refinement predicate like
+            // `(> (len #) INT:0)` is carried by a null-blind, byte-counted model. Assumed maps
+            // away from Discharged (ProofOutcome.ToObligationStatus), so the guard survives.
+            if (status == Status.UNSATISFIABLE && translator.TouchedStringTheory)
+            {
+                obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.AssumedProof(
+                    "Proof is conditional on the string model: the obligation is carried by the " +
+                    "solver's string theory, whose strings are non-null and byte-counted while " +
+                    ".NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12). " +
+                    "Runtime check kept.",
+                    [Z3Verifier.StringModelAssumption])));
+                return;
+            }
+
             obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.SolverVerdict(
                 status, solver, translator.Variables, SatPolarity.SatIsRefutation)));
         }

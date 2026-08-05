@@ -428,7 +428,20 @@ public static class VerifyCommand
         {
             sb.AppendLine($"File: {file.FileName}");
             sb.AppendLine($"  Proven:      {file.Summary.Proven}");
+            // `Assumed` collapses into the legacy `Unproven` bucket (ProofOutcome.ToContractStatus),
+            // so without this line a demoted proof reads as an outright failure to prove — visually
+            // identical to a timeout — when in fact the solver discharged it and the result is
+            // conditional on a NAMED assumption. Broken out here rather than added to
+            // VerificationSummary, whose positional record every consumer would have to change.
+            var assumed = file.Functions.Sum(f =>
+                f.Contracts.Count(c => c.Outcome.Status == ProofStatus.Assumed));
             sb.AppendLine($"  Unproven:    {file.Summary.Unproven}");
+            if (assumed > 0)
+            {
+                // Its own line rather than a suffix on the row above, so anything parsing
+                // `Unproven:\s+(\d+)$` keeps working.
+                sb.AppendLine($"    of which assumed (discharged under a named assumption): {assumed}");
+            }
             sb.AppendLine($"  Disproven:   {file.Summary.Disproven}");
             sb.AppendLine($"  Unsupported: {file.Summary.Unsupported}");
             sb.AppendLine($"  Skipped:     {file.Summary.Skipped}");

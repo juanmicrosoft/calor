@@ -954,7 +954,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1003,7 +1003,7 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1057,7 +1057,7 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1111,7 +1111,7 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1150,7 +1150,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     // ===========================================
@@ -1235,7 +1235,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1274,7 +1274,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1310,7 +1310,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1359,7 +1359,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1398,7 +1398,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1531,7 +1531,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1575,7 +1575,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1625,7 +1625,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -1723,7 +1723,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     // ===========================================
@@ -2296,7 +2296,7 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -2343,7 +2343,7 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     [SkippableFact]
@@ -2417,7 +2417,7 @@ public class VerifierTests
             new[] { precondition1, precondition2 },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        AssertStringProofAssumed(result);
     }
 
     // ===========================================
@@ -2571,4 +2571,22 @@ public class VerifierTests
         Assert.NotNull(result.Duration);
         Assert.True(result.Duration.Value.TotalMilliseconds >= 0);
     }
+
+    /// <summary>
+    /// D3/D12 (v0.12): a proof carried by the solver's string theory is <b>Assumed</b>, never
+    /// <c>Proven</c>. Z3's strings are total, non-null and UTF-8-byte-counted; .NET's are nullable
+    /// and UTF-16-code-unit-counted. Both gaps produced false <c>Proven</c>s that deleted failing
+    /// runtime checks, so the proof is demoted rather than suppressed — <c>Assumed</c> never
+    /// elides, and the assumption is named instead of silent (the D8 precedent).
+    ///
+    /// <para>This is the same strength of assertion as the <c>Proven</c> it replaced: the solver
+    /// still had to discharge the obligation, and the assumption must be the string-model one
+    /// specifically — a demotion for any OTHER reason still fails this.</para>
+    /// </summary>
+    private static void AssertStringProofAssumed(ContractVerificationResult result)
+    {
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.StringModelAssumption, result.EffectiveOutcome.Assumptions);
+    }
+
 }

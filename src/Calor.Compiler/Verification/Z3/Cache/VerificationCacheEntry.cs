@@ -59,7 +59,14 @@ public sealed class VerificationCacheEntry
     // models them ordinally, so the no-mode spelling carried the same false-`Proven`-elides vector
     // 1.9 closed for explicit non-ordinal modes — on the far more common spelling. Warm 1.9 caches
     // hold exactly those verdicts, so the bump is again required for the fix to take effect.
-    public const string CurrentFormatVersion = "1.10";
+    // 1.11 (2026-08-05, D3/D12): proofs carried by the solver's string theory are demoted to
+    // Assumed, which never elides. Warm 1.10 caches hold those verdicts as Proven — the status a
+    // false string proof needs in order to delete a runtime check — so the bump is load-bearing.
+    // 1.12 (2026-08-05, D3/D12 trigger correction): 1.11 derived the string-model demotion from
+    // the contract AST and missed the function BODY, so entries written by 1.11 can hold a Proven
+    // for a proof carried entirely by body-side string terms — the exact verdict that elides.
+    // Found by adversarial review; the bump is what makes the corrected trigger take effect.
+    public const string CurrentFormatVersion = "1.12";
 
     /// <summary>
     /// Cache format version for invalidation on format changes.

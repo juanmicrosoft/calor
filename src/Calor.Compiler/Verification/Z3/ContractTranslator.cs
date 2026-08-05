@@ -834,8 +834,32 @@ public sealed class ContractTranslator
     /// <summary>
     /// Tracks a string expression with metadata.
     /// </summary>
+    /// <summary>
+    /// True once ANY term of Z3's string sort has been minted by this translator — D3/D12's
+    /// demotion trigger (see <see cref="Z3Verifier.StringModelAssumption"/>).
+    ///
+    /// <para>This lives here, rather than being re-derived by walking the contract AST, because
+    /// the AST is the wrong thing to look at. The same translator instance also encodes the
+    /// function BODY into the solver (<c>FunctionBodyEncoder.TryEncodeResult</c> asserts
+    /// <c>result == encode(body)</c>), so a proof can be carried entirely by string terms that
+    /// appear nowhere in the contract: <c>§S (== result INT:2)</c> over <c>§R (len STR:"é")</c>
+    /// has no string parameter, a non-string return, and no string node in the contract — and it
+    /// was <c>Proven</c> and elided. Setting the flag where the sort is CREATED cannot miss a
+    /// form, because every string term in the query passes through here or through
+    /// <see cref="TranslateStringOperation"/>.</para>
+    /// </summary>
+    public bool TouchedStringTheory { get; private set; }
+
+    /// <summary>Records the string-sort touch for sites that hand back a bare <c>Sort</c>.</summary>
+    private Sort MarkStringSort()
+    {
+        TouchedStringTheory = true;
+        return _ctx.StringSort;
+    }
+
     private SeqExpr TrackString(SeqExpr expr, bool isNullable = false)
     {
+        TouchedStringTheory = true;
         _stringInfo[expr] = new StringInfo(isNullable);
         return expr;
     }
@@ -1082,6 +1106,10 @@ public sealed class ContractTranslator
     /// </remarks>
     private Expr? TranslateStringOperation(StringOperationNode node)
     {
+        // Operations whose RESULT is not a string (Length, IndexOf, Contains…) never reach
+        // TrackString, but they are still carried by the string theory's axioms.
+        TouchedStringTheory = true;
+
         // D4, closed by refusal (mirrors D9/string.Replace). A non-ordinal comparison mode used to
         // add a warning and then translate as ORDINAL anyway — the solver proved under one semantics
         // while the emitter emitted the runtime call under another. Because the mode-bearing form was
@@ -1492,7 +1520,13 @@ public sealed class ContractTranslator
             "i32" or "u32" or "int" or "uint" => _ctx.MkBitVecSort(32),
             "i64" or "u64" or "long" or "ulong" => _ctx.MkBitVecSort(64),
             "bool" => _ctx.BoolSort,
-            "string" or "str" => _ctx.StringSort,
+            // Flagged like every other string-sort site (D3/D12): this arm mints a field
+            // accessor's RESULT sort, and `accessor.Apply(target)` does not pass through
+            // TrackString. Unreachable today only because SetUserTypeRegistry has no callers —
+            // but wiring that registry up is the natural fix for D7, which would reopen this
+            // vector on `§S (== (len p.name) INT:2)`. Flagging it here means the invariant
+            // "every string term sets the flag" holds without a caveat.
+            "string" or "str" => MarkStringSort(),
             _ when !string.IsNullOrEmpty(t) => _userTypeSorts.TryGetValue(t, out var s)
                                                ? s
                                                : (_userTypeSorts[t] = _ctx.MkUninterpretedSort(t)),

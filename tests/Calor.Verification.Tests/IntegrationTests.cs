@@ -76,14 +76,19 @@ public class IntegrationTests
         Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
 
-        // Control, so the assertion above is known to discriminate rather than pass vacuously:
-        // the SAME contract stated ordinally is genuinely provable and IS elided. Pre-fix both
-        // programs produced this second output — which is exactly the defect.
+        // Control, so the assertion above is known to discriminate rather than pass vacuously.
+        // NOTE the control changed shape when D3/D12 landed: no string proof elides any more, so
+        // "the ordinal form IS elided" is no longer available as the contrast. The contrast that
+        // remains is the one that matters — REFUSED (outside the modeled surface, Calor0718) vs
+        // DEMOTED (modeled, discharged, then made conditional on the string model, Calor0720).
+        // Both keep the runtime check; only the first means the solver never engaged.
         var ordinal = Program.Compile(
             source.Replace(@" :ignore-case", string.Empty), "test.calr", NoCache());
 
         Assert.False(ordinal.HasErrors);
-        Assert.Contains("// PROVEN: Postcondition", ordinal.GeneratedCode);
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
+        Assert.DoesNotContain(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
+        Assert.Contains(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
     }
 
     /// <summary>
@@ -117,14 +122,65 @@ public class IntegrationTests
         Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
 
-        // Control: with ':ordinal' stated the model matches the emitted overload, so the proof is
-        // sound and the check IS elided. Pre-fix, the bare form took this branch too.
+        // Control: with ':ordinal' stated the model matches the emitted overload, so the solver
+        // genuinely engages — the form is DEMOTED (Calor0720, conditional on the string model per
+        // D3/D12) rather than REFUSED (Calor0718, outside the modeled surface). Both keep the
+        // check, so the emitted-overload assertion is what pins that the fix is precise: a blanket
+        // refusal of these three operations would fail here.
         var ordinal = Program.Compile(
             source.Replace(@"""))", @""" :ordinal))"), "test.calr", NoCache());
 
         Assert.False(ordinal.HasErrors);
         Assert.Contains("StringComparison.Ordinal", ordinal.GeneratedCode);
-        Assert.Contains("// PROVEN: Postcondition", ordinal.GeneratedCode);
+        Assert.DoesNotContain(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
+        Assert.Contains(ordinal.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
+    }
+
+    /// <summary>
+    /// The gap the FIRST version of the D3/D12 demotion missed, and the reason its trigger now
+    /// asks the translator rather than the contract AST. This function has <b>no string
+    /// parameter, an i32 return, and no string node anywhere in its contract</b> — yet the proof
+    /// is carried entirely by Z3's byte-counted string theory, because the body is asserted into
+    /// the same solver (<c>result == encode(body)</c>) and <c>len STR:"é"</c> is 2 bytes where
+    /// .NET's <c>Length</c> is 1.
+    ///
+    /// <para>Before the correction this was <c>Proven</c> and <b>elided</b>: `calor run` threw and
+    /// `calor run --verify` printed <c>1</c>.</para>
+    /// </summary>
+    [SkippableFact]
+    public void StringInBodyOnly_StillNeverElides()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        const string source = @"
+§M{m001:Test}
+  §F{f001:ByteLen:pub} () -> i32
+    §E{}
+    §S (== result INT:2)
+    §R (len STR:""\u00e9"")";
+
+        var result = Program.Compile(source, "test.calr", NoCache());
+
+        Assert.False(result.HasErrors);
+        Assert.Contains("ContractKind.Ensures", result.GeneratedCode);
+        Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
+
+        // DoesNotContain("// PROVEN") alone would also pass for Unsupported, Refuted, Timeout or
+        // Unknown — i.e. it does not pin that the solver still DISCHARGES this. Assert the
+        // demotion specifically, so a regression that stops proving is not mistaken for the fix.
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
+
+        // Control: the same shape with no string in the body at all is still genuinely proved and
+        // elided, so this pins the trigger rather than a verifier that stopped proving.
+        var numeric = Program.Compile(@"
+§M{m001:Test}
+  §F{f001:Two:pub} () -> i32
+    §E{}
+    §S (== result INT:2)
+    §R INT:2", "test.calr", NoCache());
+
+        Assert.False(numeric.HasErrors);
+        Assert.Contains("// PROVEN: Postcondition", numeric.GeneratedCode);
     }
 
     /// <summary>Verification must be exercised, not replayed from a warm cache.</summary>
