@@ -28,7 +28,7 @@ The `format` command formats Calor source files according to the canonical Calor
 # Format a single file (output to stdout)
 calor format MyModule.calr
 
-# Format and overwrite the file
+# Format and overwrite the file — DISABLED by the release policy (see below)
 calor format MyModule.calr --write
 
 # Check if files are formatted (for CI)
@@ -53,7 +53,7 @@ calor format MyModule.calr --diff
 | Option | Short | Default | Description |
 |:-------|:------|:--------|:------------|
 | `--check` | `-c` | `false` | Check if files are formatted without modifying (exit 1 if not) |
-| `--write` | `-w` | `false` | Write formatted output back to the file(s) |
+| `--write` | `-w` | `false` | Write formatted output back to the file(s). **Disabled by the release policy** — see below |
 | `--diff` | `-d` | `false` | Show diff of formatting changes |
 | `--verbose` | `-v` | `false` | Enable verbose output |
 | `--heal` | — | `false` | Best-effort source-level repair of files too broken for the AST formatter. **Not semantics-preserving** — see [Heal Mode](#heal-mode) |
@@ -115,7 +115,13 @@ This allows you to preview changes before applying them.
 
 ## Write Mode
 
-Use `--write` to format files in place:
+> **`--write` is disabled by the release policy (#793/#760).** The formatter's write path can rewrite
+> identifiers via its ID-abbreviation regexes and drops comments, so it is held behind an explicit
+> experimental opt-in and otherwise errors with `Calor1346`. The read-only modes (default and
+> `--check`) are unaffected. The same policy holds the LSP formatting and rename handlers behind
+> `CALOR_LSP_EXPERIMENTAL`. This is PP-A1 item 7 ("T3 containment") and is deliberate, not a bug.
+
+Use `--write` to format files in place (subject to the gate above):
 
 ```bash
 # Format single file
