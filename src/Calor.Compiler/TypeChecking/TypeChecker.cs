@@ -38,6 +38,10 @@ public sealed class TypeChecker
         }
     }
 
+    /// <summary>Set during the signature pre-pass, which re-resolves annotations CheckFunction
+    /// will resolve again — so only the second pass reports.</summary>
+    private bool _suppressDiagnostics;
+
     private void RegisterRefinementType(RefinementTypeNode rtype)
     {
         var baseType = ResolveTypeName(rtype.BaseTypeName, rtype.Span);
@@ -65,16 +69,47 @@ public sealed class TypeChecker
         _env.DefineType(rtype.Name, refinedType);
     }
 
+    /// <summary>
+    /// Registers a function's type parameters, from BOTH spellings.
+    ///
+    /// <para><c>§F{...}&lt;T&gt;</c> — after the attribute block — populates
+    /// <c>func.TypeParameters</c>. But the spelling the shipped sample and the docs use puts them
+    /// inside the name attribute, <c>§F{f001:Identity&lt;T&gt;:pub}</c>, which the parser leaves
+    /// embedded in <c>Name</c>. The emitter passes that through and the generated C# is correct,
+    /// so the program works — but the checker saw an unresolved <c>T</c> and warned that a
+    /// correct, documented generic parameter might be a typo.</para>
+    /// </summary>
+    private void RegisterTypeParameters(FunctionNode func)
+    {
+        foreach (var tp in func.TypeParameters)
+        {
+            _env.DefineType(tp.Name, new TypeParameterType(tp.Name, tp.Constraints));
+        }
+
+        var open = func.Name.IndexOf('<');
+        if (open > 0 && func.Name.EndsWith('>'))
+        {
+            foreach (var raw in func.Name[(open + 1)..^1].Split(','))
+            {
+                var name = raw.Trim();
+                if (name.Length > 0)
+                {
+                    _env.DefineType(name, new TypeParameterType(name, Array.Empty<TypeConstraintNode>()));
+                }
+            }
+        }
+    }
+
     private void RegisterFunction(FunctionNode func)
     {
         _env.EnterScope();
 
-        // Register type parameters first so they can be resolved in parameter types
-        foreach (var tp in func.TypeParameters)
-        {
-            var tpType = new TypeParameterType(tp.Name, tp.Constraints);
-            _env.DefineType(tp.Name, tpType);
-        }
+        // Signature PRE-PASS: resolve quietly. CheckFunction resolves the same annotations again
+        // and owns the diagnostics — without this the unresolved-type warning was reported three
+        // times for a single `T` (parameter here, return here, parameter again there).
+        _suppressDiagnostics = true;
+
+        RegisterTypeParameters(func);
 
         var paramTypes = new List<CalorType>();
         foreach (var param in func.Parameters)
@@ -87,6 +122,7 @@ public sealed class TypeChecker
             ? ResolveTypeName(func.Output.TypeName, func.Output.Span)
             : PrimitiveType.Void;
 
+        _suppressDiagnostics = false;
         _env.ExitScope();
 
         var funcType = new FunctionType(paramTypes, returnType);
@@ -97,12 +133,7 @@ public sealed class TypeChecker
     {
         _env.EnterScope();
 
-        // Register type parameters in scope
-        foreach (var tp in func.TypeParameters)
-        {
-            var tpType = new TypeParameterType(tp.Name, tp.Constraints);
-            _env.DefineType(tp.Name, tpType);
-        }
+        RegisterTypeParameters(func);
 
         // Add parameters to scope
         foreach (var param in func.Parameters)
@@ -381,13 +412,18 @@ public sealed class TypeChecker
                         $"Cannot add {valueType.SurfaceName} to {collectionType.SurfaceName}, expected {elementType.SurfaceName}");
                 }
             }
-            else if (IsKnownNonCollection(collectionType))
+            else
             {
+                // Reachable only for a KNOWN generic that is not a List/HashSet, so no guard is
+                // needed here — a GenericInstanceType is never ErrorType or ExternalType. An
+                // earlier revision put the guard on this branch, where it was dead code, and left
+                // the outer `else` below — the one that actually sees unmodeled receivers —
+                // unprotected.
                 _diagnostics.ReportError(push.Span, DiagnosticCode.TypeMismatch,
                     $"PUSH operation requires List or HashSet, got {collectionType.SurfaceName}");
             }
         }
-        else
+        else if (IsKnownNonCollection(collectionType))
         {
             _diagnostics.ReportError(push.Span, DiagnosticCode.TypeMismatch,
                 $"PUSH operation requires a collection type, got {collectionType.SurfaceName}");
@@ -424,7 +460,7 @@ public sealed class TypeChecker
                     $"Dictionary value type mismatch: expected {expectedValueType.SurfaceName}, got {valueType.SurfaceName}");
             }
         }
-        else if (dictType is null || IsKnownNonCollection(dictType))
+        else if (IsKnownNonCollection(dictType))
         {
             _diagnostics.ReportError(put.Span, DiagnosticCode.TypeMismatch,
                 $"PUT operation requires a Dictionary, got {dictType?.SurfaceName ?? "unknown"}");
@@ -999,13 +1035,12 @@ public sealed class TypeChecker
         // useful error, and this must not weaken it.
         if (refNode.Name.Contains('.'))
         {
-            var head = refNode.Name[..refNode.Name.IndexOf('.')];
-            if (_env.LookupVariable(head) == null)
-            {
-                return ErrorType.Instance;
-            }
-            // The head IS a local, so this is field/property access on a known value. Still not
-            // modeled — the checker has no member table — but equally not an undefined variable.
+            // Both cases — an unknown head (`Math.PI`) and a known local's member
+            // (`someLocal.Length`) — are unmodeled here, so they get the same answer. Reporting
+            // the second as an unknown MEMBER was considered and rejected: without a member table
+            // the checker cannot separate `n.NoSuchField` from `n.ToString`, and `ToString` is
+            // common enough that reporting would reintroduce exactly the false-positive class
+            // this change set removes.
             return ErrorType.Instance;
         }
 
@@ -1346,6 +1381,11 @@ public sealed class TypeChecker
         // trailing-member-access shapes reach this resolver with a local's name in the type
         // position. Warning on everything is weaker per-case and honest about which.
         var spelled = Parsing.AttributeHelper.ToSurfaceSpelling(typeName);
+        if (_suppressDiagnostics)
+        {
+            return new ExternalType(Parsing.AttributeHelper.ToSurfaceSpelling(typeName));
+        }
+
         _diagnostics.ReportWarning(span, DiagnosticCode.UndefinedReference,
             $"Type '{spelled}' is not known to the Calor type checker. If it is a .NET type used " +
             "through interop this is expected and the C# compiler will check it; if it is a typo, " +

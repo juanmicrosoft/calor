@@ -82,6 +82,56 @@ public class BenchCorpusCompilesTests
         Assert.True(count >= 20, $"expected the pair corpus to be discovered; found {count}");
     }
 
+    public static TheoryData<string> SamplePrograms()
+    {
+        var data = new TheoryData<string>();
+        var root = FindRepoRoot();
+        var samples = root == null ? null : Path.Combine(root, "samples");
+        if (samples == null || !Directory.Exists(samples))
+        {
+            return data;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(samples, "*.calr", SearchOption.AllDirectories))
+        {
+            if (!file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")
+                && !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            {
+                data.Add(Path.GetRelativePath(root!, file));
+            }
+        }
+
+        return data;
+    }
+
+    /// <summary>
+    /// Samples are what a reader copies, so they must be clean — and clean means WARNING-free too,
+    /// not just error-free. `samples/Generics/generics.calr` is why this asserts warnings: the
+    /// unresolved-type warning fired on its declared generic parameter `T`, telling a reader that
+    /// a correct, documented construct might be a typo. Nothing compiled `samples/` before.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(SamplePrograms))]
+    public void Sample_CompilesWithoutErrorsOrTypeWarnings(string relativePath)
+    {
+        var root = FindRepoRoot();
+        Assert.NotNull(root);
+
+        var full = Path.Combine(root!, relativePath);
+        var result = Program.Compile(File.ReadAllText(full), full, new CompilationOptions());
+
+        Assert.False(result.HasErrors,
+            $"{relativePath}:\n  " +
+            string.Join("\n  ", result.Diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}")));
+
+        var typeWarnings = result.Diagnostics.Warnings
+            .Where(d => d.Message.Contains("is not known to the Calor type checker"))
+            .ToList();
+        Assert.True(typeWarnings.Count == 0,
+            $"{relativePath} emits unresolved-type warnings:\n  " +
+            string.Join("\n  ", typeWarnings.Select(d => d.Message)));
+    }
+
     private static string? FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

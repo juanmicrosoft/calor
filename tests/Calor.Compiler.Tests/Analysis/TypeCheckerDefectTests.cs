@@ -74,6 +74,40 @@ public class TypeCheckerDefectTests
         Assert.Contains(type, error.Message);
     }
 
+    /// <summary>
+    /// `object` is excluded from the theory above — a top type cannot reject a `str`, so the
+    /// negative test has to run the other way. It was 13 of the original 92 and would otherwise
+    /// be the one type with no discriminating pin.
+    /// </summary>
+    [Fact]
+    public void ObjectIsATopType_NotAUniversalEscape()
+    {
+        // Everything assigns TO object...
+        AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{o:object} STR:\"a\"\n    §R\n");
+
+        // ...and nothing assigns FROM it without a cast, which is what C# requires.
+        var result = Check("§M{m:S}\n  §F{f:Do:pub} (object:o) -> void\n    §E{}\n    §B{n:i32} o\n    §R\n");
+        Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("Cannot assign"));
+    }
+
+    /// <summary>
+    /// A declared generic parameter is not an unknown type. `§F{f:Identity<T>:pub}` — the spelling
+    /// the shipped sample and the docs use — leaves `<T>` embedded in the function NAME rather
+    /// than in `TypeParameters`, so the checker warned that a correct construct might be a typo,
+    /// three times per parameter.
+    /// </summary>
+    [Fact]
+    public void DeclaredGenericParameter_IsNotWarnedAbout()
+    {
+        var result = Check("§M{m:S}\n  §F{f001:Identity<T>:pub} (T:value) -> T\n    §R value\n");
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
+    }
+
+    /// <summary>PUSH must stay silent on a receiver the checker cannot model, like its siblings.</summary>
+    [Fact]
+    public void PushOnUnmodeledReceiver_IsNotAnError()
+        => AssertNoErrors("§M{m:S}\n  §F{f:Do:pub} (SomeUnknownBag:items) -> void\n    §E{mut}\n    §PUSH{items} INT:1\n    §R\n");
+
     [Theory]
     [InlineData("[str]")]   // the collection-literal spelling in the syntax reference
     [InlineData("[u8]")]
