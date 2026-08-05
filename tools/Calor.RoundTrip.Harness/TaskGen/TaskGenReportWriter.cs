@@ -17,6 +17,15 @@ public static class TaskGenReportWriter
     public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, JsonOpts);
 
     /// <summary>Per-bundle README: what an agent working the task receives + the provenance/eligibility proof.</summary>
+    /// <summary>
+    /// Culture-INVARIANT percent. `:P1` renders "40.0%" under en-US and "40.0 %" under the invariant
+    /// culture, so epoch artifacts generated on a developer machine did not match the same artifacts
+    /// regenerated on CI — a reproducibility defect in a committed record, caught by the
+    /// README-equality test. Formatting is pinned here rather than left to the ambient culture.
+    /// </summary>
+    internal static string Pct(double fraction, int decimals = 1) =>
+        (fraction * 100).ToString("F" + decimals, System.Globalization.CultureInfo.InvariantCulture) + "%";
+
     public static string BundleReadme(TaskBundle b)
     {
         var p = b.Provenance;
@@ -59,7 +68,7 @@ public static class TaskGenReportWriter
         sb.AppendLine($"- Clause (b): held-out test outcome — C# arm=**{proof.CSharpArmHeldOutOutcome}**, Calor arm=**{proof.CalorArmHeldOutOutcome}**");
         sb.AppendLine($"  - failure signatures — C#=`{proof.CSharpArmFailureSignature}`, Calor=`{proof.CalorArmFailureSignature}`");
         sb.AppendLine($"- D-W4.3 attribution: **{proof.AttributionOutcome}**");
-        sb.AppendLine($"- Project NativeFraction at generation: {proof.ProjectNativeFraction:P1}");
+        sb.AppendLine($"- Project NativeFraction at generation: {Pct(proof.ProjectNativeFraction)}");
         sb.AppendLine();
         sb.AppendLine($"## Defect stratum: **{proof.Stratum}**");
         sb.AppendLine();
@@ -117,7 +126,7 @@ public static class TaskGenReportWriter
         sb.AppendLine("| Project | NativeFraction | Passes gate | Reason |");
         sb.AppendLine("|---|---:|:---:|---|");
         foreach (var d in run.FidelityGate.Decisions)
-            sb.AppendLine($"| {d.ProjectName} | {d.NativeFraction:P1} | {(d.Passed ? "yes" : "no")} | {d.Reason} |");
+            sb.AppendLine($"| {d.ProjectName} | {Pct(d.NativeFraction)} | {(d.Passed ? "yes" : "no")} | {d.Reason} |");
         sb.AppendLine();
 
         sb.AppendLine("## Exclusion accounting (D-W4.1 — every candidate counted, no silent shrinkage)");
@@ -127,7 +136,7 @@ public static class TaskGenReportWriter
         foreach (var p in run.Projects)
         {
             var a = p.Accounting;
-            sb.AppendLine($"| {p.ProjectName} | {p.TotalEnumeratedCandidates} | {a.Considered} | {a.Eligible} | {a.ExcludedClauseA} | {a.ExcludedClauseB} | {a.ExcludedAttribution} | {a.ExcludedHeldOutFilterLeak} | {a.ExcludedNoCoveringTest} | {a.ExcludedDidNotCompile} | {a.ExcludedMultipleSourceFiles} | {a.ExcludedInseparableRevert} | {a.EligibilityRate:P0} |");
+            sb.AppendLine($"| {p.ProjectName} | {p.TotalEnumeratedCandidates} | {a.Considered} | {a.Eligible} | {a.ExcludedClauseA} | {a.ExcludedClauseB} | {a.ExcludedAttribution} | {a.ExcludedHeldOutFilterLeak} | {a.ExcludedNoCoveringTest} | {a.ExcludedDidNotCompile} | {a.ExcludedMultipleSourceFiles} | {a.ExcludedInseparableRevert} | {Pct(a.EligibilityRate, 0)} |");
         }
         var totEnumerated = run.Projects.Sum(p => p.TotalEnumeratedCandidates);
         var totConsidered = run.Projects.Sum(p => p.Accounting.Considered);
@@ -139,7 +148,7 @@ public static class TaskGenReportWriter
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedDidNotCompile)}** | " +
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedMultipleSourceFiles)}** | " +
             $"**{run.Projects.Sum(p => p.Accounting.ExcludedInseparableRevert)}** | " +
-            $"**{(totConsidered == 0 ? 0 : (double)totEligible / totConsidered):P0}** |");
+            $"**{Pct(totConsidered == 0 ? 0 : (double)totEligible / totConsidered, 0)}** |");
         sb.AppendLine();
         sb.AppendLine("'Excl multi-src' and 'Excl inseparable' are revert-source SUPPLY exclusions (a mined fix commit ");
         sb.AppendLine("touching >1 source file, or whose source hunk could not be cleanly reverse-applied onto the pinned ");
@@ -153,7 +162,7 @@ public static class TaskGenReportWriter
         sb.AppendLine();
         foreach (var p in run.Projects)
         {
-            sb.AppendLine($"**{p.ProjectName}** (NativeFraction {p.NativeFraction:P1}, {p.NativeSourceFiles} native of {p.TotalConvertibleFiles} files)");
+            sb.AppendLine($"**{p.ProjectName}** (NativeFraction {Pct(p.NativeFraction)}, {p.NativeSourceFiles} native of {p.TotalConvertibleFiles} files)");
             sb.AppendLine();
             sb.AppendLine("| Candidate | File | Stratum | Operator | Expected check | Addressable | Verdict | Reason |");
             sb.AppendLine("|---|---|---|---|---|:---:|:---:|---|");
@@ -225,7 +234,7 @@ public static class TaskGenReportWriter
         sb.AppendLine($"- Expressible candidates considered: **{expressible.Count}**");
         sb.AppendLine($"- Probed & determinable: **{probedDeterminable}** (indeterminable — a conversion did not compile: {indeterminable})");
         sb.AppendLine($"- Verification-addressable (check introduced by the mutation): **{addressable}**");
-        sb.AppendLine($"- **Verification-addressability base rate: {baseRate:P0}** (addressable / probed-determinable)");
+        sb.AppendLine($"- **Verification-addressability base rate: {Pct(baseRate, 0)}** (addressable / probed-determinable)");
         sb.AppendLine();
         sb.AppendLine("| Expected check | Operator class | Probed-determinable | Addressable | Rate |");
         sb.AppendLine("|---|---|---:|---:|---:|");
@@ -235,7 +244,7 @@ public static class TaskGenReportWriter
         {
             var probed = g.Count(d => d.AddressabilityProbed && d.AddressabilityDeterminable);
             var addr = g.Count(d => d.VerificationAddressable);
-            var rate = probed == 0 ? "n/a" : $"{(double)addr / probed:P0}";
+            var rate = probed == 0 ? "n/a" : Pct((double)addr / probed, 0);
             sb.AppendLine($"| {g.Key.Item1} | {g.Key.Item2} | {probed} | {addr} | {rate} |");
         }
         sb.AppendLine();
