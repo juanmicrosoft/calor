@@ -48,13 +48,120 @@ public class TypeCheckerDefectTests
         AssertNoErrors($"§M{{m:S}}\n  §F{{f:Do:pub}} ({type}:x) -> void\n    §E{{}}\n    §R\n");
     }
 
+    /// <summary>
+    /// The negative half, and the half that actually discriminates. "No errors" alone cannot tell
+    /// a RESOLVED type from an unresolved one, because an unresolved name falls back to a
+    /// permissive external type that is assignable from anything — so reverting the whole
+    /// <c>FromName</c> expansion left the theory above entirely green. Each type must also be
+    /// strong enough to REJECT a bad assignment and echo its own name doing it.
+    /// </summary>
+    [Theory]
+    [InlineData("char")]
+    [InlineData("decimal")]
+    [InlineData("i8")]
+    [InlineData("i16")]
+    [InlineData("i64")]
+    [InlineData("u8")]
+    [InlineData("u16")]
+    [InlineData("u32")]
+    [InlineData("u64")]
+    [InlineData("f32")]
+    public void DocumentedPrimitiveTypes_AreCheckedNotJustAccepted(string type)
+    {
+        var result = Check($"§M{{m:S}}\n  §F{{f:Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} BOOL:true\n    §R\n");
+
+        var error = Assert.Single(result.Diagnostics.Errors);
+        Assert.Contains(type, error.Message);
+    }
+
     [Theory]
     [InlineData("[str]")]   // the collection-literal spelling in the syntax reference
     [InlineData("[u8]")]
+    [InlineData("str[]")]
     public void ArrayTypes_Resolve(string type)
     {
         AssertNoErrors($"§M{{m:S}}\n  §F{{f:Do:pub}} ({type}:xs) -> void\n    §E{{}}\n    §R\n");
     }
+
+    /// <summary>
+    /// Arrays must be checked, not merely accepted — and BOTH spellings. `[T]` reaches the checker
+    /// expanded (`ARRAY[element=…]`), so a fix that only retried the primitive table left it
+    /// falling through to the permissive external type: `§B{a:[str]} someIntArray` was accepted.
+    /// </summary>
+    [Theory]
+    [InlineData("[i32]", "[str]")]
+    [InlineData("i32[]", "str[]")]
+    public void ArrayTypes_RejectMismatchedElements(string paramType, string bindType)
+    {
+        var result = Check(
+            $"§M{{m:S}}\n  §F{{f:Do:pub}} ({paramType}:xs) -> void\n    §E{{}}\n    §B{{a:{bindType}}} xs\n    §R\n");
+
+        Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("Cannot assign"));
+    }
+
+    /// <summary>
+    /// An unresolved type must still be REPORTED — as a warning, not silence and not an error.
+    ///
+    /// <para>Silence was the first attempt and it is wrong: on `calor_check`, `calor_refine` and
+    /// `calor -i/-o` nothing else compiles the generated C#, so a misspelt type would vanish
+    /// rather than resurface as CS0246, contrary to what an earlier revision of this change
+    /// claimed. An error is also wrong — it rejects every interop type and is most of what this
+    /// change set fixes. A heuristic (lower-case = Calor typo, PascalCase = external) was tried
+    /// and rejected: it missed `Strng` while firing on working programs.</para>
+    /// </summary>
+    [Theory]
+    [InlineData("strng")]   // a misspelt Calor type
+    [InlineData("Strng")]   // ...and one that looks external, which a case heuristic would miss
+    public void UnresolvedType_IsWarnedAboutNotSilentlyAccepted(string type)
+    {
+        var result = Check($"§M{{m:S}}\n  §F{{f:Do:pub}} () -> void\n    §E{{}}\n    §B{{x:{type}}} STR:\"a\"\n    §R\n");
+
+        Assert.False(result.HasErrors);
+        Assert.Contains(result.Diagnostics.Warnings, d => d.Message.Contains($"'{type}' is not known"));
+    }
+
+    /// <summary>C# has no implicit decimal↔double conversion; accepting it emits CS0019.</summary>
+    [Fact]
+    public void DecimalMixedWithFloat_IsRejected()
+    {
+        var result = Check(
+            "§M{m:S}\n  §F{f:Do:pub} (decimal:d, f64:x) -> void\n    §E{}\n    §B{r:decimal} (+ d x)\n    §R\n");
+
+        Assert.Contains(result.Diagnostics.Errors, d => d.Message.Contains("decimal"));
+    }
+
+    /// <summary>
+    /// `§VAR{d}` in a switch-expression arm binds `d`. `CheckPattern` modelled 7 of the AST's 19
+    /// pattern kinds and hard-errored on the rest, and the match-EXPRESSION path never entered a
+    /// scope or bound patterns at all — so this program reported `Undefined variable 'd'` twice
+    /// plus `Unsupported pattern type`, on a program whose emitted C# compiles.
+    /// </summary>
+    [Fact]
+    public void SwitchExpressionPatternVariable_IsBound()
+        => AssertNoErrors("""
+            §M{m:S}
+              §F{f:Do:pub} (i32:diff) -> i32
+                §E{}
+                §B{result:i32} §W{sw1:expr} diff
+                  §K §VAR{d} §WHEN (> d 0) → d
+                  §K _ → 0
+                §R result
+            """);
+
+    /// <summary>
+    /// Arrays are indexable. Making `T[]` resolve without teaching SETIDX about it turned working
+    /// programs — including two agent-native benchmark GOLD references — into hard errors, and
+    /// dropped one of them from 53 proven contracts to zero.
+    /// </summary>
+    [Fact]
+    public void SetIndexOnArray_IsAccepted()
+        => AssertNoErrors("""
+            §M{m:S}
+              §F{f:Do:pub} (i32[]:xs, i32:i, i32:v) -> i32
+                §E{mut}
+                §SETIDX{xs} i v
+                §R INT:0
+            """);
 
     /// <summary>
     /// A width still has to be ECHOED correctly once it resolves. Resolving `i64` to the collapsed

@@ -381,7 +381,7 @@ public sealed class TypeChecker
                         $"Cannot add {valueType.SurfaceName} to {collectionType.SurfaceName}, expected {elementType.SurfaceName}");
                 }
             }
-            else
+            else if (IsKnownNonCollection(collectionType))
             {
                 _diagnostics.ReportError(push.Span, DiagnosticCode.TypeMismatch,
                     $"PUSH operation requires List or HashSet, got {collectionType.SurfaceName}");
@@ -424,7 +424,7 @@ public sealed class TypeChecker
                     $"Dictionary value type mismatch: expected {expectedValueType.SurfaceName}, got {valueType.SurfaceName}");
             }
         }
-        else
+        else if (dictType is null || IsKnownNonCollection(dictType))
         {
             _diagnostics.ReportError(put.Span, DiagnosticCode.TypeMismatch,
                 $"PUT operation requires a Dictionary, got {dictType?.SurfaceName ?? "unknown"}");
@@ -462,7 +462,7 @@ public sealed class TypeChecker
                     $"Cannot remove {removeType.SurfaceName} from {collectionType.SurfaceName}, expected {expectedType.SurfaceName}");
             }
         }
-        else
+        else if (IsKnownNonCollection(collectionType) && collectionType is not ArrayType)
         {
             _diagnostics.ReportError(remove.Span, DiagnosticCode.TypeMismatch,
                 $"REM operation requires a collection type, got {collectionType.SurfaceName}");
@@ -498,10 +498,21 @@ public sealed class TypeChecker
                     $"Cannot assign {valueType.SurfaceName} to list element of type {elementType.SurfaceName}");
             }
         }
-        else
+        else if (collectionType is ArrayType setArray)
+        {
+            // Arrays are indexable too. Before arrays resolved at all this branch was unreachable;
+            // making them resolve without teaching SETIDX about them turned a working program —
+            // including two agent-native benchmark GOLD references — into a hard error.
+            if (!IsAssignable(setArray.ElementType, valueType))
+            {
+                _diagnostics.ReportError(setIndex.Value.Span, DiagnosticCode.TypeMismatch,
+                    $"Cannot assign {valueType.SurfaceName} to array element of type {setArray.ElementType.SurfaceName}");
+            }
+        }
+        else if (IsKnownNonCollection(collectionType))
         {
             _diagnostics.ReportError(setIndex.Span, DiagnosticCode.TypeMismatch,
-                $"SETIDX operation requires a List, got {collectionType.SurfaceName}");
+                $"SETIDX operation requires a List or array, got {collectionType.SurfaceName}");
         }
     }
 
@@ -516,8 +527,9 @@ public sealed class TypeChecker
         }
 
         // Clear works on any collection type
-        if (collectionType is not GenericInstanceType git ||
-            (git.BaseName != "List" && git.BaseName != "Dictionary" && git.BaseName != "HashSet"))
+        if ((collectionType is not GenericInstanceType git ||
+             (git.BaseName != "List" && git.BaseName != "Dictionary" && git.BaseName != "HashSet"))
+            && IsKnownNonCollection(collectionType))
         {
             _diagnostics.ReportError(clear.Span, DiagnosticCode.TypeMismatch,
                 $"CLR operation requires a collection type, got {collectionType.SurfaceName}");
@@ -553,8 +565,9 @@ public sealed class TypeChecker
                     $"Cannot insert {valueType.SurfaceName} into list of type {elementType.SurfaceName}");
             }
         }
-        else
+        else if (IsKnownNonCollection(collectionType) && collectionType is not ArrayType)
         {
+            // Arrays have no INS — fixed length — but an unmodeled receiver must stay silent.
             _diagnostics.ReportError(insert.Span, DiagnosticCode.TypeMismatch,
                 $"INS operation requires a List, got {collectionType.SurfaceName}");
         }
@@ -575,7 +588,7 @@ public sealed class TypeChecker
             _env.DefineVariable(dictForeach.KeyName, keyType);
             _env.DefineVariable(dictForeach.ValueName, valueType);
         }
-        else
+        else if (IsKnownNonCollection(dictType))
         {
             _diagnostics.ReportError(dictForeach.Dictionary.Span, DiagnosticCode.TypeMismatch,
                 $"EACHKV requires a Dictionary, got {dictType.SurfaceName}");
@@ -658,10 +671,54 @@ public sealed class TypeChecker
                         $"Err pattern can only match Result types, got {expectedType.SurfaceName}");
                 }
                 break;
+            // `§VAR{d}` — the `var d` pattern. Binds like VariablePatternNode; it reached the
+            // default arm below and hard-errored, so every switch arm using it was rejected.
+            case VarPatternNode varPatNode:
+                _env.DefineVariable(varPatNode.Name, expectedType);
+                break;
+
+            // `§K{Type:name}` — a type test with an optional binding. The bound name takes the
+            // tested type, which the checker may not model; ExternalType is the honest answer.
+            case TypePatternNode typePat:
+                if (!string.IsNullOrEmpty(typePat.BindingName))
+                {
+                    _env.DefineVariable(typePat.BindingName!, ResolveTypeName(typePat.TypeName, typePat.Span));
+                }
+                break;
+
+            // Composites: recurse so nested bindings land in scope.
+            case AndPatternNode andPat:
+                CheckPattern(andPat.Left, expectedType);
+                CheckPattern(andPat.Right, expectedType);
+                break;
+
+            case OrPatternNode orPat:
+                CheckPattern(orPat.Left, expectedType);
+                CheckPattern(orPat.Right, expectedType);
+                break;
+
+            case NegatedPatternNode negPat:
+                CheckPattern(negPat.Inner, expectedType);
+                break;
+
+            case ListPatternNode listPat:
+                var elementType = expectedType is ArrayType at ? at.ElementType
+                    : expectedType is GenericInstanceType { BaseName: "List", TypeArguments.Count: 1 } lg
+                        ? lg.TypeArguments[0]
+                        : ErrorType.Instance;
+                foreach (var sub in listPat.Patterns)
+                {
+                    CheckPattern(sub, elementType);
+                }
+                break;
+
             default:
-                // Unknown pattern type - report for safety
-                _diagnostics.ReportError(pattern.Span, DiagnosticCode.TypeMismatch,
-                    $"Unsupported pattern type: {pattern.GetType().Name}");
+                // Silent. `CheckPattern` models 7 of the 19 pattern kinds in the AST, and the rest
+                // — relational, property, positional, constant, is — are simply not implemented
+                // here. Reporting "Unsupported pattern type" made the CHECKER's gap the user's
+                // error, and once the checker runs by default that is a hard error on any program
+                // using one. Any name a pattern binds and this arm misses will surface as a normal
+                // "Undefined variable" at the use site, which is the correct place for it.
                 break;
         }
     }
@@ -992,6 +1049,18 @@ public sealed class TypeChecker
             return PrimitiveType.String;
         }
 
+        // C# has no implicit conversion between `decimal` and the binary floating types, in
+        // either direction — `decimal + double` is CS0019. Both are "numeric", so the family
+        // check has to be separate or the checker accepts a program the emitted C# rejects.
+        if ((leftType.Equals(PrimitiveType.Decimal) && rightType.Equals(PrimitiveType.Float))
+            || (leftType.Equals(PrimitiveType.Float) && rightType.Equals(PrimitiveType.Decimal)))
+        {
+            _diagnostics.ReportError(binOp.Span, DiagnosticCode.TypeMismatch,
+                $"Cannot mix {leftType.SurfaceName} and {rightType.SurfaceName} in arithmetic: " +
+                "C# has no implicit conversion between decimal and floating-point types");
+            return ErrorType.Instance;
+        }
+
         // Arithmetic operators
         if (!IsNumericType(leftType) || !IsNumericType(rightType))
         {
@@ -1111,6 +1180,24 @@ public sealed class TypeChecker
         CalorType? unifiedType = null;
         foreach (var matchCase in match.Cases)
         {
+            // Each arm gets its own scope with the pattern's bindings in it, exactly as
+            // CheckMatchStatement does. This was missing entirely: an arm like
+            // `§K §VAR{d} §WHEN (> d 0) → d` had `d` unbound, so both the guard and the body
+            // reported `Undefined variable 'd'`. Harmless while the checker was opt-out;
+            // a hard error on the default path once it is on.
+            _env.EnterScope();
+            CheckPattern(matchCase.Pattern, targetType);
+
+            if (matchCase.Guard != null)
+            {
+                var guardType = InferExpressionType(matchCase.Guard);
+                if (IsDefinitelyNotBool(guardType))
+                {
+                    _diagnostics.ReportError(matchCase.Guard.Span, DiagnosticCode.TypeMismatch,
+                        $"Match guard must be bool, got {guardType.SurfaceName}");
+                }
+            }
+
             if (matchCase.Body.Count > 0)
             {
                 var lastStmt = matchCase.Body[matchCase.Body.Count - 1];
@@ -1134,6 +1221,8 @@ public sealed class TypeChecker
                         $"Match expression branches have incompatible types: {unifiedType.SurfaceName} and {caseType.SurfaceName}");
                 }
             }
+
+            _env.ExitScope();
         }
 
         return unifiedType ?? PrimitiveType.Unit;
@@ -1223,9 +1312,12 @@ public sealed class TypeChecker
         var surface = Parsing.AttributeHelper.ToSurfaceSpelling(typeName);
         if (!string.Equals(surface, typeName, StringComparison.Ordinal))
         {
-            var sized = PrimitiveType.FromName(surface);
-            if (sized != null)
-                return sized;
+            // RE-ENTER the resolver rather than only retrying FromName. Arrays arrive expanded
+            // too (`ARRAY[element=STRING]`), so a FromName-only retry left `[str]` falling through
+            // to ExternalType — which is assignable from anything, so `§B{a:[str]} xs` with
+            // `xs: [i32]` was silently accepted. The recursion is bounded: ToSurfaceSpelling is
+            // idempotent, and the guard above stops the second pass from recursing again.
+            return ResolveTypeName(surface, span);
         }
 
         // Try user-defined type (includes type parameters in scope)
@@ -1240,10 +1332,25 @@ public sealed class TypeChecker
         // opt-in TypeChecker — so a valid `i64` binding still gets this spurious "Unknown
         // type" — is a separate pre-existing gap outside this spelling change: the opt-in
         // TypeChecker does not model sized numeric widths.)
-        // Unresolved: treat as an external .NET type rather than an error. See ExternalType for
-        // why — the checker models no BCL surface, so "unknown here" and "does not exist" are
-        // indistinguishable, and the C# compiler settles it either way on the generated output.
-        return new ExternalType(Parsing.AttributeHelper.ToSurfaceSpelling(typeName));
+        // Unresolved. Reported as a WARNING, not an error, and not silently either.
+        //
+        // An error is wrong: the checker models no BCL surface, so it cannot distinguish "a .NET
+        // type reached through interop" from "a typo", and erroring rejects working programs —
+        // that is most of what this change set fixes. But silence is also wrong: on
+        // `calor_check`, `calor_refine` and `calor -i/-o` NOTHING else compiles the generated C#,
+        // so a misspelt type would simply vanish rather than resurface as CS0246 later.
+        //
+        // A heuristic was tried first — treat lower-case names as Calor typos, PascalCase as
+        // external — and it is recorded here as rejected rather than quietly dropped: it missed
+        // the obvious case (`Strng` is PascalCase) while firing on working programs, because some
+        // trailing-member-access shapes reach this resolver with a local's name in the type
+        // position. Warning on everything is weaker per-case and honest about which.
+        var spelled = Parsing.AttributeHelper.ToSurfaceSpelling(typeName);
+        _diagnostics.ReportWarning(span, DiagnosticCode.UndefinedReference,
+            $"Type '{spelled}' is not known to the Calor type checker. If it is a .NET type used " +
+            "through interop this is expected and the C# compiler will check it; if it is a typo, " +
+            "nothing else will catch it on this path.");
+        return new ExternalType(spelled);
     }
 
     /// <summary>
@@ -1286,6 +1393,15 @@ public sealed class TypeChecker
     /// the condition and field-access checks did not, which is why enabling the checker rejected
     /// the MCP primer, two shipped benchmarks and the syntax exemplar.</para>
     /// </summary>
+    /// <summary>
+    /// True when the checker genuinely knows this type and it is not a collection it models.
+    /// The <c>ErrorType</c>/<c>ExternalType</c> exclusion is the same rule the bool-condition and
+    /// field-access checks follow: an unmodeled receiver is the checker's blind spot, not the
+    /// user's error.
+    /// </summary>
+    private static bool IsKnownNonCollection(CalorType type)
+        => type is not ErrorType && type is not ExternalType;
+
     private static bool IsDefinitelyNotBool(CalorType type)
         => !type.Equals(PrimitiveType.Bool) && type is not ErrorType && type is not ExternalType;
 
