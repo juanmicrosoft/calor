@@ -20,6 +20,15 @@
       ]
     },
     {
+      "Cause": "CompileError:Expected EXT, METHOD, PROP, IXER, or END_IFACE but found \u003Ctok\u003E",
+      "Files": 14,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/IncludeRule.cs",
+        "FluentValidation/src/FluentValidation/Syntax.cs",
+        "FluentValidation/src/FluentValidation/TestHelper/ITestValidationContinuation.cs"
+      ]
+    },
+    {
       "Cause": "CompileError:Binding \u0027\u003Cid\u003E\u0027 has no type annotation and no initializer. Add either \u0027\u003Cid\u003E\u0027 (e.g",
       "Files": 11,
       "ExampleFiles": [
@@ -29,21 +38,21 @@
       ]
     },
     {
-      "Cause": "CompileError:Expected EXT, METHOD, PROP, IXER, or END_IFACE but found Class",
-      "Files": 10,
-      "ExampleFiles": [
-        "FluentValidation/src/FluentValidation/Internal/IncludeRule.cs",
-        "FluentValidation/src/FluentValidation/Validators/CreditCardValidator.cs",
-        "FluentValidation/src/FluentValidation/Validators/EqualValidator.cs"
-      ]
-    },
-    {
       "Cause": "EmitSyntaxError:Unexpected token \u0027\u003Cid\u003E\u0027",
       "Files": 7,
       "ExampleFiles": [
         "FluentValidation/src/FluentValidation/ValidationException.cs",
         "MediatR/src/MediatR/Mediator.cs",
         "MediatR/src/MediatR/Pipeline/RequestExceptionActionProcessorBehavior.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Dedent to column \u003Cn\u003E does not match any enclosing indent level.",
+      "Files": 6,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/DefaultValidatorExtensions.cs",
+        "FluentValidation/src/FluentValidation/Internal/PropertyChain.cs",
+        "MediatR/src/MediatR/Registration/ServiceRegistrar.cs"
       ]
     },
     {
@@ -74,12 +83,12 @@
       ]
     },
     {
-      "Cause": "CompileError:Dedent to column 4 does not match any enclosing indent level.",
+      "Cause": "CompileError:Expected statement but found \u003Ctok\u003E",
       "Files": 4,
       "ExampleFiles": [
-        "FluentValidation/src/FluentValidation/DefaultValidatorExtensions.cs",
-        "FluentValidation/src/FluentValidation/Internal/PropertyChain.cs",
-        "MediatR/src/MediatR/Registration/ServiceRegistrar.cs"
+        "Serilog/src/Serilog/Capturing/PropertyValueConverter.cs",
+        "Serilog/src/Serilog/Core/LevelOverrideMap.cs",
+        "Serilog/src/Serilog/Formatting/Display/PropertiesOutputFormat.cs"
       ]
     },
     {
@@ -107,24 +116,6 @@
         "Serilog/src/Serilog/Capturing/MessageTemplateProcessor.cs",
         "Serilog/src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs",
         "Serilog/src/Serilog/Configuration/LoggerSinkConfiguration.cs"
-      ]
-    },
-    {
-      "Cause": "CompileError:Expected EXT, METHOD, PROP, IXER, or END_IFACE but found Interface",
-      "Files": 3,
-      "ExampleFiles": [
-        "FluentValidation/src/FluentValidation/Syntax.cs",
-        "FluentValidation/src/FluentValidation/TestHelper/ITestValidationContinuation.cs",
-        "FluentValidation/src/FluentValidation/Validators/LengthValidator.cs"
-      ]
-    },
-    {
-      "Cause": "CompileError:Expected statement but found Identifier",
-      "Files": 3,
-      "ExampleFiles": [
-        "Serilog/src/Serilog/Capturing/PropertyValueConverter.cs",
-        "Serilog/src/Serilog/Core/LevelOverrideMap.cs",
-        "Serilog/src/Serilog/Formatting/Display/PropertiesOutputFormat.cs"
       ]
     },
     {
@@ -174,34 +165,6 @@
       "ExampleFiles": [
         "FluentValidation/src/FluentValidation/Internal/DefaultValidatorSelector.cs",
         "FluentValidation/src/FluentValidation/Internal/RulesetValidatorSelector.cs"
-      ]
-    },
-    {
-      "Cause": "CompileError:Dedent to column 2 does not match any enclosing indent level.",
-      "Files": 1,
-      "ExampleFiles": [
-        "Serilog/src/Serilog/Filters/Matching.cs"
-      ]
-    },
-    {
-      "Cause": "CompileError:Dedent to column 6 does not match any enclosing indent level.",
-      "Files": 1,
-      "ExampleFiles": [
-        "Serilog/src/Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs"
-      ]
-    },
-    {
-      "Cause": "CompileError:Expected EXT, METHOD, PROP, IXER, or END_IFACE but found Enum",
-      "Files": 1,
-      "ExampleFiles": [
-        "FluentValidation/src/FluentValidation/Validators/EmailValidator.cs"
-      ]
-    },
-    {
-      "Cause": "CompileError:Expected statement but found Arg",
-      "Files": 1,
-      "ExampleFiles": [
-        "Serilog/src/Serilog/Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs"
       ]
     },
     {
@@ -304,7 +267,7 @@
     }
   ],
   "Unattributed": 0,
-  "Top3Share": 0.3829787234042553,
-  "Top10Share": 0.6808510638297872,
-  "Verdict": "PP-S1 = MISS \u2014 top-3 causes cover 38% \u003C 50%: long tail, not a work-list"
+  "Top3Share": 0.40425531914893614,
+  "Top10Share": 0.723404255319149,
+  "Verdict": "PP-S1 = MISS \u2014 top-3 causes cover 40.4% \u003C 50.0%: long tail, not a work-list"
 }

@@ -32,6 +32,61 @@ public class FailureCensusTests
     }
 
     [Fact]
+    public void Token_names_and_column_numbers_collapse_so_one_bug_is_one_cause()
+    {
+        // Nothing pinned the normalization before, which is the axis the verdict is most sensitive
+        // to — the regex could have been changed and all tests still passed. These are the two real
+        // cases: one parser bug had been split 10+3+1 and one indent bug 4+1+1.
+        var a = FailureCensus.NormalizeCause("CompileError", ["Expected EXT, METHOD but found Class"]);
+        var b = FailureCensus.NormalizeCause("CompileError", ["Expected EXT, METHOD but found Interface"]);
+        Assert.Equal(a, b);
+
+        var c = FailureCensus.NormalizeCause("CompileError", ["Dedent to column 4 does not match"]);
+        var d = FailureCensus.NormalizeCause("CompileError", ["Dedent to column 6 does not match"]);
+        Assert.Equal(c, d);
+    }
+
+    [Fact]
+    public void Distinct_diagnostics_do_NOT_collapse_together()
+    {
+        // The other direction: over-collapsing would manufacture concentration and flip the gate.
+        var a = FailureCensus.NormalizeCause("CompileError", ["Expected EXT, METHOD but found Class"]);
+        var b = FailureCensus.NormalizeCause("CompileError", ["Dedent to column 4 does not match"]);
+        Assert.NotEqual(a, b);
+        Assert.NotEqual(
+            FailureCensus.NormalizeCause("Reverted", ["x.cs(1,2): error CS0103: no name"]),
+            FailureCensus.NormalizeCause("Reverted", ["x.cs(1,2): error CS0246: no type"]));
+    }
+
+    [Fact]
+    public void First_error_wins_is_the_pinned_tie_break()
+    {
+        // A file with several diagnostics is bucketed by its FIRST — a proxy for earliest source
+        // position. Switching to last-wins would move the shares, so the choice is pinned.
+        var cause = FailureCensus.NormalizeCause("Reverted",
+            ["a.cs(1,1): error CS0246: type", "a.cs(9,9): error CS0103: name"]);
+        Assert.Equal("Reverted:CS0246", cause);
+    }
+
+    [Fact]
+    public void The_verdict_string_is_culture_invariant()
+    {
+        // The Verdict is serialized into the committed record. `:P1` renders "40,4 %" under de-DE —
+        // the same reproducibility defect fixed in the sibling report writer one change earlier.
+        var prev = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+            var r = FailureCensus.Analyse(
+                Enumerable.Range(1, 10).Select(i => F("CompileError", $"f{i}", $"error CS{i:0000}:")).ToList());
+            Assert.Contains("30.0%", r.Verdict);
+            Assert.DoesNotContain("30,0", r.Verdict);   // de-DE decimal comma must not reach the record
+            Assert.DoesNotContain("50,0", r.Verdict);
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = prev; }
+    }
+
+    [Fact]
     public void A_failure_with_no_errors_is_counted_as_unattributed_not_dropped()
     {
         var r = FailureCensus.Analyse([F("Reverted", "p/A.cs")]);

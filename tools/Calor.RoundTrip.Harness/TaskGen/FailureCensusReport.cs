@@ -14,12 +14,12 @@ public static class FailureCensusReport
         sb.AppendLine("or compiled. This buckets those by **cause**, which is what the replacement gate decides on.");
         sb.AppendLine();
         sb.AppendLine($"**Pre-committed rule** (gates A-1.6(b), substrate plan §10): top-3 causes ≥ ");
-        sb.AppendLine($"{TaskGen.FailureCensus.Top3ContinueThreshold:P0} → continue WS-S1; **otherwise → PP-S1 = miss**. Exhaustive by construction.");
+        sb.AppendLine($"{FailureCensus.Pct(FailureCensus.Top3ContinueThreshold)} → continue WS-S1; **otherwise → PP-S1 = miss**. Exhaustive by construction.");
         sb.AppendLine();
         sb.AppendLine($"## Verdict: {r.Verdict}");
         sb.AppendLine();
         sb.AppendLine($"- Failures classified: **{r.TotalFailures}**");
-        sb.AppendLine($"- Top-3 share: **{r.Top3Share:P1}**   ·   top-10 share: {r.Top10Share:P1}");
+        sb.AppendLine($"- Top-3 share: **{FailureCensus.Pct(r.Top3Share)}**   ·   top-10 share: {FailureCensus.Pct(r.Top10Share)}");
         sb.AppendLine($"- Distinct causes: {r.Causes.Count}");
         if (r.Unattributed > 0)
             sb.AppendLine($"- ⚠ **{r.Unattributed} failure(s) had no extractable cause** and are bucketed as `unattributed`. They count in the denominator; a large share here means the census is measuring the harness's record-keeping, not the converter.");
@@ -38,7 +38,7 @@ public static class FailureCensusReport
         {
             i++;
             var share = r.TotalFailures == 0 ? 0 : (double)c.Files / r.TotalFailures;
-            sb.AppendLine($"| {i} | `{c.Cause}` | {c.Files} | {share:P1} | `{c.ExampleFiles.FirstOrDefault()}` |");
+            sb.AppendLine($"| {i} | `{c.Cause}` | {c.Files} | {FailureCensus.Pct(share)} | `{c.ExampleFiles.FirstOrDefault()}` |");
         }
         sb.AppendLine();
         sb.AppendLine("A cause key is `Status:CS####` where a compiler code was recoverable, else a normalized");

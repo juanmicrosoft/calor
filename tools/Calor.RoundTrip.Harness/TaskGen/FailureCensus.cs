@@ -17,6 +17,14 @@ public static class FailureCensus
     /// <summary>The pre-committed threshold. Not a tunable.</summary>
     public const double Top3ContinueThreshold = 0.50;
 
+    /// <summary>
+    /// Culture-invariant percent. The Verdict string is serialized into the committed record, and
+    /// `:P1` renders "38,3 %" under de-DE — the same reproducibility defect fixed in the sibling
+    /// report writer one change earlier.
+    /// </summary>
+    internal static string Pct(double f) =>
+        (f * 100).ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
     public sealed class CauseBucket
     {
         public required string Cause { get; init; }
@@ -47,8 +55,8 @@ public static class FailureCensus
         public string Verdict =>
             TotalFailures == 0 ? "UNDECIDABLE — no failures to classify"
             : Top3Share >= Top3ContinueThreshold
-                ? $"CONTINUE WS-S1 — top-3 causes cover {Top3Share:P0} ≥ {Top3ContinueThreshold:P0}: fidelity is a work-list"
-                : $"PP-S1 = MISS — top-3 causes cover {Top3Share:P0} < {Top3ContinueThreshold:P0}: long tail, not a work-list";
+                ? $"CONTINUE WS-S1 — top-3 causes cover {Pct(Top3Share)} ≥ {Pct(Top3ContinueThreshold)}: fidelity is a work-list"
+                : $"PP-S1 = MISS — top-3 causes cover {Pct(Top3Share)} < {Pct(Top3ContinueThreshold)}: long tail, not a work-list";
     }
 
     /// <summary>
@@ -67,9 +75,15 @@ public static class FailureCensus
         var first = errors.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(first)) return $"{status}:unattributed";
 
-        // Collapse paths, positions and quoted identifiers so the same defect shape buckets together.
+        // Collapse paths, positions, quoted identifiers, bare token names and column numbers so the
+        // same defect shape buckets together. The token/column collapses matter: without them one
+        // parser bug split three ways ("…but found Class/Interface/Enum" = 10+3+1) and one indent bug
+        // split three ways ("Dedent to column 4/2/6" = 4+1+1), which understates concentration by
+        // inconsistently applying this function's own principle.
         var shape = Regex.Replace(first, @"[^\s]+\.cs\(\d+,\d+\)", "<file>");
         shape = Regex.Replace(shape, @"'[^']*'", "'<id>'");
+        shape = Regex.Replace(shape, @"\bbut found \w+", "but found <tok>");
+        shape = Regex.Replace(shape, @"\bto column \d+", "to column <n>");
         shape = shape.Trim();
         if (shape.Length > 80) shape = shape[..80];
         return $"{status}:{shape}";
