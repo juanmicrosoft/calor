@@ -1,0 +1,353 @@
+{
+  "project": "MediatR",
+  "calor_version": "0.10.0",
+  "timestamp": "2026-08-04T23:50:08.5732350\u002B00:00",
+  "duration_seconds": 18.484109,
+  "verdict": "pass",
+  "inconclusive": false,
+  "baseline": {
+    "total": 157,
+    "passed": 155,
+    "failed": 0,
+    "skipped": 2
+  },
+  "round_trip": {
+    "total": 157,
+    "passed": 155,
+    "failed": 0,
+    "skipped": 2
+  },
+  "regressions": 0,
+  "files": {
+    "total": 32,
+    "replaced": 19,
+    "reverted": 6,
+    "conversion_failed": 0,
+    "emit_error": 5,
+    "compile_error": 2,
+    "crashed": 0,
+    "excluded_by_pattern": 2
+  },
+  "avg_conversion_rate": 0.9373475609756098,
+  "build_succeeded": true,
+  "fidelity": {
+    "coverage": {
+      "total_convertible_files": 32,
+      "converted_native": 15,
+      "converted_with_losses": 4,
+      "reverted": 6,
+      "failed_conversion": 7,
+      "excluded_files": 2,
+      "coverage_fraction": 0.59375,
+      "native_fraction": 0.46875,
+      "loss_kind_counts": {
+        "InteropPreserved": 6,
+        "FallbackTodo": 1
+      },
+      "total_interop_blocks": 6,
+      "distinct_gaps": [
+        "foreachvariable"
+      ]
+    },
+    "build": {
+      "succeeded": true,
+      "exit_code": 0,
+      "recovery_reverted_files": 6,
+      "error_count": 0
+    },
+    "tests": {
+      "baseline_total": 157,
+      "baseline_passed": 155,
+      "baseline_failed": 0,
+      "baseline_trx_files": 1,
+      "baseline_console_fallback": false,
+      "round_trip_total": 157,
+      "round_trip_passed": 155,
+      "round_trip_failed": 0,
+      "round_trip_trx_files": 1,
+      "round_trip_console_fallback": false,
+      "inventory_delta": 0,
+      "regressions": 0,
+      "new_passes": 0,
+      "comparison_status": "Pass"
+    }
+  },
+  "file_detail": [
+    {
+      "path": "src/MediatR/IMediator.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/INotificationHandler.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/MediatR/INotificationPublisher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/IPipelineBehavior.cs",
+      "status": "Replaced",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/IPublisher.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/MediatR/IRequestHandler.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/ISender.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/MediatR/IStreamPipelineBehavior.cs",
+      "status": "Replaced",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/IStreamRequestHandler.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Internal/HandlersOrderer.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Internal/ObjectDetails.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Mediator.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/MicrosoftExtensionsDI/RequestExceptionActionProcessorStrategy.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/MicrosoftExtensionsDI/ServiceCollectionExtensions.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/NotificationHandlerExecutor.cs",
+      "status": "Replaced",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/NotificationPublishers/ForeachAwaitPublisher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestExceptionAction.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestExceptionHandler.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestPostProcessor.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestPreProcessor.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestExceptionActionProcessorBehavior.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestExceptionHandlerState.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestExceptionProcessorBehavior.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestPostProcessorBehavior.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestPreProcessorBehavior.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Registration/ServiceRegistrar.cs",
+      "status": "CompileError",
+      "loss_count": 1,
+      "loss_kinds": {
+        "FallbackTodo": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "foreachvariable"
+      ]
+    },
+    {
+      "path": "src/MediatR/TypeForwardings.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Wrappers/NotificationHandlerWrapper.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/MediatR/Wrappers/RequestHandlerWrapper.cs",
+      "status": "Replaced",
+      "loss_count": 2,
+      "loss_kinds": {
+        "InteropPreserved": 2
+      },
+      "interop_blocks": 2,
+      "gaps": []
+    },
+    {
+      "path": "src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    }
+  ]
+}

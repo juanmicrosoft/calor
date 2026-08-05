@@ -1,0 +1,1124 @@
+{
+  "project": "Serilog",
+  "calor_version": "0.10.0",
+  "timestamp": "2026-08-04T23:50:27.0744240\u002B00:00",
+  "duration_seconds": 26.960768,
+  "verdict": "pass",
+  "inconclusive": false,
+  "baseline": {
+    "total": 811,
+    "passed": 811,
+    "failed": 0,
+    "skipped": 0
+  },
+  "round_trip": {
+    "total": 811,
+    "passed": 811,
+    "failed": 0,
+    "skipped": 0
+  },
+  "regressions": 0,
+  "files": {
+    "total": 110,
+    "replaced": 46,
+    "reverted": 43,
+    "conversion_failed": 0,
+    "emit_error": 6,
+    "compile_error": 15,
+    "crashed": 0,
+    "excluded_by_pattern": 8
+  },
+  "avg_conversion_rate": 1,
+  "build_succeeded": true,
+  "fidelity": {
+    "coverage": {
+      "total_convertible_files": 110,
+      "converted_native": 44,
+      "converted_with_losses": 2,
+      "reverted": 43,
+      "failed_conversion": 21,
+      "excluded_files": 8,
+      "coverage_fraction": 0.41818181818181815,
+      "native_fraction": 0.4,
+      "loss_kind_counts": {
+        "PreprocessorStripped": 210,
+        "InteropPreserved": 4,
+        "Dropped": 2,
+        "EmitterFallback": 1
+      },
+      "total_interop_blocks": 5,
+      "distinct_gaps": [
+        "preprocessor-directive",
+        "unsupported-member"
+      ]
+    },
+    "build": {
+      "succeeded": true,
+      "exit_code": 0,
+      "recovery_reverted_files": 43,
+      "error_count": 0
+    },
+    "tests": {
+      "baseline_total": 811,
+      "baseline_passed": 811,
+      "baseline_failed": 0,
+      "baseline_trx_files": 1,
+      "baseline_console_fallback": false,
+      "round_trip_total": 811,
+      "round_trip_passed": 811,
+      "round_trip_failed": 0,
+      "round_trip_trx_files": 1,
+      "round_trip_console_fallback": false,
+      "inventory_delta": 0,
+      "regressions": 0,
+      "new_passes": 0,
+      "comparison_status": "Pass"
+    }
+  },
+  "file_detail": [
+    {
+      "path": "src/Serilog/Capturing/DepthLimiter.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Capturing/MessageTemplateProcessor.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Capturing/PropertyBinder.cs",
+      "status": "CompileError",
+      "loss_count": 6,
+      "loss_kinds": {
+        "PreprocessorStripped": 6
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Capturing/PropertyValueConverter.cs",
+      "status": "CompileError",
+      "loss_count": 5,
+      "loss_kinds": {
+        "PreprocessorStripped": 4,
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Capturing/TrimConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Configuration/BatchingOptions.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Configuration/ILoggerSettings.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerDestructuringConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerFilterConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerMinimumLevelConfiguration.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerSettingsConfiguration.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerSinkConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Context/EnricherStack.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Context/LogContext.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Context/LogContextEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Constants.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/CustomDefaultMethodImplementationAttribute.cs",
+      "status": "Replaced",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/ConditionalEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/EmptyEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/FixedPropertyEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/PropertyEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/SafeAggregateEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Filters/DelegateFilter.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/IBatchedLogEventSink.cs",
+      "status": "Replaced",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/IDestructuringPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventFilter.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventPropertyFactory.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventPropertyValueFactory.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventSink.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/ILoggingFailureListener.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/IMessageTemplateParser.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/IScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/ISetLoggingFailureListener.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/LevelOverrideMap.cs",
+      "status": "CompileError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Logger.cs",
+      "status": "CompileError",
+      "loss_count": 23,
+      "loss_kinds": {
+        "PreprocessorStripped": 23
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/LoggingFailureKind.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/LoggingLevelSwitch.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/LoggingLevelSwitchChangedEventArgs.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/MessageTemplateFormatMethodAttribute.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Pipeline/ByReferenceStringComparer.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Pipeline/MessageTemplateCache.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Pipeline/SilentLogger.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/PropertiesInlineArray.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/AggregateSink.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/Batching/BatchingSink.cs",
+      "status": "CompileError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/ConditionalSink.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/DisposingAggregateSink.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/Fallback/DelegatingLoggingFailureListener.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/FilteringSink.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs",
+      "status": "Reverted",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 4
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/RestrictedSink.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/SafeAggregateSink.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/SecondaryLoggerSink.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Data/LogEventPropertyValueRewriter.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Data/LogEventPropertyValueVisitor.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Debugging/LoggingFailedException.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Debugging/SelfLog.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Events/DictionaryValue.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Events/EventProperty.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Events/LevelAlias.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Events/LogEvent.cs",
+      "status": "Reverted",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 4
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Events/LogEventLevel.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Events/LogEventProperty.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Events/LogEventPropertyValue.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Events/MessageTemplate.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Events/ScalarValue.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Events/SequenceValue.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Events/StructureValue.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Filters/Matching.cs",
+      "status": "CompileError",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Formatting/Display/LevelOutputFormat.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
+      "status": "CompileError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Formatting/Display/OutputProperties.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Formatting/Display/PropertiesOutputFormat.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Formatting/ITextFormatter.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Formatting/Json/JsonFormatter.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Formatting/Json/JsonValueFormatter.cs",
+      "status": "Reverted",
+      "loss_count": 34,
+      "loss_kinds": {
+        "PreprocessorStripped": 34
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Guard.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/ILogger.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 99,
+      "loss_kinds": {
+        "PreprocessorStripped": 97,
+        "Dropped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive",
+        "unsupported-member"
+      ]
+    },
+    {
+      "path": "src/Serilog/Log.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/LoggerConfiguration.cs",
+      "status": "CompileError",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 3,
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/LoggerExtensions.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Parsing/Alignment.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Parsing/AlignmentDirection.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Parsing/Destructuring.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Parsing/MessageTemplateParser.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Parsing/MessageTemplateToken.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Parsing/PropertyToken.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Parsing/TextToken.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 4
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Policies/ByteMemoryScalarConversionPolicy.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Policies/DelegateDestructuringPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Policies/EnumScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Policies/ProjectedDestructuringPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Policies/SimpleScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Rendering/Casing.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Rendering/MessageTemplateRenderer.cs",
+      "status": "CompileError",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 4
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ]
+    },
+    {
+      "path": "src/Serilog/Rendering/Padding.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Rendering/ReusableStringWriter.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 3: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs",
+      "status": "CompileError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "InteropPreserved": 1,
+        "EmitterFallback": 1
+      },
+      "interop_blocks": 2,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Settings/KeyValuePairs/SettingValueConversions.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": []
+    },
+    {
+      "path": "src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    },
+    {
+      "path": "src/Serilog/Util/TimeProvider.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output"
+    }
+  ]
+}
