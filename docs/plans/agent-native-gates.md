@@ -324,8 +324,28 @@ disclosures in the A-1.5 entry below.
 
 ### A.3 Annex revision log
 
-**A-1.8 — PP-A1 adjudicated (2026-08-05).** Additive; registers outcomes against the PP-A1 list frozen
-at `wedge-w1-prereqs.md` §3 and carried unchanged into v0.12. **Items 1–8 PASS; item 9 LAPSED.**
+**A-1.8 — PP-A1 adjudicated (2026-08-05). PP-A1 = FAIL.** Additive; registers outcomes against the
+PP-A1 list frozen at `wedge-w1-prereqs.md` §3 and carried unchanged into v0.12. **Item 6 FAILS; item
+9 LAPSED; items 1–5, 7, 8 PASS. v0.12.0 is blocked.**
+
+**Item 6 fails on divergence D3, which is live.** Three adversarial review rounds found three false-
+`Proven`-elides vectors behind this one item, each time after it had been marked ✅: D4's
+explicit-mode half, D4's no-mode half (both closed in #872), and **D3**, which is not closed. D3
+reproduces on the shipped `calor run --verify` path — `§S (|| (! (isempty result)) (== result
+STR:"")) ` over `§R s` throws under `calor run` and prints `survived` under `--verify`, with `calor
+verify` reporting 100% Proven — and a second shape, `§S (>= (len result) INT:0)`, crashes with a
+NullReferenceException unverified and survives verified. Two prior claims are withdrawn: that
+Calor's `str` is non-nullable (`§B{bad:str}` binds a null interop return with **zero diagnostics**),
+and that D3 was "argued unreachable". **Unlike D4 and D9 this is not closable by refusing an
+operation:** Z3's string sort has no null, so every total axiom of its string theory is unsound once
+a `str` holds one. The two candidate fixes — enforce non-nullable `str` at the binder, or demote
+string-involving proofs to `Assumed` so they never elide (D8 precedent) — are a **maintainer
+decision**, recorded in `pp-a1-adjudication.md` and not taken here.
+
+**Registered lesson, because this bar has now failed three times by inspection:** *known*-divergence-
+free is a claim about how hard anyone looked. §2 of the freeze already says it is **weaker than
+differentially clean**. Item 6's bar should not be re-asserted by another reading of the divergence
+table; it should be replaced by #779's solver-vs-runtime differential suite.
 
 **Item 6 was FAIL when first adjudicated, and this is registered rather than smoothed over.** Its bar
 is *no known false-`Proven`-elides vector*, known set = the divergence table + T1. **Divergence D4 was

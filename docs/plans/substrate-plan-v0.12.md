@@ -240,20 +240,26 @@ v0.12 is **not** on the strategy's Phase-2a/2b progression — it is prerequisit
 | **PP-A1 item 9** — `EnableTypeChecking` default-on (#761) | **LAPSED at v0.12 (A-1.8).** The frozen text named the **W2/W3 window**; it closed without the flip. Cost measured, not guessed: **92 failures / 6,158**, dominated by type-checker completeness gaps (`object` ×31, `Type` ×6), i.e. valid programs would start being rejected. **A further deferral must name a new window** — this row exists so it lapses visibly rather than accruing silently. Blocking-or-not for v0.12.0 is a maintainer decision |
 | **D2** (within-range signedness context) and **#779 differential suite** | Unchanged residual. Item 6's bar is *known-divergence-free*, which §2 of `wedge-w1-prereqs.md` records as **weaker than differentially clean**; the suite is what actually closes it |
 | `ContractTranslator._stringInfo` / `IsNullable` | **Inert** — written at five sites, read at none, never passed `true`. Not a live defect (see D3's argued-unreachable disposition), but it reads as a nullability guard and is not one. Wire up or delete |
+| **D3 — Z3 strings cannot be null** | **OPEN, live false-`Proven`-elides vector; blocks PP-A1 item 6 and therefore v0.12.0.** Two candidate fixes, both maintainer decisions: (i) enforce non-nullable `str` at the binder so a possibly-null interop return needs `?str` — the correct fix, needs interop nullability analysis; (ii) demote string-involving proofs to `Assumed`, which never elides (D8 precedent) — cheap, closes the whole class including undiscovered vectors, costs elision on every string postcondition. `ContractTranslator._stringInfo`/`IsNullable` is the unbuilt half of (i), not housekeeping |
+| **Item 6's bar itself** | Registered recommendation: *known*-divergence-free has now failed three times by inspection. Replace it with #779's solver-vs-runtime differential suite rather than re-asserting it by another reading of the table |
 | Frames / `old()`; `Justified` tier; #807-adjacent verifier limits | Unchanged from the v0.10/v0.11 registers |
 
 ---
 
 ## 10. Revision log
 
-- **PP-A1 adjudicated, 2026-08-05 (A-1.8) — items 1–8 PASS, item 9 LAPSED.** The first adjudication
+- **PP-A1 adjudicated, 2026-08-05 (A-1.8) — PP-A1 = FAIL; v0.12.0 blocked.** The first adjudication
   claimed all nine; adversarial review refuted **item 6** and it was right: **divergence D4 was a live
   false-`Proven`-elides vector**, reproduced end-to-end on a shipped path (`calor run` threw;
   `calor run --verify` printed the value with the check deleted). Closed by refusal in #872. Items 4
   and 7 also passed only after fixes to the **shipped** surface rather than the one the original
   evidence cited, and the `Calor1346` containment turned out to have no test anywhere in the repo.
   The common failure was assembling an evidence column by confirming each row instead of attacking
-  it. Record: `docs/plans/pp-a1-adjudication.md`.
+  it — and a third round then found **D3** live by the same test, after I had personally re-audited
+  that row and argued it unreachable. Item 6 = FAIL. Unlike D4/D9, D3 is not closable by refusing an
+  operation: Z3's string sort has no null, so every total axiom of its string theory is unsound once
+  a `str` holds one, and `§B{bad:str}` binds a null interop return with no diagnostic today. Record:
+  `docs/plans/pp-a1-adjudication.md`.
 
 - **Call S, 2026-08-05 — the plan's central objective failed, and the plan records it.** PP-S3 = MISS
   (8 screened tasks against ≥ 70), PP-S1 = MISS (census: top-3 = 40.4% < 50%), PP-S2 reported-only,

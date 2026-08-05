@@ -315,7 +315,7 @@ public class EnvelopeEarlyExitTests : IDisposable
         var file = Path.Combine(_tempDir, "a.calr");
         File.WriteAllText(file, ValidSource);
 
-        var (exitCode, stdOut, _) = CliTestHarness.RunCli(_tempDir,
+        var (exitCode, stdOut, _) = CliTestHarness.RunCli(_tempDir, NotAcknowledged,
             "format", file, "--write", "--format", "json");
 
         Assert.Equal(1, exitCode);
@@ -335,6 +335,14 @@ public class EnvelopeEarlyExitTests : IDisposable
         Assert.Equal(ValidSource, File.ReadAllText(file));
     }
 
+    /// <summary>
+    /// Explicitly UN-acknowledged. Without this the refusal tests inherit the ambient environment,
+    /// and `docs/cli/format.md` itself recommends `export CALOR_EXPERIMENTAL_FORMAT_WRITE=1` for a
+    /// session or CI job — under which these tests would pass vacuously by never reaching the gate.
+    /// </summary>
+    private static readonly Dictionary<string, string> NotAcknowledged =
+        new() { ["CALOR_EXPERIMENTAL_FORMAT_WRITE"] = "" };
+
     /// <summary>Text mode keeps its human-oriented stderr line and the same exit code.</summary>
     [Fact]
     public void FormatWrite_Text_RefusedWithoutExperimental()
@@ -342,11 +350,36 @@ public class EnvelopeEarlyExitTests : IDisposable
         var file = Path.Combine(_tempDir, "b.calr");
         File.WriteAllText(file, ValidSource);
 
-        var (exitCode, stdOut, stdErr) = CliTestHarness.RunCli(_tempDir, "format", file, "--write");
+        var (exitCode, stdOut, stdErr) = CliTestHarness.RunCli(_tempDir, NotAcknowledged,
+            "format", file, "--write");
 
         Assert.Equal(1, exitCode);
         Assert.Contains(DiagnosticCode.FormatWriteExperimentalRequired, stdErr);
         Assert.DoesNotContain("{", stdOut);
+        Assert.Equal(ValidSource, File.ReadAllText(file));
+    }
+
+    /// <summary>
+    /// `lint --fix` is the SAME containment as `format --write` — same diagnostic code, same
+    /// acknowledgement, named together in the CHANGELOG and in structured-output.md. Its refusal
+    /// was still ignoring --format after the format side was fixed, which is exactly the half-fix
+    /// this file exists to catch. Covers `sarif` too, since lint offers it and `format` does not.
+    /// </summary>
+    [Theory]
+    [InlineData("json")]
+    [InlineData("sarif")]
+    public void LintFix_Structured_RefusedWithoutExperimental_StillEmitsDocument(string format)
+    {
+        var file = Path.Combine(_tempDir, $"lint-{format}.calr");
+        File.WriteAllText(file, ValidSource);
+
+        var (exitCode, stdOut, _) = CliTestHarness.RunCli(_tempDir, NotAcknowledged,
+            "lint", file, "--fix", "--format", format);
+
+        Assert.Equal(1, exitCode);
+
+        using var doc = JsonDocument.Parse(stdOut);
+        Assert.Contains(DiagnosticCode.FormatWriteExperimentalRequired, stdOut);
         Assert.Equal(ValidSource, File.ReadAllText(file));
     }
 
@@ -358,8 +391,15 @@ public class EnvelopeEarlyExitTests : IDisposable
     [Fact]
     public void FormatWrite_WithEnvAcknowledgement_IsAllowedThrough()
     {
+        // Deliberately mis-formatted, so a successful run must CHANGE the file — feeding it
+        // already-canonical source would let this pass without a write ever happening. The noise
+        // is blank lines and trailing whitespace rather than bad indentation: over-indenting is a
+        // parse error, and the formatter (correctly) declines to write a file it cannot parse,
+        // which would make the test fail for a reason unrelated to the gate.
         var file = Path.Combine(_tempDir, "c.calr");
-        File.WriteAllText(file, ValidSource);
+        var misformatted = ValidSource.Replace("\u00a7M{m001:T}\n", "\u00a7M{m001:T}\n\n\n")
+                                      .Replace("-> void", "-> void   ");
+        File.WriteAllText(file, misformatted);
 
         var (exitCode, _, stdErr) = CliTestHarness.RunCli(_tempDir,
             new Dictionary<string, string> { ["CALOR_EXPERIMENTAL_FORMAT_WRITE"] = "1" },
@@ -367,5 +407,8 @@ public class EnvelopeEarlyExitTests : IDisposable
 
         Assert.DoesNotContain(DiagnosticCode.FormatWriteExperimentalRequired, stdErr);
         Assert.NotEqual(1, exitCode);
+
+        // The gate is an ACKNOWLEDGEMENT: past it, the write path actually writes.
+        Assert.NotEqual(misformatted, File.ReadAllText(file));
     }
 }
