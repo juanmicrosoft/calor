@@ -173,7 +173,7 @@ PP-A2's pre-committed routing. Keep the shipped v0.11 adoption surface working, 
 
 **PP-S3's four values, with triggers enumerated in advance** — v1 claimed four and listed three, and gave "not adjudicated" no triggers at all, leaving an unbounded post-hoc escape from "miss":
 - **Underpowered:** supply ≥ bar but below what the variance dry-run shows is needed for 80% power → epoch not authorized, supply work continues, **no venue retirement**.
-- **Not adjudicated**, exhaustively: (i) the supply measurement cannot complete, or candidate enumeration is not reproducible across two runs at the pinned configuration; (ii) fewer than 2 projects pass the frozen fidelity bar; (iii) eligible tasks exist but fail the determinism screen, so no valid epoch is constructible.
+- **Not adjudicated**, exhaustively: (i) the supply measurement cannot complete, or candidate enumeration is not reproducible across two runs at the pinned configuration; (ii) **[SUPERSEDED by gates A-1.5.2 — see Call S]** fewer than 2 projects pass the frozen fidelity bar; the registered form is "fewer than 2 projects produce any **evaluable candidates**", a measurability condition. Recorded stale rather than deleted: under this wording the trigger *would* have fired at Call S (0 of 3 pass the bar), and §6.2 combines miss/not-adjudicated into one cell, so the call is invariant either way; (iii) eligible tasks exist but fail the determinism screen, so no valid epoch is constructible.
 - **Any route not on that list is adjudicated MISS**, with the novel route disclosed *and the miss registered anyway*. Task-supply starvation was a novel not-adjudicated route once (A-1.4 tranche 2, PP-W2); the default now reverses so it cannot be reused as an escape.
 
 Carried forward as **release gates, not Call-S inputs**: **PP-W5** (frozen #839, restated additively at D-S5.5) and **PP-A1** (frozen list at `wedge-w1-prereqs.md` §3, unchanged). **PP-A2** is resolved ("demand unproven") and is not re-opened by this plan; only the Call 3 crossing reopens it.
@@ -234,7 +234,7 @@ v0.12 is **not** on the strategy's Phase-2a/2b progression — it is prerequisit
 | Item | Disposition |
 |---|---|
 | Persisted semantic index + `calor query` (strategy 2a never-shed core) | Deferred again. **Flagged: third consecutive deferral — re-examine explicitly at v0.13 planning, do not roll forward silently** |
-| Real-scale epoch re-run | Out of box by design; separate spend gate after Call S, gated on a variance dry-run |
+| Real-scale epoch re-run | **RETIRED at Call S (2026-08-05).** No spend gate follows; quantitative re-entry conditions are registered in `call-s-adjudication.md` |
 | Logic-mutation stratum as a thesis channel | Retired as a mechanical-arm channel; retained only as a conversion-penalty measurement |
 | Proof-depth measurement (arm-ii) | Rides on WS-S4; explicitly not adjudicated by v0.12 (§0.1) |
 | Frames / `old()`; `Justified` tier; #807-adjacent verifier limits | Unchanged from the v0.10/v0.11 registers |
@@ -242,6 +242,14 @@ v0.12 is **not** on the strategy's Phase-2a/2b progression — it is prerequisit
 ---
 
 ## 10. Revision log
+
+- **Call S, 2026-08-05 — the plan's central objective failed, and the plan records it.** PP-S3 = MISS
+  (8 screened tasks against ≥ 70), PP-S1 = MISS (census: top-3 = 40.4% < 50%), PP-S2 reported-only,
+  PP-S4 pass (vacuously — 0 `src/` changes all cycle; its A-1.5.7 instrument was never built and is
+  carried to v0.13 as debt). **Real-scale venue RETIRED** per §6.2's (PP-S1 miss, PP-S3 miss) cell.
+  WS-S1 continues on its narrowed `calor import` justification only; **WS-S2 and WS-S3 close
+  unstarted**; **WS-S4 closes unresolved**, leaving the proof-depth headline with no live measurement
+  channel. Record: `call-s-adjudication.md`; registered at gates **A-1.7**.
 
 - **Deviation, 2026-08-05 — D-S1.1a fired and was not honoured (maintainer decision).** The ledger's
   cumulative achievable recovery is **7 files against a need of 65** (`epochs/s1-ledger-001`), so

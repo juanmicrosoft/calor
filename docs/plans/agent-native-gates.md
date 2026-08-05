@@ -341,6 +341,28 @@ landed, so the D-S1.5 registry is legitimately empty.
 cell. No real-scale epoch is authorized; the differentiated claim re-scopes to
 earliness/attribution/cost, which `guarantees-probe-001` (PP-G3 HIT) already evidences and which this
 call leaves untouched. Record: `docs/plans/call-s-adjudication.md`.
+**Disclosures added after adversarial review, because a gate record retiring a three-release venue is
+the last place to relax the standard:** (a) `substrate-plan-v0.12.md` §5 still carried an earlier
+wording of not-adjudicated trigger (ii) — *"fewer than 2 projects pass the frozen fidelity bar"* —
+under which the trigger **would** have fired (0 of 3 reach 0.70). The annex governs, and §6.2's
+combined *"miss / not adjudicated"* column makes the call **invariant** either way; the plan is
+amended in the same change. (b) **PP-S4 passes VACUOUSLY** — M-S4's population is empty (no v0.12
+commit touched `src/`; `FeatureSupport.cs` untouched since `4d7f5887`), and its registered instrument
+was **never built**: `fixtures/d-s1.5/` and the `d-s1.5-fixtures` CI job do not exist, so the blocker
+is cleared because nothing required gating, not because the gate ran. Carried to v0.13 as debt. (c) A
+**third** supply-raising change is adjudicated — the arm-signature canonicalization (5 → 8 via
+`ArmsDiverge` 3 → 0, i.e. M-S5's own metric); not an M-S4 event because the exclusions were an
+instrument artifact (both arms failed identical test sets, compared positionally across differently
+ordered runs), and M-S5's baseline was consequently set by it at the strictest possible value. (d)
+PP-G3, cited as the surviving evidence, is **authorable-fixture scale**, and this program's own §0.2
+records that ceiling does not survive real code. (e) PP-S1 also misses on **M-S1's own bar** (0 of 3
+vs ≥ 2 of 3) — a second independent route to the same verdict.
+
+**Workstream shape:** WS-S1 continues on its narrowed `calor import` justification only; **WS-S2 and
+WS-S3 close unstarted**; **WS-S4 closes unresolved**, leaving the proof-depth headline with no live
+measurement channel. Quantitative re-entry conditions for the venue are registered in the Call S
+record.
+
 **This entry alters no frozen row and makes no §7 supersession claim** — it records outcomes against
 A-1.5's thresholds, which are unchanged. Insertions only, plus the Annex version pointer.
 
