@@ -1,0 +1,1745 @@
+{
+  "project": "Serilog",
+  "calor_version": "0.10.0",
+  "timestamp": "2026-08-05T15:26:48.1955700\u002B00:00",
+  "duration_seconds": 30.239168,
+  "verdict": "pass",
+  "inconclusive": false,
+  "baseline": {
+    "total": 811,
+    "passed": 811,
+    "failed": 0,
+    "skipped": 0
+  },
+  "round_trip": {
+    "total": 811,
+    "passed": 811,
+    "failed": 0,
+    "skipped": 0
+  },
+  "regressions": 0,
+  "files": {
+    "total": 110,
+    "replaced": 46,
+    "reverted": 43,
+    "conversion_failed": 0,
+    "emit_error": 6,
+    "compile_error": 15,
+    "crashed": 0,
+    "excluded_by_pattern": 8
+  },
+  "avg_conversion_rate": 1,
+  "build_succeeded": true,
+  "fidelity": {
+    "coverage": {
+      "total_convertible_files": 110,
+      "converted_native": 44,
+      "converted_with_losses": 2,
+      "reverted": 43,
+      "failed_conversion": 21,
+      "excluded_files": 8,
+      "coverage_fraction": 0.41818181818181815,
+      "native_fraction": 0.4,
+      "loss_kind_counts": {
+        "PreprocessorStripped": 210,
+        "InteropPreserved": 4,
+        "Dropped": 2,
+        "EmitterFallback": 1
+      },
+      "total_interop_blocks": 5,
+      "distinct_gaps": [
+        "preprocessor-directive",
+        "unsupported-member"
+      ]
+    },
+    "build": {
+      "succeeded": true,
+      "exit_code": 0,
+      "recovery_reverted_files": 43,
+      "error_count": 0
+    },
+    "tests": {
+      "baseline_total": 811,
+      "baseline_passed": 811,
+      "baseline_failed": 0,
+      "baseline_trx_files": 1,
+      "baseline_console_fallback": false,
+      "round_trip_total": 811,
+      "round_trip_passed": 811,
+      "round_trip_failed": 0,
+      "round_trip_trx_files": 1,
+      "round_trip_console_fallback": false,
+      "inventory_delta": 0,
+      "regressions": 0,
+      "new_passes": 0,
+      "comparison_status": "Pass"
+    }
+  },
+  "file_detail": [
+    {
+      "path": "src/Serilog/Capturing/DepthLimiter.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Capturing/DepthLimiter.cs(50,73): error CS0106: The modifier \u0027private\u0027 is not valid for this item [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Capturing/DepthLimiter.cs(50,73): error CS0106: The modifier \u0027private\u0027 is not valid for this item [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Capturing/MessageTemplateProcessor.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Capturing/MessageTemplateProcessor.cs(12,35): error CS1729: \u0027object\u0027 does not contain a constructor that takes 1 arguments [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Capturing/MessageTemplateProcessor.cs(12,35): error CS1729: \u0027object\u0027 does not contain a constructor that takes 1 arguments [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Capturing/PropertyBinder.cs",
+      "status": "CompileError",
+      "loss_count": 6,
+      "loss_kinds": {
+        "PreprocessorStripped": 6
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Binding \u0027position\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{position:i32}\u0027) or an initializer expression so the binder can infer the type."
+      ]
+    },
+    {
+      "path": "src/Serilog/Capturing/PropertyValueConverter.cs",
+      "status": "CompileError",
+      "loss_count": 5,
+      "loss_kinds": {
+        "PreprocessorStripped": 4,
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Expected statement but found Identifier"
+      ]
+    },
+    {
+      "path": "src/Serilog/Capturing/TrimConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Capturing/TrimConfiguration.cs(11,137): error CS0103: The name \u0027isEnabled\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Capturing/TrimConfiguration.cs(11,151): error CS0103: The name \u0027isEnabled\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Capturing/TrimConfiguration.cs(11,137): error CS0103: The name \u0027isEnabled\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Capturing/TrimConfiguration.cs(11,151): error CS0103: The name \u0027isEnabled\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Configuration/BatchingOptions.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Configuration/ILoggerSettings.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs(7,38): error CS1729: \u0027object\u0027 does not contain a constructor that takes 2 arguments [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs(7,38): error CS1729: \u0027object\u0027 does not contain a constructor that takes 2 arguments [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerDestructuringConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerDestructuringConfiguration.cs(73,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerDestructuringConfiguration.cs(74,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerDestructuringConfiguration.cs(88,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerDestructuringConfiguration.cs(73,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerDestructuringConfiguration.cs(74,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerDestructuringConfiguration.cs(88,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs(59,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs(70,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs(81,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs(106,36): error CS0119: \u0027IDisposable\u0027 is a type, which is not valid in the given context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs(59,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs(70,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs(81,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs(106,36): error CS0119: \u0027IDisposable\u0027 is a type, which is not valid in the given context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerFilterConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerFilterConfiguration.cs(37,48): error CS0103: The name \u0027logEvent\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerFilterConfiguration.cs(38,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerFilterConfiguration.cs(37,48): error CS0103: The name \u0027logEvent\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerFilterConfiguration.cs(38,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerMinimumLevelConfiguration.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Unexpected token \u0027source\u0027"
+      ]
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerSettingsConfiguration.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Configuration/LoggerSinkConfiguration.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(39,41): error CS1729: \u0027object\u0027 does not contain a constructor that takes 1 arguments [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(40,49): error CS1503: Argument 2: cannot convert from \u0027object\u0027 to \u0027Serilog.Core.LoggingLevelSwitch\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(133,44): error CS1061: \u0027ILogger\u0027 does not contain a definition for \u0027HasOverrideMap\u0027 and no accessible extension method \u0027HasOverrideMap\u0027 accepting a first argument of type \u0027ILogger\u0027 could be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(147,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(161,59): error CS0029: Cannot implicitly convert type \u0027System.Collections.Generic.List\u003Cobject\u003E\u0027 to \u0027System.Span\u003CSystem.Action\u003CSerilog.Configuration.LoggerSinkConfiguration\u003E\u003E\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(166,31): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(180,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(39,41): error CS1729: \u0027object\u0027 does not contain a constructor that takes 1 arguments [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(40,49): error CS1503: Argument 2: cannot convert from \u0027object\u0027 to \u0027Serilog.Core.LoggingLevelSwitch\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Configuration/LoggerSinkConfiguration.cs(133,44): error CS1061: \u0027ILogger\u0027 does not contain a definition for \u0027HasOverrideMap\u0027 and no accessible extension method \u0027HasOverrideMap\u0027 accepting a first argument of type \u0027ILogger\u0027 could be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Context/EnricherStack.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(75,41): error CS0106: The modifier \u0027private\u0027 is not valid for this item [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(10,36): error CS0738: \u0027EnricherStack\u0027 does not implement interface member \u0027IEnumerable\u003CILogEventEnricher\u003E.GetEnumerator()\u0027. \u0027EnricherStack.GetEnumerator()\u0027 cannot implement \u0027IEnumerable\u003CILogEventEnricher\u003E.GetEnumerator()\u0027 because it does not have the matching return type of \u0027IEnumerator\u003CILogEventEnricher\u003E\u0027. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(95,38): error CS0738: \u0027EnricherStack.Enumerator\u0027 does not implement interface member \u0027IEnumerator.Current\u0027. \u0027EnricherStack.Enumerator.Current\u0027 cannot implement \u0027IEnumerator.Current\u0027 because it does not have the matching return type of \u0027object\u0027. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(110,28): error CS0102: The type \u0027EnricherStack.Enumerator\u0027 already contains a definition for \u0027Current\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(110,28): error CS0276: \u0027EnricherStack.Enumerator.Current\u0027: accessibility modifiers on accessors may only be used if the property or indexer has both a get and a set accessor [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(112,25): error CS0273: The accessibility modifier of the \u0027EnricherStack.Enumerator.Current.get\u0027 accessor must be more restrictive than the property or indexer \u0027EnricherStack.Enumerator.Current\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(75,41): error CS0106: The modifier \u0027private\u0027 is not valid for this item [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(10,36): error CS0738: \u0027EnricherStack\u0027 does not implement interface member \u0027IEnumerable\u003CILogEventEnricher\u003E.GetEnumerator()\u0027. \u0027EnricherStack.GetEnumerator()\u0027 cannot implement \u0027IEnumerable\u003CILogEventEnricher\u003E.GetEnumerator()\u0027 because it does not have the matching return type of \u0027IEnumerator\u003CILogEventEnricher\u003E\u0027. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(95,38): error CS0738: \u0027EnricherStack.Enumerator\u0027 does not implement interface member \u0027IEnumerator.Current\u0027. \u0027EnricherStack.Enumerator.Current\u0027 cannot implement \u0027IEnumerator.Current\u0027 because it does not have the matching return type of \u0027object\u0027. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/EnricherStack.cs(110,28): error CS0102: The type \u0027EnricherStack.Enumerator\u0027 already contains a definition for \u0027Current\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Context/LogContext.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/LogContext.cs(12,39): error CS0274: Cannot specify accessibility modifiers for both accessors of the property or indexer \u0027LogContext.Enrichers\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/LogContext.cs(14,21): error CS0273: The accessibility modifier of the \u0027LogContext.Enrichers.get\u0027 accessor must be more restrictive than the property or indexer \u0027LogContext.Enrichers\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/LogContext.cs(20,21): error CS0273: The accessibility modifier of the \u0027LogContext.Enrichers.set\u0027 accessor must be more restrictive than the property or indexer \u0027LogContext.Enrichers\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/LogContext.cs(12,39): error CS0274: Cannot specify accessibility modifiers for both accessors of the property or indexer \u0027LogContext.Enrichers\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/LogContext.cs(14,21): error CS0273: The accessibility modifier of the \u0027LogContext.Enrichers.get\u0027 accessor must be more restrictive than the property or indexer \u0027LogContext.Enrichers\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Context/LogContext.cs(20,21): error CS0273: The accessibility modifier of the \u0027LogContext.Enrichers.set\u0027 accessor must be more restrictive than the property or indexer \u0027LogContext.Enrichers\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Context/LogContextEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Constants.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/CustomDefaultMethodImplementationAttribute.cs",
+      "status": "Replaced",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/ConditionalEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/EmptyEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/FixedPropertyEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/PropertyEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Enrichers/SafeAggregateEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Filters/DelegateFilter.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/IBatchedLogEventSink.cs",
+      "status": "Replaced",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/IDestructuringPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/IDestructuringPolicy.cs(11,108): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/IDestructuringPolicy.cs(11,108): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventEnricher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventFilter.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventPropertyFactory.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventPropertyValueFactory.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/ILogEventSink.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/ILoggingFailureListener.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/IMessageTemplateParser.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/IScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/IScalarConversionPolicy.cs(11,60): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/IScalarConversionPolicy.cs(11,60): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/ISetLoggingFailureListener.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/LevelOverrideMap.cs",
+      "status": "CompileError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Expected statement but found Identifier",
+        "Expected statement but found Identifier"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Logger.cs",
+      "status": "CompileError",
+      "loss_count": 23,
+      "loss_kinds": {
+        "PreprocessorStripped": 23
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Binding \u0027parsedTemplate\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{parsedTemplate:i32}\u0027) or an initializer expression so the binder can infer the type.",
+        "Binding \u0027parsedTemplate\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{parsedTemplate:i32}\u0027) or an initializer expression so the binder can infer the type."
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/LoggingFailureKind.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/LoggingLevelSwitch.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/LoggingLevelSwitchChangedEventArgs.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/MessageTemplateFormatMethodAttribute.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Pipeline/ByReferenceStringComparer.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Pipeline/MessageTemplateCache.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Pipeline/SilentLogger.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Type expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/PropertiesInlineArray.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/PropertiesInlineArray.cs(12,45): error CS1620: Argument 1 must be passed with the \u0027ref\u0027 keyword [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/PropertiesInlineArray.cs(12,45): error CS1620: Argument 1 must be passed with the \u0027ref\u0027 keyword [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/AggregateSink.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/AggregateSink.cs(19,34): error CS0019: Operator \u0027??\u0027 cannot be applied to operands of type \u0027List\u003CException\u003E\u0027 and \u0027object[]\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/AggregateSink.cs(19,34): error CS0019: Operator \u0027??\u0027 cannot be applied to operands of type \u0027List\u003CException\u003E\u0027 and \u0027object[]\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/Batching/BatchingSink.cs",
+      "status": "CompileError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Binding \u0027shouldDropBatch\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{shouldDropBatch:i32}\u0027) or an initializer expression so the binder can infer the type."
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs(23,43): error CS1503: Argument 1: cannot convert from \u0027double\u0027 to \u0027long\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs(23,43): error CS1503: Argument 1: cannot convert from \u0027double\u0027 to \u0027long\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/ConditionalSink.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/ConditionalSink.cs(29,20): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/ConditionalSink.cs(29,20): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/DisposingAggregateSink.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/DisposingAggregateSink.cs(11,80): error CS0738: \u0027DisposingAggregateSink\u0027 does not implement interface member \u0027IAsyncDisposable.DisposeAsync()\u0027. \u0027DisposingAggregateSink.DisposeAsync()\u0027 cannot implement \u0027IAsyncDisposable.DisposeAsync()\u0027 because it does not have the matching return type of \u0027ValueTask\u0027. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/DisposingAggregateSink.cs(11,80): error CS0738: \u0027DisposingAggregateSink\u0027 does not implement interface member \u0027IAsyncDisposable.DisposeAsync()\u0027. \u0027DisposingAggregateSink.DisposeAsync()\u0027 cannot implement \u0027IAsyncDisposable.DisposeAsync()\u0027 because it does not have the matching return type of \u0027ValueTask\u0027. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/Fallback/DelegatingLoggingFailureListener.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs(21,107): error CS1503: Argument 4: cannot convert from \u0027object[]\u0027 to \u0027System.Collections.Generic.IReadOnlyCollection\u003CSerilog.Events.LogEvent\u003E?\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/Fallback/FailureListenerSink.cs(21,107): error CS1503: Argument 4: cannot convert from \u0027object[]\u0027 to \u0027System.Collections.Generic.IReadOnlyCollection\u003CSerilog.Events.LogEvent\u003E?\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/FilteringSink.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs",
+      "status": "Reverted",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 4
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs(9,117): error CS0738: \u0027OptionalInterfaceForwardingSink\u0027 does not implement interface member \u0027IAsyncDisposable.DisposeAsync()\u0027. \u0027OptionalInterfaceForwardingSink.DisposeAsync()\u0027 cannot implement \u0027IAsyncDisposable.DisposeAsync()\u0027 because it does not have the matching return type of \u0027ValueTask\u0027. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/OptionalInterfaceForwardingSink.cs(9,117): error CS0738: \u0027OptionalInterfaceForwardingSink\u0027 does not implement interface member \u0027IAsyncDisposable.DisposeAsync()\u0027. \u0027OptionalInterfaceForwardingSink.DisposeAsync()\u0027 cannot implement \u0027IAsyncDisposable.DisposeAsync()\u0027 because it does not have the matching return type of \u0027ValueTask\u0027. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/RestrictedSink.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/RestrictedSink.cs(30,20): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/RestrictedSink.cs(30,20): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/SafeAggregateSink.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Core/Sinks/SecondaryLoggerSink.cs",
+      "status": "Reverted",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/SecondaryLoggerSink.cs(34,28): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/SecondaryLoggerSink.cs(37,20): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/SecondaryLoggerSink.cs(34,28): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Core/Sinks/SecondaryLoggerSink.cs(37,20): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Data/LogEventPropertyValueRewriter.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Data/LogEventPropertyValueRewriter.cs(50,45): error CS1729: \u0027object\u0027 does not contain a constructor that takes 2 arguments [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Data/LogEventPropertyValueRewriter.cs(50,45): error CS1729: \u0027object\u0027 does not contain a constructor that takes 2 arguments [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Data/LogEventPropertyValueVisitor.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Debugging/LoggingFailedException.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Debugging/SelfLog.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Debugging/SelfLog.cs(14,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Debugging/SelfLog.cs(14,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Events/DictionaryValue.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/DictionaryValue.cs(11,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/DictionaryValue.cs(12,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/DictionaryValue.cs(11,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/DictionaryValue.cs(12,27): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Events/EventProperty.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/EventProperty.cs(11,44): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/EventProperty.cs(11,44): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Events/LevelAlias.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Events/LogEvent.cs",
+      "status": "Reverted",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 4
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(17,37): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(21,36): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(81,234): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(81,244): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(81,222): error CS1503: Argument 5: cannot convert from \u0027System.Collections.Generic.IEnumerable\u003CSerilog.Events.LogEventProperty\u003E\u0027 to \u0027System.Collections.Generic.Dictionary\u003Cstring, Serilog.Events.LogEventPropertyValue\u003E\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(86,270): error CS0103: The name \u0027_newDictionary006\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(102,258): error CS0103: The name \u0027_newDictionary009\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(167,102): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(167,122): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/LogEvent.cs(17,37): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Events/LogEventLevel.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Events/LogEventProperty.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Unexpected token \u0027name\u0027"
+      ]
+    },
+    {
+      "path": "src/Serilog/Events/LogEventPropertyValue.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Events/MessageTemplate.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/MessageTemplate.cs(48,37): error CS0030: Cannot convert type \u0027Serilog.Parsing.MessageTemplateToken\u0027 to \u0027TResult\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/MessageTemplate.cs(48,37): error CS0030: Cannot convert type \u0027Serilog.Parsing.MessageTemplateToken\u0027 to \u0027TResult\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Events/ScalarValue.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(45,59): error CS1061: \u0027IFormatProvider\u0027 does not contain a definition for \u0027GetFormattypeofICustomFormatter\u0027 and no accessible extension method \u0027GetFormattypeofICustomFormatter\u0027 accepting a first argument of type \u0027IFormatProvider\u0027 could be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(62,59): error CS1061: \u0027IFormatProvider\u0027 does not contain a definition for \u0027GetFormattypeofICustomFormatter\u0027 and no accessible extension method \u0027GetFormattypeofICustomFormatter\u0027 accepting a first argument of type \u0027IFormatProvider\u0027 could be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(79,60): error CS0103: The name \u0027charsWritten\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(81,56): error CS0841: Cannot use local variable \u0027charsWritten\u0027 before it is declared [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(81,21): error CS0815: Cannot assign void to an implicitly-typed variable [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(45,59): error CS1061: \u0027IFormatProvider\u0027 does not contain a definition for \u0027GetFormattypeofICustomFormatter\u0027 and no accessible extension method \u0027GetFormattypeofICustomFormatter\u0027 accepting a first argument of type \u0027IFormatProvider\u0027 could be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(62,59): error CS1061: \u0027IFormatProvider\u0027 does not contain a definition for \u0027GetFormattypeofICustomFormatter\u0027 and no accessible extension method \u0027GetFormattypeofICustomFormatter\u0027 accepting a first argument of type \u0027IFormatProvider\u0027 could be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(79,60): error CS0103: The name \u0027charsWritten\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(81,56): error CS0841: Cannot use local variable \u0027charsWritten\u0027 before it is declared [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Events/ScalarValue.cs(81,21): error CS0815: Cannot assign void to an implicitly-typed variable [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Events/SequenceValue.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Events/StructureValue.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Filters/Matching.cs",
+      "status": "CompileError",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Dedent to column 2 does not match any enclosing indent level."
+      ]
+    },
+    {
+      "path": "src/Serilog/Formatting/Display/LevelOutputFormat.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Display/LevelOutputFormat.cs(11,65): error CS0266: Cannot implicitly convert type \u0027object[]\u0027 to \u0027string[][]\u0027. An explicit conversion exists (are you missing a cast?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Display/LevelOutputFormat.cs(12,65): error CS0266: Cannot implicitly convert type \u0027object[]\u0027 to \u0027string[][]\u0027. An explicit conversion exists (are you missing a cast?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Display/LevelOutputFormat.cs(13,65): error CS0266: Cannot implicitly convert type \u0027object[]\u0027 to \u0027string[][]\u0027. An explicit conversion exists (are you missing a cast?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Display/LevelOutputFormat.cs(11,65): error CS0266: Cannot implicitly convert type \u0027object[]\u0027 to \u0027string[][]\u0027. An explicit conversion exists (are you missing a cast?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Display/LevelOutputFormat.cs(12,65): error CS0266: Cannot implicitly convert type \u0027object[]\u0027 to \u0027string[][]\u0027. An explicit conversion exists (are you missing a cast?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Display/LevelOutputFormat.cs(13,65): error CS0266: Cannot implicitly convert type \u0027object[]\u0027 to \u0027string[][]\u0027. An explicit conversion exists (are you missing a cast?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
+      "status": "CompileError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "PreprocessorStripped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Binding \u0027propertyValue\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{propertyValue:i32}\u0027) or an initializer expression so the binder can infer the type."
+      ]
+    },
+    {
+      "path": "src/Serilog/Formatting/Display/OutputProperties.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Formatting/Display/PropertiesOutputFormat.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Expected statement but found Identifier"
+      ]
+    },
+    {
+      "path": "src/Serilog/Formatting/ITextFormatter.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Formatting/Json/JsonFormatter.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonFormatter.cs(63,34): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonFormatter.cs(64,32): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonFormatter.cs(65,71): error CS0411: The type arguments for method \u0027AsyncEnumerable.OfType\u003CTResult\u003E(IAsyncEnumerable\u003Cobject?\u003E)\u0027 cannot be inferred from the usage. Try specifying the type arguments explicitly. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonFormatter.cs(63,34): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonFormatter.cs(64,32): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonFormatter.cs(65,71): error CS0411: The type arguments for method \u0027AsyncEnumerable.OfType\u003CTResult\u003E(IAsyncEnumerable\u003Cobject?\u003E)\u0027 cannot be inferred from the usage. Try specifying the type arguments explicitly. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Formatting/Json/JsonValueFormatter.cs",
+      "status": "Reverted",
+      "loss_count": 34,
+      "loss_kinds": {
+        "PreprocessorStripped": 34
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(80,39): error CS1503: Argument 1: cannot convert from \u0027object\u0027 to \u0027string\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(115,21): error CS0246: The type or namespace name \u0027dc\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(116,45): error CS0103: The name \u0027dc\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(150,21): error CS0246: The type or namespace name \u0027dt\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(151,41): error CS0103: The name \u0027dt\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(154,21): error CS0246: The type or namespace name \u0027dto\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(155,47): error CS0103: The name \u0027dto\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(159,41): error CS0103: The name \u0027timeSpan\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(162,21): error CS0246: The type or namespace name \u0027dateOnly\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Formatting/Json/JsonValueFormatter.cs(163,41): error CS0103: The name \u0027dateOnly\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Guard.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Guard.cs(17,105): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Guard.cs(17,105): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/ILogger.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 99,
+      "loss_kinds": {
+        "PreprocessorStripped": 97,
+        "Dropped": 2
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive",
+        "unsupported-member"
+      ],
+      "errors": [
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Type expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected"
+      ]
+    },
+    {
+      "path": "src/Serilog/Log.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected",
+        "Identifier expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Syntax error, \u0027,\u0027 expected",
+        "Identifier expected"
+      ]
+    },
+    {
+      "path": "src/Serilog/LoggerConfiguration.cs",
+      "status": "CompileError",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 3,
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Dedent to column 4 does not match any enclosing indent level."
+      ]
+    },
+    {
+      "path": "src/Serilog/LoggerExtensions.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Parsing/Alignment.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Parsing/AlignmentDirection.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Parsing/Destructuring.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Parsing/MessageTemplateParser.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Binding \u0027propertyNameAndDestructuring\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{propertyNameAndDestructuring:i32}\u0027) or an initializer expression so the binder can infer the type.",
+        "Binding \u0027format\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{format:i32}\u0027) or an initializer expression so the binder can infer the type.",
+        "Binding \u0027alignment\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{alignment:i32}\u0027) or an initializer expression so the binder can infer the type.",
+        "Binding \u0027width\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{width:i32}\u0027) or an initializer expression so the binder can infer the type."
+      ]
+    },
+    {
+      "path": "src/Serilog/Parsing/MessageTemplateToken.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Parsing/PropertyToken.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Binding \u0027position\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{position:i32}\u0027) or an initializer expression so the binder can infer the type."
+      ]
+    },
+    {
+      "path": "src/Serilog/Parsing/TextToken.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 4
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs(12,67): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/ByteArrayScalarConversionPolicy.cs(12,67): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Policies/ByteMemoryScalarConversionPolicy.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "Unexpected token \u0027bytes\u0027"
+      ]
+    },
+    {
+      "path": "src/Serilog/Policies/DelegateDestructuringPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/DelegateDestructuringPolicy.cs(11,115): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/DelegateDestructuringPolicy.cs(11,115): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Policies/EnumScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/EnumScalarConversionPolicy.cs(11,67): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/EnumScalarConversionPolicy.cs(11,67): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs(11,67): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/PrimitiveScalarConversionPolicy.cs(11,67): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Policies/ProjectedDestructuringPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/ProjectedDestructuringPolicy.cs(23,115): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/ProjectedDestructuringPolicy.cs(23,115): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs(11,115): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/ReflectionTypesScalarDestructuringPolicy.cs(11,115): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Policies/SimpleScalarConversionPolicy.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/SimpleScalarConversionPolicy.cs(21,67): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Policies/SimpleScalarConversionPolicy.cs(21,67): error CS0103: The name \u0027Calor\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Rendering/Casing.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/Serilog/Rendering/MessageTemplateRenderer.cs",
+      "status": "CompileError",
+      "loss_count": 4,
+      "loss_kinds": {
+        "PreprocessorStripped": 4
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "errors": [
+        "\u0027\u00A7EI\u0027 is not aligned with any open \u00A7IF \u2014 the if-chain already closed at a shallower indent level. Indent the clause to the same column as its \u00A7IF.",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found For",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Colon",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Colon",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found IntLiteral",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Colon",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Minus",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found IntLiteral",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Colon",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found IntLiteral",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Bind",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Index",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found If",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Bind",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Colon",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Call",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Arg",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Arg",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found EndCall",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Else",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Bind",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found OpenBrace",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found CloseBrace",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found OpenParen",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found CloseParen",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Call",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found OpenBrace",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found CloseBrace",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Arg",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Arg",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Arg",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Arg",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Arg",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Arg",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found Identifier",
+        "Expected USING, IFACE, CLASS, DEL, FUNC, CSHARP, RTYPE, ITYPE, PP, or END_MODULE but found EndCall",
+        "Expected Eof but found Method"
+      ]
+    },
+    {
+      "path": "src/Serilog/Rendering/Padding.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Rendering/Padding.cs(12,55): error CS0103: The name \u0027_chainRepeat002\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Rendering/Padding.cs(12,55): error CS0103: The name \u0027_chainRepeat002\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Rendering/ReusableStringWriter.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 3: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Rendering/ReusableStringWriter.cs(83,30): error CS0115: \u0027ReusableStringWriter.Write(ReadOnlySpan\u003Cchar\u003E)\u0027: no suitable method found to override [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=netstandard2.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Rendering/ReusableStringWriter.cs(93,30): error CS0115: \u0027ReusableStringWriter.WriteLine(ReadOnlySpan\u003Cchar\u003E)\u0027: no suitable method found to override [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=netstandard2.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Rendering/ReusableStringWriter.cs(83,30): error CS0115: \u0027ReusableStringWriter.Write(ReadOnlySpan\u003Cchar\u003E)\u0027: no suitable method found to override [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=netstandard2.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Rendering/ReusableStringWriter.cs(93,30): error CS0115: \u0027ReusableStringWriter.WriteLine(ReadOnlySpan\u003Cchar\u003E)\u0027: no suitable method found to override [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=netstandard2.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Expected statement but found Arg",
+        "Expected statement but found Identifier",
+        "Expected statement but found EndCall"
+      ]
+    },
+    {
+      "path": "src/Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs",
+      "status": "CompileError",
+      "loss_count": 2,
+      "loss_kinds": {
+        "InteropPreserved": 1,
+        "EmitterFallback": 1
+      },
+      "interop_blocks": 2,
+      "gaps": [],
+      "errors": [
+        "Dedent to column 6 does not match any enclosing indent level."
+      ]
+    },
+    {
+      "path": "src/Serilog/Settings/KeyValuePairs/SettingValueConversions.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Binding \u0027accessorTypeName\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{accessorTypeName:i32}\u0027) or an initializer expression so the binder can infer the type.",
+        "Binding \u0027memberName\u0027 has no type annotation and no initializer. Add either \u0027:type\u0027 (e.g. \u0027\u00A7B{memberName:i32}\u0027) or an initializer expression so the binder can infer the type."
+      ]
+    },
+    {
+      "path": "src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs(12,92): error CS0103: The name \u0027_chainGroupBy018\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs(12,122): error CS0103: The name \u0027_lam004\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs(12,131): error CS0103: The name \u0027_lam005\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs(12,92): error CS0103: The name \u0027_chainGroupBy018\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs(12,122): error CS0103: The name \u0027_lam004\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Settings/KeyValuePairs/SurrogateConfigurationMethods.cs(12,131): error CS0103: The name \u0027_lam005\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    },
+    {
+      "path": "src/Serilog/Util/TimeProvider.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "PreprocessorStripped": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "preprocessor-directive"
+      ],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Util/TimeProvider.cs(22,33): error CS1503: Argument 1: cannot convert from \u0027double\u0027 to \u0027long\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Util/TimeProvider.cs(22,33): error CS1503: Argument 1: cannot convert from \u0027double\u0027 to \u0027long\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/Serilog/fa9338df/src/Serilog/Serilog.csproj::TargetFramework=net10.0]"
+      ]
+    }
+  ]
+}

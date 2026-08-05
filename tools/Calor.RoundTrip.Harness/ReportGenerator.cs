@@ -306,6 +306,10 @@ public static class ReportGenerator
                     interop_blocks = f.InteropBlocks,
                     gaps = f.Gaps,
                     revert_reason = f.RevertReason,
+                    // Serialized so a failure-cause census is possible from the committed report
+                    // alone; previously these lived in-model only and the record said only "how
+                    // many" files failed, never "why".
+                    errors = f.Errors,
                 })
                 .ToList(),
         };

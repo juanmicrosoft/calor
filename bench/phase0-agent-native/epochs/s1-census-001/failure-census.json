@@ -1,0 +1,310 @@
+{
+  "TotalFailures": 141,
+  "Causes": [
+    {
+      "Cause": "Reverted:CS0103",
+      "Files": 23,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/AccessorCache.cs",
+        "FluentValidation/src/FluentValidation/Internal/ConditionBuilder.cs",
+        "FluentValidation/src/FluentValidation/Resources/LanguageManager.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0246",
+      "Files": 20,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/DefaultValidatorExtensions_Validate.cs",
+        "FluentValidation/src/FluentValidation/DefaultValidatorOptions.cs",
+        "FluentValidation/src/FluentValidation/IValidationRule.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Binding \u0027\u003Cid\u003E\u0027 has no type annotation and no initializer. Add either \u0027\u003Cid\u003E\u0027 (e.g",
+      "Files": 11,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/AbstractValidator.cs",
+        "FluentValidation/src/FluentValidation/Internal/ExtensionsInternal.cs",
+        "FluentValidation/src/FluentValidation/Internal/RuleBase.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Expected EXT, METHOD, PROP, IXER, or END_IFACE but found Class",
+      "Files": 10,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/IncludeRule.cs",
+        "FluentValidation/src/FluentValidation/Validators/CreditCardValidator.cs",
+        "FluentValidation/src/FluentValidation/Validators/EqualValidator.cs"
+      ]
+    },
+    {
+      "Cause": "EmitSyntaxError:Unexpected token \u0027\u003Cid\u003E\u0027",
+      "Files": 7,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/ValidationException.cs",
+        "MediatR/src/MediatR/Mediator.cs",
+        "MediatR/src/MediatR/Pipeline/RequestExceptionActionProcessorBehavior.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS1503",
+      "Files": 6,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/CompositeValidatorSelector.cs",
+        "FluentValidation/src/FluentValidation/Validators/StringEnumValidator.cs",
+        "Serilog/src/Serilog/Core/Sinks/Batching/FailureAwareBatchScheduler.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS8917",
+      "Files": 6,
+      "ExampleFiles": [
+        "MediatR/src/MediatR/Wrappers/NotificationHandlerWrapper.cs",
+        "Serilog/src/Serilog/Configuration/LoggerDestructuringConfiguration.cs",
+        "Serilog/src/Serilog/Configuration/LoggerEnrichmentConfiguration.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0738",
+      "Files": 5,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/PropertyRule.cs",
+        "FluentValidation/src/FluentValidation/Validators/NotEqualValidator.cs",
+        "FluentValidation/src/FluentValidation/Validators/RangeValidator.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Dedent to column 4 does not match any enclosing indent level.",
+      "Files": 4,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/DefaultValidatorExtensions.cs",
+        "FluentValidation/src/FluentValidation/Internal/PropertyChain.cs",
+        "MediatR/src/MediatR/Registration/ServiceRegistrar.cs"
+      ]
+    },
+    {
+      "Cause": "EmitSyntaxError:Identifier expected",
+      "Files": 4,
+      "ExampleFiles": [
+        "MediatR/src/MediatR/Internal/ObjectDetails.cs",
+        "Serilog/src/Serilog/Core/Pipeline/SilentLogger.cs",
+        "Serilog/src/Serilog/ILogger.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0106",
+      "Files": 4,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/AssemblyScanner.cs",
+        "FluentValidation/src/FluentValidation/Internal/TrackingCollection.cs",
+        "Serilog/src/Serilog/Capturing/DepthLimiter.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS1729",
+      "Files": 4,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Capturing/MessageTemplateProcessor.cs",
+        "Serilog/src/Serilog/Configuration/LoggerAuditSinkConfiguration.cs",
+        "Serilog/src/Serilog/Configuration/LoggerSinkConfiguration.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Expected EXT, METHOD, PROP, IXER, or END_IFACE but found Interface",
+      "Files": 3,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Syntax.cs",
+        "FluentValidation/src/FluentValidation/TestHelper/ITestValidationContinuation.cs",
+        "FluentValidation/src/FluentValidation/Validators/LengthValidator.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Expected statement but found Identifier",
+      "Files": 3,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Capturing/PropertyValueConverter.cs",
+        "Serilog/src/Serilog/Core/LevelOverrideMap.cs",
+        "Serilog/src/Serilog/Formatting/Display/PropertiesOutputFormat.cs"
+      ]
+    },
+    {
+      "Cause": "EmitSyntaxError:Invalid expression term \u0027\u003Cid\u003E\u0027",
+      "Files": 3,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/CollectionPropertyRule.cs",
+        "FluentValidation/src/FluentValidation/Results/ValidationResult.cs",
+        "FluentValidation/src/FluentValidation/ValidatorOptions.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:\u0027\u003Cid\u003E\u0027 is not aligned with any open \u00A7IF \u2014 the if-chain already closed at a shall",
+      "Files": 2,
+      "ExampleFiles": [
+        "MediatR/src/MediatR/Internal/HandlersOrderer.cs",
+        "Serilog/src/Serilog/Rendering/MessageTemplateRenderer.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0535",
+      "Files": 2,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/ValidatorFactoryBase.cs",
+        "MediatR/src/MediatR/INotificationHandler.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0759",
+      "Files": 2,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/MemberNameValidatorSelector.cs",
+        "FluentValidation/src/FluentValidation/Internal/MessageFormatter.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS1061",
+      "Files": 2,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/Extensions.cs",
+        "Serilog/src/Serilog/Events/ScalarValue.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS1929",
+      "Files": 2,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/DefaultValidatorSelector.cs",
+        "FluentValidation/src/FluentValidation/Internal/RulesetValidatorSelector.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Dedent to column 2 does not match any enclosing indent level.",
+      "Files": 1,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Filters/Matching.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Dedent to column 6 does not match any enclosing indent level.",
+      "Files": 1,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Expected EXT, METHOD, PROP, IXER, or END_IFACE but found Enum",
+      "Files": 1,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Validators/EmailValidator.cs"
+      ]
+    },
+    {
+      "Cause": "CompileError:Expected statement but found Arg",
+      "Files": 1,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Settings/KeyValuePairs/CallableConfigurationMethodFinder.cs"
+      ]
+    },
+    {
+      "Cause": "EmitSyntaxError:; expected",
+      "Files": 1,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/TestHelper/ValidatorTestExtensions.cs"
+      ]
+    },
+    {
+      "Cause": "EmitSyntaxError:A new expression requires an argument list or (), [], or {} after type",
+      "Files": 1,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/IValidationContext.cs"
+      ]
+    },
+    {
+      "Cause": "EmitSyntaxError:Syntax error, \u0027\u003Cid\u003E\u0027 expected",
+      "Files": 1,
+      "ExampleFiles": [
+        "MediatR/src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0019",
+      "Files": 1,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Core/Sinks/AggregateSink.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0030",
+      "Files": 1,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Events/MessageTemplate.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0115",
+      "Files": 1,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Rendering/ReusableStringWriter.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0128",
+      "Files": 1,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Validators/EnumValidator.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0225",
+      "Files": 1,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Internal/ValidationStrategy.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0266",
+      "Files": 1,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Formatting/Display/LevelOutputFormat.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0274",
+      "Files": 1,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Context/LogContext.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0411",
+      "Files": 1,
+      "ExampleFiles": [
+        "MediatR/src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS0508",
+      "Files": 1,
+      "ExampleFiles": [
+        "MediatR/src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS1620",
+      "Files": 1,
+      "ExampleFiles": [
+        "Serilog/src/Serilog/Core/PropertiesInlineArray.cs"
+      ]
+    },
+    {
+      "Cause": "Reverted:CS1643",
+      "Files": 1,
+      "ExampleFiles": [
+        "FluentValidation/src/FluentValidation/Validators/RegularExpressionValidator.cs"
+      ]
+    }
+  ],
+  "Unattributed": 0,
+  "Top3Share": 0.3829787234042553,
+  "Top10Share": 0.6808510638297872,
+  "Verdict": "PP-S1 = MISS \u2014 top-3 causes cover 38% \u003C 50%: long tail, not a work-list"
+}

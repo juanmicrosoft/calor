@@ -31,6 +31,8 @@ switch (command)
         return await ScreenDeterminismCommand(cliArgs.Skip(1).ToArray());
     case "regen-bundle-readmes":
         return await RegenBundleReadmesCommand(cliArgs.Skip(1).ToArray());
+    case "failure-census":
+        return await FailureCensusCommand(cliArgs.Skip(1).ToArray());
     case "list":
         Console.WriteLine("Known projects:");
         foreach (var p in ProjectConfigs.KnownProjects)
@@ -285,6 +287,55 @@ async Task<int> GenTasksCommand(string[] genArgs)
 
     var run = await TaskGenRunner.RunAsync(configs, options);
     return run.TotalEligible > 0 ? 0 : 1;
+}
+
+// WS-S1 failure-cause census over conversion reports. Decides the pre-committed replacement gate
+// (gates A-1.6(b) / substrate plan §10): top-3 causes >= 50% -> continue WS-S1; otherwise PP-S1 = miss.
+async Task<int> FailureCensusCommand(string[] args)
+{
+    var reportsDir = GetOption(args, "--reports");
+    if (reportsDir == null) { Console.Error.WriteLine("--reports <dir> (containing *-roundtrip.json) is required."); return 2; }
+    reportsDir = Path.GetFullPath(reportsDir);
+    var outDir = Path.GetFullPath(GetOption(args, "--output") ?? reportsDir);
+
+    var files = Directory.GetFiles(reportsDir, "*-roundtrip.json").OrderBy(f => f, StringComparer.Ordinal).ToList();
+    if (files.Count == 0) { Console.Error.WriteLine($"No *-roundtrip.json under {reportsDir}."); return 2; }
+
+    var failures = new List<(string Status, string Path, IReadOnlyList<string> Errors)>();
+    var perProject = new Dictionary<string, int>(StringComparer.Ordinal);
+
+    foreach (var f in files)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(f));
+        var root = doc.RootElement;
+        var project = root.TryGetProperty("project", out var p) ? p.GetString() ?? "?" : "?";
+        if (!root.TryGetProperty("file_detail", out var detail)) continue;
+
+        foreach (var fd in detail.EnumerateArray())
+        {
+            var status = fd.GetProperty("status").GetString() ?? "?";
+            // The non-native gap: everything that is not a zero-loss Replaced file. Excluded files
+            // are outside the denominator by construction (they are not convertible).
+            if (status is "Replaced" or "Excluded") continue;
+
+            var path = fd.GetProperty("path").GetString() ?? "?";
+            var errors = fd.TryGetProperty("errors", out var errs) && errs.ValueKind == System.Text.Json.JsonValueKind.Array
+                ? errs.EnumerateArray().Select(e => e.GetString() ?? "").Where(e => e.Length > 0).ToList()
+                : [];
+            failures.Add((status, $"{project}/{path}", errors));
+            perProject[project] = perProject.GetValueOrDefault(project) + 1;
+        }
+    }
+
+    var result = FailureCensus.Analyse(failures);
+    var md = FailureCensusReport.Render(result, perProject);
+    Directory.CreateDirectory(outDir);
+    await File.WriteAllTextAsync(Path.Combine(outDir, "failure-census.md"), md);
+    await File.WriteAllTextAsync(Path.Combine(outDir, "failure-census.json"),
+        System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+    Console.WriteLine();
+    Console.WriteLine(md);
+    return 0;
 }
 
 // Regenerate each bundle's README from its provenance.json THROUGH THE GENERATOR. provenance.json is

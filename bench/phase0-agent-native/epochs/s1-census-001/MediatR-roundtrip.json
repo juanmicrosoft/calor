@@ -1,0 +1,476 @@
+{
+  "project": "MediatR",
+  "calor_version": "0.10.0",
+  "timestamp": "2026-08-05T15:26:31.8986210\u002B00:00",
+  "duration_seconds": 16.278884,
+  "verdict": "pass",
+  "inconclusive": false,
+  "baseline": {
+    "total": 157,
+    "passed": 154,
+    "failed": 1,
+    "skipped": 2
+  },
+  "round_trip": {
+    "total": 157,
+    "passed": 155,
+    "failed": 0,
+    "skipped": 2
+  },
+  "regressions": 0,
+  "files": {
+    "total": 32,
+    "replaced": 19,
+    "reverted": 6,
+    "conversion_failed": 0,
+    "emit_error": 5,
+    "compile_error": 2,
+    "crashed": 0,
+    "excluded_by_pattern": 2
+  },
+  "avg_conversion_rate": 0.9373475609756098,
+  "build_succeeded": true,
+  "fidelity": {
+    "coverage": {
+      "total_convertible_files": 32,
+      "converted_native": 15,
+      "converted_with_losses": 4,
+      "reverted": 6,
+      "failed_conversion": 7,
+      "excluded_files": 2,
+      "coverage_fraction": 0.59375,
+      "native_fraction": 0.46875,
+      "loss_kind_counts": {
+        "InteropPreserved": 6,
+        "FallbackTodo": 1
+      },
+      "total_interop_blocks": 6,
+      "distinct_gaps": [
+        "foreachvariable"
+      ]
+    },
+    "build": {
+      "succeeded": true,
+      "exit_code": 0,
+      "recovery_reverted_files": 6,
+      "error_count": 0
+    },
+    "tests": {
+      "baseline_total": 157,
+      "baseline_passed": 154,
+      "baseline_failed": 1,
+      "baseline_trx_files": 1,
+      "baseline_console_fallback": false,
+      "round_trip_total": 157,
+      "round_trip_passed": 155,
+      "round_trip_failed": 0,
+      "round_trip_trx_files": 1,
+      "round_trip_console_fallback": false,
+      "inventory_delta": 0,
+      "regressions": 0,
+      "new_passes": 1,
+      "comparison_status": "Pass"
+    }
+  },
+  "file_detail": [
+    {
+      "path": "src/MediatR/IMediator.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/INotificationHandler.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/INotificationHandler.cs(16,64): error CS0535: \u0027NotificationHandler\u003CTNotification\u003E\u0027 does not implement interface member \u0027INotificationHandler\u003CTNotification\u003E.Handle(TNotification, CancellationToken)\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/INotificationHandler.cs(16,64): error CS0535: \u0027NotificationHandler\u003CTNotification\u003E\u0027 does not implement interface member \u0027INotificationHandler\u003CTNotification\u003E.Handle(TNotification, CancellationToken)\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/INotificationPublisher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/IPipelineBehavior.cs",
+      "status": "Replaced",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/IPublisher.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/IPublisher.cs(14,35): error CS0246: The type or namespace name \u0027TNotification\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/IPublisher.cs(13,81): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/IPublisher.cs(14,101): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/IPublisher.cs(14,35): error CS0246: The type or namespace name \u0027TNotification\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/IPublisher.cs(13,81): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/IPublisher.cs(14,101): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/IRequestHandler.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/ISender.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(14,48): error CS0246: The type or namespace name \u0027TResponse\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(14,14): error CS0246: The type or namespace name \u0027TResponse\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(15,27): error CS0246: The type or namespace name \u0027TRequest\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(17,74): error CS0246: The type or namespace name \u0027TResponse\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(17,26): error CS0246: The type or namespace name \u0027TResponse\u0027 could not be found (are you missing a using directive or an assembly reference?) [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(14,106): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(15,83): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(16,82): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(17,132): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/ISender.cs(18,102): error CS0103: The name \u0027default\u0027 does not exist in the current context [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/IStreamPipelineBehavior.cs",
+      "status": "Replaced",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/IStreamRequestHandler.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Internal/HandlersOrderer.cs",
+      "status": "CompileError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "\u0027\u00A7EI\u0027 is not aligned with any open \u00A7IF \u2014 the if-chain already closed at a shallower indent level. Indent the clause to the same column as its \u00A7IF.",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Bind",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Lambda",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Colon",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Colon",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Colon",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Exclamation",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseParen",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found EndLambda",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Return",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Call",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found OpenBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found CloseBrace",
+        "Expected TP, WHERE, EXT, IMPL, FLD, PROP, IXER, CTOR, OP, METHOD, AMT, EVT, CSHARP, PP, CLASS, IFACE, EN, DEL, or END_CLASS but found Identifier"
+      ]
+    },
+    {
+      "path": "src/MediatR/Internal/ObjectDetails.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Identifier expected"
+      ]
+    },
+    {
+      "path": "src/MediatR/Mediator.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Unexpected token \u0027IRequest\u0027",
+        "Unexpected token \u0027notification\u0027",
+        "Unexpected token \u0027INotification\u0027"
+      ]
+    },
+    {
+      "path": "src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Syntax error, \u0027(\u0027 expected",
+        ") expected",
+        "Syntax error, \u0027(\u0027 expected",
+        ") expected",
+        "Syntax error, \u0027(\u0027 expected",
+        ") expected",
+        "Syntax error, \u0027(\u0027 expected",
+        ") expected",
+        "Syntax error, \u0027(\u0027 expected",
+        ") expected",
+        "Syntax error, \u0027(\u0027 expected",
+        ") expected",
+        "Syntax error, \u0027(\u0027 expected",
+        ") expected",
+        "Syntax error, \u0027(\u0027 expected",
+        ") expected"
+      ]
+    },
+    {
+      "path": "src/MediatR/MicrosoftExtensionsDI/RequestExceptionActionProcessorStrategy.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/MicrosoftExtensionsDI/ServiceCollectionExtensions.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/NotificationHandlerExecutor.cs",
+      "status": "Replaced",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/NotificationPublishers/ForeachAwaitPublisher.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs(13,52): error CS0411: The type arguments for method \u0027Enumerable.Select\u003CTSource, TResult\u003E(IEnumerable\u003CTSource\u003E, Func\u003CTSource, int, TResult\u003E)\u0027 cannot be inferred from the usage. Try specifying the type arguments explicitly. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/NotificationPublishers/TaskWhenAllPublisher.cs(13,52): error CS0411: The type arguments for method \u0027Enumerable.Select\u003CTSource, TResult\u003E(IEnumerable\u003CTSource\u003E, Func\u003CTSource, int, TResult\u003E)\u0027 cannot be inferred from the usage. Try specifying the type arguments explicitly. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestExceptionAction.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestExceptionHandler.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestPostProcessor.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/IRequestPreProcessor.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestExceptionActionProcessorBehavior.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Unexpected token \u0027Execute\u0027"
+      ]
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestExceptionHandlerState.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestExceptionProcessorBehavior.cs",
+      "status": "EmitSyntaxError",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": [
+        "Unexpected token \u0027Handle\u0027"
+      ]
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestPostProcessorBehavior.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Pipeline/RequestPreProcessorBehavior.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Registration/ServiceRegistrar.cs",
+      "status": "CompileError",
+      "loss_count": 1,
+      "loss_kinds": {
+        "FallbackTodo": 1
+      },
+      "interop_blocks": 0,
+      "gaps": [
+        "foreachvariable"
+      ],
+      "errors": [
+        "Dedent to column 4 does not match any enclosing indent level."
+      ]
+    },
+    {
+      "path": "src/MediatR/TypeForwardings.cs",
+      "status": "Replaced",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Wrappers/NotificationHandlerWrapper.cs",
+      "status": "Reverted",
+      "loss_count": 0,
+      "loss_kinds": {},
+      "interop_blocks": 0,
+      "gaps": [],
+      "revert_reason": "build-recovery round 2: build error in round-tripped output",
+      "errors": [
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/Wrappers/NotificationHandlerWrapper.cs(18,33): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/Wrappers/NotificationHandlerWrapper.cs(19,55): error CS0411: The type arguments for method \u0027ServiceProviderServiceExtensions.GetServices\u003CT\u003E(IServiceProvider)\u0027 cannot be inferred from the usage. Try specifying the type arguments explicitly. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/Wrappers/NotificationHandlerWrapper.cs(18,33): error CS8917: The delegate type could not be inferred. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/Wrappers/NotificationHandlerWrapper.cs(19,55): error CS0411: The type arguments for method \u0027ServiceProviderServiceExtensions.GetServices\u003CT\u003E(IServiceProvider)\u0027 cannot be inferred from the usage. Try specifying the type arguments explicitly. [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    },
+    {
+      "path": "src/MediatR/Wrappers/RequestHandlerWrapper.cs",
+      "status": "Replaced",
+      "loss_count": 2,
+      "loss_kinds": {
+        "InteropPreserved": 2
+      },
+      "interop_blocks": 2,
+      "gaps": [],
+      "errors": []
+    },
+    {
+      "path": "src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs",
+      "status": "Reverted",
+      "loss_count": 1,
+      "loss_kinds": {
+        "InteropPreserved": 1
+      },
+      "interop_blocks": 1,
+      "gaps": [],
+      "revert_reason": "build-recovery round 1: build error in round-tripped output",
+      "errors": [
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs(29,76): error CS0508: \u0027StreamRequestHandlerWrapperImpl\u003CTRequest, TResponse\u003E.Handle(object, IServiceProvider, CancellationToken)\u0027: return type must be \u0027IAsyncEnumerable\u003Cobject?\u003E\u0027 to match overridden member \u0027StreamRequestHandlerBase.Handle(object, IServiceProvider, CancellationToken)\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]",
+        "/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/Wrappers/StreamRequestHandlerWrapper.cs(29,76): error CS0508: \u0027StreamRequestHandlerWrapperImpl\u003CTRequest, TResponse\u003E.Handle(object, IServiceProvider, CancellationToken)\u0027: return type must be \u0027IAsyncEnumerable\u003Cobject?\u003E\u0027 to match overridden member \u0027StreamRequestHandlerBase.Handle(object, IServiceProvider, CancellationToken)\u0027 [/private/var/folders/6k/p_3c7f5s7qx5_0shc1rx5fwr0000gn/T/calor-roundtrip/MediatR/9fcb40b1/src/MediatR/MediatR.csproj::TargetFramework=net6.0]"
+      ]
+    }
+  ]
+}
