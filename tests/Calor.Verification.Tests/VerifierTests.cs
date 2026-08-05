@@ -1676,6 +1676,9 @@ public class VerifierTests
             postcondition);
 
         Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+        // Name the refusal: with StartsWith now also refusable (D4 second half), status
+        // alone cannot tell which rule fired, and this test exists to pin the D9 one.
+        Assert.Contains("Replace", result.CounterexampleDescription ?? string.Empty);
     }
 
     [SkippableFact]

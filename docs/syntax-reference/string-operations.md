@@ -84,10 +84,18 @@ This is the part that surprises people, and it is .NET's behaviour, not Calor's 
 | `(ends s "x")` | `s.EndsWith("x")` | **current culture** |
 | `(indexof s "x")` | `s.IndexOf("x")` | **current culture** |
 
-Culture-sensitive comparison is not a rounding error: on .NET 10, `"abc".StartsWith("\u200dabc")` is
-**true** (a zero-width joiner has no collation weight) while the ordinal comparison is **false**. The
-same input makes `indexof` return `0` culturally and `-1` ordinally. If you want ordinal behaviour
-from `starts`, `ends` or `indexof`, **say `:ordinal`**.
+Culture-sensitive comparison is not a rounding error. Under `hu-HU`, where the `dzs` digraph collates
+as a single unit, **the same two strings give opposite answers in one expression**:
+
+```
+"dzsx".Contains("zsx")   -> True    (Contains is ordinal)
+"dzsx".IndexOf("zsx")    -> -1      (IndexOf is culture-sensitive)
+```
+
+And under any culture, `"abc".StartsWith("\u200dabc")` is **true** — a zero-width joiner has no
+collation weight — while the ordinal comparison is **false**.
+
+If you want ordinal behaviour from `starts`, `ends` or `indexof`, **say `:ordinal`**.
 
 ### In contracts, only ordinal comparison is verifiable
 
