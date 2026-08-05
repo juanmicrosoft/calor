@@ -79,17 +79,23 @@ public class DiagnosticSurfaceSpellingTests
         // TypeChecker — arithmetic on non-numeric (echoes operand types).
         new object[] { "arith-non-numeric",
             "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{s:str} \"a\"\n    §B{r:i32} (+ s s)\n    §R r\n" },
-        // Sized numeric types (#748 review finding 2): these reach the checker as their
-        // EXPANDED internal form (INT[bits=64][signed=true], FLOAT[bits=32]) and are the
-        // token family most likely to leak `INT`/`[bits=`. Each must surface as i64/f32/i16.
+        // Sized numeric types (#748 review finding 2): the token family most likely to leak
+        // `INT`/`[bits=`. Each must surface as i64/f32/i16/u8.
+        //
+        // These four used to be CLEAN programs (`§B{x:i64} 0`) that produced a diagnostic only
+        // because the opt-in checker could not resolve a sized spelling at all and reported a
+        // spurious "Unknown type 'i64'". That defect is fixed, so those programs now compile —
+        // and a trigger that fires on nothing guards nothing, by this test's own rule above.
+        // Each is now a genuine type error on a sized binding, which still forces the checker to
+        // echo the width the user wrote.
         new object[] { "sized-int-i64",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i64} 0\n    §R 0\n" },
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i64} STR:\"a\"\n    §R INT:0\n" },
         new object[] { "sized-float-f32",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{y:f32} 0.0\n    §R 0\n" },
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{y:f32} STR:\"a\"\n    §R INT:0\n" },
         new object[] { "sized-int-i16",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{z:i16} 0\n    §R 0\n" },
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{z:i16} STR:\"a\"\n    §R INT:0\n" },
         new object[] { "sized-uint-u8",
-            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{b:u8} 0\n    §R 0\n" },
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{b:u8} STR:\"a\"\n    §R INT:0\n" },
     };
 
     [Theory]
@@ -211,4 +217,5 @@ public class DiagnosticSurfaceSpellingTests
         }
         return Array.Empty<string>();
     }
+
 }

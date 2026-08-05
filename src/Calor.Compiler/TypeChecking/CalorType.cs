@@ -44,6 +44,26 @@ public sealed class PrimitiveType : CalorType
     public static readonly PrimitiveType String = new("STRING");
     public static readonly PrimitiveType Unit = new("UNIT");
 
+    /// <summary>
+    /// <c>char</c>. Distinct from <see cref="Int"/> deliberately: collapsing it would make
+    /// `char + i32` type-check, and C# does promote there, but it would also make a `char`
+    /// silently satisfy an `i32` parameter, which is the error worth catching.
+    /// </summary>
+    public static readonly PrimitiveType Char = new("CHAR");
+
+    /// <summary>
+    /// <c>decimal</c>. Kept apart from <see cref="Float"/> because C# has no implicit
+    /// decimal↔double conversion in either direction — treating them as one type would accept
+    /// programs the emitted C# rejects.
+    /// </summary>
+    public static readonly PrimitiveType Decimal = new("DECIMAL");
+
+    /// <summary>
+    /// <c>object</c> — the top type. Everything is assignable TO it and nothing is assignable
+    /// FROM it without a cast, which is what <see cref="TypeChecker.IsAssignable"/> implements.
+    /// </summary>
+    public static readonly PrimitiveType Object = new("OBJECT");
+
     public override string Name { get; }
 
     /// <summary>
@@ -56,7 +76,17 @@ public sealed class PrimitiveType : CalorType
     /// to <c>i32</c> here — the opt-in checker does not resolve sized types at all, so they
     /// surface from their carried width string via <c>ToSurfaceSpelling</c>, not this map.
     /// </summary>
-    public override string SurfaceName => Name switch
+    /// <summary>
+    /// The spelling the user actually wrote, when it differs from the canonical one for this
+    /// type's family. Every integer width collapses to <see cref="Int"/> for CHECKING — that is
+    /// the type system's existing design, and width analysis lives in the verifier — but a
+    /// diagnostic must still echo `i64` for an `i64` binding. Without this, resolving the sized
+    /// spellings (which previously failed outright with a spurious "Unknown type 'i64'") would
+    /// have traded a false error for a message that quietly reports the wrong width.
+    /// </summary>
+    private readonly string? _surfaceOverride;
+
+    public override string SurfaceName => _surfaceOverride ?? Name switch
     {
         "INT" => "i32",
         "FLOAT" => "f64",
@@ -64,8 +94,25 @@ public sealed class PrimitiveType : CalorType
         "STRING" => "str",
         "VOID" => "void",
         "UNIT" => "unit",
+        "CHAR" => "char",
+        "DECIMAL" => "decimal",
+        "OBJECT" => "object",
         _ => Name,
     };
+
+    /// <summary>
+    /// A width-carrying view of a collapsed primitive: equal to the canonical instance (equality
+    /// and hashing are on <see cref="Name"/>, so <c>Sized("INT","i64") == Int</c>) but rendering
+    /// the spelling the user wrote.
+    /// </summary>
+    private static PrimitiveType Sized(PrimitiveType canonical, string surface)
+        => new(canonical.Name, surface);
+
+    private PrimitiveType(string name, string? surfaceOverride)
+    {
+        Name = name;
+        _surfaceOverride = surfaceOverride;
+    }
 
     private PrimitiveType(string name)
     {
@@ -77,10 +124,27 @@ public sealed class PrimitiveType : CalorType
         return name.ToUpperInvariant() switch
         {
             "VOID" => Void,
-            "INT" or "INT32" or "I32" or "I64" or "INT64" => Int,
-            "FLOAT" or "FLOAT64" or "DOUBLE" or "F64" or "F32" => Float,
+            // Every integer width collapses to one Int. That is the type system's existing
+            // choice (I32/I64 already did) and the sized-width checking lives in the verifier,
+            // not here — but the SPELLINGS have to resolve, or a documented type reads as
+            // "Unknown type 'u32'". docs/syntax-reference/types.md is the authority for this list.
+            "INT" or "INT32" or "I32" => Int,
+            "I64" or "INT64" => Sized(Int, "i64"),
+            "I8" => Sized(Int, "i8"),
+            "SBYTE" => Sized(Int, "i8"),
+            "I16" or "INT16" or "SHORT" => Sized(Int, "i16"),
+            "U8" or "BYTE" => Sized(Int, "u8"),
+            "U16" or "UINT16" or "USHORT" => Sized(Int, "u16"),
+            "U32" or "UINT" or "UINT32" => Sized(Int, "u32"),
+            "U64" or "UINT64" or "ULONG" => Sized(Int, "u64"),
+            "LONG" => Sized(Int, "i64"),
+            "FLOAT" or "FLOAT64" or "DOUBLE" or "F64" => Float,
+            "F32" or "SINGLE" => Sized(Float, "f32"),
+            "DECIMAL" => Decimal,
             "BOOL" or "BOOLEAN" => Bool,
             "STRING" or "STR" => String,
+            "CHAR" => Char,
+            "OBJECT" => Object,
             "UNIT" => Unit,
             _ => null
         };
@@ -94,6 +158,49 @@ public sealed class PrimitiveType : CalorType
     }
 
     public override int GetHashCode() => Name.GetHashCode();
+}
+
+/// <summary>
+/// A type the checker does not model — overwhelmingly a .NET type reached through interop
+/// (<c>Type</c>, <c>StringComparison</c>, a class from a <c>using</c>).
+///
+/// <para>This exists because the alternative is a false positive by construction. The checker
+/// has no BCL surface, so it cannot distinguish "external type" from "typo", and reporting
+/// <c>Unknown type 'Type'</c> rejected programs that compile and run. The generated C# is
+/// compiled regardless, and a genuine typo surfaces there as CS0246 with a better message than
+/// this checker could produce — so the signal is deferred, not lost.</para>
+///
+/// <para>Assignability is permissive in both directions: nothing is known about the type, and
+/// guessing in either direction would be inventing a verdict.</para>
+/// </summary>
+public sealed class ExternalType : CalorType
+{
+    public override string Name { get; }
+
+    public ExternalType(string name) => Name = name;
+
+    public override bool Equals(CalorType? other) => other is ExternalType et && et.Name == Name;
+    public override int GetHashCode() => Name.GetHashCode();
+}
+
+/// <summary>
+/// An array, <c>T[]</c>. A distinct kind rather than a <see cref="GenericInstanceType"/> named
+/// "Array" so diagnostics echo <c>i32[]</c> — a spelling the user can actually write — instead of
+/// <c>Array&lt;i32&gt;</c>, which is the #741 rule this file already applies to primitives.
+/// </summary>
+public sealed class ArrayType : CalorType
+{
+    public CalorType ElementType { get; }
+    public override string Name => $"{ElementType.Name}[]";
+    public override string SurfaceName => $"{ElementType.SurfaceName}[]";
+
+    public ArrayType(CalorType elementType)
+        => ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
+
+    public override bool Equals(CalorType? other)
+        => other is ArrayType at && at.ElementType.Equals(ElementType);
+
+    public override int GetHashCode() => HashCode.Combine("[]", ElementType);
 }
 
 /// <summary>

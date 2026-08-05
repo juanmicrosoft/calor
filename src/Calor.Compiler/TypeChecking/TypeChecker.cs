@@ -38,10 +38,18 @@ public sealed class TypeChecker
         }
     }
 
+    /// <summary>Set during the signature pre-pass, which re-resolves annotations CheckFunction
+    /// will resolve again — so only the second pass reports.</summary>
+    private bool _suppressDiagnostics;
+
     private void RegisterRefinementType(RefinementTypeNode rtype)
     {
         var baseType = ResolveTypeName(rtype.BaseTypeName, rtype.Span);
-        if (baseType is ErrorType)
+        // ExternalType counts as undefined HERE, unlike an interop annotation. A refinement's
+        // base type is a Calor-level construct the refinement machinery has to reason about, so
+        // "some .NET type we don't model" is not an acceptable answer — `§RTYPE{r:T:no_such_type}`
+        // must still be an error even though the general type resolver is now permissive.
+        if (baseType is ErrorType or ExternalType)
         {
             _diagnostics.ReportError(rtype.Span, DiagnosticCode.RefinementUndefinedBaseType,
                 $"Refinement type '{rtype.Name}' references undefined base type '{rtype.BaseTypeName}'");
@@ -61,16 +69,47 @@ public sealed class TypeChecker
         _env.DefineType(rtype.Name, refinedType);
     }
 
+    /// <summary>
+    /// Registers a function's type parameters, from BOTH spellings.
+    ///
+    /// <para><c>§F{...}&lt;T&gt;</c> — after the attribute block — populates
+    /// <c>func.TypeParameters</c>. But the spelling the shipped sample and the docs use puts them
+    /// inside the name attribute, <c>§F{f001:Identity&lt;T&gt;:pub}</c>, which the parser leaves
+    /// embedded in <c>Name</c>. The emitter passes that through and the generated C# is correct,
+    /// so the program works — but the checker saw an unresolved <c>T</c> and warned that a
+    /// correct, documented generic parameter might be a typo.</para>
+    /// </summary>
+    private void RegisterTypeParameters(FunctionNode func)
+    {
+        foreach (var tp in func.TypeParameters)
+        {
+            _env.DefineType(tp.Name, new TypeParameterType(tp.Name, tp.Constraints));
+        }
+
+        var open = func.Name.IndexOf('<');
+        if (open > 0 && func.Name.EndsWith('>'))
+        {
+            foreach (var raw in func.Name[(open + 1)..^1].Split(','))
+            {
+                var name = raw.Trim();
+                if (name.Length > 0)
+                {
+                    _env.DefineType(name, new TypeParameterType(name, Array.Empty<TypeConstraintNode>()));
+                }
+            }
+        }
+    }
+
     private void RegisterFunction(FunctionNode func)
     {
         _env.EnterScope();
 
-        // Register type parameters first so they can be resolved in parameter types
-        foreach (var tp in func.TypeParameters)
-        {
-            var tpType = new TypeParameterType(tp.Name, tp.Constraints);
-            _env.DefineType(tp.Name, tpType);
-        }
+        // Signature PRE-PASS: resolve quietly. CheckFunction resolves the same annotations again
+        // and owns the diagnostics — without this the unresolved-type warning was reported three
+        // times for a single `T` (parameter here, return here, parameter again there).
+        _suppressDiagnostics = true;
+
+        RegisterTypeParameters(func);
 
         var paramTypes = new List<CalorType>();
         foreach (var param in func.Parameters)
@@ -83,6 +122,7 @@ public sealed class TypeChecker
             ? ResolveTypeName(func.Output.TypeName, func.Output.Span)
             : PrimitiveType.Void;
 
+        _suppressDiagnostics = false;
         _env.ExitScope();
 
         var funcType = new FunctionType(paramTypes, returnType);
@@ -93,12 +133,7 @@ public sealed class TypeChecker
     {
         _env.EnterScope();
 
-        // Register type parameters in scope
-        foreach (var tp in func.TypeParameters)
-        {
-            var tpType = new TypeParameterType(tp.Name, tp.Constraints);
-            _env.DefineType(tp.Name, tpType);
-        }
+        RegisterTypeParameters(func);
 
         // Add parameters to scope
         foreach (var param in func.Parameters)
@@ -228,7 +263,7 @@ public sealed class TypeChecker
     private void CheckWhileStatement(WhileStatementNode whileStmt)
     {
         var condType = InferExpressionType(whileStmt.Condition);
-        if (!condType.Equals(PrimitiveType.Bool))
+        if (IsDefinitelyNotBool(condType))
         {
             _diagnostics.ReportError(whileStmt.Condition.Span, DiagnosticCode.TypeMismatch,
                 $"WHILE condition must be bool, got {condType.SurfaceName}");
@@ -245,7 +280,7 @@ public sealed class TypeChecker
     private void CheckIfStatement(IfStatementNode ifStmt)
     {
         var condType = InferExpressionType(ifStmt.Condition);
-        if (!condType.Equals(PrimitiveType.Bool))
+        if (IsDefinitelyNotBool(condType))
         {
             _diagnostics.ReportError(ifStmt.Condition.Span, DiagnosticCode.TypeMismatch,
                 $"IF condition must be bool, got {condType.SurfaceName}");
@@ -261,7 +296,7 @@ public sealed class TypeChecker
         foreach (var elseIf in ifStmt.ElseIfClauses)
         {
             var elseIfCondType = InferExpressionType(elseIf.Condition);
-            if (!elseIfCondType.Equals(PrimitiveType.Bool))
+            if (IsDefinitelyNotBool(elseIfCondType))
             {
                 _diagnostics.ReportError(elseIf.Condition.Span, DiagnosticCode.TypeMismatch,
                     $"ELSEIF condition must be bool, got {elseIfCondType.SurfaceName}");
@@ -314,8 +349,11 @@ public sealed class TypeChecker
         }
         else
         {
-            _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
-                "Variable binding requires either a type annotation or an initializer");
+            // Deliberately silent. `BindValidationPass` owns this condition and reports it as
+            // Calor0250 (BindRequiresTypeOrInitializer) — the specific, documented code that
+            // carries a quickfix. Reporting it here too meant that turning the checker on
+            // REPLACED a precise diagnostic with a vaguer one (Calor0202 TypeMismatch), so the
+            // same program produced different codes depending on a flag.
             varType = ErrorType.Instance;
         }
 
@@ -334,7 +372,7 @@ public sealed class TypeChecker
             if (matchCase.Guard != null)
             {
                 var guardType = InferExpressionType(matchCase.Guard);
-                if (!guardType.Equals(PrimitiveType.Bool))
+                if (IsDefinitelyNotBool(guardType))
                 {
                     _diagnostics.ReportError(matchCase.Guard.Span, DiagnosticCode.TypeMismatch,
                         $"Match guard must be bool, got {guardType.SurfaceName}");
@@ -376,11 +414,16 @@ public sealed class TypeChecker
             }
             else
             {
+                // Reachable only for a KNOWN generic that is not a List/HashSet, so no guard is
+                // needed here — a GenericInstanceType is never ErrorType or ExternalType. An
+                // earlier revision put the guard on this branch, where it was dead code, and left
+                // the outer `else` below — the one that actually sees unmodeled receivers —
+                // unprotected.
                 _diagnostics.ReportError(push.Span, DiagnosticCode.TypeMismatch,
                     $"PUSH operation requires List or HashSet, got {collectionType.SurfaceName}");
             }
         }
-        else
+        else if (IsKnownNonCollection(collectionType))
         {
             _diagnostics.ReportError(push.Span, DiagnosticCode.TypeMismatch,
                 $"PUSH operation requires a collection type, got {collectionType.SurfaceName}");
@@ -417,7 +460,7 @@ public sealed class TypeChecker
                     $"Dictionary value type mismatch: expected {expectedValueType.SurfaceName}, got {valueType.SurfaceName}");
             }
         }
-        else
+        else if (IsKnownNonCollection(dictType))
         {
             _diagnostics.ReportError(put.Span, DiagnosticCode.TypeMismatch,
                 $"PUT operation requires a Dictionary, got {dictType?.SurfaceName ?? "unknown"}");
@@ -455,7 +498,7 @@ public sealed class TypeChecker
                     $"Cannot remove {removeType.SurfaceName} from {collectionType.SurfaceName}, expected {expectedType.SurfaceName}");
             }
         }
-        else
+        else if (IsKnownNonCollection(collectionType) && collectionType is not ArrayType)
         {
             _diagnostics.ReportError(remove.Span, DiagnosticCode.TypeMismatch,
                 $"REM operation requires a collection type, got {collectionType.SurfaceName}");
@@ -491,10 +534,21 @@ public sealed class TypeChecker
                     $"Cannot assign {valueType.SurfaceName} to list element of type {elementType.SurfaceName}");
             }
         }
-        else
+        else if (collectionType is ArrayType setArray)
+        {
+            // Arrays are indexable too. Before arrays resolved at all this branch was unreachable;
+            // making them resolve without teaching SETIDX about them turned a working program —
+            // including two agent-native benchmark GOLD references — into a hard error.
+            if (!IsAssignable(setArray.ElementType, valueType))
+            {
+                _diagnostics.ReportError(setIndex.Value.Span, DiagnosticCode.TypeMismatch,
+                    $"Cannot assign {valueType.SurfaceName} to array element of type {setArray.ElementType.SurfaceName}");
+            }
+        }
+        else if (IsKnownNonCollection(collectionType))
         {
             _diagnostics.ReportError(setIndex.Span, DiagnosticCode.TypeMismatch,
-                $"SETIDX operation requires a List, got {collectionType.SurfaceName}");
+                $"SETIDX operation requires a List or array, got {collectionType.SurfaceName}");
         }
     }
 
@@ -509,8 +563,9 @@ public sealed class TypeChecker
         }
 
         // Clear works on any collection type
-        if (collectionType is not GenericInstanceType git ||
-            (git.BaseName != "List" && git.BaseName != "Dictionary" && git.BaseName != "HashSet"))
+        if ((collectionType is not GenericInstanceType git ||
+             (git.BaseName != "List" && git.BaseName != "Dictionary" && git.BaseName != "HashSet"))
+            && IsKnownNonCollection(collectionType))
         {
             _diagnostics.ReportError(clear.Span, DiagnosticCode.TypeMismatch,
                 $"CLR operation requires a collection type, got {collectionType.SurfaceName}");
@@ -546,8 +601,9 @@ public sealed class TypeChecker
                     $"Cannot insert {valueType.SurfaceName} into list of type {elementType.SurfaceName}");
             }
         }
-        else
+        else if (IsKnownNonCollection(collectionType) && collectionType is not ArrayType)
         {
+            // Arrays have no INS — fixed length — but an unmodeled receiver must stay silent.
             _diagnostics.ReportError(insert.Span, DiagnosticCode.TypeMismatch,
                 $"INS operation requires a List, got {collectionType.SurfaceName}");
         }
@@ -568,7 +624,7 @@ public sealed class TypeChecker
             _env.DefineVariable(dictForeach.KeyName, keyType);
             _env.DefineVariable(dictForeach.ValueName, valueType);
         }
-        else
+        else if (IsKnownNonCollection(dictType))
         {
             _diagnostics.ReportError(dictForeach.Dictionary.Span, DiagnosticCode.TypeMismatch,
                 $"EACHKV requires a Dictionary, got {dictType.SurfaceName}");
@@ -651,10 +707,54 @@ public sealed class TypeChecker
                         $"Err pattern can only match Result types, got {expectedType.SurfaceName}");
                 }
                 break;
+            // `§VAR{d}` — the `var d` pattern. Binds like VariablePatternNode; it reached the
+            // default arm below and hard-errored, so every switch arm using it was rejected.
+            case VarPatternNode varPatNode:
+                _env.DefineVariable(varPatNode.Name, expectedType);
+                break;
+
+            // `§K{Type:name}` — a type test with an optional binding. The bound name takes the
+            // tested type, which the checker may not model; ExternalType is the honest answer.
+            case TypePatternNode typePat:
+                if (!string.IsNullOrEmpty(typePat.BindingName))
+                {
+                    _env.DefineVariable(typePat.BindingName!, ResolveTypeName(typePat.TypeName, typePat.Span));
+                }
+                break;
+
+            // Composites: recurse so nested bindings land in scope.
+            case AndPatternNode andPat:
+                CheckPattern(andPat.Left, expectedType);
+                CheckPattern(andPat.Right, expectedType);
+                break;
+
+            case OrPatternNode orPat:
+                CheckPattern(orPat.Left, expectedType);
+                CheckPattern(orPat.Right, expectedType);
+                break;
+
+            case NegatedPatternNode negPat:
+                CheckPattern(negPat.Inner, expectedType);
+                break;
+
+            case ListPatternNode listPat:
+                var elementType = expectedType is ArrayType at ? at.ElementType
+                    : expectedType is GenericInstanceType { BaseName: "List", TypeArguments.Count: 1 } lg
+                        ? lg.TypeArguments[0]
+                        : ErrorType.Instance;
+                foreach (var sub in listPat.Patterns)
+                {
+                    CheckPattern(sub, elementType);
+                }
+                break;
+
             default:
-                // Unknown pattern type - report for safety
-                _diagnostics.ReportError(pattern.Span, DiagnosticCode.TypeMismatch,
-                    $"Unsupported pattern type: {pattern.GetType().Name}");
+                // Silent. `CheckPattern` models 7 of the 19 pattern kinds in the AST, and the rest
+                // — relational, property, positional, constant, is — are simply not implemented
+                // here. Reporting "Unsupported pattern type" made the CHECKER's gap the user's
+                // error, and once the checker runs by default that is a hard error on any program
+                // using one. Any name a pattern binds and this arm misses will surface as a normal
+                // "Undefined variable" at the use site, which is the correct place for it.
                 break;
         }
     }
@@ -911,13 +1011,42 @@ public sealed class TypeChecker
     private CalorType InferReferenceType(ReferenceNode refNode)
     {
         var type = _env.LookupVariable(refNode.Name);
-        if (type == null)
+        if (type != null)
         {
-            _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
-                $"Undefined variable '{refNode.Name}'");
+            return type;
+        }
+
+        // A dotted reference whose head is not a local is a MEMBER ACCESS, not a variable:
+        // `Math.PI`, `int.MaxValue`, `StringComparison.Ordinal`, `System.Environment.NewLine`.
+        // The checker models no BCL surface, so it cannot type these — but reporting them as
+        // "Undefined variable" is worse than saying nothing: it rejects programs that compile
+        // and run correctly, and the emitter passes the path through to C# verbatim. Yield to
+        // the C# compiler, which does know these, rather than inventing a verdict.
+        //
+        // C# expression keywords that reach the checker as bare references. `default` is the one
+        // observed (generic code emits `default`); the others are listed because they arrive by
+        // the same route and reporting any of them as an undefined VARIABLE is simply wrong.
+        if (refNode.Name is "default" or "null" or "this" or "base" or "value")
+        {
             return ErrorType.Instance;
         }
-        return type;
+
+        // Deliberately NOT applied to a bare identifier: `Undefined variable 'x'` is a real and
+        // useful error, and this must not weaken it.
+        if (refNode.Name.Contains('.'))
+        {
+            // Both cases — an unknown head (`Math.PI`) and a known local's member
+            // (`someLocal.Length`) — are unmodeled here, so they get the same answer. Reporting
+            // the second as an unknown MEMBER was considered and rejected: without a member table
+            // the checker cannot separate `n.NoSuchField` from `n.ToString`, and `ToString` is
+            // common enough that reporting would reintroduce exactly the false-positive class
+            // this change set removes.
+            return ErrorType.Instance;
+        }
+
+        _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
+            $"Undefined variable '{refNode.Name}'");
+        return ErrorType.Instance;
     }
 
     private CalorType InferBinaryOperationType(BinaryOperationNode binOp)
@@ -936,12 +1065,35 @@ public sealed class TypeChecker
         // Logical operators require BOOL operands
         if (binOp.Operator is BinaryOperator.And or BinaryOperator.Or)
         {
-            if (!leftType.Equals(PrimitiveType.Bool) || !rightType.Equals(PrimitiveType.Bool))
+            if (IsDefinitelyNotBool(leftType) || IsDefinitelyNotBool(rightType))
             {
                 _diagnostics.ReportError(binOp.Span, DiagnosticCode.TypeMismatch,
                     "Logical operators require bool operands");
             }
             return PrimitiveType.Bool;
+        }
+
+        // `+` on strings is CONCATENATION, exactly as in the emitted C#. Rejecting it as
+        // "requires numeric operands" made the checker refuse a working, documented program —
+        // the MCP primer's own §M{m3:Files} module among them.
+        if (binOp.Operator == BinaryOperator.Add
+            && (leftType.Equals(PrimitiveType.String) || rightType.Equals(PrimitiveType.String)))
+        {
+            // C#'s string + T binds for any T via ToString(), and that is what the emitter
+            // produces, so the other operand is unconstrained.
+            return PrimitiveType.String;
+        }
+
+        // C# has no implicit conversion between `decimal` and the binary floating types, in
+        // either direction — `decimal + double` is CS0019. Both are "numeric", so the family
+        // check has to be separate or the checker accepts a program the emitted C# rejects.
+        if ((leftType.Equals(PrimitiveType.Decimal) && rightType.Equals(PrimitiveType.Float))
+            || (leftType.Equals(PrimitiveType.Float) && rightType.Equals(PrimitiveType.Decimal)))
+        {
+            _diagnostics.ReportError(binOp.Span, DiagnosticCode.TypeMismatch,
+                $"Cannot mix {leftType.SurfaceName} and {rightType.SurfaceName} in arithmetic: " +
+                "C# has no implicit conversion between decimal and floating-point types");
+            return ErrorType.Instance;
         }
 
         // Arithmetic operators
@@ -1042,6 +1194,14 @@ public sealed class TypeChecker
             return fieldDef.Type;
         }
 
+        // Same rule as the bool conditions: only complain when the receiver's type is actually
+        // known. An unmodeled receiver — a `new` expression, an external call result — is the
+        // checker's blind spot, not the program's error, and C# resolves the member itself.
+        if (targetType is ErrorType or ExternalType)
+        {
+            return ErrorType.Instance;
+        }
+
         _diagnostics.ReportError(field.Span, DiagnosticCode.TypeMismatch,
             $"Cannot access field on non-record type {targetType.SurfaceName}");
         return ErrorType.Instance;
@@ -1055,6 +1215,24 @@ public sealed class TypeChecker
         CalorType? unifiedType = null;
         foreach (var matchCase in match.Cases)
         {
+            // Each arm gets its own scope with the pattern's bindings in it, exactly as
+            // CheckMatchStatement does. This was missing entirely: an arm like
+            // `§K §VAR{d} §WHEN (> d 0) → d` had `d` unbound, so both the guard and the body
+            // reported `Undefined variable 'd'`. Harmless while the checker was opt-out;
+            // a hard error on the default path once it is on.
+            _env.EnterScope();
+            CheckPattern(matchCase.Pattern, targetType);
+
+            if (matchCase.Guard != null)
+            {
+                var guardType = InferExpressionType(matchCase.Guard);
+                if (IsDefinitelyNotBool(guardType))
+                {
+                    _diagnostics.ReportError(matchCase.Guard.Span, DiagnosticCode.TypeMismatch,
+                        $"Match guard must be bool, got {guardType.SurfaceName}");
+                }
+            }
+
             if (matchCase.Body.Count > 0)
             {
                 var lastStmt = matchCase.Body[matchCase.Body.Count - 1];
@@ -1078,6 +1256,8 @@ public sealed class TypeChecker
                         $"Match expression branches have incompatible types: {unifiedType.SurfaceName} and {caseType.SurfaceName}");
                 }
             }
+
+            _env.ExitScope();
         }
 
         return unifiedType ?? PrimitiveType.Unit;
@@ -1085,6 +1265,20 @@ public sealed class TypeChecker
 
     private CalorType ResolveTypeName(string typeName, Parsing.TextSpan span)
     {
+        // Arrays, in BOTH spellings the compiler produces. `T[]` is what the C# converter and
+        // §I/§O annotations emit; `[T]` is the collection-literal spelling in the syntax
+        // reference. Neither resolved before, so `§I{[str]:args}` — a documented, working
+        // declaration — reported "Unknown type '[str]'".
+        if (typeName.EndsWith("[]", StringComparison.Ordinal) && typeName.Length > 2)
+        {
+            return new ArrayType(ResolveTypeName(typeName[..^2], span));
+        }
+        if (typeName.Length > 2 && typeName[0] == '[' && typeName[^1] == ']'
+            && typeName.IndexOf(',') < 0)
+        {
+            return new ArrayType(ResolveTypeName(typeName[1..^1], span));
+        }
+
         // Handle generic types with bracket syntax: Option[INT] or Result[INT, STRING]
         var bracketIndex = typeName.IndexOf('[');
         if (bracketIndex > 0 && typeName.EndsWith(']'))
@@ -1145,6 +1339,22 @@ public sealed class TypeChecker
         if (primitive != null)
             return primitive;
 
+        // Sized numerics arrive EXPANDED — `INT[bits=64][signed=true]`, `FLOAT[bits=32]` — not as
+        // the `i64`/`f32` the user wrote, so the lookup above cannot match them. Normalize through
+        // the same surface-spelling helper the diagnostics use and try once more. Without this the
+        // sized spellings fall through to ExternalType, which is assignable to anything, and the
+        // checker silently accepts `§B{x:i64} "a"`.
+        var surface = Parsing.AttributeHelper.ToSurfaceSpelling(typeName);
+        if (!string.Equals(surface, typeName, StringComparison.Ordinal))
+        {
+            // RE-ENTER the resolver rather than only retrying FromName. Arrays arrive expanded
+            // too (`ARRAY[element=STRING]`), so a FromName-only retry left `[str]` falling through
+            // to ExternalType — which is assignable from anything, so `§B{a:[str]} xs` with
+            // `xs: [i32]` was silently accepted. The recursion is bounded: ToSurfaceSpelling is
+            // idempotent, and the guard above stops the second pass from recursing again.
+            return ResolveTypeName(surface, span);
+        }
+
         // Try user-defined type (includes type parameters in scope)
         var userType = _env.LookupType(typeName);
         if (userType != null)
@@ -1157,9 +1367,30 @@ public sealed class TypeChecker
         // opt-in TypeChecker — so a valid `i64` binding still gets this spurious "Unknown
         // type" — is a separate pre-existing gap outside this spelling change: the opt-in
         // TypeChecker does not model sized numeric widths.)
-        _diagnostics.ReportError(span, DiagnosticCode.UndefinedReference,
-            $"Unknown type '{Parsing.AttributeHelper.ToSurfaceSpelling(typeName)}'");
-        return ErrorType.Instance;
+        // Unresolved. Reported as a WARNING, not an error, and not silently either.
+        //
+        // An error is wrong: the checker models no BCL surface, so it cannot distinguish "a .NET
+        // type reached through interop" from "a typo", and erroring rejects working programs —
+        // that is most of what this change set fixes. But silence is also wrong: on
+        // `calor_check`, `calor_refine` and `calor -i/-o` NOTHING else compiles the generated C#,
+        // so a misspelt type would simply vanish rather than resurface as CS0246 later.
+        //
+        // A heuristic was tried first — treat lower-case names as Calor typos, PascalCase as
+        // external — and it is recorded here as rejected rather than quietly dropped: it missed
+        // the obvious case (`Strng` is PascalCase) while firing on working programs, because some
+        // trailing-member-access shapes reach this resolver with a local's name in the type
+        // position. Warning on everything is weaker per-case and honest about which.
+        var spelled = Parsing.AttributeHelper.ToSurfaceSpelling(typeName);
+        if (_suppressDiagnostics)
+        {
+            return new ExternalType(Parsing.AttributeHelper.ToSurfaceSpelling(typeName));
+        }
+
+        _diagnostics.ReportWarning(span, DiagnosticCode.UndefinedReference,
+            $"Type '{spelled}' is not known to the Calor type checker. If it is a .NET type used " +
+            "through interop this is expected and the C# compiler will check it; if it is a typo, " +
+            "nothing else will catch it on this path.");
+        return new ExternalType(spelled);
     }
 
     /// <summary>
@@ -1191,14 +1422,48 @@ public sealed class TypeChecker
         return args;
     }
 
+    /// <summary>
+    /// True when the type is not usable as a bool CONDITION — and known well enough to say so.
+    ///
+    /// <para><c>ErrorType</c> is excluded deliberately. It means "the checker could not determine
+    /// this", which is routine: it models no BCL surface, so <c>§C{File.Exists}</c> and any other
+    /// external call yields it. Reporting "condition must be bool, got &lt;error&gt;" turns the
+    /// checker's own ignorance into the user's error, and it cascades — one unmodeled call
+    /// produced errors at every downstream use. The arithmetic check already suppressed this;
+    /// the condition and field-access checks did not, which is why enabling the checker rejected
+    /// the MCP primer, two shipped benchmarks and the syntax exemplar.</para>
+    /// </summary>
+    /// <summary>
+    /// True when the checker genuinely knows this type and it is not a collection it models.
+    /// The <c>ErrorType</c>/<c>ExternalType</c> exclusion is the same rule the bool-condition and
+    /// field-access checks follow: an unmodeled receiver is the checker's blind spot, not the
+    /// user's error.
+    /// </summary>
+    private static bool IsKnownNonCollection(CalorType type)
+        => type is not ErrorType && type is not ExternalType;
+
+    private static bool IsDefinitelyNotBool(CalorType type)
+        => !type.Equals(PrimitiveType.Bool) && type is not ErrorType && type is not ExternalType;
+
     private static bool IsNumeric(CalorType type)
-        => type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float);
+        => type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float)
+        || type.Equals(PrimitiveType.Char) || type.Equals(PrimitiveType.Decimal);
 
     private static bool IsAssignable(CalorType target, CalorType source)
     {
         if (target.Equals(source)) return true;
         if (source is ErrorType) return true; // Allow error types to be assigned anywhere
+        // Nothing is known about an unmodeled external type, in either direction.
+        if (target is ExternalType || source is ExternalType) return true;
         if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Int)) return true;
+        // `object` is the top type: anything may be assigned TO it. Deliberately not symmetric —
+        // assigning object to a concrete type needs a cast in C#, so accepting it here would
+        // green-light code the emitted C# rejects.
+        if (target.Equals(PrimitiveType.Object)) return true;
+        // char widens to an integer, as in C#. Not the reverse: `i32 -> char` is a narrowing
+        // conversion C# requires an explicit cast for.
+        if (target.Equals(PrimitiveType.Int) && source.Equals(PrimitiveType.Char)) return true;
+        if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Char)) return true;
         // Refined type is a subtype of its base type (erasure)
         if (source is RefinedType refinedSource && IsAssignable(target, refinedSource.BaseType)) return true;
         return false;
@@ -1206,7 +1471,11 @@ public sealed class TypeChecker
 
     private static bool IsNumericType(CalorType type)
     {
-        return type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float) || type is ErrorType;
+        // `char` participates in arithmetic and comparison, promoting to int (C# §12.4.7).
+        // `decimal` is numeric too — it simply does not convert implicitly to/from double.
+        return type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float)
+            || type.Equals(PrimitiveType.Char) || type.Equals(PrimitiveType.Decimal)
+            || type is ErrorType;
     }
 }
 

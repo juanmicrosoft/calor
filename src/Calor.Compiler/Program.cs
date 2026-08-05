@@ -1120,7 +1120,7 @@ public sealed class CompilationOptions
     /// <summary>
     /// Enable type checking phase.
     /// </summary>
-    public bool EnableTypeChecking { get; init; }
+    public bool EnableTypeChecking { get; init; } = true;
 
     /// <summary>
     /// Enable strict bind-inference diagnostics (Calor0251-0253). Default-on
