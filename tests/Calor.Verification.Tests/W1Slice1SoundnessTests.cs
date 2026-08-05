@@ -668,30 +668,41 @@ public class W1Slice1SoundnessTests
     }
 
     /// <summary>
-    /// MAJOR 1 from the D14 review: `$length` is minted at THREE sites, and the first fix flagged
-    /// only the two that sit beside a `MkArrayConst`. `TranslateArrayLength` mints it on demand
-    /// with no array const in sight, so `(>= (arraylen a) 0)` over an array that was never
-    /// declared as a variable still proved. Every mint now routes through `MarkArrayLength`.
+    /// The ON-DEMAND `$length` path, which is the one the D14 fix actually missed.
+    ///
+    /// <para>This must go through the translator directly. An earlier version of this pin used
+    /// <c>VerifyPostcondition</c> with an <c>i32[]</c> parameter — and that <b>never reaches the
+    /// on-demand branch</b>: declaring the parameter mints <c>a$length</c> EAGERLY, so
+    /// <c>TranslateArrayLength</c> takes the <c>_variables</c> cache hit and returns. Review
+    /// proved it vacuous by reverting the fix, at which point the test still passed and the real
+    /// repro still discharged. No <c>VerifyPostcondition</c>-shaped test can reach the branch,
+    /// because postcondition references are restricted to parameters and <c>result</c> — which is
+    /// exactly why the hole lived only in the obligation channel.</para>
+    ///
+    /// <para>So: do not declare <c>a</c>. That is the whole point of the test.</para>
     /// </summary>
     [SkippableFact]
-    public void OnDemandArrayLength_AlsoDemotes()
+    public void OnDemandArrayLength_SetsTheReferenceModelFlag()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        OnDemandArrayLength_AlsoDemotesCore();
+        OnDemandArrayLength_SetsTheReferenceModelFlagCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void OnDemandArrayLength_AlsoDemotesCore()
+    private void OnDemandArrayLength_SetsTheReferenceModelFlagCore()
     {
         using var ctx = Z3ContextFactory.Create();
-        using var verifier = new Z3Verifier(ctx);
+        var translator = new ContractTranslator(ctx);
 
-        var result = Verify(verifier, [("a", "i32[]")], [],
-            Ensures(BinOp(BinaryOperator.GreaterOrEqual,
-                new ArrayLengthNode(TextSpan.Empty, Ref("a")), Int(0))));
+        // `a` is deliberately NOT declared — this forces the on-demand $length mint.
+        var cond = BinOp(BinaryOperator.GreaterOrEqual,
+            new ArrayLengthNode(TextSpan.Empty, Ref("a")),
+            Int(0));
 
-        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
-        Assert.Contains(Z3Verifier.NullableReferenceModelAssumption, result.EffectiveOutcome.Assumptions);
+        Assert.NotNull(translator.TranslateBoolExpr(cond));
+        Assert.True(translator.TouchedNullableReferenceSort,
+            "on-demand $length must set the D14 flag — it is the site the first fix missed");
     }
+
 
 }
