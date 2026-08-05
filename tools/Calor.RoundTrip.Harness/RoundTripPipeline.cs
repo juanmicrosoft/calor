@@ -423,8 +423,11 @@ public sealed class RoundTripPipeline
             var buildResult = await BuildProjectAsync(workDir, config);
             if (buildResult.Succeeded) break;
 
-            // Extract file paths from build error lines
+            // Extract file paths from build error lines, KEEPING the diagnostics per file. The
+            // reverted bucket is the largest failure class, and without the attributed errors a
+            // cause census over it is impossible — the file just says "build error".
             var errorFiles = new HashSet<string>();
+            var errorsByFile = new Dictionary<string, List<string>>(StringComparer.Ordinal);
 
             foreach (var error in buildResult.Errors)
             {
@@ -439,7 +442,12 @@ public sealed class RoundTripPipeline
                         var normalized = filePath.Replace("/private/var/", "/var/");
                         var relativePath = Path.GetRelativePath(workDir, normalized);
                         if (!relativePath.StartsWith(".."))
+                        {
                             errorFiles.Add(relativePath);
+                            if (!errorsByFile.TryGetValue(relativePath, out var list))
+                                errorsByFile[relativePath] = list = [];
+                            if (list.Count < 10) list.Add(error.Trim());   // cap: a file can emit hundreds
+                        }
                     }
                 }
             }
@@ -463,7 +471,9 @@ public sealed class RoundTripPipeline
                 // it compiled standalone; the round-tripped output broke the build.
                 fileResult.Status = FileStatus.Reverted;
                 fileResult.RevertReason = $"build-recovery round {attempt + 1}: build error in round-tripped output";
-                fileResult.Errors = [$"Reverted: build error in round-tripped output (recovery round {attempt + 1})"];
+                fileResult.Errors = errorsByFile.TryGetValue(relPath, out var attributed) && attributed.Count > 0
+                    ? attributed
+                    : [$"Reverted: build error in round-tripped output (recovery round {attempt + 1})"];
                 revertedThisRound++;
                 Console.WriteLine($"    Reverted: {relPath}");
             }
