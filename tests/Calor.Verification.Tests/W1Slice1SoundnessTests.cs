@@ -605,9 +605,10 @@ public class W1Slice1SoundnessTests
     }
 
     /// <summary>
-    /// The control that keeps the demotion honest. A genuinely numeric obligation — no string, no
-    /// array, no user type — must still be `Proven` and must still elide. Without this the D14
-    /// pin above would pass just as well if the verifier had stopped proving anything at all.
+    /// The control that keeps the demotion honest: a signature of modeled primitives only must
+    /// still be `Proven`. Deliberately stronger than the `x == x` it replaced — that version
+    /// exercised no body encoding and would have passed unchanged even when elision had been lost
+    /// for every function with a non-primitive parameter, which is exactly what happened.
     /// </summary>
     [SkippableFact]
     public void PurelyNumericObligation_StillProvenAfterD14()
@@ -622,10 +623,75 @@ public class W1Slice1SoundnessTests
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
 
-        var result = Verify(verifier, [("x", "i32")], [],
-            Ensures(BinOp(BinaryOperator.Equal, Ref("x"), Ref("x"))), outputType: "i32");
+        // A real proof over a real body: §Q 0 <= x < 100, §R x, §S result >= 0.
+        var result = verifier.VerifyPostcondition(
+            [("x", "i32")],
+            "i32",
+            [Requires(BinOp(BinaryOperator.GreaterOrEqual, Ref("x"), Int(0))),
+             Requires(BinOp(BinaryOperator.LessThan, Ref("x"), Int(100)))],
+            Ensures(BinOp(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0))),
+            body: [new ReturnStatementNode(TextSpan.Empty, Ref("x"))]);
 
         Assert.Equal(ProofStatus.Proven, result.EffectiveOutcome.Status);
+    }
+
+    /// <summary>
+    /// The coarseness, pinned as a DECISION rather than left as a future surprise. The D14 flag is
+    /// set when the sort is minted, and parameters are declared before any contract is translated
+    /// — so a function that merely TAKES an array loses elision even when its postcondition names
+    /// only `result`. That is deliberate (narrow is how the previous attempts failed), but it is a
+    /// real reduction in what can be proved and it should not be discoverable only by surprise.
+    /// </summary>
+    [SkippableFact]
+    public void ArrayParameter_DemotesEvenAPurelyNumericPostcondition()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        ArrayParameter_DemotesEvenAPurelyNumericPostconditionCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void ArrayParameter_DemotesEvenAPurelyNumericPostconditionCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        // `a` appears nowhere in the contract or the returned expression.
+        var result = verifier.VerifyPostcondition(
+            [("a", "i32[]"), ("x", "i32")],
+            "i32",
+            [Requires(BinOp(BinaryOperator.GreaterOrEqual, Ref("x"), Int(0)))],
+            Ensures(BinOp(BinaryOperator.GreaterOrEqual, Ref("result"), Int(0))),
+            body: [new ReturnStatementNode(TextSpan.Empty, Ref("x"))]);
+
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.NullableReferenceModelAssumption, result.EffectiveOutcome.Assumptions);
+    }
+
+    /// <summary>
+    /// MAJOR 1 from the D14 review: `$length` is minted at THREE sites, and the first fix flagged
+    /// only the two that sit beside a `MkArrayConst`. `TranslateArrayLength` mints it on demand
+    /// with no array const in sight, so `(>= (arraylen a) 0)` over an array that was never
+    /// declared as a variable still proved. Every mint now routes through `MarkArrayLength`.
+    /// </summary>
+    [SkippableFact]
+    public void OnDemandArrayLength_AlsoDemotes()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        OnDemandArrayLength_AlsoDemotesCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void OnDemandArrayLength_AlsoDemotesCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        var result = Verify(verifier, [("a", "i32[]")], [],
+            Ensures(BinOp(BinaryOperator.GreaterOrEqual,
+                new ArrayLengthNode(TextSpan.Empty, Ref("a")), Int(0))));
+
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Contains(Z3Verifier.NullableReferenceModelAssumption, result.EffectiveOutcome.Assumptions);
     }
 
 }

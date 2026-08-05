@@ -149,8 +149,17 @@ stops compiling.
 said "numeric and array contracts are unaffected". That was accurate and it was the hole: the class
 is not *strings*, it is **a sort Z3 models as total where the .NET value can be null**, and arrays
 and user-type sorts are two more members of it. `TouchedNullableReferenceSort` is set where those
-sorts are minted and drives the same demotion. Genuinely numeric obligations — no string, no array,
-no user type — are still `Proven` and still elide.
+sorts are minted and drives the same demotion.
+
+**Be precise about the reach, because it is wider than "the obligation mentions an array".** The
+trigger fires when the sort is *minted*, and parameters are declared before any contract is
+translated — so it is really **"the signature mentions an array or any non-primitive type"**. A
+function taking `[i32]` and returning `i32` loses postcondition elision even if the postcondition
+names only `result`. `CreateUserDefinedTypeVariable` catches every unmodeled type name, so classes,
+interfaces, `Option<T>`, `Result<T,E>` and interop types all qualify. This is the same coarseness
+already documented above for `str`, and for the same reason — being wrong in the narrow direction
+deletes a runtime check, being wrong in the broad direction costs an elision. Only a signature made
+entirely of modeled primitives still elides.
 
 **How it gets lifted.** #875 (make `str` genuinely non-nullable at the binder) removes D3's premise;
 a separate fix for the count/index operations removes D12's. Each case proved safe can have the

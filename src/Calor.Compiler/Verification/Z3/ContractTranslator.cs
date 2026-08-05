@@ -793,7 +793,7 @@ public sealed class ContractTranslator
 
         // Create associated length variable (unsigned 32-bit)
         var lengthVarName = $"{name}$length";
-        var lengthExpr = TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
+        var lengthExpr = MarkArrayLength(lengthVarName);
         _variables[lengthVarName] = (lengthExpr, "u32");
 
         _arrayInfo[name] = new ArrayInfo(elementType, lengthExpr);
@@ -884,6 +884,25 @@ public sealed class ContractTranslator
     {
         TouchedStringTheory = true;
         return _ctx.StringSort;
+    }
+
+    /// <summary>
+    /// Mints an array's synthetic <c>$length</c> companion, flagging the reference-model
+    /// assumption (D14) at the point the tautology is actually created.
+    ///
+    /// <para>An earlier revision put the flag next to <c>MkArrayConst</c> instead. That covered
+    /// two of the three <c>$length</c> sites <b>incidentally</b> — because they happen to sit
+    /// beside an array construction — and missed the third, where <c>TranslateArrayLength</c>
+    /// mints the length ON DEMAND with no array const in sight. `§PROOF (>= §LEN a INT:0)` over a
+    /// local `§ARR` therefore still discharged. The whole argument of this fix is that
+    /// enumerating members of a class by hand is what keeps failing; the first attempt then
+    /// enumerated by hand and missed one. Routing every mint through here is the invariant:
+    /// <b>no <c>$length</c> exists that did not set the flag.</b></para>
+    /// </summary>
+    private BitVecExpr MarkArrayLength(string lengthVarName)
+    {
+        TouchedNullableReferenceSort = true;
+        return TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
     }
 
     private SeqExpr TrackString(SeqExpr expr, bool isNullable = false)
@@ -1579,7 +1598,7 @@ public sealed class ContractTranslator
             // D6 adjudication (W1 Slice 1): on-demand $length is u32 always — no
             // width is guessed — and this path is unreachable from the §Q/§S proof
             // path (see TranslateArrayAccess). Create unsigned 32-bit length.
-            var lengthExpr = TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
+            var lengthExpr = MarkArrayLength(lengthVarName);
             _variables[lengthVarName] = (lengthExpr, "u32");
 
             return lengthExpr;
@@ -1610,7 +1629,7 @@ public sealed class ContractTranslator
 
         // Create associated length variable (unsigned 32-bit)
         var lengthVarName = $"{name}$length";
-        var lengthExpr = TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
+        var lengthExpr = MarkArrayLength(lengthVarName);
         _variables[lengthVarName] = (lengthExpr, "u32");
 
         _arrayInfo[name] = new ArrayInfo(elementType, lengthExpr);
