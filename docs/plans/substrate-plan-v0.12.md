@@ -237,7 +237,7 @@ v0.12 is **not** on the strategy's Phase-2a/2b progression — it is prerequisit
 | Real-scale epoch re-run | **RETIRED at Call S (2026-08-05).** No spend gate follows; quantitative re-entry conditions are registered in `call-s-adjudication.md` |
 | Logic-mutation stratum as a thesis channel | Retired as a mechanical-arm channel; retained only as a conversion-penalty measurement |
 | Proof-depth measurement (arm-ii) | Rides on WS-S4; explicitly not adjudicated by v0.12 (§0.1) |
-| **PP-A1 item 9** — `EnableTypeChecking` default-on (#761) | **LAPSED at v0.12 (A-1.8).** The frozen text named the **W2/W3 window**; it closed without the flip. Cost measured, not guessed: **92 failures / 6,158**, dominated by type-checker completeness gaps (`object` ×31, `Type` ×6), i.e. valid programs would start being rejected. **A further deferral must name a new window** — this row exists so it lapses visibly rather than accruing silently. Blocking-or-not for v0.12.0 is a maintainer decision |
+| **PP-A1 item 9** — `EnableTypeChecking` default-on (#761) | **DELIVERED at v0.12 (#877)**, later than the registered W2/W3 window. The row stays so the lateness is visible: the blocker was 92 checker defects, every one a working program it refused, and all of them already live for agents through `calor_check`/`calor_refine`. Three review rounds on the fix also exposed that **no gate compiled `bench/` or `samples/`** — both now have one |
 | **D2** (within-range signedness context) and **#779 differential suite** | Unchanged residual. Item 6's bar is *known-divergence-free*, which §2 of `wedge-w1-prereqs.md` records as **weaker than differentially clean**; the suite is what actually closes it |
 | `ContractTranslator._stringInfo` / `IsNullable` | **Inert** — written at five sites, read at none, never passed `true`. Not a live defect (see D3's argued-unreachable disposition), but it reads as a nullability guard and is not one. Wire up or delete |
 | **D3 / D12 — the string model is null-blind and byte-counted** | **Elide vectors CLOSED by demotion (#876); the modeling gaps remain OPEN.** String-carried proofs are `Assumed`, which never elides, so `len`/`isempty`/`substr`/`indexof` cannot delete a guard — at the cost of elision on every string postcondition. **#875** tracks the root-cause fix (non-nullable `str` at the binder), which is what would let the demotion be lifted; D12 needs a separate fix for the count/index operations, narrowed in `verification-modeled-forms` §4.1 |
@@ -248,7 +248,7 @@ v0.12 is **not** on the strategy's Phase-2a/2b progression — it is prerequisit
 
 ## 10. Revision log
 
-- **PP-A1 adjudicated, 2026-08-05 (A-1.8) — items 1–8 PASS, item 9 LAPSED.** The first adjudication
+- **PP-A1 adjudicated, 2026-08-05 (A-1.8) — PASS, all nine items.** The first adjudication
   claimed all nine; adversarial review refuted **item 6** and it was right: **divergence D4 was a live
   false-`Proven`-elides vector**, reproduced end-to-end on a shipped path (`calor run` threw;
   `calor run --verify` printed the value with the check deleted). Closed by refusal in #872. Items 4

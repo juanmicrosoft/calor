@@ -324,9 +324,10 @@ disclosures in the A-1.5 entry below.
 
 ### A.3 Annex revision log
 
-**A-1.8 — PP-A1 adjudicated (2026-08-05). Items 1–8 PASS; item 9 LAPSED.** Additive; registers outcomes against the
-PP-A1 list frozen at `wedge-w1-prereqs.md` §3 and carried unchanged into v0.12. **Items 1–8 PASS,
-item 6 only as of #876; item 9 LAPSED and referred to the maintainer.**
+**A-1.8 — PP-A1 adjudicated (2026-08-05). PP-A1 = PASS, all nine items.** Additive; registers outcomes against the
+PP-A1 list frozen at `wedge-w1-prereqs.md` §3 and carried unchanged into v0.12. **All nine PASS —
+item 6 only as of #876, items 4 and 7 only after fixes made during the audit, item 9 only as of
+#877 and later than its registered W2/W3 window.**
 
 **Item 6 passed only after four review rounds found four live vectors.** Three adversarial review rounds found three false-
 `Proven`-elides vectors behind this one item, each time after it had been marked ✅: D4's
@@ -361,16 +362,22 @@ the corrected record carries a **row-by-row** audit of all eleven, including an 
 *argued-unreachable* disposition for D3 and D2 named as the residual inside §2's recorded risk
 acceptance.
 
-**Item 9 = LAPSED.** The frozen text says the `EnableTypeChecking` default-on flip *"lands in the
-W2/W3 window"*; that window closed at v0.12 without it. The first adjudication re-read this as "the
-flip has a slot" and marked it ✅ — a reinterpretation in the favourable direction, and the same class
-of move as overriding a fired trigger. The freeze's "not gate-blocking" clause is scoped to **W1
-exit** and is **not** extended here to the v0.12.0 release. **Cost measured rather than guessed:** the
-flip produces **92 failures / 6,158** in `Calor.Compiler.Tests`, and they are type-checker
-*completeness* gaps — `Calor0200` unknown type ×36 (`object` ×31, `Type` ×6), `Calor0202` member
-access ×8 — i.e. the compiler would begin rejecting programs that are valid today. **Whether the lapse
-blocks v0.12.0 is a maintainer decision**, not one the adjudication may make by reinterpretation; a
-further deferral must name a **new window**.
+**Item 9 = DELIVERED at v0.12 (#877), later than its registered window, and the lapse stays on the
+record.** The frozen text says the flip *"lands in the W2/W3 window"*; that window closed without it,
+and the first adjudication marked the item ✅ anyway by re-reading "lands in the W2/W3 window" as "has
+a slot" — a reinterpretation in the favourable direction. The correct disposition at that moment was
+LAPSED. It is ✅ now because the work was done, not because the reading changed.
+
+**What blocked it was never scheduling.** Flipping the default produced **92 failures**, every one a
+*working program the checker refused*: unknown type `char` ×37, `object` ×13, `Type` ×6, arrays ×6,
+cascades from unmodeled calls, static members read as undefined variables, string `+` reported as
+non-numeric, and a duplicated `Calor0250`. All of it was **already live** — `calor_check` and
+`calor_refine` set the flag — so the MCP primer's own module, two shipped benchmarks and the syntax
+exemplar were being rejected. **Three adversarial review rounds** on the fix found that the flip then
+introduced *new* false positives on two agent-native benchmark **gold references** (one dropping from
+53 proven contracts to zero with a non-zero exit), that **no test project compiled anything under
+`bench/`** so the fix's own measurement had excluded that corpus, and that the round-2 guard was dead
+code. Gates over the bench gold references and over `samples/` now exist; neither did before.
 
 **Items 4 and 7 passed only after fixes made during the audit**, both on the shipped surface rather
 than the one the original evidence cited: `CompileCalor` (the MSBuild task real projects build

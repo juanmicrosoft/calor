@@ -1,4 +1,4 @@
-# PP-A1 — CI adoption gates: **items 1–8 PASS**, item 9 LAPSED
+# PP-A1 — CI adoption gates: **all nine items PASS**
 
 **Adjudicated 2026-08-05**, against the list frozen at [`wedge-w1-prereqs.md`](wedge-w1-prereqs.md)
 §3 ("frozen now, before any results exist"), carried unchanged into v0.12 by the fold-forward
@@ -56,7 +56,7 @@ gate gets marked green while a soundness hole ships.
 | 6 | **Slice-1 soundness batch** — bar: **no known false-`Proven`-elides vector**, known set = divergence table + T1, **and no silently-skipped postcondition check ships** | Four vectors found across four review rounds, all now closed: **D4** both halves by refusal (#872), **D3** and **D12** by demotion (#876). T2 half holds — a nested return emits `Calor1001` rather than skipping silently | ✅ *(only as of #876; see the caveat under Verdict)* |
 | 7 | **T3 containment** — three surfaces gated | `format --write` → `Calor1346` unless `--experimental` / `CALOR_EXPERIMENTAL_FORMAT_WRITE=1`; LSP **formatting** and **rename** register only under `CALOR_LSP_EXPERIMENTAL=1`, read-only handlers unaffected. Two defects found and fixed here; the gate is now **tested** for the first time | ✅ |
 | 8 | **#770 eject-contract** — documented degradation spec | `docs/guides/adoption-playbook.md` §"The eject story (tested)" (`:139-157`) — per-construct degradation table | ✅ |
-| 9 | **#761 flip stance** — `EnableTypeChecking` default-on **lands in the W2/W3 window** with a CHANGELOG note | Window closed at v0.12 without the flip. Still `init`-default `false`, with **no CLI flag at all** | ❌ **LAPSED** |
+| 9 | **#761 flip stance** — `EnableTypeChecking` default-on **lands in the W2/W3 window** with a CHANGELOG note | **Delivered at v0.12 (#877), late.** The flip is in, with the CHANGELOG note the item names. It was blocked not by the flip but by 92 defects in the checker itself — every one a working program it refused, and all of them live for agents already, since `calor_check`/`calor_refine` set the flag | ✅ *(late — see below)* |
 
 ## Item 6 — the row-by-row re-audit the first version owed
 
@@ -142,63 +142,45 @@ by refusal. It was disclosed at the freeze and sits inside §2's recorded risk a
 ("known-divergence-free is **weaker than differentially clean**"), which #779's differential suite is
 the thing that actually closes. **Item 6 passes against its own bar; it does not certify D2.**
 
-## Item 9 — LAPSED, with the cost measured rather than guessed
+## Item 9 — delivered at v0.12, and the lapse stays in the record
 
-The frozen text, verbatim: *"`EnableTypeChecking` default-on lands in the W2/W3 window with a
-CHANGELOG note; recorded here so the flip has a slot, not gate-blocking for W1 exit."*
+The frozen text reads: *"`EnableTypeChecking` default-on lands in the W2/W3 window with a CHANGELOG
+note; recorded here so the flip has a slot, not gate-blocking for W1 exit."*
 
-The first version rendered that as "the requirement is that the flip be *scheduled*, not shipped" and
-marked it ✅. That is a re-reading in the favourable direction: the text names a **window**, and the
-window is what makes a schedule a commitment rather than an intention. W2/W3 are past; the flip did
-not land; the item **lapsed**.
+**The substance is now delivered (#877): the flip is in and the CHANGELOG note is written.** The item
+is satisfied on its own terms.
 
-**What the flip would cost, measured.** Flipping the `init` default to `true` and running
-`Calor.Compiler.Tests`: **92 failures / 6,160**. Tallied by **first cause per failing test** — an
-earlier revision of this document counted diagnostic occurrences across the whole log instead, which
-double-counted `object`, missed `char` entirely, and produced a table whose rows summed to 48 of 92:
+**It landed outside its registered window, and that is recorded rather than smoothed away.** W2/W3
+passed without it, and an earlier revision of this document marked the item ✅ anyway by re-reading
+"lands in the W2/W3 window" as "has a slot" — a reinterpretation in the favourable direction. The
+correct disposition at that moment was LAPSED; it is only ✅ now because the work was actually done.
+
+**What the delay was actually made of, since "not scheduled" was never the reason.** Flipping the
+default produced **92 test failures**, and every one was a *working program the checker refused*:
 
 | First cause | Count |
 |---|---:|
-| `Calor0200` unknown type `char` | **37** |
-| `Calor0200` unknown type `object` | 13 |
-| `Calor0200` unknown type `Type` | 6 |
-| `Calor0200` unknown type `i32[]` | 4 |
-| `Calor0200` unknown type `[str]` | 2 |
-| `Calor0200` unknown type `u32` | 1 |
-| `Calor0200` unknown type, dotted receiver (`price`, `result`) | 2 |
-| no `Unknown type` — assertion failures, `Calor0202`/`0250`/`0251`, indentation | 27 |
-| **Total** | **92** |
+| unknown type `char` | **37** |
+| unknown type `object` | 13 |
+| unknown type `Type` | 6 |
+| arrays (`i32[]`, `[str]`) | 6 |
+| cascades from unmodeled calls (`IF condition must be bool, got <error>`) | ~12 |
+| static members read as undefined variables (`Math.PI`, `int.MaxValue`) | 7 |
+| string `+` reported as non-numeric arithmetic | 4 |
+| `Calor0250` duplicated under a vaguer code | 4 |
 
-Two corrections to the earlier characterization, both in the direction that made the work look
-easier than it is:
+**These were never latent.** `calor_check` and `calor_refine` already set `EnableTypeChecking = true`,
+so agents were hitting all of it — including the MCP primer's own `§M{m3:Files}` module, two shipped
+benchmarks, and the syntax exemplar. A checker that contradicts `docs/syntax-reference/types.md` on
+`char` and `u32` was worse than no checker, and it had been shipped that way.
 
-- **`char` is the dominant cause, not `object`**, and it drives the whole `StringOperationsE2ETests`
-  cluster. The earlier claim that "the dominant cause is a single missing type (`object`, 31 of 36),
-  which makes the work look tractable" was the one sentence a maintainer would act on, and it was
-  not supported.
-- **`u32` and `i32[]`/`[str]` being unknown means the checker's table is missing core documented
-  Calor scalar and array types**, not just BCL escapes.
-- **The residue is not all "completeness gaps".** It contains checker *defects*: string `+`
-  concatenation rejected as non-numeric (`Arithmetic operators require numeric operands, got str`,
-  ×4), `Logical operators require bool operands` (×7), dotted static members unresolved
-  (`Math.PI`, `int.MaxValue`, `StringComparison.Ordinal`, `System.Environment.NewLine`, ×8), and
-  typed literals unrecognized in loop bounds (`Undefined variable 'INT'`, ×2).
-
-Also correcting the diagnostic labels: `Calor0200` is **`UndefinedReference`** and `Calor0202` is
-**`TypeMismatch`** (`Diagnostics/Diagnostic.cs:106,108`); the earlier table called them "unknown
-type" and "field access on non-record".
-
-So item 9 is blocked on **type-checker completeness and correctness**, not on remembering to
-schedule it, and it is a larger job than the first tally implied.
-
-**This is recorded, not overridden.**
-
-- The freeze's "not gate-blocking" clause is scoped to **W1 exit**. It is not evidence about a v0.12.0
-  release, and silently extending it there would be the same move that produced the original ✅.
-- **Whether the lapse blocks v0.12.0 is a maintainer decision**, not one this document may make by
-  reinterpretation.
-- If it is deferred again, the successor plan must name a **new window**, so it can lapse visibly a
-  second time rather than accrue silently.
+**Three adversarial review rounds on the fix**, which is worth recording because the pattern matches
+item 6's: round 2 found the flip had introduced *new* false-positive hard errors on two agent-native
+benchmark **gold references**, one dropping from 53 proven contracts to **zero with a non-zero exit**
+— and that no test project compiled anything under `bench/` at all, so the "92 → 0" measurement had
+been taken on a surface that excluded the corpus the program's own numbers depend on. Round 3 found
+the guard added in round 2 was dead code, and that the new warning fired on a shipped sample. Gates
+over the bench gold references and over `samples/` now exist; neither did before.
 
 ## Defects found by this audit and fixed here
 
@@ -240,29 +222,28 @@ context, not the line.
 
 ## Verdict
 
-**Items 1–8 PASS. Item 9 LAPSED and referred to the maintainer.**
+**PP-A1 = PASS. All nine items.**
 
-Item 6 passes **only as of #876**, and did not pass in any of the three earlier revisions of this
-document that claimed it did.
+Item 6 passes only as of #876, item 4 and item 7 only after fixes made during this audit, and item 9
+only as of #877 — later than its registered window. None of them passed when this document first
+said they did.
 
 **The caveat that belongs on this PASS, stated rather than buried.** Four adversarial review rounds
-found four live false-`Proven`-elides vectors behind this item — D4's explicit-mode half, D4's
-no-mode half, D3, and D12 — each time *after* the item had been marked green, and two of them behind
-rows I had personally re-audited and argued safe. What finally closed it was **not** a better
-enumeration of the divergence table. It was a change of mechanism: #876 removes elision for
-string-carried proofs, so the class is closed by construction rather than by having found every
-member.
+found four live false-`Proven`-elides vectors behind item 6 — each time *after* it had been marked
+green, and two of them behind rows I had personally re-audited and argued safe. What finally closed
+it was **not** a better enumeration of the divergence table. It was a change of mechanism: #876
+removes elision for string-carried proofs, so the class is closed by construction rather than by
+having found every member.
 
 That is the honest reading of the bar. *Known*-divergence-free is a claim about how hard anyone
 looked, and on this evidence inspection does not find the bottom of the solver's string model. §2 of
-the freeze says the same thing in its own words — known-divergence-free is **weaker than
-differentially clean** — and #779's solver-vs-runtime differential suite is the instrument that would
-actually settle it.
+the freeze says the same in its own words — known-divergence-free is **weaker than differentially
+clean** — and #779's differential suite is the instrument that would settle it.
 
 **Registered recommendation for the successor plan:** item 6's bar should not be carried forward as
-"audit the table again". It should be replaced by the differential suite, or by more
+"audit the table again". Replace it with #779's differential suite, or with more
 closed-by-construction changes of the #876 kind. D1, D2, D3 and D12 remain open *modeling* gaps whose
-elide consequences are now neutralized; #875 tracks the root cause of D3.
+elide consequences are now neutralized; #875 tracks D3's root cause.
 
 ## Scope
 
