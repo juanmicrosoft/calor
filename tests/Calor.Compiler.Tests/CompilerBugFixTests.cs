@@ -190,8 +190,17 @@ public class CompilerBugFixTests
 
     #region Bug 8: TypeChecker — arithmetic operators reject non-numeric
 
+    /// <summary>
+    /// Was <c>TypeChecker_StringArithmetic_ReportsError</c>, which asserted that
+    /// <c>"hello" + "world"</c> is a type error. It is not: `+` on strings is CONCATENATION in
+    /// Calor exactly as in the emitted C#, and `calor run` on that program prints
+    /// <c>helloworld</c>. The old assertion pinned a defect — it made the opt-in checker reject a
+    /// working program, including the MCP primer's own <c>§M{m3:Files}</c> module, which
+    /// <c>PrimerCompilesTests</c> requires to compile. The two tests contradicted each other and
+    /// this one was wrong.
+    /// </summary>
     [Fact]
-    public void TypeChecker_StringArithmetic_ReportsError()
+    public void TypeChecker_StringConcatenation_IsStringNotError()
     {
         var left = new StringLiteralNode(DummySpan, "hello");
         var right = new StringLiteralNode(DummySpan, "world");
@@ -205,8 +214,8 @@ public class CompilerBugFixTests
         var checker = new TypeChecker(diagnostics);
         checker.Check(module);
 
-        Assert.True(diagnostics.HasErrors);
-        Assert.Contains(diagnostics.Errors,
+        Assert.False(diagnostics.HasErrors);
+        Assert.DoesNotContain(diagnostics.Errors,
             d => d.Message.Contains("Arithmetic operators require numeric operands"));
     }
 
@@ -686,11 +695,16 @@ public class CompilerBugFixTests
     [Fact]
     public void BindValidation_BareBinding_InsideForBody_ReportsCalor0250()
     {
+        // The loop header is `§L{id:var:from:to:step}` — colon-delimited, so a typed literal
+        // `INT:0` inside it parses `INT` as the `from` expression. The fixture used to write
+        // that, and nothing noticed: the misparse was silent until the type checker started
+        // reporting `Undefined variable 'INT'`. Corrected to the documented form; the §B{tmp}
+        // this test is actually about is unchanged.
         var source = """
             §M{m001:Test}
               §F{f001:Foo:pub}
                   §O{void}
-                  §L{l1:i:INT:0:INT:10:INT:1}
+                  §L{l1:i:0:10:1}
                       §B{tmp}
             """;
 

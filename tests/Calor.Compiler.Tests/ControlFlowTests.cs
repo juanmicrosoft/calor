@@ -495,6 +495,7 @@ public class ControlFlowTests
                   §I{i32:limit}
                   §O{void}
                   §E{cw}
+                  §B{~i:i32} INT:0
                   §WH{w1} (<= i limit)
                       §C{Console.WriteLine}
                         §A i
