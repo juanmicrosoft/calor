@@ -293,11 +293,12 @@ async Task<int> ScreenDeterminismCommand(string[] args)
     var epochDir = GetOption(args, "--epoch");
     if (epochDir == null) { Console.Error.WriteLine("--epoch <dir> is required."); return 2; }
     epochDir = Path.GetFullPath(epochDir);
-    var reportPath = Path.Combine(epochDir, "task-generation-report.json");
-    if (!File.Exists(reportPath)) { Console.Error.WriteLine($"No task-generation-report.json under {epochDir}."); return 2; }
+    if (!File.Exists(Path.Combine(epochDir, "task-generation-report.json")))
+    { Console.Error.WriteLine($"No task-generation-report.json under {epochDir}."); return 2; }
 
     var projectsDir = GetOption(args, "--projects-dir") ?? ProjectConfigs.DefaultCorpusDir;
     projectsDir = Path.GetFullPath(projectsDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+    var dotnet = GetOption(args, "--dotnet") ?? "dotnet";
 
     var bundlesDir = Path.Combine(epochDir, "bundles");
     if (!Directory.Exists(bundlesDir)) { Console.Error.WriteLine($"No bundles/ under {epochDir}."); return 2; }
@@ -305,75 +306,133 @@ async Task<int> ScreenDeterminismCommand(string[] args)
     var pipeline = new RoundTripPipeline();
     var workRoot = Path.Combine(Path.GetTempPath(), "calor-screen-" + Guid.NewGuid().ToString("N")[..8]);
     var screens = new List<DeterminismScreen.TaskScreen>();
-    var prepared = new Dictionary<string, (string Dir, RoundTripConfig Cfg)>(StringComparer.OrdinalIgnoreCase);
+    // Per project: the C# reference (pristine) and the Calor reference (converted, UNMUTATED).
+    var csRef = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    var calorRef = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+    async Task<DeterminismScreen.RunRecord?> RunOnce(string dir, RoundTripConfig cfg)
+    {
+        // Every other RunTestsAsync caller cleans TRX first; without it a run that could not execute
+        // (testhost crash, timeout) is scored from the PREVIOUS run's results on disk — i.e. "5 runs"
+        // silently becomes one run counted five times, in the one instrument whose job is to detect
+        // exactly that.
+        TrxParser.CleanTrxFiles(dir);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var run = await pipeline.RunTestsAsync(dir, cfg, noBuild: true);
+        sw.Stop();
+        if (run.ExitCode < 0 || run.TotalTests == 0) return null;   // timeout / nothing matched → inconclusive
+        return new DeterminismScreen.RunRecord
+        {
+            TotalTests = run.TotalTests, Passed = run.Passed, Failed = run.Failed, DurationMs = sw.ElapsedMilliseconds,
+        };
+    }
+
+    async Task<(List<DeterminismScreen.RunRecord> Runs, string? Bad)> FiveRuns(string label, string dir, RoundTripConfig cfg)
+    {
+        var runs = new List<DeterminismScreen.RunRecord>();
+        for (var i = 0; i < DeterminismScreen.RequiredConsecutiveGreenRuns; i++)
+        {
+            var r = await RunOnce(dir, cfg);
+            if (r == null) return (runs, $"{label} run {i + 1} did not execute (timeout, or the filter matched no tests)");
+            runs.Add(r);
+            Console.WriteLine($"    {label} run {i + 1}: {(r.Green ? "green" : $"RED ({r.Failed} failed)")} [{r.TotalTests} tests, {r.DurationMs} ms]");
+        }
+        return (runs, null);
+    }
 
     try
     {
         foreach (var bundle in Directory.GetDirectories(bundlesDir).OrderBy(d => d, StringComparer.Ordinal))
         {
+            var name = Path.GetFileName(bundle);
             var provPath = Path.Combine(bundle, "provenance.json");
-            if (!File.Exists(provPath)) continue;
-            using var doc = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(provPath));
-            var root = doc.RootElement;
-            var taskId = root.GetProperty("TaskId").GetString()!;
-            var projectName = root.GetProperty("ProjectName").GetString()!;
+            // Every bundle directory produces a row. Silently skipping one would compute "N of N pass"
+            // over a self-selected population — the arithmetic a supply gate must never permit.
+            if (!File.Exists(provPath)) { screens.Add(Blank(name, "?", "", "no provenance.json")); continue; }
 
-            var heldOutNames = root.GetProperty("HeldOut").EnumerateArray()
-                .Select(h => h.GetProperty("FilterName").GetString())
-                .Where(n => !string.IsNullOrEmpty(n)).Distinct(StringComparer.Ordinal).ToList();
-            var filter = string.Join("|", heldOutNames.Select(n => $"FullyQualifiedName~{n}"));
+            string taskId = name, projectName = "?";
+            string filter = "";
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(provPath));
+                var root = doc.RootElement;
+                taskId = root.GetProperty("TaskId").GetString() ?? name;
+                projectName = root.GetProperty("ProjectName").GetString() ?? "?";
+                var heldOut = root.GetProperty("HeldOut").EnumerateArray().Select(h => new HeldOutTest
+                {
+                    TestName = h.GetProperty("TestName").GetString() ?? "",
+                    ClassName = h.GetProperty("ClassName").GetString() ?? "",
+                    FilterName = h.TryGetProperty("FilterName", out var fn) ? fn.GetString() ?? "" : "",
+                }).ToList();
+                // The canonical builder — it escapes filter metacharacters, so the screen cannot
+                // silently select a different set than the epoch graded.
+                filter = HeldOutExtraction.BuildHeldOutFilter(heldOut);
+            }
+            catch (Exception ex) { screens.Add(Blank(name, projectName, "", $"unreadable provenance: {ex.GetType().Name}")); continue; }
 
-            var cfg = ProjectConfigs.Get(projectName, projectsDir, "dotnet");
+            // An empty filter becomes `--filter ""`, which runs the ENTIRE suite — green on a pristine
+            // reference, so the task would pass on evidence unrelated to its held-out set.
+            if (string.IsNullOrWhiteSpace(filter)) { screens.Add(Blank(taskId, projectName, "", "no held-out filter")); continue; }
+
+            var cfg = ProjectConfigs.Get(projectName, projectsDir, dotnet);
             if (cfg == null || !Directory.Exists(cfg.OriginalProjectPath))
-            {
-                screens.Add(Screen(taskId, projectName, filter, [], [], $"project '{projectName}' unavailable"));
-                continue;
-            }
+            { screens.Add(Blank(taskId, projectName, filter, $"project '{projectName}' unavailable")); continue; }
 
-            // Pristine reference working copy, prepared ONCE per project and reused across its tasks.
-            if (!prepared.TryGetValue(projectName, out var refCopy))
-            {
-                var dir = pipeline.PrepareWorkingCopy(CloneForScreen(cfg, Path.Combine(workRoot, projectName + "-reference"), null));
-                var build = await pipeline.BuildProjectAsync(dir, cfg);
-                if (!build.Succeeded)
-                {
-                    screens.Add(Screen(taskId, projectName, filter, [], [], "pristine reference did not build"));
-                    continue;
-                }
-                refCopy = (dir, cfg);
-                prepared[projectName] = refCopy;
-            }
+            Console.WriteLine($"[{taskId}] screening both arms, {DeterminismScreen.RequiredConsecutiveGreenRuns} runs each…");
 
-            Console.WriteLine($"[{taskId}] screening — {DeterminismScreen.RequiredConsecutiveGreenRuns} runs on the pristine reference…");
-            var referenceRuns = new List<bool>();
-            string? inconclusive = null;
-            for (var i = 0; i < DeterminismScreen.RequiredConsecutiveGreenRuns; i++)
+            // --- C# arm reference: the pristine corpus, prepared once per project. ---
+            if (!csRef.TryGetValue(projectName, out var csDir))
             {
-                var run = await pipeline.RunTestsAsync(refCopy.Dir, CloneForScreen(cfg, refCopy.Dir, filter), noBuild: true);
-                if (run.TotalTests == 0) { inconclusive = "held-out filter matched no tests on the reference"; break; }
-                var green = run.Failed == 0;
-                referenceRuns.Add(green);
-                Console.WriteLine($"[{taskId}]   reference run {i + 1}: {(green ? "green" : $"RED ({run.Failed} failed)")}");
+                var dir = pipeline.PrepareWorkingCopy(CloneForScreen(cfg, Path.Combine(workRoot, projectName + "-cs-ref"), null));
+                csDir = (await pipeline.BuildProjectAsync(dir, cfg)).Succeeded ? dir : null;
+                csRef[projectName] = csDir;
             }
+            if (csDir == null) { screens.Add(Blank(taskId, projectName, filter, "pristine C# reference did not build")); continue; }
 
-            // Reported only: does the defect manifest every time on the mutated arm?
-            var mutatedRuns = new List<bool>();
+            // --- Calor arm reference: the CONVERTED, UNMUTATED program, prepared once per project. ---
+            if (!calorRef.TryGetValue(projectName, out var calDir))
+            {
+                var dir = pipeline.PrepareWorkingCopy(CloneForScreen(cfg, Path.Combine(workRoot, projectName + "-calor-ref"), null));
+                var report = new RoundTripReport { ProjectName = projectName };
+                var results = await pipeline.ConvertAndReplaceAsync(dir, cfg, report);
+                var built = await pipeline.BuildProjectAsync(dir, cfg);
+                if (!built.Succeeded) { await pipeline.RecoverBuildAsync(dir, cfg, results); built = await pipeline.BuildProjectAsync(dir, cfg); }
+                calDir = built.Succeeded ? dir : null;
+                calorRef[projectName] = calDir;
+            }
+            if (calDir == null) { screens.Add(Blank(taskId, projectName, filter, "converted-unmutated Calor reference did not build")); continue; }
+
+            var (csRuns, csBad) = await FiveRuns("C# reference", csDir, CloneForScreen(cfg, csDir, filter));
+            var (calRuns, calBad) = await FiveRuns("Calor reference", calDir, CloneForScreen(cfg, calDir, filter));
+
+            // --- Mutated arm (reported only). Absence is recorded as absence, never as intermittency. ---
+            var mutRuns = new List<DeterminismScreen.RunRecord>();
+            var armStatus = DeterminismScreen.ArmStatus.NotAttempted;
             var armDir = Path.Combine(bundle, "csharp-arm");
-            if (inconclusive == null && Directory.Exists(armDir))
+            if (csBad == null && calBad == null)
             {
-                var armCfg = CloneForScreen(cfg, armDir, filter);
-                var armBuild = await pipeline.BuildProjectAsync(armDir, armCfg);
-                if (armBuild.Succeeded)
+                if (!Directory.Exists(armDir)) armStatus = DeterminismScreen.ArmStatus.NotPresent;
+                else
                 {
-                    for (var i = 0; i < DeterminismScreen.RequiredConsecutiveGreenRuns; i++)
+                    var armCfg = CloneForScreen(cfg, armDir, filter);
+                    if (!(await pipeline.BuildProjectAsync(armDir, armCfg)).Succeeded)
+                        armStatus = DeterminismScreen.ArmStatus.BuildFailed;
+                    else
                     {
-                        var run = await pipeline.RunTestsAsync(armDir, armCfg, noBuild: true);
-                        mutatedRuns.Add(run.TotalTests > 0 && run.Failed > 0);
+                        var (mr, _) = await FiveRuns("mutated", armDir, armCfg);
+                        mutRuns = mr;
+                        armStatus = DeterminismScreen.ArmStatus.Ran;
                     }
                 }
             }
 
-            screens.Add(Screen(taskId, projectName, filter, referenceRuns, mutatedRuns, inconclusive));
+            screens.Add(new DeterminismScreen.TaskScreen
+            {
+                TaskId = taskId, ProjectName = projectName, HeldOutFilter = filter,
+                CSharpReferenceRuns = csRuns, CalorReferenceRuns = calRuns,
+                MutatedRuns = mutRuns, MutatedArm = armStatus,
+                Inconclusive = csBad ?? calBad,
+            });
         }
     }
     finally
@@ -381,23 +440,47 @@ async Task<int> ScreenDeterminismCommand(string[] args)
         try { if (Directory.Exists(workRoot)) Directory.Delete(workRoot, recursive: true); } catch { /* best effort */ }
     }
 
-    var result = new DeterminismScreen.Result { Tasks = screens };
+    var result = new DeterminismScreen.Result
+    {
+        Tasks = screens,
+        CorpusPins = ProjectConfigs.KnownProjects
+            .Where(p => !ProjectConfigs.SyntheticProjects.Contains(p))
+            .ToDictionary(p => p, p => SubmoduleSha(Path.Combine(projectsDir, p)), StringComparer.OrdinalIgnoreCase),
+        HarnessCommit = SubmoduleSha("."),
+    };
+
     var md = DeterminismScreenReport.Render(result);
     await File.WriteAllTextAsync(Path.Combine(epochDir, "determinism-screen.md"), md);
     await File.WriteAllTextAsync(Path.Combine(epochDir, "determinism-screen.json"),
         System.Text.Json.JsonSerializer.Serialize(result, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
     Console.WriteLine();
     Console.WriteLine(md);
-    return 0;
+
+    // A gate command must gate: a vacuous screen and a total-failure screen are not successes.
+    return result.Tasks.Count > 0 && result.Rejected == 0 ? 0 : 1;
 }
 
-DeterminismScreen.TaskScreen Screen(string id, string proj, string filter,
-    IReadOnlyList<bool> reference, IReadOnlyList<bool> mutated, string? inconclusive) =>
-    new()
+DeterminismScreen.TaskScreen Blank(string id, string proj, string filter, string why) => new()
+{
+    TaskId = id, ProjectName = proj, HeldOutFilter = filter,
+    CSharpReferenceRuns = [], CalorReferenceRuns = [], MutatedRuns = [],
+    MutatedArm = DeterminismScreen.ArmStatus.NotAttempted, Inconclusive = why,
+};
+
+string SubmoduleSha(string dir)
+{
+    try
     {
-        TaskId = id, ProjectName = proj, HeldOutFilter = filter,
-        ReferenceRuns = reference, MutatedRuns = mutated, Inconclusive = inconclusive,
-    };
+        var psi = new System.Diagnostics.ProcessStartInfo("git", "rev-parse HEAD")
+        { WorkingDirectory = dir, RedirectStandardOutput = true, RedirectStandardError = true };
+        using var p = System.Diagnostics.Process.Start(psi);
+        if (p == null) return "unknown";
+        var sha = p.StandardOutput.ReadToEnd().Trim();
+        p.WaitForExit(5000);
+        return string.IsNullOrWhiteSpace(sha) ? "unknown" : sha;
+    }
+    catch { return "unknown"; }
+}
 
 RoundTripConfig CloneForScreen(RoundTripConfig c, string workDir, string? testFilter) => new()
 {
