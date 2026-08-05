@@ -99,7 +99,7 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.5 (thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.6 (thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
@@ -323,6 +323,57 @@ disclosures in the A-1.5 entry below.
 | **PP-S4** — no converter-appeasement (**blocker**) | M-S4 = 0 via the A-1.5.7 fixture registry; indeterminate counts as **failing** | Blocks the v0.12.0 release |
 
 ### A.3 Annex revision log
+
+**A-1.6 — PP-W2 restated (instrument scope) + PP-S1 disposition (2026-08-05).** Additive. Two
+maintainer decisions, recorded together because the second is conditioned on the first.
+
+**(a) PP-W2 RESTATED, under the D-G3.1 restate-or-demote precedent.** The real-scale bundle epoch's
+"Calor arm" contains no Calor: both arms ship plain `.cs` (the calor arm is round-tripped C#), the
+runner never invokes the Calor compiler, and the dotnet shim is a pass-through. `Calor0410` therefore
+**cannot fire in the agent loop**; it is established out-of-band by the addressability probe at
+generation time. Verified independently — 0 `.calr` across all 8 bundles, no differing `.csproj`, no
+injection path. Evidence and options: `docs/plans/substrate-arm-validity-finding.md`.
+
+Consequently **an epoch over these arms cannot adjudicate the verification-depth thesis**, and PP-W2
+is restated to what the instrument measures:
+
+> **PP-W2 (restated):** over the real-scale bundle arms, the measurable quantities are the
+> **conversion penalty** (idiomatic C# vs machine-converted C#, both carrying the same defect) and the
+> **arm-symmetric ceiling-recurrence leg**. The `Calor0410` differential is retained as a
+> **compiler-level** result — evidence about what Calor's checkers catch, established out-of-band —
+> and is **not** evidence about agent behaviour. The verification-depth claim is **not testable by
+> this instrument as built**.
+
+This **narrows** PP-W2's reach; it does not revive it. PP-W2 remains **NOT ADJUDICATED** (A-1.4
+tranche 2), and nothing here re-opens it. Three records described an arm the implementation does not
+carry and are corrected in the same change: the **registered** D-W5.2(a) arm definition
+(`wedge-plan-v0.11.md`), the `w4-dryrun-001` VERDICT arm description (load-bearing for M-S3's power
+derivation), and the generated bundle README (`TaskGenReportWriter.cs`), which asserted the agent is
+"confronted by the diagnostic" — now corrected at the generator and pinned by tests.
+
+**Option 1 (rebuild the arm as real Calor) was NOT taken.** Recorded so a later reader does not infer
+it was impossible: `Calor0410` is an *enforcement* diagnostic requiring no contracts, so that leg does
+**not** depend on the authored-contract overlay (WS-S4) and is cheaper than it. It remains available
+to a successor plan.
+
+**(b) PP-S1 disposition: CONTINUE WS-S1.** D-S1.1a's early-abort trigger fires as written — the loss
+ledger's entire achievable recovery is **7 files against a need of 65** (`epochs/s1-ledger-001`). It is
+**not** honoured, and the reason is registered: the ledger covers **4.7%** of the non-native gap;
+**95.3%** of it is files that never converted or compiled (`Reverted` 87, `CompileError` 37,
+`EmitSyntaxError` 17). PP-S1 claims *fidelity is movable*; what the ledger shows is that **the ledger**
+cannot move it — a fact about the work-list's source, not about fidelity. Resolving PP-S1 = miss on it
+would repeat the error the §4 go/no-go nearly made on a pre-widening ceiling of 9 that was an artifact
+of our own mutation operator.
+
+**PP-S1 remains open, not adjudicated**, and WS-S1 proceeds against the **failure statuses** rather
+than the ledger. Its justification is narrowed in step with (a): `NativeFraction` is the quality metric
+of the **shipped** `calor import` path and stands on its own; the "supply the epoch so PP-W2 can be
+measured" framing does **not**. The census of the 141 failures, under its pre-committed rule (top-3
+causes ≥50% → work-list, continue; top-10 <50% → long tail, PP-S1 = miss), is the next gate.
+
+**This entry alters no frozen row and makes no §7 supersession claim.** PP-W2's *registered outcome*
+(not adjudicated) is unchanged; only the description of what the instrument can measure is narrowed.
+
 
 **A-1.5 — v0.12 substrate registration (2026-08-04).** Additive. Registers the v0.12 metrics,
 proof points, and pinned measurement configuration, per substrate plan D-S5.2. **Frozen at the end

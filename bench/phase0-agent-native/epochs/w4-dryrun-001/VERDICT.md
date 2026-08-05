@@ -9,6 +9,14 @@ This is a **feasibility probe**, not an adjudication (wedge plan §2 D-W4.4). It
 job: price the epoch, measure variance, and run the ceiling-recurrence check.
 
 ## Arms (D-W4.5 provisional protocol i — mechanical-only)
+
+> **CORRECTION (2026-08-05).** The description below states an INTENDED configuration the runner does
+> not implement. `run-bundle.sh` ships both arms as plain `.cs` — the calor arm is round-tripped C# —
+> and never invokes the Calor compiler, so there is no "Calor working copy", no effect enforcement in
+> the loop, and `Calor0410` cannot fire in front of an agent. This record is cited by
+> `docs/plans/substrate-plan-v0.12.md` as the basis for M-S3's power derivation, so the divergence is
+> recorded here rather than left to a reader. See `docs/plans/substrate-arm-validity-finding.md`.
+
 `csharp` = idiomatic C# + compiler + visible tests. `calor` = machine-converted
 Calor working copy + WS-W2 effect enforcement + `calor import` annotations, **no
 authored §Q/§S** (the authored-contract overlay does not exist). Both arms get

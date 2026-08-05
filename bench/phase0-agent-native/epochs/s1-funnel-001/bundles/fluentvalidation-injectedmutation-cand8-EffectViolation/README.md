@@ -62,9 +62,17 @@ Presentation asymmetry (recorded): Calor arm = machine-converted round-tripped C
 
 - Verification-addressable: the mutation makes Calor's **Calor0410** fire on the 
   converted arm — a signal the C# compiler has no equivalent of. The C# arm's agent may ship the 
-  defect; the Calor arm's agent is confronted by the diagnostic. Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) — verification-addressable.
+  defect. Calor0410 is INTRODUCED by the mutation (fires on the mutated conversion, absent on the clean one) — verification-addressable.
 
-  > **Papering-over residual (preserved by design):** the agent can clear the Calor build by 
+  > **This bundle does NOT present that diagnostic to an agent.** Both arms ship plain `.cs` — the
+  > calor arm is round-tripped C# — and the runner never invokes the Calor compiler, so the check
+  > cannot fire in the loop and neither arm's build fails. The differential above is a
+  > **compiler-level** property, established out-of-band by the addressability probe. An epoch over
+  > these arms measures the **conversion penalty** (plus the arm-symmetric ceiling-recurrence leg),
+  > NOT the verification-depth thesis. See `docs/plans/substrate-arm-validity-finding.md`.
+
+  > **Papering-over residual — a property of the DEFECT, not of this bundle (neither path is
+  > exercisable here: no `.calr` sources, no Calor build):** were the arm a real Calor build, the agent could clear it by 
   > REMOVING the injected effect (correct → held-out passes → caught) OR by DECLARING it in §E 
   > (papers over → the bug still ships → held-out fails → escaped). Which path the agent takes IS 
   > the measurement; both remain possible.

@@ -65,16 +65,23 @@ public static class TaskGenReportWriter
         sb.AppendLine();
         if (proof.VerificationCheckFired != null)
         {
-            sb.AppendLine($"- Verification-addressable: the mutation makes Calor's **{proof.VerificationCheckFired}** fire on the ");
-            sb.AppendLine($"  converted arm — a signal the C# compiler has no equivalent of. The C# arm's agent may ship the ");
-            sb.AppendLine($"  defect; the Calor arm's agent is confronted by the diagnostic. {proof.AddressabilityNote}");
+            sb.AppendLine($"- Verification-addressable **at generation time**: compiling the mutated file as Calor makes ");
+            sb.AppendLine($"  **{proof.VerificationCheckFired}** fire, and it does not fire on the clean conversion — a signal the ");
+            sb.AppendLine($"  C# compiler has no equivalent of. {proof.AddressabilityNote}");
+            sb.AppendLine();
+            sb.AppendLine("  > **This bundle does NOT present that diagnostic to an agent.** Both arms ship plain `.cs` — the ");
+            sb.AppendLine("  > calor arm is round-tripped C# — and the runner never invokes the Calor compiler, so the check ");
+            sb.AppendLine("  > cannot fire in the loop and neither arm's build fails. The differential above is a ");
+            sb.AppendLine("  > **compiler-level** property, established out-of-band by the addressability probe. An epoch over ");
+            sb.AppendLine("  > these arms measures the **conversion penalty** (plus the arm-symmetric ceiling-recurrence leg), ");
+            sb.AppendLine("  > NOT the verification-depth thesis. See `docs/plans/substrate-arm-validity-finding.md`.");
             if (proof.VerificationCheckFired == ExpressibleMutationOperators.CalorForbiddenEffect)
             {
                 sb.AppendLine();
-                sb.AppendLine("  > **Papering-over residual (preserved by design):** the agent can clear the Calor build by ");
-                sb.AppendLine("  > REMOVING the injected effect (correct → held-out passes → caught) OR by DECLARING it in §E ");
-                sb.AppendLine("  > (papers over → the bug still ships → held-out fails → escaped). Which path the agent takes IS ");
-                sb.AppendLine("  > the measurement; both remain possible.");
+                sb.AppendLine("  > **Papering-over residual — a property of the DEFECT, not of this bundle:** were the arm a real ");
+                sb.AppendLine("  > Calor build, the agent could clear it by REMOVING the injected effect (correct → caught) or by ");
+                sb.AppendLine("  > DECLARING it in §E (papers over → the bug still ships → escaped). With no `.calr` sources and ");
+                sb.AppendLine("  > no Calor build present, **neither path is exercisable here** and that choice is not measured.");
             }
         }
         else
