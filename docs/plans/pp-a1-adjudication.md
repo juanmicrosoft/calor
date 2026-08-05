@@ -50,18 +50,21 @@ gate gets marked green while a soundness hole ships.
 |---|---|---|---|
 | 1 | Functional **published** `Calor.Sdk`; **M-A1 green in CI** | `sdk-package-consumer` runs `.github/scripts/test-sdk-package.sh`: packs `Calor.Sdk`, serves it from a **local feed**, and a template consumer restores/builds/tests against the **packaged artifact** — never a source-tree `ProjectReference` — with `CALOR_SDK_REQUIRE_ALL_RIDS=1` and the in-task Z3 canary | ✅ consumability; "published" ⏳ (see Scope) |
 | 2 | Unmasked gates; publish workflow test-gated; **test-manifest honesty** | All three legs, the third of which an earlier revision restated away: (a) `test.yml:408-430` scans `samples/` unmasked, and `:406` runs `Calor.Ids.Tests`; (b) `publish-nuget.yml`'s `publish` declares `needs: [test, sdk-consumer]`, both keys exist verbatim, and neither the job nor its steps carry an `if:`/`continue-on-error:` that could undermine it; (c) `Calor.Performance.Tests` is wired to nightly `performance.yml:29`. **Residual disclosed:** `Calor.Ids.Tests` is in `test.yml` but **not** in the publish gate | ✅ |
-| 3 | **Checksummed natives** on every publish path | `scripts/z3-upstream-4.15.7.sha256` + `verify_archive` (defined `download-z3.sh:29`, called at `:122` and `:157`), fail-closed on missing manifest / missing entry / hash mismatch, across four fetch sites. **Residual disclosed rather than glossed:** the ARM64-macOS branch (`:59-64`) execs `build-z3-from-source.sh`, which clones `--branch z3-4.15.7` — a **mutable tag**, no commit pin, no verification (noted in `CHANGELOG.md:31`, absent from the earlier revision of this row) | ✅ |
+| 3 | **Checksummed natives** on every publish path | `scripts/z3-upstream-4.15.7.sha256` + `verify_archive` (defined `download-z3.sh:29`, called at `:122` and `:157`), fail-closed on missing manifest / missing entry / hash mismatch, across four fetch sites. **Residual disclosed rather than glossed:** the ARM64-macOS branch (`:59-64`) execs `build-z3-from-source.sh`, which clones `--branch z3-4.15.7` — a **mutable tag**, no commit pin, no verification (noted in `CHANGELOG.md:42`, absent from the earlier revision of this row) | ✅ |
 | 4 | Complete **options hash** + **fail-closed enforcement** | Options hash: `BuildStateCache.ComputeOptionsHash`, consumed at `CompilationDriver.cs:113`. Fail-closed enforcement **completed here** — `CompileCalor` now matches the driver's output-content check | ✅ *(as of this PR)* |
 | 5 | **Telemetry opt-in** default, stripped payloads, documented | `CalorTelemetry` activates **only** on `CALOR_TELEMETRY=1`; `--no-telemetry` / `CALOR_TELEMETRY_OPTOUT=1` force off; `AnonymizingTelemetryInitializer` strips payloads; `docs/telemetry.md` | ✅ |
-| 6 | **Slice-1 soundness batch** — bar: **no known false-`Proven`-elides vector**, known set = divergence table + T1, **and no silently-skipped postcondition check ships** | Four vectors found across four review rounds, all now closed: **D4** both halves by refusal (#872), **D3** and **D12** by demotion (#876). T2 half holds — a nested return emits `Calor1001` rather than skipping silently | ✅ *(only as of #876; see the caveat under Verdict)* |
+| 6 | **Slice-1 soundness batch** — bar: **no known false-`Proven`-elides vector**, known set = divergence table + T1, **and no silently-skipped postcondition check ships** | **Six** vectors across **six** review rounds, all closed: **D4** both halves by refusal (#872), **D3**/**D12** by demotion (#876), **D14** (arrays and user-type sorts) by the same demotion (#878), and a sixth site inside that fix. T2 half holds — a nested return emits `Calor1001` rather than skipping silently | ✅ *(only as of #878; see the caveat under Verdict)* |
 | 7 | **T3 containment** — three surfaces gated | `format --write` → `Calor1346` unless `--experimental` / `CALOR_EXPERIMENTAL_FORMAT_WRITE=1`; LSP **formatting** and **rename** register only under `CALOR_LSP_EXPERIMENTAL=1`, read-only handlers unaffected. Two defects found and fixed here; the gate is now **tested** for the first time | ✅ |
 | 8 | **#770 eject-contract** — documented degradation spec | `docs/guides/adoption-playbook.md` §"The eject story (tested)" (`:139-157`) — per-construct degradation table | ✅ |
-| 9 | **#761 flip stance** — `EnableTypeChecking` default-on **lands in the W2/W3 window** with a CHANGELOG note | **Delivered at v0.12 (#877), late.** The flip is in, with the CHANGELOG note the item names. It was blocked not by the flip but by 92 defects in the checker itself — every one a working program it refused, and all of them live for agents already, since `calor_check`/`calor_refine` set the flag | ✅ *(late — see below)* |
+| 9 | **#761 flip stance** — `EnableTypeChecking` default-on **lands in the W2/W3 window** with a CHANGELOG note | **Delivered at v0.12 (#877), outside the window.** The flip is in, with the CHANGELOG note the item names. It was blocked not by the flip but by 92 defects in the checker itself — every one a working program it refused, and all of them live for agents already, since `calor_check`/`calor_refine` set the flag | ✅ *(delivered v0.12, outside window — see below)* |
 
 ## Item 6 — the row-by-row re-audit the first version owed
 
-The bar is *known-divergence-free* and the known set is the **whole** divergence table. Every row,
-with its disposition **and** whether it can mint a false `Proven` that elides:
+The bar is *known-divergence-free* and the known set is the **whole** divergence table — **all
+fifteen rows**, not the eleven an earlier revision of this section swept. It omitted D12 (recorded
+only inside D3's prose) and D13 entirely, which is the identical failure this document indicts two
+sections above. Every row, with its disposition **and** whether it can mint a false `Proven` that
+elides:
 
 | Row | Disposition | Elide-vector? |
 |---|---|---|
@@ -76,6 +79,9 @@ with its disposition **and** whether it can mint a false `Proven` that elides:
 | D9 `string.Replace` first-vs-all | closed by refusal | no |
 | D10 mixed signed/unsigned | closed by modeling | no |
 | D11 unmasked shift counts | closed by modeling | no |
+| D12 Z3 strings are UTF-8 BYTES, .NET counts UTF-16 code units | **closed by demotion (#876)**, same mechanism as D3 | no *(was: **yes**)* |
+| D13 `Substring` out of range throws in .NET; Z3 totalizes to `""` | open in the table, but **neutralized incidentally**: any `substr` touches the string theory, so the proof is demoted to `Assumed` and cannot elide | no |
+| **D14** Z3's array and user-type sorts are total and non-null; .NET's `T[]` and classes are nullable references | **closed by demotion (#878).** `a$length` is an unconstrained u32, so `a.Length >= 0` was a solver tautology and a runtime `NullReferenceException`. Found on the FIFTH audit, in nine lines of pure Calor | no *(was: **yes**)* |
 | **T2** (#764) — the bar's second clause, *no silently-skipped postcondition check ships* | Holds: a nested return emits `warning Calor1001: Postcondition runtime checks for '…' were NOT emitted` | no |
 
 **D3 is live, and my argument that it was not is the single worst thing in this document's history.**
@@ -228,12 +234,20 @@ Item 6 passes only as of #876, item 4 and item 7 only after fixes made during th
 only as of #877 — later than its registered window. None of them passed when this document first
 said they did.
 
-**The caveat that belongs on this PASS, stated rather than buried.** Four adversarial review rounds
-found four live false-`Proven`-elides vectors behind item 6 — each time *after* it had been marked
-green, and two of them behind rows I had personally re-audited and argued safe. What finally closed
-it was **not** a better enumeration of the divergence table. It was a change of mechanism: #876
-removes elision for string-carried proofs, so the class is closed by construction rather than by
+**The caveat that belongs on this PASS, stated rather than buried.** **Six** adversarial review
+rounds found **six** live false-`Proven`-elides vectors behind item 6 — every one *after* the item
+had been marked green, two behind rows I had personally re-audited and argued safe, and **two inside
+the fixes for the previous ones**. What closed them was **not** a better enumeration of the
+divergence table. It was a change of mechanism: proofs carried by a sort Z3 models as total are
+demoted to `Assumed`, which never elides, so the class is closed by construction rather than by
 having found every member.
+
+**And the class had to be redrawn twice before that construction was right.** #876 closed *strings*
+and this document then said arrays were unaffected — which was true, and was D14. The class is
+**a sort Z3 models as total where the .NET value can be null**; strings, arrays and user-type sorts
+are three members, and the sixth vector was a `$length` mint inside D14's own fix that the by-hand
+enumeration missed. The record is that hand-enumeration failed at every level it was tried:
+divergence rows, then sorts, then mint sites.
 
 That is the honest reading of the bar. *Known*-divergence-free is a claim about how hard anyone
 looked, and on this evidence inspection does not find the bottom of the solver's string model. §2 of
@@ -242,8 +256,14 @@ clean** — and #779's differential suite is the instrument that would settle it
 
 **Registered recommendation for the successor plan:** item 6's bar should not be carried forward as
 "audit the table again". Replace it with #779's differential suite, or with more
-closed-by-construction changes of the #876 kind. D1, D2, D3 and D12 remain open *modeling* gaps whose
-elide consequences are now neutralized; #875 tracks D3's root cause.
+closed-by-construction changes of the #876/#878 kind. The evidence for this is now concrete rather
+than rhetorical: **D14 was found in under an hour by asking which *other* sorts are total in Z3 and
+nullable in .NET** — a differential question — after four rounds of table re-reading had missed it.
+
+D1, D2, D3, D12 and D14 remain open *modeling* gaps whose elide consequences are neutralized.
+**#875** tracks D3's root cause; **#879** tracks a seventh finding in a different class entirely —
+the elision key is a mutable cursor `Visit(MethodNode)` never maintains, which today means class-
+method postconditions never elide and every `§MT` violation reports the wrong function id.
 
 ## Scope
 

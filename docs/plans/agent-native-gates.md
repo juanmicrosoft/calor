@@ -99,7 +99,7 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.8 (additive A-1.8, 2026-08-05 — PP-A1 adjudicated: items 1–8 PASS, item 9 LAPSED, item 6 passing only as of #872; additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.8 (additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
@@ -331,7 +331,7 @@ item 6 only as of #876, items 4 and 7 only after fixes made during the audit, it
 
 **Item 6 passed only after four review rounds found four live vectors.** Three adversarial review rounds found three false-
 `Proven`-elides vectors behind this one item, each time after it had been marked ✅: D4's
-explicit-mode half, D4's no-mode half (both closed in #872), and **D3**, which is not closed. D3
+explicit-mode half, D4's no-mode half (both closed in #872), **D3** and **D12** (closed in #876), and **D14** (closed in #878). D3
 reproduced on the shipped `calor run --verify` path, as did **D12** (Z3 counts UTF-8 bytes, .NET
 counts UTF-16 code units: `"é".Length` is 1 vs 2). Two prior claims are withdrawn: that Calor's
 `str` is non-nullable (`§B{bad:str}` binds a null interop return with **zero diagnostics**), and
@@ -343,7 +343,7 @@ channels, postconditions and refinement obligations. That closes the class **by 
 rather than by enumeration, which matters given that enumeration is what failed four times. The
 modeling gaps remain open; **#875** tracks the root cause of D3.
 
-**Registered lesson, because this bar has now failed three times by inspection:** *known*-divergence-
+**Registered lesson, because this bar has now failed SIX times by inspection, twice inside its own fixes:** *known*-divergence-
 free is a claim about how hard anyone looked. §2 of the freeze already says it is **weaker than
 differentially clean**. Item 6's bar should not be re-asserted by another reading of the divergence
 table; it should be replaced by #779's solver-vs-runtime differential suite.
@@ -358,8 +358,8 @@ runtime check**. Reproduced end-to-end on a shipped CLI path: the same program t
 Closed by refusal in **#872** (mirroring D9), cache format 1.8 → **1.9** — the bump is load-bearing,
 not hygiene, since warm 1.8 caches hold exactly those false verdicts. Item 6 passes **only as of
 #872**. The first adjudication cited four closed rows (D6–D9) and did not audit the remaining seven;
-the corrected record carries a **row-by-row** audit of all eleven, including an explicit
-*argued-unreachable* disposition for D3 and D2 named as the residual inside §2's recorded risk
+the corrected record carries a **row-by-row** audit of all fourteen. An intermediate revision gave
+D3 an *argued-unreachable* disposition; that argument was refuted by execution and is withdrawn and D2 named as the residual inside §2's recorded risk
 acceptance.
 
 **Item 9 = DELIVERED at v0.12 (#877), later than its registered window, and the lapse stays on the
