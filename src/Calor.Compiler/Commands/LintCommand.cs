@@ -74,11 +74,34 @@ public static class LintCommand
                 || Environment.GetEnvironmentVariable("CALOR_EXPERIMENTAL_FORMAT_WRITE") is "1" or "true";
             if (wantsFix && !experimentalAcknowledged)
             {
-                Console.Error.WriteLine(
-                    $"error {Diagnostics.DiagnosticCode.FormatWriteExperimentalRequired}: 'lint --fix' is disabled by the release policy (#793/#760): " +
-                    "it rewrites files through the formatter write path, which can rewrite identifiers and drops comments. " +
-                    "Pass --experimental (or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to acknowledge, " +
-                    "or use --check for read-only linting.");
+                const string refusal =
+                    "'lint --fix' is disabled by the release policy (#793/#760): it rewrites files " +
+                    "through the formatter write path, which can rewrite identifiers and drops " +
+                    "comments. Pass --experimental (or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to " +
+                    "acknowledge, or use --check for read-only linting.";
+
+                // The refusal must honour --format, exactly as `format --write`'s does. This is the
+                // SAME containment (CHANGELOG and docs/cli/structured-output.md name the two
+                // surfaces as one policy), so an agent that asked for a machine-readable document
+                // and got a bare stderr line sees a parse failure rather than a policy decision.
+                // Found by adversarial review: the format side was fixed and this one was not.
+                var refusalFormat = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
+                if (!refusalFormat.Equals("text", StringComparison.OrdinalIgnoreCase))
+                {
+                    var bag = new DiagnosticBag();
+                    bag.Add(new Diagnostic(
+                        DiagnosticCode.FormatWriteExperimentalRequired,
+                        refusal,
+                        new TextSpan(0, 0, 1, 1),
+                        DiagnosticSeverity.Error));
+                    Console.WriteLine(DiagnosticFormatterFactory.Create(refusalFormat, null).Format(bag));
+                }
+                else
+                {
+                    Console.Error.WriteLine(
+                        $"error {DiagnosticCode.FormatWriteExperimentalRequired}: {refusal}");
+                }
+
                 ctx.ExitCode = 1;
                 return;
             }

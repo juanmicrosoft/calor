@@ -299,4 +299,116 @@ public class EnvelopeEarlyExitTests : IDisposable
         Assert.Contains(root.GetProperty("diagnostics").EnumerateArray(),
             d => d.GetProperty("severity").GetString() == "error");
     }
+
+    private const string ValidSource = "\u00a7M{m001:T}\n  \u00a7F{f001:Main:pub} () -> void\n    \u00a7E{cw}\n    \u00a7P \"hi\"\n";
+
+    /// <summary>
+    /// The PP-A1 item-7 containment: `format --write` is refused by release policy (#793/#760).
+    /// The refusal is an early exit like the others in this file, and in JSON mode it was writing
+    /// a bare line to stderr with EMPTY stdout — so an agent that asked for JSON saw a parse
+    /// failure rather than a policy decision. The one message whose entire purpose is to be
+    /// understood was the one it could not read.
+    /// </summary>
+    [Fact]
+    public void FormatWrite_Json_RefusedWithoutExperimental_StillEmitsEnvelope()
+    {
+        var file = Path.Combine(_tempDir, "a.calr");
+        File.WriteAllText(file, ValidSource);
+
+        var (exitCode, stdOut, _) = CliTestHarness.RunCli(_tempDir, NotAcknowledged,
+            "format", file, "--write", "--format", "json");
+
+        Assert.Equal(1, exitCode);
+        var root = ParseSingleDocument(stdOut);
+        Assert.Equal("format", root.GetProperty("command").GetString());
+
+        var diagnostic = Assert.Single(root.GetProperty("diagnostics").EnumerateArray());
+        Assert.Equal(DiagnosticCode.FormatWriteExperimentalRequired, diagnostic.GetProperty("code").GetString());
+        Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
+
+        // The refusal must name both escape hatches, or it is not actionable.
+        var message = diagnostic.GetProperty("message").GetString()!;
+        Assert.Contains("--experimental", message);
+        Assert.Contains("CALOR_EXPERIMENTAL_FORMAT_WRITE", message);
+
+        // Refused means refused: the file is untouched.
+        Assert.Equal(ValidSource, File.ReadAllText(file));
+    }
+
+    /// <summary>
+    /// Explicitly UN-acknowledged. Without this the refusal tests inherit the ambient environment,
+    /// and `docs/cli/format.md` itself recommends `export CALOR_EXPERIMENTAL_FORMAT_WRITE=1` for a
+    /// session or CI job — under which these tests would pass vacuously by never reaching the gate.
+    /// </summary>
+    private static readonly Dictionary<string, string> NotAcknowledged =
+        new() { ["CALOR_EXPERIMENTAL_FORMAT_WRITE"] = "" };
+
+    /// <summary>Text mode keeps its human-oriented stderr line and the same exit code.</summary>
+    [Fact]
+    public void FormatWrite_Text_RefusedWithoutExperimental()
+    {
+        var file = Path.Combine(_tempDir, "b.calr");
+        File.WriteAllText(file, ValidSource);
+
+        var (exitCode, stdOut, stdErr) = CliTestHarness.RunCli(_tempDir, NotAcknowledged,
+            "format", file, "--write");
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains(DiagnosticCode.FormatWriteExperimentalRequired, stdErr);
+        Assert.DoesNotContain("{", stdOut);
+        Assert.Equal(ValidSource, File.ReadAllText(file));
+    }
+
+    /// <summary>
+    /// `lint --fix` is the SAME containment as `format --write` — same diagnostic code, same
+    /// acknowledgement, named together in the CHANGELOG and in structured-output.md. Its refusal
+    /// was still ignoring --format after the format side was fixed, which is exactly the half-fix
+    /// this file exists to catch. Covers `sarif` too, since lint offers it and `format` does not.
+    /// </summary>
+    [Theory]
+    [InlineData("json")]
+    [InlineData("sarif")]
+    public void LintFix_Structured_RefusedWithoutExperimental_StillEmitsDocument(string format)
+    {
+        var file = Path.Combine(_tempDir, $"lint-{format}.calr");
+        File.WriteAllText(file, ValidSource);
+
+        var (exitCode, stdOut, _) = CliTestHarness.RunCli(_tempDir, NotAcknowledged,
+            "lint", file, "--fix", "--format", format);
+
+        Assert.Equal(1, exitCode);
+
+        using var doc = JsonDocument.Parse(stdOut);
+        Assert.Contains(DiagnosticCode.FormatWriteExperimentalRequired, stdOut);
+        Assert.Equal(ValidSource, File.ReadAllText(file));
+    }
+
+    /// <summary>
+    /// The control that makes the two above meaningful: the gate is an ACKNOWLEDGEMENT, not a
+    /// removal. With the env var set the write path runs — so the tests above pin a policy gate
+    /// rather than an unconditionally broken command.
+    /// </summary>
+    [Fact]
+    public void FormatWrite_WithEnvAcknowledgement_IsAllowedThrough()
+    {
+        // Deliberately mis-formatted, so a successful run must CHANGE the file — feeding it
+        // already-canonical source would let this pass without a write ever happening. The noise
+        // is blank lines and trailing whitespace rather than bad indentation: over-indenting is a
+        // parse error, and the formatter (correctly) declines to write a file it cannot parse,
+        // which would make the test fail for a reason unrelated to the gate.
+        var file = Path.Combine(_tempDir, "c.calr");
+        var misformatted = ValidSource.Replace("\u00a7M{m001:T}\n", "\u00a7M{m001:T}\n\n\n")
+                                      .Replace("-> void", "-> void   ");
+        File.WriteAllText(file, misformatted);
+
+        var (exitCode, _, stdErr) = CliTestHarness.RunCli(_tempDir,
+            new Dictionary<string, string> { ["CALOR_EXPERIMENTAL_FORMAT_WRITE"] = "1" },
+            "format", file, "--write");
+
+        Assert.DoesNotContain(DiagnosticCode.FormatWriteExperimentalRequired, stdErr);
+        Assert.NotEqual(1, exitCode);
+
+        // The gate is an ACKNOWLEDGEMENT: past it, the write path actually writes.
+        Assert.NotEqual(misformatted, File.ReadAllText(file));
+    }
 }

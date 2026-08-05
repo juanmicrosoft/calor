@@ -237,11 +237,30 @@ v0.12 is **not** on the strategy's Phase-2a/2b progression — it is prerequisit
 | Real-scale epoch re-run | **RETIRED at Call S (2026-08-05).** No spend gate follows; quantitative re-entry conditions are registered in `call-s-adjudication.md` |
 | Logic-mutation stratum as a thesis channel | Retired as a mechanical-arm channel; retained only as a conversion-penalty measurement |
 | Proof-depth measurement (arm-ii) | Rides on WS-S4; explicitly not adjudicated by v0.12 (§0.1) |
+| **PP-A1 item 9** — `EnableTypeChecking` default-on (#761) | **DELIVERED at v0.12 (#877)**, later than the registered W2/W3 window. The row stays so the lateness is visible: the blocker was 92 checker defects, every one a working program it refused, and all of them already live for agents through `calor_check`/`calor_refine`. Three review rounds on the fix also exposed that **no gate compiled `bench/` or `samples/`** — both now have one |
+| **D2** (within-range signedness context) and **#779 differential suite** | Unchanged residual. Item 6's bar is *known-divergence-free*, which §2 of `wedge-w1-prereqs.md` records as **weaker than differentially clean**; the suite is what actually closes it |
+| `ContractTranslator._stringInfo` / `IsNullable` | **Inert** — written at five sites, read at none, never passed `true`. Not a live defect (see D3's argued-unreachable disposition), but it reads as a nullability guard and is not one. Wire up or delete |
+| **D3 / D12 — the string model is null-blind and byte-counted** | **Elide vectors CLOSED by demotion (#876); the modeling gaps remain OPEN.** String-carried proofs are `Assumed`, which never elides, so `len`/`isempty`/`substr`/`indexof` cannot delete a guard — at the cost of elision on every string postcondition. **#875** tracks the root-cause fix (non-nullable `str` at the binder), which is what would let the demotion be lifted; D12 needs a separate fix for the count/index operations, narrowed in `verification-modeled-forms` §4.1 |
+| **Item 6's bar itself** | Registered recommendation: *known*-divergence-free has now failed three times by inspection. Replace it with #779's solver-vs-runtime differential suite rather than re-asserting it by another reading of the table |
 | Frames / `old()`; `Justified` tier; #807-adjacent verifier limits | Unchanged from the v0.10/v0.11 registers |
 
 ---
 
 ## 10. Revision log
+
+- **PP-A1 adjudicated, 2026-08-05 (A-1.8) — PASS, all nine items.** The first adjudication
+  claimed all nine; adversarial review refuted **item 6** and it was right: **divergence D4 was a live
+  false-`Proven`-elides vector**, reproduced end-to-end on a shipped path (`calor run` threw;
+  `calor run --verify` printed the value with the check deleted). Closed by refusal in #872. Items 4
+  and 7 also passed only after fixes to the **shipped** surface rather than the one the original
+  evidence cited, and the `Calor1346` containment turned out to have no test anywhere in the repo.
+  The common failure was assembling an evidence column by confirming each row instead of attacking
+  it — and a third round then found **D3** live by the same test, after I had personally re-audited
+  that row and argued it unreachable. A fourth then found **D12**. All four are closed — D4 by refusal
+  (#872), D3 and D12 by demoting string-carried proofs to `Assumed`, which never elides (#876) —
+  but note what closed them: a change of **mechanism**, not a better audit. The modeling gaps stay
+  open (#875 tracks D3's root cause); only their elide consequences are neutralized. Record:
+  `docs/plans/pp-a1-adjudication.md`.
 
 - **Call S, 2026-08-05 — the plan's central objective failed, and the plan records it.** PP-S3 = MISS
   (8 screened tasks against ≥ 70), PP-S1 = MISS (census: top-3 = 40.4% < 50%), PP-S2 reported-only,

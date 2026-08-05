@@ -99,7 +99,7 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.7 (additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.8 (additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
@@ -323,6 +323,85 @@ disclosures in the A-1.5 entry below.
 | **PP-S4** — no converter-appeasement (**blocker**) | M-S4 = 0 via the A-1.5.7 fixture registry; indeterminate counts as **failing** | Blocks the v0.12.0 release |
 
 ### A.3 Annex revision log
+
+**A-1.8 — PP-A1 adjudicated (2026-08-05). PP-A1 = PASS, all nine items.** Additive; registers outcomes against the
+PP-A1 list frozen at `wedge-w1-prereqs.md` §3 and carried unchanged into v0.12. **All nine PASS —
+item 6 only as of #876, items 4 and 7 only after fixes made during the audit, item 9 only as of
+#877 and later than its registered W2/W3 window.**
+
+**Item 6 passed only after four review rounds found four live vectors.** Three adversarial review rounds found three false-
+`Proven`-elides vectors behind this one item, each time after it had been marked ✅: D4's
+explicit-mode half, D4's no-mode half (both closed in #872), **D3** and **D12** (closed in #876), and **D14** (closed in #878). D3
+reproduced on the shipped `calor run --verify` path, as did **D12** (Z3 counts UTF-8 bytes, .NET
+counts UTF-16 code units: `"é".Length` is 1 vs 2). Two prior claims are withdrawn: that Calor's
+`str` is non-nullable (`§B{bad:str}` binds a null interop return with **zero diagnostics**), and
+that D3 was "argued unreachable". **Unlike D4 and D9 neither is closable by refusing an operation** —
+Z3's string sort has no null and is byte-counted, so every total axiom of its string theory is
+affected. **#876 closes both by DEMOTION** (option B, maintainer-chosen): a proof carried by the
+string theory becomes `Assumed`, which never elides, with the assumption named — on both elision
+channels, postconditions and refinement obligations. That closes the class **by construction**
+rather than by enumeration, which matters given that enumeration is what failed four times. The
+modeling gaps remain open; **#875** tracks the root cause of D3.
+
+**Registered lesson, because this bar has now failed SIX times by inspection, twice inside its own fixes:** *known*-divergence-
+free is a claim about how hard anyone looked. §2 of the freeze already says it is **weaker than
+differentially clean**. Item 6's bar should not be re-asserted by another reading of the divergence
+table; it should be replaced by #779's solver-vs-runtime differential suite.
+
+**Item 6 was FAIL when first adjudicated, and this is registered rather than smoothed over.** Its bar
+is *no known false-`Proven`-elides vector*, known set = the divergence table + T1. **Divergence D4 was
+a live one**: a non-ordinal `StringComparison` mode in a contract was translated as **ordinal**, the
+mode-bearing form stayed whitelisted in `ModeledForms`, and `Z3Verifier` never demoted on the warning
+— so the solver returned a genuine false `Proven`, and `Proven && !IsVacuous` (D-G1.3) **elided the
+runtime check**. Reproduced end-to-end on a shipped CLI path: the same program threw
+`ContractViolationException` under `calor run` and printed its value under `calor run --verify`.
+Closed by refusal in **#872** (mirroring D9), cache format 1.8 → **1.9** — the bump is load-bearing,
+not hygiene, since warm 1.8 caches hold exactly those false verdicts. Item 6 passes **only as of
+#872**. The first adjudication cited four closed rows (D6–D9) and did not audit the remaining seven;
+the corrected record carries a **row-by-row** audit of all fourteen. An intermediate revision gave
+D3 an *argued-unreachable* disposition; that argument was refuted by execution and is withdrawn and D2 named as the residual inside §2's recorded risk
+acceptance.
+
+**Item 9 = DELIVERED at v0.12 (#877), later than its registered window, and the lapse stays on the
+record.** The frozen text says the flip *"lands in the W2/W3 window"*; that window closed without it,
+and the first adjudication marked the item ✅ anyway by re-reading "lands in the W2/W3 window" as "has
+a slot" — a reinterpretation in the favourable direction. The correct disposition at that moment was
+LAPSED. It is ✅ now because the work was done, not because the reading changed.
+
+**What blocked it was never scheduling.** Flipping the default produced **92 failures**, every one a
+*working program the checker refused*: unknown type `char` ×37, `object` ×13, `Type` ×6, arrays ×6,
+cascades from unmodeled calls, static members read as undefined variables, string `+` reported as
+non-numeric, and a duplicated `Calor0250`. All of it was **already live** — `calor_check` and
+`calor_refine` set the flag — so the MCP primer's own module, two shipped benchmarks and the syntax
+exemplar were being rejected. **Three adversarial review rounds** on the fix found that the flip then
+introduced *new* false positives on two agent-native benchmark **gold references** (one dropping from
+53 proven contracts to zero with a non-zero exit), that **no test project compiled anything under
+`bench/`** so the fix's own measurement had excluded that corpus, and that the round-2 guard was dead
+code. Gates over the bench gold references and over `samples/` now exist; neither did before.
+
+**Items 4 and 7 passed only after fixes made during the audit**, both on the shipped surface rather
+than the one the original evidence cited: `CompileCalor` (the MSBuild task real projects build
+through) trusted a `.g.cs`'s *existence* rather than its content hash, diverging from
+`CompilationDriver`; and `format --write`'s policy refusal ignored `--format json`, so an agent that
+asked for an envelope got a parse failure. The `Calor1346` containment also had **no test anywhere in
+the repo** — item 7 had been adjudicated on code-reading alone — and is now pinned, with a control
+proving the gate is an acknowledgement rather than a broken command.
+
+**Item 1's "published" half is dispositioned, not asserted:** CI evidences the *packaged* SDK's
+consumability from a local feed; **"published" clears at the v0.12.0 publish event itself**.
+
+**PP-W5 remains NOT adjudicated** — it requires a spend-authorized parity epoch (A-1.4 tranche 1,
+restated additively at A-1.5.6) and **may not be self-cleared**. Record: `docs/plans/pp-a1-adjudication.md`.
+
+**A correction the record carries rather than hides:** #872's first fix closed only the
+*explicit-non-ordinal-mode* half of D4. A second adversarial review found the vector still live on
+the **no-mode** spelling — .NET resolves `StartsWith(String)`/`EndsWith(String)`/`IndexOf(String)` to
+**CurrentCulture** while the solver models them ordinally — and it reproduced with the same
+throw-under-`run` / print-under-`--verify` signature. Also closed in #872 (cache 1.9 → **1.10**). The
+lesson registered: the first fix was scoped to *the divergence row as written* rather than to *the
+property the row protects*, and only the second is item 6's bar. **Two rounds of review found two
+live vectors behind one ✅**, so the honest reading of "known-divergence-free" is a statement about
+how hard anyone looked — which is what §2's own risk acceptance already says.
 
 **A-1.7 — Call S adjudicated (2026-08-05).** Additive; registers outcomes against thresholds frozen at
 A-1.5 before any eligibility was evaluated. **PP-S3 = MISS** (headline): M-S3 realized **8** screened

@@ -318,8 +318,24 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             {
                 priorFiles.TryGetValue(relativePath, out var cachedEntry);
 
+                // The skip conditions mirror CompilationDriver.cs:178-198 deliberately — the two
+                // sites decide the same thing (is this file's cached output trustworthy?) and had
+                // drifted apart, with this one weaker on both counts.
+                //
+                //  - OutputContentHash: presence of the .g.cs is NOT enough. A truncated, corrupted,
+                //    or hand-edited output must be a miss, or the build compiles stale bytes and
+                //    reports "up-to-date". Entries predating this check carry a null hash and are
+                //    therefore a miss — one cold rebuild, fail-closed, as the driver does.
+                //  - EffectSummary: skipping without one silently drops the module from
+                //    cross-module effect enforcement, so its Calor0410 violations vanish on warm
+                //    builds. Not reachable through this task today (a null Ast implies HasErrors,
+                //    which returns before caching), so this is defence in depth against a future
+                //    caller — not a fix for a live bug.
                 if (cachedEntry != null
                     && existingOutputFiles!.Contains(outputPath)
+                    && cachedEntry.EffectSummary != null
+                    && cachedEntry.OutputContentHash != null
+                    && BuildStateCache.ComputeFileHash(outputPath) == cachedEntry.OutputContentHash
                     && BuildStateCache.IsFileUpToDate(cachedEntry, inputPath))
                 {
                     // Skip — carry entry forward
@@ -447,6 +463,14 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
 
                 // Compute effect summary from the fresh AST and cache it for future warm builds.
                 var fileEntry = BuildStateCache.CreateFileEntry(inputPath);
+
+                // Record what this compile actually wrote, so the next build can tell whether the
+                // .g.cs on disk is still that output. Without this every entry is a permanent miss
+                // under the check above — which is safe, but defeats incrementality entirely.
+                fileEntry.OutputContentHash = File.Exists(outputPath)
+                    ? BuildStateCache.ComputeFileHash(outputPath)
+                    : null;
+
                 if (result.Ast != null)
                 {
                     var summary = Calor.Compiler.Effects.EffectSummaryBuilder.Build(result.Ast);
