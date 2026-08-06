@@ -10,6 +10,28 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-06
+
+The soundness release. **This entry covers the v0.11 range as well** — there is no `v0.11.0` tag; the maintainer folded v0.11 forward, so everything below ships together.
+
+Six distinct false-proof vectors were closed — cases where `calor run --verify` deleted a runtime check that `calor run` proved would have failed. Enumerated so the count is checkable: **D4** in two halves (non-ordinal string comparison modes; bare `StartsWith`/`EndsWith`/`IndexOf`, which use the current culture in .NET), **D3** (Z3 strings are null-free), **D12** (Z3 counts code points, .NET counts UTF-16 units), and **D14** in two halves (array sorts, user-type sorts) — plus a sixth `$length` mint site found inside the D14 fix. That is six closures, not six review rounds. The number of vectors *still unfound* is not knowable and is not claimed to be zero.
+
+What closed the class was a change of mechanism, not a better enumeration. Hand-enumeration was tried at three levels — divergence rows, then Z3 sorts, then mint sites — and missed something at every one. Proofs carried by a sort Z3 models as total are now **demoted to `Assumed`**, which never elides, so the class closes by construction.
+
+### Added
+- **`calor import <package>`** generates effect manifests from real assemblies in three tiers — IL-derived, curated, and **unresolved, which is surfaced loudly and excluded** rather than defaulted to pure. Nothing is ever emitted as `verified`. Validated on Serilog and MediatR.
+- **`calor review-packet`** leads with the unproven remainder: seven-status counts, assumption lists, vacuity flags, counterexamples, and per-module interop/waiver fractions with waiver disclosure on the first line.
+- **Adoption playbook and a tested eject path** — an 11-test suite that compiles *and executes* ejected C# to pin exactly what survives leaving Calor.
+- **Effect soundness (WS-W2).** Invoking a delegate held in a value is now an error rather than an assumed-pure no-op; effect variance is checked on both the override and interface legs; interop is `Assumed` and propagates transitively; the known-pure list no longer contains mutators; and both silent `=> Empty` catch-alls are replaced by exhaustive switches. `--enforce-effects` defaults on.
+
+### Changed
+- **Postcondition elision is withdrawn for any signature naming an array or a non-primitive type.** Z3's array and user-type sorts are total and non-null; .NET's are nullable references. Coarse on purpose — being wrong in the narrow direction deletes a runtime check, being wrong in the broad direction costs an optimization. Contract *proving* and reporting are unchanged.
+- **The type checker is on by default**, which required fixing 92 defects in the checker itself first — every one of them a working program it refused (`char`, `object`, `decimal`, every sized integer, arrays, string concatenation, static member access). `--no-type-check` opts out.
+- **Conversion no longer substitutes silently.** Unknown operators, patterns, and compound assignments escalate to loud interop blocks instead of quietly becoming something else.
+
+### Known limitations shipping with this release
+All pre-existing rather than regressions: `§MT` contract violations report the wrong function id; a contract call carrying a keyword argument crashes the translator instead of diagnosing it; `str` is not yet non-nullable at the binder, which is what would let the string demotion be lifted.
+
 ## [0.10.0] - 2026-07-30
 
 The Guarantees release: every verification verdict an agent sees is now sound, honestly statused, and provenance-aware — and the upgrade is measured. On a paired A/B probe epoch, all three seeded contract defects moved from runtime exceptions to build-time refutations under the new verify gate, with zero catch regression and zero contract weakening across 30 eligible runs.

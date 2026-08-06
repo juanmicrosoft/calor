@@ -19,6 +19,16 @@ public sealed class TypeChecker
 
     public void Check(ModuleNode module)
     {
+        // Pass -1: register the module's OWN type declarations, before anything resolves a
+        // type name. Without this the checker treats a class the user declared eight lines
+        // above as an unknown external type and warns that it "may be a typo" — a false
+        // positive on a program that compiles and runs, and one the shipped corpus does not
+        // exercise because no sample binds a locally-declared class to a typed §B.
+        foreach (var name in ModuleDeclaredTypeNames(module))
+        {
+            _env.DefineType(name, new ExternalType(name));
+        }
+
         // Pass 0: register refinement type definitions
         foreach (var rtype in module.RefinementTypes)
         {
@@ -36,6 +46,20 @@ public sealed class TypeChecker
         {
             CheckFunction(func);
         }
+    }
+
+    /// <summary>
+    /// Every type name the module itself declares. Modelled as <see cref="ExternalType"/> rather
+    /// than a structural type: the checker has no member table, so it can say "this name exists"
+    /// but not "this member exists on it". That is exactly the honest claim — it stops the
+    /// unknown-type warning without inventing member checking the checker cannot back up.
+    /// </summary>
+    private static IEnumerable<string> ModuleDeclaredTypeNames(ModuleNode module)
+    {
+        foreach (var c in module.Classes) yield return c.Name;
+        foreach (var i in module.Interfaces) yield return i.Name;
+        foreach (var e in module.Enums) yield return e.Name;
+        foreach (var d in module.Delegates) yield return d.Name;
     }
 
     /// <summary>Set during the signature pre-pass, which re-resolves annotations CheckFunction

@@ -54,6 +54,15 @@ public class Program
             description: "Disable effect enforcement (opt out of the v0.11 default-on behavior)",
             getDefaultValue: () => false);
 
+        // Opt-out for the v0.12 default-on type checker, matching the shape the repo already
+        // uses for --no-enforce-effects (v0.11) and --no-strict-bind-inference (v0.6.3). A
+        // default flip that rejects previously-compiling programs needs an escape hatch; v0.12
+        // shipped the flip without one until this was caught in release review.
+        var noTypeCheckOption = new Option<bool>(
+            aliases: ["--no-type-check"],
+            description: "Disable the type checker (opt out of the v0.12 default-on behavior)",
+            getDefaultValue: () => false);
+
         var strictEffectsOption = new Option<bool>(
             aliases: ["--strict-effects"],
             description: "Promote unknown external call warnings (Calor0411) to errors",
@@ -141,6 +150,7 @@ public class Program
             requireDocsOption,
             enforceEffectsOption,
             noEnforceEffectsOption,
+            noTypeCheckOption,
             strictEffectsOption,
             permissiveEffectsOption,
             contractModeOption,
@@ -181,6 +191,7 @@ public class Program
             var noEnforceEffects = ctx.ParseResult.GetValueForOption(noEnforceEffectsOption);
             // --no-enforce-effects always wins over the default-on behavior (D-W2.5)
             if (noEnforceEffects) enforceEffects = false;
+            var noTypeCheck = ctx.ParseResult.GetValueForOption(noTypeCheckOption);
             var strictEffects = ctx.ParseResult.GetValueForOption(strictEffectsOption);
             var permissiveEffects = ctx.ParseResult.GetValueForOption(permissiveEffectsOption);
             var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
@@ -216,7 +227,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format);
+                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format);
             }
             catch (Exception ex)
             {
@@ -289,10 +300,10 @@ public class Program
         return result;
     }
 
-    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text")
-        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format));
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text")
+        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format));
 
-    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text")
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text")
     {
         // Structured diagnostic output (--format json|sarif): diagnostics are
         // aggregated across files and serialized once through the shared
@@ -407,6 +418,7 @@ public class Program
                         StrictApi = strictApi,
                         RequireDocs = requireDocs,
                         EnforceEffects = enforceEffects,
+                        EnableTypeChecking = !noTypeCheck,
                         StrictEffects = strictEffects,
                         UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
                         ContractMode = parsedContractMode,

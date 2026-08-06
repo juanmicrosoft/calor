@@ -302,4 +302,56 @@ public class TypeCheckerDefectTests
         var result = Check("§M{m:S}\n  §RTYPE{r1:MyType:nonexistent_type_xyz} (>= # INT:0)\n");
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.RefinementUndefinedBaseType);
     }
+    /// <summary>
+    /// A type the module DECLARES is not an unknown external type. Found in release review of
+    /// v0.12.0: the checker registered only type parameters, so a class declared eight lines
+    /// above was reported as possibly a typo — on a program that compiles and runs. It escaped
+    /// the corpus sweep because no shipped sample binds a locally-declared class to a typed §B.
+    /// </summary>
+    [Fact]
+    public void ModuleDeclaredTypes_AreNotReportedAsUnknown()
+    {
+        var result = Check("""
+            §M{m001:ClsTest}
+              §CL{c001:Point:pub}
+                §FLD{i32:X:pub}
+                §CTOR{ctor1:pub} (i32:x)
+                  §ASSIGN X x
+              §F{f001:Use:pub} () -> void
+                §E{}
+                §B{p:Point} §NEW{Point} §A INT:3 §/NEW
+                §R
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
+    }
+
+    /// <summary>
+    /// ...and the guard that keeps the fix honest: a name the module does NOT declare is still
+    /// reported, so registering declarations did not simply silence the check.
+    /// </summary>
+    [Fact]
+    public void UndeclaredType_IsStillReported()
+    {
+        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{x:NoSuchTypeXyz} STR:\"a\"\n    §R\n");
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("'NoSuchTypeXyz' is not known"));
+    }
+
+    /// <summary>
+    /// The v0.12 default flip must have an opt-out, as `--no-enforce-effects` (v0.11) and
+    /// `--no-strict-bind-inference` (v0.6.3) do. Shipping a flip that rejects previously
+    /// compiling programs with no escape hatch is what release review caught.
+    /// </summary>
+    [Fact]
+    public void TypeCheckingCanBeDisabled()
+    {
+        const string src = "§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{x:NoSuchTypeXyz} STR:\"a\"\n    §R\n";
+
+        var on = Program.Compile(src, "t.calr", new CompilationOptions { EnableTypeChecking = true });
+        var off = Program.Compile(src, "t.calr", new CompilationOptions { EnableTypeChecking = false });
+
+        Assert.Contains(on.Diagnostics, d => d.Message.Contains("is not known"));
+        Assert.DoesNotContain(off.Diagnostics, d => d.Message.Contains("is not known"));
+    }
+
 }

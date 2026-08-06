@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.10.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.12.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The Guarantees release: sound, honestly-statused verification verdicts — result-bound postcondition proofs, a seven-status vocabulary with assumption provenance, cross-module linking, and an MSBuild verify gate that surfaces contract refutations at build time. Measured A/B: all three seeded contract defects moved from runtime exceptions to build-time refutations with zero catch regression and zero contract weakening.</span>
+            <span className="text-foreground">The soundness release: six distinct cases where <code>--verify</code> deleted a runtime check that would have failed are closed — by refusing the divergent forms and by demoting proofs carried by a sort Z3 models as total to <em>Assumed</em>, which never elides. Type checking is on by default, effect enforcement closes five fail-open holes, and <code>calor import</code> plus <code>calor review-packet</code> land the adoption surface. Both release gates pass; the toolchain-parity epoch found no large token tax.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
