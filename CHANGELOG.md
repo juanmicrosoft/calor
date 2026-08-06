@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-06
+
+**This release covers the v0.11 range as well** — there is no `v0.11.0` tag; the maintainer folded
+v0.11 forward, so everything below ships together.
+
+**Both release gates pass.** **PP-A1** (CI adoption gates, all nine frozen items) at A-1.8;
+**PP-W5** (toolchain parity, epoch `w5-parity-002`) at A-1.9 — point estimate 1.0016 after a metric
+erratum, registered as *no large tax detected*, explicitly not a proof of parity.
+
+**The headline is soundness.** Six false-`Proven`-elides vectors were found and closed during this
+cycle — cases where `calor run --verify` deleted a runtime check that would have failed. Each was
+found by adversarial review *after* the gate had been marked green, and two were found inside the
+fixes for earlier ones. What finally closed the class was a change of mechanism rather than a better
+enumeration: proofs carried by a sort Z3 models as total are now **demoted to `Assumed`**, which
+never elides. See `docs/verification-modeled-forms.md` §4.1 and divergences D3, D4, D12, D14.
+
+**Known limitations shipping with this release**, all pre-existing rather than regressions:
+`§MT` contract violations report the wrong function id (#879); a contract call expression carrying a
+keyword argument crashes the translator instead of diagnosing it (#874); `str` is not yet enforced
+non-nullable at the binder, which is what would let the string demotion be lifted (#875).
+
+
 ### Added
 - **W1 Slice 4 — `Calor.Sdk` is a functional, published, consumer-tested package (#787/#790/#788 subsets; PP-A1 items 1/2/4):**
   - **Self-contained MSBuild SDK package**: the nupkg carries `Sdk/` props+targets, the full `Calor.Tasks` dependency closure (compiler, `Calor.Runtime`, `Microsoft.Z3`) under `tasks/net10.0/`, and per-RID Z3 natives — staged via `dotnet publish` and packed through the supported `TargetsForTfmSpecificContentInPackage` extension point with hard `<Error>` assertions for every required file (the old late-glob target could silently pack nothing). `Calor.Runtime` is bundled and injected as a `Reference` by the targets (version lockstep by construction; `CalorSdkImportRuntime=false` opts out). `Z3ContextFactory` now probes assembly-relative `runtimes/<rid>/native` and registers its resolver on the task assembly's own AssemblyLoadContext — verification genuinely runs inside consumer MSBuild builds.
