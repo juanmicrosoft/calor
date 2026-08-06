@@ -510,7 +510,7 @@ public sealed class CheckTool : McpToolBase
         {
             var options = new CompilationOptions
             {
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 

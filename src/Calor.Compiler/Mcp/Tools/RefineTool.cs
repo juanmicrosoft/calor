@@ -97,7 +97,7 @@ public sealed class RefineTool : McpToolBase
             {
                 VerifyRefinements = true,
                 VerificationTimeoutMs = timeout,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
@@ -106,13 +106,18 @@ public sealed class RefineTool : McpToolBase
             var tracker = options.ObligationResults;
             if (tracker == null)
             {
+            // A null tracker means compilation FAILED, so nothing was analyzed. Reporting
+            // Success = true with an empty result set told an agent "clean, zero obligations,
+            // zero failed" about a program that was never looked at — the false-clean-signal
+            // shape this release exists to close, on the very tool through which the sixth
+            // soundness vector reached agents. isError mirrors the analyzed path below.
                 return Task.FromResult(McpToolResult.Json(new ObligationsOutput
                 {
-                    Success = true,
+                    Success = false,
                     Summary = new ObligationsSummaryOutput(),
                     Obligations = new List<ObligationOutput>(),
                     CompilationErrors = result.Diagnostics.Errors.Select(d => d.Message).ToList()
-                }));
+                }, isError: true));
             }
 
             var obligations = functionId != null
@@ -176,7 +181,7 @@ public sealed class RefineTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
@@ -240,7 +245,7 @@ public sealed class RefineTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
@@ -348,7 +353,7 @@ public sealed class RefineTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
@@ -357,11 +362,16 @@ public sealed class RefineTool : McpToolBase
             var tracker = options.ObligationResults;
             if (tracker == null)
             {
+            // A null tracker means compilation FAILED, so nothing was analyzed. Reporting
+            // Success = true with an empty result set told an agent "clean, zero obligations,
+            // zero failed" about a program that was never looked at — the false-clean-signal
+            // shape this release exists to close, on the very tool through which the sixth
+            // soundness vector reached agents. isError mirrors the analyzed path below.
                 return Task.FromResult(McpToolResult.Json(new GuardDiscoveryOutput
                 {
-                    Success = true,
+                    Success = false,
                     Guards = new List<GuardOutput>()
-                }));
+                }, isError: true));
             }
 
             var discovery = new GuardDiscovery();
@@ -412,7 +422,7 @@ public sealed class RefineTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
@@ -421,11 +431,16 @@ public sealed class RefineTool : McpToolBase
             var tracker = options.ObligationResults;
             if (tracker == null)
             {
+            // A null tracker means compilation FAILED, so nothing was analyzed. Reporting
+            // Success = true with an empty result set told an agent "clean, zero obligations,
+            // zero failed" about a program that was never looked at — the false-clean-signal
+            // shape this release exists to close, on the very tool through which the sixth
+            // soundness vector reached agents. isError mirrors the analyzed path below.
                 return Task.FromResult(McpToolResult.Json(new SuggestFixesOutput
                 {
-                    Success = true,
+                    Success = false,
                     Fixes = new List<FixSuggestion>()
-                }));
+                }, isError: true));
             }
 
             var targetObligations = obligationId != null

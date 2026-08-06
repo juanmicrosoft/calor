@@ -168,14 +168,14 @@ Fix by adding one or the other:
 
 **Pre-v0.6 behavior:** the binder silently defaulted to `INT` in this
 case, producing wrong-typed code with no diagnostic. The diagnostic
-was added in v0.6 and is enforced through the main `calor compile`
+was added in v0.6 and is enforced through the default `calor` compile command
 pipeline by `BindValidationPass`.
 
 ### Strict-mode diagnostics (default-on since v0.6.3)
 
 The following diagnostics are reserved in the `Calor0250-0259` range
 and are enforced **by default** as of v0.6.3 (RFC §6). To opt out
-during migration, pass `--no-strict-bind-inference` to `calor compile`
+during migration, pass `--no-strict-bind-inference` to `calor`
 or set `CompilationOptions.StrictBindInference = false`.
 
 | Code | Title | Fires on |

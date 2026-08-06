@@ -74,6 +74,46 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool EnforceEffects { get; set; } = true;
 
     /// <summary>
+    /// Whether to run the type checker. Mirrors
+    /// <see cref="Calor.Compiler.CompilationOptions.EnableTypeChecking"/>, default-on since
+    /// v0.12. Set the MSBuild property <c>CalorTypeCheck</c> to <c>false</c> to opt out —
+    /// without it a consumer of the published SDK has no way off a default that can reject a
+    /// program their previous build accepted.
+    /// </summary>
+    public bool TypeCheck { get; set; } = true;
+
+    /// <summary>
+    /// This task's options token, from its own properties. The call site goes through here so a
+    /// test can observe the composition — an earlier pin passed literal booleans to
+    /// <see cref="OptionsToken"/> and therefore could not tell whether the call site still folded
+    /// in <see cref="CompilationOptions.TypeCheckingDefault"/>. Reverting the fix left it green,
+    /// which is the same non-discriminating-pin failure this release already shipped twice.
+    /// </summary>
+    internal string ComputeOptionsToken(string canonicalExperimentalFlags)
+        => OptionsToken(
+            EnforceEffects,
+            TypeCheck && CompilationOptions.TypeCheckingDefault,
+            Verify,
+            EnableILAnalysis,
+            canonicalExperimentalFlags);
+
+    /// <summary>
+    /// The options token, extracted so it can be pinned directly. Note the type-check parameter is
+    /// the EFFECTIVE value (<c>TypeCheck &amp;&amp; CompilationOptions.TypeCheckingDefault</c>), not the
+    /// task property: the first cut hashed the property, so flipping <c>CALOR_NO_TYPE_CHECK</c>
+    /// against a warm cache changed what was reported without invalidating anything, and every
+    /// unchanged file was silently skipped — the #788 defect described at the call site.
+    /// </summary>
+    internal static string OptionsToken(
+        bool enforceEffects,
+        bool effectiveTypeCheck,
+        bool verify,
+        bool ilAnalysis,
+        string canonicalExperimentalFlags)
+        => $"enforceEffects:{enforceEffects}|typeCheck:{effectiveTypeCheck}|verify:{verify}"
+           + $"|ilAnalysis:{ilAnalysis}|experimental:{canonicalExperimentalFlags}";
+
+    /// <summary>
     /// Run static contract verification during compilation (Annex A-1.3
     /// instrumentation item 1): refutations surface as Calor0712-band build
     /// diagnostics (Warning severity — the build still succeeds). Off by
@@ -128,8 +168,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 .Select(f => f.ToLowerInvariant())
                 .OrderBy(f => f, StringComparer.Ordinal));
         var optionsHash = BuildStateCache.ComputeOptionsHash(
-            $"enforceEffects:{EnforceEffects}|verify:{Verify}"
-            + $"|ilAnalysis:{EnableILAnalysis}|experimental:{canonicalExperimentalFlags}");
+            ComputeOptionsToken(canonicalExperimentalFlags));
         var manifestHash = BuildStateCache.ComputeManifestHash(ProjectDirectory);
 
         // 3. Global invalidation check
@@ -389,6 +428,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 {
                     Verbose = Verbose,
                     EnforceEffects = EnforceEffects,
+                    EnableTypeChecking = TypeCheck && CompilationOptions.TypeCheckingDefault,
                     ProjectDirectory = ProjectDirectory,
                     Context = compilationContext,
                     EnableILAnalysis = EnableILAnalysis,

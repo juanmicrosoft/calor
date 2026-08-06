@@ -56,6 +56,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--require-docs` | | No | Require documentation on public functions |
 | `--enforce-effects` | | No | Enforce effect declarations (default: true) |
 | `--no-enforce-effects` | | No | Disable effect enforcement (opt out of the v0.11 default-on behavior) |
+| `--no-type-check` | | No | Disable the type checker (opt out of the v0.12 default-on behavior). Applies to this command only; set `CALOR_NO_TYPE_CHECK=1` to opt out on `run`, `test`, `watch`, `verify` and the MSBuild task as well |
 
 ---
 

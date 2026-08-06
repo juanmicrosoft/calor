@@ -6,7 +6,11 @@ tsconfig.json
 # Development files
 .vscode/**
 scripts/**
-node_modules/**
+
+# node_modules is NOT excluded: out/extension.js requires vscode-languageclient/node
+# unconditionally at module load, so a VSIX without it fails to activate. Excluding it
+# produced a 10-file, 54 KB package that cannot start; the published 0.3.8 has the same
+# defect. Found by the consumer-facing round of v0.12.0 release review.
 
 # Git files
 .git/**

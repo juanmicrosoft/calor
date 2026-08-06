@@ -761,4 +761,81 @@ public class EffectEnforcementTests
         Assert.False(result.HasErrors,
             $"Should compile with all effects declared. Errors: {string.Join("; ", result.Diagnostics.Errors.Select(e => e.Message))}");
     }
+    /// <summary>
+    /// A directly self-recursive function must not be reported as an unknown call target.
+    ///
+    /// Tarjan reports a self-recursive function as a singleton SCC exactly as it reports a
+    /// non-recursive one, and <c>ProcessScc</c>'s fast path took that branch with an EMPTY member
+    /// set — so the recursive call failed the SccMembers test, found no computed entry (it was
+    /// being computed), and fell through to the unknown-call path. Every directly self-recursive
+    /// function then failed to compile with <c>Calor0410 uses effect 'Unknown:*'</c>, which cannot
+    /// be declared away: the only escapes were the global --no-enforce-effects/--permissive-effects.
+    ///
+    /// Mutual recursion was unaffected (SCC size >= 2 populates the set), which is why nothing
+    /// caught it. Found by the consumer-facing round of v0.12.0 release review, against a corpus
+    /// that contains recursion — the release's own corpus tests cover samples/ and bench/pairs,
+    /// where no file is self-recursive.
+    /// </summary>
+    [Fact]
+    public void SelfRecursiveFunction_IsNotAnUnknownCallTarget()
+    {
+        const string source = """
+            §M{m001:Rec}
+              §F{f001:Fact:pub} (i32:n) -> i32
+                §E{}
+                §IF{if1} (<= n 1)
+                  §R 1
+                §R (* n §C{Fact} (- n 1))
+            """;
+
+        var result = TestHarness.Compile(source);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+        Assert.False(result.HasErrors);
+    }
+
+    /// <summary>
+    /// The guard that keeps the fix honest: routing self-recursive singletons through the fixpoint
+    /// loop must not stop enforcement from biting. A self-recursive function that performs an
+    /// undeclared effect is still an error.
+    /// </summary>
+    [Fact]
+    public void SelfRecursiveFunction_WithUndeclaredEffect_StillFails()
+    {
+        const string source = """
+            §M{m001:RecUndecl}
+              §F{f001:Countdown:pub} (i32:n) -> void
+                §E{}
+                §P n
+                §IF{if1} (> n 0)
+                  §C{Countdown} (- n 1)
+            """;
+
+        var result = TestHarness.Compile(source);
+
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    /// <summary>
+    /// And the effect a self-recursive function DOES declare must propagate, rather than the
+    /// fixpoint seeding Empty and never growing.
+    /// </summary>
+    [Fact]
+    public void SelfRecursiveFunction_DeclaredEffect_IsAccepted()
+    {
+        const string source = """
+            §M{m001:RecEff}
+              §F{f001:Countdown:pub} (i32:n) -> void
+                §E{cw}
+                §P n
+                §IF{if1} (> n 0)
+                  §C{Countdown} (- n 1)
+            """;
+
+        var result = TestHarness.Compile(source);
+
+        Assert.False(result.HasErrors);
+    }
+
 }

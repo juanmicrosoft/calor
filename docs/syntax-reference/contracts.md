@@ -378,14 +378,17 @@ Control how contracts are emitted with `--contract-mode`:
 
 ```bash
 # Development (default)
-calor compile myprogram.calr --contract-mode=debug
+calor -i myprogram.calr -o myprogram.g.cs --contract-mode=debug
 
 # Production
-calor compile myprogram.calr --contract-mode=release
+calor -i myprogram.calr -o myprogram.g.cs --contract-mode=release
 
 # Disable (not recommended)
-calor compile myprogram.calr --contract-mode=off
+calor -i myprogram.calr -o myprogram.g.cs --contract-mode=off
 ```
+
+There is no `calor compile` subcommand — compilation is the default command, taking
+`--input`/`-i` and `--output`/`-o`. See [compile (default)](../cli/compile.md).
 
 ### Why Runtime Enforcement Works
 

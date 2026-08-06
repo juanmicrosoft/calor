@@ -8,6 +8,8 @@
     <CalorTasksAssembly Condition="'$(CalorTasksAssembly)' == ''">$(MSBuildThisFileDirectory)../tasks/net10.0/Calor.Tasks.dll</CalorTasksAssembly>
     <!-- Effect enforcement: default true, matching CompilationOptions.EnforceEffects -->
     <CalorEnforceEffects Condition="'$(CalorEnforceEffects)' == ''">true</CalorEnforceEffects>
+    <!-- Type checking: default true, matching CompilationOptions.EnableTypeChecking (v0.12) -->
+    <CalorTypeCheck Condition="'$(CalorTypeCheck)' == ''">true</CalorTypeCheck>
   </PropertyGroup>
 
   <!-- When consumed from the Calor.Sdk package, the bundled Calor.Runtime.dll
@@ -68,6 +70,7 @@
         ProjectDirectory="$(MSBuildProjectDirectory)"
         Verbose="$(CalorVerbose)"
         EnforceEffects="$(CalorEnforceEffects)"
+        TypeCheck="$(CalorTypeCheck)"
         Verify="$(CalorVerify)"
         EnableILAnalysis="$(CalorEnableILAnalysis)"
         ReferencedAssemblies="@(ReferencePath)"

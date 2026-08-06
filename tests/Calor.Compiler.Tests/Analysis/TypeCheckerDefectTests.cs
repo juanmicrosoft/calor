@@ -302,4 +302,187 @@ public class TypeCheckerDefectTests
         var result = Check("§M{m:S}\n  §RTYPE{r1:MyType:nonexistent_type_xyz} (>= # INT:0)\n");
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.RefinementUndefinedBaseType);
     }
+    /// <summary>
+    /// A type the module DECLARES is not an unknown external type. Found in release review of
+    /// v0.12.0: the checker registered only type parameters, so a class declared eight lines
+    /// above was reported as possibly a typo — on a program that compiles and runs. It escaped
+    /// the corpus sweep because no shipped sample binds a locally-declared class to a typed §B.
+    /// </summary>
+    [Fact]
+    public void ModuleDeclaredTypes_AreNotReportedAsUnknown()
+    {
+        var result = Check("""
+            §M{m001:ClsTest}
+              §CL{c001:Point:pub}
+                §FLD{i32:X:pub}
+                §CTOR{ctor1:pub} (i32:x)
+                  §ASSIGN X x
+              §F{f001:Use:pub} () -> void
+                §E{}
+                §B{p:Point} §NEW{Point} §A INT:3 §/NEW
+                §R
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
+    }
+
+    /// <summary>
+    /// ...and the guard that keeps the fix honest: a name the module does NOT declare is still
+    /// reported, so registering declarations did not simply silence the check.
+    /// </summary>
+    [Fact]
+    public void UndeclaredType_IsStillReported()
+    {
+        var result = Check("§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{x:NoSuchTypeXyz} STR:\"a\"\n    §R\n");
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("'NoSuchTypeXyz' is not known"));
+    }
+
+    /// <summary>
+    /// The §PP, nested-type and §ITYPE gaps in the first cut of the declared-type pass, which
+    /// hand-enumerated four module collections and missed every declaration not sitting directly
+    /// on the module — in a release whose own headline is that hand-enumeration failed at three
+    /// successive levels. Found by release review.
+    /// </summary>
+    [Fact]
+    public void PreprocessorWrappedAndNestedDeclarations_AreNotReportedAsUnknown()
+    {
+        var result = Check("""
+            §M{m001:PpTest}
+              §PP{DEBUG}
+                §CL{c001:Dbg:pub}
+                  §FLD{i32:N:pub}
+              §/PP{DEBUG}
+              §CL{c002:Outer:pub}
+                §CL{c003:Inner:pub}
+                  §FLD{i32:M:pub}
+              §F{f001:Use:pub} (Dbg:d) -> void
+                §E{}
+                §B{i:Outer.Inner}
+                §R
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
+    }
+
+    /// <summary>
+    /// The counterpart, and the reason nested types are registered QUALIFIED. Module functions are
+    /// emitted into a sibling static class, so the bare spelling produces C# that csc rejects with
+    /// CS0246. The first cut of the fix registered nested types bare — silencing this true positive
+    /// while leaving `Outer.Inner`, the spelling that does compile, still warning. Second-round
+    /// release review caught it, and an earlier revision of the test above cemented it.
+    /// </summary>
+    [Fact]
+    public void BareNestedTypeName_IsStillReported()
+    {
+        var result = Check("""
+            §M{m001:NestTest}
+              §CL{c002:Outer:pub}
+                §CL{c003:Inner:pub}
+                  §FLD{i32:M:pub}
+              §F{f001:Use:pub} () -> void
+                §E{}
+                §B{i:Inner}
+                §R
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("'Inner' is not known"));
+    }
+
+    /// <summary>
+    /// A §RTYPE whose base names a module class must not ALSO warn that a class declared two lines
+    /// above "may be a typo". Stated precisely, because an earlier revision of this test claimed
+    /// more than is true: such a program is still <c>Calor1102</c> — a module-declared type is an
+    /// <c>ExternalType</c>, which <c>RegisterRefinementType</c> rejects as a base outright, before
+    /// and after v0.12. The declared-type pass running first buys only the removal of a redundant
+    /// second diagnostic on an already-failing program. That is the whole benefit; it is not a
+    /// claim that the program now works.
+    /// </summary>
+    [Fact]
+    public void RefinementBaseNamingAModuleClass_DoesNotAlsoWarnUnknownType()
+    {
+        var result = Check("""
+            §M{m001:RtBase}
+              §CL{c001:Money:pub}
+                §FLD{i32:V:pub}
+              §RTYPE{r001:PosMoney:Money} (> value INT:0)
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'Money' is not known"));
+        // The pre-existing rejection is unchanged, and saying so here keeps the test from reading
+        // as "this compiles now".
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("undefined base type 'Money'"));
+    }
+
+    /// <summary>
+    /// A refinement may claim a name the declared-type pass seeded — but only ONE may. The first
+    /// cut of that exemption used a set membership test that never expired, so every later §RTYPE
+    /// of the same name was exempt too and two conflicting refinements compiled clean, a
+    /// regression against main. Found by the third round of release review.
+    /// </summary>
+    [Fact]
+    public void TwoRefinementsSharingAClassName_IsStillADuplicate()
+    {
+        var result = Check("""
+            §M{m001:Dup2}
+              §CL{c001:Positive:pub}
+                §FLD{i32:V:pub}
+              §RTYPE{r001:Positive:i32} (> value INT:0)
+              §RTYPE{r002:Positive:i32} (> value INT:1)
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("Duplicate refinement type name 'Positive'"));
+    }
+
+    /// <summary>
+    /// §ITYPE declarations are part of the declared-type pass and were unpinned: deleting that
+    /// line from the enumeration left the whole suite green while emitting a false Calor0200.
+    /// </summary>
+    [Fact]
+    public void IndexedTypeDeclaration_IsNotReportedAsUnknown()
+    {
+        const string src = """
+            §M{m001:ItypeTest}
+              §ITYPE{it1:NonEmptyList:List:n} (> # INT:0)
+              §F{f001:Use:pub} (NonEmptyList:a) -> void
+                §E{}
+                §R
+            """;
+
+        var result = Check(src);
+
+        // The fixture must actually be a §ITYPE program. The first version of this test wrote the
+        // §RTYPE attribute shape and failed Calor0102 "Missing required attribute 'sizeParam'" —
+        // it asserted the absence of a warning on a program that never got far enough to produce
+        // one, and passed with the §ITYPE line deleted from the checker entirely.
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.MissingRequiredAttribute);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'NonEmptyList' is not known"));
+    }
+
+    /// <summary>
+    /// The declared-type pass must not steal a name from a §RTYPE. RegisterRefinementType rejects
+    /// an already-defined name, so registering module types first would newly reject a refinement
+    /// sharing a class name — a program that compiled before v0.12. Refinements are registered
+    /// first and the declared-type pass skips names already taken.
+    /// </summary>
+    [Fact]
+    public void RefinementType_KeepsItsName_AgainstASameNamedClass()
+    {
+        var result = Check("""
+            §M{m001:RtTest}
+              §CL{c001:Positive:pub}
+                §FLD{i32:V:pub}
+              §RTYPE{r001:Positive:i32} (> value INT:0)
+              §F{f001:Use:pub} () -> void
+                §E{}
+                §R
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("Duplicate refinement type name"));
+    }
+
+    // The opt-out itself is pinned in CliTypeCheckDefaultTests, against the real CLI. A pin that
+    // sets CompilationOptions.EnableTypeChecking directly cannot discriminate: that property has
+    // been init-settable since long before the flag existed, so such a test passes with the entire
+    // opt-out removed. Release review caught exactly that here.
+
 }

@@ -629,4 +629,81 @@ public class BuildStateCacheTests : IDisposable
         Assert.False(BuildStateCache.IsGlobalInvalidation(
             cached, "compiler", "opts", "manifest", "obj\\Debug\\net10.0\\calor"));
     }
+    /// <summary>
+    /// The options token must carry the EFFECTIVE type-check setting, not the task property.
+    /// v0.12 added a CALOR_NO_TYPE_CHECK escape hatch read at the CompilationOptions default; the
+    /// first cut hashed `TypeCheck` alone, so flipping the variable against a warm cache changed
+    /// what would be reported without invalidating anything and every unchanged file was silently
+    /// skipped — the exact #788 failure the call site's own comment warns about. Found by the
+    /// second round of release review.
+    /// </summary>
+    [Fact]
+    public void OptionsToken_DistinguishesEffectiveTypeCheck()
+    {
+        // A SHAPE pin: the token must carry a typeCheck component that tracks the task property.
+        // It is explicitly NOT the regression guard — driving TypeCheck true/false produces
+        // typeCheck:True/False whether or not the call site folds in TypeCheckingDefault, so it
+        // stays green with the fix reverted (confirmed). OptionsToken_EnvironmentOptOut_MovesTheToken
+        // below is the guard that fails. Two earlier revisions of this comment claimed otherwise;
+        // a pin's docstring asserting a discrimination it does not have is how the first two
+        // versions of this test survived review.
+        var on = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
+        var off = new Calor.Tasks.CompileCalor { TypeCheck = false }.ComputeOptionsToken("");
+
+        Assert.NotEqual(on, off);
+        Assert.NotEqual(BuildStateCache.ComputeOptionsHash(on), BuildStateCache.ComputeOptionsHash(off));
+        Assert.Contains("typeCheck:True", on);
+        Assert.Contains("typeCheck:False", off);
+    }
+
+    /// <summary>
+    /// The half that actually caught the defect. `CALOR_NO_TYPE_CHECK` changes what the task will
+    /// report, so it MUST move the options token — otherwise a warm cache serves the other
+    /// setting's findings and every unchanged file is silently skipped (#788). Two earlier
+    /// revisions of this pin passed with the fix reverted: the first fed literal booleans straight
+    /// to the token function, the second drove the task but never set the variable, so the value it
+    /// was meant to observe was never in play. Verified by reverting: this one fails.
+    /// </summary>
+    [Fact]
+    public void OptionsToken_EnvironmentOptOut_MovesTheToken()
+    {
+        var previous = Environment.GetEnvironmentVariable("CALOR_NO_TYPE_CHECK");
+        try
+        {
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", null);
+            var checking = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
+
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", "1");
+            var optedOut = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
+
+            Assert.Contains("typeCheck:True", checking);
+            Assert.Contains("typeCheck:False", optedOut);
+            Assert.NotEqual(
+                BuildStateCache.ComputeOptionsHash(checking),
+                BuildStateCache.ComputeOptionsHash(optedOut));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", previous);
+        }
+    }
+
+    /// <summary>
+    /// And the guard that keeps that honest: every other diagnostics-affecting option must still
+    /// move the token, so the parameter above was not simply added to a token nobody consults.
+    /// </summary>
+    [Theory]
+    [InlineData(false, true, true, true, "")]
+    [InlineData(true, true, false, true, "")]
+    [InlineData(true, true, true, false, "")]
+    [InlineData(true, true, true, true, "flag-a")]
+    public void OptionsToken_DistinguishesEveryOption(
+        bool enforceEffects, bool typeCheck, bool verify, bool il, string flags)
+    {
+        var baseline = Calor.Tasks.CompileCalor.OptionsToken(true, true, true, true, "");
+        var varied = Calor.Tasks.CompileCalor.OptionsToken(enforceEffects, typeCheck, verify, il, flags);
+
+        Assert.NotEqual(baseline, varied);
+    }
+
 }

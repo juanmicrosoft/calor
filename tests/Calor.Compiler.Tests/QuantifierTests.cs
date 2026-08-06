@@ -1358,4 +1358,85 @@ public class QuantifierTests
     }
 
     #endregion
+    /// <summary>
+    /// The runtime lowering of a bounded forall must check the WHOLE implication, not just the
+    /// consequent. This is the seventh false-`Proven`-elide vector of the v0.12 cycle and the
+    /// first on the emitter side — the sort-demotion mechanism is structurally blind to it,
+    /// because nothing in this path mints a Z3 sort at all.
+    ///
+    /// The bounds mined out of the antecedent constrain the `Enumerable.Range`; they do not
+    /// replace the antecedent. Emitting `impl.Consequent` alone dropped every antecedent conjunct
+    /// that is not a bound on the loop variable, making the runtime check a strictly STRONGER
+    /// proposition than the one Z3 proved — and `Proven &amp;&amp; !IsVacuous` then deleted it.
+    ///
+    /// End-to-end before the fix, on a postcondition that is a TAUTOLOGY as written:
+    ///   §S (forall ((i i32)) (-&gt; (&amp;&amp; (&amp;&amp; (&gt;= i 0) (&lt; i n)) (!= i 3)) (!= i 3)))
+    ///   calor run          → Postcondition failed: Range(0, n-0).All(i =&gt; (i != 3))
+    ///   calor run --verify → prints 5, exit 0
+    /// </summary>
+    [Fact]
+    public void Emitter_BoundedForall_KeepsNonBoundAntecedentConjuncts()
+    {
+        var span = new TextSpan(0, 0, 1, 1);
+        var boundVar = new QuantifierVariableNode(span, "i", "i32");
+
+        // (&& (&& (>= i 0) (< i n)) (!= i 3)) -> (!= i 3)
+        var antecedent = new BinaryOperationNode(span, BinaryOperator.And,
+            new BinaryOperationNode(span, BinaryOperator.And,
+                new BinaryOperationNode(span, BinaryOperator.GreaterOrEqual,
+                    new ReferenceNode(span, "i"), new IntLiteralNode(span, 0)),
+                new BinaryOperationNode(span, BinaryOperator.LessThan,
+                    new ReferenceNode(span, "i"), new ReferenceNode(span, "n"))),
+            new BinaryOperationNode(span, BinaryOperator.NotEqual,
+                new ReferenceNode(span, "i"), new IntLiteralNode(span, 3)));
+        var consequent = new BinaryOperationNode(span, BinaryOperator.NotEqual,
+            new ReferenceNode(span, "i"), new IntLiteralNode(span, 3));
+
+        var forall = new ForallExpressionNode(span, new[] { boundVar },
+            new ImplicationExpressionNode(span, antecedent, consequent));
+
+        var result = forall.Accept(new CSharpEmitter(EmitContractMode.Debug));
+
+        // Still a bounded range check...
+        Assert.Contains("Enumerable.Range", result);
+        Assert.Contains(".All(", result);
+        // ...but the guard survives into the predicate, as the implication's `!(ante) ||` form.
+        Assert.Contains("!(", result);
+        Assert.Contains("i < n", result);
+    }
+
+    /// <summary>
+    /// The `??=` in ExtractBound keeps only the FIRST bound of each direction, so a second,
+    /// tighter upper bound was silently discarded: Z3 proved over [0, min(n,m)) while the runtime
+    /// checked [0, n). Keeping the full implication makes a too-wide range harmless — the extra
+    /// values are guarded by the antecedent and the implication is vacuously true there.
+    /// </summary>
+    [Fact]
+    public void Emitter_BoundedForall_KeepsASecondTighterBound()
+    {
+        var span = new TextSpan(0, 0, 1, 1);
+        var boundVar = new QuantifierVariableNode(span, "i", "i32");
+
+        // (&& (&& (>= i 0) (< i n)) (< i 2)) -> (< i 2)
+        var antecedent = new BinaryOperationNode(span, BinaryOperator.And,
+            new BinaryOperationNode(span, BinaryOperator.And,
+                new BinaryOperationNode(span, BinaryOperator.GreaterOrEqual,
+                    new ReferenceNode(span, "i"), new IntLiteralNode(span, 0)),
+                new BinaryOperationNode(span, BinaryOperator.LessThan,
+                    new ReferenceNode(span, "i"), new ReferenceNode(span, "n"))),
+            new BinaryOperationNode(span, BinaryOperator.LessThan,
+                new ReferenceNode(span, "i"), new IntLiteralNode(span, 2)));
+        var consequent = new BinaryOperationNode(span, BinaryOperator.LessThan,
+            new ReferenceNode(span, "i"), new IntLiteralNode(span, 2));
+
+        var forall = new ForallExpressionNode(span, new[] { boundVar },
+            new ImplicationExpressionNode(span, antecedent, consequent));
+
+        var result = forall.Accept(new CSharpEmitter(EmitContractMode.Debug));
+
+        // The discarded second bound must appear in the emitted predicate, not only in the Range.
+        Assert.Contains("i < 2", result);
+        Assert.Contains("!(", result);
+    }
+
 }
