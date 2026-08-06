@@ -5412,9 +5412,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             allRanges.Add(new VariableRange(boundVar.Name, start, end));
         }
 
-        // Use the first variable's range for backward compatibility
+        // The runtime body is the WHOLE implication, not just the consequent.
+        //
+        // The bounds mined out of the antecedent constrain the Range; they do NOT replace the
+        // antecedent. Emitting only `impl.Consequent` made the runtime check a strictly STRONGER
+        // proposition than the one Z3 proved: every antecedent conjunct that is not a bound on the
+        // loop variable — and every bound after the first, since ExtractBound uses `??=` — was
+        // silently dropped. Z3 proved `∀i. (bounds ∧ G) → P(i)`; the emitter then checked
+        // `∀i ∈ [lo,hi). P(i)`. `Proven && !IsVacuous` deleted that stronger check, so a program
+        // that throws under `calor run` printed cleanly under `calor run --verify`.
+        //
+        // Keeping the full implication is sound in both directions: inside the range the bound
+        // conjuncts hold, so it reduces to the consequent; for any value a too-wide range admits
+        // but the antecedent excludes, the implication is vacuously true. A too-wide range costs
+        // iterations, never soundness — and `??=` can only ever widen.
+        //
+        // This is the seventh false-Proven-elide vector of the v0.12 cycle and the first on the
+        // EMITTER side: the sort-demotion mechanism is structurally blind to it, because nothing
+        // here mints a Z3 sort at all. It also mis-lowered §Q preconditions, which never elide —
+        // there it was a pure false alarm, and it is fixed by the same change.
         var firstRange = allRanges[0];
-        return new FiniteRange(firstRange.Start, firstRange.End, impl.Consequent, allRanges);
+        return new FiniteRange(firstRange.Start, firstRange.End, impl, allRanges);
     }
 
     /// <summary>
