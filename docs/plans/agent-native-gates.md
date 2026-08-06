@@ -99,7 +99,7 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.8 (additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.9 (additive A-1.9, 2026-08-05 — PP-W5 adjudicated PASS on epoch w5-parity-001, point ratio 1.109 with lower bound 0.927, registered as "no LARGE tax detected" rather than parity; additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
@@ -323,6 +323,41 @@ disclosures in the A-1.5 entry below.
 | **PP-S4** — no converter-appeasement (**blocker**) | M-S4 = 0 via the A-1.5.7 fixture registry; indeterminate counts as **failing** | Blocks the v0.12.0 release |
 
 ### A.3 Annex revision log
+
+**A-1.9 — PP-W5 adjudicated (2026-08-05). PASS.** Additive; registers the outcome against the
+row frozen at A-1.4 tranche 1, with the A-1.5.6 additive note applied. Epoch `w5-parity-001`:
+control `v0.10.0` (`e24a6832`), treatment `main` (`87a783dd`), the four registered N1 neutral
+pairs, 5 runs/arm, `raw` both arms, model `claude-opus-4-8`. **40/40 cells valid, 0 censored,
+20 per arm; realised spend $38.75.**
+
+**Median paired output-tokens-to-green ratio (treatment/control): point 1.1090, one-sided 95%
+lower bound 0.9269.** The gate fails only if BOTH the lower bound exceeds 1.0 and the point
+estimate exceeds 1.25; neither fires. **PASS.**
+
+**Registered with the caveat, not without it.** The point estimate is a **~11% increase**, and
+the direction is consistent in **3 of 4 pairs** (1.128 / 1.159 / 1.090, with N1-002 at 0.987).
+The lower bound sits below 1.0, so parity is not excluded — and by the row's own power
+statement (detection 0.33/0.62/0.87 at 1.25×/1.4×/1.6×) an 11% real tax is precisely what this
+design cannot resolve. **"PASS" here means no LARGE tax detected; it does not mean no tax.**
+That reading was pre-committed in the row and is not a post-hoc softening.
+
+**Attribution:** per A-1.5.6 the treatment carries **v0.11 + v0.12**, so this adjudicates a
+two-release delta. v0.12 in particular added type checking on every compile (#877) and withdrew
+elision from a large class of contracts (#876/#878), leaving more runtime checks in the emitted
+C# — a mild positive ratio is what that would predict, and this epoch is consistent with it
+without being able to attribute it. The on-fail isolation ladder is not triggered.
+
+**Three apparatus defects were found before any number existed**, two by the zero-spend
+`--null-agent` pre-flight and one by a live attempt that spent **$0.00**: the two arms wrote to
+the same directory and the treatment silently destroyed the control (4 result files where 8 were
+expected); the M5 swap guard rejected a correct parity configuration; and the `raw` arm never
+invoked the agent at all on bash 3.2, because an empty array expanded under `set -u`. A fourth
+was avoided by reading the frozen row rather than the runner's defaults — the M5 runner
+hardcodes arm B to `mcp-file`, which would have measured the tooling delta under PP-W5's name.
+Record: `bench/phase0-agent-native/epochs/w5-parity-001/VERDICT.md`.
+
+**PP-W5 was the last unadjudicated v0.12.0 release gate. Both gates now stand: PP-A1 = PASS
+(A-1.8), PP-W5 = PASS.**
 
 **A-1.8 — PP-A1 adjudicated (2026-08-05). PP-A1 = PASS, all nine items.** Additive; registers outcomes against the
 PP-A1 list frozen at `wedge-w1-prereqs.md` §3 and carried unchanged into v0.12. **All nine PASS —
