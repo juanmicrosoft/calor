@@ -97,7 +97,7 @@ public sealed class RefineTool : McpToolBase
             {
                 VerifyRefinements = true,
                 VerificationTimeoutMs = timeout,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
@@ -176,7 +176,7 @@ public sealed class RefineTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
@@ -240,7 +240,7 @@ public sealed class RefineTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
@@ -348,7 +348,7 @@ public sealed class RefineTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 
@@ -412,7 +412,7 @@ public sealed class RefineTool : McpToolBase
             var options = new CompilationOptions
             {
                 VerifyRefinements = true,
-                EnableTypeChecking = true,
+                EnableTypeChecking = CompilationOptions.TypeCheckingDefault,
                 CancellationToken = cancellationToken
             };
 

@@ -629,4 +629,40 @@ public class BuildStateCacheTests : IDisposable
         Assert.False(BuildStateCache.IsGlobalInvalidation(
             cached, "compiler", "opts", "manifest", "obj\\Debug\\net10.0\\calor"));
     }
+    /// <summary>
+    /// The options token must carry the EFFECTIVE type-check setting, not the task property.
+    /// v0.12 added a CALOR_NO_TYPE_CHECK escape hatch read at the CompilationOptions default; the
+    /// first cut hashed `TypeCheck` alone, so flipping the variable against a warm cache changed
+    /// what would be reported without invalidating anything and every unchanged file was silently
+    /// skipped — the exact #788 failure the call site's own comment warns about. Found by the
+    /// second round of release review.
+    /// </summary>
+    [Fact]
+    public void OptionsToken_DistinguishesEffectiveTypeCheck()
+    {
+        var on = Calor.Tasks.CompileCalor.OptionsToken(true, effectiveTypeCheck: true, false, false, "");
+        var off = Calor.Tasks.CompileCalor.OptionsToken(true, effectiveTypeCheck: false, false, false, "");
+
+        Assert.NotEqual(on, off);
+        Assert.NotEqual(BuildStateCache.ComputeOptionsHash(on), BuildStateCache.ComputeOptionsHash(off));
+    }
+
+    /// <summary>
+    /// And the guard that keeps that honest: every other diagnostics-affecting option must still
+    /// move the token, so the parameter above was not simply added to a token nobody consults.
+    /// </summary>
+    [Theory]
+    [InlineData(false, true, true, true, "")]
+    [InlineData(true, true, false, true, "")]
+    [InlineData(true, true, true, false, "")]
+    [InlineData(true, true, true, true, "flag-a")]
+    public void OptionsToken_DistinguishesEveryOption(
+        bool enforceEffects, bool typeCheck, bool verify, bool il, string flags)
+    {
+        var baseline = Calor.Tasks.CompileCalor.OptionsToken(true, true, true, true, "");
+        var varied = Calor.Tasks.CompileCalor.OptionsToken(enforceEffects, typeCheck, verify, il, flags);
+
+        Assert.NotEqual(baseline, varied);
+    }
+
 }

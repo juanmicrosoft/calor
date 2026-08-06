@@ -19,30 +19,27 @@ public sealed class TypeChecker
 
     public void Check(ModuleNode module)
     {
-        // Pass 0: register refinement type definitions.
-        //
-        // Ordered BEFORE the declared-type pass on purpose. RegisterRefinementType rejects a
-        // name that is already defined ("Duplicate refinement type name"), so registering
-        // classes first would newly reject a §RTYPE sharing a module type's name — a program
-        // that compiled before v0.12. Refinements win the name, as they did when the checker
-        // knew no module types at all.
-        foreach (var rtype in module.RefinementTypes)
-        {
-            RegisterRefinementType(rtype);
-        }
-
-        // Pass -1 (runs second, named for what it establishes): the module's OWN type
-        // declarations, before anything in a function signature or body resolves a type name.
-        // Without this the checker treats a class the user declared eight lines above as an
-        // unknown external type and warns that it "may be a typo" — a false positive on a
-        // program that compiles and runs, and one the shipped corpus does not exercise because
-        // no sample binds a locally-declared class to a typed §B.
+        // Pass -1: the module's OWN type declarations, before anything resolves a type name —
+        // including a §RTYPE base type. Without this the checker treats a class the user declared
+        // eight lines above as an unknown external type and warns that it "may be a typo": a false
+        // positive on a program that compiles and runs, which the shipped corpus does not exercise
+        // because no sample binds a locally-declared class to a typed §B.
         foreach (var name in ModuleDeclaredTypeNames(module))
         {
-            if (_env.LookupType(name) == null)
+            if (_moduleDeclaredTypes.Add(name) && _env.LookupType(name) == null)
             {
                 _env.DefineType(name, new ExternalType(name));
             }
+        }
+
+        // Pass 0: refinement type definitions. These run second so a §RTYPE's base type can name
+        // a module class, but RegisterRefinementType rejects an already-defined name — so it is
+        // taught to treat a name Pass -1 seeded as available. A refinement sharing a class's name
+        // wins it, exactly as it did when the checker knew no module types at all; a §RTYPE
+        // duplicating another §RTYPE is still an error.
+        foreach (var rtype in module.RefinementTypes)
+        {
+            RegisterRefinementType(rtype);
         }
 
         // First pass: register all type definitions
@@ -99,31 +96,47 @@ public sealed class TypeChecker
     /// The four type-declaring collections, recursing through nested classes. Shared between the
     /// module level and every §PP arm so a declaration cannot be visible in one place and unknown
     /// in the other — the release that shipped this pass found the hand-enumerated version missed
-    /// §PP blocks, nested types and §IDX, which is the same enumeration failure its own headline
+    /// §PP blocks, nested types and §ITYPE, which is the same enumeration failure its own headline
     /// is about.
     /// </summary>
     private static IEnumerable<string> DeclaredTypeNames(
         IReadOnlyList<ClassDefinitionNode> classes,
         IReadOnlyList<InterfaceDefinitionNode> interfaces,
         IReadOnlyList<EnumDefinitionNode> enums,
-        IReadOnlyList<DelegateDefinitionNode> delegates)
+        IReadOnlyList<DelegateDefinitionNode> delegates,
+        string? enclosing = null)
     {
         foreach (var c in classes)
         {
-            yield return c.Name;
+            var name = Qualify(enclosing, c.Name);
+            yield return name;
 
-            // Nested types are spelled by their bare name inside the enclosing scope.
-            foreach (var name in DeclaredTypeNames(
-                c.NestedClasses, c.NestedInterfaces, c.NestedEnums, c.NestedDelegates))
+            // Nested types are registered QUALIFIED (`Outer.Inner`), not bare. Module functions
+            // are emitted into a sibling static class, so `§B{i:Inner}` produces C# that csc
+            // rejects with CS0246 — registering the bare name would silence a true positive while
+            // leaving the spelling that does compile still warning. Release review caught the
+            // first cut doing exactly that.
+            foreach (var nested in DeclaredTypeNames(
+                c.NestedClasses, c.NestedInterfaces, c.NestedEnums, c.NestedDelegates, name))
             {
-                yield return name;
+                yield return nested;
             }
         }
 
-        foreach (var i in interfaces) yield return i.Name;
-        foreach (var e in enums) yield return e.Name;
-        foreach (var d in delegates) yield return d.Name;
+        foreach (var i in interfaces) yield return Qualify(enclosing, i.Name);
+        foreach (var e in enums) yield return Qualify(enclosing, e.Name);
+        foreach (var d in delegates) yield return Qualify(enclosing, d.Name);
     }
+
+    private static string Qualify(string? enclosing, string name)
+        => enclosing is null ? name : $"{enclosing}.{name}";
+
+    /// <summary>
+    /// Names seeded by Pass -1. Lets RegisterRefinementType tell "this name is another refinement"
+    /// (a real duplicate) from "this name is a module class Pass -1 seeded" (a refinement is
+    /// allowed to take it, as it could before v0.12).
+    /// </summary>
+    private readonly HashSet<string> _moduleDeclaredTypes = new(StringComparer.Ordinal);
 
     /// <summary>Set during the signature pre-pass, which re-resolves annotations CheckFunction
     /// will resolve again — so only the second pass reports.</summary>
@@ -143,7 +156,7 @@ public sealed class TypeChecker
             return;
         }
 
-        if (_env.LookupType(rtype.Name) != null)
+        if (_env.LookupType(rtype.Name) != null && !_moduleDeclaredTypes.Contains(rtype.Name))
         {
             _diagnostics.ReportError(rtype.Span, DiagnosticCode.RefinementDuplicateName,
                 $"Duplicate refinement type name '{rtype.Name}'");

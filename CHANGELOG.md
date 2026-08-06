@@ -42,8 +42,17 @@ the count is checkable rather than asserted: (1) **D4** non-ordinal comparison m
 `StartsWith`/`EndsWith`/`IndexOf`, which use the *current culture* in .NET and so diverge with no
 mode argument present to signal it; (3) **D3**, Z3 strings are null-free; (4) **D12**, Z3 counts code
 points where .NET counts UTF-16 units; (5) **D14**, array and user-type sorts are total and non-null;
-(6) the third `$length` mint site, which the D14 fix's own first cut missed. Each of the six has a
-recorded `calor run` versus `calor run --verify` reproduction.
+(6) the third `$length` mint site, which the D14 fix's own first cut missed.
+
+**Which of the six were demonstrated, and which were argued.** (1), (2), (3) and the array half of
+(5) carry a recorded `calor run` versus `calor run --verify` pair — the check was observed to
+disappear. (4) and the user-type half of (5) were established by *inspection* of the encoding, not
+by a run. (6) **cannot** have such a pair: `VerifyRefinements` has no CLI flag, so that site is not
+reachable from `calor run --verify` at all — it served a false `proven` to agents through the MCP
+refine tool, which is how it was found. An earlier revision of this entry claimed a reproduction for
+all six; that was wrong and is withdrawn. The distinction matters because a demonstrated vector and
+an argued one carry different confidence, and this release's whole thesis is that arguing was what
+kept failing.
 
 That is six closures, not six review rounds — several arrived in the same round, and two were found
 *inside* the fix for an earlier one. The count of *vectors still unfound* is not knowable and is not
@@ -80,7 +89,7 @@ non-nullable at the binder, which is what would let the string demotion be lifte
   - **Cache format 1.12 → 1.13**, which invalidates every persisted verification entry: 1.12 entries hold `Proven` for array-carried proofs, exactly the verdict that elides.
   - This is vector (5) in the headline's enumeration, and the fifth of one class — *a sort Z3 models as total where the .NET value can be null* — after D4 (string comparison modes) and D3/D12 (null-free, byte-counted strings). The class, not its members, is the thing; enumerating members by hand is what repeatedly failed.
 
-- **`EnableTypeChecking` is now default-ON, and the type checker no longer rejects valid programs (#761; PP-A1 item 9).** The flip was blocked by defects in the checker itself, not by the flip: turning it on produced **92 test failures**, every one of them a working program the checker refused. They were already live for agents — `calor_check` and `calor_refine` set `EnableTypeChecking = true`, so the MCP primer's own `§M{m3:Files}` module, two shipped benchmarks and the syntax exemplar were all being rejected. Fixed:
+- **`EnableTypeChecking` is now default-ON, and the type checker no longer rejects valid programs (#761; PP-A1 item 9).** **Two opt-outs**, because a default flip that can reject a previously-compiling program needs one on every entry point: `--no-type-check` on `build`, and **`CALOR_NO_TYPE_CHECK=1`** everywhere else — `run`, `test`, `watch`, `verify`, the MCP tools, and the MSBuild task inside the published SDK, where a consumer otherwise has no lever at all. The variable is read at the `CompilationOptions` default rather than threaded through the ~30 sites that construct it; the first cut threaded a flag and reached `build` only. `CalorTypeCheck=false` is the MSBuild spelling. The flip was blocked by defects in the checker itself, not by the flip: turning it on produced **92 test failures**, every one of them a working program the checker refused. They were already live for agents — `calor_check` and `calor_refine` set `EnableTypeChecking = true`, so the MCP primer's own `§M{m3:Files}` module, two shipped benchmarks and the syntax exemplar were all being rejected. Fixed:
   - **Types the checker did not know.** `char` (37 of the 92), `object`, `decimal`, and every sized/unsigned integer (`i8 i16 i64 u8 u16 u32 u64`, `f32`) — all documented in the syntax reference, all reported as `Unknown type`. Arrays (`T[]` and `[T]`) did not resolve either. Sized types reach the checker **expanded** (`INT[bits=64][signed=true]`), so they are now normalized through the same surface-spelling helper the diagnostics use — and they carry the width the user wrote, so a mismatch on an `i64` binding says `i64` rather than the collapsed `i32`.
   - **String concatenation.** `(+ str str)` is concatenation in Calor and in the emitted C# — `calor run` prints `helloworld` — and the checker called it `Arithmetic operators require numeric operands`.
   - **Static member access.** `Math.PI`, `int.MaxValue`, `StringComparison.Ordinal`, `System.Environment.NewLine` were reported as *undefined variables*. A bare unknown identifier is still an error.

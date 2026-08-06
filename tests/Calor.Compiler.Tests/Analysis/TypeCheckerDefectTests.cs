@@ -338,10 +338,10 @@ public class TypeCheckerDefectTests
     }
 
     /// <summary>
-    /// The §PP, nested-type and §IDX gaps in the first cut of the declared-type pass. The first
-    /// version hand-enumerated four module collections and missed every declaration that was not
-    /// directly on the module — in a release whose own headline is that hand-enumeration failed
-    /// at three successive levels. Found by release review.
+    /// The §PP, nested-type and §ITYPE gaps in the first cut of the declared-type pass, which
+    /// hand-enumerated four module collections and missed every declaration not sitting directly
+    /// on the module — in a release whose own headline is that hand-enumeration failed at three
+    /// successive levels. Found by release review.
     /// </summary>
     [Fact]
     public void PreprocessorWrappedAndNestedDeclarations_AreNotReportedAsUnknown()
@@ -357,11 +357,54 @@ public class TypeCheckerDefectTests
                   §FLD{i32:M:pub}
               §F{f001:Use:pub} (Dbg:d) -> void
                 §E{}
-                §B{i:Inner}
+                §B{i:Outer.Inner}
                 §R
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
+    }
+
+    /// <summary>
+    /// The counterpart, and the reason nested types are registered QUALIFIED. Module functions are
+    /// emitted into a sibling static class, so the bare spelling produces C# that csc rejects with
+    /// CS0246. The first cut of the fix registered nested types bare — silencing this true positive
+    /// while leaving `Outer.Inner`, the spelling that does compile, still warning. Second-round
+    /// release review caught it, and an earlier revision of the test above cemented it.
+    /// </summary>
+    [Fact]
+    public void BareNestedTypeName_IsStillReported()
+    {
+        var result = Check("""
+            §M{m001:NestTest}
+              §CL{c002:Outer:pub}
+                §CL{c003:Inner:pub}
+                  §FLD{i32:M:pub}
+              §F{f001:Use:pub} () -> void
+                §E{}
+                §B{i:Inner}
+                §R
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("'Inner' is not known"));
+    }
+
+    /// <summary>
+    /// A §RTYPE whose base type names a module class must resolve it, not warn that a class
+    /// declared two lines above "may be a typo". This is why the declared-type pass runs BEFORE
+    /// refinement registration — and why the duplicate-name check had to learn the difference
+    /// between a name another §RTYPE took and a name the declared-type pass seeded.
+    /// </summary>
+    [Fact]
+    public void RefinementBaseNamingAModuleClass_IsNotReportedAsUnknown()
+    {
+        var result = Check("""
+            §M{m001:RtBase}
+              §CL{c001:Money:pub}
+                §FLD{i32:V:pub}
+              §RTYPE{r001:PosMoney:Money} (> value INT:0)
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'Money' is not known"));
     }
 
     /// <summary>

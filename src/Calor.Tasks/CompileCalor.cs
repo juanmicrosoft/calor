@@ -83,6 +83,22 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool TypeCheck { get; set; } = true;
 
     /// <summary>
+    /// The options token, extracted so it can be pinned directly. Note the type-check parameter is
+    /// the EFFECTIVE value (<c>TypeCheck &amp;&amp; CompilationOptions.TypeCheckingDefault</c>), not the
+    /// task property: the first cut hashed the property, so flipping <c>CALOR_NO_TYPE_CHECK</c>
+    /// against a warm cache changed what was reported without invalidating anything, and every
+    /// unchanged file was silently skipped — the #788 defect described at the call site.
+    /// </summary>
+    internal static string OptionsToken(
+        bool enforceEffects,
+        bool effectiveTypeCheck,
+        bool verify,
+        bool ilAnalysis,
+        string canonicalExperimentalFlags)
+        => $"enforceEffects:{enforceEffects}|typeCheck:{effectiveTypeCheck}|verify:{verify}"
+           + $"|ilAnalysis:{ilAnalysis}|experimental:{canonicalExperimentalFlags}";
+
+    /// <summary>
     /// Run static contract verification during compilation (Annex A-1.3
     /// instrumentation item 1): refutations surface as Calor0712-band build
     /// diagnostics (Warning severity — the build still succeeds). Off by
@@ -136,9 +152,12 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags).EnabledFlags
                 .Select(f => f.ToLowerInvariant())
                 .OrderBy(f => f, StringComparer.Ordinal));
-        var optionsHash = BuildStateCache.ComputeOptionsHash(
-            $"enforceEffects:{EnforceEffects}|typeCheck:{TypeCheck}|verify:{Verify}"
-            + $"|ilAnalysis:{EnableILAnalysis}|experimental:{canonicalExperimentalFlags}");
+        var optionsHash = BuildStateCache.ComputeOptionsHash(OptionsToken(
+            EnforceEffects,
+            TypeCheck && CompilationOptions.TypeCheckingDefault,
+            Verify,
+            EnableILAnalysis,
+            canonicalExperimentalFlags));
         var manifestHash = BuildStateCache.ComputeManifestHash(ProjectDirectory);
 
         // 3. Global invalidation check
