@@ -640,9 +640,13 @@ public class BuildStateCacheTests : IDisposable
     [Fact]
     public void OptionsToken_DistinguishesEffectiveTypeCheck()
     {
-        // Driven through the TASK, not through OptionsToken's parameters. An earlier revision
-        // passed literal booleans, which only proved a bool reaches a format string: reverting the
-        // call site left it green. Verified by reverting again — this version fails.
+        // A SHAPE pin: the token must carry a typeCheck component that tracks the task property.
+        // It is explicitly NOT the regression guard — driving TypeCheck true/false produces
+        // typeCheck:True/False whether or not the call site folds in TypeCheckingDefault, so it
+        // stays green with the fix reverted (confirmed). OptionsToken_EnvironmentOptOut_MovesTheToken
+        // below is the guard that fails. Two earlier revisions of this comment claimed otherwise;
+        // a pin's docstring asserting a discrimination it does not have is how the first two
+        // versions of this test survived review.
         var on = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
         var off = new Calor.Tasks.CompileCalor { TypeCheck = false }.ComputeOptionsToken("");
 

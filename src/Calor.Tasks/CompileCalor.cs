@@ -83,13 +83,6 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool TypeCheck { get; set; } = true;
 
     /// <summary>
-    /// The options token, extracted so it can be pinned directly. Note the type-check parameter is
-    /// the EFFECTIVE value (<c>TypeCheck &amp;&amp; CompilationOptions.TypeCheckingDefault</c>), not the
-    /// task property: the first cut hashed the property, so flipping <c>CALOR_NO_TYPE_CHECK</c>
-    /// against a warm cache changed what was reported without invalidating anything, and every
-    /// unchanged file was silently skipped — the #788 defect described at the call site.
-    /// </summary>
-    /// <summary>
     /// This task's options token, from its own properties. The call site goes through here so a
     /// test can observe the composition — an earlier pin passed literal booleans to
     /// <see cref="OptionsToken"/> and therefore could not tell whether the call site still folded
@@ -104,6 +97,13 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             EnableILAnalysis,
             canonicalExperimentalFlags);
 
+    /// <summary>
+    /// The options token, extracted so it can be pinned directly. Note the type-check parameter is
+    /// the EFFECTIVE value (<c>TypeCheck &amp;&amp; CompilationOptions.TypeCheckingDefault</c>), not the
+    /// task property: the first cut hashed the property, so flipping <c>CALOR_NO_TYPE_CHECK</c>
+    /// against a warm cache changed what was reported without invalidating anything, and every
+    /// unchanged file was silently skipped — the #788 defect described at the call site.
+    /// </summary>
     internal static string OptionsToken(
         bool enforceEffects,
         bool effectiveTypeCheck,
