@@ -132,10 +132,39 @@ public sealed class EffectEnforcementPass
         return _callGraphAnalysis.ResolveToInternalId(callee);
     }
 
+    /// <summary>
+    /// Whether a function calls itself directly. Tarjan reports a self-recursive function as a
+    /// singleton SCC exactly as it reports a non-recursive one, so the self-edge has to be asked
+    /// for separately — the distinction the two branches of <see cref="ProcessScc"/> turn on.
+    /// </summary>
+    private bool HasSelfEdge(string functionId)
+    {
+        foreach (var (calleeId, _, _) in _callGraphAnalysis.GetCallees(functionId))
+        {
+            if (string.Equals(calleeId, functionId, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
     private void ProcessScc(List<string> scc)
     {
-        // For single-function SCCs with no self-recursion, compute effects directly
-        if (scc.Count == 1)
+        // For single-function SCCs with no self-recursion, compute effects directly.
+        //
+        // The self-edge test is load-bearing and was missing: this comment claimed it and the
+        // code did not do it. A directly self-recursive function is its own singleton SCC, so it
+        // took this branch with an EMPTY member set — the recursive call then failed the
+        // `SccMembers.Contains` test, found no entry in `_computedEffects` (it is being computed),
+        // and fell through to the unknown-call path. Result: `Calor0411 Unknown call target 'Fact'`
+        // on a function defined ten lines above, then `Calor0410 uses effect 'Unknown:*'`, which
+        // cannot be declared away — every directly self-recursive function failed to compile,
+        // on `build`, `run`, `test` and the MCP tools alike. Mutual recursion was unaffected
+        // because an SCC of size >= 2 populates the set.
+        //
+        // A self-recursive singleton goes through the fixpoint loop below, which seeds
+        // `EffectSet.Empty` and iterates — the same treatment mutual recursion already got.
+        if (scc.Count == 1 && !HasSelfEdge(scc[0]))
         {
             var functionId = scc[0];
             var function = _callGraphAnalysis.Functions[functionId];
@@ -144,7 +173,7 @@ public sealed class EffectEnforcementPass
             return;
         }
 
-        // For multi-function SCCs (mutual recursion), iterate until fixpoint
+        // For recursive SCCs — mutual, or a single function calling itself — iterate to fixpoint
         var changed = true;
         var iterations = 0;
         const int maxIterations = 100;
