@@ -4,3 +4,9 @@ global using BuildState = Calor.Compiler.Incremental.BuildState;
 global using BuildFileEntry = Calor.Compiler.Incremental.BuildFileEntry;
 global using BuildStateCache = Calor.Compiler.Incremental.BuildStateCache;
 global using BuildStateJsonContext = Calor.Compiler.Incremental.BuildStateJsonContext;
+
+// Calor.Tasks.Tests manipulates CALOR_NO_TYPE_CHECK to pin the MSBuild task's options token
+// against the environment escape hatch. Environment variables are process-wide, so in-assembly
+// parallelism has to be off for that to be sound. It costs nothing here (65 tests, under a
+// second) and cannot affect other test projects, which run in their own testhost processes.
+[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]

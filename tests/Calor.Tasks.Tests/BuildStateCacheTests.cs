@@ -640,11 +640,48 @@ public class BuildStateCacheTests : IDisposable
     [Fact]
     public void OptionsToken_DistinguishesEffectiveTypeCheck()
     {
-        var on = Calor.Tasks.CompileCalor.OptionsToken(true, effectiveTypeCheck: true, false, false, "");
-        var off = Calor.Tasks.CompileCalor.OptionsToken(true, effectiveTypeCheck: false, false, false, "");
+        // Driven through the TASK, not through OptionsToken's parameters. An earlier revision
+        // passed literal booleans, which only proved a bool reaches a format string: reverting the
+        // call site left it green. Verified by reverting again — this version fails.
+        var on = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
+        var off = new Calor.Tasks.CompileCalor { TypeCheck = false }.ComputeOptionsToken("");
 
         Assert.NotEqual(on, off);
         Assert.NotEqual(BuildStateCache.ComputeOptionsHash(on), BuildStateCache.ComputeOptionsHash(off));
+        Assert.Contains("typeCheck:True", on);
+        Assert.Contains("typeCheck:False", off);
+    }
+
+    /// <summary>
+    /// The half that actually caught the defect. `CALOR_NO_TYPE_CHECK` changes what the task will
+    /// report, so it MUST move the options token — otherwise a warm cache serves the other
+    /// setting's findings and every unchanged file is silently skipped (#788). Two earlier
+    /// revisions of this pin passed with the fix reverted: the first fed literal booleans straight
+    /// to the token function, the second drove the task but never set the variable, so the value it
+    /// was meant to observe was never in play. Verified by reverting: this one fails.
+    /// </summary>
+    [Fact]
+    public void OptionsToken_EnvironmentOptOut_MovesTheToken()
+    {
+        var previous = Environment.GetEnvironmentVariable("CALOR_NO_TYPE_CHECK");
+        try
+        {
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", null);
+            var checking = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
+
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", "1");
+            var optedOut = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
+
+            Assert.Contains("typeCheck:True", checking);
+            Assert.Contains("typeCheck:False", optedOut);
+            Assert.NotEqual(
+                BuildStateCache.ComputeOptionsHash(checking),
+                BuildStateCache.ComputeOptionsHash(optedOut));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", previous);
+        }
     }
 
     /// <summary>

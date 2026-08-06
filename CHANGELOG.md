@@ -37,22 +37,27 @@ v0.11 forward, so everything below ships together.
 erratum, registered as *no large tax detected*, explicitly not a proof of parity.
 
 **The headline is soundness.** Six distinct false-`Proven`-elides vectors were closed — cases where
-`calor run --verify` deleted a runtime check that `calor run` proved would have failed. Enumerated so
+a proof deleted a runtime check that would have failed (five of them on the `calor run --verify`
+path; the sixth reached agents through the MCP refine tool, see below). Enumerated so
 the count is checkable rather than asserted: (1) **D4** non-ordinal comparison modes; (2) **D4** bare
 `StartsWith`/`EndsWith`/`IndexOf`, which use the *current culture* in .NET and so diverge with no
-mode argument present to signal it; (3) **D3**, Z3 strings are null-free; (4) **D12**, Z3 counts code
-points where .NET counts UTF-16 units; (5) **D14**, array and user-type sorts are total and non-null;
+mode argument present to signal it; (3) **D3**, Z3 strings are null-free; (4) **D12**, Z3 counts UTF-8
+**bytes** where .NET counts UTF-16 units; (5) **D14**, array and user-type sorts are total and non-null;
 (6) the third `$length` mint site, which the D14 fix's own first cut missed.
 
-**Which of the six were demonstrated, and which were argued.** (1), (2), (3) and the array half of
-(5) carry a recorded `calor run` versus `calor run --verify` pair — the check was observed to
-disappear. (4) and the user-type half of (5) were established by *inspection* of the encoding, not
-by a run. (6) **cannot** have such a pair: `VerifyRefinements` has no CLI flag, so that site is not
-reachable from `calor run --verify` at all — it served a false `proven` to agents through the MCP
-refine tool, which is how it was found. An earlier revision of this entry claimed a reproduction for
-all six; that was wrong and is withdrawn. The distinction matters because a demonstrated vector and
-an argued one carry different confidence, and this release's whole thesis is that arguing was what
-kept failing.
+**Which of the six were demonstrated, and which were argued.** (1), (2), (3), (4) and the array
+half of (5) carry a recorded `calor run` versus `calor run --verify` pair — the check was observed to
+disappear. Only the **user-type half of (5)** rests on inspection of the encoding rather than a run.
+(6) **cannot** have such a pair: `VerifyRefinements` has no CLI flag, so that site is not reachable
+from `calor run --verify` at all — it served a false `proven` to agents through the MCP refine tool,
+which is how it was found.
+
+This paragraph took three attempts. The first revision claimed a reproduction for all six, which was
+wrong; the second withdrew it for (4) as well, which was also wrong — #876 records the D12 pair in
+its own commit body (`§S (== (len result) INT:2)` over `§R STR:"é"`: throws under `calor run`, prints
+under `--verify`). Both are withdrawn in favour of the line above. Recorded rather than quietly
+fixed, because over-correcting a claim is the same defect as over-claiming it, and this release's
+whole thesis is that asserting instead of demonstrating is what kept failing.
 
 That is six closures, not six review rounds — several arrived in the same round, and two were found
 *inside* the fix for an earlier one. The count of *vectors still unfound* is not knowable and is not
@@ -79,11 +84,11 @@ non-nullable at the binder, which is what would let the string demotion be lifte
   - **M-A1 is enforced in CI**: `tests/SdkConsumer/` + `.github/scripts/test-sdk-package.sh` pack the SDK into a local source-mapped feed, then restore/build/test a consumer that uses `<Sdk Name="Calor.Sdk"/>` with no project references — asserting build+tests green AND that the verify gate produced a real `Calor0712` counterexample in the task context (`Calor0710` absent). Package-content inspection via `.github/scripts/inspect-sdk-nupkg.sh`.
   - **Publishing is gated and atomic**: `publish-nuget.yml` packs CLI + SDK together (one push of both, same version) and now `needs:` the full test suite and the M-A1 consumer check — release events can no longer publish unconditionally.
   - **id-validation unmasked** (#790): the `|| true`/`|| echo` swallows are gone and the check covers `samples/` per-directory (which the masked check had let rot — real ID-prefix violations and cross-file duplicate IDs in `samples/Generics` and `samples/Verification` are fixed in this change); `docs/` is deliberately not ids-checked (it has no standalone `.calr` files — its fenced calor blocks are drift-checked by `self-check docs`). `Calor.Performance.Tests` (wall-clock-threshold tests) now runs on a nightly workflow with the flakiness rationale recorded.
-  - **Incremental-build honesty** (#788 subset): the MSBuild task's options hash now covers all four diagnostics-affecting params (`enforceEffects|verify|ilAnalysis|experimental`, with experimental flags canonicalized), and IL-analysis/cross-module-enforcement init failures now **fail the build** instead of warn-and-continue.
+  - **Incremental-build honesty** (#788 subset): the MSBuild task's options hash now covers every diagnostics-affecting param (`enforceEffects|verify|ilAnalysis|experimental`, with experimental flags canonicalized — plus `typeCheck`, added later in this same release), and IL-analysis/cross-module-enforcement init failures now **fail the build** instead of warn-and-continue.
 
 ### Changed
 - **String comparison with an explicit non-ordinal mode, and bare `StartsWith`/`EndsWith`/`IndexOf`, are refused rather than modeled (D4; #872).** Z3's string theory is byte/code-point ordinal only. A contract written `(== (§C{s.Equals} §A t §A StringComparison.OrdinalIgnoreCase §/C) BOOL:true)` was translated as ordinal equality and could be **proven** while the runtime call returned the opposite — and `Proven && !IsVacuous` then deleted the check. The second half is the one hand-enumeration missed: the *mode-less* overloads are not ordinal either. `string.StartsWith(string)`, `EndsWith(string)` and `IndexOf(string)` use the **current culture** by default in .NET, so the whitelist's ordinal model diverged from the runtime with no mode argument present to signal it. All such forms now report `unsupported`, which keeps the runtime check. **Cache format 1.8 → 1.10** (two bumps, one per half) — 1.8/1.9 entries hold `Proven` for exactly these shapes.
-- **Every proof whose translation touched Z3's string sort is demoted to `Assumed` (D3 + D12; #876).** Two divergences, one mechanism. **D3:** Z3's `String` sort is total — there is no null string in the theory — so `(> (§C{s.Length}…) INT:0)` is provable while the .NET call throws `NullReferenceException` on a null receiver. **D12:** Z3 counts code points; .NET's `string.Length` counts UTF-16 code units, so any contract over a string containing a surrogate pair is off by one per pair. Refusal was rejected here because it would have withdrawn *reporting* on the whole string surface; demotion withdraws only **elision**, which is the sound half — `Assumed` proofs are still computed, still reported, and still never elide (the D8 precedent). Lifting this requires `str` to be non-nullable at the binder, tracked as #875. **Cache format 1.10 → 1.12.**
+- **Every proof whose translation touched Z3's string sort is demoted to `Assumed` (D3 + D12; #876).** Two divergences, one mechanism. **D3:** Z3's `String` sort is total — there is no null string in the theory — so `(> (§C{s.Length}…) INT:0)` is provable while the .NET call throws `NullReferenceException` on a null receiver. **D12:** Z3 models strings as **UTF-8 byte** sequences while .NET's `string.Length` counts UTF-16 code units, so the two disagree on every non-ASCII character — `"é"` is one UTF-16 unit and two UTF-8 bytes, and `"😀"` is two units and four bytes. (An earlier revision of this entry said "code points" and "off by one per surrogate pair"; under a code-point model the recorded `"é"` reproduction would not exist at all. The compiler's own assumption string, `string-model — … UTF-8-byte-counted`, is the authority.) Refusal was rejected here because it would have withdrawn *reporting* on the whole string surface; demotion withdraws only **elision**, which is the sound half — `Assumed` proofs are still computed, still reported, and still never elide (the D8 precedent). Lifting this requires `str` to be non-nullable at the binder, tracked as #875. **Cache format 1.10 → 1.12.**
 - **Postcondition elision is withdrawn for any signature naming an array or a non-primitive type (D14).** Z3's array and user-type sorts are **total and non-null**; .NET's `T[]` and class types are nullable references. `<name>$length` is minted as an unconstrained `u32`, so `a.Length >= 0` is a solver tautology while the same expression throws at runtime on a null array — a false `Proven`, and `Proven && !IsVacuous` deletes the runtime check. Reproduced end-to-end: `calor run` crashed with a `NullReferenceException` where `calor run --verify` printed and exited 0. Such proofs are now **`Assumed`**, which never elides, on both the postcondition and `§PROOF` channels.
   - **What this costs, stated plainly:** the trigger fires when the sort is *minted*, and parameters are declared before any contract is translated — so a function taking `[i32]` or a class loses postcondition elision **even when its postcondition names only `result`**. Only signatures made entirely of modeled primitives still elide. Coarse on purpose: being wrong in the narrow direction deletes a runtime check; being wrong in the broad direction costs an optimization. Contract *proving* and reporting are unchanged.
   - **Cache format 1.12 → 1.13**, which invalidates every persisted verification entry: 1.12 entries hold `Proven` for array-carried proofs, exactly the verdict that elides.

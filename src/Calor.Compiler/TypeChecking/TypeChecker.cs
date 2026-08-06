@@ -156,7 +156,13 @@ public sealed class TypeChecker
             return;
         }
 
-        if (_env.LookupType(rtype.Name) != null && !_moduleDeclaredTypes.Contains(rtype.Name))
+        // A name Pass -1 seeded is available to the FIRST refinement that claims it — that is how
+        // a §RTYPE sharing a module type's name kept working across the v0.12 flip. `Remove`
+        // consumes the exemption, so a SECOND §RTYPE of the same name is a duplicate again. An
+        // earlier revision used `Contains`, which left the exemption standing forever and silently
+        // accepted two conflicting refinements — a regression against main, caught by review.
+        var seededName = _moduleDeclaredTypes.Remove(rtype.Name);
+        if (_env.LookupType(rtype.Name) != null && !seededName)
         {
             _diagnostics.ReportError(rtype.Span, DiagnosticCode.RefinementDuplicateName,
                 $"Duplicate refinement type name '{rtype.Name}'");

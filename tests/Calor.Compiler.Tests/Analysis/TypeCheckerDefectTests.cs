@@ -389,13 +389,16 @@ public class TypeCheckerDefectTests
     }
 
     /// <summary>
-    /// A §RTYPE whose base type names a module class must resolve it, not warn that a class
-    /// declared two lines above "may be a typo". This is why the declared-type pass runs BEFORE
-    /// refinement registration — and why the duplicate-name check had to learn the difference
-    /// between a name another §RTYPE took and a name the declared-type pass seeded.
+    /// A §RTYPE whose base names a module class must not ALSO warn that a class declared two lines
+    /// above "may be a typo". Stated precisely, because an earlier revision of this test claimed
+    /// more than is true: such a program is still <c>Calor1102</c> — a module-declared type is an
+    /// <c>ExternalType</c>, which <c>RegisterRefinementType</c> rejects as a base outright, before
+    /// and after v0.12. The declared-type pass running first buys only the removal of a redundant
+    /// second diagnostic on an already-failing program. That is the whole benefit; it is not a
+    /// claim that the program now works.
     /// </summary>
     [Fact]
-    public void RefinementBaseNamingAModuleClass_IsNotReportedAsUnknown()
+    public void RefinementBaseNamingAModuleClass_DoesNotAlsoWarnUnknownType()
     {
         var result = Check("""
             §M{m001:RtBase}
@@ -405,6 +408,54 @@ public class TypeCheckerDefectTests
             """);
 
         Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'Money' is not known"));
+        // The pre-existing rejection is unchanged, and saying so here keeps the test from reading
+        // as "this compiles now".
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("undefined base type 'Money'"));
+    }
+
+    /// <summary>
+    /// A refinement may claim a name the declared-type pass seeded — but only ONE may. The first
+    /// cut of that exemption used a set membership test that never expired, so every later §RTYPE
+    /// of the same name was exempt too and two conflicting refinements compiled clean, a
+    /// regression against main. Found by the third round of release review.
+    /// </summary>
+    [Fact]
+    public void TwoRefinementsSharingAClassName_IsStillADuplicate()
+    {
+        var result = Check("""
+            §M{m001:Dup2}
+              §CL{c001:Positive:pub}
+                §FLD{i32:V:pub}
+              §RTYPE{r001:Positive:i32} (> value INT:0)
+              §RTYPE{r002:Positive:i32} (> value INT:1)
+            """);
+
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("Duplicate refinement type name 'Positive'"));
+    }
+
+    /// <summary>
+    /// §ITYPE declarations are part of the declared-type pass and were unpinned: deleting that
+    /// line from the enumeration left the whole suite green while emitting a false Calor0200.
+    /// </summary>
+    [Fact]
+    public void IndexedTypeDeclaration_IsNotReportedAsUnknown()
+    {
+        const string src = """
+            §M{m001:ItypeTest}
+              §ITYPE{it1:NonEmptyList:List:n} (> # INT:0)
+              §F{f001:Use:pub} (NonEmptyList:a) -> void
+                §E{}
+                §R
+            """;
+
+        var result = Check(src);
+
+        // The fixture must actually be a §ITYPE program. The first version of this test wrote the
+        // §RTYPE attribute shape and failed Calor0102 "Missing required attribute 'sizeParam'" —
+        // it asserted the absence of a warning on a program that never got far enough to produce
+        // one, and passed with the §ITYPE line deleted from the checker entirely.
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.MissingRequiredAttribute);
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("'NonEmptyList' is not known"));
     }
 
     /// <summary>

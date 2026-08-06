@@ -89,6 +89,21 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     /// against a warm cache changed what was reported without invalidating anything, and every
     /// unchanged file was silently skipped — the #788 defect described at the call site.
     /// </summary>
+    /// <summary>
+    /// This task's options token, from its own properties. The call site goes through here so a
+    /// test can observe the composition — an earlier pin passed literal booleans to
+    /// <see cref="OptionsToken"/> and therefore could not tell whether the call site still folded
+    /// in <see cref="CompilationOptions.TypeCheckingDefault"/>. Reverting the fix left it green,
+    /// which is the same non-discriminating-pin failure this release already shipped twice.
+    /// </summary>
+    internal string ComputeOptionsToken(string canonicalExperimentalFlags)
+        => OptionsToken(
+            EnforceEffects,
+            TypeCheck && CompilationOptions.TypeCheckingDefault,
+            Verify,
+            EnableILAnalysis,
+            canonicalExperimentalFlags);
+
     internal static string OptionsToken(
         bool enforceEffects,
         bool effectiveTypeCheck,
@@ -152,12 +167,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags).EnabledFlags
                 .Select(f => f.ToLowerInvariant())
                 .OrderBy(f => f, StringComparer.Ordinal));
-        var optionsHash = BuildStateCache.ComputeOptionsHash(OptionsToken(
-            EnforceEffects,
-            TypeCheck && CompilationOptions.TypeCheckingDefault,
-            Verify,
-            EnableILAnalysis,
-            canonicalExperimentalFlags));
+        var optionsHash = BuildStateCache.ComputeOptionsHash(
+            ComputeOptionsToken(canonicalExperimentalFlags));
         var manifestHash = BuildStateCache.ComputeManifestHash(ProjectDirectory);
 
         // 3. Global invalidation check
