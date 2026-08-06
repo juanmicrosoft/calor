@@ -99,7 +99,7 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.9 (additive A-1.9, 2026-08-05 — PP-W5 adjudicated PASS on epoch w5-parity-001, point ratio 1.109 with lower bound 0.927, registered as "no LARGE tax detected" rather than parity; additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.9 (additive A-1.9, 2026-08-06 — PP-W5 adjudicated PASS on epoch w5-parity-002 (w5-parity-001 VOID: both arms shared a compiler), point 1.098 with lower bound 0.653 on per-pair ratios spanning 0.47–1.62; registered as "no LARGE systematic tax detected", explicitly not parity; additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
@@ -324,40 +324,45 @@ disclosures in the A-1.5 entry below.
 
 ### A.3 Annex revision log
 
-**A-1.9 — PP-W5 adjudicated (2026-08-05). PASS.** Additive; registers the outcome against the
-row frozen at A-1.4 tranche 1, with the A-1.5.6 additive note applied. Epoch `w5-parity-001`:
-control `v0.10.0` (`e24a6832`), treatment `main` (`87a783dd`), the four registered N1 neutral
-pairs, 5 runs/arm, `raw` both arms, model `claude-opus-4-8`. **40/40 cells valid, 0 censored,
-20 per arm; realised spend $38.75.**
+**A-1.9 — PP-W5 adjudicated. PASS on `w5-parity-002` (2026-08-06); the first attempt is
+recorded VOID.** Additive; registers the outcome against the row frozen at A-1.4 tranche 1,
+with the A-1.5.6 additive note applied.
 
-**Median paired output-tokens-to-green ratio (treatment/control): point 1.1090, one-sided 95%
-lower bound 0.9269.** The gate fails only if BOTH the lower bound exceeds 1.0 and the point
-estimate exceeds 1.25; neither fires. **PASS.**
+**`w5-parity-001` (2026-08-05) is VOID and its PASS is WITHDRAWN.** `--calor-dll` pins only the
+CLI, which the agent never invokes; the compiler that builds the agent's code comes from the arm
+template's `__REPO_ROOT__`, and `run-m5-epoch.sh` never passed `--arm-repo-root`. Both arms
+compiled through the same Calor.Tasks. Cost $38.75 and measured nothing. The CLI-hash guard
+certified a contrast that did not exist, and the per-run `calorDll` stamp — reported at the time
+as provenance — was the flag echoed back.
 
-**Registered with the caveat, not without it.** The point estimate is a **~11% increase**, and
-the direction is consistent in **3 of 4 pairs** (1.128 / 1.159 / 1.090, with N1-002 at 0.987).
-The lower bound sits below 1.0, so parity is not excluded — and by the row's own power
-statement (detection 0.33/0.62/0.87 at 1.25×/1.4×/1.6×) an 11% real tax is precisely what this
-design cannot resolve. **"PASS" here means no LARGE tax detected; it does not mean no tax.**
-That reading was pre-committed in the row and is not a post-hoc softening.
+**`w5-parity-002`:** control `v0.10.0` (`e24a6832`, Calor.Tasks `715cb5ad…`) vs treatment `main`
+(`87a783dd`, `9870805b…`), contrast **verified before the run**; 4 N1 pairs, 5 runs/arm, `raw`
+both arms, **interleaved**; 40/40 valid, 0 censored, 20/arm; $54.08. **Median paired ratio: point
+1.0984, lower bound 0.6531 — neither gate fires, PASS.** Iterations-to-green, which the row
+requires and the void record omitted: control `{1:17, 2:2, 3:1}`, treatment `{1:18, 2:1, 4:1}`.
 
-**Attribution:** per A-1.5.6 the treatment carries **v0.11 + v0.12**, so this adjudicates a
-two-release delta. v0.12 in particular added type checking on every compile (#877) and withdrew
-elision from a large class of contracts (#876/#878), leaving more runtime checks in the emitted
-C# — a mild positive ratio is what that would predict, and this epoch is consistent with it
-without being able to attribute it. The on-fail isolation ladder is not triggered.
+**Registered with the finding that outweighs the verdict.** Per-pair ratios span **0.470 to
+1.622** — one task cost the treatment half the tokens, another 62% more, with no consistent
+direction. Against the accidental null of `w5-parity-001` (same compiler both arms, ratios
+0.987–1.159), a genuine contrast multiplied the between-pair spread roughly **sevenfold**. So
+the PASS means only *no large systematic tax detected*: the lower bound of 0.653 admits anything
+from a ~35% improvement to a ~10% tax. **This epoch does not establish parity and could not
+have.** The row's power figures (0.33/0.62/0.87) were calibrated on the null variance at
+`m5-compare-001`; realised variance here is far higher, so true power is **lower** than frozen.
+No mechanism is attributed — the heterogeneity is not the shape a single systematic channel
+produces, and the elision-withdrawal mechanism a prior draft invoked cannot operate here
+because all four N1 fixtures contain **zero contracts**.
 
-**Three apparatus defects were found before any number existed**, two by the zero-spend
-`--null-agent` pre-flight and one by a live attempt that spent **$0.00**: the two arms wrote to
-the same directory and the treatment silently destroyed the control (4 result files where 8 were
-expected); the M5 swap guard rejected a correct parity configuration; and the `raw` arm never
-invoked the agent at all on bash 3.2, because an empty array expanded under `set -u`. A fourth
-was avoided by reading the frozen row rather than the runner's defaults — the M5 runner
-hardcodes arm B to `mcp-file`, which would have measured the tooling delta under PP-W5's name.
-Record: `bench/phase0-agent-native/epochs/w5-parity-001/VERDICT.md`.
+**Five apparatus defects preceded the number**, four of them silent: arms overwriting each other;
+the M5 swap guard rejecting a valid parity config; the `raw` arm never invoking the agent on bash
+3.2; the product never bound per arm (the void); and interleaving re-invoking `run-pair` such
+that run 2 overwrote run 1. Four were caught pre-spend or at $0.00. Guards now hard-fail a parity
+epoch lacking per-arm roots, and the adjudicator refuses unless the pins record two distinct roots
+with distinct `Calor.Tasks` hashes and every run's provenance matches one.
+Record: `bench/phase0-agent-native/epochs/w5-parity-002/VERDICT.md`.
 
-**PP-W5 was the last unadjudicated v0.12.0 release gate. Both gates now stand: PP-A1 = PASS
-(A-1.8), PP-W5 = PASS.**
+**PP-W5 was the last unadjudicated v0.12.0 release gate. Both now stand: PP-A1 = PASS (A-1.8),
+PP-W5 = PASS (A-1.9) — the latter narrowly, as above.**
 
 **A-1.8 — PP-A1 adjudicated (2026-08-05). PP-A1 = PASS, all nine items.** Additive; registers outcomes against the
 PP-A1 list frozen at `wedge-w1-prereqs.md` §3 and carried unchanged into v0.12. **All nine PASS —

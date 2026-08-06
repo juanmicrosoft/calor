@@ -1,0 +1,72 @@
+{
+  "epochId": "w5-parity-002",
+  "kind": "pp-w5-parity",
+  "modelPin": "claude-opus-4-8",
+  "agentVersion": "2.1.220 (Claude Code)",
+  "startedAt": "2026-08-06T15:24:24Z",
+  "mode": "live",
+  "runsPerArm": 5,
+  "suiteDirtyFiles": 4,
+  "armA": {
+    "label": "calor+control",
+    "role": "control (v0.10.0)",
+    "commit": "e24a6832",
+    "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/9c18d39f-e38e-40e8-bcb9-598a208db2c1/scratchpad/w5-control/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "editMechanism": "raw",
+    "repoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/9c18d39f-e38e-40e8-bcb9-598a208db2c1/scratchpad/w5-control",
+    "calorTasksSha": "715cb5adcff55f714cf9d980a9229654876407ec"
+  },
+  "armB": {
+    "label": "calor+treatment",
+    "role": "treatment (main)",
+    "commit": "87a783dd",
+    "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/9c18d39f-e38e-40e8-bcb9-598a208db2c1/scratchpad/w5-treatment/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "editMechanism": "raw",
+    "repoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/9c18d39f-e38e-40e8-bcb9-598a208db2c1/scratchpad/w5-treatment",
+    "calorTasksSha": "9870805be50ec42185785eefa2c81b0a4bdad38b"
+  },
+  "ppL5": {
+    "metric": "tokens-to-green",
+    "threshold": 0.85,
+    "note": ">=15% median paired-ratio reduction, one-sided cluster bootstrap a=0.05 (gates Annex A)",
+    "pairs": [
+      "W2-001",
+      "W2-002",
+      "W2-003",
+      "W2-004",
+      "W2-005",
+      "W3-001",
+      "W3-002",
+      "W3-003",
+      "W3-004"
+    ]
+  },
+  "ppL6": {
+    "check": "neutral iterations-to-green parity + config invariance",
+    "pairs": [
+      "N1-001",
+      "N1-002",
+      "N1-003",
+      "N1-005"
+    ]
+  },
+  "ppW5": {
+    "metric": "output-tokens-to-green",
+    "pointGate": 1.25,
+    "lowerBoundGate": 1.0,
+    "note": "FAILS iff BOTH the one-sided 95% cluster-bootstrap LOWER bound of the median paired ratio (treatment/control) exceeds 1.0 AND the point estimate exceeds 1.25 (gates Annex A, A-1.4 tranche 1)",
+    "pairs": [
+      "N1-001",
+      "N1-002",
+      "N1-003",
+      "N1-005"
+    ]
+  },
+  "suite": [
+    "N1-001",
+    "N1-002",
+    "N1-003",
+    "N1-005"
+  ],
+  "telemetrySchema": "loop-telemetry/2"
+}

@@ -34,16 +34,21 @@ import sys
 
 EPOCH = sys.argv[1] if len(sys.argv) > 1 else sys.exit("usage: w5-analyze.py <epoch-dir>")
 
-# Both arms are the CALOR arm; they differ only in the pinned compiler build. Arms are
-# separated by the BUILD each run used (#813 stamps it per run), NOT by the arm label —
-# the label only has to keep their output directories apart. Keying on the build means a
-# mislabelled or reordered collection cannot silently swap the arms.
+# Both arms are the CALOR arm; they differ only in the compiler build.
+#
+# Arms are keyed on the PRODUCT root (`--arm-repo-root`), not on `calorDll` and not on
+# the arm label. w5-parity-001 is why. There, `calorDll` split a clean 20/20 and was
+# reported as provenance — but it is only the `--calor-dll` argument echoed back, and
+# that flag pins the CLI, which the agent never invokes. Both arms compiled through the
+# same Calor.Tasks and the epoch measured nothing. A key that can be satisfied while the
+# contrast is absent is not provenance; it is decoration.
 BOOT = 2000
 MIN_RUNS_PER_CELL = 2      # below this, the PAIR drops
 MIN_PAIRS = 3              # below this, reported-not-adjudicated
 MIN_VALID_PER_ARM = 12     # below this, reported-not-adjudicated
 LOWER_BOUND_GATE = 1.0     # (a)
 POINT_GATE = 1.25          # (b)
+CENSOR_CAP = 0.40          # gates doc §2: >40% censored on neutral tasks invalidates the gate
 random.seed(4537)          # same seed convention as m5-analyze
 
 pins = json.load(open(os.path.join(EPOCH, "pins.json")))
@@ -53,28 +58,47 @@ if not w5 or not w5.get("pairs"):
              "epoch (--kind pp-w5-parity). Refusing to guess the registered pair set: an "
              "adjudicator that infers its own population is not adjudicating a frozen gate.")
 PAIRS = list(w5["pairs"])
-CONTROL_DLL = pins["armA"]["calorDll"]
-TREATMENT_DLL = pins["armB"]["calorDll"]
+CONTROL_ROOT = pins["armA"].get("repoRoot") or ""
+TREATMENT_ROOT = pins["armB"].get("repoRoot") or ""
 
-# runs[pairId][role] = [{tokensOut, invalid}]
+# The product contrast must be provable FROM THE RECORD, not assumed from the flags.
+if not CONTROL_ROOT or not TREATMENT_ROOT or CONTROL_ROOT == TREATMENT_ROOT:
+    sys.exit("ERROR: pins.json does not record two distinct per-arm repoRoots. `--calor-dll` "
+             "pins the CLI, which the agent never invokes; the compiler that builds the "
+             "agent's code comes from the arm template's __REPO_ROOT__. Without two roots "
+             "both arms share that compiler and the epoch measures nothing — this is what "
+             "voided w5-parity-001. Refusing to adjudicate.")
+if pins["armA"].get("calorTasksSha") and \
+        pins["armA"]["calorTasksSha"] == pins["armB"].get("calorTasksSha"):
+    sys.exit("ERROR: both arms' Calor.Tasks.dll hash to the same value — the agent-visible "
+             "compiler is identical on both arms. Epoch void.")
+
+# runs[pairId][role] = [{tokensOut, invalid, censored}]
 runs = {}
+unattributed = 0
 for f in sorted(glob.glob(os.path.join(EPOCH, "*", "*", "run-*", "result.json"))):
     r = json.load(open(f))
     pid = "-".join(r["pair"].split("-")[:2])
-    dll = r.get("calorDll") or ""
-    # Arms are separated by the BUILD that produced the run, which #813 stamps per run.
-    # Matching on the pinned path rather than on ordering means a mis-ordered or partial
-    # collection cannot silently swap the arms.
-    if dll == CONTROL_DLL:
+    # Key on the PRODUCT root the run actually built against.
+    root = r.get("armRepoRoot") or ""
+    if root == CONTROL_ROOT:
         role = "control"
-    elif dll == TREATMENT_DLL:
+    elif root == TREATMENT_ROOT:
         role = "treatment"
     else:
+        unattributed += 1
         continue
     runs.setdefault(pid, {}).setdefault(role, []).append({
         "tokensOut": (r.get("tokens", {}) or {}).get("output", 0),
         "invalid": bool(r.get("invalid", False)),
+        "censored": bool(r.get("censored", False)) or bool(r.get("invalid", False)),
+        "itg": r.get("iterationsToGreen"),
     })
+
+if unattributed:
+    sys.exit(f"ERROR: {unattributed} run(s) carry no armRepoRoot matching either pinned arm. "
+             "A run whose compiler provenance cannot be established cannot be attributed to "
+             "an arm, and silently dropping it would bias whichever arm kept its runs.")
 
 
 def vals(pid, role):
@@ -82,6 +106,16 @@ def vals(pid, role):
     count, per the frozen M-L5 definition."""
     return [x["tokensOut"] for x in runs.get(pid, {}).get(role, [])
             if not x["invalid"] and x["tokensOut"] is not None]
+
+
+def censored_frac(pid_list, role):
+    """§2 of the gates doc: a gate is INVALID if either arm exceeds 40% censored on
+    neutral tasks. The frozen PP-W5 row says '§2 censoring caps apply'; an earlier
+    revision of this adjudicator read only `invalid` and silently folded a censored
+    run into the token means."""
+    tot = sum(len(runs.get(p, {}).get(role, [])) for p in pid_list)
+    cen = sum(1 for p in pid_list for x in runs.get(p, {}).get(role, []) if x["censored"])
+    return (cen / tot) if tot else 0.0
 
 
 dropped = []
@@ -148,10 +182,32 @@ if total_control < MIN_VALID_PER_ARM:
 if total_treatment < MIN_VALID_PER_ARM:
     blockers.append(f"treatment has {total_treatment} valid runs (need >= {MIN_VALID_PER_ARM})")
 
+# §2 censoring caps, which the frozen row invokes and an earlier revision omitted.
+cen_c, cen_t = censored_frac(PAIRS, "control"), censored_frac(PAIRS, "treatment")
+print(f"censored — control {cen_c:.0%}, treatment {cen_t:.0%} (gate invalid above {CENSOR_CAP:.0%})")
+if cen_c > CENSOR_CAP:
+    blockers.append(f"control censored fraction {cen_c:.0%} exceeds the §2 cap of {CENSOR_CAP:.0%}")
+if cen_t > CENSOR_CAP:
+    blockers.append(f"treatment censored fraction {cen_t:.0%} exceeds the §2 cap of {CENSOR_CAP:.0%}")
+
 for pid in surviving:
     print(f"  {pid}: control mean {statistics.mean(vals(pid,'control')):.0f} tok "
           f"({len(vals(pid,'control'))} runs), treatment mean {statistics.mean(vals(pid,'treatment')):.0f} tok "
           f"({len(vals(pid,'treatment'))} runs), ratio {point_ratio(pid):.3f}")
+
+# Iterations-to-green: the frozen row REQUIRES it be recorded (observational,
+# floor-bound). w5-parity-001's record omitted it; a mandated quantity left out of the
+# record is a lapse even when it changes no verdict.
+def itg_summary(role):
+    v = [x["itg"] for p in PAIRS for x in runs.get(p, {}).get(role, [])
+         if not x["invalid"] and x["itg"] is not None]
+    return v
+for role in ("control", "treatment"):
+    v = itg_summary(role)
+    if v:
+        from collections import Counter
+        print(f"iterations-to-green ({role}, observational): {dict(sorted(Counter(v).items()))}")
+        out.setdefault("iterationsToGreen", {})[role] = dict(sorted(Counter(v).items()))
 
 if blockers:
     out["verdict"] = "REPORTED-NOT-ADJUDICATED"

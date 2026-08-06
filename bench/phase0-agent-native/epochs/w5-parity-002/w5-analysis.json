@@ -1,0 +1,25 @@
+{
+  "epoch": "w5-parity-002",
+  "gate": "PP-W5",
+  "iterationsToGreen": {
+    "control": {
+      "1": 17,
+      "2": 2,
+      "3": 1
+    },
+    "treatment": {
+      "1": 18,
+      "2": 1,
+      "4": 1
+    }
+  },
+  "pairs": [
+    "N1-001",
+    "N1-002",
+    "N1-003",
+    "N1-005"
+  ],
+  "pointEstimate": 1.0983804835058952,
+  "lowerBound95": 0.6530623216788526,
+  "verdict": "PASS"
+}

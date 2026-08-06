@@ -1,0 +1,54 @@
+§M{m001:CsvRow}
+  §F{f001:NeedsQuoting:pub} (str:field) -> bool
+    §E{}
+    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))
+
+  §F{f002:EscapeField:pub} (str:field) -> str
+    §E{}
+    §B{needs:bool} §C{NeedsQuoting} §A field §/C
+    §IF{if1} (! needs)
+      §R field
+    §R (+ "\"" (+ (replace field "\"" "\"\"") "\""))
+
+  §F{f003:JoinRow:pub} (List<str>:fields) -> str
+    §E{}
+    §B{~outp:str} ""
+    §B{~i:i32} 0
+    §WH{wh1} (< i §CNT{fields})
+      §IF{if2} (> i 0)
+        §ASSIGN outp (+ outp ",")
+      §B{f:str} §IDX fields i
+      §B{esc:str} §C{EscapeField} §A f §/C
+      §ASSIGN outp (+ outp esc)
+      §ASSIGN i (+ i 1)
+    §R outp
+
+  §F{f004:SplitRow:pub} (str:line) -> List<str>
+    §E{mut}
+    §LIST{fields:str}
+    §/LIST{fields}
+    §B{~cur:str} ""
+    §B{~inQuotes:bool} false
+    §B{~i:i32} 0
+    §WH{wh2} (< i (len line))
+      §B{c:str} (substr line i 1)
+      §IF{if3} inQuotes
+        §IF{if4} (== c "\"")
+          §IF{if5} (&& (< (+ i 1) (len line)) (== (substr line (+ i 1) 1) "\""))
+            §ASSIGN cur (+ cur "\"")
+            §ASSIGN i (+ i 1)
+          §EL
+            §ASSIGN inQuotes false
+        §EL
+          §ASSIGN cur (+ cur c)
+      §EL
+        §IF{if6} (== c ",")
+          §PUSH{fields} cur
+          §ASSIGN cur ""
+        §EI (&& (== c "\"") (== (len cur) 0))
+          §ASSIGN inQuotes true
+        §EL
+          §ASSIGN cur (+ cur c)
+      §ASSIGN i (+ i 1)
+    §PUSH{fields} cur
+    §R fields

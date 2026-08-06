@@ -42,6 +42,15 @@ ARM_A_MECH="raw"; ARM_B_MECH="mcp-file"
 ARM_A_LABEL="calor"; ARM_B_LABEL="calor+mcp-file"
 ARM_A_ROLE="baseline (WS1-only)"; ARM_B_ROLE="baseline + WS2/WS3 isolation"
 KIND="m5-comparison"
+# Per-arm PRODUCT root. `--calor-dll` pins ONLY the CLI/MCP/envelope build; the agent's
+# own `dotnet build` binds Calor.Tasks/Sdk/Runtime and the EMITTER through the arm
+# template's __REPO_ROOT__, which comes from run-pair's --arm-repo-root. For M5 that
+# distinction is harmless — its delta touches none of those, and run-pair.sh says so
+# explicitly. For a PARITY epoch it is the entire measurement: w5-parity-001 was VOID
+# because both arms compiled .calr with the same main-era compiler while the pins
+# claimed a contrast. The agent never invokes the `calor` CLI at all; it is told to run
+# `dotnet build`, so the CLI pin alone cannot reach it.
+ARM_A_ROOT=""; ARM_B_ROOT=""
 RUNS=5; NULL_FLAG=""; PAIR_FILTER=""
 # Frozen M5 sets (loop-m5-comparison.md §3): warm = PP-L5, neutral N1 = PP-L6(b).
 WARM_PAIRS=(W2-001 W2-002 W2-003 W2-004 W2-005 W3-001 W3-002 W3-003 W3-004)
@@ -50,6 +59,8 @@ NEUTRAL_PAIRS=(N1-001 N1-002 N1-003 N1-005)
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --epoch) EPOCH="$2"; shift 2 ;;
+        --arm-a-repo-root) ARM_A_ROOT="$2"; shift 2 ;;
+        --arm-b-repo-root) ARM_B_ROOT="$2"; shift 2 ;;
         --arm-a-mech) ARM_A_MECH="$2"; shift 2 ;;
         --arm-b-mech) ARM_B_MECH="$2"; shift 2 ;;
         --arm-a-label) ARM_A_LABEL="$2"; shift 2 ;;
@@ -96,6 +107,34 @@ a_sha="$(shasum "$ARM_A_DLL" | awk '{print $1}')"
 b_sha="$(shasum "$ARM_B_DLL" | awk '{print $1}')"
 [[ "$ARM_A_LABEL" != "$ARM_B_LABEL" ]] || { echo "ERROR: arm labels are identical ('$ARM_A_LABEL') — run-pair writes both arms to the same directory and the second overwrites the first" >&2; exit 2; }
 [[ "$a_sha" != "$b_sha" ]] || { echo "ERROR: arm-A and arm-B dll are byte-identical — no A/B contrast, epoch void" >&2; exit 2; }
+
+# PRODUCT-CONTRAST guard, for every kind EXCEPT m5-comparison. This is the check whose
+# absence voided w5-parity-001. The CLI hash guard above passed while both arms compiled
+# through the SAME Calor.Tasks, because --calor-dll does not bind the product — so it
+# certified a contrast that did not exist. A parity epoch must prove the arms differ in
+# the artifact that actually compiles the agent's code.
+if [[ "$KIND" != "m5-comparison" ]]; then
+    [[ -n "$ARM_A_ROOT" && -n "$ARM_B_ROOT" ]] || {
+        echo "ERROR: --arm-a-repo-root and --arm-b-repo-root are REQUIRED for --kind $KIND." >&2
+        echo "       Without them BOTH arms build against the harness checkout and the epoch" >&2
+        echo "       measures nothing. That is exactly how w5-parity-001 was voided." >&2
+        exit 2; }
+    ARM_A_ROOT="$(cd "$ARM_A_ROOT" && pwd -P)"; ARM_B_ROOT="$(cd "$ARM_B_ROOT" && pwd -P)"
+    [[ "$ARM_A_ROOT" != "$ARM_B_ROOT" ]] || { echo "ERROR: both arms share a repo root — no product contrast" >&2; exit 2; }
+    for r in "$ARM_A_ROOT" "$ARM_B_ROOT"; do
+        for need in src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll \
+                    src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll; do
+            [[ -f "$r/$need" ]] || { echo "ERROR: $r is missing $need — build the PRODUCT per arm, not just Calor.Compiler" >&2; exit 2; }
+        done
+    done
+    a_tasks="$(shasum "$ARM_A_ROOT/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll" | awk '{print $1}')"
+    b_tasks="$(shasum "$ARM_B_ROOT/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll" | awk '{print $1}')"
+    [[ "$a_tasks" != "$b_tasks" ]] || {
+        echo "ERROR: the two arms' Calor.Tasks.dll are byte-identical — the AGENT-VISIBLE compiler" >&2
+        echo "       is the same on both arms. Epoch void before it starts." >&2
+        exit 2; }
+    echo "product contrast verified: Calor.Tasks ${a_tasks:0:12} vs ${b_tasks:0:12}"
+fi
 
 # M5-SPECIFIC swap guard. The WS2 write path (`calor mcp --root`) discriminates M5's
 # two arms — baseline lacks it, isolation has it. It is NOT a general invariant: a
@@ -147,10 +186,12 @@ jq -n \
     --arg a_mech "$ARM_A_MECH" --arg b_mech "$ARM_B_MECH" \
     --arg a_label "$ARM_A_LABEL" --arg b_label "$ARM_B_LABEL" \
     --arg a_role "$ARM_A_ROLE" --arg b_role "$ARM_B_ROLE" \
+    --arg a_root "$ARM_A_ROOT" --arg b_root "$ARM_B_ROOT" \
+    --arg a_tasks "${a_tasks:-}" --arg b_tasks "${b_tasks:-}" \
     '{epochId:$epoch, kind:$kind, modelPin:$model, agentVersion:$agent_version,
       startedAt:$date, mode:$mode, runsPerArm:$runs, suiteDirtyFiles:($suite_dirty|tonumber),
-      armA:{label:$a_label, role:$a_role, commit:$a_commit, calorDll:$a_dll, editMechanism:$a_mech},
-      armB:{label:$b_label, role:$b_role, commit:$b_commit, calorDll:$b_dll, editMechanism:$b_mech},
+      armA:{label:$a_label, role:$a_role, commit:$a_commit, calorDll:$a_dll, editMechanism:$a_mech, repoRoot:$a_root, calorTasksSha:$a_tasks},
+      armB:{label:$b_label, role:$b_role, commit:$b_commit, calorDll:$b_dll, editMechanism:$b_mech, repoRoot:$b_root, calorTasksSha:$b_tasks},
       ppL5:{metric:"tokens-to-green", threshold:0.85, note:">=15% median paired-ratio reduction, one-sided cluster bootstrap a=0.05 (gates Annex A)", pairs:$warm},
       ppL6:{check:"neutral iterations-to-green parity + config invariance", pairs:$neutral},
       ppW5:(if $kind == "pp-w5-parity" then
@@ -165,8 +206,12 @@ echo "arm B: $ARM_B_COMMIT ($ARM_B_MECH)  $ARM_B_DLL"
 echo "pairs (${#PAIRS[@]}): ${PAIRS[*]}"
 echo "runs/arm: $RUNS   mode: ${NULL_FLAG:-live}   model: ${CLAUDE_MODEL:-default}"
 
-run_arm() {  # <pair_dir> <mechanism> <dll> <label>
-    local pair_dir="$1" mech="$2" dll="$3" label="$4"
+run_arm() {  # <pair_dir> <mechanism> <dll> <label> [repo-root] [runs] [run-offset]
+    local pair_dir="$1" mech="$2" dll="$3" label="$4" root="${5:-}" nruns="${6:-$RUNS}" roff="${7:-0}"
+    # The PRODUCT binding. Without it the arm template's __REPO_ROOT__ resolves to the
+    # harness checkout and both arms share the compiler that actually builds the agent's
+    # code — the defect that voided w5-parity-001.
+    local root_args=(); [[ -n "$root" ]] && root_args=(--arm-repo-root "$root")
     # --arm-label is REQUIRED, not cosmetic: run-pair writes to
     # $OUT/$PAIR/$ARM_LABEL/run-N, so two arms sharing a label overwrite each other.
     # M5 got away without it only because its arms differ in edit mechanism, which
@@ -175,7 +220,8 @@ run_arm() {  # <pair_dir> <mechanism> <dll> <label>
     # observed in the w5 null pre-flight: 4 result.json files where 8 were expected,
     # every one of them the treatment build.
     "$SCRIPT_DIR/run-pair.sh" --pair "$pair_dir" --arm calor --arm-label "$label" \
-        --edit-mechanism "$mech" --calor-dll "$dll" --runs "$RUNS" \
+        ${root_args[@]+"${root_args[@]}"} --run-offset "$roff" \
+        --edit-mechanism "$mech" --calor-dll "$dll" --runs "$nruns" \
         $NULL_FLAG --out "$OUT" \
         | jq -c --unbuffered '{pair,arm,run,taskSuccess,iterationsToGreen,editMechanism,calorDll:((.calorDll // "")|split("/")|.[-4:]|join("/")),tokensOut:(.tokens.output // 0),censored,invalid}'
 }
@@ -183,10 +229,24 @@ run_arm() {  # <pair_dir> <mechanism> <dll> <label>
 for pid in "${PAIRS[@]}"; do
     pair_dir="$(echo "$SCRIPT_DIR"/pairs/${pid}-*)"
     [[ -d "$pair_dir" ]] || { echo "WARNING: pair not found, skipping: $pid" >&2; continue; }
-    echo "=== $pid / arm A ($ARM_A_ROLE, $ARM_A_MECH) ==="
-    run_arm "$pair_dir" "$ARM_A_MECH" "$ARM_A_DLL" "$ARM_A_LABEL"
-    echo "=== $pid / arm B ($ARM_B_ROLE, $ARM_B_MECH) ==="
-    run_arm "$pair_dir" "$ARM_B_MECH" "$ARM_B_DLL" "$ARM_B_LABEL"
+    if [[ "$KIND" == "m5-comparison" ]]; then
+        echo "=== $pid / arm A ($ARM_A_ROLE, $ARM_A_MECH) ==="
+        run_arm "$pair_dir" "$ARM_A_MECH" "$ARM_A_DLL" "$ARM_A_LABEL" "$ARM_A_ROOT"
+        echo "=== $pid / arm B ($ARM_B_ROLE, $ARM_B_MECH) ==="
+        run_arm "$pair_dir" "$ARM_B_MECH" "$ARM_B_DLL" "$ARM_B_LABEL" "$ARM_B_ROOT"
+    else
+        # INTERLEAVED, one run per arm at a time. Running all of arm A and then all of
+        # arm B confounds every time-varying factor — API state, machine load, model
+        # drift — with the arm. Blocked order was a disclosed weakness of w5-parity-001;
+        # removing it costs nothing, because run-pair appends runs rather than
+        # restarting the numbering.
+        for ((k = 1; k <= RUNS; k++)); do
+            echo "=== $pid / run $k / arm A ($ARM_A_ROLE) ==="
+            run_arm "$pair_dir" "$ARM_A_MECH" "$ARM_A_DLL" "$ARM_A_LABEL" "$ARM_A_ROOT" 1 "$((k-1))"
+            echo "=== $pid / run $k / arm B ($ARM_B_ROLE) ==="
+            run_arm "$pair_dir" "$ARM_B_MECH" "$ARM_B_DLL" "$ARM_B_LABEL" "$ARM_B_ROOT" 1 "$((k-1))"
+        done
+    fi
 done
 
 echo "--- M5 collection complete; adjudicate with: bench/phase0-agent-native/m5-analyze.py $OUT ---"

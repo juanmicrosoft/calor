@@ -248,16 +248,14 @@ v0.12 is **not** on the strategy's Phase-2a/2b progression — it is prerequisit
 
 ## 10. Revision log
 
-- **PP-W5 adjudicated, 2026-08-05 (A-1.9) — PASS; both v0.12.0 release gates now stand.**
-  Epoch `w5-parity-001`, 40/40 valid cells, $38.75. Median paired output-tokens-to-green ratio
-  (treatment `main` / control `v0.10.0`) point **1.109**, one-sided 95% lower bound **0.927** —
-  neither gate fires, so PASS. **Registered with its caveat:** the point estimate is a ~11%
-  increase, consistent in 3 of 4 pairs, and the row's own power statement says an 11% real tax
-  is exactly what this design cannot resolve. PASS means *no large tax detected*, not *no tax*.
-  Three apparatus defects were found before any number existed — two by the zero-spend
-  pre-flight, one by a live attempt that spent $0.00 — including the two arms silently
-  overwriting each other. Record: `bench/phase0-agent-native/epochs/w5-parity-001/VERDICT.md`.
-
+- **PP-W5 adjudicated, 2026-08-06 (A-1.9) — PASS on `w5-parity-002`; the first attempt VOID.**
+  `w5-parity-001` measured nothing — `--calor-dll` pins the CLI the agent never invokes, so both
+  arms compiled through the same Calor.Tasks ($38.75, withdrawn). The re-run bound the product
+  per arm: point **1.098**, lower bound **0.653**, 40/40 valid, $54.08. **The finding that
+  outweighs the verdict:** per-pair ratios span **0.470–1.622** with no consistent direction, a
+  ~7× increase in spread over the accidental null. PASS therefore means *no large systematic tax
+  detected*, not parity — the bound admits a ~35% improvement or a ~10% tax. Five apparatus
+  defects preceded the number, four silent.
 - **PP-A1 adjudicated, 2026-08-05 (A-1.8) — PASS, all nine items.** The first adjudication
   claimed all nine; adversarial review refuted **item 6** and it was right: **divergence D4 was a live
   false-`Proven`-elides vector**, reproduced end-to-end on a shipped path (`calor run` threw;
