@@ -1,0 +1,30 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "Inventory",
+    "file": "Inventory.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "AddItem",
+    "file": "Inventory.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "RemoveItem",
+    "file": "Inventory.calr",
+    "line": 9
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "TotalCount",
+    "file": "Inventory.calr",
+    "line": 19
+  }
+]

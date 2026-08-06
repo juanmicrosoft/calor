@@ -99,7 +99,7 @@ After freezing, this document may be superseded only for a **documented empirica
 
 ## Annex A — Instrument metrics (loop plan v0.9, D4.4)
 
-**Annex version: A-1.8 (additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
+**Annex version: A-1.9 (additive A-1.9, 2026-08-06 — PP-W5 adjudicated PASS on epoch w5-parity-002 (w5-parity-001 VOID: both arms shared a compiler), point 1.098 recorded / 1.0016 after a metric erratum; registered as "no large tax detected", explicitly not parity and with the earlier heterogeneity claim withdrawn; additive A-1.8, 2026-08-05 — PP-A1 adjudicated: all nine PASS, item 6 only after six audits and three merged fixes (#872/#876/#878), item 9 delivered outside its registered window (#877); additive A-1.6, 2026-08-05 — PP-W2 restated to instrument scope + PP-S1 disposition; additive A-1.7, 2026-08-05 — Call S adjudicated: PP-S3 = MISS, PP-S1 = MISS, PP-S4 = PASS, venue retired; thresholds frozen at A-1.0, 2026-07-24; additive
 clarification A-1.1, 2026-07-25; additive PP-W1/M-W1 registration A-1.2, 2026-07-27;
 additive M-G*/PP-G3/PP-G4 registration A-1.3, 2026-07-29 — guarantees plan
 D-G5.1, frozen before the Guarantees probe epoch; additive PP-W5 registration
@@ -323,6 +323,64 @@ disclosures in the A-1.5 entry below.
 | **PP-S4** — no converter-appeasement (**blocker**) | M-S4 = 0 via the A-1.5.7 fixture registry; indeterminate counts as **failing** | Blocks the v0.12.0 release |
 
 ### A.3 Annex revision log
+
+**A-1.9 — PP-W5 adjudicated. PASS on `w5-parity-002` (2026-08-06); the first attempt is
+recorded VOID.** Additive; registers the outcome against the row frozen at A-1.4 tranche 1,
+with the A-1.5.6 additive note applied.
+
+**`w5-parity-001` (2026-08-05) is VOID and its PASS is WITHDRAWN.** `--calor-dll` pins only the
+CLI, which the agent never invokes; the compiler that builds the agent's code comes from the arm
+template's `__REPO_ROOT__`, and `run-m5-epoch.sh` never passed `--arm-repo-root`. Both arms
+compiled through the same Calor.Tasks. Cost $38.75 and measured nothing. The CLI-hash guard
+certified a contrast that did not exist, and the per-run `calorDll` stamp — reported at the time
+as provenance — was the flag echoed back.
+
+**`w5-parity-002`:** control `v0.10.0` (`e24a6832`, Calor.Tasks `715cb5ad…`) vs treatment `main`
+(`87a783dd`, `9870805b…`), contrast **verified before the run**; 4 N1 pairs, 5 runs/arm, `raw`
+both arms, **interleaved**; 40/40 valid, 0 censored, 20/arm; $54.08. **Median paired ratio: point
+1.0984, lower bound 0.6531 — neither gate fires, PASS.** Iterations-to-green, which the row
+requires and the void record omitted: control `{1:17, 2:2, 3:1}`, treatment `{1:18, 2:1, 4:1}`.
+
+**Metric erratum, filed as a §7 correction rather than a clarification.** The row pins output
+tokens to `agent.json` `usage.output_tokens`. That field **silently under-counts** on runs that
+delegate to a subagent or resume after compaction: four runs across the two epochs are affected,
+the worst by **55×** (543 recorded vs 30,084 actual, `num_turns` 1). Corrected, the per-pair
+ratios are 0.953 / 0.938 / 1.622 / 1.051 and the point estimate is **1.0016** — the verdict is
+PASS on either basis, and robust across 200 bootstrap seeds. Future epochs should pin
+`modelUsage[*].outputTokens` or disallow subagent spawning.
+
+**Two claims from an earlier revision of this entry are WITHDRAWN**, both artifacts of that
+defect. (a) *"One task cost the treatment half the tokens"* — the 0.470 does not exist; that run
+was the most expensive in its cell, not the least. (b) *"A genuine contrast multiplied the
+between-pair spread roughly sevenfold"* — corrected identically, the two epochs' spreads are
+0.538 and 0.684, a ratio of **1.27×**; and an arm-label permutation test (20,000 draws) places
+the observed spread at the **50th percentile** of the distribution under *no arm effect at all*.
+The earlier entry treated `w5-parity-001` as a clean-null baseline; it was a 7th-percentile draw.
+**No heterogeneity is claimed and none is supported.** N1-003's 1.622 is real and not
+outlier-driven; it is one pair.
+
+**So the PASS is narrow but unremarkable:** corrected point 1.0016, as close to parity as this
+design resolves, with a bound that still admits a wide interval — no large tax detected, not
+proven equal. Within-cell CV rose from 0.20 (the frozen derivation's population at
+`m5-compare-001`) to 0.42 median, so realised power is **below** the frozen 0.33/0.62/0.87.
+No mechanism is attributed: all four N1 fixtures contain **zero contracts**, so the D3/D12/D14
+elision withdrawal cannot operate, and the `EnableTypeChecking` flip has zero supporting
+instances in the archived journals.
+
+**The contrast is verified by execution, not by flag.** `--arm-repo-root` is `sed`-substituted
+into `CalorTasksAssembly`, and `obj/calor/.calor-build-state.json` — written by `Calor.Tasks`
+itself — records `compilerHash` `65ee7cf0…` (control) vs `40472f37…` (treatment).
+
+**Five apparatus defects preceded the number**, four of them silent: arms overwriting each other;
+the M5 swap guard rejecting a valid parity config; the `raw` arm never invoking the agent on bash
+3.2; the product never bound per arm (the void); and interleaving re-invoking `run-pair` such
+that run 2 overwrote run 1. Four were caught pre-spend or at $0.00. Guards now hard-fail a parity
+epoch lacking per-arm roots, and the adjudicator refuses unless the pins record two distinct roots
+with distinct `Calor.Tasks` hashes and every run's provenance matches one.
+Record: `bench/phase0-agent-native/epochs/w5-parity-002/VERDICT.md`.
+
+**PP-W5 was the last unadjudicated v0.12.0 release gate. Both now stand: PP-A1 = PASS (A-1.8),
+PP-W5 = PASS (A-1.9) — the latter narrowly, as above.**
 
 **A-1.8 — PP-A1 adjudicated (2026-08-05). PP-A1 = PASS, all nine items.** Additive; registers outcomes against the
 PP-A1 list frozen at `wedge-w1-prereqs.md` §3 and carried unchanged into v0.12. **All nine PASS —

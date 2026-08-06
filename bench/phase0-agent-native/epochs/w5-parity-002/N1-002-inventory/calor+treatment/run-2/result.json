@@ -1,0 +1,24 @@
+{
+  "pair": "N1-002-inventory",
+  "arm": "calor+treatment",
+  "run": 2,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 10,
+  "iterations": 2,
+  "iterationsToGreen": 2,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1043,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": null,
+  "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/9c18d39f-e38e-40e8-bcb9-598a208db2c1/scratchpad/w5-treatment/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "armRepoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/9c18d39f-e38e-40e8-bcb9-598a208db2c1/scratchpad/w5-treatment",
+  "editMechanism": "raw",
+  "tokens": {
+    "input": 53,
+    "output": 13610
+  },
+  "nullAgent": false
+}

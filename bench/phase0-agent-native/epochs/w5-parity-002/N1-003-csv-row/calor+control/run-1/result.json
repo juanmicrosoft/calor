@@ -1,0 +1,24 @@
+{
+  "pair": "N1-003-csv-row",
+  "arm": "calor+control",
+  "run": 1,
+  "taskSuccess": true,
+  "escapedBugs": 0,
+  "heldoutPassed": 20,
+  "iterations": 1,
+  "iterationsToGreen": 1,
+  "censored": false,
+  "invalid": false,
+  "meanFeedbackLatencyMs": 1126,
+  "envelopeValidAll": true,
+  "mcpWrites": null,
+  "defect": null,
+  "calorDll": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/9c18d39f-e38e-40e8-bcb9-598a208db2c1/scratchpad/w5-control/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+  "armRepoRoot": "/private/tmp/claude-501/-Users-juanrivera-sources-repos-juanmicrosoft-calor/9c18d39f-e38e-40e8-bcb9-598a208db2c1/scratchpad/w5-control",
+  "editMechanism": "raw",
+  "tokens": {
+    "input": 32,
+    "output": 10476
+  },
+  "nullAgent": false
+}

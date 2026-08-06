@@ -1,0 +1,16 @@
+§M{m001:TextUtils}
+  §F{f001:Slugify:pub} (str:s) -> str
+    §E{}
+    §B{lower:str} §C{s.ToLowerInvariant} §/C
+    §R §C{lower.Replace} §A " " §A "-" §/C
+  §F{f002:Truncate:pub} (str:s, i32:maxLen) -> str
+    §E{}
+    §IF{if1} (<= (len s) maxLen) → §R s
+    §IF{if2} (> maxLen 3) → §R (concat (substr s 0 (- maxLen 3)) "...")
+    §R (substr s 0 maxLen)
+  §F{f003:WordCount:pub} (str:s) -> i32
+    §E{}
+    §B{trimmed:str} (trim s)
+    §IF{if3} (== (len trimmed) 0) → §R 0
+    §B{words} (regex-split trimmed "\\s+")
+    §R (len words)

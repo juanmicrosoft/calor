@@ -1,0 +1,59 @@
+§M{m001:CsvRow}
+  §F{f001:NeedsQuoting:pub} (str:field) -> bool
+    §E{}
+    §R (|| (contains field ",") (|| (contains field "\"") (|| (contains field "\r") (contains field "\n"))))
+
+  §F{f002:EscapeField:pub} (str:field) -> str
+    §E{}
+    §B{needs} §C{NeedsQuoting} field
+    §IF{if1} needs
+      §R (concat "\"" (replace field "\"" "\"\"") "\"")
+    §EL
+      §R field
+
+  §F{f003:JoinRow:pub} (List<str>:fields) -> str
+    §E{}
+    §B{~result} ""
+    §B{~first} true
+    §EACH{e1:f} fields
+      §B{esc} §C{EscapeField} f
+      §IF{if1} first
+        §ASSIGN result esc
+        §ASSIGN first false
+      §EL
+        §ASSIGN result (concat result "," esc)
+    §R result
+
+  §F{f004:SplitRow:pub} (str:line) -> List<str>
+    §E{mut}
+    §B{result} §NEW{List<str>} §/NEW
+    §B{~current} ""
+    §B{~inQuotes} false
+    §B{~i} 0
+    §B{n} (len line)
+    §WH{wh1} (< i n)
+      §B{ch} (substr line i 1)
+      §IF{if1} inQuotes
+        §IF{if2} (== ch "\"")
+          §IF{if3} (&& (< (+ i 1) n) (== (substr line (+ i 1) 1) "\""))
+            §ASSIGN current (+ current "\"")
+            §ASSIGN i (+ i 2)
+          §EL
+            §ASSIGN inQuotes false
+            §ASSIGN i (+ i 1)
+        §EL
+          §ASSIGN current (+ current ch)
+          §ASSIGN i (+ i 1)
+      §EL
+        §IF{if4} (== ch "\"")
+          §ASSIGN inQuotes true
+          §ASSIGN i (+ i 1)
+        §EI (== ch ",")
+          §PUSH{result} current
+          §ASSIGN current ""
+          §ASSIGN i (+ i 1)
+        §EL
+          §ASSIGN current (+ current ch)
+          §ASSIGN i (+ i 1)
+    §PUSH{result} current
+    §R result

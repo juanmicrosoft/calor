@@ -1,0 +1,37 @@
+[
+  {
+    "id": "m001",
+    "kind": "Module",
+    "name": "CsvRow",
+    "file": "CsvRow.calr",
+    "line": 1
+  },
+  {
+    "id": "f001",
+    "kind": "Function",
+    "name": "NeedsQuoting",
+    "file": "CsvRow.calr",
+    "line": 2
+  },
+  {
+    "id": "f002",
+    "kind": "Function",
+    "name": "EscapeField",
+    "file": "CsvRow.calr",
+    "line": 6
+  },
+  {
+    "id": "f003",
+    "kind": "Function",
+    "name": "JoinRow",
+    "file": "CsvRow.calr",
+    "line": 14
+  },
+  {
+    "id": "f004",
+    "kind": "Function",
+    "name": "SplitRow",
+    "file": "CsvRow.calr",
+    "line": 26
+  }
+]

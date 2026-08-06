@@ -1,0 +1,13 @@
+{
+  "epoch": "w5-parity-001",
+  "gate": "PP-W5",
+  "pairs": [
+    "N1-001",
+    "N1-002",
+    "N1-003",
+    "N1-005"
+  ],
+  "pointEstimate": 1.10901061691755,
+  "lowerBound95": 0.9268867123776128,
+  "verdict": "PASS"
+}

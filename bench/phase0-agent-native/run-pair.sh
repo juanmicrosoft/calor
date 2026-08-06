@@ -111,6 +111,10 @@ fi
 PAIR_DIR=""
 ARM=""
 RUNS=1
+# Starting run index. Interleaved epochs invoke run-pair once per run per arm, and
+# without an offset every invocation would restart at run-1 and overwrite the previous
+# one — the same silent-data-loss shape as two arms sharing an output directory.
+RUN_OFFSET=0
 OUT_DIR="$SCRIPT_DIR/epochs/adhoc"
 NULL_AGENT=0
 ITERATION_BUDGET=10
@@ -132,6 +136,7 @@ while [[ $# -gt 0 ]]; do
         --edit-mechanism) EDIT_MECHANISM="$2"; shift 2 ;;
         --calor-dll) CALOR_DLL_OVERRIDE="$2"; shift 2 ;;
         --arm-repo-root) ARM_REPO_ROOT="$2"; shift 2 ;;
+        --run-offset) RUN_OFFSET="$2"; shift 2 ;;
         --arm-label) ARM_LABEL_OVERRIDE="$2"; shift 2 ;;
         *) echo "Unknown arg: $1" >&2; exit 2 ;;
     esac
@@ -828,11 +833,21 @@ run_agent() {
     local mcp_args=()
     [[ -f "$ws_out/mcp-config.json" ]] && mcp_args=(--mcp-config "$ws_out/mcp-config.json" --strict-mcp-config)
 
+    # bash 3.2 (macOS's /bin/bash) treats "${arr[@]}" on an EMPTY array as an unbound
+    # variable under `set -u`, so the two invocations below must expand through the
+    # ${arr[@]+...} guard. Without it the raw arm — which registers no MCP server, so
+    # mcp_args is empty — dies BEFORE claude is invoked: no agent.json, exit 1, every
+    # run counted invalid, zero API spend. Found by the PP-W5 parity epoch, which is
+    # `raw` on both arms and so hit it 40/40; M5 never did because its arm B uses
+    # mcp-file (populating the array) and its arm A ran where `timeout` existed,
+    # taking the other branch. Both branches are guarded here — the timeout branch has
+    # the identical expansion and fails the same way when it is the live one.
+
     local rc=0
     if [[ -n "$timeout_bin" ]]; then
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
             "$timeout_bin" -k 10 "$TIMEOUT_SECS" \
-            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" "${mcp_args[@]}" \
+            claude --print --output-format json --dangerously-skip-permissions ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) || rc=$?
     else
         # Bash-watchdog fallback, hardened after ws2-exit-e2e-001 run 1: the
@@ -846,7 +861,7 @@ run_agent() {
         # pattern kill — logging every step to stderr.
         set -m
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
-            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" "${mcp_args[@]}" \
+            claude --print --output-format json --dangerously-skip-permissions ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
         local agent_pid=$!
         local deadline=$(( SECONDS + TIMEOUT_SECS ))
@@ -995,13 +1010,14 @@ extract_metrics() {
         --argjson mcp_writes "$mcp_writes" \
         --argjson defect "$defect" \
         --arg calor_dll "$CALOR_CLI_DLL" --arg edit_mech "$EDIT_MECHANISM" \
+        --arg arm_repo_root "$ARM_REPO_ROOT" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:$success,
           escapedBugs:$escaped, heldoutPassed:$passed,
           iterations:$iterations, iterationsToGreen:$itg, censored:$censored,
           invalid:false,
           meanFeedbackLatencyMs:$mean_lat, envelopeValidAll:$env_all,
           mcpWrites:$mcp_writes, defect:$defect,
-          calorDll:$calor_dll, editMechanism:$edit_mech,
+          calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
           tokens:{input:$tin, output:$tout}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
@@ -1019,11 +1035,12 @@ write_invalid_result() {
         --argjson escaped "$HELDOUT_TEST_COUNT" \
         --argjson null_agent "$NULL_AGENT" \
         --arg calor_dll "$CALOR_CLI_DLL" --arg edit_mech "$EDIT_MECHANISM" \
+        --arg arm_repo_root "$ARM_REPO_ROOT" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
           escapedBugs:$escaped, heldoutPassed:0,
           iterations:0, iterationsToGreen:$itg, censored:true,
           invalid:true, defect:null,
-          calorDll:$calor_dll, editMechanism:$edit_mech,
+          calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
           tokens:{input:0, output:0}, nullAgent:($null_agent==1)}' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
@@ -1037,7 +1054,7 @@ wipe_ws_out() {
 
 # ---------------------------------------------------------------------------
 check_pins
-for (( run=1; run<=RUNS; run++ )); do
+for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
     WS_OUT="$OUT_DIR/$PAIR_ID/$ARM_LABEL/run-$run"
     mkdir -p "$WS_OUT"
 
