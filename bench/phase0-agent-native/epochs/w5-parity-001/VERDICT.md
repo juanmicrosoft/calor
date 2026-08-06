@@ -16,8 +16,8 @@ from `run-pair.sh --arm-repo-root`, and **`run-m5-epoch.sh` never passed it.**
 So both arms compiled `.calr` with the same main-era compiler. The v0.10.0 build was used
 only for harness-internal telemetry the agent never sees.
 
-**The proof is filesystem, not inference.** Neither arm worktree contains
-`src/Calor.Tasks/bin` at all. Had `__REPO_ROOT__` pointed at the control worktree,
+**The proof is filesystem, not inference.** At the time of this epoch neither arm worktree
+contained `src/Calor.Tasks/bin` at all (both were built later, for `w5-parity-002`). Had `__REPO_ROOT__` pointed at the control worktree,
 `UsingTask AssemblyFile=…/Calor.Tasks.dll` would have failed and **every control run would
 have failed to build**. All 20 control runs were green with full held-out passes on
 iteration 1. There is no reading of that other than: both arms ran the harness checkout's

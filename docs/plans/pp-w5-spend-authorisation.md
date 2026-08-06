@@ -77,3 +77,35 @@ to detect a tax.
 A `--null-agent` pass (zero spend) runs first to verify plumbing. Epochs in this program
 have been invalidated by plumbing defects before — a nondeterministic eligible set, an
 arm that carried no Calor — and the cheap check is the one that catches them.
+
+
+---
+
+## Amendment, 2026-08-06 — realised spend exceeded the authorised range
+
+**Cumulative realised: $92.83.** That is above this authorisation's stated ceiling of $89, and
+is recorded here rather than left to be reconstructed from two epoch records.
+
+| epoch | outcome | spend |
+|---|---|---:|
+| `w5-parity-001` (attempt 1) | **VOID** — both arms compiled through the same `Calor.Tasks` | $38.75 |
+| `w5-parity-002` (attempt 2) | PASS | $54.08 |
+| | **cumulative** | **$92.83** |
+
+**Why the first attempt bought nothing.** `--calor-dll` pins the CLI, which the agent never
+invokes; the compiler that builds the agent's code comes from the arm template's `__REPO_ROOT__`
+via `--arm-repo-root`, which `run-m5-epoch.sh` never passed. The pre-flight I ran did not test
+for it, and the CLI content-hash guard I had added certified a contrast that did not exist. That
+$38.75 is a straightforward loss attributable to an unverified assumption in the apparatus.
+
+**Why attempt 2 cost more than projected** ($54.08 against ~$39). The projection was derived from
+the void epoch's own N1 costs — where both arms ran the *same* compiler. A genuine contrast costs
+more. Deriving a projection from a run that turned out to be void is itself a lesson: the
+projection inherited the defect.
+
+**Guards added so the same loss cannot recur:** a parity epoch now hard-fails unless per-arm
+repo roots are supplied, differ, and contain `Calor.Tasks.dll` binaries with different hashes;
+every run stamps the root it built against; and the adjudicator refuses to adjudicate unless the
+pins record two distinct roots and every run's provenance matches one of them.
+
+No further spend is authorised under this record.

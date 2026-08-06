@@ -118,7 +118,7 @@ Exit criteria: mechanism shipped **or** D-S4.2 negative published. Explicitly **
 - **D-S5.1 Supply measurement** at the pinned configuration: the full funnel per project, per stratum, with exclusion accounting, **plus a determinism screen** — gates §0.2's 5-consecutive-green rule applied to each eligible candidate's held-out test on both arms. The eligibility predicate decides on **one** run per arm, so unscreened "eligible" tasks may be ineligible for an epoch. Only screened tasks count toward M-S3.
 - **D-S5.2 Annex A-1.5 registration — frozen in S1, not S5.** Registers M-S1/M-S2/M-S3/M-S4/M-S5, PP-S1–PP-S4, the **exact `TaskGenOptions`** (all fields, committed as JSON, hash-referenced), each project's `ExcludePatterns` hash, the **frozen mutation-operator set**, the D-S1.5 fixture registry, and PP-S3's exhaustive non-hit trigger list. Governing rule, quoted correctly this time (`agent-native-gates.md:81`): *"reduce category count or raise the threshold **before** freezing — never after."* Draft v1 paraphrased this as "registration happens before freezing — never after," a tautology that constrained nothing.
 - **D-S5.3 Call S** (§6.2).
-- **D-S5.4 Release gates.** ~~Run the carried-forward PP-W5 parity epoch (own spend authorization) and clear PP-A1~~ — **both done: PP-A1 = PASS (A-1.8, #873), PP-W5 = PASS (A-1.9, `w5-parity-001`).** v0.12.0 covering the v0.11 range is unblocked on its gates.
+- **D-S5.4 Release gates.** ~~Run the carried-forward PP-W5 parity epoch (own spend authorization) and clear PP-A1~~ — **both done: PP-A1 = PASS (A-1.8, #873), PP-W5 = PASS (A-1.9, `w5-parity-002`).** v0.12.0 covering the v0.11 range is unblocked on its gates.
 - **D-S5.5 PP-W5 additive annex note,** registered results-blind before the epoch: (a) the adjudicated question is now "v0.11+v0.12 toolchain vs v0.10.0 release", superseding the frozen row's v0.11-only Basis sentence, which is recorded stale rather than deleted; (b) the on-fail isolation ladder becomes **two-step** (`v0.10.0 + WS-W2-only`, then `v0.10.0 + all-v0.11`) so a tax can be attributed among batch / v0.11-other / v0.12; (c) the 1.25 margin and its null calibration were derived for a one-release delta and are **not** re-derived, so a fail is more likely and a pass correspondingly stronger. The A-1.4 exclusion-closure note is the precedent for doing this additively.
 
 ### WS-S0 — Adoption: maintenance-mode posture (size: S; standing)
@@ -251,11 +251,12 @@ v0.12 is **not** on the strategy's Phase-2a/2b progression — it is prerequisit
 - **PP-W5 adjudicated, 2026-08-06 (A-1.9) — PASS on `w5-parity-002`; the first attempt VOID.**
   `w5-parity-001` measured nothing — `--calor-dll` pins the CLI the agent never invokes, so both
   arms compiled through the same Calor.Tasks ($38.75, withdrawn). The re-run bound the product
-  per arm: point **1.098**, lower bound **0.653**, 40/40 valid, $54.08. **The finding that
-  outweighs the verdict:** per-pair ratios span **0.470–1.622** with no consistent direction, a
-  ~7× increase in spread over the accidental null. PASS therefore means *no large systematic tax
-  detected*, not parity — the bound admits a ~35% improvement or a ~10% tax. Five apparatus
-  defects preceded the number, four silent.
+  per arm and verified it by the compiler's own `compilerHash`: point **1.098** recorded,
+  **1.0016** after a metric erratum, 40/40 valid, $54.08 ($92.83 cumulative). **Two claims from
+  the first draft of this entry are withdrawn** — a 0.470 ratio that was a 55× token
+  under-count, and a "sevenfold spread" finding that a permutation test places at the 50th
+  percentile of the no-effect null. No heterogeneity is claimed. Six apparatus defects preceded
+  the number; five were silent.
 - **PP-A1 adjudicated, 2026-08-05 (A-1.8) — PASS, all nine items.** The first adjudication
   claimed all nine; adversarial review refuted **item 6** and it was right: **divergence D4 was a live
   false-`Proven`-elides vector**, reproduced end-to-end on a shipped path (`calor run` threw;
