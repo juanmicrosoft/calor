@@ -82,6 +82,20 @@ public class BenchCorpusCompilesTests
         Assert.True(count >= 20, $"expected the pair corpus to be discovered; found {count}");
     }
 
+    /// <summary>
+    /// Same guard for the samples corpus, which was written with the same silent-empty return and
+    /// no check. Found by release review of v0.12: the guard above was added for exactly this
+    /// failure mode and then not applied to the second discovery function in the same file.
+    /// </summary>
+    [Fact]
+    public void SampleCorpusIsNotEmpty()
+    {
+        // 11 on disk at v0.12.0. The floor is a discovery guard, not an inventory pin — it must
+        // catch "found zero" without failing on an intentional removal of one sample.
+        var count = SamplePrograms().Count();
+        Assert.True(count >= 8, $"expected the samples corpus to be discovered; found {count}");
+    }
+
     public static TheoryData<string> SamplePrograms()
     {
         var data = new TheoryData<string>();

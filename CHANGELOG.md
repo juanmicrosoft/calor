@@ -6,6 +6,29 @@ All notable changes to this project will be documented in this file.
 
 ## [0.12.0] - 2026-08-06
 
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32 (Calor/C#)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x (large effect)
+  - ErrorDetection: 1.49x (large effect)
+  - TokenEconomics: 1.42x (small effect)
+  - InformationDensity: 0.98x (**C# wins**, medium effect)
+- **Programs Tested**: 217
+
+**Read these with the caveat they deserve.** Every confidence interval in this run is
+zero-width (`[1.84, 1.84]`), because these metrics are computed by static analysis and are
+deterministic: the 30 runs are 30 identical runs. The interval measures run-to-run variance,
+of which there is none, and *not* uncertainty about the underlying claim — sampling error over
+the 217-program corpus is real and is not what these numbers report. The reported p-values
+inherit the same defect. The measurements are unchanged from v0.10.0 on this corpus; only the
+timestamp and commit moved. Filed as a known defect in the dashboard's statistics, not fixed
+in this release.
+
+**And a scope caveat.** These are the C#-versus-Calor micro-benchmarks. They are **not** the
+release gates — PP-A1 and PP-W5 are, and PP-W5 explicitly adjudicates nothing about Calor
+versus C#.
+
 **This release covers the v0.11 range as well** — there is no `v0.11.0` tag; the maintainer folded
 v0.11 forward, so everything below ships together.
 
@@ -15,12 +38,16 @@ erratum, registered as *no large tax detected*, explicitly not a proof of parity
 
 **The headline is soundness.** Six distinct false-`Proven`-elides vectors were closed — cases where
 `calor run --verify` deleted a runtime check that `calor run` proved would have failed. Enumerated so
-the count is checkable rather than asserted: **D4** in two halves (non-ordinal comparison modes;
-bare `StartsWith`/`EndsWith`/`IndexOf` with no mode), **D3** (Z3 strings are null-free), **D12** (Z3
-counts code points, .NET counts UTF-16 units), and **D14** in two halves (array sorts, user-type
-sorts) — plus a sixth `$length` mint site found inside the D14 fix itself. That is six closures, not
-six review rounds; several arrived in the same round, and two were found *inside* the fix for an
-earlier one. The count of *vectors still unfound* is not knowable and is not claimed to be zero.
+the count is checkable rather than asserted: (1) **D4** non-ordinal comparison modes; (2) **D4** bare
+`StartsWith`/`EndsWith`/`IndexOf`, which use the *current culture* in .NET and so diverge with no
+mode argument present to signal it; (3) **D3**, Z3 strings are null-free; (4) **D12**, Z3 counts code
+points where .NET counts UTF-16 units; (5) **D14**, array and user-type sorts are total and non-null;
+(6) the third `$length` mint site, which the D14 fix's own first cut missed. Each of the six has a
+recorded `calor run` versus `calor run --verify` reproduction.
+
+That is six closures, not six review rounds — several arrived in the same round, and two were found
+*inside* the fix for an earlier one. The count of *vectors still unfound* is not knowable and is not
+claimed to be zero.
 
 What closed the class was a change of mechanism, not a better enumeration. Hand-enumeration was tried
 at three levels — divergence rows, then Z3 sorts, then `$length` mint sites — and missed something at
@@ -37,7 +64,7 @@ non-nullable at the binder, which is what would let the string demotion be lifte
 ### Added
 - **WS-W2 — the five effect-soundness holes are closed (#842).** Effect enforcement previously had branches that resolved to *silently pure*, which is the fail-open direction. Now: invoking a delegate held in a value (parameter, `§B` binding, field) is an **error** (`Calor0418`) rather than an assumed-pure no-op, with `--permissive-effects` the only waiver; **effect variance is checked on both legs** — an override's `§E` must be a subset of its base's (`Calor0420`) and an implementation's a subset of its interface's (`Calor0421`), which is what makes charging declared effects at in-module virtual call sites dispatch-sound; **interop is `Assumed`, and propagates** (`Calor0419`) transitively over the reverse call graph rather than stopping at the boundary; the **mutator purge** (#785) removes `Add`/`Remove`/`Clear`/`Insert`/`Sort`/`CopyTo` and friends from the known-pure list, with untyped receivers now failing loud; and both `_ => EffectSet.Empty` catch-alls are replaced by exhaustive node-kind switches, so an AST node nobody taught the pass about becomes `Calor0419`, never silently pure. `--enforce-effects` now **defaults on** for `build` and `watch` (`--no-enforce-effects` opts out), ending the CLI/SDK split-brain where the SDK enforced and the CLI did not.
 - **WS-W3 — the adoption surface (#841).** `calor import <package>` generates effect manifests from a real assembly in three tiers — IL-derived (`Confidence: inferred`), curated-manifest (reported, not re-emitted), and **unresolved, which is surfaced loudly (`Calor1351`) and excluded from the manifest** rather than defaulted to pure; classification is per (type, member, kind) group and any unresolved overload poisons the member. Nothing is ever emitted as `verified`. Validated live on Serilog (207 members: 76/115/16) and MediatR (38: 19/4/15). Contract synthesis writes a `<pkg>.calor-contracts.json` sidecar in which **every entry carries `provenance: "assumed"`** (`Calor1353`); the consumption path is deliberately not built, so these are annotation-only and cannot launder into a proof. `calor review-packet` leads with the **unproven remainder** — seven-status counts, assumption lists, vacuity flags, counterexamples, and per-module interop/waiver fractions with waiver disclosure on the first line (`Calor1357`) — plus caller-impact from the in-memory call graph (`--changed`/`--baseline-ref`). Ships with `docs/guides/adoption-playbook.md` and an **11-test eject suite** that compiles and *executes* the ejected C# to pin what survives leaving Calor (`§Q`/`§S` degrade to runtime guards; `Off` strips them; the #764 early-return refusal is pinned as a known gap).
-- **WS-W4 — conversion honesty completed, and the real-scale benchmark venue built and then retired (#844/#846/#849/#852/#853/#854).** The remaining **silent** conversion substitutions became loud (#844), and namespace and local-function handling moved SILENT → LOUD with preprocessor/record behavior pinned (#846). On top of that, a real-scale task venue: mutate-then-convert task generation with an eligibility predicate (#849), a gold-standard bug-fix-revert task source (#852), an epoch runner verified end-to-end against a null agent (#853), and a dry-run record with spend authorisation (#854). **The venue was then retired by Call S before it adjudicated anything**, on the finding that its "Calor arm" bundles contained no Calor — recorded in `docs/plans/` rather than quietly dropped, because a venue that was built, paid for, and found unfit is a result.
+- **WS-W4 — conversion honesty completed, and the real-scale benchmark venue built and then retired (#844/#846/#848/#849/#852/#853/#854/#856).** The remaining **silent** conversion substitutions became loud (#844), and namespace and local-function handling moved SILENT → LOUD with preprocessor/record behavior pinned (#846). On top of that, a real-scale task venue: mutate-then-convert task generation with an eligibility predicate (#849), a vendored corpus pinned at fixed SHAs with the first fidelity measurement against it (#848), a gold-standard bug-fix-revert task source (#852), an expressible-defect stratum — verification-addressable mutation operators plus an addressability gate, so the tasks a verification claim is tested on are ones verification could in principle catch (#856), an epoch runner verified end-to-end against a null agent (#853), and a dry-run record with spend authorisation (#854). **The venue was then retired by Call S before it adjudicated anything**, on the finding that its "Calor arm" bundles contained no Calor — recorded in `docs/plans/` rather than quietly dropped, because a venue that was built, paid for, and found unfit is a result.
 - **W1 Slice 4 — `Calor.Sdk` is a functional, published, consumer-tested package (#787/#790/#788 subsets; PP-A1 items 1/2/4):**
   - **Self-contained MSBuild SDK package**: the nupkg carries `Sdk/` props+targets, the full `Calor.Tasks` dependency closure (compiler, `Calor.Runtime`, `Microsoft.Z3`) under `tasks/net10.0/`, and per-RID Z3 natives — staged via `dotnet publish` and packed through the supported `TargetsForTfmSpecificContentInPackage` extension point with hard `<Error>` assertions for every required file (the old late-glob target could silently pack nothing). `Calor.Runtime` is bundled and injected as a `Reference` by the targets (version lockstep by construction; `CalorSdkImportRuntime=false` opts out). `Z3ContextFactory` now probes assembly-relative `runtimes/<rid>/native` and registers its resolver on the task assembly's own AssemblyLoadContext — verification genuinely runs inside consumer MSBuild builds.
   - **M-A1 is enforced in CI**: `tests/SdkConsumer/` + `.github/scripts/test-sdk-package.sh` pack the SDK into a local source-mapped feed, then restore/build/test a consumer that uses `<Sdk Name="Calor.Sdk"/>` with no project references — asserting build+tests green AND that the verify gate produced a real `Calor0712` counterexample in the task context (`Calor0710` absent). Package-content inspection via `.github/scripts/inspect-sdk-nupkg.sh`.
@@ -51,7 +78,7 @@ non-nullable at the binder, which is what would let the string demotion be lifte
 - **Postcondition elision is withdrawn for any signature naming an array or a non-primitive type (D14).** Z3's array and user-type sorts are **total and non-null**; .NET's `T[]` and class types are nullable references. `<name>$length` is minted as an unconstrained `u32`, so `a.Length >= 0` is a solver tautology while the same expression throws at runtime on a null array — a false `Proven`, and `Proven && !IsVacuous` deletes the runtime check. Reproduced end-to-end: `calor run` crashed with a `NullReferenceException` where `calor run --verify` printed and exited 0. Such proofs are now **`Assumed`**, which never elides, on both the postcondition and `§PROOF` channels.
   - **What this costs, stated plainly:** the trigger fires when the sort is *minted*, and parameters are declared before any contract is translated — so a function taking `[i32]` or a class loses postcondition elision **even when its postcondition names only `result`**. Only signatures made entirely of modeled primitives still elide. Coarse on purpose: being wrong in the narrow direction deletes a runtime check; being wrong in the broad direction costs an optimization. Contract *proving* and reporting are unchanged.
   - **Cache format 1.12 → 1.13**, which invalidates every persisted verification entry: 1.12 entries hold `Proven` for array-carried proofs, exactly the verdict that elides.
-  - This is the fifth vector of one class — *a sort Z3 models as total where the .NET value can be null* — after D4 (string comparison modes) and D3/D12 (null-free, byte-counted strings). The class, not its members, is the thing; enumerating members by hand is what repeatedly failed.
+  - This is vector (5) in the headline's enumeration, and the fifth of one class — *a sort Z3 models as total where the .NET value can be null* — after D4 (string comparison modes) and D3/D12 (null-free, byte-counted strings). The class, not its members, is the thing; enumerating members by hand is what repeatedly failed.
 
 - **`EnableTypeChecking` is now default-ON, and the type checker no longer rejects valid programs (#761; PP-A1 item 9).** The flip was blocked by defects in the checker itself, not by the flip: turning it on produced **92 test failures**, every one of them a working program the checker refused. They were already live for agents — `calor_check` and `calor_refine` set `EnableTypeChecking = true`, so the MCP primer's own `§M{m3:Files}` module, two shipped benchmarks and the syntax exemplar were all being rejected. Fixed:
   - **Types the checker did not know.** `char` (37 of the 92), `object`, `decimal`, and every sized/unsigned integer (`i8 i16 i64 u8 u16 u32 u64`, `f32`) — all documented in the syntax reference, all reported as `Unknown type`. Arrays (`T[]` and `[T]`) did not resolve either. Sized types reach the checker **expanded** (`INT[bits=64][signed=true]`), so they are now normalized through the same surface-spelling helper the diagnostics use — and they carry the width the user wrote, so a mismatch on an `i64` binding says `i64` rather than the collapsed `i32`.
@@ -82,6 +109,7 @@ non-nullable at the binder, which is what would let the string demotion be lifte
   - **Z3 binaries are checksum-verified on every scripted fetch path (#789; widened by review M3).** `publish-nuget.yml` previously fetched natives with a bare `curl -L` (no `-f`, no verification) — a 404 page could ship inside the nupkg as `libz3`. Now fail-closed against committed SHA-256 manifests at all four fetch sites: the publish workflow (repo `z3-binaries` assets, `.github/z3-binaries-4.15.7.sha256`), `download-z3.sh`, `download-z3.ps1` (the Windows dev path), and `build-z3.yml`'s prebuilt job — the job whose output *becomes* the `z3-binaries` release, so an unverified fetch there would have laundered a poisoned upstream archive into a "pinned" release (upstream manifest: `src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256`). Recorded residual: the ARM64-macOS from-source build clones the z3-4.15.7 **tag** (not a commit pin); manifests are trust-on-first-use, disclosed in each file.
 
 ### Fixed
+- **~365 Z3-backed verification tests were silently skipping in CI, and now cannot (#858).** The natives were seeded *after* MSBuild evaluation, so the Z3-gated suites resolved to "solver unavailable" and skipped rather than failed — which means **v0.10.0 was published with those tests not actually running**, and the gate that was reported green was green for the wrong reason. Natives are now seeded before evaluation, and a new `Assert no Z3-gated test silently skipped` step gates `publish-nuget.yml`: a skip is now a build failure rather than a quiet subtraction from the denominator. Recorded here rather than left in the commit log because it changes what the previous release's green CI meant.
 - **W1 Slice 1 soundness batch (wedge plan v0.11, kickoff T1/T2 + D6–D10):** every known false-`Proven`-that-elides vector on the modeled-forms whitelist is closed, and the postcondition runtime-check lowering no longer silently skips or reorders checks. Verification cache format bumps to **1.8** (verdict semantics changed in both polarities — warm 1.7 caches could serve stale verdicts for all shapes below).
   - **`string.Replace` un-whitelisted (D9):** Z3 models first-occurrence replacement, .NET replaces all occurrences; contracts using it now report `unsupported` (runtime check kept) instead of proving through the divergence.
   - **Narrow-int arithmetic refused (D1):** arithmetic/shifts/negation where every operand is sub-32-bit report `unsupported` — C# promotes narrow integers to `int` while the solver would wrap at the narrow width (`§S (< (+ x y) 128)` over `i8` was provable while runtime 100+100=200 violated it). A 32-bit-or-wider operand rescues the pair (width normalization matches promotion); comparisons on narrow operands stay modeled.

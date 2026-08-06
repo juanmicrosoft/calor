@@ -74,6 +74,15 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool EnforceEffects { get; set; } = true;
 
     /// <summary>
+    /// Whether to run the type checker. Mirrors
+    /// <see cref="Calor.Compiler.CompilationOptions.EnableTypeChecking"/>, default-on since
+    /// v0.12. Set the MSBuild property <c>CalorTypeCheck</c> to <c>false</c> to opt out —
+    /// without it a consumer of the published SDK has no way off a default that can reject a
+    /// program their previous build accepted.
+    /// </summary>
+    public bool TypeCheck { get; set; } = true;
+
+    /// <summary>
     /// Run static contract verification during compilation (Annex A-1.3
     /// instrumentation item 1): refutations surface as Calor0712-band build
     /// diagnostics (Warning severity — the build still succeeds). Off by
@@ -128,7 +137,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 .Select(f => f.ToLowerInvariant())
                 .OrderBy(f => f, StringComparer.Ordinal));
         var optionsHash = BuildStateCache.ComputeOptionsHash(
-            $"enforceEffects:{EnforceEffects}|verify:{Verify}"
+            $"enforceEffects:{EnforceEffects}|typeCheck:{TypeCheck}|verify:{Verify}"
             + $"|ilAnalysis:{EnableILAnalysis}|experimental:{canonicalExperimentalFlags}");
         var manifestHash = BuildStateCache.ComputeManifestHash(ProjectDirectory);
 
@@ -389,6 +398,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 {
                     Verbose = Verbose,
                     EnforceEffects = EnforceEffects,
+                    EnableTypeChecking = TypeCheck && CompilationOptions.TypeCheckingDefault,
                     ProjectDirectory = ProjectDirectory,
                     Context = compilationContext,
                     EnableILAnalysis = EnableILAnalysis,

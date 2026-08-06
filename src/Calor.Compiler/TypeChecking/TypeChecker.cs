@@ -19,20 +19,30 @@ public sealed class TypeChecker
 
     public void Check(ModuleNode module)
     {
-        // Pass -1: register the module's OWN type declarations, before anything resolves a
-        // type name. Without this the checker treats a class the user declared eight lines
-        // above as an unknown external type and warns that it "may be a typo" — a false
-        // positive on a program that compiles and runs, and one the shipped corpus does not
-        // exercise because no sample binds a locally-declared class to a typed §B.
-        foreach (var name in ModuleDeclaredTypeNames(module))
-        {
-            _env.DefineType(name, new ExternalType(name));
-        }
-
-        // Pass 0: register refinement type definitions
+        // Pass 0: register refinement type definitions.
+        //
+        // Ordered BEFORE the declared-type pass on purpose. RegisterRefinementType rejects a
+        // name that is already defined ("Duplicate refinement type name"), so registering
+        // classes first would newly reject a §RTYPE sharing a module type's name — a program
+        // that compiled before v0.12. Refinements win the name, as they did when the checker
+        // knew no module types at all.
         foreach (var rtype in module.RefinementTypes)
         {
             RegisterRefinementType(rtype);
+        }
+
+        // Pass -1 (runs second, named for what it establishes): the module's OWN type
+        // declarations, before anything in a function signature or body resolves a type name.
+        // Without this the checker treats a class the user declared eight lines above as an
+        // unknown external type and warns that it "may be a typo" — a false positive on a
+        // program that compiles and runs, and one the shipped corpus does not exercise because
+        // no sample binds a locally-declared class to a typed §B.
+        foreach (var name in ModuleDeclaredTypeNames(module))
+        {
+            if (_env.LookupType(name) == null)
+            {
+                _env.DefineType(name, new ExternalType(name));
+            }
         }
 
         // First pass: register all type definitions
@@ -56,10 +66,63 @@ public sealed class TypeChecker
     /// </summary>
     private static IEnumerable<string> ModuleDeclaredTypeNames(ModuleNode module)
     {
-        foreach (var c in module.Classes) yield return c.Name;
-        foreach (var i in module.Interfaces) yield return i.Name;
-        foreach (var e in module.Enums) yield return e.Name;
-        foreach (var d in module.Delegates) yield return d.Name;
+        foreach (var name in DeclaredTypeNames(
+            module.Classes, module.Interfaces, module.Enums, module.Delegates))
+        {
+            yield return name;
+        }
+
+        foreach (var it in module.IndexedTypes) yield return it.Name;
+
+        // §PP-wrapped declarations, both branches. A name declared only in the #else arm is
+        // still a name the user wrote, and the checker has no preprocessor state — registering
+        // both arms is the fail-open direction, and failing open here costs only a suppressed
+        // warning, while failing closed reports a working program as a typo.
+        foreach (var pp in module.TypePreprocessorBlocks)
+        {
+            foreach (var name in PreprocessorDeclaredTypeNames(pp)) yield return name;
+        }
+    }
+
+    private static IEnumerable<string> PreprocessorDeclaredTypeNames(TypePreprocessorBlockNode? pp)
+    {
+        for (; pp is not null; pp = pp.ElseBranch)
+        {
+            foreach (var name in DeclaredTypeNames(pp.Classes, pp.Interfaces, pp.Enums, pp.Delegates))
+            {
+                yield return name;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The four type-declaring collections, recursing through nested classes. Shared between the
+    /// module level and every §PP arm so a declaration cannot be visible in one place and unknown
+    /// in the other — the release that shipped this pass found the hand-enumerated version missed
+    /// §PP blocks, nested types and §IDX, which is the same enumeration failure its own headline
+    /// is about.
+    /// </summary>
+    private static IEnumerable<string> DeclaredTypeNames(
+        IReadOnlyList<ClassDefinitionNode> classes,
+        IReadOnlyList<InterfaceDefinitionNode> interfaces,
+        IReadOnlyList<EnumDefinitionNode> enums,
+        IReadOnlyList<DelegateDefinitionNode> delegates)
+    {
+        foreach (var c in classes)
+        {
+            yield return c.Name;
+
+            // Nested types are spelled by their bare name inside the enclosing scope.
+            foreach (var name in DeclaredTypeNames(
+                c.NestedClasses, c.NestedInterfaces, c.NestedEnums, c.NestedDelegates))
+            {
+                yield return name;
+            }
+        }
+
+        foreach (var i in interfaces) yield return i.Name;
+        foreach (var e in enums) yield return e.Name;
+        foreach (var d in delegates) yield return d.Name;
     }
 
     /// <summary>Set during the signature pre-pass, which re-resolves annotations CheckFunction

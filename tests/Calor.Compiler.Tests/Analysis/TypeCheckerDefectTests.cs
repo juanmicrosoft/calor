@@ -338,20 +338,57 @@ public class TypeCheckerDefectTests
     }
 
     /// <summary>
-    /// The v0.12 default flip must have an opt-out, as `--no-enforce-effects` (v0.11) and
-    /// `--no-strict-bind-inference` (v0.6.3) do. Shipping a flip that rejects previously
-    /// compiling programs with no escape hatch is what release review caught.
+    /// The §PP, nested-type and §IDX gaps in the first cut of the declared-type pass. The first
+    /// version hand-enumerated four module collections and missed every declaration that was not
+    /// directly on the module — in a release whose own headline is that hand-enumeration failed
+    /// at three successive levels. Found by release review.
     /// </summary>
     [Fact]
-    public void TypeCheckingCanBeDisabled()
+    public void PreprocessorWrappedAndNestedDeclarations_AreNotReportedAsUnknown()
     {
-        const string src = "§M{m:S}\n  §F{f:Do:pub} () -> void\n    §E{}\n    §B{x:NoSuchTypeXyz} STR:\"a\"\n    §R\n";
+        var result = Check("""
+            §M{m001:PpTest}
+              §PP{DEBUG}
+                §CL{c001:Dbg:pub}
+                  §FLD{i32:N:pub}
+              §/PP{DEBUG}
+              §CL{c002:Outer:pub}
+                §CL{c003:Inner:pub}
+                  §FLD{i32:M:pub}
+              §F{f001:Use:pub} (Dbg:d) -> void
+                §E{}
+                §B{i:Inner}
+                §R
+            """);
 
-        var on = Program.Compile(src, "t.calr", new CompilationOptions { EnableTypeChecking = true });
-        var off = Program.Compile(src, "t.calr", new CompilationOptions { EnableTypeChecking = false });
-
-        Assert.Contains(on.Diagnostics, d => d.Message.Contains("is not known"));
-        Assert.DoesNotContain(off.Diagnostics, d => d.Message.Contains("is not known"));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("is not known"));
     }
+
+    /// <summary>
+    /// The declared-type pass must not steal a name from a §RTYPE. RegisterRefinementType rejects
+    /// an already-defined name, so registering module types first would newly reject a refinement
+    /// sharing a class name — a program that compiled before v0.12. Refinements are registered
+    /// first and the declared-type pass skips names already taken.
+    /// </summary>
+    [Fact]
+    public void RefinementType_KeepsItsName_AgainstASameNamedClass()
+    {
+        var result = Check("""
+            §M{m001:RtTest}
+              §CL{c001:Positive:pub}
+                §FLD{i32:V:pub}
+              §RTYPE{r001:Positive:i32} (> value INT:0)
+              §F{f001:Use:pub} () -> void
+                §E{}
+                §R
+            """);
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Message.Contains("Duplicate refinement type name"));
+    }
+
+    // The opt-out itself is pinned in CliTypeCheckDefaultTests, against the real CLI. A pin that
+    // sets CompilationOptions.EnableTypeChecking directly cannot discriminate: that property has
+    // been init-settable since long before the flag existed, so such a test passes with the entire
+    // opt-out removed. Release review caught exactly that here.
 
 }

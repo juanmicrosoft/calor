@@ -109,3 +109,22 @@ every run stamps the root it built against; and the adjudicator refuses to adjud
 pins record two distinct roots and every run's provenance matches one of them.
 
 No further spend is authorised under this record.
+
+---
+
+## Disclosure, 2026-08-06 — release-triggered spend outside this record
+
+Creating the `v0.12.0` GitHub release fires `.github/workflows/benchmark.yml`
+(`on: release: types: [created]`), which runs four LLM benchmark suites at `--budget 5.00`
+each — **up to ~$20**, on `ANTHROPIC_API_KEY`, unattended — and then opens a PR against `main`
+with the results.
+
+This is **not** authorised by this record and is **not** epoch spend: it is the repo's
+long-standing release automation, predating this program, and it adjudicates no gate. It is
+written down here rather than left to be discovered in a billing statement, because a program
+that maintains a spend-authorisation file and then spends outside it silently has the file for
+decoration. Found by adversarial review of the v0.12.0 release cut.
+
+The workflow is not disabled for this release — the results feed the public dashboard, which is
+its purpose. If a future release should not carry that spend, the lever is
+`workflow_dispatch`-only plus a manual trigger, not a surprise.

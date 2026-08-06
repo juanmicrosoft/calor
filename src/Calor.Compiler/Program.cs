@@ -418,7 +418,7 @@ public class Program
                         StrictApi = strictApi,
                         RequireDocs = requireDocs,
                         EnforceEffects = enforceEffects,
-                        EnableTypeChecking = !noTypeCheck,
+                        EnableTypeChecking = !noTypeCheck && CompilationOptions.TypeCheckingDefault,
                         StrictEffects = strictEffects,
                         UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
                         ContractMode = parsedContractMode,
@@ -1130,9 +1130,34 @@ public sealed class CompilationOptions
     public Analysis.VerificationAnalysisResult? VerificationAnalysisResult { get; internal set; }
 
     /// <summary>
-    /// Enable type checking phase.
+    /// Enable the type checking phase. Default-on since v0.12 (PP-A1 item 9).
     /// </summary>
-    public bool EnableTypeChecking { get; init; } = true;
+    /// <remarks>
+    /// The default is <see cref="TypeCheckingDefault"/>, which is <c>true</c> unless
+    /// <c>CALOR_NO_TYPE_CHECK=1</c> is set. The opt-out is read <em>here</em>, at the default,
+    /// rather than threaded through the ~30 sites that construct <see cref="CompilationOptions"/>:
+    /// a default flip that can reject a previously-compiling program needs an escape hatch on
+    /// every entry point — <c>run</c>, <c>test</c>, <c>watch</c>, <c>verify</c>, the MCP tools and
+    /// the MSBuild task inside the published SDK — and hand-threading a flag would have covered
+    /// <c>build</c> only. The CLI flag <c>--no-type-check</c> and the MSBuild property
+    /// <c>CalorTypeCheck</c> set this explicitly; the variable is the backstop that cannot be
+    /// forgotten at a new construction site.
+    /// </remarks>
+    public bool EnableTypeChecking { get; init; } = TypeCheckingDefault;
+
+    /// <summary>
+    /// The type-checking default, honouring <c>CALOR_NO_TYPE_CHECK</c>. Explicit setters should
+    /// AND against this rather than assigning <c>true</c>, so an explicit "on" from a default-on
+    /// CLI flag does not silently defeat the environment opt-out.
+    /// </summary>
+    public static bool TypeCheckingDefault
+    {
+        get
+        {
+            var v = Environment.GetEnvironmentVariable("CALOR_NO_TYPE_CHECK");
+            return v is not ("1" or "true" or "TRUE" or "True");
+        }
+    }
 
     /// <summary>
     /// Enable strict bind-inference diagnostics (Calor0251-0253). Default-on
