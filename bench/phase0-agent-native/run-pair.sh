@@ -828,11 +828,21 @@ run_agent() {
     local mcp_args=()
     [[ -f "$ws_out/mcp-config.json" ]] && mcp_args=(--mcp-config "$ws_out/mcp-config.json" --strict-mcp-config)
 
+    # bash 3.2 (macOS's /bin/bash) treats "${arr[@]}" on an EMPTY array as an unbound
+    # variable under `set -u`, so the two invocations below must expand through the
+    # ${arr[@]+...} guard. Without it the raw arm — which registers no MCP server, so
+    # mcp_args is empty — dies BEFORE claude is invoked: no agent.json, exit 1, every
+    # run counted invalid, zero API spend. Found by the PP-W5 parity epoch, which is
+    # `raw` on both arms and so hit it 40/40; M5 never did because its arm B uses
+    # mcp-file (populating the array) and its arm A ran where `timeout` existed,
+    # taking the other branch. Both branches are guarded here — the timeout branch has
+    # the identical expansion and fails the same way when it is the live one.
+
     local rc=0
     if [[ -n "$timeout_bin" ]]; then
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
             "$timeout_bin" -k 10 "$TIMEOUT_SECS" \
-            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" "${mcp_args[@]}" \
+            claude --print --output-format json --dangerously-skip-permissions ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) || rc=$?
     else
         # Bash-watchdog fallback, hardened after ws2-exit-e2e-001 run 1: the
@@ -846,7 +856,7 @@ run_agent() {
         # pattern kill — logging every step to stderr.
         set -m
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
-            claude --print --output-format json --dangerously-skip-permissions "${model_args[@]}" "${mcp_args[@]}" \
+            claude --print --output-format json --dangerously-skip-permissions ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
             "$prompt" > "$ws_out/agent.json" 2> "$ws_out/agent.err" ) &
         local agent_pid=$!
         local deadline=$(( SECONDS + TIMEOUT_SECS ))
