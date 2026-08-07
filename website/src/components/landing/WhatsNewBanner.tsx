@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.12.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.12.1</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The soundness release: six distinct cases where <code>--verify</code> deleted a runtime check that would have failed are closed — by refusing the divergent forms and by demoting proofs carried by a sort Z3 models as total to <em>Assumed</em>, which never elides. Type checking is on by default, effect enforcement closes five fail-open holes, and <code>calor import</code> plus <code>calor review-packet</code> land the adoption surface. Both release gates pass; the toolchain-parity epoch found no large token tax.</span>
+            <span className="text-foreground">The soundness release of v0.12.0 is now actually installable. Both publish channels were broken — the extension had failed to publish for three consecutive releases — so <code>calor</code> is back on NuGet and the VS Code extension is back on the marketplace. Along the way: the shipped Z3 wrapper is now upstream&apos;s Release build rather than a Debug artifact, it loads on ARM64 again, and CI exercises both release-only paths so neither failure can reach release day unseen.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
