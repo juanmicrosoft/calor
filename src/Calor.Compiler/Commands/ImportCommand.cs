@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Diagnostics;
@@ -137,7 +138,12 @@ public static class ImportCommand
 
             var ilOptions = new ILAnalysisOptions
             {
-                RuntimeDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location),
+                // Not typeof(object).Assembly.Location: that is empty under
+                // single-file publish (IL3000), which would silently drop the
+                // framework-assembly probe root in AssemblyIndex. GetRuntimeDirectory
+                // is the single-file-safe equivalent and returns the shared-framework
+                // directory for the framework-dependent `calor` global tool.
+                RuntimeDirectory = RuntimeEnvironment.GetRuntimeDirectory(),
                 NuGetPackageRoot = GetNuGetPackagesRoot(),
                 DepsFilePath = target.DepsFilePath
             };

@@ -5,6 +5,14 @@ name: Build Z3 Native Libraries
 #
 # The publish-nuget workflow downloads these pre-built binaries.
 
+# DELIBERATE REPUBLISH ONLY. This workflow used to also run on push to main
+# whenever one of the z3 scripts changed. That is what broke the v0.12.0 NuGet
+# publish: #789 added .github/z3-binaries-4.15.7.sha256 pinning the release
+# assets, and the push of that very commit re-triggered this workflow, which
+# republished all 8 assets a day after the manifest was computed — invalidating
+# the pin with its own introduction. Republishing the shared z3-binaries release
+# retroactively changes what every past tag resolves to, so it must be an
+# explicit act, never a side effect of editing a script.
 on:
   workflow_dispatch:
     inputs:
@@ -13,27 +21,27 @@ on:
         required: true
         default: '4.15.7'
         type: string
-  push:
-    branches: [main]
-    paths:
-      # Only trigger when Z3 version might have changed
-      - 'src/Calor.Compiler/scripts/download-z3.sh'
-      - 'src/Calor.Compiler/scripts/download-z3.ps1'
-      - 'src/Calor.Compiler/scripts/build-z3-from-source.sh'
 
 env:
   Z3_VERSION: ${{ github.event.inputs.z3_version || '4.15.7' }}
+  # Must stay in sync with MANAGED_DLL_ARCHIVE in
+  # src/Calor.Compiler/scripts/download-z3.sh — the managed wrapper we publish
+  # has to be the same bytes developers and CI already build against.
+  MANAGED_DLL_ARCHIVE: x64-win
 
 jobs:
-  # Build Z3 on ARM64 platforms (pre-built binaries have loading issues)
+  # Build Z3 from source on ARM64 macOS ONLY. The upstream arm64-osx archive has
+  # assembly-loading problems on that platform (same exception download-z3.sh
+  # makes at its Darwin/arm64 branch). Every other RID — including linux-arm64,
+  # which download-z3.sh has always taken from the upstream arm64-glibc-2.38
+  # archive — uses the checksum-verified prebuilt path below, because a
+  # from-source C++ build is not reproducible and silently re-drifts the pin on
+  # every run.
   build-z3-arm64:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04-arm
-            rid: linux-arm64
-            lib: libz3.so
           - os: macos-latest
             rid: osx-arm64
             lib: libz3.dylib
@@ -98,10 +106,16 @@ jobs:
           cp /tmp/z3/build/${{ matrix.lib }} bin/Debug/net10.0/
           dotnet run
 
+      # ONLY the native library. The source-built Microsoft.Z3.dll is a Debug
+      # netstandard1.4 assembly that embeds the builder's absolute obj path, so
+      # it differs on every run — and it used to win the `find | head -1` race in
+      # create-release, which is how a Debug, source-compiled managed wrapper
+      # ended up shipping inside the calor nupkg instead of the official Release
+      # assembly that download-z3.sh gives every developer and every CI test run.
+      # The managed DLL now comes from the canonical upstream archive below.
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
-          cp /tmp/z3/build/dotnet/bin/Debug/netstandard1.4/Microsoft.Z3.dll artifacts/
           cp /tmp/z3/build/${{ matrix.lib }} artifacts/
 
       - name: Upload artifacts
@@ -110,7 +124,9 @@ jobs:
           name: z3-${{ matrix.rid }}-${{ env.Z3_VERSION }}
           path: artifacts/
 
-  # Download pre-built Z3 for x64 and Windows ARM64 platforms
+  # Download pre-built Z3 for every RID except osx-arm64. These archives are
+  # pinned by src/Calor.Compiler/scripts/z3-upstream-<ver>.sha256, so extraction
+  # is deterministic and the resulting release assets are byte-stable across runs.
   download-z3-prebuilt:
     runs-on: ubuntu-latest
 
@@ -119,6 +135,9 @@ jobs:
         include:
           - rid: linux-x64
             archive: x64-glibc-2.39
+            lib: libz3.so
+          - rid: linux-arm64
+            archive: arm64-glibc-2.38
             lib: libz3.so
           - rid: osx-x64
             archive: x64-osx-15.7.3
@@ -169,8 +188,25 @@ jobs:
           # Copy native library
           find . -name "${{ matrix.lib }}" -path "*/bin/*" -exec cp {} artifacts/ \;
 
-          # Copy managed DLL (only need one copy, they're identical)
-          find . -name "Microsoft.Z3.dll" -exec cp {} artifacts/ \; 2>/dev/null || true
+          # The managed wrapper is emitted by ONE designated archive only.
+          # The old code copied it from whichever archive happened to contain it
+          # and called them "identical" — they are not. Upstream builds the
+          # netstandard1.4 assembly separately per archive, so the hashes differ
+          # (x64-win and x64-glibc-2.39 disagree), and combining that with
+          # `find | head -1` in create-release made the shipped wrapper a
+          # coin flip. x64-win is the canonical source because that is what
+          # download-z3.sh pins as MANAGED_DLL_ARCHIVE — so the DLL we ship is
+          # byte-identical to the one every test run exercises.
+          if [ "${{ matrix.archive }}" = "$MANAGED_DLL_ARCHIVE" ]; then
+            MANAGED="$(find . -name "Microsoft.Z3.dll" -path "*/bin/*" | head -1)"
+            if [ -z "$MANAGED" ]; then
+              echo "::error::canonical archive ${{ matrix.archive }} contains no Microsoft.Z3.dll"
+              exit 1
+            fi
+            cp "$MANAGED" artifacts/Microsoft.Z3.dll
+            echo "Managed wrapper (canonical, from ${{ matrix.archive }}):"
+            sha256sum artifacts/Microsoft.Z3.dll
+          fi
 
           ls -la artifacts/
 
@@ -195,10 +231,30 @@ jobs:
 
       - name: Organize binaries
         run: |
+          set -euo pipefail
           mkdir -p release
 
-          # Get managed DLL (same for all platforms)
-          find artifacts -name "Microsoft.Z3.dll" | head -1 | xargs -I {} cp {} release/Microsoft.Z3.dll
+          # Exactly one artifact carries the managed wrapper now (the canonical
+          # upstream archive). Take it by explicit path and fail closed if it is
+          # absent — the previous `find artifacts -name Microsoft.Z3.dll | head -1`
+          # ranged over every artifact, including the non-reproducible Debug
+          # source builds, so the shipped wrapper depended on artifact download
+          # order rather than on anything anyone chose.
+          MANAGED_ARTIFACT="artifacts/z3-win-x64-${{ env.Z3_VERSION }}/Microsoft.Z3.dll"
+          if [ ! -f "$MANAGED_ARTIFACT" ]; then
+            echo "::error::canonical managed wrapper missing at $MANAGED_ARTIFACT"
+            exit 1
+          fi
+          cp "$MANAGED_ARTIFACT" release/Microsoft.Z3.dll
+
+          # No other artifact may carry a managed wrapper — if one does, the
+          # canonical-source invariant has silently regressed.
+          STRAYS="$(find artifacts -name Microsoft.Z3.dll ! -path "artifacts/z3-win-x64-${{ env.Z3_VERSION }}/*")"
+          if [ -n "$STRAYS" ]; then
+            echo "::error::stray Microsoft.Z3.dll outside the canonical artifact:"
+            echo "$STRAYS"
+            exit 1
+          fi
 
           # Organize native libraries by RID
           for dir in artifacts/z3-*; do
@@ -216,6 +272,17 @@ jobs:
 
           echo "Release contents:"
           ls -la release/
+
+      # The manifest .github/z3-binaries-<ver>.sha256 must be updated in the same
+      # change that republishes these assets, otherwise publish-nuget fails closed
+      # on the next release — which is exactly what happened to v0.12.0. Print the
+      # regenerated manifest body so it can be committed without re-downloading.
+      - name: Emit checksum manifest for the published assets
+        run: |
+          set -euo pipefail
+          cd release
+          echo "::notice::Copy the block below into .github/z3-binaries-${{ env.Z3_VERSION }}.sha256 (keeping its header comment)"
+          sha256sum Microsoft.Z3.dll libz3-*.so libz3-*.dylib libz3-*.dll | tee "$GITHUB_STEP_SUMMARY"
 
       - name: Create or update release
         uses: softprops/action-gh-release@v1
