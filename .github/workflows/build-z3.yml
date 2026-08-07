@@ -24,10 +24,16 @@ on:
 
 env:
   Z3_VERSION: ${{ github.event.inputs.z3_version || '4.15.7' }}
-  # Must stay in sync with MANAGED_DLL_ARCHIVE in
-  # src/Calor.Compiler/scripts/download-z3.sh — the managed wrapper we publish
-  # has to be the same bytes developers and CI already build against.
-  MANAGED_DLL_ARCHIVE: x64-win
+  # The archive we take the managed wrapper from. This MUST be an archive whose
+  # Microsoft.Z3.dll is architecture-neutral. Upstream does not build it the same
+  # way everywhere: the x64-win archive ships a PE32+/AMD64 assembly that throws
+  # "assembly architecture is not compatible with the current process
+  # architecture" in an arm64 process, while the glibc archives ship the ordinary
+  # PE32/I386 AnyCPU shape that loads anywhere. The wrapper is pure P/Invoke — the
+  # per-RID native libz3 is what actually differs — so the neutral one is correct
+  # for every RID we publish. Verified by the assertion in the job below.
+  # Keep in sync with MANAGED_DLL_ARCHIVE in download-z3.sh.
+  MANAGED_DLL_ARCHIVE: x64-glibc-2.39
 
 jobs:
   # Build Z3 from source on ARM64 macOS ONLY. The upstream arm64-osx archive has
@@ -191,18 +197,31 @@ jobs:
           # The managed wrapper is emitted by ONE designated archive only.
           # The old code copied it from whichever archive happened to contain it
           # and called them "identical" — they are not. Upstream builds the
-          # netstandard1.4 assembly separately per archive, so the hashes differ
-          # (x64-win and x64-glibc-2.39 disagree), and combining that with
-          # `find | head -1` in create-release made the shipped wrapper a
-          # coin flip. x64-win is the canonical source because that is what
-          # download-z3.sh pins as MANAGED_DLL_ARCHIVE — so the DLL we ship is
-          # byte-identical to the one every test run exercises.
+          # netstandard1.4 assembly separately per archive, so both the bytes AND
+          # the target architecture differ, and combining that with
+          # `find | head -1` in create-release made the shipped wrapper a coin
+          # flip between builds that are not interchangeable.
           if [ "${{ matrix.archive }}" = "$MANAGED_DLL_ARCHIVE" ]; then
             MANAGED="$(find . -name "Microsoft.Z3.dll" -path "*/bin/*" | head -1)"
             if [ -z "$MANAGED" ]; then
               echo "::error::canonical archive ${{ matrix.archive }} contains no Microsoft.Z3.dll"
               exit 1
             fi
+
+            # Fail closed if the canonical archive ever ships an architecture-
+            # specific wrapper. An AMD64-marked assembly builds fine and passes
+            # x64 CI, then fails at load time on every arm64 consumer — a defect
+            # that is invisible on the machines that would publish it.
+            python3 - "$MANAGED" <<'PY'
+          import struct, sys
+          d = open(sys.argv[1], 'rb').read()
+          machine = struct.unpack_from('<H', d, struct.unpack_from('<I', d, 0x3c)[0] + 4)[0]
+          if machine != 0x14c:  # IMAGE_FILE_MACHINE_I386 == the AnyCPU encoding
+              sys.exit(f"::error::managed wrapper is architecture-specific "
+                       f"(COFF machine 0x{machine:x}); it will not load on other architectures")
+          print(f"  [arch-neutral] COFF machine 0x{machine:x} (AnyCPU)")
+          PY
+
             cp "$MANAGED" artifacts/Microsoft.Z3.dll
             echo "Managed wrapper (canonical, from ${{ matrix.archive }}):"
             sha256sum artifacts/Microsoft.Z3.dll

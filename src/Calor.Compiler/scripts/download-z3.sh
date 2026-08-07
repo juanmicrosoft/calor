@@ -74,8 +74,16 @@ PLATFORMS=(
     "linux-x64|z3-${Z3_VERSION}-x64-glibc-2.39|libz3.so|libz3.so"
 )
 
-# Use one platform to get the managed DLL (it's the same across all platforms)
-MANAGED_DLL_ARCHIVE="z3-${Z3_VERSION}-x64-win"
+# One archive supplies the managed wrapper for every platform. It is NOT "the
+# same across all platforms" as previously assumed: upstream's x64-win archive
+# ships a PE32+/AMD64 Microsoft.Z3.dll that throws "assembly architecture is not
+# compatible with the current process architecture" when loaded in an arm64
+# process, whereas the glibc archives ship the ordinary PE32/I386 AnyCPU shape.
+# The wrapper is pure P/Invoke (the per-RID native libz3 carries the platform
+# difference), so the architecture-neutral one is correct everywhere — and it is
+# the only choice that works on linux-arm64 and win-arm64. Keep in sync with
+# MANAGED_DLL_ARCHIVE in .github/workflows/build-z3.yml.
+MANAGED_DLL_ARCHIVE="z3-${Z3_VERSION}-x64-glibc-2.39"
 
 BASE_URL="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}"
 
