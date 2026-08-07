@@ -222,9 +222,14 @@ jobs:
           print(f"  [arch-neutral] COFF machine 0x{machine:x} (AnyCPU)")
           PY
 
-            cp "$MANAGED" artifacts/Microsoft.Z3.dll
+            # Staged OUTSIDE artifacts/ so it travels as its own fixed-name
+            # artifact. create-release must not have to know which RID happens
+            # to be canonical — encoding that twice is precisely how this broke:
+            # moving the canonical archive left a hardcoded RID path behind.
+            mkdir -p managed
+            cp "$MANAGED" managed/Microsoft.Z3.dll
             echo "Managed wrapper (canonical, from ${{ matrix.archive }}):"
-            sha256sum artifacts/Microsoft.Z3.dll
+            sha256sum managed/Microsoft.Z3.dll
           fi
 
           ls -la artifacts/
@@ -234,6 +239,17 @@ jobs:
         with:
           name: z3-${{ matrix.rid }}-${{ env.Z3_VERSION }}
           path: artifacts/
+
+      # One fixed-name artifact for the managed wrapper, produced by exactly one
+      # matrix leg. create-release addresses it by this name and never needs to
+      # know which archive or RID is canonical.
+      - name: Upload managed wrapper (canonical archive only)
+        if: matrix.archive == env.MANAGED_DLL_ARCHIVE
+        uses: actions/upload-artifact@v4
+        with:
+          name: z3-managed-${{ env.Z3_VERSION }}
+          path: managed/Microsoft.Z3.dll
+          if-no-files-found: error
 
   # Create/update the z3-binaries release with all artifacts
   create-release:
@@ -259,24 +275,26 @@ jobs:
           # ranged over every artifact, including the non-reproducible Debug
           # source builds, so the shipped wrapper depended on artifact download
           # order rather than on anything anyone chose.
-          MANAGED_ARTIFACT="artifacts/z3-win-x64-${{ env.Z3_VERSION }}/Microsoft.Z3.dll"
+          MANAGED_DIR="artifacts/z3-managed-${{ env.Z3_VERSION }}"
+          MANAGED_ARTIFACT="$MANAGED_DIR/Microsoft.Z3.dll"
           if [ ! -f "$MANAGED_ARTIFACT" ]; then
             echo "::error::canonical managed wrapper missing at $MANAGED_ARTIFACT"
             exit 1
           fi
           cp "$MANAGED_ARTIFACT" release/Microsoft.Z3.dll
 
-          # No other artifact may carry a managed wrapper — if one does, the
+          # No RID artifact may carry a managed wrapper — if one does, the
           # canonical-source invariant has silently regressed.
-          STRAYS="$(find artifacts -name Microsoft.Z3.dll ! -path "artifacts/z3-win-x64-${{ env.Z3_VERSION }}/*")"
+          STRAYS="$(find artifacts -name Microsoft.Z3.dll ! -path "$MANAGED_DIR/*")"
           if [ -n "$STRAYS" ]; then
             echo "::error::stray Microsoft.Z3.dll outside the canonical artifact:"
             echo "$STRAYS"
             exit 1
           fi
 
-          # Organize native libraries by RID
+          # Organize native libraries by RID (the managed artifact holds no native)
           for dir in artifacts/z3-*; do
+            [ "$dir" = "$MANAGED_DIR" ] && continue
             rid=$(basename "$dir" | sed "s/z3-//" | sed "s/-${{ env.Z3_VERSION }}//")
 
             # Find and copy native lib with RID prefix
