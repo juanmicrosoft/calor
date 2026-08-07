@@ -2,15 +2,39 @@
 # (W1 Slice 2, #789). publish-nuget.yml verifies every download against
 # this file before packing — a missing or corrupt native fails the release
 # instead of shipping inside the nupkg.
-# Provenance (trust-on-first-use): computed 2026-07-31 by downloading the
-# then-current z3-binaries-4.15.7 release assets and hashing them — the pin
-# guarantees the RELEASE cannot change silently afterward, not that the
-# original upload was audited. Regenerate ONLY when the z3-binaries release
-# is deliberately republished, and only from a build-z3.yml run whose
-# upstream inputs verified against scripts/z3-upstream-4.15.7.sha256:
-#   for a in <assets>; do curl -fL -o "$a" "$RELEASE_URL/$a"; done && shasum -a 256 *
-b9b26761e2da23c38836e65cbc0dd0e50f5bace35293b4be1385265f64cd3124  Microsoft.Z3.dll
-9646bb8e5599a93bc4f26c9c593d6e0261f029eee73a896f15ce8502fc22d55b  libz3-linux-arm64.so
+#
+# Provenance: regenerated 2026-08-07 from build-z3.yml run 31207597466, a
+# deliberate workflow_dispatch republish. Seven of the eight assets are plain
+# extractions from upstream Z3Prover archives that the same run verified against
+# scripts/z3-upstream-4.15.7.sha256, so they are reproducible: all seven were
+# predicted from the pinned archives BEFORE the run and matched byte for byte.
+# The eighth, libz3-osx-arm64.dylib, is still built from source (upstream's
+# arm64-osx archive has assembly-loading problems) and is the only entry not
+# derivable from a pinned input — though it has now reproduced bit-identically
+# across three separate runs.
+#
+# This replaces a 2026-07-31 trust-on-first-use manifest that had drifted. Two
+# entries changed, and neither because upstream changed:
+#
+#   Microsoft.Z3.dll     was a Debug, source-compiled wrapper that a macOS runner
+#                        happened to win a `find | head -1` race with. Now the
+#                        upstream Release build from the x64-glibc-2.39 archive.
+#                        That archive is canonical because its wrapper is
+#                        architecture-NEUTRAL (PE32/I386); upstream's x64-win
+#                        wrapper is PE32+/AMD64 and cannot load in an arm64
+#                        process. build-z3.yml asserts this before publishing.
+#   libz3-linux-arm64.so was built from source for no reason — download-z3.sh has
+#                        always taken linux-arm64 from upstream. Now the upstream
+#                        binary, so a rebuild no longer reshuffles it.
+#
+# Regenerate ONLY when the z3-binaries release is deliberately republished, and
+# only from a build-z3.yml run whose upstream inputs verified against
+# scripts/z3-upstream-4.15.7.sha256. That run prints the replacement block in its
+# step summary; commit it in the same change that republishes. Never rehash the
+# live assets — that launders whatever is currently published into the pin and
+# defeats the entire mechanism. z3-pin-check.yml watches for drift daily.
+59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175  Microsoft.Z3.dll
+7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5  libz3-linux-arm64.so
 3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8  libz3-linux-x64.so
 038f356687ac800c2269ff4d289c7921ec5802dafca3ae6a2a4620defc807f9c  libz3-osx-arm64.dylib
 8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada  libz3-osx-x64.dylib
