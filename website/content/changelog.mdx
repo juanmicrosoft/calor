@@ -10,6 +10,20 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-08-07
+
+A packaging release. **v0.12.0 was tagged but never installable** — both publish workflows failed, so nuget.org continued to serve `0.10.0` and the VS Code marketplace continued to serve `0.3.8`. Nothing in the language, compiler, or verifier changed here.
+
+### Fixed
+- **The VS Code extension can be published again.** It had failed to publish for **three consecutive releases** without anyone noticing, which is why the marketplace still served `0.3.8`. The language server is packed as a single file, which promotes `Assembly.Location` to a build error. Fixed at both sites — one justified suppression where the empty location is a supported and already-guarded input, and one switch to the single-file-safe `RuntimeEnvironment.GetRuntimeDirectory()`, since the old expression would have silently emptied the framework probe root used by IL effect analysis.
+- **The NuGet publish no longer fails its own checksum gate.** The gate was right — the pinned Z3 binaries release had been republished underneath its manifest. Two underlying defects are fixed rather than papered over by rehashing the live assets: the managed `Microsoft.Z3.dll` was selected with `find | head -1` across all build artifacts, and `linux-arm64` was built from source despite upstream publishing a binary for it. Both now come from checksum-verified upstream archives, so the published assets are reproducible.
+- **The shipped Z3 managed wrapper is now upstream's Release build.** Because of that selection race, released packages had been carrying a *Debug* assembly compiled on a CI runner, with the runner's absolute build path embedded in it.
+- **Z3 now loads on ARM64.** Upstream's Windows x64 archive ships an AMD64-marked wrapper that cannot load in an arm64 process, and both download scripts had designated it. This affected `linux-arm64` and `win-arm64`; it stayed hidden because x64 CI cannot observe it.
+- **Republishing the shared Z3 binaries is now deliberate.** The build workflow no longer runs on push — which is what invalidated the pin originally, since the commit that *introduced* the manifest re-triggered the workflow and republished every asset a day later.
+
+### Added
+- **CI now exercises both release-only paths.** Neither failure was catchable before release day, because the single-file publish and the binary pins were only ever exercised while publishing. The test suite now runs the same single-file publish the extension build uses, and a scheduled check verifies the binary pins daily against both the project's release and the upstream archives.
+
 ## [0.12.0] - 2026-08-06
 
 The soundness release. **This entry covers the v0.11 range as well** — there is no `v0.11.0` tag; the maintainer folded v0.11 forward, so everything below ships together.

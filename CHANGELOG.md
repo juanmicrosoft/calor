@@ -4,6 +4,66 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-08-07
+
+**A packaging release. v0.12.0 was tagged but never installable** — both publish workflows
+failed, so nuget.org continued to serve `0.10.0` and the VS Code marketplace continued to serve
+`0.3.8`. Nothing in the language, compiler, or verifier changed here; if you already build from
+source, this release contains nothing for you.
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32 (Calor/C#)
+- **Metrics**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x (large effect)
+  - ErrorDetection: 1.49x (large effect)
+  - TokenEconomics: 1.42x (small effect)
+  - InformationDensity: 0.98x (**C# wins**, medium effect)
+- **Programs Tested**: 217
+
+**Identical to v0.12.0 in every digit, and that is the expected result, not a coincidence.** The
+suite was re-run at the documented 30 iterations; the regenerated dashboard JSON differs from
+v0.12.0's by exactly two lines, the timestamp and the commit hash. These metrics are computed by
+deterministic static analysis, and this release changes no analyzed code path. The zero-width
+confidence intervals carry the same defect disclosed in v0.12.0 and are still not fixed.
+
+### Fixed
+- **The VS Code extension can be published again.** It had failed to publish for **three
+  consecutive releases** (v0.9.0, v0.10.0, v0.12.0) without anyone noticing, which is why the
+  marketplace still served `0.3.8`. The language server is packed with `PublishSingleFile=true`,
+  which promotes `Assembly.Location` to an `IL3000` error under `TreatWarningsAsErrors`. Fixed at
+  both sites: `Z3ContextFactory` carries a justified suppression (the empty location is a
+  supported input there and is already guarded), and `ImportCommand` now uses
+  `RuntimeEnvironment.GetRuntimeDirectory()`, the single-file-safe equivalent — the previous
+  expression would have silently emptied the framework probe root used by IL effect analysis.
+- **The NuGet publish no longer fails its own checksum gate.** The gate was right; the pinned
+  `z3-binaries` release had been republished underneath its manifest. Two underlying defects are
+  fixed rather than papered over by rehashing: the managed `Microsoft.Z3.dll` was selected with
+  `find | head -1` across all build artifacts, and `linux-arm64` was built from source despite
+  upstream publishing a binary for it. Both now come from checksum-verified upstream archives, so
+  the published assets are reproducible.
+- **The shipped Z3 managed wrapper is now upstream's Release build.** Because of the selection
+  race above, released packages had been carrying a **Debug** `netstandard1.4` assembly compiled
+  on a CI runner, with that runner's absolute build path embedded in it.
+- **Z3 now loads on ARM64 consumers.** Upstream's `x64-win` archive ships an AMD64-marked wrapper
+  that throws *"the assembly architecture is not compatible with the current process
+  architecture"* in an arm64 process; the glibc archives ship the architecture-neutral build.
+  Both `download-z3.sh` and `download-z3.ps1` had designated the AMD64 one — latent because x64 CI
+  cannot observe it and macOS/arm64 diverts to a source build. This affected `linux-arm64` and
+  `win-arm64`.
+- **Republishing the shared Z3 binaries is now a deliberate act.** `build-z3.yml` no longer runs
+  on push, which is what invalidated the pin originally: the commit that *introduced* the manifest
+  re-triggered the workflow and republished every asset a day later.
+
+### Added
+- **CI now exercises both release-only paths**, which is why neither failure was catchable before
+  release day. `test.yml` runs the same single-file publish the VSIX build uses (~1m10s), and a
+  new scheduled `z3-pin-check` workflow verifies the binary pins daily and on changes to the
+  pinning machinery — against both the repo's release and the upstream Z3Prover archives.
+- `build-z3.yml` asserts that the wrapper it is about to publish is architecture-neutral, and
+  fails closed otherwise. An architecture-specific wrapper builds fine and passes x64 CI, so it
+  would only break on consumers whose machines never run the publish.
+
 ## [0.12.0] - 2026-08-06
 
 ### Benchmark Results (Statistical: 30 runs)
