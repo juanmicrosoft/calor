@@ -63,6 +63,17 @@ public static class Z3ContextFactory
         return TryLoadZ3Native();
     }
 
+    // IL3000: Assembly.Location is empty under single-file publish (the VS Code
+    // extension packs the language server that way). That is a supported input
+    // here, not a defect: AppContext.BaseDirectory is probe root #1 and covers
+    // the single-file case, while Location is consulted only to reach the
+    // MSBuild-task layout (natives next to calor.dll, where BaseDirectory is the
+    // MSBuild host directory). The empty result is filtered by the
+    // IsNullOrEmpty guard below, so the single-file app simply probes one root.
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+        "SingleFile", "IL3000",
+        Justification = "Empty Location is expected under single-file and is guarded; " +
+                        "AppContext.BaseDirectory is the primary probe root.")]
     private static IntPtr TryLoadZ3Native()
     {
         // Probe roots, in order:

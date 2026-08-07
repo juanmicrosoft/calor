@@ -1,0 +1,103 @@
+name: Z3 Binary Pin Check
+
+# publish-nuget.yml verifies the downloaded z3-binaries release assets against
+# .github/z3-binaries-<ver>.sha256 and refuses to pack on a mismatch. That guard
+# is correct and it did its job — but v0.12.0 is how we found out it only ever
+# fires at release time, after the tag is cut and the GitHub release is public.
+# The pinned z3-binaries release had been republished underneath the manifest a
+# day after the manifest was computed, and nothing noticed for a week.
+#
+# This workflow checks the same invariant continuously, so drift is a red build
+# on an ordinary day rather than a failed publish on release day.
+#
+# Not part of test.yml because verifying the pins means downloading ~350MB of
+# release assets and upstream archives; that is worth a daily run and a run when
+# the pinning machinery itself changes, but not a run on every pull request.
+
+on:
+  schedule:
+    # Daily, 06:15 UTC.
+    - cron: '15 6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/z3-binaries-*.sha256'
+      - '.github/workflows/publish-nuget.yml'
+      - '.github/workflows/build-z3.yml'
+      - '.github/workflows/z3-pin-check.yml'
+      - 'src/Calor.Compiler/scripts/z3-upstream-*.sha256'
+      - 'src/Calor.Compiler/scripts/download-z3.sh'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/z3-binaries-*.sha256'
+      - '.github/workflows/publish-nuget.yml'
+      - '.github/workflows/build-z3.yml'
+      - '.github/workflows/z3-pin-check.yml'
+      - 'src/Calor.Compiler/scripts/z3-upstream-*.sha256'
+      - 'src/Calor.Compiler/scripts/download-z3.sh'
+
+env:
+  Z3_VERSION: "4.15.7"
+
+jobs:
+  verify-pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Layer 1: the repo's own z3-binaries release — what publish-nuget packs.
+      - name: Verify committed manifest still matches the live z3-binaries release
+        run: |
+          set -euo pipefail
+          MANIFEST=".github/z3-binaries-${Z3_VERSION}.sha256"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/download/z3-binaries-${Z3_VERSION}"
+
+          if [ ! -s "$MANIFEST" ]; then
+            echo "::error::$MANIFEST is missing or empty"
+            exit 1
+          fi
+
+          STAGING="$(mktemp -d)"
+          trap 'rm -rf "$STAGING"' EXIT
+
+          # Fetch exactly the assets the manifest names, so an asset that is in the
+          # manifest but missing from the release fails here too (curl -f).
+          while read -r asset; do
+            curl -fL -sS --retry 5 --retry-delay 3 -o "$STAGING/$asset" "${RELEASE_URL}/${asset}"
+          done < <(grep -v '^#' "$MANIFEST" | awk 'NF {print $2}')
+
+          if ! (cd "$STAGING" && grep -v '^#' "$GITHUB_WORKSPACE/$MANIFEST" | sha256sum --check --strict -); then
+            echo "::error::z3-binaries release no longer matches $MANIFEST — publish-nuget WILL fail on the next release."
+            echo "::error::Do NOT rehash the live assets: that launders whatever is currently published into the pin."
+            echo "::error::Republish deliberately via build-z3.yml (workflow_dispatch) and commit the manifest it prints in its step summary."
+            exit 1
+          fi
+
+      # Layer 2: the upstream Z3Prover archives those assets are derived from.
+      - name: Verify upstream Z3 archives still match their pin
+        run: |
+          set -euo pipefail
+          MANIFEST="src/Calor.Compiler/scripts/z3-upstream-${Z3_VERSION}.sha256"
+          BASE="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}"
+
+          if [ ! -s "$MANIFEST" ]; then
+            echo "::error::$MANIFEST is missing or empty"
+            exit 1
+          fi
+
+          STAGING="$(mktemp -d)"
+          trap 'rm -rf "$STAGING"' EXIT
+
+          while read -r zip; do
+            curl -fL -sS --retry 5 --retry-delay 3 -o "$STAGING/$zip" "${BASE}/${zip}"
+          done < <(grep -v '^#' "$MANIFEST" | awk 'NF {print $2}')
+
+          if ! (cd "$STAGING" && grep -v '^#' "$GITHUB_WORKSPACE/$MANIFEST" | sha256sum --check --strict -); then
+            echo "::error::upstream Z3 ${Z3_VERSION} archives no longer match $MANIFEST — investigate before touching anything downstream."
+            exit 1
+          fi
