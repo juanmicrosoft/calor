@@ -301,7 +301,7 @@ public sealed class TelemetryPrivacyTests
     }
 
     [Fact]
-    public void PublicCliPreviewWorksAfterSubcommandAndDoesNotExposeArguments()
+    public async Task PublicCliPreviewWorksAfterSubcommandAndDoesNotExposeArguments()
     {
         var canary = $"{Canary}_ARGUMENT";
         var startInfo = new ProcessStartInfo
@@ -321,11 +321,7 @@ public sealed class TelemetryPrivacyTests
         startInfo.ArgumentList.Add(canary);
         startInfo.ArgumentList.Add("--telemetry-preview");
 
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Failed to start calor CLI.");
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        Assert.True(process.WaitForExit(30_000));
+        var (stdout, stderr) = await RunCliAsync(startInfo);
 
         var payloadLines = stderr.Split(
             Environment.NewLine,
@@ -344,7 +340,7 @@ public sealed class TelemetryPrivacyTests
     }
 
     [Fact]
-    public void ColonDelimitedOptOutOverridesPreview()
+    public async Task ColonDelimitedOptOutOverridesPreview()
     {
         var startInfo = CreateCliStartInfo(
             "feature-check",
@@ -356,16 +352,13 @@ public sealed class TelemetryPrivacyTests
             "InstrumentationKey=00000000-0000-0000-0000-000000000001;" +
             "IngestionEndpoint=https://localhost/";
 
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Failed to start calor CLI.");
-        var stderr = process.StandardError.ReadToEnd();
-        Assert.True(process.WaitForExit(30_000));
+        var (_, stderr) = await RunCliAsync(startInfo);
 
         Assert.DoesNotContain("\"eventName\"", stderr, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void ColonDelimitedPreviewUsesLocalSink()
+    public async Task ColonDelimitedPreviewUsesLocalSink()
     {
         var startInfo = CreateCliStartInfo(
             "feature-check",
@@ -374,10 +367,7 @@ public sealed class TelemetryPrivacyTests
         startInfo.Environment["CALOR_TELEMETRY"] = "1";
         startInfo.Environment.Remove(CalorTelemetry.ConnectionStringEnvironmentVariable);
 
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("Failed to start calor CLI.");
-        var stderr = process.StandardError.ReadToEnd();
-        Assert.True(process.WaitForExit(30_000));
+        var (_, stderr) = await RunCliAsync(startInfo);
 
         Assert.Contains("\"eventName\"", stderr, StringComparison.Ordinal);
     }
@@ -399,6 +389,27 @@ public sealed class TelemetryPrivacyTests
             startInfo.ArgumentList.Add(argument);
         }
         return startInfo;
+    }
+
+    private static async Task<(string Stdout, string Stderr)> RunCliAsync(
+        ProcessStartInfo startInfo)
+    {
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Failed to start calor CLI.");
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException("calor CLI did not exit within 30 seconds.");
+        }
+
+        return (await stdoutTask, await stderrTask);
     }
 
     private static (CalorTelemetry Telemetry, CapturingTelemetryChannel Channel)
