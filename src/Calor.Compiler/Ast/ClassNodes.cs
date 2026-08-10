@@ -492,8 +492,9 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<InterfaceDefinitionNode>? nestedInterfaces = null,
         IReadOnlyList<EnumDefinitionNode>? nestedEnums = null,
         IReadOnlyList<IndexerNode>? indexers = null,
-        IReadOnlyList<DelegateDefinitionNode>? nestedDelegates = null)
-        : base(span, id, name, attributes)
+        IReadOnlyList<DelegateDefinitionNode>? nestedDelegates = null,
+        TextSpan? identifierSpan = null)
+        : base(span, id, name, attributes, identifierSpan)
     {
         IsAbstract = isAbstract;
         IsSealed = isSealed;
@@ -532,6 +533,7 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
 public sealed class ClassFieldNode : AstNode
 {
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public string TypeName { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
@@ -577,10 +579,12 @@ public sealed class ClassFieldNode : AstNode
         MethodModifiers modifiers,
         ExpressionNode? defaultValue,
         AttributeCollection attributes,
-        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         Visibility = visibility;
         Modifiers = modifiers;
@@ -604,6 +608,7 @@ public sealed class MethodNode : AstNode
 {
     public string Id { get; }
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
@@ -659,11 +664,13 @@ public sealed class MethodNode : AstNode
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
-        bool isAsync = false)
+        bool isAsync = false,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         Visibility = visibility;
         Modifiers = modifiers;
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));

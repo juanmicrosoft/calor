@@ -1,11 +1,75 @@
 using Calor.LanguageServer.Handlers;
+using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
+using OmniSharp.Extensions.LanguageServer.Protocol;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Xunit;
 
 namespace Calor.LanguageServer.Tests.Handlers;
 
 public class RenameHandlerTests
 {
+    [Fact]
+    public async Task RenameFunctionDeclaration_EditsOnlyIdentifierTokenAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §F{f001:Compute:pub}
+                §O{i32}
+                §R 42
+            """;
+        var uri = DocumentUri.From("file:///rename.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Compute", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "Calculate",
+            },
+            CancellationToken.None);
+
+        var textEdit = Assert.Single(Assert.Single(edit!.Changes!).Value);
+        Assert.Equal(new Position(line - 1, column - 1), textEdit.Range.Start);
+        Assert.Equal(
+            new Position(line - 1, column - 1 + "Compute".Length),
+            textEdit.Range.End);
+    }
+
+    [Fact]
+    public async Task RenameWithNonExactReferenceSpan_IsRefusedRatherThanCorruptingSourceAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §F{f001:Compute:pub} () -> i32
+                §R 42
+              §F{f002:Use:pub} () -> i32
+                §R §C{Compute} §/C
+            """;
+        var uri = DocumentUri.From("file:///rename.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Compute", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "Calculate",
+            },
+            CancellationToken.None);
+
+        Assert.Null(edit);
+    }
+
     [Fact]
     public void ReferenceCollectorForRename_FindsAllOccurrences()
     {

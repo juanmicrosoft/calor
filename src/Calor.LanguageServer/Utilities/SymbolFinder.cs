@@ -214,13 +214,26 @@ public static class SymbolFinder
                 break;
             case BoundNewExpression creation
                 when string.Equals(creation.TypeName, result.Name, StringComparison.Ordinal)
-                     && creation.ResolvedSymbolId is { IsNone: false } constructorId:
-                return constructorId;
+                     && creation.ResolvedSymbolId is { IsNone: false } targetId:
+                return targetId;
         }
+
+        var declarationAtOffset = boundModule.SymbolsById.Values
+            .Where(symbol => symbol.DeclarationSpan.Contains(offset))
+            .Where(symbol =>
+                string.Equals(symbol.Name, result.Name, StringComparison.Ordinal)
+                || symbol.Name.EndsWith("." + result.Name, StringComparison.Ordinal))
+            .OrderBy(symbol => symbol.DeclarationSpan.Length)
+            .Select(symbol => (SymbolId?)symbol.Id)
+            .FirstOrDefault();
+        if (declarationAtOffset != null)
+            return declarationAtOffset;
 
         var definitionSpan = result.DefinitionSpan ?? result.Span;
         return boundModule.SymbolsById.Values
-            .Where(symbol => symbol.DeclarationSpan == definitionSpan)
+            .Where(symbol =>
+                symbol.DeclarationSpan == definitionSpan
+                || symbol.DefinitionSpan == definitionSpan)
             .Where(symbol =>
                 string.Equals(symbol.Name, result.Name, StringComparison.Ordinal)
                 || symbol.Name.EndsWith("." + result.Name, StringComparison.Ordinal))
@@ -239,7 +252,8 @@ public static class SymbolFinder
 
         var references = new List<TextSpan>();
         if (includeDeclaration
-            && boundModule.SymbolsById.TryGetValue(symbolId, out var declaration))
+            && boundModule.SymbolsById.TryGetValue(symbolId, out var declaration)
+            && declaration.DeclarationSpan.Length > 0)
         {
             references.Add(declaration.DeclarationSpan);
         }

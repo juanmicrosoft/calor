@@ -85,11 +85,15 @@ public sealed class Binder
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
     private readonly Dictionary<ClassDefinitionNode, string> _qualifiedClassNames = new();
     private readonly Dictionary<ClassDefinitionNode, SymbolId> _classSymbolIds = new();
+    private readonly Dictionary<ClassDefinitionNode, TypeSymbol> _classSymbols = new();
+    private readonly Dictionary<string, ClassDefinitionNode> _classesByQualifiedName = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<ClassDefinitionNode>> _classesBySimpleName = new(StringComparer.Ordinal);
     private readonly Dictionary<SymbolId, Symbol> _symbolsById = new();
+    private readonly Dictionary<string, int> _declarationIdOccurrences = new(StringComparer.Ordinal);
     private SymbolId _moduleSymbolId;
     private SymbolId _declarationContext;
-    private int _nextLocalSymbolOrdinal;
     private string? _currentClassName;
+    private ClassDefinitionNode? _currentClass;
     private Scope? _currentClassScope;
     private SymbolId _currentClassIdentity;
     private bool _isStaticContext;
@@ -97,9 +101,7 @@ public sealed class Binder
     public Binder(DiagnosticBag diagnostics, string? sourceIdentity = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
-        _sourceIdentity = string.IsNullOrWhiteSpace(sourceIdentity)
-            ? "<memory>"
-            : sourceIdentity.Replace('\\', '/');
+        _sourceIdentity = SymbolSourceIdentity.Canonicalize(sourceIdentity);
         _scope = new Scope();
     }
 
@@ -136,32 +138,26 @@ public sealed class Binder
     private IDisposable PushDeclarationContext(SymbolId context)
     {
         var previousContext = _declarationContext;
-        var previousOrdinal = _nextLocalSymbolOrdinal;
         _declarationContext = context;
-        _nextLocalSymbolOrdinal = 0;
-        return new DeclarationContextRestorer(this, previousContext, previousOrdinal);
+        return new DeclarationContextRestorer(this, previousContext);
     }
 
     private sealed class DeclarationContextRestorer : IDisposable
     {
         private readonly Binder _binder;
         private readonly SymbolId _previousContext;
-        private readonly int _previousOrdinal;
 
         public DeclarationContextRestorer(
             Binder binder,
-            SymbolId previousContext,
-            int previousOrdinal)
+            SymbolId previousContext)
         {
             _binder = binder;
             _previousContext = previousContext;
-            _previousOrdinal = previousOrdinal;
         }
 
         public void Dispose()
         {
             _binder._declarationContext = _previousContext;
-            _binder._nextLocalSymbolOrdinal = _previousOrdinal;
         }
     }
 
@@ -172,16 +168,19 @@ public sealed class Binder
         _classScopes.Clear();
         _qualifiedClassNames.Clear();
         _classSymbolIds.Clear();
+        _classSymbols.Clear();
+        _classesByQualifiedName.Clear();
+        _classesBySimpleName.Clear();
         _symbolsById.Clear();
+        _declarationIdOccurrences.Clear();
         _moduleSymbolId = SymbolId.Create("source", _sourceIdentity, "module", module.Id);
         _declarationContext = _moduleSymbolId;
-        _nextLocalSymbolOrdinal = 0;
 
         var functions = new List<BoundFunction>();
 
         RegisterTopLevelFunctions(module);
-        for (var classIndex = 0; classIndex < module.Classes.Count; classIndex++)
-            RegisterClassTree(module.Classes[classIndex], classIndex, _moduleSymbolId, null);
+        foreach (var cls in module.Classes)
+            RegisterClassTree(cls, _moduleSymbolId, null);
 
         foreach (var func in module.Functions)
             functions.Add(BindFunction(func));
@@ -198,18 +197,20 @@ public sealed class Binder
 
     private void RegisterTopLevelFunctions(ModuleNode module)
     {
-        for (var functionIndex = 0; functionIndex < module.Functions.Count; functionIndex++)
+        foreach (var function in module.Functions)
         {
-            var function = module.Functions[functionIndex];
             var symbol = CreateFunctionSymbol(
-                _moduleSymbolId.Append($"function:{functionIndex}", $"ast:{function.Id}"),
+                CreateDeclarationId(_moduleSymbolId, "function", function.Id, function.Name),
                 function.Name,
                 function.Output?.TypeName ?? "VOID",
                 GetCallableTypeParameters(
                     function.Name,
                     function.TypeParameters.Select(parameter => parameter.Name)),
                 function.Parameters,
-                function.Span);
+                function.IdentifierSpan,
+                function.Visibility,
+                containingTypeName: null,
+                definitionSpan: function.Span);
             _functionSymbols.Add(function, symbol);
 
             var lookupName = GetCallableLookupName(function.Name);
@@ -220,32 +221,48 @@ public sealed class Binder
 
     private void RegisterClassTree(
         ClassDefinitionNode cls,
-        int classIndex,
         SymbolId parentIdentity,
         string? containingTypeName)
     {
-        var classIdentity = parentIdentity.Append($"class:{classIndex}", $"ast:{cls.Id}");
+        var classIdentity = CreateDeclarationId(parentIdentity, "class", cls.Id, cls.Name);
         var qualifiedClassName = containingTypeName == null
             ? cls.Name
             : $"{containingTypeName}.{cls.Name}";
         var classScope = _scope.CreateChild();
+        var classSymbol = new TypeSymbol(
+            classIdentity,
+            cls.Name,
+            qualifiedClassName,
+            cls.Visibility,
+            cls.IdentifierSpan,
+            cls.Span);
+        TrackSymbol(classSymbol);
 
         _classScopes.Add(cls, classScope);
         _qualifiedClassNames.Add(cls, qualifiedClassName);
         _classSymbolIds.Add(cls, classIdentity);
-
-        for (var fieldIndex = 0; fieldIndex < cls.Fields.Count; fieldIndex++)
+        _classSymbols.Add(cls, classSymbol);
+        _classesByQualifiedName[qualifiedClassName] = cls;
+        if (!_classesBySimpleName.TryGetValue(cls.Name, out var simpleMatches))
         {
-            var field = cls.Fields[fieldIndex];
+            simpleMatches = new List<ClassDefinitionNode>();
+            _classesBySimpleName.Add(cls.Name, simpleMatches);
+        }
+        simpleMatches.Add(cls);
+
+        var fields = EnumerateFields(cls).ToArray();
+        for (var fieldIndex = 0; fieldIndex < fields.Length; fieldIndex++)
+        {
+            var field = fields[fieldIndex];
             var isMutable = !field.Modifiers.HasFlag(MethodModifiers.Readonly);
             var symbol = CreateVariable(
-                classIdentity.Append($"field:{fieldIndex}"),
+                CreateDeclarationId(classIdentity, "field", stableAstId: null, field.Name),
                 field.Name,
                 field.TypeName,
                 isMutable,
                 isParameter: false,
                 ParameterModifier.None,
-                field.Span);
+                field.IdentifierSpan);
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -255,17 +272,18 @@ public sealed class Binder
             }
         }
 
-        for (var propertyIndex = 0; propertyIndex < cls.Properties.Count; propertyIndex++)
+        var properties = EnumerateProperties(cls).ToArray();
+        for (var propertyIndex = 0; propertyIndex < properties.Length; propertyIndex++)
         {
-            var property = cls.Properties[propertyIndex];
+            var property = properties[propertyIndex];
             var symbol = CreateVariable(
-                classIdentity.Append($"property:{propertyIndex}", $"ast:{property.Id}"),
+                CreateDeclarationId(classIdentity, "property", property.Id, property.Name),
                 property.Name,
                 property.TypeName,
                 property.Setter != null || property.Initer != null,
                 isParameter: false,
                 ParameterModifier.None,
-                property.Span);
+                property.IdentifierSpan);
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -275,19 +293,23 @@ public sealed class Binder
             }
         }
 
-        for (var methodIndex = 0; methodIndex < cls.Methods.Count; methodIndex++)
+        var methods = EnumerateMethods(cls).ToArray();
+        for (var methodIndex = 0; methodIndex < methods.Length; methodIndex++)
         {
-            var method = cls.Methods[methodIndex];
+            var method = methods[methodIndex];
             var lookupName = GetCallableLookupName(method.Name);
             var qualifiedLookupName = $"{qualifiedClassName}.{lookupName}";
             var symbol = CreateFunctionSymbol(
-                classIdentity.Append($"method:{methodIndex}", $"ast:{method.Id}"),
+                CreateDeclarationId(classIdentity, "method", method.Id, method.Name),
                 $"{qualifiedClassName}.{method.Name}",
                 method.Output?.TypeName ?? "VOID",
                 GetCallableTypeParameters(
                     method.Name,
                     method.TypeParameters.Select(parameter => parameter.Name)),
                 method.Parameters,
+                method.IdentifierSpan,
+                method.Visibility,
+                qualifiedClassName,
                 method.Span);
             _functionSymbols.Add(method, symbol);
 
@@ -301,16 +323,20 @@ public sealed class Binder
                 ReportDuplicateSignature(method.Span, qualifiedLookupName, symbol, duplicate);
         }
 
-        for (var constructorIndex = 0; constructorIndex < cls.Constructors.Count; constructorIndex++)
+        var constructors = EnumerateConstructors(cls).ToArray();
+        for (var constructorIndex = 0; constructorIndex < constructors.Length; constructorIndex++)
         {
-            var constructor = cls.Constructors[constructorIndex];
+            var constructor = constructors[constructorIndex];
             var qualifiedLookupName = $"{qualifiedClassName}..ctor";
             var symbol = CreateFunctionSymbol(
-                classIdentity.Append($"constructor:{constructorIndex}", $"ast:{constructor.Id}"),
+                CreateDeclarationId(classIdentity, "constructor", constructor.Id, ".ctor"),
                 qualifiedLookupName,
                 "VOID",
                 Array.Empty<string>(),
                 constructor.Parameters,
+                cls.IdentifierSpan,
+                constructor.Visibility,
+                qualifiedClassName,
                 constructor.Span);
             _functionSymbols.Add(constructor, symbol);
 
@@ -326,15 +352,46 @@ public sealed class Binder
                 ReportDuplicateSignature(constructor.Span, qualifiedLookupName, symbol, duplicate);
         }
 
-        for (var nestedIndex = 0; nestedIndex < cls.NestedClasses.Count; nestedIndex++)
+        foreach (var nested in cls.NestedClasses)
         {
             RegisterClassTree(
-                cls.NestedClasses[nestedIndex],
-                nestedIndex,
+                nested,
                 classIdentity,
                 qualifiedClassName);
         }
     }
+
+    private static IEnumerable<MemberPreprocessorBlockNode> EnumeratePreprocessorBranches(
+        ClassDefinitionNode cls)
+    {
+        foreach (var block in cls.PreprocessorBlocks)
+        {
+            for (var branch = block; branch != null; branch = branch.ElseBranch)
+                yield return branch;
+        }
+    }
+
+    private static IEnumerable<ClassFieldNode> EnumerateFields(ClassDefinitionNode cls) =>
+        cls.Fields.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Fields));
+
+    private static IEnumerable<PropertyNode> EnumerateProperties(ClassDefinitionNode cls) =>
+        cls.Properties.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Properties));
+
+    private static IEnumerable<IndexerNode> EnumerateIndexers(ClassDefinitionNode cls) =>
+        cls.Indexers.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Indexers));
+
+    private static IEnumerable<ConstructorNode> EnumerateConstructors(ClassDefinitionNode cls) =>
+        cls.Constructors.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Constructors));
+
+    private static IEnumerable<MethodNode> EnumerateMethods(ClassDefinitionNode cls) =>
+        cls.Methods.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Methods));
+
+    private static IEnumerable<EventDefinitionNode> EnumerateEvents(ClassDefinitionNode cls) =>
+        cls.Events.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Events));
+
+    private static IEnumerable<OperatorOverloadNode> EnumerateOperators(ClassDefinitionNode cls) =>
+        cls.OperatorOverloads.Concat(
+            EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.OperatorOverloads));
 
     private FunctionSymbol CreateFunctionSymbol(
         SymbolId id,
@@ -342,17 +399,21 @@ public sealed class Binder
         string returnType,
         IReadOnlyList<string> typeParameters,
         IReadOnlyList<ParameterNode> parameters,
-        Parsing.TextSpan declarationSpan)
+        Parsing.TextSpan declarationSpan,
+        Visibility visibility,
+        string? containingTypeName,
+        Parsing.TextSpan definitionSpan)
     {
         var parameterSymbols = parameters
             .Select((parameter, index) => CreateVariable(
-                id.Append($"parameter:{index}"),
+                CreateDeclarationId(id, "parameter", stableAstId: null, parameter.Name),
                 parameter.Name,
                 parameter.TypeName,
                 isMutable: false,
                 isParameter: true,
                 parameter.Modifier,
-                parameter.Span))
+                parameter.IdentifierSpan,
+                parameter.DefaultValue))
             .ToArray();
         var symbol = new FunctionSymbol(
             id,
@@ -360,7 +421,10 @@ public sealed class Binder
             returnType,
             parameterSymbols,
             typeParameters,
-            declarationSpan);
+            declarationSpan,
+            visibility,
+            containingTypeName,
+            definitionSpan);
         TrackSymbol(symbol);
         return symbol;
     }
@@ -372,7 +436,8 @@ public sealed class Binder
         bool isMutable,
         bool isParameter,
         ParameterModifier modifier,
-        Parsing.TextSpan declarationSpan)
+        Parsing.TextSpan declarationSpan,
+        ExpressionNode? defaultValue = null)
     {
         var symbol = new VariableSymbol(
             id,
@@ -381,7 +446,8 @@ public sealed class Binder
             isMutable,
             isParameter,
             modifier,
-            declarationSpan);
+            declarationSpan,
+            defaultValue);
         TrackSymbol(symbol);
         return symbol;
     }
@@ -393,17 +459,39 @@ public sealed class Binder
         bool isParameter,
         ParameterModifier modifier,
         Parsing.TextSpan declarationSpan,
-        string kind)
+        string kind,
+        ExpressionNode? defaultValue = null)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         return CreateVariable(
-            context.Append($"{kind}:{_nextLocalSymbolOrdinal++}"),
+            CreateDeclarationId(context, kind, stableAstId: null, name),
             name,
             typeName,
             isMutable,
             isParameter,
             modifier,
-            declarationSpan);
+            declarationSpan,
+            defaultValue);
+    }
+
+    private SymbolId CreateDeclarationId(
+        SymbolId parent,
+        string kind,
+        string? stableAstId,
+        string fallbackName)
+    {
+        var baseId = !string.IsNullOrWhiteSpace(stableAstId)
+            ? parent.Append(kind, $"ast:{stableAstId}")
+            : parent.Append(kind, $"name:{fallbackName}");
+        var key = baseId.Value;
+        if (!_declarationIdOccurrences.TryGetValue(key, out var occurrence))
+        {
+            _declarationIdOccurrences.Add(key, 1);
+            return baseId;
+        }
+
+        _declarationIdOccurrences[key] = occurrence + 1;
+        return baseId.Append($"duplicate:{occurrence}");
     }
 
     private VariableSymbol CreateUnresolvedVariable(ReferenceNode reference)
@@ -514,7 +602,7 @@ public sealed class Binder
             {
                 var suggestedName = GenerateUniqueName(symbol.Name);
                 _diagnostics.ReportDuplicateDefinitionWithFix(
-                    parameters[index].Span,
+                    parameters[index].IdentifierSpan,
                     symbol.Name,
                     suggestedName);
             }
@@ -532,13 +620,14 @@ public sealed class Binder
                 isMutable: false,
                 isParameter: true,
                 parameter.Modifier,
-                parameter.Span,
-                "parameter");
+                parameter.IdentifierSpan,
+                "parameter",
+                parameter.DefaultValue);
             if (!_scope.TryDeclare(symbol))
             {
                 var suggestedName = GenerateUniqueName(parameter.Name);
                 _diagnostics.ReportDuplicateDefinitionWithFix(
-                    parameter.Span,
+                    parameter.IdentifierSpan,
                     parameter.Name,
                     suggestedName);
             }
@@ -650,7 +739,7 @@ public sealed class Binder
             isMutable: true,
             isParameter: false,
             ParameterModifier.None,
-            forStmt.Span,
+            forStmt.VariableSpan,
             "for");
         if (!_scope.TryDeclare(loopVar))
         {
@@ -705,7 +794,7 @@ public sealed class Binder
         return new BoundIfStatement(ifStmt.Span, condition, thenBody, elseIfClauses, elseBody);
     }
 
-    private BoundBindStatement BindBindStatement(BindStatementNode bind)
+    private BoundStatement BindBindStatement(BindStatementNode bind)
     {
         BoundExpression? initializer = null;
         string typeName;
@@ -734,13 +823,66 @@ public sealed class Binder
             typeName = "INT";
         }
 
+        var rebindTarget = bind.IsMutable ? FindRebindTarget(bind.Name) : null;
+        if (rebindTarget != null)
+        {
+            if (!CanRebind(rebindTarget))
+            {
+                _diagnostics.ReportError(
+                    bind.IdentifierSpan,
+                    DiagnosticCode.BindReassignsImmutable,
+                    $"Binding '{bind.Name}' is immutable and cannot be rebound. " +
+                    "Declare it mutable at its original declaration or use a new name.");
+
+                var recoveryVariable = CreateLocalVariable(
+                    bind.Name,
+                    typeName,
+                    isMutable: true,
+                    isParameter: false,
+                    ParameterModifier.None,
+                    bind.IdentifierSpan,
+                    "invalid-rebind");
+                return new BoundBindStatement(bind.Span, recoveryVariable, initializer);
+            }
+
+            var annotatedType = bind.TypeName == null
+                ? null
+                : TypeIdentity.Canonicalize(bind.TypeName);
+            var valueType = initializer?.TypeName;
+            if ((annotatedType != null
+                    && !AreAssignmentCompatible(rebindTarget.TypeName, annotatedType))
+                || (valueType != null
+                    && !AreAssignmentCompatible(rebindTarget.TypeName, valueType)))
+            {
+                _diagnostics.ReportError(
+                    bind.IdentifierSpan,
+                    DiagnosticCode.BindRebindTypeMismatch,
+                    $"Mutable binding '{bind.Name}' has type '{rebindTarget.TypeName}' and cannot be " +
+                    $"rebound with '{annotatedType ?? valueType}'.");
+            }
+
+            if (initializer != null)
+            {
+                return new BoundAssignmentStatement(
+                    bind.Span,
+                    new BoundVariableExpression(bind.IdentifierSpan, rebindTarget),
+                    initializer);
+            }
+
+            _diagnostics.ReportError(
+                bind.IdentifierSpan,
+                DiagnosticCode.BindRequiresTypeOrInitializer,
+                $"Mutable rebind '{bind.Name}' requires an initializer value.");
+            return new BoundBindStatement(bind.Span, rebindTarget, initializer);
+        }
+
         var variable = CreateLocalVariable(
             bind.Name,
             typeName,
             bind.IsMutable,
             isParameter: false,
             ParameterModifier.None,
-            bind.Span,
+            bind.IdentifierSpan,
             "local");
 
         if (!_scope.TryDeclare(variable))
@@ -750,6 +892,51 @@ public sealed class Binder
         }
 
         return new BoundBindStatement(bind.Span, variable, initializer);
+    }
+
+    private VariableSymbol? FindRebindTarget(string name)
+    {
+        if (_scope.Lookup(name) is not VariableSymbol variable)
+            return null;
+
+        var classMember = _currentClassScope?.LookupLocal(name);
+        return classMember is VariableSymbol member && member.Id == variable.Id
+            ? null
+            : variable;
+    }
+
+    private static bool CanRebind(VariableSymbol variable) =>
+        variable.IsMutable
+        || (variable.IsParameter
+            && !variable.Modifier.HasFlag(ParameterModifier.In));
+
+    private static bool AreAssignmentCompatible(string targetType, string valueType)
+    {
+        var target = TypeIdentity.Canonicalize(targetType);
+        var value = TypeIdentity.Canonicalize(valueType);
+        if (target == value || target is "OBJECT" || value is "OBJECT" or "<unresolved>")
+            return true;
+
+        return value switch
+        {
+            "INT[bits=8][signed=true]" => target is
+                "INT[bits=16][signed=true]" or "INT" or "LONG"
+                or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "INT[bits=8][signed=false]" => target is
+                "INT[bits=16][signed=true]" or "INT[bits=16][signed=false]"
+                or "INT" or "UINT" or "LONG" or "ULONG"
+                or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "INT[bits=16][signed=true]" => target is
+                "INT" or "LONG" or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "INT[bits=16][signed=false]" => target is
+                "INT" or "UINT" or "LONG" or "ULONG"
+                or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "INT" => target is "LONG" or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "UINT" => target is "LONG" or "ULONG" or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "LONG" or "ULONG" => target is "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "FLOAT[bits=32]" => target is "FLOAT",
+            _ => false,
+        };
     }
 
     private BoundExpression BindExpression(ExpressionNode expr)
@@ -806,7 +993,12 @@ public sealed class Binder
     private BoundExpression BindBaseExpression(BaseExpressionNode expression)
     {
         if (!_isStaticContext && _currentClassName != null)
-            return new BoundBaseExpression(expression.Span);
+        {
+            var baseClass = ResolveBaseClass(_currentClass);
+            return new BoundBaseExpression(
+                expression.Span,
+                baseClass == null ? "OBJECT" : _qualifiedClassNames[baseClass]);
+        }
 
         return BindUnsupportedExpression(
             expression,
@@ -827,6 +1019,15 @@ public sealed class Binder
             var symbol = _currentClassScope.LookupLocal(fieldAccess.FieldName);
             if (symbol is VariableSymbol varSymbol)
                 resolvedField = varSymbol;
+        }
+        else if (fieldAccess.Target is BaseExpressionNode)
+        {
+            var baseClass = ResolveBaseClass(_currentClass);
+            if (baseClass != null
+                && _classScopes[baseClass].LookupLocal(fieldAccess.FieldName) is VariableSymbol field)
+            {
+                resolvedField = field;
+            }
         }
 
         return new BoundFieldAccessExpression(
@@ -880,7 +1081,8 @@ public sealed class Binder
             newExpr.TypeArguments,
             boundArgs,
             initializers,
-            resolution.Function);
+            resolution.Function,
+            ResolveTypeSymbol(newExpr.TypeName));
     }
 
     private BoundExpression BindArrayAccess(ArrayAccessNode arrayAccess)
@@ -1227,9 +1429,11 @@ public sealed class Binder
     private BoundExpression BindLambdaExpression(LambdaExpressionNode lambda)
     {
         var parentContext = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
-        var lambdaIdentity = parentContext.Append(
-            $"lambda:{_nextLocalSymbolOrdinal++}",
-            $"ast:{lambda.Id}");
+        var lambdaIdentity = CreateDeclarationId(
+            parentContext,
+            "lambda",
+            lambda.Id,
+            "lambda");
         using var _scopeGuard = PushScope(_scope.CreateChild());
         using var _staticGuard = PushStaticContext(lambda.IsStatic);
         using var _identityGuard = PushDeclarationContext(lambdaIdentity);
@@ -1243,7 +1447,7 @@ public sealed class Binder
                 isMutable: false,
                 isParameter: true,
                 ParameterModifier.None,
-                parameter.Span,
+                parameter.IdentifierSpan,
                 "parameter");
             if (!_scope.TryDeclare(symbol))
             {
@@ -1330,7 +1534,7 @@ public sealed class Binder
                 return Pattern(pattern);
             case VariablePatternNode variable:
                 if (!variable.Name.Contains('.', StringComparison.Ordinal))
-                    DeclarePatternVariable(variable.Span, variable.Name, "OBJECT");
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?>
@@ -1339,13 +1543,16 @@ public sealed class Binder
                         ["IsConstant"] = variable.Name.Contains('.', StringComparison.Ordinal),
                     });
             case VarPatternNode variable:
-                DeclarePatternVariable(variable.Span, variable.Name, "OBJECT");
+                DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?> { ["Name"] = variable.Name });
             case TypePatternNode typePattern:
                 if (typePattern.BindingName != null)
-                    DeclarePatternVariable(typePattern.Span, typePattern.BindingName, typePattern.TypeName);
+                    DeclarePatternVariable(
+                        typePattern.BindingSpan ?? typePattern.Span,
+                        typePattern.BindingName,
+                        typePattern.TypeName);
                 return Pattern(
                     typePattern,
                     metadata: new Dictionary<string, object?>
@@ -1463,7 +1670,7 @@ public sealed class Binder
                 isMutable: false,
                 isParameter: false,
                 ParameterModifier.None,
-                variable.Span,
+                variable.IdentifierSpan,
                 "quantifier");
             if (!_scope.TryDeclare(symbol))
             {
@@ -1824,6 +2031,16 @@ public sealed class Binder
             yield break;
         }
 
+        if (target.StartsWith("base.", StringComparison.Ordinal))
+        {
+            var baseClass = ResolveBaseClass(_currentClass);
+            if (baseClass != null)
+            {
+                yield return $"{_qualifiedClassNames[baseClass]}.{target["base.".Length..]}";
+            }
+            yield break;
+        }
+
         var firstDot = target.IndexOf('.');
         if (firstDot <= 0)
             yield break;
@@ -1847,6 +2064,37 @@ public sealed class Binder
         if (array > 0)
             type = type[..array];
         return type.TrimEnd('?', '*');
+    }
+
+    private TypeSymbol? ResolveTypeSymbol(string typeName)
+    {
+        var cls = ResolveClass(typeName);
+        return cls == null ? null : _classSymbols[cls];
+    }
+
+    private ClassDefinitionNode? ResolveBaseClass(ClassDefinitionNode? cls) =>
+        cls?.BaseClass is { Length: > 0 } baseClass ? ResolveClass(baseClass) : null;
+
+    private ClassDefinitionNode? ResolveClass(string typeName)
+    {
+        var nominal = GetNominalTypeName(typeName);
+        if (_classesByQualifiedName.TryGetValue(nominal, out var qualified))
+            return qualified;
+
+        if (_currentClassName != null)
+        {
+            var containingSeparator = _currentClassName.LastIndexOf('.');
+            if (containingSeparator > 0)
+            {
+                var nestedCandidate = $"{_currentClassName[..containingSeparator]}.{nominal}";
+                if (_classesByQualifiedName.TryGetValue(nestedCandidate, out var nested))
+                    return nested;
+            }
+        }
+
+        return _classesBySimpleName.TryGetValue(nominal, out var matches) && matches.Count == 1
+            ? matches[0]
+            : null;
     }
 
     private static string FormatCallSignature(
@@ -1997,6 +2245,9 @@ public sealed class Binder
         if (typeName.StartsWith(arrayPrefix, StringComparison.OrdinalIgnoreCase)
             && typeName.EndsWith(']'))
             return typeName[arrayPrefix.Length..^1];
+
+        if (typeName.StartsWith('[') && typeName.EndsWith(']') && typeName.Length > 2)
+            return typeName[1..^1];
 
         var bracket = typeName.LastIndexOf('[');
         if (bracket > 0 && typeName.EndsWith(']'))
@@ -2224,7 +2475,7 @@ public sealed class Binder
                     isMutable: false,
                     isParameter: false,
                     ParameterModifier.None,
-                    catchClause.Span,
+                    catchClause.VariableSpan ?? catchClause.Span,
                     "catch");
                 _scope.TryDeclare(exceptionVar);
             }
@@ -2277,13 +2528,18 @@ public sealed class Binder
     {
         using var _ = PushScope(_scope.CreateChild());
 
+        var collection = BindExpression(forEach.Collection);
+        var variableType = string.IsNullOrWhiteSpace(forEach.VariableType)
+                           || forEach.VariableType.Equals("var", StringComparison.OrdinalIgnoreCase)
+            ? GetIndexedElementType(collection.TypeName)
+            : forEach.VariableType;
         var loopVar = CreateLocalVariable(
             forEach.VariableName,
-            forEach.VariableType,
+            variableType,
             isMutable: false,
             isParameter: false,
             ParameterModifier.None,
-            forEach.Span,
+            forEach.VariableSpan,
             "foreach");
         _scope.TryDeclare(loopVar);
 
@@ -2295,12 +2551,11 @@ public sealed class Binder
                 isMutable: true,
                 isParameter: false,
                 ParameterModifier.None,
-                forEach.Span,
+                forEach.IndexVariableSpan ?? forEach.Span,
                 "foreach-index");
             _scope.TryDeclare(indexVar);
         }
 
-        var collection = BindExpression(forEach.Collection);
         var body = BindStatements(forEach.Body);
         return new BoundForeachStatement(forEach.Span, loopVar, collection, body);
     }
@@ -2319,7 +2574,7 @@ public sealed class Binder
                 isMutable: false,
                 isParameter: false,
                 ParameterModifier.None,
-                usingStmt.Span,
+                usingStmt.VariableSpan ?? usingStmt.Span,
                 "using");
             _scope.TryDeclare(resource);
         }
@@ -2367,16 +2622,18 @@ public sealed class Binder
 
         using var _ = PushScope(classScope);
         var previousClassName = _currentClassName;
+        var previousClass = _currentClass;
         var previousClassScope = _currentClassScope;
         var previousClassIdentity = _currentClassIdentity;
         _currentClassName = className;
+        _currentClass = cls;
         _currentClassScope = classScope;
         _currentClassIdentity = _classSymbolIds[cls];
 
         try
         {
             // Methods
-            foreach (var method in cls.Methods)
+            foreach (var method in EnumerateMethods(cls))
             {
                 if (method.IsAbstract || method.IsExtern || method.Body.Count == 0)
                     continue;
@@ -2385,17 +2642,19 @@ public sealed class Binder
             }
 
             // Constructors
-            foreach (var ctor in cls.Constructors)
+            foreach (var ctor in EnumerateConstructors(cls))
             {
-                if (ctor.Body.Count == 0) continue;
+                if (ctor.Body.Count == 0 && ctor.Initializer == null)
+                    continue;
                 var bound = TryBindMember(() => BindConstructor(ctor, className), ctor.Span, className, ".ctor");
                 if (bound != null) functions.Add(bound);
             }
 
             // Property accessors
-            for (var propertyIndex = 0; propertyIndex < cls.Properties.Count; propertyIndex++)
+            var properties = EnumerateProperties(cls).ToArray();
+            for (var propertyIndex = 0; propertyIndex < properties.Length; propertyIndex++)
             {
-                var prop = cls.Properties[propertyIndex];
+                var prop = properties[propertyIndex];
                 if (prop.Getter is { IsAutoImplemented: false })
                 {
                     var bound = TryBindMember(
@@ -2405,7 +2664,7 @@ public sealed class Binder
                             prop.Name,
                             prop.TypeName,
                             prop.Id,
-                            propertyIndex),
+                            prop.IdentifierSpan),
                         prop.Getter.Span, className, $"{prop.Name}.get");
                     if (bound != null) functions.Add(bound);
                 }
@@ -2418,7 +2677,7 @@ public sealed class Binder
                             prop.Name,
                             prop.TypeName,
                             prop.Id,
-                            propertyIndex),
+                            prop.IdentifierSpan),
                         prop.Setter.Span, className, $"{prop.Name}.set");
                     if (bound != null) functions.Add(bound);
                 }
@@ -2431,16 +2690,17 @@ public sealed class Binder
                             prop.Name,
                             prop.TypeName,
                             prop.Id,
-                            propertyIndex),
+                            prop.IdentifierSpan),
                         prop.Initer.Span, className, $"{prop.Name}.init");
                     if (bound != null) functions.Add(bound);
                 }
             }
 
             // Operator overloads
-            for (var operatorIndex = 0; operatorIndex < cls.OperatorOverloads.Count; operatorIndex++)
+            var operators = EnumerateOperators(cls).ToArray();
+            for (var operatorIndex = 0; operatorIndex < operators.Length; operatorIndex++)
             {
-                var op = cls.OperatorOverloads[operatorIndex];
+                var op = operators[operatorIndex];
                 if (op.Body.Count == 0) continue;
                 var bound = TryBindMember(
                     () => BindOperator(op, className, operatorIndex),
@@ -2451,9 +2711,10 @@ public sealed class Binder
             }
 
             // Indexer accessors
-            for (var indexerIndex = 0; indexerIndex < cls.Indexers.Count; indexerIndex++)
+            var indexers = EnumerateIndexers(cls).ToArray();
+            for (var indexerIndex = 0; indexerIndex < indexers.Length; indexerIndex++)
             {
-                var ixer = cls.Indexers[indexerIndex];
+                var ixer = indexers[indexerIndex];
                 if (ixer.Getter is { IsAutoImplemented: false })
                 {
                     var bound = TryBindMember(
@@ -2483,9 +2744,10 @@ public sealed class Binder
             }
 
             // Event accessors
-            for (var eventIndex = 0; eventIndex < cls.Events.Count; eventIndex++)
+            var events = EnumerateEvents(cls).ToArray();
+            for (var eventIndex = 0; eventIndex < events.Length; eventIndex++)
             {
-                var evt = cls.Events[eventIndex];
+                var evt = events[eventIndex];
                 if (evt.AddBody != null && evt.AddBody.Count > 0)
                 {
                     var bound = TryBindMember(
@@ -2527,6 +2789,7 @@ public sealed class Binder
         finally
         {
             _currentClassName = previousClassName;
+            _currentClass = previousClass;
             _currentClassScope = previousClassScope;
             _currentClassIdentity = previousClassIdentity;
         }
@@ -2595,7 +2858,12 @@ public sealed class Binder
         if (ctor.Initializer != null)
         {
             var initArgs = BindExpressions(ctor.Initializer.Arguments);
-            var initTarget = ctor.Initializer.IsBaseCall ? "base..ctor" : $"{className}..ctor";
+            var baseClass = ResolveBaseClass(_currentClass);
+            var initTarget = ctor.Initializer.IsBaseCall
+                ? baseClass == null
+                    ? "base..ctor"
+                    : $"{_qualifiedClassNames[baseClass]}..ctor"
+                : $"{className}..ctor";
             var resolution = ResolveCall(
                 ctor.Initializer.Span,
                 initTarget,
@@ -2621,14 +2889,12 @@ public sealed class Binder
         string propName,
         string propType,
         string propertyId,
-        int propertyIndex)
+        Parsing.TextSpan propertyIdentifierSpan)
     {
         var functionScope = _scope.CreateChild();
         using var _ = PushScope(functionScope);
-        var functionId = _currentClassIdentity.Append(
-            $"property:{propertyIndex}",
-            $"ast:{propertyId}",
-            $"accessor:{accessor.Kind}");
+        var propertyIdentity = _currentClassIdentity.Append("property", $"ast:{propertyId}");
+        var functionId = propertyIdentity.Append($"accessor:{accessor.Kind}");
         using var _identity = PushDeclarationContext(functionId);
 
         var parameters = new List<VariableSymbol>();
@@ -2643,7 +2909,7 @@ public sealed class Binder
                 isMutable: false,
                 isParameter: true,
                 ParameterModifier.None,
-                accessor.Span,
+                Parsing.TextSpan.Empty,
                 "parameter");
             _scope.TryDeclare(valueParam);
             parameters.Add(valueParam);
@@ -2658,7 +2924,10 @@ public sealed class Binder
             qualifiedName,
             returnType,
             parameters,
-            declarationSpan: accessor.Span);
+            declarationSpan: propertyIdentifierSpan,
+            visibility: accessor.Visibility ?? Visibility.Public,
+            containingTypeName: className,
+            definitionSpan: accessor.Span);
         TrackSymbol(functionSymbol);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
@@ -2673,9 +2942,11 @@ public sealed class Binder
         var functionScope = _scope.CreateChild();
         using var _s = PushScope(functionScope);
         using var _c = PushStaticContext(true); // operators are always static in C#
-        var functionId = _currentClassIdentity.Append(
-            $"operator:{operatorIndex}",
-            $"ast:{op.Id}");
+        var functionId = CreateDeclarationId(
+            _currentClassIdentity,
+            "operator",
+            op.Id,
+            $"op_{op.Kind}");
         using var _identity = PushDeclarationContext(functionId);
 
         var parameters = BindParameters(op.Parameters);
@@ -2686,7 +2957,10 @@ public sealed class Binder
             qualifiedName,
             returnType,
             parameters,
-            declarationSpan: op.Span);
+            declarationSpan: op.Span,
+            visibility: op.Visibility,
+            containingTypeName: className,
+            definitionSpan: op.Span);
         TrackSymbol(functionSymbol);
         var boundBody = BindStatements(op.Body);
         // OperatorOverloadNode has no Effects field — mark as unknown
@@ -2704,10 +2978,8 @@ public sealed class Binder
     {
         var functionScope = _scope.CreateChild();
         using var _ = PushScope(functionScope);
-        var functionId = _currentClassIdentity.Append(
-            $"indexer:{indexerIndex}",
-            $"ast:{indexerId}",
-            $"accessor:{accessor.Kind}");
+        var indexerIdentity = _currentClassIdentity.Append("indexer", $"ast:{indexerId}");
+        var functionId = indexerIdentity.Append($"accessor:{accessor.Kind}");
         using var _identity = PushDeclarationContext(functionId);
 
         var parameters = BindParameters(indexerParams);
@@ -2722,7 +2994,7 @@ public sealed class Binder
                 isMutable: false,
                 isParameter: true,
                 ParameterModifier.None,
-                accessor.Span,
+                Parsing.TextSpan.Empty,
                 "parameter");
             _scope.TryDeclare(valueParam);
             parameters.Add(valueParam);
@@ -2736,7 +3008,10 @@ public sealed class Binder
             qualifiedName,
             returnType,
             parameters,
-            declarationSpan: accessor.Span);
+            declarationSpan: accessor.Span,
+            visibility: accessor.Visibility ?? Visibility.Public,
+            containingTypeName: className,
+            definitionSpan: accessor.Span);
         TrackSymbol(functionSymbol);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
@@ -2753,10 +3028,8 @@ public sealed class Binder
     {
         var functionScope = _scope.CreateChild();
         using var _ = PushScope(functionScope);
-        var functionId = _currentClassIdentity.Append(
-            $"event:{eventIndex}",
-            $"ast:{eventId}",
-            $"accessor:{accessorKind}");
+        var eventIdentity = _currentClassIdentity.Append("event", $"ast:{eventId}");
+        var functionId = eventIdentity.Append($"accessor:{accessorKind}");
         using var _identity = PushDeclarationContext(functionId);
 
         var valueParam = CreateLocalVariable(
@@ -2765,7 +3038,7 @@ public sealed class Binder
             isMutable: false,
             isParameter: true,
             ParameterModifier.None,
-            span,
+            Parsing.TextSpan.Empty,
             "parameter");
         _scope.TryDeclare(valueParam);
         var parameters = new List<VariableSymbol> { valueParam };
@@ -2777,7 +3050,10 @@ public sealed class Binder
             qualifiedName,
             "VOID",
             parameters,
-            declarationSpan: span);
+            declarationSpan: span,
+            visibility: Visibility.Public,
+            containingTypeName: className,
+            definitionSpan: span);
         TrackSymbol(functionSymbol);
         var boundBody = BindStatements(body);
         return new BoundFunction(span, functionSymbol, boundBody, functionScope,

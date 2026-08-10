@@ -965,9 +965,12 @@ public sealed class BoundThisExpression : BoundExpression
 /// </summary>
 public sealed class BoundBaseExpression : BoundExpression
 {
-    public override string TypeName => "OBJECT";
+    public override string TypeName { get; }
 
-    public BoundBaseExpression(TextSpan span) : base(span) { }
+    public BoundBaseExpression(TextSpan span, string typeName = "OBJECT") : base(span)
+    {
+        TypeName = typeName;
+    }
 }
 
 /// <summary>
@@ -1022,7 +1025,8 @@ public sealed class BoundNewExpression : BoundExpression
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<BoundObjectInitializer> Initializers { get; }
     public FunctionSymbol? ResolvedConstructor { get; }
-    public SymbolId? ResolvedSymbolId => ResolvedConstructor?.Id;
+    public TypeSymbol? ResolvedType { get; }
+    public SymbolId? ResolvedSymbolId => ResolvedConstructor?.Id ?? ResolvedType?.Id;
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IEnumerable<BoundNode> ChildNodes =>
         Arguments.Cast<BoundNode>().Concat(Initializers);
@@ -1043,7 +1047,8 @@ public sealed class BoundNewExpression : BoundExpression
         IReadOnlyList<string> typeArguments,
         IReadOnlyList<BoundExpression> arguments,
         IReadOnlyList<BoundObjectInitializer> initializers,
-        FunctionSymbol? resolvedConstructor = null)
+        FunctionSymbol? resolvedConstructor = null,
+        TypeSymbol? resolvedType = null)
         : base(span)
     {
         TypeName = typeName ?? "OBJECT";
@@ -1051,6 +1056,7 @@ public sealed class BoundNewExpression : BoundExpression
         Arguments = arguments ?? Array.Empty<BoundExpression>();
         Initializers = initializers ?? Array.Empty<BoundObjectInitializer>();
         ResolvedConstructor = resolvedConstructor;
+        ResolvedType = resolvedType;
         Children = [.. Arguments, .. Initializers.Select(initializer => initializer.Value)];
     }
 }

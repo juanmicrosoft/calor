@@ -117,6 +117,93 @@ public class VerificationAnalysisPassTests
                 diagnostic.Code == DiagnosticCode.MissingPrecondition));
     }
 
+    [Fact]
+    public void QuantifierAndLambdaShadowing_DoNotGuardOuterParameter()
+    {
+        var outerParameter = new Ast.ParameterNode(
+            new TextSpan(1, 1, 1, 1),
+            "y",
+            "i32",
+            new Ast.AttributeCollection());
+        var shadowedReference = new Ast.ReferenceNode(
+            new TextSpan(2, 1, 1, 2),
+            "y");
+        var quantifier = new Ast.ForallExpressionNode(
+            new TextSpan(3, 1, 1, 3),
+            [new Ast.QuantifierVariableNode(new TextSpan(4, 1, 1, 4), "y", "i32")],
+            new Ast.BinaryOperationNode(
+                new TextSpan(5, 1, 1, 5),
+                Ast.BinaryOperator.NotEqual,
+                shadowedReference,
+                new Ast.IntLiteralNode(new TextSpan(6, 1, 1, 6), 0)));
+        var lambda = new Ast.LambdaExpressionNode(
+            new TextSpan(7, 1, 1, 7),
+            "l1",
+            [new Ast.LambdaParameterNode(new TextSpan(8, 1, 1, 8), "y", "i32")],
+            effects: null,
+            isAsync: false,
+            expressionBody: new Ast.ReferenceNode(new TextSpan(9, 1, 1, 9), "y"),
+            statementBody: null,
+            new Ast.AttributeCollection());
+        var function = new Ast.FunctionNode(
+            new TextSpan(0, 20, 1, 1),
+            "f1",
+            "Divide",
+            Ast.Visibility.Public,
+            [outerParameter],
+            new Ast.OutputNode(new TextSpan(10, 1, 1, 10), "i32"),
+            effects: null,
+            preconditions:
+            [
+                new Ast.RequiresNode(
+                    new TextSpan(11, 1, 1, 11),
+                    quantifier,
+                    message: null,
+                    new Ast.AttributeCollection()),
+                new Ast.RequiresNode(
+                    new TextSpan(12, 1, 1, 12),
+                    lambda,
+                    message: null,
+                    new Ast.AttributeCollection()),
+            ],
+            postconditions: [],
+            body:
+            [
+                new Ast.ReturnStatementNode(
+                    new TextSpan(13, 1, 1, 13),
+                    new Ast.BinaryOperationNode(
+                        new TextSpan(14, 1, 1, 14),
+                        Ast.BinaryOperator.Divide,
+                        new Ast.IntLiteralNode(new TextSpan(15, 1, 1, 15), 1),
+                        new Ast.ReferenceNode(new TextSpan(16, 1, 1, 16), "y"))),
+            ],
+            new Ast.AttributeCollection());
+        var module = new Ast.ModuleNode(
+            new TextSpan(0, 30, 1, 1),
+            "m1",
+            "Test",
+            [],
+            [function],
+            new Ast.AttributeCollection());
+        var diagnostics = new DiagnosticBag();
+
+        new VerificationAnalysisPass(
+                diagnostics,
+                new VerificationAnalysisOptions
+                {
+                    EnableDataflow = false,
+                    EnableBugPatterns = true,
+                    EnableTaintAnalysis = false,
+                    EnableContractInference = false,
+                    EnableKInduction = false,
+                    UseZ3Verification = false,
+                })
+            .Analyze(module);
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.MissingPrecondition);
+    }
+
     #endregion
 
     #region Result Tests

@@ -409,6 +409,7 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         DiagnosticCode.TypeMismatch => "Type mismatch",
         DiagnosticCode.UndefinedReference => "Undefined reference",
         DiagnosticCode.DuplicateFunctionSignature => "Duplicate function signature",
+        DiagnosticCode.BindReassignsImmutable => "Cannot rebind immutable symbol",
         DiagnosticCode.AmbiguousOverload => "Ambiguous overload",
         DiagnosticCode.NoMatchingOverload => "No matching overload",
         DiagnosticCode.NonExhaustiveMatch => "Non-exhaustive match expression",

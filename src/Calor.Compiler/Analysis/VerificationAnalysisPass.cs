@@ -321,10 +321,50 @@ public sealed class VerificationAnalysisPass
         HashSet<string> paramNames,
         HashSet<string> collected)
     {
-        foreach (var node in DescendantsAndSelf(expr))
+        Visit(expr, new HashSet<string>(StringComparer.Ordinal));
+
+        void Visit(Ast.AstNode node, HashSet<string> shadowed)
         {
-            if (node is Ast.ReferenceNode reference && paramNames.Contains(reference.Name))
-                collected.Add(reference.Name);
+            switch (node)
+            {
+                case Ast.ReferenceNode reference:
+                    if (paramNames.Contains(reference.Name) && !shadowed.Contains(reference.Name))
+                        collected.Add(reference.Name);
+                    return;
+
+                case Ast.ForallExpressionNode forall:
+                {
+                    var nested = new HashSet<string>(shadowed, StringComparer.Ordinal);
+                    nested.UnionWith(forall.BoundVariables.Select(variable => variable.Name));
+                    Visit(forall.Body, nested);
+                    return;
+                }
+
+                case Ast.ExistsExpressionNode exists:
+                {
+                    var nested = new HashSet<string>(shadowed, StringComparer.Ordinal);
+                    nested.UnionWith(exists.BoundVariables.Select(variable => variable.Name));
+                    Visit(exists.Body, nested);
+                    return;
+                }
+
+                case Ast.LambdaExpressionNode lambda:
+                {
+                    var nested = new HashSet<string>(shadowed, StringComparer.Ordinal);
+                    nested.UnionWith(lambda.Parameters.Select(parameter => parameter.Name));
+                    if (lambda.ExpressionBody != null)
+                        Visit(lambda.ExpressionBody, nested);
+                    if (lambda.StatementBody != null)
+                    {
+                        foreach (var statement in lambda.StatementBody)
+                            Visit(statement, nested);
+                    }
+                    return;
+                }
+            }
+
+            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+                Visit(child, shadowed);
         }
     }
 
@@ -494,7 +534,7 @@ public sealed class VerificationAnalysisPass
         var result = new Dictionary<SymbolId, IReadOnlySet<SymbolId>>();
         foreach (var function in boundModule.Functions)
         {
-            if (!namesByDeclaration.TryGetValue(function.Symbol.DeclarationSpan, out var guardedNames))
+            if (!namesByDeclaration.TryGetValue(function.Symbol.DefinitionSpan, out var guardedNames))
                 continue;
 
             result[function.SymbolId] = function.Symbol.Parameters

@@ -25,22 +25,23 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
     public override Task<SignatureHelp?> Handle(SignatureHelpParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null)
+        var snapshot = state?.Snapshot;
+        if (state == null || snapshot?.Ast == null)
         {
             return Task.FromResult<SignatureHelp?>(null);
         }
 
-        var offset = PositionConverter.ToOffset(request.Position, state.Source);
+        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
 
         // Find if we're inside a function call
-        var callContext = FindCallContext(state.Source, offset);
+        var callContext = FindCallContext(snapshot.Source, offset);
         if (callContext == null)
         {
             return Task.FromResult<SignatureHelp?>(null);
         }
 
         var resolvedSymbol = SymbolFinder.FindResolvedCall(
-            state.BoundModule,
+            snapshot.BoundModule,
             offset);
         if (resolvedSymbol != null)
         {
@@ -49,10 +50,10 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         }
 
         var boundCall = SymbolFinder.FindBoundCallAtOffset(
-            state.BoundModule,
+            snapshot.BoundModule,
             offset,
             callContext.FunctionName);
-        var projectCall = _workspace.ResolveProjectCall(boundCall);
+        var projectCall = _workspace.ResolveProjectCall(state, snapshot, boundCall);
         if (projectCall.Symbol != null)
         {
             return Task.FromResult<SignatureHelp?>(
@@ -65,11 +66,11 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         }
 
         // Find the function definition
-        var func = SymbolFinder.FindFunction(state.Ast, callContext.FunctionName);
+        var func = SymbolFinder.FindFunction(snapshot.Ast, callContext.FunctionName);
         if (func == null)
         {
             // Try to find a method in classes
-            var method = FindMethodInClasses(state.Ast, callContext.FunctionName);
+            var method = FindMethodInClasses(snapshot.Ast, callContext.FunctionName);
             if (method != null)
             {
                 return Task.FromResult<SignatureHelp?>(BuildSignatureHelp(method, callContext.ArgumentIndex));

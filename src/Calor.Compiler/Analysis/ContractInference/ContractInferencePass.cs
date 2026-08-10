@@ -44,7 +44,7 @@ public sealed class ContractInferencePass
             if (boundFunc.MemberKind != BoundMemberKind.TopLevelFunction)
                 continue;
 
-            if (functionsWithContracts.Contains(boundFunc.Symbol.DeclarationSpan))
+            if (functionsWithContracts.Contains(boundFunc.Symbol.DefinitionSpan))
                 continue;
 
             contractsInferred += InferForFunction(boundFunc);

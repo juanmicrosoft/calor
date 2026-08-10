@@ -40,7 +40,8 @@ public sealed class BindValidationPass
     private readonly bool _strictInference;
     private readonly string? _source;
 
-    // Return type of each user function/method by name — built per module so the
+    // Return type of each user function/method by callable name and applicable arity
+    // — built per module so the
     // array-vs-collection check (Calor0254) can see when an initializer call
     // returns an array (e.g. §F ... -> [str]). Rebuilt on every Check(module).
     private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
@@ -60,6 +61,7 @@ public sealed class BindValidationPass
     // single-threaded / non-reentrant, which matches its current usage (one pass
     // per compilation); parallelizing over modules would need per-call state.
     private readonly List<Dictionary<string, string>> _scopes = [];
+    private readonly List<HashSet<string>> _mutableScopes = [];
 
     // Fields of the class whose member is currently being walked (null at module
     // level). Kept separate from _scopes: a local may legally shadow a field, so
@@ -209,18 +211,27 @@ public sealed class BindValidationPass
         // separate means a body-top-level §B that reuses a parameter name is caught
         // (the parameter is in an enclosing scope), matching C#'s CS0136.
         _scopes.Clear();
+        _mutableScopes.Clear();
         var paramScope = new Dictionary<string, string>(StringComparer.Ordinal);
+        var mutableParams = new HashSet<string>(StringComparer.Ordinal);
         if (parameters != null)
         {
             // Empty-string type is benign in the downstream lookups (the §ASSIGN /
             // Calor0254 checks call TryGetConcreteCollectionName, which fails on "");
             // the entry is only load-bearing for the shadowing check, which needs the
             // name, not the type.
-            foreach (var p in parameters) paramScope[p.Name] = p.TypeName ?? "";
+            foreach (var p in parameters)
+            {
+                paramScope[p.Name] = p.TypeName ?? "";
+                if (!p.Modifier.HasFlag(ParameterModifier.In))
+                    mutableParams.Add(p.Name);
+            }
         }
 
         _scopes.Add(paramScope);
+        _mutableScopes.Add(mutableParams);
         _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+        _mutableScopes.Add(new HashSet<string>(StringComparer.Ordinal));
         foreach (var stmt in body)
         {
             CheckStatement(stmt);
@@ -232,15 +243,22 @@ public sealed class BindValidationPass
     private void CheckBlock(IReadOnlyList<StatementNode> body)
     {
         _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+        _mutableScopes.Add(new HashSet<string>(StringComparer.Ordinal));
         foreach (var stmt in body)
         {
             CheckStatement(stmt);
         }
 
         _scopes.RemoveAt(_scopes.Count - 1);
+        _mutableScopes.RemoveAt(_mutableScopes.Count - 1);
     }
 
-    private void DeclareLocal(string name, string type) => _scopes[^1][name] = type;
+    private void DeclareLocal(string name, string type, bool isMutable)
+    {
+        _scopes[^1][name] = type;
+        if (isMutable)
+            _mutableScopes[^1].Add(name);
+    }
 
     // Names of §EACH/§EACHKV iteration variables currently in scope. Foreach iteration
     // variables are read-only in C#, so a mutable §B rebinding one is neither a valid
@@ -266,6 +284,7 @@ public sealed class BindValidationPass
         IReadOnlyList<string?> scopeVars)
     {
         var loopScope = new Dictionary<string, string>(StringComparer.Ordinal);
+        var mutableLoopScope = new HashSet<string>(StringComparer.Ordinal);
         var trackedIterVars = new List<string>();
         foreach (var name in readOnlyVars)
         {
@@ -282,11 +301,14 @@ public sealed class BindValidationPass
             if (string.IsNullOrEmpty(name)) continue;
             CheckLoopVarShadows(name, loopSpan);
             loopScope[name] = "";
+            mutableLoopScope.Add(name);
         }
 
         _scopes.Add(loopScope);
+        _mutableScopes.Add(mutableLoopScope);
         CheckBlock(body);
         _scopes.RemoveAt(_scopes.Count - 1);
+        _mutableScopes.RemoveAt(_mutableScopes.Count - 1);
         foreach (var name in trackedIterVars) _foreachIterationVars.Remove(name);
     }
 
@@ -346,6 +368,17 @@ public sealed class BindValidationPass
         return false;
     }
 
+    private bool IsMutableInAnyLiveScope(string name)
+    {
+        for (var index = _scopes.Count - 1; index >= 0; index--)
+        {
+            if (_scopes[index].ContainsKey(name))
+                return _mutableScopes[index].Contains(name);
+        }
+
+        return false;
+    }
+
     /// <summary>The expanded type of a literal initializer, or null if the initializer is
     /// null or not a statically-typed literal. Used as the leaf case of
     /// <see cref="TryInferValueType"/>.</summary>
@@ -380,7 +413,7 @@ public sealed class BindValidationPass
                 return TryLookupLocal(reference.Name, out type) && !string.IsNullOrEmpty(type);
 
             case CallExpressionNode call:
-                if (TryResolveReturnType(call.Target, out type) && !string.IsNullOrEmpty(type))
+                if (TryResolveReturnType(call, out type) && !string.IsNullOrEmpty(type))
                 {
                     return true;
                 }
@@ -642,6 +675,15 @@ public sealed class BindValidationPass
         }
         else if (isReassignment)
         {
+            if (!IsMutableInAnyLiveScope(bind.Name))
+            {
+                _diagnostics.ReportError(
+                    bind.Span,
+                    DiagnosticCode.BindReassignsImmutable,
+                    $"Binding '{bind.Name}' is immutable and cannot be rebound. " +
+                    "Declare it mutable at its original declaration or use a new name.");
+            }
+
             // Calor0256 — a mutable rebind whose value is of a type category that is not
             // implicitly convertible to the variable's declaration. The variable's type is
             // fixed at first declaration; the emitter emits `x = value` against that type,
@@ -706,7 +748,7 @@ public sealed class BindValidationPass
 
             // Track the name (with its declared type, or empty when untyped) so later
             // §ASSIGN can be type-checked and nested §B can detect shadowing of it.
-            DeclareLocal(bind.Name, bind.TypeName ?? "");
+            DeclareLocal(bind.Name, bind.TypeName ?? "", bind.IsMutable);
         }
 
         // Calor0254 — always-on hard type error: an array bound to a concrete
@@ -818,11 +860,13 @@ public sealed class BindValidationPass
     // context here — is what prevents a same-named method and free function from
     // clobbering each other (PR #728 review finding 1). When neither is present the
     // callee is unknown (BCL / cross-module): a conservative false negative.
-    private bool TryResolveReturnType(string target, out string returnType)
+    private bool TryResolveReturnType(CallExpressionNode call, out string returnType)
     {
+        var target = call.Target;
+        var arity = call.Arguments.Count;
         if (_currentClassName != null)
         {
-            var qualified = $"{_currentClassName}.{target}";
+            var qualified = $"{_currentClassName}.{target}/{arity}";
             if (_ambiguousUserReturnTypes.Contains(qualified))
             {
                 returnType = string.Empty;
@@ -832,12 +876,13 @@ public sealed class BindValidationPass
                 return true;
         }
 
-        if (_ambiguousUserReturnTypes.Contains(target))
+        var key = $"{target}/{arity}";
+        if (_ambiguousUserReturnTypes.Contains(key))
         {
             returnType = string.Empty;
             return false;
         }
-        return _userReturnTypes.TryGetValue(target, out returnType!);
+        return _userReturnTypes.TryGetValue(key, out returnType!);
     }
 
     private bool TryResolveParamTypes(string target, int arity, out List<string> paramTypes)
@@ -884,7 +929,7 @@ public sealed class BindValidationPass
         // shadows a BCL name (e.g. a local `File.ReadAllLines -> List<str>`) is
         // judged by its real return type, not the built-in assumption. Resolution
         // is context-sensitive (current class before module level).
-        if (TryResolveReturnType(call.Target, out var returnType))
+        if (TryResolveReturnType(call, out var returnType))
         {
             return IsArrayTypeName(returnType)
                 ? returnType.Trim().TrimStart('[').TrimEnd(']').Trim()
@@ -918,7 +963,7 @@ public sealed class BindValidationPass
         {
             if (func.Output?.TypeName is { } rt)
             {
-                RegisterReturnType(func.Name, rt);
+                RegisterReturnType(func.Name, func.Parameters, rt);
             }
 
             RegisterParams(func.Name, func.Parameters);
@@ -931,7 +976,7 @@ public sealed class BindValidationPass
                 var key = $"{cls.Name}.{method.Name}";
                 if (method.Output?.TypeName is { } rt)
                 {
-                    RegisterReturnType(key, rt);
+                    RegisterReturnType(key, method.Parameters, rt);
                 }
 
                 RegisterParams(key, method.Parameters);
@@ -956,18 +1001,36 @@ public sealed class BindValidationPass
         _userParamTypes[key] = parameters.Select(p => p.TypeName ?? "").ToList();
     }
 
-    private void RegisterReturnType(string name, string returnType)
+    private void RegisterReturnType(
+        string name,
+        IReadOnlyList<ParameterNode> parameters,
+        string returnType)
     {
-        if (_ambiguousUserReturnTypes.Contains(name))
-            return;
-        if (_userReturnTypes.ContainsKey(name))
-        {
-            _userReturnTypes.Remove(name);
-            _ambiguousUserReturnTypes.Add(name);
-            return;
-        }
+        var paramsIndex = parameters
+            .Select((parameter, index) => (parameter, index))
+            .Where(item => item.parameter.Modifier.HasFlag(ParameterModifier.Params))
+            .Select(item => item.index)
+            .DefaultIfEmpty(parameters.Count)
+            .First();
+        var requiredArity = parameters
+            .Take(paramsIndex)
+            .Count(parameter => parameter.DefaultValue == null);
+        var maximumRegisteredArity = parameters.Count;
 
-        _userReturnTypes[name] = returnType;
+        for (var arity = requiredArity; arity <= maximumRegisteredArity; arity++)
+        {
+            var key = $"{name}/{arity}";
+            if (_ambiguousUserReturnTypes.Contains(key))
+                continue;
+            if (_userReturnTypes.ContainsKey(key))
+            {
+                _userReturnTypes.Remove(key);
+                _ambiguousUserReturnTypes.Add(key);
+                continue;
+            }
+
+            _userReturnTypes[key] = returnType;
+        }
     }
 
     private static bool IsArrayTypeName(string? typeName)

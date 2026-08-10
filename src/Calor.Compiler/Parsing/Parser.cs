@@ -736,6 +736,7 @@ public sealed class Parser
         CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
 
         var (id, funcName, visibilityStr) = AttributeHelper.InterpretFuncAttributes(attrs);
+        var functionNameKey = "_pos1";
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
@@ -745,6 +746,7 @@ public sealed class Parser
             visibilityStr = funcName;
             funcName = id;
             id = GenerateParserAutoId("f");
+            functionNameKey = "_pos0";
         }
 
         if (string.IsNullOrEmpty(id))
@@ -908,10 +910,11 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
+        var identifierSpan = GetIdentifierSpan(attrs, functionNameKey, funcName);
         return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs,
             examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
-            properties, lockNode, author, taskRef);
+            properties, lockNode, author, taskRef, identifierSpan: identifierSpan);
     }
 
     /// <summary>
@@ -931,6 +934,7 @@ public sealed class Parser
         CheckMalformedFunctionHeader(startToken, attrs, headerOpen, Peek(-1));
 
         var (id, funcName, visibilityStr) = AttributeHelper.InterpretFuncAttributes(attrs);
+        var functionNameKey = "_pos1";
 
         // --- Compact syntax: optional ID ---
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
@@ -939,6 +943,7 @@ public sealed class Parser
             visibilityStr = funcName;
             funcName = id;
             id = GenerateParserAutoId("f");
+            functionNameKey = "_pos0";
         }
 
         if (string.IsNullOrEmpty(id))
@@ -1097,10 +1102,11 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
+        var identifierSpan = GetIdentifierSpan(attrs, functionNameKey, funcName);
         return new FunctionNode(span, id, funcName, visibility, typeParameters, parameters, output, effects,
             preconditions, postconditions, body, attrs,
             examples, issues, uses, usedBy, assumptions, complexity, since, deprecated, breakingChanges,
-            properties, lockNode, author, taskRef, isAsync: true);
+            properties, lockNode, author, taskRef, isAsync: true, identifierSpan: identifierSpan);
     }
 
     private ParameterNode ParseParameter()
@@ -1165,7 +1171,17 @@ public sealed class Parser
             defaultValue = ParseExpression();
         }
 
-        return new ParameterNode(startToken.Span, paramName, typeName, modifier, attrs, csharpAttrs, defaultValue, inlineRefinement);
+        var identifierSpan = GetIdentifierSpan(attrs, "_pos1", paramName);
+        return new ParameterNode(
+            startToken.Span,
+            paramName,
+            typeName,
+            modifier,
+            attrs,
+            csharpAttrs,
+            defaultValue,
+            inlineRefinement,
+            identifierSpan);
     }
 
     private OutputNode ParseOutput()
@@ -2002,13 +2018,16 @@ public sealed class Parser
             var firstToken = Advance();
             var paramName = firstToken.Text;
             string? paramType = null;
+            var parameterSpan = firstToken.Span;
 
             // Check for typed parameter: type:name
             if (Check(TokenKind.Colon))
             {
                 Advance(); // consume :
                 paramType = paramName;
-                paramName = Expect(TokenKind.Identifier).Text;
+                var nameToken = Expect(TokenKind.Identifier);
+                paramName = nameToken.Text;
+                parameterSpan = nameToken.Span;
             }
 
             if (Check(TokenKind.CloseParen))
@@ -2020,7 +2039,11 @@ public sealed class Parser
                     Advance(); // consume →
                     var (exprBody, stmtBody, endSpan) = ParseLambdaBody();
                     var span = startToken.Span.Union(endSpan);
-                    var param = new LambdaParameterNode(firstToken.Span, paramName, paramType);
+                    var param = new LambdaParameterNode(
+                        firstToken.Span,
+                        paramName,
+                        paramType,
+                        parameterSpan);
                     return new LambdaExpressionNode(
                         span,
                         "inline",
@@ -2877,7 +2900,11 @@ public sealed class Parser
             var typeToken = Expect(TokenKind.Identifier);
             var bindingEnd = Expect(TokenKind.CloseParen);
             var bindingSpan = bindingStart.Span.Union(bindingEnd.Span);
-            boundVars.Add(new QuantifierVariableNode(bindingSpan, nameToken.Text, typeToken.Text));
+            boundVars.Add(new QuantifierVariableNode(
+                bindingSpan,
+                nameToken.Text,
+                typeToken.Text,
+                nameToken.Span));
         }
 
         Expect(TokenKind.CloseParen);
@@ -3929,7 +3956,10 @@ public sealed class Parser
             var varToken = Expect(TokenKind.Var);
             var attrs = ParseAttributes();
             var name = attrs["_pos0"] ?? attrs["name"] ?? "_";
-            return new VarPatternNode(varToken.Span, name);
+            return new VarPatternNode(
+                varToken.Span,
+                name,
+                GetIdentifierSpan(attrs, "_pos0", name));
         }
 
         // Handle §PREL{op} value pattern (relational pattern)
@@ -3978,7 +4008,10 @@ public sealed class Parser
             {
                 Advance(); // consume 'var'
                 var nameToken = Advance(); // consume name
-                return new VarPatternNode(token.Span.Union(nameToken.Span), nameToken.Text);
+                return new VarPatternNode(
+                    token.Span.Union(nameToken.Span),
+                    nameToken.Text,
+                    nameToken.Span);
             }
 
             // Handle null pattern
@@ -4058,20 +4091,22 @@ public sealed class Parser
                 if (Check(TokenKind.CloseBrace)) Advance(); // consume }
                 // Check for optional variable binding after property pattern: Type { ... } varName
                 string? varName = null;
+                TextSpan? varSpan = null;
                 if (Check(TokenKind.Identifier) && Current.Text != "_"
                     && Peek(1).Kind != TokenKind.Arrow && Peek(1).Kind != TokenKind.Case
                     && Peek(1).Kind != TokenKind.EndMatch && Peek(1).Kind != TokenKind.EndCase)
                 {
-                    varName = Current.Text;
-                    Advance();
+                    var nameToken = Advance();
+                    varName = nameToken.Text;
+                    varSpan = nameToken.Span;
                 }
                 // Return as a variable pattern with the type name (property patterns are opaque to Calor)
                 return varName != null
-                    ? new VarPatternNode(token.Span, varName)
-                    : new VariablePatternNode(token.Span, token.Text);
+                    ? new VarPatternNode(token.Span, varName, varSpan)
+                    : new VariablePatternNode(token.Span, token.Text, token.Span);
             }
 
-            return new VariablePatternNode(token.Span, token.Text);
+            return new VariablePatternNode(token.Span, token.Text, token.Span);
         }
 
         if (Check(TokenKind.IntLiteral) || Check(TokenKind.StrLiteral) ||
@@ -4226,6 +4261,7 @@ public sealed class Parser
 
         // Interpret loop attributes
         var (id, varName, fromStr, toStr, stepStr) = AttributeHelper.InterpretForAttributes(attrs);
+        var variableKey = "_pos1";
 
         // --- Compact syntax: optional ID (RFC §1 Phase 1) ---
         // §L{var:from:to[:step]} is accepted alongside the legacy
@@ -4243,6 +4279,7 @@ public sealed class Parser
                 stepStr = "1";
             }
             id = GenerateParserAutoId("l");
+            variableKey = "_pos0";
         }
 
         if (string.IsNullOrEmpty(id))
@@ -4289,7 +4326,16 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ForStatementNode(span, id, varName, from, to, step, body, attrs);
+        return new ForStatementNode(
+            span,
+            id,
+            varName,
+            from,
+            to,
+            step,
+            body,
+            attrs,
+            GetIdentifierSpan(attrs, variableKey, varName));
     }
 
     /// <summary>
@@ -4667,7 +4713,18 @@ public sealed class Parser
         }
 
         var span = initializer != null ? startToken.Span.Union(initializer.Span) : startToken.Span;
-        return new BindStatementNode(span, name, typeName, isMutable, initializer, attrs);
+        var rawPos0 = attrs["_pos0"] ?? "";
+        var nameKey = rawPos0 == name || rawPos0 == $"~{name}" ? "_pos0" : "_pos1";
+        var leadingCharacters = rawPos0 == $"~{name}" ? 1 : 0;
+        var identifierSpan = GetIdentifierSpan(attrs, nameKey, name, leadingCharacters);
+        return new BindStatementNode(
+            span,
+            name,
+            typeName,
+            isMutable,
+            initializer,
+            attrs,
+            identifierSpan);
     }
 
     /// <summary>
@@ -4763,15 +4820,37 @@ public sealed class Parser
 
         do
         {
+            var valueStart = Current.Span;
+            var startPosition = _position;
             var value = ParseValue();
             values.Add(value);
-            attrs.Add($"_pos{position}", value);
+            var valueSpan = _position > startPosition
+                ? valueStart.Union(Peek(-1).Span)
+                : valueStart;
+            attrs.Add($"_pos{position}", value, valueSpan);
             position++;
         }
         while (MatchColon());
 
         // Also store the raw positional count
         attrs.Add("_posCount", position.ToString());
+    }
+
+    private static TextSpan GetIdentifierSpan(
+        AttributeCollection attrs,
+        string key,
+        string identifier,
+        int leadingCharacters = 0)
+    {
+        if (!attrs.TryGetSpan(key, out var span))
+            return TextSpan.Empty;
+
+        var length = Math.Min(identifier.Length, Math.Max(0, span.Length - leadingCharacters));
+        return new TextSpan(
+            span.Start + leadingCharacters,
+            length,
+            span.Line,
+            span.Column + leadingCharacters);
     }
 
     /// <summary>
@@ -6147,7 +6226,19 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ForeachStatementNode(span, id, variableName, variableType, collection, body, attrs, indexVariableName);
+        return new ForeachStatementNode(
+            span,
+            id,
+            variableName,
+            variableType,
+            collection,
+            body,
+            attrs,
+            indexVariableName,
+            GetIdentifierSpan(attrs, "_pos1", variableName),
+            indexVariableName == null
+                ? null
+                : GetIdentifierSpan(attrs, "_pos3", indexVariableName));
     }
 
     // Phase 6 Extended: Collections (List, Dictionary, HashSet)
@@ -7238,6 +7329,7 @@ public sealed class Parser
         // Positional: [id:name:modifiers?] or [id:name:baseClass:modifiers?]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
+        var classNameKey = "_pos1";
         var pos2 = attrs["_pos2"] ?? "";
         var pos3 = attrs["_pos3"];
 
@@ -7250,6 +7342,7 @@ public sealed class Parser
             pos2 = name;
             name = id;
             id = GenerateParserAutoId("c");
+            classNameKey = "_pos0";
         }
 
         if (string.IsNullOrEmpty(id))
@@ -7478,6 +7571,7 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
+        var identifierSpan = GetIdentifierSpan(attrs, classNameKey, name);
         return new ClassDefinitionNode(span, id, name, isAbstract, isSealed, isPartial, isStatic, baseClass,
             implementedInterfaces, typeParameters, fields, properties, constructors, methods, events, operatorOverloads, attrs, csharpAttrs,
             isStruct: isStruct, isReadOnly: isReadOnly, visibility: visibility, interopBlocks: interopBlocks,
@@ -7486,7 +7580,8 @@ public sealed class Parser
             nestedInterfaces: nestedInterfaces.Count > 0 ? nestedInterfaces : null,
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
             indexers: indexers.Count > 0 ? indexers : null,
-            nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null);
+            nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
+            identifierSpan: identifierSpan);
     }
 
     /// <summary>
@@ -7537,7 +7632,16 @@ public sealed class Parser
         }
 
         var span = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
-        return new ClassFieldNode(span, name, typeName, visibility, fieldModifiers, defaultValue, attrs, csharpAttrs);
+        return new ClassFieldNode(
+            span,
+            name,
+            typeName,
+            visibility,
+            fieldModifiers,
+            defaultValue,
+            attrs,
+            csharpAttrs,
+            GetIdentifierSpan(attrs, "_pos1", name));
     }
 
     /// <summary>
@@ -7557,6 +7661,7 @@ public sealed class Parser
         // Positional: [id:name:visibility?:modifiers?]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
+        var methodNameKey = "_pos1";
         var visStr = attrs["_pos2"] ?? "private";
         var modStr = attrs["_pos3"] ?? "";
 
@@ -7569,6 +7674,7 @@ public sealed class Parser
             visStr = name;
             name = id;
             id = GenerateParserAutoId("m");
+            methodNameKey = "_pos0";
         }
 
         if (string.IsNullOrEmpty(id))
@@ -7679,7 +7785,8 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
-            output, effects, preconditions, postconditions, body, attrs, csharpAttrs);
+            output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
+            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name));
     }
 
     /// <summary>
@@ -7700,6 +7807,7 @@ public sealed class Parser
         // Positional: [id:name:visibility?:modifiers?]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
+        var methodNameKey = "_pos1";
         var visStr = attrs["_pos2"] ?? "private";
         var modStr = attrs["_pos3"] ?? "";
 
@@ -7711,6 +7819,7 @@ public sealed class Parser
             visStr = name;
             name = id;
             id = GenerateParserAutoId("m");
+            methodNameKey = "_pos0";
         }
 
         if (string.IsNullOrEmpty(id))
@@ -7821,7 +7930,9 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new MethodNode(span, id, name, visibility, modifiers, typeParameters, parameters,
-            output, effects, preconditions, postconditions, body, attrs, csharpAttrs, isAsync: true);
+            output, effects, preconditions, postconditions, body, attrs, csharpAttrs,
+            isAsync: true,
+            identifierSpan: GetIdentifierSpan(attrs, methodNameKey, name));
     }
 
     private static MethodModifiers ParseMethodModifiers(string modStr)
@@ -8361,6 +8472,7 @@ public sealed class Parser
         // Positional: [id:name:type:visibility?:modifiers?:accessors?]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
+        var propertyNameKey = "_pos1";
         var typeName = attrs["_pos2"] ?? "object";
         var visStr = attrs["_pos3"] ?? "public";
         var modStr = attrs["_pos4"] ?? "";
@@ -8379,6 +8491,7 @@ public sealed class Parser
             typeName = name;
             name = id;
             id = GenerateParserAutoId("p");
+            propertyNameKey = "_pos0";
         }
 
         // If modStr is an accessor shorthand and there's no explicit accessorStr,
@@ -8417,7 +8530,20 @@ public sealed class Parser
 
             // Compact form: no §/PROP closing tag needed
             var compactSpan = defaultValue != null ? startToken.Span.Union(defaultValue.Span) : startToken.Span;
-            return new PropertyNode(compactSpan, id, name, typeName, visibility, modifiers, getter, setter, initer, defaultValue, attrs, csharpAttrs);
+            return new PropertyNode(
+                compactSpan,
+                id,
+                name,
+                typeName,
+                visibility,
+                modifiers,
+                getter,
+                setter,
+                initer,
+                defaultValue,
+                attrs,
+                csharpAttrs,
+                GetIdentifierSpan(attrs, propertyNameKey, name));
         }
 
         PropertyAccessorNode? getter2 = null;
@@ -8473,7 +8599,20 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new PropertyNode(span, id, name, typeName, visibility, modifiers, getter2, setter2, initer2, defaultValue2, attrs, csharpAttrs);
+        return new PropertyNode(
+            span,
+            id,
+            name,
+            typeName,
+            visibility,
+            modifiers,
+            getter2,
+            setter2,
+            initer2,
+            defaultValue2,
+            attrs,
+            csharpAttrs,
+            GetIdentifierSpan(attrs, propertyNameKey, name));
     }
 
     /// <summary>
@@ -9087,7 +9226,16 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new UsingStatementNode(span, id, variableName, variableType, resource, body);
+        return new UsingStatementNode(
+            span,
+            id,
+            variableName,
+            variableType,
+            resource,
+            body,
+            variableName == null
+                ? null
+                : GetIdentifierSpan(attrs, "_pos1", variableName));
     }
 
     private TryStatementNode ParseTryStatement()
@@ -9195,7 +9343,16 @@ public sealed class Parser
         ConsumeDedentBeforeChain(TokenKind.Catch, TokenKind.Finally);
 
         var span = body.Count > 0 ? startToken.Span.Union(body[^1].Span) : startToken.Span;
-        return new CatchClauseNode(span, exceptionType, variableName, filter, body, attrs);
+        return new CatchClauseNode(
+            span,
+            exceptionType,
+            variableName,
+            filter,
+            body,
+            attrs,
+            variableName == null
+                ? null
+                : GetIdentifierSpan(attrs, "_pos1", variableName));
     }
 
     private ThrowExpressionNode ParseThrowExpression()
@@ -9628,7 +9785,11 @@ public sealed class Parser
 
                 if (!string.IsNullOrEmpty(paramName))
                 {
-                    parameters.Add(new LambdaParameterNode(startToken.Span, paramName, paramType));
+                    parameters.Add(new LambdaParameterNode(
+                        startToken.Span,
+                        paramName,
+                        paramType,
+                        GetIdentifierSpan(attrs, $"_pos{i}", paramName)));
                 }
                 i += 2;
             }
@@ -10206,7 +10367,11 @@ public sealed class Parser
         var attrs = ParseAttributes();
         var typeName = attrs["_pos0"] ?? "";
         var binding = attrs["_pos1"];
-        return new TypePatternNode(startToken.Span, typeName, binding);
+        return new TypePatternNode(
+            startToken.Span,
+            typeName,
+            binding,
+            binding == null ? null : GetIdentifierSpan(attrs, "_pos1", binding));
     }
 
     /// <summary>
@@ -10247,13 +10412,15 @@ public sealed class Parser
                 // Only consume one {name} attribute block — ParseAttributes would
                 // greedily consume a following property pattern { Prop: val } as attributes
                 string restName = "_";
+                TextSpan? restNameSpan = null;
                 if (Check(TokenKind.OpenBrace))
                 {
                     Advance(); // consume {
+                    restNameSpan = Current.Span;
                     restName = ParseValue();
                     Expect(TokenKind.CloseBrace);
                 }
-                slicePattern = new VarPatternNode(restToken.Span, restName);
+                slicePattern = new VarPatternNode(restToken.Span, restName, restNameSpan);
             }
             else if (Check(TokenKind.Call))
             {
@@ -10301,7 +10468,10 @@ public sealed class Parser
         var token = Expect(TokenKind.Var);
         var attrs = ParseAttributes();
         var name = attrs["_pos0"] ?? "_";
-        return new VarPatternNode(token.Span, name);
+        return new VarPatternNode(
+            token.Span,
+            name,
+            GetIdentifierSpan(attrs, "_pos0", name));
     }
 
     /// <summary>
@@ -11718,6 +11888,7 @@ public sealed class Parser
 
                 var paramType = ReadInlineTypeToken();
                 var paramName = "";
+                var parameterIdentifierSpan = span;
 
                 // Check for colon separator (type:name format) or space separator (type name)
                 if (Check(TokenKind.Colon))
@@ -11725,7 +11896,9 @@ public sealed class Parser
                     Advance(); // consume :
                     if (Check(TokenKind.Identifier))
                     {
-                        paramName = Advance().Text;
+                        var nameToken = Advance();
+                        paramName = nameToken.Text;
+                        parameterIdentifierSpan = nameToken.Span;
                     }
 
                     // Check for optional modifier suffix :mod1,mod2
@@ -11749,7 +11922,9 @@ public sealed class Parser
                 else if (Check(TokenKind.Identifier))
                 {
                     // Space-separated: type name
-                    paramName = Advance().Text;
+                    var nameToken = Advance();
+                    paramName = nameToken.Text;
+                    parameterIdentifierSpan = nameToken.Span;
                 }
 
                 // Parse optional default value: = expression
@@ -11762,7 +11937,15 @@ public sealed class Parser
                 var paramAttrs = new AttributeCollection();
                 paramAttrs.Add("_pos0", paramType);
                 paramAttrs.Add("_pos1", paramName);
-                parameters.Add(new ParameterNode(span, paramName, paramType, modifier, paramAttrs, Array.Empty<CalorAttributeNode>(), defaultValue));
+                parameters.Add(new ParameterNode(
+                    span,
+                    paramName,
+                    paramType,
+                    modifier,
+                    paramAttrs,
+                    Array.Empty<CalorAttributeNode>(),
+                    defaultValue,
+                    identifierSpan: parameterIdentifierSpan));
             }
             while (Match(TokenKind.Comma));
         }

@@ -9,13 +9,20 @@ public abstract class TypeDefinitionNode : AstNode
 {
     public string Id { get; }
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public AttributeCollection Attributes { get; }
 
-    protected TypeDefinitionNode(TextSpan span, string id, string name, AttributeCollection attributes)
+    protected TypeDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        AttributeCollection attributes,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 }

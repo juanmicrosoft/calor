@@ -25,7 +25,8 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
     public override Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null)
+        var snapshot = state?.Snapshot;
+        if (state == null || snapshot?.Ast == null)
         {
             return Task.FromResult<LocationContainer?>(null);
         }
@@ -35,11 +36,11 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
 
         // Find the symbol at the cursor position
         var result = SymbolFinder.FindSymbolAtPosition(
-            state.Ast,
+            snapshot.Ast,
             line,
             column,
-            state.Source,
-            state.BoundModule);
+            snapshot.Source,
+            snapshot.BoundModule);
         if (result == null || string.IsNullOrEmpty(result.Name))
         {
             return Task.FromResult<LocationContainer?>(null);
@@ -49,31 +50,31 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
 
         if (result.SymbolId is { IsNone: false } symbolId)
         {
-            if (state.BoundModule?.SymbolsById.TryGetValue(symbolId, out var symbol) == true
+            if (snapshot.BoundModule?.SymbolsById.TryGetValue(symbolId, out var symbol) == true
                 && symbol is Calor.Compiler.Binding.FunctionSymbol function)
             {
-                foreach (var (doc, span) in _workspace.FindProjectFunctionReferences(
+                foreach (var reference in _workspace.FindProjectFunctionReferences(
                              function,
                              request.Context.IncludeDeclaration))
                 {
                     locations.Add(new Location
                     {
-                        Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(doc.Uri),
-                        Range = PositionConverter.ToLspRange(span, doc.Source),
+                        Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(reference.Doc.Uri),
+                        Range = PositionConverter.ToLspRange(reference.Span, reference.Snapshot.Source),
                     });
                 }
             }
-            else if (state.BoundModule != null)
+            else if (snapshot.BoundModule != null)
             {
                 foreach (var span in SymbolFinder.FindBoundReferences(
-                             state.BoundModule,
+                             snapshot.BoundModule,
                              symbolId,
                              request.Context.IncludeDeclaration))
                 {
                     locations.Add(new Location
                     {
                         Uri = request.TextDocument.Uri,
-                        Range = PositionConverter.ToLspRange(span, state.Source),
+                        Range = PositionConverter.ToLspRange(span, snapshot.Source),
                     });
                 }
             }
@@ -82,19 +83,19 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
                 locations.Count == 0 ? null : new LocationContainer(locations));
         }
 
-        var offset = PositionConverter.ToOffset(request.Position, state.Source);
-        var boundCall = SymbolFinder.FindBoundCallAtOffset(state.BoundModule, offset);
-        var projectCall = _workspace.ResolveProjectCall(boundCall);
+        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
+        var boundCall = SymbolFinder.FindBoundCallAtOffset(snapshot.BoundModule, offset);
+        var projectCall = _workspace.ResolveProjectCall(state, snapshot, boundCall);
         if (projectCall.Symbol != null)
         {
-            foreach (var (doc, span) in _workspace.FindProjectFunctionReferences(
+            foreach (var reference in _workspace.FindProjectFunctionReferences(
                          projectCall.Symbol,
                          request.Context.IncludeDeclaration))
             {
                 locations.Add(new Location
                 {
-                    Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(doc.Uri),
-                    Range = PositionConverter.ToLspRange(span, doc.Source),
+                    Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(reference.Doc.Uri),
+                    Range = PositionConverter.ToLspRange(reference.Span, reference.Snapshot.Source),
                 });
             }
 

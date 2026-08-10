@@ -44,6 +44,15 @@ public static class Program
                 .WithHandler<SemanticTokensHandler>()
                 .OnInitialize((server, request, token) =>
                 {
+                    if (request.WorkspaceFolders?.FirstOrDefault()?.Uri is { } workspaceFolderUri)
+                    {
+                        workspace.ConfigureWorkspaceRoot(workspaceFolderUri.ToUri());
+                    }
+                    else if (request.RootUri is { } rootUri)
+                    {
+                        workspace.ConfigureWorkspaceRoot(rootUri.ToUri());
+                    }
+
                     // Register TextDocumentSyncHandler which needs the server reference
                     server.Register(opts =>
                     {

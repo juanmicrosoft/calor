@@ -65,6 +65,81 @@ public class SymbolFinderTests
     }
 
     [Fact]
+    public void ParsedDeclarationIdentifierSpans_AreSafeRenameEdits()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c1:Container:pub}
+                §FLD{i32:field:priv}
+                §MT{m1:Compute:pub} (i32:parameter) -> i32
+                  §B{local:i32} parameter
+                  §R (+ local field)
+            """;
+        var state = LspTestHarness.CreateDocument(source);
+        var symbols = state.BoundModule!.SymbolsById.Values.ToArray();
+
+        foreach (var (name, symbol) in new[]
+                 {
+                     ("Container", symbols.Single(symbol => symbol.Name == "Container")),
+                     ("field", symbols.Single(symbol => symbol.Name == "field")),
+                     ("Compute", symbols.Single(symbol => symbol.Name == "Container.Compute")),
+                     ("parameter", symbols.Single(symbol => symbol.Name == "parameter")),
+                     ("local", symbols.Single(symbol => symbol.Name == "local")),
+                 })
+        {
+            Assert.Equal(
+                name,
+                source.Substring(symbol.DeclarationSpan.Start, symbol.DeclarationSpan.Length));
+        }
+    }
+
+    [Fact]
+    public void NestedLocalDeclarationSpans_AreIdentifierTokens()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §F{f1:Scopes:pub} ([str]:items, IDisposable:input) -> bool
+                §L{l1:index:0:1:1}
+                  §P index
+                §EACH{e1:item:str:position} items
+                  §P item
+                §USE{u1:resource:IDisposable} input
+                  §P STR:"using"
+                §TR{t1}
+                  §P STR:"try"
+                §CA{Exception:error}
+                  §P STR:"catch"
+                §/TR{t1}
+                §B{predicate} §LAM{lam1:lambdaValue:i32} (> lambdaValue 0) §/LAM{lam1}
+                §B{matched:i32} §W{match1} INT:1
+                  §K §VAR{captured} → captured
+                §R (forall ((quantified i32)) (>= quantified 0))
+            """;
+        var state = LspTestHarness.CreateDocument(source);
+        var symbols = state.BoundModule!.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .ToArray();
+
+        foreach (var name in new[]
+                 {
+                     "index",
+                     "item",
+                     "position",
+                     "resource",
+                     "error",
+                     "lambdaValue",
+                     "captured",
+                     "quantified",
+                 })
+        {
+            var symbol = symbols.Single(candidate => candidate.Name == name);
+            Assert.Equal(
+                name,
+                source.Substring(symbol.DeclarationSpan.Start, symbol.DeclarationSpan.Length));
+        }
+    }
+
+    [Fact]
     public void FindDefinition_Function_ReturnsFunction()
     {
         var source = """

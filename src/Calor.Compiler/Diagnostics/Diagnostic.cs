@@ -231,6 +231,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string BindDuplicateInScope = "Calor0258";
 
+    /// <summary>
+    /// Error: a mutable rebind targets a symbol that was not declared mutable.
+    /// </summary>
+    public const string BindReassignsImmutable = "Calor0259";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

@@ -46,6 +46,77 @@ public readonly record struct SymbolId
         Uri.EscapeDataString(component ?? throw new ArgumentNullException(nameof(component)));
 }
 
+public static class SymbolSourceIdentity
+{
+    public static string Canonicalize(string? sourceIdentity)
+    {
+        if (string.IsNullOrWhiteSpace(sourceIdentity))
+            return "<memory>";
+
+        var normalized = sourceIdentity.Replace('\\', '/').Trim();
+        if (normalized.StartsWith("workspace:", StringComparison.Ordinal)
+            || normalized.StartsWith("canonical:", StringComparison.Ordinal))
+        {
+            return normalized;
+        }
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri))
+        {
+            if (uri.IsFile)
+                return CanonicalizePath(uri.LocalPath);
+
+            return $"uri:{uri.Scheme}:{uri.Host}{uri.AbsolutePath}".TrimEnd('/');
+        }
+
+        return Path.IsPathRooted(normalized)
+            ? CanonicalizePath(normalized)
+            : normalized.TrimStart('.', '/');
+    }
+
+    private static string CanonicalizePath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var projectRoot = FindProjectRoot(Path.GetDirectoryName(fullPath));
+        if (projectRoot != null)
+        {
+            return "workspace:" + Path.GetRelativePath(projectRoot, fullPath)
+                .Replace('\\', '/');
+        }
+
+        var segments = fullPath.Replace('\\', '/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return "path:" + string.Join('/', segments.TakeLast(Math.Min(3, segments.Length)));
+    }
+
+    private static string? FindProjectRoot(string? directory)
+    {
+        while (!string.IsNullOrEmpty(directory))
+        {
+            try
+            {
+                if (Directory.Exists(Path.Combine(directory, ".git"))
+                    || File.Exists(Path.Combine(directory, "Directory.Build.props"))
+                    || File.Exists(Path.Combine(directory, "global.json")))
+                {
+                    return directory;
+                }
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
+
+            directory = Directory.GetParent(directory)?.FullName;
+        }
+
+        return null;
+    }
+}
+
 /// <summary>
 /// Exact type identity used by overload resolution. Aliases for the same Calor
 /// type normalize together, while distinct numeric and nominal types do not.
@@ -315,13 +386,19 @@ public abstract class Symbol
     public SymbolId Id { get; }
     public string Name { get; }
     public TextSpan DeclarationSpan { get; }
+    public TextSpan DefinitionSpan { get; }
     public string IdentityKey => Id.IsNone ? Name : Id.Value;
 
-    protected Symbol(SymbolId id, string name, TextSpan declarationSpan)
+    protected Symbol(
+        SymbolId id,
+        string name,
+        TextSpan declarationSpan,
+        TextSpan? definitionSpan = null)
     {
         Id = id;
         Name = name ?? throw new ArgumentNullException(nameof(name));
         DeclarationSpan = declarationSpan;
+        DefinitionSpan = definitionSpan ?? declarationSpan;
     }
 }
 
@@ -334,6 +411,8 @@ public sealed class VariableSymbol : Symbol
     public bool IsMutable { get; }
     public bool IsParameter { get; }
     public ParameterModifier Modifier { get; }
+    public ExpressionNode? DefaultValue { get; }
+    public bool IsOptional => DefaultValue != null;
 
     public VariableSymbol(
         SymbolId id,
@@ -342,13 +421,15 @@ public sealed class VariableSymbol : Symbol
         bool isMutable,
         bool isParameter = false,
         ParameterModifier modifier = ParameterModifier.None,
-        TextSpan declarationSpan = default)
+        TextSpan declarationSpan = default,
+        ExpressionNode? defaultValue = null)
         : base(id, name, declarationSpan)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         IsMutable = isMutable;
         IsParameter = isParameter;
         Modifier = modifier;
+        DefaultValue = defaultValue;
     }
 
     public VariableSymbol(
@@ -370,6 +451,8 @@ public sealed class FunctionSymbol : Symbol
     public string ReturnType { get; }
     public IReadOnlyList<VariableSymbol> Parameters { get; }
     public IReadOnlyList<string> TypeParameters { get; }
+    public Visibility Visibility { get; }
+    public string? ContainingTypeName { get; }
     public int GenericArity => TypeParameters.Count;
 
     public string SignatureKey => string.Join(
@@ -401,12 +484,17 @@ public sealed class FunctionSymbol : Symbol
         string returnType,
         IReadOnlyList<VariableSymbol> parameters,
         IReadOnlyList<string>? typeParameters = null,
-        TextSpan declarationSpan = default)
-        : base(id, name, declarationSpan)
+        TextSpan declarationSpan = default,
+        Visibility visibility = Visibility.Public,
+        string? containingTypeName = null,
+        TextSpan? definitionSpan = null)
+        : base(id, name, declarationSpan, definitionSpan)
     {
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
         Parameters = parameters?.ToArray() ?? throw new ArgumentNullException(nameof(parameters));
         TypeParameters = typeParameters?.ToArray() ?? Array.Empty<string>();
+        Visibility = visibility;
+        ContainingTypeName = containingTypeName;
     }
 
     public FunctionSymbol(
@@ -430,6 +518,25 @@ public sealed class FunctionSymbol : Symbol
             _ when modifier.HasFlag(ParameterModifier.This) => "this ",
             _ => string.Empty,
         };
+    }
+}
+
+public sealed class TypeSymbol : Symbol
+{
+    public string QualifiedName { get; }
+    public Visibility Visibility { get; }
+
+    public TypeSymbol(
+        SymbolId id,
+        string name,
+        string qualifiedName,
+        Visibility visibility,
+        TextSpan declarationSpan,
+        TextSpan? definitionSpan = null)
+        : base(id, name, declarationSpan, definitionSpan)
+    {
+        QualifiedName = qualifiedName ?? throw new ArgumentNullException(nameof(qualifiedName));
+        Visibility = visibility;
     }
 }
 
@@ -579,7 +686,7 @@ public sealed class Scope
                 ?? OverloadResolutionResult.NotFound();
         }
 
-        var applicable = new List<(FunctionSymbol Function, string ReturnType)>();
+        var applicable = new List<(FunctionSymbol Function, string ReturnType, int Score)>();
         foreach (var function in overloads)
         {
             if (TryMatch(
@@ -588,18 +695,21 @@ public sealed class Scope
                     argumentNames,
                     argumentModifiers,
                     typeArguments,
-                    out var resolvedReturnType))
+                    out var resolvedReturnType,
+                    out var score))
             {
-                applicable.Add((function, resolvedReturnType));
+                applicable.Add((function, resolvedReturnType, score));
             }
         }
 
-        return applicable.Count switch
-        {
-            0 => OverloadResolutionResult.NoMatch(overloads),
-            1 => OverloadResolutionResult.Resolved(applicable[0].Function, applicable[0].ReturnType),
-            _ => OverloadResolutionResult.Ambiguous(applicable.Select(item => item.Function).ToArray()),
-        };
+        if (applicable.Count == 0)
+            return OverloadResolutionResult.NoMatch(overloads);
+
+        var bestScore = applicable.Min(item => item.Score);
+        var best = applicable.Where(item => item.Score == bestScore).ToArray();
+        return best.Length == 1
+            ? OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType)
+            : OverloadResolutionResult.Ambiguous(best.Select(item => item.Function).ToArray());
     }
 
     public IReadOnlyList<FunctionSymbol> GetOverloads(string name)
@@ -681,11 +791,11 @@ public sealed class Scope
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
         IReadOnlyList<string>? typeArguments,
-        out string resolvedReturnType)
+        out string resolvedReturnType,
+        out int score)
     {
         resolvedReturnType = function.ReturnType;
-        if (function.Parameters.Count != argumentTypes.Count)
-            return false;
+        score = int.MaxValue;
 
         if (typeArguments != null && function.GenericArity != typeArguments.Count)
             return false;
@@ -694,51 +804,92 @@ public sealed class Scope
             // Non-generic candidate; no substitutions are needed.
         }
 
-        if (!TryMapArguments(function, argumentTypes.Count, argumentNames, out var parameterMap))
-            return false;
-
         var typeParameterSet = function.TypeParameters.ToHashSet(StringComparer.Ordinal);
-        var substitutions = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (typeArguments != null)
+        foreach (var mapping in MapArguments(function, argumentTypes.Count, argumentNames))
         {
-            for (var index = 0; index < typeArguments.Count; index++)
-                substitutions[function.TypeParameters[index]] = TypeIdentity.Canonicalize(typeArguments[index]);
-        }
-
-        for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
-        {
-            var parameter = function.Parameters[parameterMap[argumentIndex]];
-            if (!ModifiersMatch(parameter.Modifier, GetArgumentModifier(argumentModifiers, argumentIndex)))
-                return false;
-
-            if (!TypeIdentity.TryUnify(
-                    parameter.TypeName,
-                    argumentTypes[argumentIndex],
-                    typeParameterSet,
-                    substitutions))
+            var substitutions = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (typeArguments != null)
             {
-                return false;
+                for (var index = 0; index < typeArguments.Count; index++)
+                    substitutions[function.TypeParameters[index]] = TypeIdentity.Canonicalize(typeArguments[index]);
             }
+
+            var matches = true;
+            for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
+            {
+                var parameter = function.Parameters[mapping.ParameterMap[argumentIndex]];
+                if (!ModifiersMatch(parameter.Modifier, GetArgumentModifier(argumentModifiers, argumentIndex)))
+                {
+                    matches = false;
+                    break;
+                }
+
+                var parameterType = mapping.ExpandedParams[argumentIndex]
+                    ? GetParamsElementType(parameter.TypeName)
+                    : parameter.TypeName;
+                if (parameterType == null
+                    || !TypeIdentity.TryUnify(
+                        parameterType,
+                        argumentTypes[argumentIndex],
+                        typeParameterSet,
+                        substitutions))
+                {
+                    matches = false;
+                    break;
+                }
+            }
+
+            if (!matches
+                || function.TypeParameters.Any(typeParameter => !substitutions.ContainsKey(typeParameter)))
+            {
+                continue;
+            }
+
+            var candidateScore =
+                (mapping.UsesParams ? mapping.UsesExpandedParams ? 200 : 100 : 0)
+                + mapping.OmittedOptionalCount * 10;
+            if (candidateScore >= score)
+                continue;
+
+            score = candidateScore;
+            resolvedReturnType = substitutions.Count == 0
+                ? function.ReturnType
+                : TypeIdentity.Substitute(function.ReturnType, substitutions);
         }
 
-        if (function.TypeParameters.Any(typeParameter => !substitutions.ContainsKey(typeParameter)))
-            return false;
-
-        resolvedReturnType = substitutions.Count == 0
-            ? function.ReturnType
-            : TypeIdentity.Substitute(function.ReturnType, substitutions);
-        return true;
+        return score != int.MaxValue;
     }
 
-    private static bool TryMapArguments(
+    private sealed record ArgumentMapping(
+        int[] ParameterMap,
+        bool[] ExpandedParams,
+        int OmittedOptionalCount,
+        bool UsesParams,
+        bool UsesExpandedParams);
+
+    private static IEnumerable<ArgumentMapping> MapArguments(
         FunctionSymbol function,
         int argumentCount,
-        IReadOnlyList<string?>? argumentNames,
-        out int[] parameterMap)
+        IReadOnlyList<string?>? argumentNames)
     {
-        parameterMap = new int[argumentCount];
+        var parameterMap = new int[argumentCount];
+        var expandedParams = new bool[argumentCount];
         var assigned = new bool[function.Parameters.Count];
+        var paramsCandidates = function.Parameters
+            .Select((parameter, index) => (parameter, index))
+            .Where(item => item.parameter.Modifier.HasFlag(ParameterModifier.Params))
+            .Select(item => item.index)
+            .Take(2)
+            .ToArray();
+        if (paramsCandidates.Length > 1)
+            yield break;
+        var paramsIndex = paramsCandidates.Length == 0 ? -1 : paramsCandidates[0];
+        if (paramsIndex >= 0 && paramsIndex != function.Parameters.Count - 1)
+            yield break;
+
         var nextPositional = 0;
+        var positionalParamsArguments = new List<int>();
+        var namedParamsAssigned = false;
 
         for (var argumentIndex = 0; argumentIndex < argumentCount; argumentIndex++)
         {
@@ -755,22 +906,110 @@ public sealed class Scope
                     .Select(item => item.index)
                     .DefaultIfEmpty(-1)
                     .First();
+
+                if (parameterIndex == paramsIndex)
+                {
+                    if (assigned[parameterIndex])
+                        yield break;
+                    assigned[parameterIndex] = true;
+                    namedParamsAssigned = true;
+                }
             }
             else
             {
-                while (nextPositional < assigned.Length && assigned[nextPositional])
+                while (nextPositional < assigned.Length
+                       && assigned[nextPositional]
+                       && nextPositional != paramsIndex)
+                {
                     nextPositional++;
-                parameterIndex = nextPositional++;
+                }
+
+                if (nextPositional < assigned.Length && nextPositional != paramsIndex)
+                {
+                    parameterIndex = nextPositional++;
+                    assigned[parameterIndex] = true;
+                }
+                else if (paramsIndex >= 0)
+                {
+                    if (assigned[paramsIndex])
+                        yield break;
+                    parameterIndex = paramsIndex;
+                    expandedParams[argumentIndex] = true;
+                    positionalParamsArguments.Add(argumentIndex);
+                }
+                else
+                {
+                    yield break;
+                }
             }
 
-            if (parameterIndex < 0 || parameterIndex >= assigned.Length || assigned[parameterIndex])
-                return false;
+            if (parameterIndex < 0 || parameterIndex >= assigned.Length)
+                yield break;
+            if (!string.IsNullOrWhiteSpace(argumentName)
+                && parameterIndex != paramsIndex
+                && assigned[parameterIndex])
+            {
+                yield break;
+            }
 
             parameterMap[argumentIndex] = parameterIndex;
-            assigned[parameterIndex] = true;
+            if (parameterIndex != paramsIndex)
+                assigned[parameterIndex] = true;
         }
 
-        return assigned.All(value => value);
+        var omittedOptionalCount = 0;
+        for (var index = 0; index < function.Parameters.Count; index++)
+        {
+            if (index == paramsIndex)
+                continue;
+            if (assigned[index])
+                continue;
+            if (!function.Parameters[index].IsOptional)
+                yield break;
+            omittedOptionalCount++;
+        }
+
+        if (paramsIndex < 0)
+        {
+            yield return new ArgumentMapping(
+                parameterMap,
+                expandedParams,
+                omittedOptionalCount,
+                UsesParams: false,
+                UsesExpandedParams: false);
+            yield break;
+        }
+
+        if (positionalParamsArguments.Count == 1)
+        {
+            var normalExpanded = (bool[])expandedParams.Clone();
+            normalExpanded[positionalParamsArguments[0]] = false;
+            yield return new ArgumentMapping(
+                (int[])parameterMap.Clone(),
+                normalExpanded,
+                omittedOptionalCount,
+                UsesParams: true,
+                UsesExpandedParams: false);
+        }
+
+        yield return new ArgumentMapping(
+            parameterMap,
+            expandedParams,
+            omittedOptionalCount,
+            UsesParams: true,
+            UsesExpandedParams: !namedParamsAssigned
+                && (positionalParamsArguments.Count != 1
+                    || expandedParams.Any(value => value)));
+    }
+
+    private static string? GetParamsElementType(string typeName)
+    {
+        var type = typeName.Trim();
+        if (type.StartsWith('[') && type.EndsWith(']') && type.Length > 2)
+            return type[1..^1].Trim();
+        if (type.EndsWith("[]", StringComparison.Ordinal) && type.Length > 2)
+            return type[..^2].Trim();
+        return null;
     }
 
     private static ParameterModifier GetArgumentModifier(

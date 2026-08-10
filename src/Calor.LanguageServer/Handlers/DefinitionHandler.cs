@@ -23,7 +23,8 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
     public override Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null)
+        var snapshot = state?.Snapshot;
+        if (state == null || snapshot?.Ast == null)
         {
             return Task.FromResult<LocationOrLocationLinks?>(null);
         }
@@ -33,22 +34,25 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
 
         // Find symbol at position
         var result = SymbolFinder.FindSymbolAtPosition(
-            state.Ast,
+            snapshot.Ast,
             line,
             column,
-            state.Source,
-            state.BoundModule);
+            snapshot.Source,
+            snapshot.BoundModule);
         if (result == null)
         {
             return Task.FromResult<LocationOrLocationLinks?>(null);
         }
 
         if (result.SymbolId is { } symbolId
-            && state.BoundModule?.SymbolsById.TryGetValue(symbolId, out var localSymbol) == true)
+            && snapshot.BoundModule?.SymbolsById.TryGetValue(symbolId, out var localSymbol) == true)
         {
+            if (localSymbol.DeclarationSpan.Length == 0)
+                return Task.FromResult<LocationOrLocationLinks?>(null);
+
             var definitionRange = PositionConverter.ToLspRange(
                 localSymbol.DeclarationSpan,
-                state.Source);
+                snapshot.Source);
             var location = new Location
             {
                 Uri = request.TextDocument.Uri,
@@ -58,20 +62,41 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
                 new LocationOrLocationLinks(new[] { new LocationOrLocationLink(location) }));
         }
 
-        var offset = PositionConverter.ToOffset(request.Position, state.Source);
-        var boundCall = SymbolFinder.FindBoundCallAtOffset(state.BoundModule, offset);
-        var projectCall = _workspace.ResolveProjectCall(boundCall);
-        if (projectCall.Doc != null && projectCall.Symbol != null)
+        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
+        var boundCall = SymbolFinder.FindBoundCallAtOffset(snapshot.BoundModule, offset);
+        var projectCall = _workspace.ResolveProjectCall(state, snapshot, boundCall);
+        if (projectCall.Doc != null
+            && projectCall.Snapshot != null
+            && projectCall.Symbol != null)
         {
             var location = new Location
             {
                 Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(projectCall.Doc.Uri),
                 Range = PositionConverter.ToLspRange(
                     projectCall.Symbol.DeclarationSpan,
-                    projectCall.Doc.Source),
+                    projectCall.Snapshot.Source),
             };
             return Task.FromResult<LocationOrLocationLinks?>(
                 new LocationOrLocationLinks(new[] { new LocationOrLocationLink(location) }));
+        }
+
+        if (boundCall is Calor.Compiler.Binding.BoundNewExpression creation)
+        {
+            var projectType = _workspace.ResolveProjectType(state, snapshot, creation);
+            if (projectType.Doc != null
+                && projectType.Snapshot != null
+                && projectType.Symbol != null)
+            {
+                var location = new Location
+                {
+                    Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(projectType.Doc.Uri),
+                    Range = PositionConverter.ToLspRange(
+                        projectType.Symbol.DeclarationSpan,
+                        projectType.Snapshot.Source),
+                };
+                return Task.FromResult<LocationOrLocationLinks?>(
+                    new LocationOrLocationLinks(new[] { new LocationOrLocationLink(location) }));
+            }
         }
 
         if (boundCall != null)
@@ -82,7 +107,7 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
         // If we found a definition in the same file, return it
         if (result.DefinitionSpan != null)
         {
-            var definitionRange = PositionConverter.ToLspRange(result.DefinitionSpan.Value, state.Source);
+            var definitionRange = PositionConverter.ToLspRange(result.DefinitionSpan.Value, snapshot.Source);
 
             var location = new Location
             {

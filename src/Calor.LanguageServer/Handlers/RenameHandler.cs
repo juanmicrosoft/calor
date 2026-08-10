@@ -26,7 +26,8 @@ public sealed class RenameHandler : RenameHandlerBase
     public override Task<WorkspaceEdit?> Handle(RenameParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null)
+        var snapshot = state?.Snapshot;
+        if (state == null || snapshot?.Ast == null)
         {
             return Task.FromResult<WorkspaceEdit?>(null);
         }
@@ -36,11 +37,11 @@ public sealed class RenameHandler : RenameHandlerBase
 
         // Find the symbol at the cursor position
         var result = SymbolFinder.FindSymbolAtPosition(
-            state.Ast,
+            snapshot.Ast,
             line,
             column,
-            state.Source,
-            state.BoundModule);
+            snapshot.Source,
+            snapshot.BoundModule);
         if (result == null || string.IsNullOrEmpty(result.Name))
         {
             return Task.FromResult<WorkspaceEdit?>(null);
@@ -59,30 +60,47 @@ public sealed class RenameHandler : RenameHandlerBase
 
         if (result.SymbolId is { IsNone: false } symbolId)
         {
-            if (state.BoundModule?.SymbolsById.TryGetValue(symbolId, out var symbol) == true
+            if (snapshot.BoundModule?.SymbolsById.TryGetValue(symbolId, out var symbol) == true
                 && symbol is Calor.Compiler.Binding.FunctionSymbol function)
             {
-                foreach (var group in _workspace.FindProjectFunctionReferences(
-                             function,
-                             includeDeclaration: true)
-                         .GroupBy(item => item.Doc))
+                var references = _workspace.FindProjectFunctionReferences(
+                    function,
+                    includeDeclaration: true);
+                if (references.Any(reference =>
+                        !IsExactIdentifierSpan(
+                            reference.Snapshot.Source,
+                            reference.Span,
+                            oldName)))
                 {
-                    changes[DocumentUri.From(group.Key.Uri)] = group.Select(item => new TextEdit
+                    return Task.FromResult<WorkspaceEdit?>(null);
+                }
+
+                foreach (var group in references
+                         .GroupBy(item => (item.Doc, item.Snapshot)))
+                {
+                    changes[DocumentUri.From(group.Key.Doc.Uri)] = group.Select(item => new TextEdit
                     {
-                        Range = PositionConverter.ToLspRange(item.Span, group.Key.Source),
+                        Range = PositionConverter.ToLspRange(item.Span, group.Key.Snapshot.Source),
                         NewText = newName,
                     }).ToArray();
                 }
             }
-            else if (state.BoundModule != null)
+            else if (snapshot.BoundModule != null)
             {
-                changes[request.TextDocument.Uri] = SymbolFinder.FindBoundReferences(
-                        state.BoundModule,
+                var references = SymbolFinder.FindBoundReferences(
+                        snapshot.BoundModule,
                         symbolId,
-                        includeDeclaration: true)
+                        includeDeclaration: true);
+                if (references.Any(span =>
+                        !IsExactIdentifierSpan(snapshot.Source, span, oldName)))
+                {
+                    return Task.FromResult<WorkspaceEdit?>(null);
+                }
+
+                changes[request.TextDocument.Uri] = references
                     .Select(span => new TextEdit
                     {
-                        Range = PositionConverter.ToLspRange(span, state.Source),
+                        Range = PositionConverter.ToLspRange(span, snapshot.Source),
                         NewText = newName,
                     })
                     .ToArray();
@@ -92,19 +110,29 @@ public sealed class RenameHandler : RenameHandlerBase
                 changes.Count == 0 ? null : new WorkspaceEdit { Changes = changes });
         }
 
-        var offset = PositionConverter.ToOffset(request.Position, state.Source);
-        var boundCall = SymbolFinder.FindBoundCallAtOffset(state.BoundModule, offset);
-        var projectCall = _workspace.ResolveProjectCall(boundCall);
+        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
+        var boundCall = SymbolFinder.FindBoundCallAtOffset(snapshot.BoundModule, offset);
+        var projectCall = _workspace.ResolveProjectCall(state, snapshot, boundCall);
         if (projectCall.Symbol != null)
         {
-            foreach (var group in _workspace.FindProjectFunctionReferences(
-                         projectCall.Symbol,
-                         includeDeclaration: true)
-                     .GroupBy(item => item.Doc))
+            var references = _workspace.FindProjectFunctionReferences(
+                projectCall.Symbol,
+                includeDeclaration: true);
+            if (references.Any(reference =>
+                    !IsExactIdentifierSpan(
+                        reference.Snapshot.Source,
+                        reference.Span,
+                        oldName)))
             {
-                changes[DocumentUri.From(group.Key.Uri)] = group.Select(item => new TextEdit
+                return Task.FromResult<WorkspaceEdit?>(null);
+            }
+
+            foreach (var group in references
+                     .GroupBy(item => (item.Doc, item.Snapshot)))
+            {
+                changes[DocumentUri.From(group.Key.Doc.Uri)] = group.Select(item => new TextEdit
                 {
-                    Range = PositionConverter.ToLspRange(item.Span, group.Key.Source),
+                    Range = PositionConverter.ToLspRange(item.Span, group.Key.Snapshot.Source),
                     NewText = newName,
                 }).ToArray();
             }
@@ -115,42 +143,21 @@ public sealed class RenameHandler : RenameHandlerBase
         if (boundCall != null)
             return Task.FromResult<WorkspaceEdit?>(null);
 
-        // Find all references across all open documents and create text edits
-        foreach (var doc in _workspace.GetAllDocuments())
-        {
-            if (doc.Ast == null) continue;
-
-            var edits = CreateRenameEdits(doc, oldName, newName);
-            if (edits.Any())
-            {
-                var uri = DocumentUri.From(doc.Uri);
-                changes[uri] = edits;
-            }
-        }
-
-        if (changes.Count == 0)
-        {
-            return Task.FromResult<WorkspaceEdit?>(null);
-        }
-
-        return Task.FromResult<WorkspaceEdit?>(new WorkspaceEdit
-        {
-            Changes = changes
-        });
+        // Write operations require bound identity. The legacy name-only collector
+        // uses whole AST spans for some declarations and is retained only for its
+        // read-only/unit-test surface; refusing here is safer than corrupting source.
+        return Task.FromResult<WorkspaceEdit?>(null);
     }
 
-    private IEnumerable<TextEdit> CreateRenameEdits(DocumentState doc, string oldName, string newName)
+    private static bool IsExactIdentifierSpan(
+        string source,
+        Calor.Compiler.Parsing.TextSpan span,
+        string identifier)
     {
-        if (doc.Ast == null) yield break;
-
-        var collector = new ReferenceCollectorForRename(oldName);
-        collector.Visit(doc.Ast);
-
-        foreach (var span in collector.References)
-        {
-            var range = PositionConverter.ToLspRange(span, doc.Source);
-            yield return new TextEdit { Range = range, NewText = newName };
-        }
+        return span.Length == identifier.Length
+            && span.Start >= 0
+            && span.End <= source.Length
+            && source.AsSpan(span.Start, span.Length).SequenceEqual(identifier.AsSpan());
     }
 
     private static bool IsValidIdentifier(string name)

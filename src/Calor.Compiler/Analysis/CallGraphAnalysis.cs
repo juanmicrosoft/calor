@@ -427,7 +427,7 @@ public sealed class CallGraphAnalysis
                 .Select(function => (
                     function.SymbolId,
                     LegacyId: functions.Values
-                        .Where(candidate => candidate.Span == function.Symbol.DeclarationSpan)
+                        .Where(candidate => candidate.Span == function.Symbol.DefinitionSpan)
                         .Select(candidate => candidate.Id)
                         .FirstOrDefault()))
                 .Where(item => item.LegacyId != null)
