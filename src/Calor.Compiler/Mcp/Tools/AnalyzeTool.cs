@@ -261,7 +261,12 @@ public sealed class AnalyzeTool : McpToolBase
                 var result = Program.Compile(source, Path.GetFileName(filePath), compileOptions);
                 var analysisResult = compileOptions.VerificationAnalysisResult;
 
-                var issueCount = result.Diagnostics.Count;
+                // Info-severity diagnostics (e.g. the Calor0259 incomplete-fraction
+                // instrument, #762 B1) are measurements, not issues — counting them
+                // would flip filesWithIssues on clean files that merely use constructs
+                // the binder has not reached yet.
+                var issueCount = result.Diagnostics.Count(
+                    d => d.Severity != DiagnosticSeverity.Info);
                 totalIssues += issueCount;
                 if (issueCount > 0) filesWithIssues++;
 

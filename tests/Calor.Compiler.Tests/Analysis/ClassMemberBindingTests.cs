@@ -745,8 +745,20 @@ public class ClassMemberBindingTests
         Assert.NotNull(bound);
         var method = bound.Functions.FirstOrDefault(f => f.Symbol.Name == "Utils.StaticMethod");
         Assert.NotNull(method);
-        // In static context, §THIS should not resolve to BoundThisExpression
-        // It should fall through to BindFallbackExpression (which reports a diagnostic)
+        // #762 B1 (review Major 2): static-context §THIS is a CONTEXT error on a bound
+        // construct — it takes the QUIET opaque path: no Calor0259 (that would pollute
+        // the incomplete-fraction instrument with a non-incompleteness), and — matching
+        // the pre-B1 silent fallback — no other diagnostic either, until it gets a real
+        // semantic diagnostic in B2+. Discriminating both ways: instrument silence AND
+        // opacity are pinned.
+        Assert.DoesNotContain(diagnostics,
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisIncomplete);
+        var thisBound = method!.Body.OfType<Compiler.Binding.BoundCallStatement>()
+            .SelectMany(c => c.Arguments)
+            .OfType<Compiler.Binding.BoundIncompleteExpression>()
+            .FirstOrDefault();
+        Assert.NotNull(thisBound);
+        Assert.Equal("ThisExpressionNode", thisBound!.NodeTypeName);
     }
 
     #endregion

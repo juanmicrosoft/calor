@@ -1,11 +1,11 @@
-§DOC{Security Benchmark: Path Traversal Detection}
-§DOC{Tests taint analysis for path traversal vulnerabilities}
+// Security Benchmark: Path Traversal Detection
+// Tests taint analysis for path traversal vulnerabilities
 
 §M{m001:PathTraversalBenchmark}
 
   §F{f001:VulnerableFileRead:pub}
-    §DOC{BUG: Direct file read with user-provided path}
-    §DOC{EXPECTED: Calor0983 Path Traversal}
+    // BUG: Direct file read with user-provided path
+    // EXPECTED: Calor0983 Path Traversal
     §I{string:user_path}
     §O{string}
     §E{fs:r}
@@ -13,8 +13,8 @@
     §R content
 
   §F{f002:SafeWhitelistedPath:pub}
-    §DOC{SAFE: Only whitelisted paths allowed}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Only whitelisted paths allowed
+    // EXPECTED: No warnings
     §I{string:filename}
     §O{string}
     §E{fs:r}
@@ -25,8 +25,8 @@
     §R content
 
   §F{f003:VulnerablePathJoin:pub}
-    §DOC{BUG: User input used in path.join}
-    §DOC{EXPECTED: Calor0983 Path Traversal}
+    // BUG: User input used in path.join
+    // EXPECTED: Calor0983 Path Traversal
     §I{string:request_path}
     §O{string}
     §E{fs:r}
@@ -36,8 +36,8 @@
     §R content
 
   §F{f004:SafeSanitizedPath:pub}
-    §DOC{SAFE: Path properly sanitized}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Path properly sanitized
+    // EXPECTED: No warnings
     §I{string:user_input}
     §O{string}
     §E{fs:r}
@@ -48,8 +48,8 @@
     §R content
 
   §F{f005:VulnerableFileWrite:pub}
-    §DOC{BUG: Writing to user-controlled path}
-    §DOC{EXPECTED: Calor0983 Path Traversal}
+    // BUG: Writing to user-controlled path
+    // EXPECTED: Calor0983 Path Traversal
     §I{string:form_input}
     §I{string:content}
     §O{void}
@@ -58,8 +58,8 @@
     §C file.write path content
 
   §F{f006:SafeConstantPath:pub}
-    §DOC{SAFE: Path is a constant}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Path is a constant
+    // EXPECTED: No warnings
     §O{string}
     §E{fs:r}
     §B{path:string} STR:"/etc/app/config.json"

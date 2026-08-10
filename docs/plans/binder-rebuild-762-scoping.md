@@ -151,7 +151,15 @@ items 1–3 (B1–B8 families), 4 (B5), 5–6 (B8), 7 (B8), 8 (B1 expression-hal
   amendment rules.
 - **Discriminating pin** (F-2's requirement): a fixture whose Tier A construct is temporarily
   routed to `BindIncomplete` must turn the CI leg red; runs as a test, continuously.
-- **Checker-delta disclosure** per family PR, diffed against B1's frozen baseline snapshot.
+- **Checker-delta disclosure** per family PR. **Mechanism (named in B1, per its review Major 1,
+  before any family PR): the analysis-layer test suite IS the verdict baseline** — ~1,500
+  analysis tests pin checker verdicts, and the ratchet pins the corpus-level incomplete counts;
+  a family PR's checker-delta disclosure = the suite diff (any analysis-test change it required,
+  each explained) plus the baseline movement. No separate serialized verdict-snapshot artifact
+  exists; if a family PR changes checker behavior the suite does not pin, that is a test GAP to
+  close in that PR, not a silent delta. (B1's direct-Binder audit, corrected count: **14**
+  pre-existing test files instantiate `Binder` directly — not 22 as round-1 review estimated —
+  all green post-B1 with one updated pin, `Binder_FallbackExpression_ReturnsOpaqueExpression`.)
 - **CI cost budget (review m2):** the corpus leg must stay under **5 minutes**; B1 measures and
   publishes the actual cost; the conversion leg's migrate outputs are cached per pinned subject
   commit (they are deterministic at a frozen commit).

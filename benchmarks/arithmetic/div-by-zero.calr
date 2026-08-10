@@ -1,19 +1,19 @@
-§DOC{Arithmetic Benchmark: Division by Zero Detection}
-§DOC{Tests bug pattern analysis for division by zero vulnerabilities}
+// Arithmetic Benchmark: Division by Zero Detection
+// Tests bug pattern analysis for division by zero vulnerabilities
 
 §M{m001:DivByZeroBenchmark}
 
   §F{f001:VulnerableDivision:pub}
-    §DOC{BUG: Division by unchecked parameter}
-    §DOC{EXPECTED: Calor0920 Division by Zero}
+    // BUG: Division by unchecked parameter
+    // EXPECTED: Calor0920 Division by Zero
     §I{i32:x}
     §I{i32:y}
     §O{i32}
     §R (/ x y)
 
   §F{f002:SafeDivisionWithGuard:pub}
-    §DOC{SAFE: Division with zero check}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Division with zero check
+    // EXPECTED: No warnings
     §I{i32:x}
     §I{i32:y}
     §O{i32}
@@ -23,23 +23,23 @@
       §R INT:0
 
   §F{f003:VulnerableModulo:pub}
-    §DOC{BUG: Modulo by unchecked parameter}
-    §DOC{EXPECTED: Calor0920 Division by Zero}
+    // BUG: Modulo by unchecked parameter
+    // EXPECTED: Calor0920 Division by Zero
     §I{i32:a}
     §I{i32:b}
     §O{i32}
     §R (% a b)
 
   §F{f004:SafeDivisionByLiteral:pub}
-    §DOC{SAFE: Division by non-zero literal}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Division by non-zero literal
+    // EXPECTED: No warnings
     §I{i32:x}
     §O{i32}
     §R (/ x INT:2)
 
   §F{f005:VulnerableDivisionInLoop:pub}
-    §DOC{BUG: Division in loop where counter can be zero}
-    §DOC{EXPECTED: Calor0920 Division by Zero}
+    // BUG: Division in loop where counter can be zero
+    // EXPECTED: Calor0920 Division by Zero
     §I{i32:n}
     §O{i32}
     §B{result:i32} INT:0
@@ -48,8 +48,8 @@
     §R result
 
   §F{f006:SafeDivisionInLoopFromOne:pub}
-    §DOC{SAFE: Loop starts from 1}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Loop starts from 1
+    // EXPECTED: No warnings
     §I{i32:n}
     §O{i32}
     §B{result:i32} INT:0
@@ -58,8 +58,8 @@
     §R result
 
   §F{f007:VulnerableDivisionAfterDecrement:pub}
-    §DOC{BUG: Division after value can become zero}
-    §DOC{EXPECTED: Calor0920 Division by Zero}
+    // BUG: Division after value can become zero
+    // EXPECTED: Calor0920 Division by Zero
     §I{i32:x}
     §I{i32:y}
     §O{i32}
@@ -67,11 +67,11 @@
     §R (/ x divisor)
 
   §F{f008:SafeDivisionWithContract:pub}
-    §DOC{SAFE: Precondition guarantees non-zero}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Precondition guarantees non-zero
+    // EXPECTED: No warnings
     §I{i32:x}
     §I{i32:y}
-    §PRE (> y INT:0)
+    §Q (> y INT:0)
     §O{i32}
     §R (/ x y)
 

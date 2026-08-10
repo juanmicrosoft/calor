@@ -214,6 +214,16 @@ public static class DiagnosticCode
     /// </summary>
     public const string BindDuplicateInScope = "Calor0258";
 
+    /// <summary>
+    /// #762 B1: an accepted expression has no structural binder yet — analysis treats it
+    /// as an opaque value. This code IS the incomplete-fraction instrument (freeze
+    /// registration F-2 as amended): the CI leg counts it over the pinned corpus, and the
+    /// roadmap §2.5 gate 1 bar is zero occurrences for F-1 Tier A classes at release.
+    /// Info severity until B8 (the LSP binds every open document live; Warning would
+    /// flood editors while 37 Tier A classes remain unbound).
+    /// </summary>
+    public const string AnalysisIncomplete = "Calor0259";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

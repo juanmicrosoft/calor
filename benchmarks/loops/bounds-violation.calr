@@ -1,19 +1,19 @@
-§DOC{Loop Benchmark: Array Bounds Violation Detection}
-§DOC{Tests bug pattern analysis for array index out of bounds}
+// Loop Benchmark: Array Bounds Violation Detection
+// Tests bug pattern analysis for array index out of bounds
 
 §M{m001:BoundsViolationBenchmark}
 
   §F{f001:VulnerableArrayAccess:pub}
-    §DOC{BUG: Array access with unchecked index}
-    §DOC{EXPECTED: Calor0921 Index Out of Bounds}
+    // BUG: Array access with unchecked index
+    // EXPECTED: Calor0921 Index Out of Bounds
     §I{i32:index}
     §I{i32:len}
     §O{i32}
     §R (CALL array.get index)
 
   §F{f002:SafeBoundsCheck:pub}
-    §DOC{SAFE: Bounds check before access}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Bounds check before access
+    // EXPECTED: No warnings
     §I{i32:index}
     §I{i32:len}
     §O{i32}
@@ -23,8 +23,8 @@
       §R INT:-1
 
   §F{f003:VulnerableLoopBeyondLength:pub}
-    §DOC{BUG: Loop can exceed array bounds}
-    §DOC{EXPECTED: Calor0921 Index Out of Bounds}
+    // BUG: Loop can exceed array bounds
+    // EXPECTED: Calor0921 Index Out of Bounds
     §I{i32:n}
     §I{i32:len}
     §O{i32}
@@ -35,8 +35,8 @@
     §R sum
 
   §F{f004:SafeLoopWithinBounds:pub}
-    §DOC{SAFE: Loop bounded by array length}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Loop bounded by array length
+    // EXPECTED: No warnings
     §I{i32:len}
     §O{i32}
     §B{sum:i32} INT:0
@@ -46,8 +46,8 @@
     §R sum
 
   §F{f005:VulnerableNegativeIndex:pub}
-    §DOC{BUG: Index can be negative}
-    §DOC{EXPECTED: Calor0921 Index Out of Bounds}
+    // BUG: Index can be negative
+    // EXPECTED: Calor0921 Index Out of Bounds
     §I{i32:offset}
     §I{i32:base}
     §O{i32}
@@ -55,8 +55,8 @@
     §R (CALL array.get index)
 
   §F{f006:SafeClampedIndex:pub}
-    §DOC{SAFE: Index clamped to valid range}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Index clamped to valid range
+    // EXPECTED: No warnings
     §I{i32:index}
     §I{i32:len}
     §O{i32}
@@ -65,8 +65,8 @@
     §R (CALL array.get safeIdx)
 
   §F{f007:VulnerableOffByOne:pub}
-    §DOC{BUG: Classic off-by-one error}
-    §DOC{EXPECTED: Calor0921 Index Out of Bounds}
+    // BUG: Classic off-by-one error
+    // EXPECTED: Calor0921 Index Out of Bounds
     §I{i32:len}
     §O{i32}
     §B{sum:i32} INT:0
@@ -76,12 +76,12 @@
     §R sum
 
   §F{f008:SafeWithPrecondition:pub}
-    §DOC{SAFE: Precondition guarantees valid index}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Precondition guarantees valid index
+    // EXPECTED: No warnings
     §I{i32:index}
     §I{i32:len}
-    §PRE (>= index INT:0)
-    §PRE (< index len)
+    §Q (>= index INT:0)
+    §Q (< index len)
     §O{i32}
     §R (CALL array.get index)
 

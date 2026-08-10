@@ -45,6 +45,30 @@ public class DocumentStateTests
         Assert.True(state.Diagnostics.HasErrors);
     }
 
+    [Fact]
+    public void Reanalyze_UnboundConstruct_PublishesInfoSeverityIncomplete_NotError()
+    {
+        // #762 B1: the LSP binds every open document with the LIVE diagnostics bag, so
+        // the Calor0259 incomplete-fraction instrument is editor-visible. This pins the
+        // severity decision (scoping doc §5): Info until B8 — a document using a
+        // not-yet-bound construct (null-coalesce, family B6) must gain the instrument
+        // diagnostic WITHOUT errors, or every editor floods while the family PRs land.
+        var source = """
+            §M{m001:TestModule}
+              §F{f001:Pick:pub} (i32:x) -> i32
+                §R (?? x 5)
+            """;
+
+        var state = LspTestHarness.CreateDocument(source);
+
+        Assert.False(state.Diagnostics.HasErrors);
+        var incomplete = state.Diagnostics.Where(
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisIncomplete).ToList();
+        Assert.NotEmpty(incomplete);
+        Assert.All(incomplete,
+            d => Assert.Equal(Compiler.Diagnostics.DiagnosticSeverity.Info, d.Severity));
+    }
+
     [Fact(Skip = "Phase 4d: mismatched-ID diagnostic is obsolete under indent-only (no closing tags)")]
     public void Reanalyze_MismatchedId_HasDiagnosticsWithFixes()
     {

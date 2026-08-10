@@ -383,7 +383,7 @@ public sealed class BoundUnaryExpression : BoundExpression
 /// <summary>
 /// Bound call expression.
 /// </summary>
-public sealed class BoundCallExpression : BoundExpression
+public class BoundCallExpression : BoundExpression
 {
     public string Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
@@ -417,6 +417,33 @@ public sealed class BoundCallExpression : BoundExpression
         ResolvedTypeName = resolvedTypeName;
         ResolvedMethodName = resolvedMethodName;
         ResolvedParameterTypes = resolvedParameterTypes;
+    }
+}
+
+/// <summary>
+/// #762 B1: an accepted expression the binder cannot yet bind structurally. Subclasses
+/// BoundCallExpression with the historical zero-child "&lt;unsupported:TypeName&gt;" shape so
+/// every existing checker's pattern-match and traversal behavior is BIT-IDENTICAL to the
+/// old fallback (the B1 "zero checker behavior change" exit criterion, by construction) —
+/// the node stays an opaque non-constant value (the div-by-zero lesson). What B1 adds is
+/// the type itself (so later phases can attach children and deferred-evaluation marking
+/// without another checker-visible shape change) and the Calor0259 diagnostic that carries
+/// the incomplete-fraction instrument. Children arrive per family PR; Tier-B residuals get
+/// explicit extractors in B8 (scoping doc D2).
+/// </summary>
+public sealed class BoundIncompleteExpression : BoundCallExpression
+{
+    /// <summary>The concrete ExpressionNode class that lacked a binder.</summary>
+    public string NodeTypeName { get; }
+
+    /// <summary>Why this class is incomplete (F-1 tier reason or "family PR pending").</summary>
+    public string Reason { get; }
+
+    public BoundIncompleteExpression(TextSpan span, string nodeTypeName, string reason)
+        : base(span, $"<unsupported:{nodeTypeName}>", Array.Empty<BoundExpression>(), "OBJECT")
+    {
+        NodeTypeName = nodeTypeName;
+        Reason = reason;
     }
 }
 

@@ -161,11 +161,12 @@ Conditional in this sense: gate 2's index and review-packet legs, gate 3, and ga
 gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
 
 1. **Binding totality**: on a pinned measurement corpus (in-repo `.calr` fixtures + the three
-   A-1.5.3-pinned conversion subjects), **zero `<unsupported:...>` fallbacks for the registered
-   construct-class list** (§2.1 — the list is registered before binder work merges; it does not yet
-   exist, and registering it is the freeze event); the residual incomplete-fraction outside those
-   classes is **published per release, reported-not-adjudicated** (the M-S2/PP-L4 route). The
-   escape category is thereby bounded: the gate cannot be passed by marking registered constructs
+   A-1.5.3-pinned conversion subjects), **zero analysis-incomplete occurrences (`Calor0259`) for
+   the registered construct-class list** (F-1; the marker moved from the silent `<unsupported:>`
+   tree string to a counted diagnostic by F-2's 2026-08-10 additive amendment — same denominator,
+   strictly better instrument); the residual incomplete-fraction outside those classes is
+   **published per release, reported-not-adjudicated** (the M-S2/PP-L4 route). The escape
+   category is thereby bounded: the gate cannot be passed by marking registered constructs
    "incomplete".
 2. **Full-vs-incremental identity**: byte-identical diagnostics, index contents, and review packets
    (after canonical ordering) across a **registered edit-script corpus** that includes the #883

@@ -1,3 +1,5 @@
+using Calor.Compiler.Parsing;
+
 namespace Calor.Compiler.Binding;
 
 /// <summary>
@@ -6,6 +8,25 @@ namespace Calor.Compiler.Binding;
 public abstract class Symbol
 {
     public string Name { get; }
+
+    /// <summary>
+    /// #762 item 9 (scoping doc D4): stable identity for analyses, the index, and the
+    /// LSP. Shape: <c>&lt;project-relative-file-path&gt;::&lt;module-id&gt;/&lt;declaration-id&gt;</c> for
+    /// declarations (module ids are NOT unique across files — nine samples share
+    /// <c>m001</c> — so the path component is load-bearing);
+    /// <c>…/&lt;function-id&gt;/local#&lt;declaration-index&gt;</c> for locals and parameters, keyed by
+    /// declaration ORDER, which is invariant under rename (a per-name ordinal would
+    /// renumber the surviving symbol when a shadowing local is renamed — exactly the
+    /// rename-gate oracle's failure mode). Null until the binder assigns it (population
+    /// lands with the B-series family PRs; B1 is plumbing only).
+    /// </summary>
+    public string? SymbolId { get; init; }
+
+    /// <summary>
+    /// The exact identifier TOKEN span (not the whole declaration) — what the roadmap's
+    /// rename gate edits. Null until the parser records identifier spans distinctly.
+    /// </summary>
+    public TextSpan? IdentifierSpan { get; init; }
 
     protected Symbol(string name)
     {
