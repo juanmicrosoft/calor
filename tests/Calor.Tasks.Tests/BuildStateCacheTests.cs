@@ -1,6 +1,7 @@
 using Xunit;
 using Calor.Tasks;
 using Calor.Compiler.Effects;
+using Microsoft.Build.Utilities;
 
 namespace Calor.Tasks.Tests;
 
@@ -55,9 +56,9 @@ public class BuildStateCacheTests : IDisposable
         Assert.NotEqual(hash1, hash2);
     }
 
-    // Test 3: Stat gate hit — matching (mtime, size) → skip without hashing
+    // Test 3: Matching metadata never overrides a byte mismatch.
     [Fact]
-    public void IsFileUpToDate_MatchingStatFields_ReturnsTrue()
+    public void IsFileUpToDate_MatchingStatFieldsButDifferentBytes_ReturnsFalse()
     {
         var filePath = CreateTempFile("test.calr", "content");
         var fileInfo = new FileInfo(filePath);
@@ -69,10 +70,10 @@ public class BuildStateCacheTests : IDisposable
             FileSize = fileInfo.Length
         };
 
-        Assert.True(BuildStateCache.IsFileUpToDate(entry, filePath));
+        Assert.False(BuildStateCache.IsFileUpToDate(entry, filePath));
     }
 
-    // Test 4: Stat gate miss, hash match — mtime changed, content same → skip
+    // Test 4: Metadata changed, content same → skip
     [Fact]
     public void IsFileUpToDate_MtimeChanged_ContentSame_ReturnsTrue()
     {
@@ -86,7 +87,6 @@ public class BuildStateCacheTests : IDisposable
             FileSize = new FileInfo(filePath).Length
         };
 
-        // Stat gate misses (mtime differs), falls through to hash check, hash matches → skip
         Assert.True(BuildStateCache.IsFileUpToDate(entry, filePath));
     }
 
@@ -134,7 +134,8 @@ public class BuildStateCacheTests : IDisposable
         var loaded = BuildStateCache.Load(outputDir);
 
         Assert.NotNull(loaded);
-        Assert.Equal("2.1", loaded.FormatVersion);
+        Assert.Equal(BuildStateCache.CurrentFormatVersion, loaded.FormatVersion);
+        Assert.Equal(BuildStateCache.CurrentCompilerSemanticsVersion, loaded.CompilerSemanticsVersion);
         Assert.Equal("abc123", loaded.CompilerHash);
         Assert.Equal("def456", loaded.OptionsHash);
         Assert.Equal("ghi789", loaded.ManifestHash);
@@ -341,6 +342,33 @@ public class BuildStateCacheTests : IDisposable
             cached, "compiler", "opts", "manifest", "out/"));
     }
 
+    [Fact]
+    public void GlobalInvalidationReasons_AreDeterministic_AndTrackCompilerSemantics()
+    {
+        var cached = new BuildState
+        {
+            FormatVersion = "old-schema",
+            CompilerSemanticsVersion = "old-semantics",
+            CompilerHash = "old-compiler",
+            OptionsHash = "old-options",
+            ManifestHash = "old-manifest",
+            OutputDirectory = "old-output"
+        };
+
+        var reasons = BuildStateCache.GetGlobalInvalidationReasons(
+            cached, "compiler", "options", "manifest", "output");
+
+        Assert.Equal(new[]
+        {
+            Calor.Compiler.Incremental.GlobalCacheInvalidationReason.SchemaVersionChanged,
+            Calor.Compiler.Incremental.GlobalCacheInvalidationReason.CompilerSemanticsChanged,
+            Calor.Compiler.Incremental.GlobalCacheInvalidationReason.CompilerChanged,
+            Calor.Compiler.Incremental.GlobalCacheInvalidationReason.OptionsOrInputsChanged,
+            Calor.Compiler.Incremental.GlobalCacheInvalidationReason.ManifestChanged,
+            Calor.Compiler.Incremental.GlobalCacheInvalidationReason.OutputDirectoryChanged
+        }, reasons);
+    }
+
     // Test 12: Corrupt cache → recompile all, no exception
     [Fact]
     public void Load_CorruptCache_ReturnsNull()
@@ -352,6 +380,30 @@ public class BuildStateCacheTests : IDisposable
         var result = BuildStateCache.Load(outputDir);
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public void Load_CurrentSchemaMissingSemanticVersion_IsRejectedAsPartial()
+    {
+        var outputDir = Path.Combine(_tempDir, "partial-current");
+        Directory.CreateDirectory(outputDir);
+        File.WriteAllText(
+            BuildStateCache.GetCachePath(outputDir),
+            $$"""
+              {
+                "formatVersion": "{{BuildStateCache.CurrentFormatVersion}}",
+                "compilerHash": "compiler",
+                "optionsHash": "options",
+                "manifestHash": "",
+                "outputDirectory": ".",
+                "files": {}
+              }
+              """);
+
+        var result = BuildStateCache.LoadWithStatus(outputDir);
+
+        Assert.Equal(CacheLoadStatus.CorruptOrPartial, result.Status);
+        Assert.Null(result.State);
     }
 
     // Test 13: Missing cache → all compile
@@ -540,6 +592,28 @@ public class BuildStateCacheTests : IDisposable
     }
 
     [Fact]
+    public void ComputeCompilerHash_TracksDeployedCompilerAndRuntimeClosure()
+    {
+        var dir = Path.Combine(_tempDir, "compiler-closure");
+        Directory.CreateDirectory(dir);
+        var tasks = Path.Combine(dir, "Calor.Tasks.dll");
+        var compiler = Path.Combine(dir, "calor.dll");
+        var runtime = Path.Combine(dir, "Calor.Runtime.dll");
+        File.WriteAllText(tasks, "tasks");
+        File.WriteAllText(compiler, "compiler-v1");
+        File.WriteAllText(runtime, "runtime-v1");
+
+        var baseline = BuildStateCache.ComputeCompilerHash(tasks);
+        File.WriteAllText(compiler, "compiler-v2");
+        var compilerChanged = BuildStateCache.ComputeCompilerHash(tasks);
+        File.WriteAllText(runtime, "runtime-v2");
+        var runtimeChanged = BuildStateCache.ComputeCompilerHash(tasks);
+
+        Assert.NotEqual(baseline, compilerChanged);
+        Assert.NotEqual(compilerChanged, runtimeChanged);
+    }
+
+    [Fact]
     public void Save_AtomicWrite_NoCorruptionOnRead()
     {
         var outputDir = Path.Combine(_tempDir, "atomic-test");
@@ -630,7 +704,7 @@ public class BuildStateCacheTests : IDisposable
             cached, "compiler", "opts", "manifest", "obj\\Debug\\net10.0\\calor"));
     }
     /// <summary>
-    /// The options token must carry the EFFECTIVE type-check setting, not the task property.
+    /// The canonical input record must carry the EFFECTIVE type-check setting, not the task property.
     /// v0.12 added a CALOR_NO_TYPE_CHECK escape hatch read at the CompilationOptions default; the
     /// first cut hashed `TypeCheck` alone, so flipping the variable against a warm cache changed
     /// what would be reported without invalidating anything and every unchanged file was silently
@@ -647,18 +721,20 @@ public class BuildStateCacheTests : IDisposable
         // below is the guard that fails. Two earlier revisions of this comment claimed otherwise;
         // a pin's docstring asserting a discrimination it does not have is how the first two
         // versions of this test survived review.
-        var on = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
-        var off = new Calor.Tasks.CompileCalor { TypeCheck = false }.ComputeOptionsToken("");
+        var on = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeCacheInputs();
+        var off = new Calor.Tasks.CompileCalor { TypeCheck = false }.ComputeCacheInputs();
 
-        Assert.NotEqual(on, off);
-        Assert.NotEqual(BuildStateCache.ComputeOptionsHash(on), BuildStateCache.ComputeOptionsHash(off));
-        Assert.Contains("typeCheck:True", on);
-        Assert.Contains("typeCheck:False", off);
+        Assert.NotEqual(on.Serialize(), off.Serialize());
+        Assert.NotEqual(
+            BuildStateCache.ComputeOptionsHash(on.Serialize()),
+            BuildStateCache.ComputeOptionsHash(off.Serialize()));
+        Assert.True(on.EnableTypeChecking);
+        Assert.False(off.EnableTypeChecking);
     }
 
     /// <summary>
     /// The half that actually caught the defect. `CALOR_NO_TYPE_CHECK` changes what the task will
-    /// report, so it MUST move the options token — otherwise a warm cache serves the other
+    /// report, so it MUST move the canonical fingerprint — otherwise a warm cache serves the other
     /// setting's findings and every unchanged file is silently skipped (#788). Two earlier
     /// revisions of this pin passed with the fix reverted: the first fed literal booleans straight
     /// to the token function, the second drove the task but never set the variable, so the value it
@@ -671,16 +747,16 @@ public class BuildStateCacheTests : IDisposable
         try
         {
             Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", null);
-            var checking = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
+            var checking = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeCacheInputs();
 
             Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", "1");
-            var optedOut = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeOptionsToken("");
+            var optedOut = new Calor.Tasks.CompileCalor { TypeCheck = true }.ComputeCacheInputs();
 
-            Assert.Contains("typeCheck:True", checking);
-            Assert.Contains("typeCheck:False", optedOut);
+            Assert.True(checking.EnableTypeChecking);
+            Assert.False(optedOut.EnableTypeChecking);
             Assert.NotEqual(
-                BuildStateCache.ComputeOptionsHash(checking),
-                BuildStateCache.ComputeOptionsHash(optedOut));
+                BuildStateCache.ComputeOptionsHash(checking.Serialize()),
+                BuildStateCache.ComputeOptionsHash(optedOut.Serialize()));
         }
         finally
         {
@@ -692,18 +768,65 @@ public class BuildStateCacheTests : IDisposable
     /// And the guard that keeps that honest: every other diagnostics-affecting option must still
     /// move the token, so the parameter above was not simply added to a token nobody consults.
     /// </summary>
-    [Theory]
-    [InlineData(false, true, true, true, "")]
-    [InlineData(true, true, false, true, "")]
-    [InlineData(true, true, true, false, "")]
-    [InlineData(true, true, true, true, "flag-a")]
-    public void OptionsToken_DistinguishesEveryOption(
-        bool enforceEffects, bool typeCheck, bool verify, bool il, string flags)
+    [Fact]
+    public void CanonicalInputs_DistinguishEveryTaskInput_AndDoNotPersistPaths()
     {
-        var baseline = Calor.Tasks.CompileCalor.OptionsToken(true, true, true, true, "");
-        var varied = Calor.Tasks.CompileCalor.OptionsToken(enforceEffects, typeCheck, verify, il, flags);
+        var reference = CreateTempFile("refs/Fake.dll", "reference-v1");
+        var deps = CreateTempFile("project.deps.json", """{"runtimeTarget":{"name":"x"}}""");
+        var baselineTask = new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir };
+        var baseline = baselineTask.ComputeCacheInputs().Serialize();
 
-        Assert.NotEqual(baseline, varied);
+        var variants = new[]
+        {
+            new Calor.Tasks.CompileCalor
+            {
+                ProjectDirectory = Path.Combine(_tempDir, "other-project")
+            },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, Verbose = true },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, EnforceEffects = false },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, TypeCheck = false },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, Verify = true },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, EnableILAnalysis = true },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, ExperimentalFlags = "flag-a" },
+            new Calor.Tasks.CompileCalor
+            {
+                ProjectDirectory = _tempDir,
+                ReferencedAssemblies = [new TaskItem(reference)]
+            },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, RuntimeDirectory = _tempDir },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, NuGetPackageRoot = _tempDir },
+            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, DepsFilePath = deps }
+        };
+
+        Assert.All(variants, task => Assert.NotEqual(baseline, task.ComputeCacheInputs().Serialize()));
+        Assert.DoesNotContain(_tempDir, variants[^1].ComputeCacheInputs().Serialize());
+        var record = baselineTask.ComputeCacheInputs();
+        Assert.Equal(BuildStateCache.CurrentOptionsSerializerVersion, record.SerializerVersion);
+        Assert.Equal(BuildStateCache.CurrentFormatVersion, record.CacheSchemaVersion);
+        Assert.Equal(BuildStateCache.CurrentCompilerSemanticsVersion, record.CompilerSemanticsVersion);
+    }
+
+    [Fact]
+    public void CanonicalInputs_ReferenceOrderIsStable_AndContentChangesFingerprint()
+    {
+        var referenceA = CreateTempFile("refs/A.dll", "a-v1");
+        var referenceB = CreateTempFile("refs/B.dll", "b-v1");
+        var first = new Calor.Tasks.CompileCalor
+        {
+            ProjectDirectory = _tempDir,
+            ReferencedAssemblies = [new TaskItem(referenceA), new TaskItem(referenceB)]
+        };
+        var reordered = new Calor.Tasks.CompileCalor
+        {
+            ProjectDirectory = _tempDir,
+            ReferencedAssemblies = [new TaskItem(referenceB), new TaskItem(referenceA)]
+        };
+
+        var baseline = first.ComputeCacheInputs().Serialize();
+        Assert.Equal(baseline, reordered.ComputeCacheInputs().Serialize());
+
+        File.WriteAllText(referenceA, "a-v2");
+        Assert.NotEqual(baseline, first.ComputeCacheInputs().Serialize());
     }
 
 }

@@ -1,9 +1,63 @@
+using System.Reflection;
+using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Calor.Compiler;
 using Calor.Compiler.Effects;
 
 namespace Calor.Tasks;
+
+internal enum CompileCalorTestPhase
+{
+    BeforeILAnalysisInitialization,
+    AfterSourceRead,
+    BeforeCacheEntrySaved,
+    BeforeCrossModuleEnforcement
+}
+
+internal sealed record CompileCalorCacheInputs(
+    string SerializerVersion,
+    string CacheSchemaVersion,
+    string CompilerSemanticsVersion,
+    bool Verbose,
+    bool EnforceEffects,
+    bool EnableTypeChecking,
+    bool VerifyContracts,
+    bool EnableILAnalysis,
+    string ExperimentalFlags,
+    string ProjectDirectory,
+    IReadOnlyList<string> ReferencedAssemblies,
+    string RuntimeDirectory,
+    string NuGetPackageRoot,
+    string DepsFile)
+{
+    internal string Serialize()
+    {
+        var builder = new StringBuilder();
+        Append(builder, "serializerVersion", SerializerVersion);
+        Append(builder, "cacheSchemaVersion", CacheSchemaVersion);
+        Append(builder, "compilerSemanticsVersion", CompilerSemanticsVersion);
+        Append(builder, "verbose", Verbose ? "true" : "false");
+        Append(builder, "enforceEffects", EnforceEffects ? "true" : "false");
+        Append(builder, "enableTypeChecking", EnableTypeChecking ? "true" : "false");
+        Append(builder, "verifyContracts", VerifyContracts ? "true" : "false");
+        Append(builder, "enableILAnalysis", EnableILAnalysis ? "true" : "false");
+        Append(builder, "experimentalFlags", ExperimentalFlags);
+        Append(builder, "projectDirectory", ProjectDirectory);
+        foreach (var reference in ReferencedAssemblies)
+            Append(builder, "referencedAssembly", reference);
+        Append(builder, "runtimeDirectory", RuntimeDirectory);
+        Append(builder, "nuGetPackageRoot", NuGetPackageRoot);
+        Append(builder, "depsFile", DepsFile);
+        return builder.ToString();
+    }
+
+    private static void Append(StringBuilder builder, string name, string value)
+    {
+        builder.Append(name.Length).Append(':').Append(name)
+            .Append('=').Append(value.Length).Append(':').Append(value).Append(';');
+    }
+}
 
 /// <summary>
 /// MSBuild task that compiles Calor source files to C#.
@@ -83,37 +137,6 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool TypeCheck { get; set; } = true;
 
     /// <summary>
-    /// This task's options token, from its own properties. The call site goes through here so a
-    /// test can observe the composition — an earlier pin passed literal booleans to
-    /// <see cref="OptionsToken"/> and therefore could not tell whether the call site still folded
-    /// in <see cref="CompilationOptions.TypeCheckingDefault"/>. Reverting the fix left it green,
-    /// which is the same non-discriminating-pin failure this release already shipped twice.
-    /// </summary>
-    internal string ComputeOptionsToken(string canonicalExperimentalFlags)
-        => OptionsToken(
-            EnforceEffects,
-            TypeCheck && CompilationOptions.TypeCheckingDefault,
-            Verify,
-            EnableILAnalysis,
-            canonicalExperimentalFlags);
-
-    /// <summary>
-    /// The options token, extracted so it can be pinned directly. Note the type-check parameter is
-    /// the EFFECTIVE value (<c>TypeCheck &amp;&amp; CompilationOptions.TypeCheckingDefault</c>), not the
-    /// task property: the first cut hashed the property, so flipping <c>CALOR_NO_TYPE_CHECK</c>
-    /// against a warm cache changed what was reported without invalidating anything, and every
-    /// unchanged file was silently skipped — the #788 defect described at the call site.
-    /// </summary>
-    internal static string OptionsToken(
-        bool enforceEffects,
-        bool effectiveTypeCheck,
-        bool verify,
-        bool ilAnalysis,
-        string canonicalExperimentalFlags)
-        => $"enforceEffects:{enforceEffects}|typeCheck:{effectiveTypeCheck}|verify:{verify}"
-           + $"|ilAnalysis:{ilAnalysis}|experimental:{canonicalExperimentalFlags}";
-
-    /// <summary>
     /// Run static contract verification during compilation (Annex A-1.3
     /// instrumentation item 1): refutations surface as Calor0712-band build
     /// diagnostics (Warning severity — the build still succeeds). Off by
@@ -128,6 +151,159 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     /// Unknown flags are accepted silently — see <see cref="Calor.Compiler.ExperimentalFlags"/>.
     /// </summary>
     public string ExperimentalFlags { get; set; } = string.Empty;
+
+    internal Action<string, CompileCalorTestPhase>? CacheTestHook { get; set; }
+
+    internal CompileCalorCacheInputs ComputeCacheInputs()
+        => ComputeCacheInputs(ResolveReferencedAssemblies());
+
+    private sealed record ResolvedReference(
+        string Path, string Descriptor, bool Exists, bool IsUsable);
+
+    private CompileCalorCacheInputs ComputeCacheInputs(
+        IReadOnlyList<ResolvedReference> referencedAssemblies)
+    {
+        var canonicalExperimentalFlags = string.Join(",",
+            Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags).EnabledFlags
+                .Select(flag => flag.ToLowerInvariant())
+                .OrderBy(flag => flag, StringComparer.Ordinal));
+
+        return new CompileCalorCacheInputs(
+            BuildStateCache.CurrentOptionsSerializerVersion,
+            BuildStateCache.CurrentFormatVersion,
+            BuildStateCache.CurrentCompilerSemanticsVersion,
+            Verbose,
+            EnforceEffects,
+            TypeCheck && CompilationOptions.TypeCheckingDefault,
+            Verify,
+            EnableILAnalysis,
+            canonicalExperimentalFlags,
+            DescribePath(ProjectDirectory, includeContent: false),
+            referencedAssemblies.Select(reference => reference.Descriptor).ToList(),
+            DescribePath(RuntimeDirectory, includeContent: false),
+            DescribePath(NuGetPackageRoot, includeContent: false),
+            DescribePath(DepsFilePath, includeContent: true));
+    }
+
+    private IReadOnlyList<ResolvedReference> ResolveReferencedAssemblies()
+    {
+        return ReferencedAssemblies
+            .Select(item =>
+            {
+                var path = item.GetMetadata("FullPath");
+                if (string.IsNullOrEmpty(path))
+                    path = item.ItemSpec;
+                var fullPath = NormalizeFullPath(path);
+                var exists = !string.IsNullOrEmpty(fullPath) && File.Exists(fullPath);
+                var descriptor = DescribeAssembly(fullPath, exists);
+                return new ResolvedReference(
+                    fullPath,
+                    descriptor,
+                    exists,
+                    exists
+                    && !descriptor.Contains("non-managed:", StringComparison.Ordinal)
+                    && !descriptor.Contains("unreadable", StringComparison.Ordinal));
+            })
+            .OrderBy(reference => reference.Descriptor, StringComparer.Ordinal)
+            .ThenBy(reference => PrivacySafePathFingerprint(reference.Path), StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static string DescribeAssembly(string path, bool exists)
+    {
+        if (!exists)
+            return $"missing:{PrivacySafePathFingerprint(path)}";
+
+        string identity;
+        try
+        {
+            identity = AssemblyName.GetAssemblyName(path).FullName
+                ?? Path.GetFileName(path);
+        }
+        catch (BadImageFormatException)
+        {
+            identity = $"non-managed:{CanonicalFileName(path)}";
+        }
+        catch (FileLoadException)
+        {
+            identity = $"unreadable:{CanonicalFileName(path)}";
+        }
+        catch (IOException)
+        {
+            identity = $"unreadable:{CanonicalFileName(path)}";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            identity = $"unreadable:{CanonicalFileName(path)}";
+        }
+
+        string contentHash;
+        try
+        {
+            contentHash = BuildStateCache.ComputeFileHash(path);
+        }
+        catch (IOException)
+        {
+            contentHash = "unreadable";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            contentHash = "unreadable";
+        }
+        return $"identity:{identity}|content:{contentHash}";
+    }
+
+    private static string DescribePath(string path, bool includeContent)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return "unset";
+
+        var fullPath = NormalizeFullPath(path);
+        var kind = File.Exists(fullPath) ? "file"
+            : Directory.Exists(fullPath) ? "directory"
+            : "missing";
+        var descriptor = $"{kind}:{PrivacySafePathFingerprint(fullPath)}";
+        if (!includeContent || kind != "file")
+            return descriptor;
+
+        try
+        {
+            return $"{descriptor}|content:{BuildStateCache.ComputeFileHash(fullPath)}";
+        }
+        catch (IOException)
+        {
+            return $"{descriptor}|content:unreadable";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return $"{descriptor}|content:unreadable";
+        }
+    }
+
+    private static string NormalizeFullPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return string.Empty;
+        try
+        {
+            var normalized = Path.GetFullPath(path).Replace('\\', '/').TrimEnd('/');
+            return OperatingSystem.IsWindows() ? normalized.ToUpperInvariant() : normalized;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException
+                                   or PathTooLongException)
+        {
+            return path.Replace('\\', '/').TrimEnd('/');
+        }
+    }
+
+    private static string PrivacySafePathFingerprint(string path)
+        => string.IsNullOrEmpty(path) ? "unset" : BuildStateCache.ComputePathHash(path);
+
+    private static string CanonicalFileName(string path)
+    {
+        var name = Path.GetFileName(path);
+        return OperatingSystem.IsWindows() ? name.ToUpperInvariant() : name;
+    }
 
     public override bool Execute()
     {
@@ -144,31 +320,16 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         }
 
         // 1. Load cache
-        BuildState? priorCache;
-        try
-        {
-            priorCache = BuildStateCache.Load(OutputDirectory);
-        }
-        catch
-        {
-            priorCache = null;
-        }
+        var cacheLoad = BuildStateCache.LoadWithStatus(OutputDirectory);
+        var priorCache = cacheLoad.State;
 
         // 2. Compute global hashes
         var tasksAssemblyPath = typeof(CompileCalor).Assembly.Location;
-        var compilerHash = BuildStateCache.ComputeCompilerHash(tasksAssemblyPath);
-        // Every diagnostics-affecting task option must be in the options token:
-        // flipping one with a warm cache has to force a recompile, or findings
-        // the new option set would report on unchanged files are silently
-        // missed (#788: ExperimentalFlags and EnableILAnalysis were omitted).
-        // Experimental flags are canonicalized (parsed, sorted, case-folded) so
-        // "a;b" and "B,a" hash identically.
-        var canonicalExperimentalFlags = string.Join(",",
-            Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags).EnabledFlags
-                .Select(f => f.ToLowerInvariant())
-                .OrderBy(f => f, StringComparer.Ordinal));
+        var compilerHash = BuildStateCache.ComputeCompilerHash(
+            ResolveCompilerClosurePaths(tasksAssemblyPath));
+        var referencedAssemblyInputs = ResolveReferencedAssemblies();
         var optionsHash = BuildStateCache.ComputeOptionsHash(
-            ComputeOptionsToken(canonicalExperimentalFlags));
+            ComputeCacheInputs(referencedAssemblyInputs).Serialize());
         var manifestHash = BuildStateCache.ComputeManifestHash(ProjectDirectory);
 
         // 3. Global invalidation check
@@ -177,14 +338,19 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // Store output directory relative to project for cache portability across machines
         var relativeOutputDir = BuildStateCache.NormalizeRelativePath(
             Path.GetRelativePath(fullProjectDir, Path.GetFullPath(OutputDirectory)));
-        var globalInvalidation = BuildStateCache.IsGlobalInvalidation(
-            priorCache, compilerHash, optionsHash, manifestHash, relativeOutputDir);
-
-        if (globalInvalidation && Verbose)
+        var globalReasons = BuildStateCache.GetGlobalInvalidationReasons(
+            priorCache, compilerHash, optionsHash, manifestHash, relativeOutputDir).ToList();
+        if (cacheLoad.Status == CacheLoadStatus.CorruptOrPartial)
         {
-            Log.LogMessage(MessageImportance.High, "Calor: global invalidation — recompiling all files.");
+            globalReasons.Clear();
+            globalReasons.Add(GlobalCacheInvalidationReason.CorruptOrPartialCache);
+            BuildStateCache.Delete(OutputDirectory);
         }
-
+        else if (cacheLoad.Status == CacheLoadStatus.Unreadable)
+        {
+            globalReasons.Clear();
+            globalReasons.Add(GlobalCacheInvalidationReason.UnreadableCache);
+        }
         var newState = new BuildState
         {
             CompilerHash = compilerHash,
@@ -200,9 +366,19 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         {
             try
             {
-                var assemblyPaths = ReferencedAssemblies
-                    .Select(item => item.GetMetadata("FullPath"))
-                    .Where(p => !string.IsNullOrEmpty(p) && File.Exists(p))
+                CacheTestHook?.Invoke(
+                    ProjectDirectory, CompileCalorTestPhase.BeforeILAnalysisInitialization);
+                var unusableReferenceCount = referencedAssemblyInputs.Count(
+                    input => !input.IsUsable);
+                if (unusableReferenceCount != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"{unusableReferenceCount} referenced assembly input(s) were missing, "
+                        + "unreadable, or not managed assemblies");
+                }
+                var assemblyPaths = referencedAssemblyInputs
+                    .Where(input => input.Exists)
+                    .Select(input => input.Path)
                     .ToList();
 
                 if (assemblyPaths.Count > 0)
@@ -284,19 +460,6 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // Track output paths to detect collisions from out-of-project file sanitization
         var outputPaths = new Dictionary<string, string>(pathComparer);
 
-        // On warm path: build lookup dictionary + pre-scan outputs to avoid per-file stat calls
-        Dictionary<string, BuildFileEntry>? priorFiles = null;
-        HashSet<string>? existingOutputFiles = null;
-        if (!globalInvalidation && priorCache?.Files != null)
-        {
-            priorFiles = new Dictionary<string, BuildFileEntry>(priorCache.Files, pathComparer);
-            existingOutputFiles = new HashSet<string>(
-                Directory.Exists(OutputDirectory)
-                    ? Directory.GetFiles(OutputDirectory, "*.g.cs", SearchOption.AllDirectories)
-                    : [],
-                pathComparer);
-        }
-
         // Cross-module call qualification map (G3/#809, #823 review M2): MSBuild is
         // the surface where csc actually consumes the outputs, so it needs the same
         // map the CLI driver builds. Warm-skip validity: a changed map invalidates
@@ -316,9 +479,27 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             crossModuleMapHash = Calor.Compiler.CompilationDriver.ComputeCrossModuleMapHash(crossModuleMap);
         }
         newState.CrossModuleMapHash = crossModuleMapHash;
-        if (priorFiles != null && priorCache?.CrossModuleMapHash != crossModuleMapHash)
+        if (priorCache != null && priorCache.CrossModuleMapHash != crossModuleMapHash)
         {
-            priorFiles = null;
+            globalReasons.Add(GlobalCacheInvalidationReason.CrossModuleMapChanged);
+        }
+
+        var globalInvalidation = globalReasons.Count != 0;
+        if (Verbose)
+        {
+            foreach (var reason in globalReasons.Distinct())
+            {
+                Log.LogMessage(
+                    MessageImportance.High,
+                    "Calor: global invalidation [{0}] — recompiling all files.",
+                    BuildStateCache.GetReasonCode(reason));
+            }
+        }
+
+        Dictionary<string, BuildFileEntry>? priorFiles = null;
+        if (!globalInvalidation && priorCache?.Files != null)
+        {
+            priorFiles = new Dictionary<string, BuildFileEntry>(priorCache.Files, pathComparer);
         }
 
         // 4. Process each source file
@@ -356,38 +537,32 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             if (!globalInvalidation && priorFiles != null)
             {
                 priorFiles.TryGetValue(relativePath, out var cachedEntry);
-
-                // The skip conditions mirror CompilationDriver.cs:178-198 deliberately — the two
-                // sites decide the same thing (is this file's cached output trustworthy?) and had
-                // drifted apart, with this one weaker on both counts.
-                //
-                //  - OutputContentHash: presence of the .g.cs is NOT enough. A truncated, corrupted,
-                //    or hand-edited output must be a miss, or the build compiles stale bytes and
-                //    reports "up-to-date". Entries predating this check carry a null hash and are
-                //    therefore a miss — one cold rebuild, fail-closed, as the driver does.
-                //  - EffectSummary: skipping without one silently drops the module from
-                //    cross-module effect enforcement, so its Calor0410 violations vanish on warm
-                //    builds. Not reachable through this task today (a null Ast implies HasErrors,
-                //    which returns before caching), so this is defence in depth against a future
-                //    caller — not a fix for a live bug.
-                if (cachedEntry != null
-                    && existingOutputFiles!.Contains(outputPath)
-                    && cachedEntry.EffectSummary != null
-                    && cachedEntry.OutputContentHash != null
-                    && BuildStateCache.ComputeFileHash(outputPath) == cachedEntry.OutputContentHash
-                    && BuildStateCache.IsFileUpToDate(cachedEntry, inputPath))
+                var missReason = BuildStateCache.GetFileCacheMissReason(
+                    cachedEntry, inputPath, outputPath);
+                if (missReason == null)
                 {
+                    var trustedEntry = cachedEntry!;
                     // Skip — carry entry forward
-                    newState.Files[relativePath] = cachedEntry;
+                    newState.Files[relativePath] = trustedEntry;
                     var outputItem = new TaskItem(outputPath);
                     outputItem.SetMetadata("SourceFile", inputPath);
                     generatedFiles.Add(outputItem);
 
                     // Carry forward cached effect summary so cross-module enforcement
                     // still sees this module on warm builds.
-                    if (cachedEntry.EffectSummary != null)
+                    if (trustedEntry.EffectSummary != null)
                     {
-                        moduleSummaries.Add((cachedEntry.EffectSummary, inputPath));
+                        moduleSummaries.Add((trustedEntry.EffectSummary, inputPath));
+                    }
+                    foreach (var diagnostic in trustedEntry.Diagnostics ?? [])
+                    {
+                        LogDiagnostic(
+                            diagnostic.Code,
+                            diagnostic.Severity,
+                            diagnostic.Message,
+                            inputPath,
+                            diagnostic.Line,
+                            diagnostic.Column);
                     }
 
                     if (Verbose)
@@ -396,6 +571,15 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                             "Calor: skipping (up-to-date): {0}", inputPath);
                     }
                     continue;
+                }
+
+                if (Verbose)
+                {
+                    Log.LogMessage(
+                        MessageImportance.High,
+                        "Calor: file cache miss [{0}]: {1}",
+                        BuildStateCache.GetReasonCode(missReason.Value),
+                        inputPath);
                 }
             }
 
@@ -423,7 +607,10 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
 
             try
             {
-                var source = File.ReadAllText(inputPath);
+                var statBeforeRead = BuildStateCache.StatFile(inputPath);
+                var sourceBytes = File.ReadAllBytes(inputPath);
+                CacheTestHook?.Invoke(inputPath, CompileCalorTestPhase.AfterSourceRead);
+                var source = DecodeSource(sourceBytes);
                 var compileOptions = new CompilationOptions
                 {
                     Verbose = Verbose,
@@ -445,46 +632,14 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 // has something to say.
                 foreach (var diagnostic in result.Diagnostics)
                 {
-                    if (diagnostic.IsError)
-                    {
-                        Log.LogError(
-                            subcategory: "Calor",
-                            errorCode: diagnostic.Code,
-                            helpKeyword: null,
-                            file: diagnostic.FilePath ?? inputPath,
-                            lineNumber: diagnostic.Span.Line,
-                            columnNumber: diagnostic.Span.Column,
-                            endLineNumber: 0,
-                            endColumnNumber: 0,
-                            message: diagnostic.Message);
-                    }
-                    else if (diagnostic.IsWarning)
-                    {
-                        Log.LogWarning(
-                            subcategory: "Calor",
-                            warningCode: diagnostic.Code,
-                            helpKeyword: null,
-                            file: diagnostic.FilePath ?? inputPath,
-                            lineNumber: diagnostic.Span.Line,
-                            columnNumber: diagnostic.Span.Column,
-                            endLineNumber: 0,
-                            endColumnNumber: 0,
-                            message: diagnostic.Message);
-                    }
-                    else
-                    {
-                        Log.LogMessage(
-                            subcategory: "Calor",
-                            code: diagnostic.Code,
-                            helpKeyword: null,
-                            file: diagnostic.FilePath ?? inputPath,
-                            lineNumber: diagnostic.Span.Line,
-                            columnNumber: diagnostic.Span.Column,
-                            endLineNumber: 0,
-                            endColumnNumber: 0,
-                            importance: MessageImportance.Normal,
-                            message: diagnostic.Message);
-                    }
+                    LogDiagnostic(
+                        diagnostic.Code,
+                        diagnostic.IsError ? "error"
+                            : diagnostic.IsWarning ? "warning" : "info",
+                        diagnostic.Message,
+                        diagnostic.FilePath ?? inputPath,
+                        diagnostic.Span.Line,
+                        diagnostic.Span.Column);
                 }
 
                 if (result.HasErrors)
@@ -499,24 +654,29 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     continue;
                 }
 
-                File.WriteAllText(outputPath, result.GeneratedCode);
+                var generatedBytes = new UTF8Encoding(false).GetBytes(result.GeneratedCode);
+                File.WriteAllBytes(outputPath, generatedBytes);
+                CacheTestHook?.Invoke(inputPath, CompileCalorTestPhase.BeforeCacheEntrySaved);
 
-                // Compute effect summary from the fresh AST and cache it for future warm builds.
-                var fileEntry = BuildStateCache.CreateFileEntry(inputPath);
-
-                // Record what this compile actually wrote, so the next build can tell whether the
-                // .g.cs on disk is still that output. Without this every entry is a permanent miss
-                // under the check above — which is safe, but defeats incrementality entirely.
-                fileEntry.OutputContentHash = File.Exists(outputPath)
-                    ? BuildStateCache.ComputeFileHash(outputPath)
-                    : null;
-
+                EffectSummary? summary = null;
                 if (result.Ast != null)
                 {
-                    var summary = Calor.Compiler.Effects.EffectSummaryBuilder.Build(result.Ast);
-                    fileEntry.EffectSummary = summary;
+                    summary = Calor.Compiler.Effects.EffectSummaryBuilder.Build(result.Ast);
                     moduleSummaries.Add((summary, inputPath));
                 }
+
+                var fileEntry = BuildStateCache.CreateFileEntry(statBeforeRead, sourceBytes);
+                fileEntry.OutputContentHash = BuildStateCache.ComputeContentHash(generatedBytes);
+                fileEntry.EffectSummary = summary;
+                fileEntry.Diagnostics = result.Diagnostics.Select(diagnostic => new CachedDiagnostic
+                {
+                    Code = diagnostic.Code,
+                    Severity = diagnostic.IsError ? "error"
+                        : diagnostic.IsWarning ? "warning" : "info",
+                    Message = diagnostic.Message,
+                    Line = diagnostic.Span.Line,
+                    Column = diagnostic.Span.Column
+                }).ToList();
                 newState.Files[relativePath] = fileEntry;
 
                 var item = new TaskItem(outputPath);
@@ -548,6 +708,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         {
             try
             {
+                CacheTestHook?.Invoke(
+                    ProjectDirectory, CompileCalorTestPhase.BeforeCrossModuleEnforcement);
                 Log.LogMessage(MessageImportance.Normal,
                     "Calor: running cross-module effect enforcement over {0} modules",
                     moduleSummaries.Count);
@@ -652,7 +814,19 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         }
         catch (Exception ex)
         {
-            Log.LogWarning("Calor: failed to save build state cache: {0}", ex.Message);
+            if (BuildStateCache.Delete(OutputDirectory))
+            {
+                Log.LogWarning(
+                    "Calor: failed to save build state cache; the cache was purged and the next build "
+                    + "will run cold: {0}", ex.Message);
+            }
+            else
+            {
+                Log.LogError(
+                    "Calor: failed to save or purge build state cache. Incremental state cannot be "
+                    + "trusted, so the build fails closed: {0}", ex.Message);
+                success = false;
+            }
         }
 
         GeneratedFiles = generatedFiles.ToArray();
@@ -663,5 +837,54 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             ilAnalyzer?.Dispose();
             compilationContext?.Dispose();
         }
+    }
+
+    private void LogDiagnostic(
+        string code, string severity, string message,
+        string filePath, int line, int column)
+    {
+        if (severity == "error")
+        {
+            Log.LogError(
+                "Calor", code, null, filePath, line, column, 0, 0, message);
+        }
+        else if (severity == "warning")
+        {
+            Log.LogWarning(
+                "Calor", code, null, filePath, line, column, 0, 0, message);
+        }
+        else
+        {
+            Log.LogMessage(
+                "Calor", code, null, filePath, line, column, 0, 0,
+                MessageImportance.Normal, message);
+        }
+    }
+
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+        "SingleFile", "IL3000",
+        Justification = "The MSBuild task is deployed as files; missing locations are represented in the cache fingerprint.")]
+    private static IReadOnlyList<string> ResolveCompilerClosurePaths(string tasksAssemblyPath)
+    {
+        var tasksDirectory = Path.GetDirectoryName(tasksAssemblyPath) ?? string.Empty;
+        var compilerPath = typeof(Program).Assembly.Location;
+        var compilerDirectory = Path.GetDirectoryName(compilerPath) ?? tasksDirectory;
+        var nativeZ3Name = OperatingSystem.IsWindows() ? "libz3.dll"
+            : OperatingSystem.IsMacOS() ? "libz3.dylib" : "libz3.so";
+        return new[]
+        {
+            tasksAssemblyPath,
+            compilerPath,
+            typeof(Calor.Runtime.Option<int>).Assembly.Location,
+            Path.Combine(compilerDirectory, "Microsoft.Z3.dll"),
+            Path.Combine(compilerDirectory, nativeZ3Name)
+        };
+    }
+
+    private static string DecodeSource(byte[] bytes)
+    {
+        using var reader = new StreamReader(
+            new MemoryStream(bytes), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
     }
 }

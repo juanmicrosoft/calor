@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -18,8 +19,9 @@ internal sealed partial class BuildStateJsonContext : JsonSerializerContext { }
 /// </summary>
 internal sealed class BuildState
 {
-    // Bump when cache schema changes (e.g., added EffectSummary in 2.0).
-    public string FormatVersion { get; set; } = "2.1";
+    public string FormatVersion { get; set; } = BuildStateCache.CurrentFormatVersion;
+    public string CompilerSemanticsVersion { get; set; } =
+        BuildStateCache.CurrentCompilerSemanticsVersion;
 
     /// <summary>
     /// Fingerprint of the cross-module function map the outputs were emitted
@@ -53,19 +55,71 @@ internal sealed class BuildFileEntry
     /// compile that produced this entry. A warm build only trusts an output whose
     /// current hash matches — a corrupted or manually edited output is a cache
     /// miss, not "Up-to-date". Null (older caches, or the output was never
-    /// observed) is also a miss. Populated by the CLI driver; the MSBuild task
-    /// does not populate it yet and still trusts bare output existence
-    /// (known limitation — follow-up).
+    /// observed) is also a miss.
     /// </summary>
     public string? OutputContentHash { get; set; }
+
+    /// <summary>
+    /// File-local diagnostics replayed by the MSBuild task on a warm hit. Paths
+    /// are intentionally not persisted; the current source path is supplied at
+    /// replay time to keep cache state portable and privacy-aware.
+    /// </summary>
+    public List<CachedDiagnostic>? Diagnostics { get; set; }
+}
+
+internal sealed class CachedDiagnostic
+{
+    public string Code { get; set; } = "";
+    public string Severity { get; set; } = "";
+    public string Message { get; set; } = "";
+    public int Line { get; set; }
+    public int Column { get; set; }
+}
+
+internal enum CacheLoadStatus
+{
+    Loaded,
+    Missing,
+    CorruptOrPartial,
+    Unreadable
+}
+
+internal sealed record CacheLoadResult(BuildState? State, CacheLoadStatus Status);
+
+internal enum GlobalCacheInvalidationReason
+{
+    MissingCache,
+    CorruptOrPartialCache,
+    UnreadableCache,
+    SchemaVersionChanged,
+    CompilerSemanticsChanged,
+    CompilerChanged,
+    OptionsOrInputsChanged,
+    ManifestChanged,
+    OutputDirectoryChanged,
+    CrossModuleMapChanged
+}
+
+internal enum FileCacheMissReason
+{
+    EntryMissing,
+    EffectSummaryMissing,
+    DiagnosticsMissing,
+    OutputMissing,
+    OutputHashMissing,
+    OutputContentChanged,
+    SourceMissing,
+    SourceContentChanged,
+    CacheValidationFailed
 }
 
 internal static class BuildStateCache
 {
-    // 2.1: cross-module call qualification (G3/#809) — outputs emitted before
-    // the qualifier existed carry bare cross-module calls and must not be
-    // trusted by warm builds; the bump invalidates them once.
-    private const string FormatVersion = "2.1";
+    // 3.0 adds an explicit compiler-semantics surface and canonical MSBuild input
+    // fingerprinting. Older state is intentionally rebuilt and overwritten.
+    public const string CurrentFormatVersion = "3.0";
+    public const string CurrentCompilerSemanticsVersion = "calor-compile-semantics-v1";
+    public const string CurrentOptionsSerializerVersion = "compile-inputs-v2";
     private const string CacheFileName = ".calor-build-state.json";
     private const int MaxRetries = 3;
     private const int BaseRetryDelayMs = 50;
@@ -74,17 +128,80 @@ internal static class BuildStateCache
         => Path.Combine(outputDirectory, CacheFileName);
 
     public static BuildState? Load(string outputDirectory)
+        => LoadWithStatus(outputDirectory).State;
+
+    public static CacheLoadResult LoadWithStatus(string outputDirectory)
     {
         var cachePath = GetCachePath(outputDirectory);
-        return RetryOnIOException(() =>
+        for (var attempt = 0; attempt < MaxRetries; attempt++)
         {
-            if (!File.Exists(cachePath))
-                return null;
+            try
+            {
+                if (!File.Exists(cachePath))
+                    return new CacheLoadResult(null, CacheLoadStatus.Missing);
 
-            var json = File.ReadAllText(cachePath);
-            var state = JsonSerializer.Deserialize(json, BuildStateJsonContext.Default.BuildState);
-            return state;
-        });
+                var json = File.ReadAllText(cachePath);
+                using var document = JsonDocument.Parse(json);
+                if (!HasRequiredCacheProperties(document.RootElement))
+                    return new CacheLoadResult(null, CacheLoadStatus.CorruptOrPartial);
+                var state = JsonSerializer.Deserialize(json, BuildStateJsonContext.Default.BuildState);
+                if (state == null
+                    || state.Files == null
+                    || string.IsNullOrEmpty(state.CompilerHash)
+                    || string.IsNullOrEmpty(state.OptionsHash)
+                    || string.IsNullOrEmpty(state.FormatVersion))
+                {
+                    return new CacheLoadResult(null, CacheLoadStatus.CorruptOrPartial);
+                }
+                return new CacheLoadResult(state, CacheLoadStatus.Loaded);
+            }
+            catch (IOException) when (attempt < MaxRetries - 1)
+            {
+                Thread.Sleep(BaseRetryDelayMs * (1 << attempt));
+            }
+            catch (JsonException)
+            {
+                return new CacheLoadResult(null, CacheLoadStatus.CorruptOrPartial);
+            }
+            catch (NotSupportedException)
+            {
+                return new CacheLoadResult(null, CacheLoadStatus.CorruptOrPartial);
+            }
+            catch (IOException)
+            {
+                return new CacheLoadResult(null, CacheLoadStatus.Unreadable);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new CacheLoadResult(null, CacheLoadStatus.Unreadable);
+            }
+        }
+        return new CacheLoadResult(null, CacheLoadStatus.Unreadable);
+    }
+
+    private static bool HasRequiredCacheProperties(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("formatVersion", out var format)
+            || format.ValueKind != JsonValueKind.String
+            || !root.TryGetProperty("compilerHash", out var compilerHash)
+            || compilerHash.ValueKind != JsonValueKind.String
+            || !root.TryGetProperty("optionsHash", out var optionsHash)
+            || optionsHash.ValueKind != JsonValueKind.String
+            || !root.TryGetProperty("manifestHash", out var manifestHash)
+            || manifestHash.ValueKind != JsonValueKind.String
+            || !root.TryGetProperty("outputDirectory", out var outputDirectory)
+            || outputDirectory.ValueKind != JsonValueKind.String
+            || !root.TryGetProperty("files", out var files)
+            || files.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        return format.GetString() != CurrentFormatVersion
+            || (root.TryGetProperty("compilerSemanticsVersion", out var semantics)
+                && semantics.ValueKind == JsonValueKind.String
+                && !string.IsNullOrEmpty(semantics.GetString()));
     }
 
     public static void Save(BuildState state, string outputDirectory)
@@ -94,36 +211,62 @@ internal static class BuildStateCache
         if (dir != null && !Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
-        var tmpPath = cachePath + ".tmp";
-        RetryOnIOException(() =>
+        var tmpPath = cachePath + $".tmp.{Environment.ProcessId}.{Environment.CurrentManagedThreadId}.{Guid.NewGuid():N}";
+        try
         {
-            var json = JsonSerializer.Serialize(state, BuildStateJsonContext.Default.BuildState);
-            File.WriteAllText(tmpPath, json);
-            File.Move(tmpPath, cachePath, overwrite: true);
-        });
+            RetryOnIOException(() =>
+            {
+                if (File.Exists(tmpPath))
+                    File.Delete(tmpPath);
+                var json = JsonSerializer.Serialize(state, BuildStateJsonContext.Default.BuildState);
+                using (var stream = new FileStream(
+                    tmpPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                    bufferSize: 4096, FileOptions.WriteThrough))
+                using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
+                {
+                    writer.Write(json);
+                    writer.Flush();
+                    stream.Flush(flushToDisk: true);
+                }
+                File.Move(tmpPath, cachePath, overwrite: true);
+            });
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tmpPath))
+                    File.Delete(tmpPath);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
     }
 
     /// <summary>
     /// Deletes the state file (best-effort). Used by <c>--clear-cache</c>.
     /// </summary>
-    public static void Delete(string outputDirectory)
+    public static bool Delete(string outputDirectory)
     {
         var cachePath = GetCachePath(outputDirectory);
         try
         {
             if (File.Exists(cachePath))
                 File.Delete(cachePath);
+            return !File.Exists(cachePath);
         }
-        catch (IOException) { /* best-effort */ }
-        catch (UnauthorizedAccessException) { /* best-effort */ }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
     }
 
     public static string ComputeFileHash(string filePath)
     {
         var bytes = File.ReadAllBytes(filePath);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexStringLower(hash);
+        return ComputeContentHash(bytes);
     }
+
+    public static string ComputeContentHash(byte[] bytes)
+        => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
     public static string ComputePathHash(string path)
     {
@@ -133,28 +276,55 @@ internal static class BuildStateCache
     }
 
     /// <summary>
-    /// MSBuild-task compiler hash: the task assembly plus the Calor.Compiler.dll
-    /// deployed next to it.
+    /// MSBuild-task compiler hash over the conventional deployed closure. The
+    /// task itself passes explicitly resolved assembly locations when executing.
     /// </summary>
     public static string ComputeCompilerHash(string tasksAssemblyPath)
     {
         var tasksDir = Path.GetDirectoryName(tasksAssemblyPath)!;
-        var compilerDllPath = Path.Combine(tasksDir, "Calor.Compiler.dll");
-        return ComputeCompilerHash([tasksAssemblyPath, compilerDllPath]);
+        // The compiler project deliberately emits calor.dll, not
+        // Calor.Compiler.dll. Hash the deployed task/compiler/runtime/solver
+        // closure by resolved paths; names and missing markers are included so
+        // deleting or replacing one member also changes the fingerprint.
+        var closureNames = new[]
+        {
+            Path.GetFileName(tasksAssemblyPath),
+            "calor.dll",
+            "Calor.Runtime.dll",
+            "Microsoft.Z3.dll",
+            OperatingSystem.IsWindows() ? "libz3.dll"
+                : OperatingSystem.IsMacOS() ? "libz3.dylib" : "libz3.so"
+        };
+        var paths = closureNames
+            .Select(name => Path.Combine(tasksDir, name))
+            .Distinct(GetPathComparer())
+            .OrderBy(path => Path.GetFileName(path), StringComparer.Ordinal)
+            .ToList();
+        return ComputeCompilerHash(paths);
     }
 
     /// <summary>
-    /// Compiler hash over an explicit set of assembly files (streamed; missing files
-    /// are skipped so the hash degrades gracefully rather than throwing).
+    /// Compiler hash over an explicit set of assembly files. Missing members are
+    /// represented explicitly so removing a dependency invalidates the cache.
     /// </summary>
     public static string ComputeCompilerHash(IReadOnlyList<string> assemblyPaths)
     {
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
 
-        // Stream hash to avoid allocating multi-MB arrays
-        foreach (var path in assemblyPaths)
+        foreach (var path in assemblyPaths.OrderBy(
+                     path => Path.GetFileName(path), StringComparer.Ordinal))
         {
-            HashFileStreaming(sha, path);
+            var name = Path.GetFileName(path);
+            AppendLengthPrefixed(sha, name);
+            if (File.Exists(path))
+            {
+                AppendLengthPrefixed(sha, "present");
+                HashFileStreaming(sha, path);
+            }
+            else
+            {
+                AppendLengthPrefixed(sha, "missing");
+            }
         }
 
         return Convert.ToHexStringLower(sha.GetHashAndReset());
@@ -194,8 +364,17 @@ internal static class BuildStateCache
         }
     }
 
+    private static void AppendLengthPrefixed(IncrementalHash hash, string value)
+    {
+        var bytes = Encoding.UTF8.GetBytes(value);
+        Span<byte> length = stackalloc byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
+        hash.AppendData(length);
+        hash.AppendData(bytes);
+    }
+
     /// <summary>
-    /// MSBuild-task options hash (kept bit-compatible with the historical format).
+    /// Legacy convenience overload for callers with only effect enforcement.
     /// </summary>
     public static string ComputeOptionsHash(bool enforceEffects = true)
         => ComputeOptionsHash($"enforceEffects:{enforceEffects}");
@@ -204,8 +383,9 @@ internal static class BuildStateCache
     /// Options hash over a caller-supplied canonical token. Diagnostics-affecting
     /// options must be folded into the token: an option flip between builds has to
     /// invalidate cached (skipped) files, otherwise violations that the new option
-    /// set would report are silently missed on warm builds. (Options that only
-    /// affect presentation — verbose, --format — must be excluded.)
+    /// set would report are silently missed on warm builds. Presentation-only
+    /// options are excluded unless they alter diagnostics; the MSBuild task's
+    /// Verbose setting does, so its canonical record includes that value.
     ///
     /// The set of EffectKind enum values is also folded in: cached EffectSummary entries
     /// reference kinds by name, and a kind added/removed/renamed in a compiler upgrade
@@ -214,7 +394,7 @@ internal static class BuildStateCache
     public static string ComputeOptionsHash(string optionsToken)
     {
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        sha.AppendData(Encoding.UTF8.GetBytes("options:v1"));
+        sha.AppendData(Encoding.UTF8.GetBytes($"options:{CurrentOptionsSerializerVersion}"));
         sha.AppendData(Encoding.UTF8.GetBytes($"|{optionsToken}"));
         sha.AppendData(Encoding.UTF8.GetBytes("|effectkinds:"));
         foreach (var kind in Enum.GetNames(typeof(EffectKind)))
@@ -250,14 +430,24 @@ internal static class BuildStateCache
         if (manifestFiles.Count == 0)
             return "";
 
-        manifestFiles.Sort(StringComparer.OrdinalIgnoreCase);
+        manifestFiles.Sort((left, right) => StringComparer.Ordinal.Compare(
+            NormalizePathForOrdering(left), NormalizePathForOrdering(right)));
 
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var manifestFile in manifestFiles)
         {
-            sha.AppendData(File.ReadAllBytes(manifestFile));
+            AppendLengthPrefixed(sha, Path.GetFileName(manifestFile));
+            AppendLengthPrefixed(sha, new FileInfo(manifestFile).Length.ToString(
+                System.Globalization.CultureInfo.InvariantCulture));
+            HashFileStreaming(sha, manifestFile);
         }
         return Convert.ToHexStringLower(sha.GetHashAndReset());
+    }
+
+    private static string NormalizePathForOrdering(string path)
+    {
+        var normalized = Path.GetFullPath(path).Replace('\\', '/');
+        return OperatingSystem.IsWindows() ? normalized.ToUpperInvariant() : normalized;
     }
 
     public static bool IsFileUpToDate(BuildFileEntry? cached, string filePath)
@@ -269,14 +459,88 @@ internal static class BuildStateCache
         if (!fileInfo.Exists)
             return false;
 
-        // Level 1: stat gate — (mtime, size)
-        if (fileInfo.LastWriteTimeUtc == cached.LastModified && fileInfo.Length == cached.FileSize)
-            return true;
-
-        // Level 2: content hash
-        var currentHash = ComputeFileHash(filePath);
-        return currentHash == cached.ContentHash;
+        // Always verify bytes. Metadata is retained as the pre-read snapshot for
+        // race safety and observability, but mtime/size alone cannot prove that
+        // content is unchanged (both can be preserved by editors or restored).
+        return ComputeFileHash(filePath) == cached.ContentHash;
     }
+
+    /// <summary>
+    /// Evaluates a warm-cache entry in a fixed order so verbose logs and tests get
+    /// one deterministic, actionable miss reason.
+    /// </summary>
+    public static FileCacheMissReason? GetFileCacheMissReason(
+        BuildFileEntry? cached, string sourcePath, string outputPath)
+    {
+        if (cached == null)
+            return FileCacheMissReason.EntryMissing;
+        if (cached.EffectSummary == null)
+            return FileCacheMissReason.EffectSummaryMissing;
+        if (cached.Diagnostics == null)
+            return FileCacheMissReason.DiagnosticsMissing;
+        if (cached.Diagnostics.Any(diagnostic =>
+                diagnostic.Severity is not ("warning" or "info")
+                || string.IsNullOrEmpty(diagnostic.Code)
+                || diagnostic.Line < 0
+                || diagnostic.Column < 0))
+        {
+            return FileCacheMissReason.CacheValidationFailed;
+        }
+        if (!File.Exists(outputPath))
+            return FileCacheMissReason.OutputMissing;
+        if (cached.OutputContentHash == null)
+            return FileCacheMissReason.OutputHashMissing;
+
+        try
+        {
+            if (ComputeFileHash(outputPath) != cached.OutputContentHash)
+                return FileCacheMissReason.OutputContentChanged;
+
+            var info = new FileInfo(sourcePath);
+            if (!info.Exists)
+                return FileCacheMissReason.SourceMissing;
+            return ComputeFileHash(sourcePath) == cached.ContentHash
+                ? null
+                : FileCacheMissReason.SourceContentChanged;
+        }
+        catch (IOException)
+        {
+            return FileCacheMissReason.CacheValidationFailed;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return FileCacheMissReason.CacheValidationFailed;
+        }
+    }
+
+    public static string GetReasonCode(GlobalCacheInvalidationReason reason) => reason switch
+    {
+        GlobalCacheInvalidationReason.MissingCache => "missing-cache",
+        GlobalCacheInvalidationReason.CorruptOrPartialCache => "corrupt-or-partial-cache",
+        GlobalCacheInvalidationReason.UnreadableCache => "unreadable-cache",
+        GlobalCacheInvalidationReason.SchemaVersionChanged => "schema-version-changed",
+        GlobalCacheInvalidationReason.CompilerSemanticsChanged => "compiler-semantics-changed",
+        GlobalCacheInvalidationReason.CompilerChanged => "compiler-changed",
+        GlobalCacheInvalidationReason.OptionsOrInputsChanged => "options-or-inputs-changed",
+        GlobalCacheInvalidationReason.ManifestChanged => "manifest-changed",
+        GlobalCacheInvalidationReason.OutputDirectoryChanged => "output-directory-changed",
+        GlobalCacheInvalidationReason.CrossModuleMapChanged => "cross-module-map-changed",
+        _ => throw new ArgumentOutOfRangeException(nameof(reason))
+    };
+
+    public static string GetReasonCode(FileCacheMissReason reason) => reason switch
+    {
+        FileCacheMissReason.EntryMissing => "entry-missing",
+        FileCacheMissReason.EffectSummaryMissing => "effect-summary-missing",
+        FileCacheMissReason.DiagnosticsMissing => "diagnostics-missing",
+        FileCacheMissReason.OutputMissing => "output-missing",
+        FileCacheMissReason.OutputHashMissing => "output-hash-missing",
+        FileCacheMissReason.OutputContentChanged => "output-content-changed",
+        FileCacheMissReason.SourceMissing => "source-missing",
+        FileCacheMissReason.SourceContentChanged => "source-content-changed",
+        FileCacheMissReason.CacheValidationFailed => "cache-validation-failed",
+        _ => throw new ArgumentOutOfRangeException(nameof(reason))
+    };
 
     public static BuildFileEntry CreateFileEntry(string filePath)
     {
@@ -308,16 +572,14 @@ internal static class BuildStateCache
     /// here (as <see cref="CreateFileEntry(string)"/> does) races with concurrent
     /// editors: an edit landing mid-compile would be hashed as if it had been
     /// compiled, so the next run would skip it and the new content would never
-    /// be compiled. Stat-before-read matters for the same reason — a stale
-    /// (mtime,size) fails the level-1 gate and falls through to the content hash,
-    /// whereas a too-new (mtime,size) paired with an old hash could level-1-skip
-    /// content that was never compiled.
+    /// be compiled. The snapshot is retained for observability and migration
+    /// even though warm validation hashes bytes unconditionally.
     /// </summary>
     public static BuildFileEntry CreateFileEntry(FileStat statBeforeRead, byte[] compiledContent)
     {
         return new BuildFileEntry
         {
-            ContentHash = Convert.ToHexStringLower(SHA256.HashData(compiledContent)),
+            ContentHash = ComputeContentHash(compiledContent),
             LastModified = statBeforeRead.LastWriteTimeUtc,
             FileSize = statBeforeRead.Length
         };
@@ -403,42 +665,34 @@ internal static class BuildStateCache
 
     public static bool IsGlobalInvalidation(BuildState? cached, string compilerHash,
         string optionsHash, string manifestHash, string outputDirectory)
+        => GetGlobalInvalidationReasons(
+            cached, compilerHash, optionsHash, manifestHash, outputDirectory).Count != 0;
+
+    public static IReadOnlyList<GlobalCacheInvalidationReason> GetGlobalInvalidationReasons(
+        BuildState? cached, string compilerHash, string optionsHash,
+        string manifestHash, string outputDirectory)
     {
+        var reasons = new List<GlobalCacheInvalidationReason>();
         if (cached == null)
-            return true;
-        if (cached.FormatVersion != FormatVersion)
-            return true;
+        {
+            reasons.Add(GlobalCacheInvalidationReason.MissingCache);
+            return reasons;
+        }
+        if (cached.FormatVersion != CurrentFormatVersion)
+            reasons.Add(GlobalCacheInvalidationReason.SchemaVersionChanged);
+        if (cached.CompilerSemanticsVersion != CurrentCompilerSemanticsVersion)
+            reasons.Add(GlobalCacheInvalidationReason.CompilerSemanticsChanged);
         if (cached.CompilerHash != compilerHash)
-            return true;
+            reasons.Add(GlobalCacheInvalidationReason.CompilerChanged);
         if (cached.OptionsHash != optionsHash)
-            return true;
+            reasons.Add(GlobalCacheInvalidationReason.OptionsOrInputsChanged);
         if (cached.ManifestHash != manifestHash)
-            return true;
+            reasons.Add(GlobalCacheInvalidationReason.ManifestChanged);
         if (!GetPathComparer().Equals(
             NormalizeRelativePath(cached.OutputDirectory),
             NormalizeRelativePath(outputDirectory)))
-            return true;
-        return false;
-    }
-
-    private static T? RetryOnIOException<T>(Func<T?> action)
-    {
-        for (var attempt = 0; attempt < MaxRetries; attempt++)
-        {
-            try
-            {
-                return action();
-            }
-            catch (IOException) when (attempt < MaxRetries - 1)
-            {
-                Thread.Sleep(BaseRetryDelayMs * (1 << attempt));
-            }
-            catch
-            {
-                return default;
-            }
-        }
-        return default;
+            reasons.Add(GlobalCacheInvalidationReason.OutputDirectoryChanged);
+        return reasons;
     }
 
     private static void RetryOnIOException(Action action)
