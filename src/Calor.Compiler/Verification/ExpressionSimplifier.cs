@@ -1260,6 +1260,8 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
 
     public ExpressionNode Visit(ModuleNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(FunctionNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(OutputNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(EffectsNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ParameterNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(CallStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ReturnStatementNode node) => throw new InvalidOperationException();
@@ -1267,6 +1269,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(WhileStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(DoWhileStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(IfStatementNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(ElseIfClauseNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(BindStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(ContinueStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(BreakStatementNode node) => throw new InvalidOperationException();
@@ -1274,10 +1277,14 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(LabelStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(PrintStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(RecordDefinitionNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(FieldDefinitionNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(UnionTypeDefinitionNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(VariantDefinitionNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(TypeReferenceNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(EnumDefinitionNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(EnumMemberNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(EnumExtensionNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(FieldAssignmentNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(MatchStatementNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(MatchCaseNode node) => throw new InvalidOperationException();
     public ExpressionNode Visit(WildcardPatternNode node) => throw new InvalidOperationException();

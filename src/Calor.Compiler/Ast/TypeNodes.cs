@@ -71,8 +71,8 @@ public sealed class FieldDefinitionNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) { }
-    public override T Accept<T>(IAstVisitor<T> visitor) => default!;
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
 
 /// <summary>
@@ -123,8 +123,8 @@ public sealed class VariantDefinitionNode : AstNode
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
-    public override void Accept(IAstVisitor visitor) { }
-    public override T Accept<T>(IAstVisitor<T> visitor) => default!;
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
 
 /// <summary>
@@ -143,8 +143,8 @@ public sealed class TypeReferenceNode : AstNode
         TypeArguments = typeArguments ?? Array.Empty<TypeReferenceNode>();
     }
 
-    public override void Accept(IAstVisitor visitor) { }
-    public override T Accept<T>(IAstVisitor<T> visitor) => default!;
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 
     public override string ToString()
     {
@@ -192,8 +192,8 @@ public sealed class FieldAssignmentNode : AstNode
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    public override void Accept(IAstVisitor visitor) { }
-    public override T Accept<T>(IAstVisitor<T> visitor) => default!;
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
 
 /// <summary>

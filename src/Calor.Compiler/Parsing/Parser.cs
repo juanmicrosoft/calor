@@ -8,6 +8,63 @@ namespace Calor.Compiler.Parsing;
 /// </summary>
 public sealed class Parser
 {
+    private delegate ExpressionNode ExpressionParser(Parser parser);
+
+    private static readonly IReadOnlyDictionary<TokenKind, ExpressionParser> ExpressionParsers =
+        new Dictionary<TokenKind, ExpressionParser>
+        {
+            [TokenKind.IntLiteral] = static parser => parser.ParseIntLiteral(),
+            [TokenKind.StrLiteral] = static parser => parser.ParseStringLiteral(),
+            [TokenKind.BoolLiteral] = static parser => parser.ParseBoolLiteral(),
+            [TokenKind.FloatLiteral] = static parser => parser.ParseFloatLiteral(),
+            [TokenKind.DecimalLiteral] = static parser => parser.ParseDecimalLiteral(),
+            [TokenKind.Identifier] = static parser => parser.ParseReference(),
+            [TokenKind.OpenParen] = static parser => parser.ParseParenExpressionOrInlineLambda(),
+            [TokenKind.OpenBrace] = static parser => parser.ParseCollectionInitializer(),
+            [TokenKind.If] = static parser => parser.ParseIfExpression(),
+            [TokenKind.Some] = static parser => parser.ParseSomeExpression(),
+            [TokenKind.None] = static parser => parser.ParseNoneExpression(),
+            [TokenKind.Ok] = static parser => parser.ParseOkExpression(),
+            [TokenKind.Err] = static parser => parser.ParseErrExpression(),
+            [TokenKind.Match] = static parser => parser.ParseMatchExpression(),
+            [TokenKind.Record] = static parser => parser.ParseRecordCreation(),
+            [TokenKind.Array] = static parser => parser.ParseArrayCreation(),
+            [TokenKind.Index] = static parser => parser.ParseArrayAccess(),
+            [TokenKind.Length] = static parser => parser.ParseArrayLength(),
+            [TokenKind.List] = static parser => parser.ParseListCreation(),
+            [TokenKind.Dict] = static parser => parser.ParseDictionaryCreation(),
+            [TokenKind.HashSet] = static parser => parser.ParseSetCreation(),
+            [TokenKind.Has] = static parser => parser.ParseCollectionContains(),
+            [TokenKind.Count] = static parser => parser.ParseCollectionCount(),
+            [TokenKind.Generic] = static parser => parser.ParseGenericType(),
+            [TokenKind.New] = static parser => parser.ParseNewExpression(),
+            [TokenKind.AnonymousObject] = static parser => parser.ParseAnonymousObjectCreation(),
+            [TokenKind.This] = static parser => parser.ParseThisExpression(),
+            [TokenKind.Base] = static parser => parser.ParseBaseExpression(),
+            [TokenKind.Call] = static parser => parser.ParseCallExpression(),
+            [TokenKind.Lambda] = static parser => parser.ParseLambdaExpression(),
+            [TokenKind.Await] = static parser => parser.ParseAwaitExpression(),
+            [TokenKind.Interpolate] = static parser => parser.ParseInterpolatedString(),
+            [TokenKind.NullCoalesce] = static parser => parser.ParseNullCoalesce(),
+            [TokenKind.NullConditional] = static parser => parser.ParseNullConditional(),
+            [TokenKind.RangeOp] = static parser => parser.ParseRangeExpression(),
+            [TokenKind.IndexEnd] = static parser => parser.ParseIndexFromEnd(),
+            [TokenKind.With] = static parser => parser.ParseWithExpression(),
+            [TokenKind.StackAlloc] = static parser => parser.ParseStackAlloc(),
+            [TokenKind.AddressOf] = static parser => parser.ParseAddressOf(),
+            [TokenKind.Deref] = static parser => parser.ParsePointerDereference(),
+            [TokenKind.SizeOf] = static parser => parser.ParseSizeOf(),
+            [TokenKind.Array2D] = static parser => parser.ParseMultiDimArrayCreation(),
+            [TokenKind.Index2D] = static parser => parser.ParseMultiDimArrayAccess(),
+            [TokenKind.Throw] = static parser => parser.ParseThrowExpression(),
+            [TokenKind.RawCSharpExpression] = static parser => parser.ParseRawCSharpExpression(),
+            [TokenKind.Hash] = static parser => parser.ParseSelfRef(),
+            [TokenKind.At] = static parser => parser.ParseVerbatimIdentifier(),
+        };
+
+    internal static IReadOnlyCollection<TokenKind> RegisteredExpressionStartTokens
+        => ExpressionParsers.Keys.ToArray();
+
     private readonly List<Token> _tokens;
     private readonly DiagnosticBag _diagnostics;
     private int _position;
@@ -1767,67 +1824,7 @@ public sealed class Parser
 
     private bool IsExpressionStart()
     {
-        return Current.Kind is TokenKind.IntLiteral
-            or TokenKind.StrLiteral
-            or TokenKind.BoolLiteral
-            or TokenKind.FloatLiteral
-            or TokenKind.DecimalLiteral
-            or TokenKind.Identifier
-            // Lisp-style expression
-            or TokenKind.OpenParen
-            // Phase 2: Control Flow - IF as conditional expression
-            or TokenKind.If
-            // Phase 3: Type System
-            or TokenKind.Some
-            or TokenKind.None
-            or TokenKind.Ok
-            or TokenKind.Err
-            or TokenKind.Match
-            or TokenKind.Record
-            // Phase 6: Arrays
-            or TokenKind.Array
-            or TokenKind.Index
-            or TokenKind.Length
-            // Phase 6 Extended: Collections
-            or TokenKind.List
-            or TokenKind.Dict
-            or TokenKind.HashSet
-            or TokenKind.Has
-            or TokenKind.Count
-            // Phase 7: Generics
-            or TokenKind.Generic
-            // Phase 8: Classes
-            or TokenKind.New
-            or TokenKind.AnonymousObject
-            or TokenKind.This
-            or TokenKind.Base
-            or TokenKind.Call  // Call expressions (§C[...])
-            // Phase 11: Lambdas
-            or TokenKind.Lambda
-            // Phase 12: Async/Await
-            or TokenKind.Await
-            // Phase 9: String Interpolation and Modern Operators
-            or TokenKind.Interpolate
-            or TokenKind.NullCoalesce
-            or TokenKind.NullConditional
-            or TokenKind.RangeOp
-            or TokenKind.IndexEnd
-            // Phase 10: Advanced Patterns
-            or TokenKind.With
-            // Unsafe/Low-Level
-            or TokenKind.StackAlloc
-            or TokenKind.AddressOf
-            or TokenKind.Deref
-            or TokenKind.SizeOf
-            or TokenKind.Array2D
-            or TokenKind.Index2D
-            or TokenKind.Throw
-            // Inline raw C# expression
-            or TokenKind.RawCSharpExpression
-            // Dependent Types: Self-reference in refinement predicates
-            or TokenKind.Hash
-            // Verbatim identifiers: @keyword
-            or TokenKind.At;
+        return ExpressionParsers.ContainsKey(Current.Kind);
     }
 
     // Deterministic guard against stack exhaustion on adversarially nested
@@ -1900,75 +1897,9 @@ public sealed class Parser
 
     private ExpressionNode ParseExpressionCore()
     {
-        var expr = Current.Kind switch
-        {
-            TokenKind.IntLiteral => ParseIntLiteral(),
-            TokenKind.StrLiteral => ParseStringLiteral(),
-            TokenKind.BoolLiteral => ParseBoolLiteral(),
-            TokenKind.FloatLiteral => ParseFloatLiteral(),
-            TokenKind.DecimalLiteral => ParseDecimalLiteral(),
-            TokenKind.Identifier => ParseReference(),
-            // Lisp-style expression: (op args...) or inline lambda: () → body
-            TokenKind.OpenParen => ParseParenExpressionOrInlineLambda(),
-            // Collection/array initializer: {elem1, elem2, ...}
-            TokenKind.OpenBrace => ParseCollectionInitializer(),
-            // Phase 2: Control Flow - IF as conditional expression
-            TokenKind.If => ParseIfExpression(),
-            // Phase 3: Type System
-            TokenKind.Some => ParseSomeExpression(),
-            TokenKind.None => ParseNoneExpression(),
-            TokenKind.Ok => ParseOkExpression(),
-            TokenKind.Err => ParseErrExpression(),
-            TokenKind.Match => ParseMatchExpression(),
-            TokenKind.Record => ParseRecordCreation(),
-            // Phase 6: Arrays
-            TokenKind.Array => ParseArrayCreation(),
-            TokenKind.Index => ParseArrayAccess(),
-            TokenKind.Length => ParseArrayLength(),
-            // Phase 6 Extended: Collections
-            TokenKind.List => ParseListCreation(),
-            TokenKind.Dict => ParseDictionaryCreation(),
-            TokenKind.HashSet => ParseSetCreation(),
-            TokenKind.Has => ParseCollectionContains(),
-            TokenKind.Count => ParseCollectionCount(),
-            // Phase 7: Generics
-            TokenKind.Generic => ParseGenericType(),
-            // Phase 8: Classes
-            TokenKind.New => ParseNewExpression(),
-            TokenKind.AnonymousObject => ParseAnonymousObjectCreation(),
-            TokenKind.This => ParseThisExpression(),
-            TokenKind.Base => ParseBaseExpression(),
-            TokenKind.Call => ParseCallExpression(),
-            // Phase 11: Lambdas
-            TokenKind.Lambda => ParseLambdaExpression(),
-            // Phase 12: Async/Await
-            TokenKind.Await => ParseAwaitExpression(),
-            // Phase 9: String Interpolation and Modern Operators
-            TokenKind.Interpolate => ParseInterpolatedString(),
-            TokenKind.NullCoalesce => ParseNullCoalesce(),
-            TokenKind.NullConditional => ParseNullConditional(),
-            TokenKind.RangeOp => ParseRangeExpression(),
-            TokenKind.IndexEnd => ParseIndexFromEnd(),
-            // Phase 10: Advanced Patterns
-            TokenKind.With => ParseWithExpression(),
-            // Unsafe/Low-Level
-            TokenKind.StackAlloc => ParseStackAlloc(),
-            TokenKind.AddressOf => ParseAddressOf(),
-            TokenKind.Deref => ParsePointerDereference(),
-            TokenKind.SizeOf => ParseSizeOf(),
-            // Multidimensional Arrays
-            TokenKind.Array2D => ParseMultiDimArrayCreation(),
-            TokenKind.Index2D => ParseMultiDimArrayAccess(),
-            // Throw expression
-            TokenKind.Throw => ParseThrowExpression(),
-            // Inline raw C# expression
-            TokenKind.RawCSharpExpression => ParseRawCSharpExpression(),
-            // Dependent Types: Self-reference in refinement predicates
-            TokenKind.Hash => ParseSelfRef(),
-            // Verbatim identifiers: @keyword (strip @ and treat as identifier)
-            TokenKind.At => ParseVerbatimIdentifier(),
-            _ => RecoverFromUnexpectedToken()
-        };
+        var expr = ExpressionParsers.TryGetValue(Current.Kind, out var parser)
+            ? parser(this)
+            : RecoverFromUnexpectedToken();
 
         // Handle trailing member access (e.g., (typeof X).Name, result.Property)
         expr = ParseTrailingMemberAccess(expr);
@@ -2356,10 +2287,10 @@ public sealed class Parser
         }
 
         // Parse arguments until we hit CloseParen
-        var args = new List<ExpressionNode>();
+        var rawArgs = new List<object>();
         while (!Check(TokenKind.CloseParen) && !IsAtEnd)
         {
-            args.Add(ParseLispArgument(allowKeyword: true));
+            rawArgs.Add(ParseLispArgumentCore(allowKeyword: true));
         }
 
         var endToken = Expect(TokenKind.CloseParen);
@@ -2370,9 +2301,8 @@ public sealed class Parser
         // comparison mode, consumed by the string-op branch below). Enforce that here, at
         // the single point where every operator branch receives its arguments. Per-branch
         // handling leaves escape routes (binary/ternary/unary operands, mid-position or
-        // doubled keywords, CALL targets), each ending in a null child from the node's
-        // no-op Accept and an unlocatable NRE — or silently invalid emitted C#.
-        args = FilterKeywordArgs(opText, args);
+        // doubled keywords, CALL targets).
+        var (args, trailingKeyword) = FilterKeywordArgs(opText, rawArgs);
 
         // Handle ternary conditional: (? cond then else)
         if (opText == "?" && args.Count == 3)
@@ -2500,7 +2430,7 @@ public sealed class Parser
             StringComparisonMode? comparisonMode = null;
             var nonKeywordArgs = args;
 
-            if (args.Count > 0 && args[^1] is KeywordArgNode keywordArg)
+            if (trailingKeyword is { } keywordArg)
             {
                 comparisonMode = StringComparisonModeExtensions.FromKeyword(keywordArg.Name);
                 if (comparisonMode == null)
@@ -2514,7 +2444,6 @@ public sealed class Parser
                         $"Operation '{opText}' does not support comparison modes");
                     comparisonMode = null;
                 }
-                nonKeywordArgs = args.Take(args.Count - 1).ToList();
             }
 
             // Handle substr disambiguation: 2 args = SubstringFrom, 3 args = Substring
@@ -2729,15 +2658,15 @@ public sealed class Parser
     /// <summary>
     /// KeywordArgNode is internal to parsing: the only legal position for one is as the
     /// final argument of a recognized string operation, where it is the comparison mode.
-    /// Every other occurrence is rejected with a diagnostic and dropped, so the node can
-    /// never escape into the AST — where its no-op Accept turns into a null child and an
-    /// unlocatable NullReferenceException, or silently invalid emitted C# (#874).
+    /// Every other occurrence is rejected with a diagnostic and dropped.
     /// Called once, at the single choke point where the lisp argument list is complete.
     /// </summary>
-    private List<ExpressionNode> FilterKeywordArgs(string opText, List<ExpressionNode> args)
+    private (List<ExpressionNode> Arguments, KeywordArgNode? TrailingKeyword) FilterKeywordArgs(
+        string opText,
+        List<object> args)
     {
         if (!args.Any(a => a is KeywordArgNode))
-            return args;
+            return (args.Cast<ExpressionNode>().ToList(), null);
 
         // A single trailing keyword on a recognized string operation is legal; the
         // string-op branch consumes it and validates the mode name and operation support.
@@ -2747,21 +2676,29 @@ public sealed class Parser
                 : -1;
 
         var kept = new List<ExpressionNode>(args.Count);
+        KeywordArgNode? trailingKeyword = null;
         for (int i = 0; i < args.Count; i++)
         {
-            if (args[i] is KeywordArgNode kw && i != lastLegalIndex)
+            if (args[i] is KeywordArgNode kw)
             {
-                _diagnostics.ReportError(kw.Span, DiagnosticCode.InvalidLispExpression,
-                    $"Keyword argument ':{kw.Name}' is not valid here. A comparison-mode " +
-                    "keyword is only allowed as the final argument of a built-in string " +
-                    "operation (e.g. starts, contains, equals — the lowercase forms).");
+                if (i == lastLegalIndex)
+                {
+                    trailingKeyword = kw;
+                }
+                else
+                {
+                    _diagnostics.ReportError(kw.Span, DiagnosticCode.InvalidLispExpression,
+                        $"Keyword argument ':{kw.Name}' is not valid here. A comparison-mode " +
+                        "keyword is only allowed as the final argument of a built-in string " +
+                        "operation (e.g. starts, contains, equals — the lowercase forms).");
+                }
             }
             else
             {
-                kept.Add(args[i]);
+                kept.Add((ExpressionNode)args[i]);
             }
         }
-        return kept;
+        return (kept, trailingKeyword);
     }
 
     private (TokenKind kind, string text, TextSpan span) ParseLispOperator()
@@ -2986,7 +2923,10 @@ public sealed class Parser
     /// operands — gets a diagnostic and a recovery node instead, so the keyword node can
     /// never leak into the AST through a side entrance (#874).
     /// </summary>
-    private ExpressionNode ParseLispArgument(bool allowKeyword = false)
+    private ExpressionNode ParseLispArgument()
+        => (ExpressionNode)ParseLispArgumentCore(allowKeyword: false);
+
+    private object ParseLispArgumentCore(bool allowKeyword)
     {
         // Handle keyword argument syntax: :keyword or :hyphenated-keyword
         if (Check(TokenKind.Colon))
@@ -3025,163 +2965,37 @@ public sealed class Parser
         }
 
         ExpressionNode expr;
-        switch (Current.Kind)
+        if (Check(TokenKind.Tilde))
         {
-            case TokenKind.IntLiteral:
-                expr = ParseIntLiteral();
-                break;
-            case TokenKind.StrLiteral:
-                expr = ParseStringLiteral();
-                break;
-            case TokenKind.BoolLiteral:
-                expr = ParseBoolLiteral();
-                break;
-            case TokenKind.FloatLiteral:
-                expr = ParseFloatLiteral();
-                break;
-            case TokenKind.DecimalLiteral:
-                expr = ParseDecimalLiteral();
-                break;
-            case TokenKind.Identifier:
-                expr = ParseBareReference(); // Bare variable reference
-                break;
-            case TokenKind.OpenParen:
-                expr = ParseParenExpressionOrInlineLambda(); // Nested expression or tuple
-                break;
-            case TokenKind.Call:
-                expr = ParseCallExpression(); // Call expression inside Lisp
-                break;
-            case TokenKind.New:
-                expr = ParseNewExpression(); // New expression inside Lisp
-                break;
-            case TokenKind.Await:
-                expr = ParseAwaitExpression(); // Await expression inside Lisp
-                break;
-            case TokenKind.Index:
-                expr = ParseArrayAccess(); // §IDX inside Lisp
-                break;
-            case TokenKind.Length:
-                expr = ParseArrayLength(); // §LEN inside Lisp
-                break;
-            case TokenKind.Has:
-                expr = ParseCollectionContains(); // §HAS inside Lisp
-                break;
-            case TokenKind.Count:
-                expr = ParseCollectionCount(); // §CNT inside Lisp
-                break;
-            case TokenKind.Hash:
-                expr = ParseSelfRef(); // # inside Lisp (refinement predicates)
-                break;
-            case TokenKind.None:
-                expr = ParseNoneExpression(); // §NN inside Lisp
-                break;
-            case TokenKind.Some:
-                expr = ParseSomeExpression(); // §SM inside Lisp
-                break;
-            case TokenKind.This:
-                expr = ParseThisExpression(); // §THIS inside Lisp
-                break;
-            case TokenKind.Base:
-                expr = ParseBaseExpression(); // §BASE inside Lisp
-                break;
-            case TokenKind.Lambda:
-                expr = ParseLambdaExpression(); // §LAM inside Lisp
-                break;
-            case TokenKind.Array:
-                expr = ParseArrayCreation(); // §ARR inside Lisp
-                break;
-            case TokenKind.List:
-                expr = ParseListCreation(); // §LIST inside Lisp
-                break;
-            case TokenKind.Dict:
-                expr = ParseDictionaryCreation(); // §DICT inside Lisp
-                break;
-            case TokenKind.HashSet:
-                expr = ParseSetCreation(); // §SET inside Lisp
-                break;
-            case TokenKind.Interpolate:
-                expr = ParseInterpolatedString(); // §INTERP inside Lisp
-                break;
-            case TokenKind.NullCoalesce:
-                expr = ParseNullCoalesce(); // §NC inside Lisp
-                break;
-            case TokenKind.If:
-                expr = ParseIfExpression(); // §IF inside Lisp (conditional expression)
-                break;
-            case TokenKind.RawCSharpExpression:
-                expr = ParseRawCSharpExpression(); // §CS inside Lisp
-                break;
-            case TokenKind.Throw:
-                expr = ParseThrowExpression(); // §TH inside Lisp
-                break;
-            case TokenKind.AddressOf:
-                expr = ParseAddressOf(); // §ADDR inside Lisp
-                break;
-            case TokenKind.SizeOf:
-                expr = ParseSizeOf(); // §SIZEOF inside Lisp
-                break;
-            case TokenKind.Deref:
-                expr = ParsePointerDereference(); // §DEREF inside Lisp
-                break;
-            case TokenKind.Index2D:
-                expr = ParseMultiDimArrayAccess(); // §IDX2D inside Lisp
-                break;
-            case TokenKind.Match:
-                expr = ParseMatchExpression(); // §W inside Lisp
-                break;
-            case TokenKind.StackAlloc:
-                expr = ParseStackAlloc(); // §SALLOC inside Lisp
-                break;
-            case TokenKind.RangeOp:
-                expr = ParseRangeExpression(); // §RNG inside Lisp
-                break;
-            case TokenKind.IndexEnd:
-                expr = ParseIndexFromEnd(); // §IEND inside Lisp
-                break;
-            case TokenKind.With:
-                expr = ParseWithExpression(); // §WITH inside Lisp
-                break;
-            case TokenKind.AnonymousObject:
-                expr = ParseAnonymousObjectCreation(); // §ANON inside Lisp
-                break;
-            case TokenKind.Ok:
-                expr = ParseOkExpression(); // §OK inside Lisp
-                break;
-            case TokenKind.Err:
-                expr = ParseErrExpression(); // §ERR inside Lisp
-                break;
-            case TokenKind.Record:
-                expr = ParseRecordCreation(); // §REC inside Lisp
-                break;
-            case TokenKind.Array2D:
-                expr = ParseMultiDimArrayCreation(); // §ARR2D inside Lisp
-                break;
-            case TokenKind.NullConditional:
-                expr = ParseNullConditional(); // §?. inside Lisp
-                break;
-            case TokenKind.Tilde:
-                Advance(); // consume ~ (used for binding targets in converter output)
-                expr = Check(TokenKind.Identifier) ? ParseBareReference() : new IntLiteralNode(Current.Span, 0);
-                break;
-            default:
-                // Provide helpful message for unexpected tokens
-                var hint = Current.Kind switch
-                {
-                    TokenKind.Plus or TokenKind.Minus or TokenKind.Star or TokenKind.Slash =>
-                        "Operators come before arguments in Lisp syntax: (+ a b) not (a + b)",
-                    TokenKind.EqualEqual or TokenKind.BangEqual or TokenKind.Less or TokenKind.Greater =>
-                        "Comparison operators come first: (== a b) not (a == b)",
-                    TokenKind.AmpAmp or TokenKind.PipePipe =>
-                        "Logical operators come first: (&& a b) not (a && b)",
-                    TokenKind.CloseParen =>
-                        "Unexpected closing parenthesis. Check expression structure.",
-                    _ => "Expected a value (number, string, variable) or nested expression"
-                };
-                _diagnostics.ReportError(Current.Span, DiagnosticCode.InvalidLispExpression,
-                    $"Unexpected token '{Current.Text}' in expression argument. {hint}");
-                Advance();
-                expr = new IntLiteralNode(Current.Span, 0); // Recovery: return dummy value
-                break;
+            Advance();
+            expr = Check(TokenKind.Identifier)
+                ? ParseBareReference()
+                : new IntLiteralNode(Current.Span, 0);
+        }
+        else if (ExpressionParsers.TryGetValue(Current.Kind, out var parser))
+        {
+            // Lisp references historically preserve qualified names in one ReferenceNode.
+            expr = Current.Kind == TokenKind.Identifier ? ParseBareReference() : parser(this);
+        }
+        else
+        {
+            var hint = Current.Kind switch
+            {
+                TokenKind.Plus or TokenKind.Minus or TokenKind.Star or TokenKind.Slash =>
+                    "Operators come before arguments in Lisp syntax: (+ a b) not (a + b)",
+                TokenKind.EqualEqual or TokenKind.BangEqual or TokenKind.Less or TokenKind.Greater =>
+                    "Comparison operators come first: (== a b) not (a == b)",
+                TokenKind.AmpAmp or TokenKind.PipePipe =>
+                    "Logical operators come first: (&& a b) not (a && b)",
+                TokenKind.CloseParen =>
+                    "Unexpected closing parenthesis. Check expression structure.",
+                _ => "Expected a value (number, string, variable) or nested expression"
+            };
+            var unexpected = Current;
+            _diagnostics.ReportError(unexpected.Span, DiagnosticCode.InvalidLispExpression,
+                $"Unexpected token '{unexpected.Text}' in expression argument. {hint}");
+            Advance();
+            expr = new IntLiteralNode(unexpected.Span, 0);
         }
 
         // Handle trailing member access (e.g., §C[...] §/C.Length or run?.Status)
@@ -4808,7 +4622,9 @@ public sealed class Parser
     private BindStatementNode ParseBindStatement()
     {
         var startToken = Expect(TokenKind.Bind);
-        var attrs = ParseAttributes();
+        // A bind has exactly one header group. A following brace group is a
+        // collection initializer expression, not another header group.
+        var attrs = ParseAttributes(maxGroups: 1);
 
         // Interpret bind attributes - now includes type as third return value
         var (name, isMutable, typeName) = AttributeHelper.InterpretBindAttributes(attrs);
@@ -4917,13 +4733,14 @@ public sealed class Parser
         return statements;
     }
 
-    private AttributeCollection ParseAttributes()
+    private AttributeCollection ParseAttributes(int maxGroups = int.MaxValue)
     {
         var attrs = new AttributeCollection();
+        var groupsParsed = 0;
 
         // Parse structural braces {} for tag attributes
         // Note: [] is now reserved for array types to align with LLM training
-        while (Check(TokenKind.OpenBrace))
+        while (groupsParsed < maxGroups && Check(TokenKind.OpenBrace))
         {
             Advance(); // consume {
 
@@ -4931,6 +4748,7 @@ public sealed class Parser
             ParsePositionalAttributes(attrs);
 
             Expect(TokenKind.CloseBrace);
+            groupsParsed++;
         }
 
         return attrs;

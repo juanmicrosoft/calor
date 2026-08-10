@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Calor.Compiler.Ast;
 using Xunit;
 
@@ -116,6 +117,40 @@ public class ArchitectureTests
             $"IAstVisitor and IAstVisitor<T> have inconsistent Visit methods:\n{string.Join("\n", mismatches)}");
     }
 
+    [Fact]
+    public void EveryConcreteAstNode_DispatchesExactlyOnceToMatchingVisitorMethod()
+    {
+        var nodeTypes = typeof(AstNode).Assembly
+            .GetTypes()
+            .Where(type => !type.IsAbstract && typeof(AstNode).IsAssignableFrom(type))
+            .OrderBy(type => type.Name)
+            .ToList();
+
+        var nonGenericVisitor = DispatchProxy.Create<IAstVisitor, RecordingVisitorProxy>();
+        var nonGenericRecorder = (RecordingVisitorProxy)(object)nonGenericVisitor;
+        var genericVisitor = DispatchProxy.Create<IAstVisitor<object?>, RecordingVisitorProxy>();
+        var genericRecorder = (RecordingVisitorProxy)(object)genericVisitor;
+
+        foreach (var nodeType in nodeTypes)
+        {
+            var node = (AstNode)RuntimeHelpers.GetUninitializedObject(nodeType);
+
+            nonGenericRecorder.Reset();
+            node.Accept(nonGenericVisitor);
+            AssertSingleMatchingDispatch(nodeType, node, nonGenericRecorder.Calls);
+
+            genericRecorder.Reset();
+            node.Accept(genericVisitor);
+            AssertSingleMatchingDispatch(nodeType, node, genericRecorder.Calls);
+        }
+    }
+
+    [Fact]
+    public void ParserOnlyKeywordArgument_IsNotAnAstNode()
+    {
+        Assert.False(typeof(AstNode).IsAssignableFrom(typeof(KeywordArgNode)));
+    }
+
     /// <summary>
     /// Lists all current visitor implementations for documentation purposes.
     /// If this test fails, update this list and ensure all visitors are properly documented.
@@ -163,4 +198,28 @@ public class ArchitectureTests
             $"Current visitors: {string.Join(", ", actualVisitors.OrderBy(x => x))}");
     }
 
+    private static void AssertSingleMatchingDispatch(
+        Type nodeType,
+        AstNode node,
+        IReadOnlyList<(MethodInfo Method, object? Argument)> calls)
+    {
+        var call = Assert.Single(calls);
+        Assert.Equal("Visit", call.Method.Name);
+        Assert.Equal(nodeType, Assert.Single(call.Method.GetParameters()).ParameterType);
+        Assert.Same(node, call.Argument);
+    }
+
+    public class RecordingVisitorProxy : DispatchProxy
+    {
+        public List<(MethodInfo Method, object? Argument)> Calls { get; } = new();
+
+        public void Reset() => Calls.Clear();
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            Assert.NotNull(targetMethod);
+            Calls.Add((targetMethod, args is { Length: > 0 } ? args[0] : null));
+            return null;
+        }
+    }
 }

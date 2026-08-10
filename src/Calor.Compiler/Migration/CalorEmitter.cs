@@ -945,6 +945,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(OutputNode node) => $"§O{{{TypeMapper.CSharpToCalor(node.TypeName)}}}";
+
+    public string Visit(EffectsNode node)
+    {
+        var effectCodes = node.Effects
+            .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
+            .Distinct();
+        return $"§E{{{string.Join(",", effectCodes)}}}";
+    }
+
     public string Visit(ParameterNode node)
     {
         var typeName = TypeMapper.CSharpToCalor(node.TypeName);
@@ -1188,13 +1198,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// Conservative whitelist for the leading character of a rendered
-    /// expression that ParseExpression() AND IsExpressionStart() both accept.
-    /// Used to gate stmt-context one-arg §/C elision: if the rendered arg
-    /// starts with a token that IsExpressionStart() rejects (e.g. <c>{</c>
-    /// for a collection initializer — Parser.cs:1584 vs 1506), the parser's
-    /// inline-arg path at Parser.cs:1398 will not fire and the call would
-    /// silently parse as zero-arg. RFC v0.6 call-closer-elision §3.2.
+    /// Conservative whitelist for rendered expressions that are safe for
+    /// stmt-context one-arg §/C elision. Braced collection initializers are
+    /// valid expression starters, but retain the explicit §A/§/C form to avoid
+    /// ambiguity with adjacent structural brace payloads in migrated text.
     /// </summary>
     private static bool StartsWithExpressionStarter(string rendered)
     {
@@ -1715,6 +1722,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
 
         EmitBlockEnd($"§/I{{{node.Id}}}");
+        return "";
+    }
+
+    public string Visit(ElseIfClauseNode node)
+    {
+        AppendLine($"§EI {node.Condition.Accept(this)}");
+        Indent();
+        foreach (var stmt in node.Body)
+        {
+            stmt.Accept(this);
+        }
+        Dedent();
         return "";
     }
 
@@ -3094,6 +3113,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(FieldDefinitionNode node)
+    {
+        var defaultValue = node.DefaultValue is null ? "" : $" = {node.DefaultValue.Accept(this)}";
+        return $"{TypeMapper.CSharpToCalor(node.TypeName)}:{node.Name}{defaultValue}";
+    }
+
     public string Visit(UnionTypeDefinitionNode node)
     {
         // Emit union types using the type/variant syntax
@@ -3109,6 +3134,22 @@ public sealed class CalorEmitter : IAstVisitor<string>
         Dedent();
         AppendLine("§/T");
         return "";
+    }
+
+    public string Visit(VariantDefinitionNode node)
+    {
+        var fields = node.Fields.Count == 0
+            ? ""
+            : $"({string.Join(", ", node.Fields.Select(Visit))})";
+        return $"§V{{{node.Name}}}{fields}";
+    }
+
+    public string Visit(TypeReferenceNode node)
+    {
+        var typeName = TypeMapper.CSharpToCalor(node.Name);
+        return node.TypeArguments.Count == 0
+            ? typeName
+            : $"{typeName}<{string.Join(",", node.TypeArguments.Select(Visit))}>";
     }
 
     public string Visit(EnumDefinitionNode node)
@@ -3190,6 +3231,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var fields = string.Join(", ", node.Fields.Select(f => f.Value.Accept(this)));
         return $"§NEW{{{node.TypeName}}} {fields}";
     }
+
+    public string Visit(FieldAssignmentNode node) => node.Value.Accept(this);
 
     // Generic type nodes
     public string Visit(TypeParameterNode node)

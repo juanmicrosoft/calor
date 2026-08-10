@@ -166,6 +166,8 @@ public sealed class IdScanner : IAstVisitor
 
     // All other visitor methods - no IDs to collect from these nodes
     public void Visit(ParameterNode node) { }
+    public void Visit(OutputNode node) { }
+    public void Visit(EffectsNode node) { }
     public void Visit(CallStatementNode node) { }
     public void Visit(ReturnStatementNode node) { }
     public void Visit(IntLiteralNode node) { }
@@ -179,6 +181,7 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(WhileStatementNode node) { }
     public void Visit(DoWhileStatementNode node) { }
     public void Visit(IfStatementNode node) { }
+    public void Visit(ElseIfClauseNode node) { }
     public void Visit(BindStatementNode node) { }
     public void Visit(BinaryOperationNode node) { }
     public void Visit(UnaryOperationNode node) { }
@@ -188,9 +191,13 @@ public sealed class IdScanner : IAstVisitor
     public void Visit(LabelStatementNode node) { }
     public void Visit(PrintStatementNode node) { }
     public void Visit(RecordDefinitionNode node) { }
+    public void Visit(FieldDefinitionNode node) { }
     public void Visit(UnionTypeDefinitionNode node) { }
+    public void Visit(VariantDefinitionNode node) { }
+    public void Visit(TypeReferenceNode node) { }
     public void Visit(EnumMemberNode node) { }
     public void Visit(RecordCreationNode node) { }
+    public void Visit(FieldAssignmentNode node) { }
     public void Visit(FieldAccessNode node) { }
     public void Visit(SomeExpressionNode node) { }
     public void Visit(NoneExpressionNode node) { }

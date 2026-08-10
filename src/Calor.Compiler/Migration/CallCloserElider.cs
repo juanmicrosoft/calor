@@ -323,9 +323,9 @@ public sealed class CallCloserElider
     }
 
     /// <summary>
-    /// Mirror of <c>CalorEmitter.StartsWithExpressionStarter</c>: the
-    /// parser's inline-arg path only accepts these starter characters,
-    /// so the migrator restricts elision to args that begin with one.
+    /// Mirror of <c>CalorEmitter.StartsWithExpressionStarter</c>: a
+    /// conservative subset of expression starters that are safe for
+    /// call-closer elision. Braced collection initializers keep §/C.
     /// </summary>
     private static bool IsSafeExpressionStarter(string source, int offset)
     {

@@ -1788,7 +1788,7 @@ public sealed class EffectEnforcementPass
                     or DecimalLiteralNode or ReferenceNode or NoneExpressionNode
                     or ThisExpressionNode or BaseExpressionNode or SelfRefNode
                     or GenericTypeNode or TypeOfExpressionNode or NameOfExpressionNode
-                    or SizeOfNode or KeywordArgNode => EffectSet.Empty,
+                    or SizeOfNode => EffectSet.Empty,
                 // Contract-form quantifiers evaluate over pure predicates
                 ForallExpressionNode or ExistsExpressionNode or ImplicationExpressionNode => EffectSet.Empty,
                 // D-W2.3: interop / unconverted content — assumed, not silently pure

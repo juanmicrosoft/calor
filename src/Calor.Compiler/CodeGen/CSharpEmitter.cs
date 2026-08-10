@@ -784,6 +784,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(OutputNode node) => MapTypeName(node.TypeName);
+
+    public string Visit(EffectsNode node) => "";
+
     public string Visit(ParameterNode node)
     {
         var attrPrefix = "";
@@ -1363,6 +1367,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(ElseIfClauseNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        AppendLine($"else if ({condition})");
+        AppendLine("{");
+        Indent();
+        PushDeclScope();
+        foreach (var stmt in node.Body)
+        {
+            EmitStatement(stmt);
+        }
+        PopDeclScope();
+        Dedent();
+        AppendLine("}");
+        return "";
+    }
+
     public string Visit(BindStatementNode node)
     {
         // Discard-await (`§B{_} §AWAIT ...`, produced by the C# converter for a
@@ -1536,6 +1557,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(FieldDefinitionNode node)
+    {
+        var defaultValue = node.DefaultValue is null ? "" : $" = {node.DefaultValue.Accept(this)}";
+        return $"{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}{defaultValue}";
+    }
+
     public string Visit(UnionTypeDefinitionNode node)
     {
         // Generate as abstract base class with derived classes for each variant
@@ -1560,6 +1587,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         return "";
+    }
+
+    public string Visit(VariantDefinitionNode node)
+    {
+        var fields = string.Join(", ", node.Fields.Select(Visit));
+        return $"{SanitizeIdentifier(node.Name)}({fields})";
+    }
+
+    public string Visit(TypeReferenceNode node)
+    {
+        var typeName = MapTypeName(node.Name);
+        return node.TypeArguments.Count == 0
+            ? typeName
+            : $"{typeName}<{string.Join(", ", node.TypeArguments.Select(Visit))}>";
     }
 
     public string Visit(EnumDefinitionNode node)
@@ -1796,6 +1837,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var fields = string.Join(", ", node.Fields.Select(f => f.Value.Accept(this)));
         return $"new {typeName}({fields})";
     }
+
+    public string Visit(FieldAssignmentNode node) => node.Value.Accept(this);
 
     public string Visit(FieldAccessNode node)
     {
