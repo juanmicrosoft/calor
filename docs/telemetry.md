@@ -1,67 +1,111 @@
 # Telemetry
 
-Calor's CLI telemetry is **opt-in and off by default**. A default invocation
-of `calor` sends nothing, to anyone, ever.
+Calor telemetry measures command reliability and compiler feature usage. It is
+anonymous, schema-enforced, **off by default**, and never required to use the
+CLI, SDK, MCP server, or watch mode.
 
-## Enabling and disabling
+## Opt in or out
 
-| Action | How |
+| Action | Configuration |
 |---|---|
-| Enable | `CALOR_TELEMETRY=1` (or `true`) in the environment |
-| Force-disable (overrides enable) | `--no-telemetry` flag, or `CALOR_TELEMETRY_OPTOUT=1` |
+| Opt in | Set `CALOR_TELEMETRY=1` (or `true`) |
+| Force opt out | Pass `--no-telemetry`, or set `CALOR_TELEMETRY_OPTOUT=1` |
+| Preview locally | Pass `--telemetry-preview` |
 
-## What is sent when enabled
+`--no-telemetry` overrides opt-in and preview. SDK use emits nothing unless the
+host explicitly initializes telemetry; normal SDK use does not do so.
 
-All payloads are metadata-only. The exact inventory (audited against the code
-in the #834 review — an item not on this list being transmitted is a bug):
+## Operator and endpoint configuration
 
-- **Command names**, the sequence of commands in a session, exit codes, and
-  wall-clock durations (total and per compiler phase).
-- **Diagnostic codes** (e.g. `Calor0410`) with severity, per-code counts, and
-  code co-occurrence pairs — **never diagnostic message text**, which can embed
-  source fragments, identifiers, literals, and file paths.
-- **Exception type names** (e.g. `System.IO.IOException`) — **never exception
-  messages or stack traces**.
-- **Aggregate input profiles**: line count and size bucket
-  (small/medium/large/xlarge), estimated token count, and boolean feature flags
-  (has-contracts, has-effects, has-modules). No source content.
-- **Compile configuration**: which compiler flags/modes were active (a
-  fixed-vocabulary flag map), compilation success, and error/warning counts.
-- **Conversion/migration metadata**: unsupported-feature names from the
-  compiler's own fixed registry, with counts and line numbers.
-- **Help-query shape**: query **length** and hit/miss for `calor_help` lookups,
-  plus matched section titles from the compiler's own documentation — never the
-  query text itself.
-- **Hook decisions** (`calor hook` agent-integration events): the hook name,
-  allow/block decision, file extension (`.calr`/`.cs`), and agent name.
-- **Session metadata**: a random per-invocation operation ID (not tied to
-  machine or user identity), OS description and process architecture as
-  reported by .NET, the .NET, Calor, and Calor-semantics versions, and the
-  coding-agent name when one identifies itself (e.g. `claude-code`). The
-  Application Insights cloud role AND internal node name are pinned to the
-  constant `calor-cli` — the SDK's defaults would transmit your machine's
-  hostname through either tag, and both are explicitly scrubbed (pinned by a
-  serialization-level test).
+Opt-in alone is insufficient. The operator must also provide a valid Azure
+Application Insights connection string through
+`CALOR_TELEMETRY_CONNECTION_STRING`. Calor source and packages contain no
+instrumentation key or endpoint credential. The connection string must contain
+a GUID `InstrumentationKey`; an `IngestionEndpoint`, when present, must use
+HTTPS. Missing or invalid configuration disables telemetry.
 
-## What is never sent
+For project-provided production builds, the Calor project operates the
+configured Application Insights resource. For redistributed or internally
+hosted builds, the party setting `CALOR_TELEMETRY_CONNECTION_STRING` is the
+operator and data recipient.
 
-Source code, file paths, file names, identifiers, diagnostic messages,
-exception messages, stack traces, environment variables, machine hostnames, or
-anything derived from the content of your files beyond the aggregate profile
-above — including content hashes: earlier builds sent SHA hashes of the input
-source and generated output for determinism tracking; those enable exact-file
-identification and were removed in the same change that made telemetry opt-in.
+Endpoint/channel failures never affect compiler behavior. Configuration,
+schema validation, value redaction, serialization, or send failures all fail
+closed to no telemetry.
 
-## Where it goes
+## Preview
 
-Enabled telemetry is sent to the Calor project's Azure Application Insights
-instance. The connection string is visible in
-`src/Calor.Compiler/Telemetry/CalorTelemetry.cs`.
+Run any public CLI command with `--telemetry-preview`:
 
-## History
+```bash
+calor convert input.cs --telemetry-preview
+calor --input input.calr --telemetry-preview
+```
 
-Before v0.11 (W1 Slice 2, issue #792), telemetry was **default-on** and sent
-raw diagnostic messages and full exception payloads. That posture was reversed:
-opt-in default, stripped payloads, and this document. If you ran an earlier
-version without `CALOR_TELEMETRY_OPTOUT=1`, those versions did transmit
-diagnostics as described in the issue.
+Preview does not require opt-in or endpoint configuration. It writes one JSON
+payload per line to **stderr**, uses the same schema and sanitization path as
+production telemetry, and creates no network telemetry client. Keeping preview
+on stderr preserves command stdout formats such as JSON and SARIF.
+
+## Schema and complete payload inventory
+
+The current application schema is **version 1.0**. The mechanical snapshot is
+[`telemetry-schema-v1.json`](telemetry-schema-v1.json). Tests compare that file
+byte-for-byte with the runtime schema, so adding/removing an event or field
+requires an explicit snapshot and privacy-review update.
+
+Every payload has:
+
+- `schemaVersion`: `1.0`
+- `eventName`: one of the names below
+- `properties`: only the event's listed low-cardinality string fields
+- `metrics`: only the event's listed non-negative numeric fields
+- `context`: exactly the global fields listed below
+
+| Event | Property fields | Metric fields |
+|---|---|---|
+| `CommandSucceeded`, `CommandFailed` | `command`, `exitCode`, `error`, `verbose`, `list` | `durationMs`, `fileCount`, `issueCount`, `errorCount`, `blockerCount`, `totalContracts`, `provenContracts`, `verifyContracts`, `verifyProven`, `verifyDisproven`, `verifyDurationMs` |
+| `CompilationPhase` | `command`, `phase`, `success` | `durationMs`, `tokenCount`, `functionsAnalyzed`, `bugPatternsFound`, `taintVulnerabilities` |
+| `DiagnosticOccurrence` | `command`, `code`, `severity`, `category` | — |
+| `DiagnosticCoOccurrence` | `command`, `codeA`, `codeB` | `count` |
+| `Exception` | `command`, `exceptionCategory`, `phase` | — |
+| `CompileOptions` | `command`, `strictApi`, `requireDocs`, `enforceEffects`, `strictEffects`, `permissiveEffects`, `contractMode`, `verify`, `noCache`, `analyze`, `strictBindInference` | `verificationTimeout`, `experimentalFlagCount` |
+| `UnsupportedFeatures` | `command` | `totalUnsupportedCount`, `distinctFeatureCount` |
+| `UnsupportedFeature` | `command`, `feature` | `count` |
+| `InputProfile` | `command`, `hasContracts`, `hasEffects`, `hasModules`, `sizeCategory` | `lineCount`, `estimatedTokenCount` |
+| `SessionStarted` | — | — |
+| `SessionEnded` | `commandSequence` | `sessionDurationMs`, `commandCount` |
+| `ConversionAttempted` | `command`, `success` | `inputLines`, `durationMs`, `issueCount`, `unsupportedCount` |
+| `ConversionGap` | `command`, `feature` | `line` |
+| `SyntaxHelpQuery` | `command`, `resolvedCategory`, `isHit` | `featureLength`, `resultCount`, `matchedSectionCount` |
+| `CompilationOutcome` | `command`, `success` | `errorCount`, `warningCount` |
+| `HookAllow`, `HookBlock` | `command`, `hook`, `decision`, `fileExtension`, `agent` | — |
+
+Global context fields are `schemaVersion`, `os`, `architecture`,
+`dotnetVersion`, `calorVersion`, `semanticsVersion`, `operationId`, and
+`codingAgent`. `operationId` is a new random 12-hex-character value per process
+invocation and has no stable user or machine linkage. `codingAgent` is mapped
+to a fixed vocabulary; unknown or multiple configured names become `none`.
+Application Insights role and node tags are pinned to `calor-cli`.
+
+## Never collected
+
+Calor does not collect source/generated code, literals, identifiers, project
+or file names, paths, command arguments, environment values, diagnostic text,
+exception type/message/stack, machine/user IDs, hostnames, IP addresses, or
+content hashes. Diagnostic data is code/category/count only. Unsupported
+feature and help categories must come from compiler-owned fixed registries.
+Unknown events, fields, enum values, or arbitrary caller properties cause the
+whole affected event to be dropped.
+
+## Retention
+
+Calor does not implement a separate retention period in the client. Retention
+is controlled by the configured Azure Application Insights workspace and the
+operator's Azure/project policy. This repository does not currently publish a
+project-specific guaranteed retention duration. Operators must configure,
+document, and honor retention/deletion policy for their endpoint; users who do
+not accept that provider/operator policy should leave telemetry disabled.
+
+Schema changes must follow the
+[telemetry privacy/security review checklist](security/telemetry-privacy-review.md).

@@ -108,7 +108,6 @@ public static class FeatureCheckCommand
             telemetry?.TrackCommand("feature-check", exitCode, new Dictionary<string, string>
             {
                 ["durationMs"] = sw.ElapsedMilliseconds.ToString(),
-                ["feature"] = feature ?? "(list)",
                 ["list"] = list.ToString()
             });
         }

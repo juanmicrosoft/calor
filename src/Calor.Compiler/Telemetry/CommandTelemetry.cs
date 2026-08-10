@@ -57,19 +57,15 @@ public static class CommandTelemetry
         telemetry.SetCommand(commandName);
 
         var sw = Stopwatch.StartNew();
-        string? errorMessage = null;
-
         try
         {
             await action();
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
             telemetry.TrackException(ex, new Dictionary<string, string>
             {
-                ["phase"] = "command_execution",
-                ["exceptionType"] = ex.GetType().Name
+                ["phase"] = "command_execution"
             });
             throw;
         }
@@ -87,7 +83,7 @@ public static class CommandTelemetry
                 IssueReporter.PromptForIssue(
                     telemetry.OperationId,
                     commandName,
-                    errorMessage ?? "Command failed with errors (see diagnostic codes)",
+                    "Command failed with errors (see diagnostic codes)",
                     diagnosticCodes: null);
             }
 

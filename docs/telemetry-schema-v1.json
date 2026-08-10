@@ -1,0 +1,244 @@
+{
+  "schemaVersion": "1.0",
+  "globalContextFields": [
+    "architecture",
+    "calorVersion",
+    "codingAgent",
+    "dotnetVersion",
+    "operationId",
+    "os",
+    "schemaVersion",
+    "semanticsVersion"
+  ],
+  "events": [
+    {
+      "eventName": "CommandFailed",
+      "propertyFields": [
+        "command",
+        "error",
+        "exitCode",
+        "list",
+        "verbose"
+      ],
+      "metricFields": [
+        "blockerCount",
+        "durationMs",
+        "errorCount",
+        "fileCount",
+        "issueCount",
+        "provenContracts",
+        "totalContracts",
+        "verifyContracts",
+        "verifyDisproven",
+        "verifyDurationMs",
+        "verifyProven"
+      ]
+    },
+    {
+      "eventName": "CommandSucceeded",
+      "propertyFields": [
+        "command",
+        "error",
+        "exitCode",
+        "list",
+        "verbose"
+      ],
+      "metricFields": [
+        "blockerCount",
+        "durationMs",
+        "errorCount",
+        "fileCount",
+        "issueCount",
+        "provenContracts",
+        "totalContracts",
+        "verifyContracts",
+        "verifyDisproven",
+        "verifyDurationMs",
+        "verifyProven"
+      ]
+    },
+    {
+      "eventName": "CompilationOutcome",
+      "propertyFields": [
+        "command",
+        "success"
+      ],
+      "metricFields": [
+        "errorCount",
+        "warningCount"
+      ]
+    },
+    {
+      "eventName": "CompilationPhase",
+      "propertyFields": [
+        "command",
+        "phase",
+        "success"
+      ],
+      "metricFields": [
+        "bugPatternsFound",
+        "durationMs",
+        "functionsAnalyzed",
+        "taintVulnerabilities",
+        "tokenCount"
+      ]
+    },
+    {
+      "eventName": "CompileOptions",
+      "propertyFields": [
+        "analyze",
+        "command",
+        "contractMode",
+        "enforceEffects",
+        "noCache",
+        "permissiveEffects",
+        "requireDocs",
+        "strictApi",
+        "strictBindInference",
+        "strictEffects",
+        "verify"
+      ],
+      "metricFields": [
+        "experimentalFlagCount",
+        "verificationTimeout"
+      ]
+    },
+    {
+      "eventName": "ConversionAttempted",
+      "propertyFields": [
+        "command",
+        "success"
+      ],
+      "metricFields": [
+        "durationMs",
+        "inputLines",
+        "issueCount",
+        "unsupportedCount"
+      ]
+    },
+    {
+      "eventName": "ConversionGap",
+      "propertyFields": [
+        "command",
+        "feature"
+      ],
+      "metricFields": [
+        "line"
+      ]
+    },
+    {
+      "eventName": "DiagnosticCoOccurrence",
+      "propertyFields": [
+        "codeA",
+        "codeB",
+        "command"
+      ],
+      "metricFields": [
+        "count"
+      ]
+    },
+    {
+      "eventName": "DiagnosticOccurrence",
+      "propertyFields": [
+        "category",
+        "code",
+        "command",
+        "severity"
+      ],
+      "metricFields": []
+    },
+    {
+      "eventName": "Exception",
+      "propertyFields": [
+        "command",
+        "exceptionCategory",
+        "phase"
+      ],
+      "metricFields": []
+    },
+    {
+      "eventName": "HookAllow",
+      "propertyFields": [
+        "agent",
+        "command",
+        "decision",
+        "fileExtension",
+        "hook"
+      ],
+      "metricFields": []
+    },
+    {
+      "eventName": "HookBlock",
+      "propertyFields": [
+        "agent",
+        "command",
+        "decision",
+        "fileExtension",
+        "hook"
+      ],
+      "metricFields": []
+    },
+    {
+      "eventName": "InputProfile",
+      "propertyFields": [
+        "command",
+        "hasContracts",
+        "hasEffects",
+        "hasModules",
+        "sizeCategory"
+      ],
+      "metricFields": [
+        "estimatedTokenCount",
+        "lineCount"
+      ]
+    },
+    {
+      "eventName": "SessionEnded",
+      "propertyFields": [
+        "commandSequence"
+      ],
+      "metricFields": [
+        "commandCount",
+        "sessionDurationMs"
+      ]
+    },
+    {
+      "eventName": "SessionStarted",
+      "propertyFields": [],
+      "metricFields": []
+    },
+    {
+      "eventName": "SyntaxHelpQuery",
+      "propertyFields": [
+        "command",
+        "isHit",
+        "resolvedCategory"
+      ],
+      "metricFields": [
+        "featureLength",
+        "matchedSectionCount",
+        "resultCount"
+      ]
+    },
+    {
+      "eventName": "UnsupportedFeature",
+      "propertyFields": [
+        "command",
+        "feature"
+      ],
+      "metricFields": [
+        "count"
+      ]
+    },
+    {
+      "eventName": "UnsupportedFeatures",
+      "propertyFields": [
+        "command"
+      ],
+      "metricFields": [
+        "distinctFeatureCount",
+        "totalUnsupportedCount"
+      ]
+    }
+  ]
+}

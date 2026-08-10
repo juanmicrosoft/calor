@@ -1,8 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
-using System.Security.Cryptography;
-using System.Text;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
@@ -15,7 +13,6 @@ using Calor.Compiler.Telemetry;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
-using Microsoft.ApplicationInsights.DataContracts;
 
 namespace Calor.Compiler;
 
@@ -112,6 +109,10 @@ public class Program
             description: "Force-disable anonymous usage telemetry (telemetry is OPT-IN and off " +
                          "by default; it activates only when CALOR_TELEMETRY=1 is set — see docs/telemetry.md)");
 
+        var telemetryPreviewOption = new Option<bool>(
+            aliases: ["--telemetry-preview"],
+            description: "Print schema-approved telemetry payloads locally to stderr without network transmission");
+
         var analyzeOption = new Option<bool>(
             aliases: ["--analyze"],
             description: "Enable advanced verification analyses (dataflow, bug patterns, taint tracking)");
@@ -159,7 +160,6 @@ public class Program
             noCacheOption,
             clearCacheOption,
             verificationTimeoutOption,
-            noTelemetryOption,
             analyzeOption,
             allFindingsOption,
             strictBindInferenceOption,
@@ -167,6 +167,8 @@ public class Program
             experimentalOption,
             formatOption
         };
+        rootCommand.AddGlobalOption(noTelemetryOption);
+        rootCommand.AddGlobalOption(telemetryPreviewOption);
 
         // Legacy compile handler (when --input is provided)
         rootCommand.SetHandler(async (InvocationContext ctx) =>
@@ -279,10 +281,11 @@ public class Program
 
         // Initialize telemetry for subcommands
         // Parse --no-telemetry early from args
-        var noTelemetryEarly = args.Contains("--no-telemetry");
-        if (!CalorTelemetry.IsInitialized)
+        var noTelemetryEarly = HasEnabledFlag(args, "--no-telemetry");
+        var telemetryPreviewEarly = HasEnabledFlag(args, "--telemetry-preview");
+        if (!CalorTelemetry.IsInitialized || telemetryPreviewEarly)
         {
-            CalorTelemetry.Initialize(noTelemetryEarly);
+            CalorTelemetry.Initialize(noTelemetryEarly, telemetryPreviewEarly);
         }
         if (CalorTelemetry.IsInitialized)
         {
@@ -299,6 +302,12 @@ public class Program
 
         return result;
     }
+
+    private static bool HasEnabledFlag(IEnumerable<string> args, string optionName) =>
+        args.Any(arg =>
+            arg.Equals(optionName, StringComparison.Ordinal)
+            || arg.Equals($"{optionName}=true", StringComparison.OrdinalIgnoreCase)
+            || arg.Equals($"{optionName}=1", StringComparison.Ordinal));
 
     private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text")
         => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format));
@@ -927,14 +936,11 @@ public class Program
             status.WriteLine("Code generation completed successfully");
         }
 
-        // Compilation outcome & determinism telemetry (Phase 5)
+        // Compilation outcome telemetry
         try
         {
-            var inputHash = ComputeHash(source);
-            var outputHash = ComputeHash(generatedCode);
-            telemetry?.TrackCompilationOutcome(inputHash, !diagnostics.HasErrors,
+            telemetry?.TrackCompilationOutcome(!diagnostics.HasErrors,
                 diagnostics.Errors.Count(), diagnostics.Warnings.Count());
-            telemetry?.TrackCompilationDeterminism(inputHash, outputHash);
         }
         catch
         {
@@ -961,25 +967,17 @@ public class Program
         return new CompilationResult(diagnostics, ast, generatedCode);
     }
 
-    private static string ComputeHash(string input)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexString(bytes)[..16].ToLowerInvariant();
-    }
-
     private static void TrackDiagnostics(CalorTelemetry? telemetry, DiagnosticBag diagnostics)
     {
         if (telemetry == null) return;
 
         foreach (var diag in diagnostics.Errors)
         {
-            telemetry.TrackDiagnostic(diag.Code, diag.Message, SeverityLevel.Error);
             telemetry.TrackDiagnosticEvent(diag.Code, "Error", GetDiagnosticCategory(diag.Code));
         }
 
         foreach (var diag in diagnostics.Warnings)
         {
-            telemetry.TrackDiagnostic(diag.Code, diag.Message, SeverityLevel.Warning);
             telemetry.TrackDiagnosticEvent(diag.Code, "Warning", GetDiagnosticCategory(diag.Code));
         }
     }

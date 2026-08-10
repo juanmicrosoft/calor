@@ -184,7 +184,8 @@ public class UnsupportedFeatureTelemetryTests
 
         telemetry.TrackUnsupportedFeatures(features, 3);
 
-        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
+        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
+            .Where(e => e.Name == "UnsupportedFeatures"));
         Assert.Equal("UnsupportedFeatures", evt.Name);
     }
 
@@ -201,9 +202,10 @@ public class UnsupportedFeatureTelemetryTests
 
         telemetry.TrackUnsupportedFeatures(features, 8);
 
-        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
-        Assert.Equal("8", evt.Properties["totalUnsupportedCount"]);
-        Assert.Equal("3", evt.Properties["distinctFeatureCount"]);
+        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
+            .Where(e => e.Name == "UnsupportedFeatures"));
+        Assert.Equal(8, evt.Metrics["totalUnsupportedCount"]);
+        Assert.Equal(3, evt.Metrics["distinctFeatureCount"]);
     }
 
     [Fact]
@@ -218,13 +220,14 @@ public class UnsupportedFeatureTelemetryTests
 
         telemetry.TrackUnsupportedFeatures(features, 7);
 
-        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
-        Assert.Equal("5", evt.Properties["feature:goto"]);
-        Assert.Equal("2", evt.Properties["feature:unsafe"]);
+        var events = channel.Items.OfType<EventTelemetry>()
+            .Where(e => e.Name == "UnsupportedFeature").ToList();
+        Assert.Contains(events, e => e.Properties["feature"] == "goto" && e.Metrics["count"] == 5);
+        Assert.Contains(events, e => e.Properties["feature"] == "unsafe" && e.Metrics["count"] == 2);
     }
 
     [Fact]
-    public void TrackUnsupportedFeatures_CapsAt50Features()
+    public void TrackUnsupportedFeatures_UnknownFeatureNamesFailClosed()
     {
         var (telemetry, channel) = CreateTestTelemetry();
         var features = new Dictionary<string, int>();
@@ -235,9 +238,7 @@ public class UnsupportedFeatureTelemetryTests
 
         telemetry.TrackUnsupportedFeatures(features, features.Values.Sum());
 
-        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
-        var featureProps = evt.Properties.Keys.Where(k => k.StartsWith("feature:")).ToList();
-        Assert.Equal(50, featureProps.Count);
+        Assert.Empty(channel.Items);
     }
 
     [Fact]
@@ -246,22 +247,23 @@ public class UnsupportedFeatureTelemetryTests
         var (telemetry, channel) = CreateTestTelemetry();
         var features = new Dictionary<string, int>
         {
-            ["rare"] = 1,
-            ["common"] = 100,
-            ["medium"] = 10
+            ["goto"] = 1,
+            ["unsafe"] = 100,
+            ["fixed"] = 10
         };
 
         telemetry.TrackUnsupportedFeatures(features, 111);
 
-        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
-        // All 3 should be present (under 50 cap), but we verify the most common is included
-        Assert.Equal("100", evt.Properties["feature:common"]);
-        Assert.Equal("10", evt.Properties["feature:medium"]);
-        Assert.Equal("1", evt.Properties["feature:rare"]);
+        var events = channel.Items.OfType<EventTelemetry>()
+            .Where(e => e.Name == "UnsupportedFeature").ToList();
+        Assert.Equal(3, events.Count);
+        Assert.Contains(events, e => e.Properties["feature"] == "unsafe" && e.Metrics["count"] == 100);
+        Assert.Contains(events, e => e.Properties["feature"] == "fixed" && e.Metrics["count"] == 10);
+        Assert.Contains(events, e => e.Properties["feature"] == "goto" && e.Metrics["count"] == 1);
     }
 
     [Fact]
-    public void TrackUnsupportedFeatures_IncludesCommandProperties()
+    public void TrackUnsupportedFeatures_ArbitraryCommandPropertiesFailClosed()
     {
         var (telemetry, channel) = CreateTestTelemetry();
         telemetry.SetCommand("convert", new Dictionary<string, string>
@@ -272,9 +274,7 @@ public class UnsupportedFeatureTelemetryTests
 
         telemetry.TrackUnsupportedFeatures(features, 1);
 
-        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
-        Assert.Equal("convert", evt.Properties["command"]);
-        Assert.Equal("cs-to-calor", evt.Properties["direction"]);
+        Assert.Empty(channel.Items);
     }
 
     #endregion
@@ -461,17 +461,7 @@ public class UnsupportedFeatureTelemetryTests
             explanation.GetFeatureCounts(),
             explanation.TotalUnsupportedCount);
 
-        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
-        Assert.Equal("UnsupportedFeatures", evt.Name);
-        Assert.Equal(
-            explanation.TotalUnsupportedCount.ToString(),
-            evt.Properties["totalUnsupportedCount"]);
-
-        // Every feature from GetFeatureCounts should appear as a property
-        foreach (var (feature, count) in explanation.GetFeatureCounts())
-        {
-            Assert.Equal(count.ToString(), evt.Properties[$"feature:{feature}"]);
-        }
+        Assert.Empty(channel.Items);
     }
 
     #endregion
