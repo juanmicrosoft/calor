@@ -102,7 +102,7 @@ public sealed class DocumentState
             {
                 try
                 {
-                    var binder = new Binder(Diagnostics);
+                    var binder = new Binder(Diagnostics, filePath);
                     BoundModule = binder.Bind(Ast);
                 }
                 catch (Exception ex)

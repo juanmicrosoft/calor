@@ -13,6 +13,28 @@ namespace Calor.LanguageServer.Tests.Integration;
 public class CrossFileResolutionTests
 {
     [Fact]
+    public void SameStructuralIdsInDifferentFiles_RemainDistinct()
+    {
+        var workspace = new WorkspaceState();
+        var firstUri = DocumentUri.FromFileSystemPath("/workspace/first.calr");
+        var secondUri = DocumentUri.FromFileSystemPath("/workspace/second.calr");
+        var source = """
+            §M{m001:Shared}
+              §F{f001:Same:pub}
+                §O{void}
+            """;
+
+        var first = workspace.GetOrCreate(firstUri, source);
+        var second = workspace.GetOrCreate(secondUri, source);
+        var firstSymbol = Assert.Single(first.BoundModule!.Functions).Symbol;
+        var secondSymbol = Assert.Single(second.BoundModule!.Functions).Symbol;
+
+        Assert.NotEqual(firstSymbol.Id, secondSymbol.Id);
+        Assert.Same(firstSymbol, workspace.FindBoundSymbol(firstSymbol.Id).Symbol);
+        Assert.Same(secondSymbol, workspace.FindBoundSymbol(secondSymbol.Id).Symbol);
+    }
+
+    [Fact]
     public void ResolveProjectCall_UsesExactOverloadSymbolId()
     {
         var workspace = new WorkspaceState();

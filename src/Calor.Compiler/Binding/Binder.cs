@@ -79,6 +79,7 @@ public sealed class Binder
         ExpressionBinders.Keys.ToArray();
 
     private readonly DiagnosticBag _diagnostics;
+    private readonly string _sourceIdentity;
     private Scope _scope;
     private readonly Dictionary<AstNode, FunctionSymbol> _functionSymbols = new();
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
@@ -93,9 +94,12 @@ public sealed class Binder
     private SymbolId _currentClassIdentity;
     private bool _isStaticContext;
 
-    public Binder(DiagnosticBag diagnostics)
+    public Binder(DiagnosticBag diagnostics, string? sourceIdentity = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        _sourceIdentity = string.IsNullOrWhiteSpace(sourceIdentity)
+            ? "<memory>"
+            : sourceIdentity.Replace('\\', '/');
         _scope = new Scope();
     }
 
@@ -169,7 +173,7 @@ public sealed class Binder
         _qualifiedClassNames.Clear();
         _classSymbolIds.Clear();
         _symbolsById.Clear();
-        _moduleSymbolId = SymbolId.Create("module", module.Id);
+        _moduleSymbolId = SymbolId.Create("source", _sourceIdentity, "module", module.Id);
         _declarationContext = _moduleSymbolId;
         _nextLocalSymbolOrdinal = 0;
 
