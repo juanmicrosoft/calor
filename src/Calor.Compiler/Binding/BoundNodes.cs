@@ -447,6 +447,108 @@ public sealed class BoundIncompleteExpression : BoundCallExpression
     }
 }
 
+/// <summary>A bound name→value pair (anonymous-object, record, and with-expression members).</summary>
+public sealed record BoundNamedValue(string Name, BoundExpression Value);
+
+/// <summary>#762 B2: Option construction. Type composes from the payload (string types, D3).</summary>
+public sealed class BoundSomeExpression : BoundExpression
+{
+    public BoundExpression Value { get; }
+    public override string TypeName { get; }
+    public BoundSomeExpression(TextSpan span, BoundExpression value) : base(span)
+    {
+        Value = value;
+        TypeName = $"Option<{value.TypeName}>";
+    }
+}
+
+/// <summary>#762 B2: Result success construction. The error type parameter is unknowable
+/// from the value alone under 0.13's string types — "OBJECT" is the explicit placeholder
+/// (never null, per D3); 0.14's typed representation replaces it.</summary>
+public sealed class BoundOkExpression : BoundExpression
+{
+    public BoundExpression Value { get; }
+    public override string TypeName { get; }
+    public BoundOkExpression(TextSpan span, BoundExpression value) : base(span)
+    {
+        Value = value;
+        TypeName = $"Result<{value.TypeName}, OBJECT>";
+    }
+}
+
+/// <summary>#762 B2: Result error construction (see BoundOkExpression on the placeholder).</summary>
+public sealed class BoundErrExpression : BoundExpression
+{
+    public BoundExpression Error { get; }
+    public override string TypeName { get; }
+    public BoundErrExpression(TextSpan span, BoundExpression error) : base(span)
+    {
+        Error = error;
+        TypeName = $"Result<OBJECT, {error.TypeName}>";
+    }
+}
+
+/// <summary>#762 B2: invocation of a function VALUE (computed target). Return type is
+/// unknowable without function types (0.14); "OBJECT" is the explicit placeholder.</summary>
+public sealed class BoundExpressionCall : BoundExpression
+{
+    public BoundExpression Target { get; }
+    public IReadOnlyList<BoundExpression> Arguments { get; }
+    public override string TypeName => "OBJECT";
+    public BoundExpressionCall(TextSpan span, BoundExpression target,
+        IReadOnlyList<BoundExpression> arguments) : base(span)
+    {
+        Target = target;
+        Arguments = arguments;
+    }
+}
+
+/// <summary>#762 B2: anonymous object creation — member values are bound children.</summary>
+public sealed class BoundAnonymousObjectCreation : BoundExpression
+{
+    public IReadOnlyList<BoundNamedValue> Initializers { get; }
+    public override string TypeName => "OBJECT";
+    public BoundAnonymousObjectCreation(TextSpan span, IReadOnlyList<BoundNamedValue> initializers)
+        : base(span) => Initializers = initializers;
+}
+
+/// <summary>#762 B2: record creation — typed by the record name; field values bound.</summary>
+public sealed class BoundRecordCreation : BoundExpression
+{
+    public IReadOnlyList<BoundNamedValue> Fields { get; }
+    public override string TypeName { get; }
+    public BoundRecordCreation(TextSpan span, string typeName, IReadOnlyList<BoundNamedValue> fields)
+        : base(span)
+    {
+        TypeName = typeName;
+        Fields = fields;
+    }
+}
+
+/// <summary>#762 B2: with-expression — same type as its target; assignments bound.</summary>
+public sealed class BoundWithExpression : BoundExpression
+{
+    public BoundExpression Target { get; }
+    public IReadOnlyList<BoundNamedValue> Assignments { get; }
+    public override string TypeName { get; }
+    public BoundWithExpression(TextSpan span, BoundExpression target,
+        IReadOnlyList<BoundNamedValue> assignments) : base(span)
+    {
+        Target = target;
+        Assignments = assignments;
+        TypeName = target.TypeName;
+    }
+}
+
+/// <summary>#762 B2: throw-expression — never produces a value; "NEVER" is the explicit type.</summary>
+public sealed class BoundThrowExpression : BoundExpression
+{
+    public BoundExpression Exception { get; }
+    public override string TypeName => "NEVER";
+    public BoundThrowExpression(TextSpan span, BoundExpression exception) : base(span)
+        => Exception = exception;
+}
+
 /// <summary>
 /// Bound break statement (exits the enclosing loop).
 /// </summary>

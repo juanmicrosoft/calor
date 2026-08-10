@@ -23,8 +23,8 @@ namespace Calor.Compiler.Tests;
 ///   the denominator, the count "improves", and the failure message invites laundering
 ///   the regression into the baseline).
 /// Regenerate: CALOR_UPDATE_BINDER_BASELINE=1 dotnet test --filter BinderIncompleteRatchet
-/// The conversion leg (the three A-1.5.3 subjects via `calor migrate`) activates in B2
-/// with its submodule + caching machinery — disclosed in the baseline file.
+/// BOTH F-2 legs are active as of B2: the conversion leg (three A-1.5.3 subjects at pinned
+/// submodule commits, converted in-process) skips only where submodules are absent.
 /// </summary>
 public class BinderIncompleteRatchetTests
 {
@@ -112,12 +112,18 @@ public class BinderIncompleteRatchetTests
             $"(and the F-2 amendment) in this PR:\n  {string.Join("\n  ", recovered)}");
 
         var measured = new Baseline(incomplete, parsedFiles, parseFailures.Count, expressionsBound,
-            "in-repo leg only; conversion leg (A-1.5.3 subjects) activates in B2 — see F-2 amendment");
+            "both F-2 legs; conversion leg skips when corpus submodules are absent");
 
         if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
         {
-            File.WriteAllText(BaselinePath(),
-                JsonSerializer.Serialize(measured, new JsonSerializerOptions { WriteIndented = true }) + "\n");
+            // Preserve the conversion-leg section — the two regen writers run in
+            // nondeterministic order under one test invocation.
+            var existing = File.Exists(BaselinePath())
+                ? JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))
+                : null;
+            File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
+                measured with { Conversion = existing?.Conversion },
+                new JsonSerializerOptions { WriteIndented = true }) + "\n");
             return;
         }
 
@@ -139,6 +145,83 @@ public class BinderIncompleteRatchetTests
             "record it: regenerate the baseline in this PR so the ratchet tracks reality.");
     }
 
+    [SkippableFact]
+    public void ConversionLeg_IncompleteCount_MatchesBaseline()
+    {
+        // F-2's second leg (activated in B2 as the amendment staged): the three A-1.5.3
+        // conversion subjects at their pinned submodule commits, converted in-process
+        // (the DS15 pattern — no CLI, no caching machinery needed at this speed) and
+        // their outputs bound. This leg exercises exactly the C#-shaped expression forms
+        // the in-repo leg under-represents. Skips when submodules are absent (plain CI
+        // test jobs); runs locally and in submodule-initialized jobs.
+        var root = RepoRoot();
+        var subjects = new[] { "MediatR", "serilog", "FluentValidation" }
+            .Select(s => Path.Combine(root, "bench", "corpus", s, "src"))
+            .ToList();
+        Skip.IfNot(subjects.All(Directory.Exists), "corpus submodules not initialized");
+
+        int incomplete = 0, expressionsBound = 0, convertedAndBound = 0, notConverted = 0;
+        foreach (var srcDir in subjects)
+        {
+            var csFiles = Directory.EnumerateFiles(srcDir, "*.cs", SearchOption.AllDirectories)
+                .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                         && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+                .OrderBy(f => f, StringComparer.Ordinal);
+            foreach (var cs in csFiles)
+            {
+                Compiler.Migration.ConversionResult conv;
+                try
+                {
+                    conv = new Compiler.Migration.CSharpToCalorConverter(
+                        new Compiler.Migration.ConversionOptions
+                        {
+                            ModuleName = "Leg2",
+                            GracefulFallback = true,
+                            AutoGenerateIds = true
+                        }).Convert(File.ReadAllText(cs), Path.GetFileName(cs));
+                }
+                catch { notConverted++; continue; }
+                if (string.IsNullOrEmpty(conv.CalorSource)) { notConverted++; continue; }
+
+                var diagnostics = new DiagnosticBag();
+                var lexer = new Lexer(conv.CalorSource.Replace("\r\n", "\n"), diagnostics);
+                var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
+                var module = parser.Parse();
+                if (diagnostics.HasErrors) { notConverted++; continue; }
+
+                var bindBag = new DiagnosticBag();
+                var binder = new Binder(bindBag);
+                binder.Bind(module);
+                expressionsBound += binder.ExpressionsBound;
+                incomplete += bindBag.Count(d => d.Code == DiagnosticCode.AnalysisIncomplete);
+                convertedAndBound++;
+            }
+        }
+
+        var measured = new ConversionLeg(incomplete, expressionsBound, convertedAndBound, notConverted);
+
+        if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
+        {
+            var baseline = JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!;
+            File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
+                baseline with { Conversion = measured, Scope = "both F-2 legs active (in-repo + A-1.5.3 conversion subjects)" },
+                new JsonSerializerOptions { WriteIndented = true }) + "\n");
+            return;
+        }
+
+        var recorded = JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!.Conversion;
+        Assert.NotNull(recorded);
+        Assert.True(measured == recorded,
+            $"Conversion-leg movement: measured {measured} vs baseline {recorded}. Binder family " +
+            "PRs and converter changes must regenerate the baseline IN THIS PR with the change " +
+            "named — never silently (same ratchet discipline as the in-repo leg; the subjects " +
+            "are at pinned submodule commits, so drift here is OUR code, not theirs).");
+    }
+
+    private sealed record ConversionLeg(
+        int Incomplete, int ExpressionsBound, int ConvertedAndBound, int NotConverted);
+
     private sealed record Baseline(
-        int IncompleteCount, int ParsedFiles, int ParseFailures, int ExpressionsBound, string Scope);
+        int IncompleteCount, int ParsedFiles, int ParseFailures, int ExpressionsBound, string Scope,
+        ConversionLeg? Conversion = null);
 }

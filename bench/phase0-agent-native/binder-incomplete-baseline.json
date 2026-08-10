@@ -1,7 +1,13 @@
 {
-  "IncompleteCount": 90,
+  "IncompleteCount": 79,
   "ParsedFiles": 443,
   "ParseFailures": 9,
-  "ExpressionsBound": 4286,
-  "Scope": "in-repo leg only; conversion leg (A-1.5.3 subjects) activates in B2 \u2014 see F-2 amendment"
+  "ExpressionsBound": 4299,
+  "Scope": "both F-2 legs; conversion leg skips when corpus submodules are absent",
+  "Conversion": {
+    "Incomplete": 1450,
+    "ExpressionsBound": 12307,
+    "ConvertedAndBound": 305,
+    "NotConverted": 59
+  }
 }
