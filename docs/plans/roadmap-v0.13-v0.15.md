@@ -1,9 +1,10 @@
 # Roadmap — v0.13 / v0.14 / v0.15
 
 **Date:** 2026-08-10
-**Status:** Draft v2 — merged from two independent proposals (Claude + Codex), then revised under a
-three-lens adversarial review (evidence 80%, strategy 60%, measurement 40% — all NEEDS-FIXES; all
-CRITICAL and Major findings applied, dispositions in §8).
+**Status:** Draft v3 — merged from two independent proposals (Claude + Codex), then revised under
+adversarial review round 1 (evidence 80%, strategy 60%, measurement 40%) and round 2 on the revised
+draft (internal consistency 75%, new-claims evidence 85%) — all NEEDS-FIXES; all findings from both
+rounds applied, dispositions in §8.
 **Governing inputs:** `call-s-adjudication.md` (the v0.12 → v0.13 gate: "v0.13 leads with product, not
 measurement"; quantitative re-entry conditions), `calor-direction.md` (safety direction commitment,
 including its TIER2D design-doc requirement), `substrate-plan-v0.12.md` §9 (semantic index flagged at
@@ -38,7 +39,7 @@ The published 1.32× benchmark number remains a **regression indicator, not a ro
 
 | Version | Theme | Core outcome |
 |---|---|---|
-| **0.13 — Trustworthy Project Model** | Make Calor usable — and honest — at project scale | Total binding, stable SymbolIds, persistent semantic index, `calor query`, reliable builds, and a delivery/docs surface that matches what we claim |
+| **0.13 — Trustworthy Project Model** | Make Calor usable — and honest — at project scale | MUST: total binding, stable SymbolIds, reliable builds, delivery/docs surface. SHOULD (§2.2): persistent semantic index, `calor query` |
 | **0.14 — Null-Safe .NET** | Make the type system's safety claims real across interop | Metadata-aware binding, enforced non-null references, typed CFG null-state, explicit nullable boundaries — `§SEMVER{2.0.0}` with a self-migration workstream |
 | **0.15 — Composable Effects** | Remove the first-order ceiling; earn the claim back honestly | Effect-typed functions, safe delegates/lambdas, effect polymorphism behind a design gate, project-wide impact analysis |
 
@@ -70,9 +71,14 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
 
 - **Structurally total binding (#762)**: every accepted expression retains type, children, and
   symbol identity, or produces an explicit "analysis incomplete" result, eliminating the zero-child
-  `<unsupported:...>` fallback for the construct classes enumerated in #762's definition-of-done.
-  This is a binder rebuild, not a fix — today `BindExpression` handles ~20 of 61 concrete expression
-  node classes — and it is the single item 0.14 and 0.15 cannot proceed without.
+  `<unsupported:...>` fallback. #762's definition-of-done is deliberately universal (100% of
+  accepted expression kinds); the release gate's bounded denominator (§2.5 gate 1) is a
+  construct-class list that **does not yet exist as a pin** — registering it (a gate-precision
+  sharpening of the issue's "Required implementation" families: conversion, type/pattern tests,
+  arrays/indexes, collections, lambdas, await, coalesce, match, quantifiers, string operations,
+  interop) is 0.13's first to-do, frozen **before binder work merges**. This is a binder rebuild,
+  not a fix — today `BindExpression` handles ~20 of 61 concrete expression node classes — and it is
+  the single item 0.14 and 0.15 cannot proceed without.
 - **Stable bound SymbolIds + exact identifier spans.**
 - **Truth-floor defects**: structural return/postcondition lowering (#764), keyword-arg verifier
   crash (#874), method elision cursor / wrong function id (#879), incremental IL-analysis hashing
@@ -86,8 +92,11 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
   hash** (not "whatever currently elides" — the shipped closure mechanism is demotion to `Assumed`,
   which never elides, so an elides-today denominator is shrinkable to green forever), exercised by a
   pre-registered generator (all whitelisted forms × both contract positions × bounded nesting
-  depth), with the D15 emitter-lowering class explicitly in scope and the **elision-coverage
-  fraction (forms eliding ÷ forms whitelisted) published** so demotion-shrinkage is visible.
+  depth), with the D15 emitter-lowering class explicitly in scope (D15 itself is the seventh closed
+  vector, fixed before it shipped — what stays open is its *class*), the **`§PROOF`
+  obligation-elision path in the denominator** (obligations elide on `ObligationStatus.Discharged`,
+  a third route outside the contract-guard path), and the **elision-coverage fraction (forms
+  eliding ÷ forms whitelisted) published** so demotion-shrinkage is visible.
   Elision re-enables by default only when that gate is green — target 0.14 (§3.4).
 - **PP-S4 fixture registry — a release gate, not a bullet** (§2.5), discharging the Call S debt at
   all three of A-1.5.7's frozen parts: location, **schema**, and CI entry point.
@@ -102,7 +111,7 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
   v1** (or hard-marked `Assumed` if exposed): today's effect resolution string-guesses receiver
   types — exactly what 0.14 replaces and what #785 (0.15) makes symbol-resolved — and a release
   titled "trustworthy" does not ship a query facet the same roadmap declares unsound two sections
-  later. Effects join the index in 0.14/0.15 on typed signatures.
+  later. Effects join the index in 0.15 (§4.2), derived from 0.14's typed signatures.
 - **`review-packet` reads the index**: a changed declaration reports affected callers, invalidated
   proofs, unproven residuals (effects join later, as above).
 - **Website adoption surface, first tranche**: `cli/verify.mdx` and the verdict-vocabulary page
@@ -112,9 +121,11 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
   enforced mechanically, not aspirationally — generated C# untracked (gitignore + CI assertion that
   no generated output under the utility is committed), built from `.calr` via `Calor.Sdk` in CI, and
   PRs touching the utility touch only `.calr`. In 0.14 this utility becomes the first migration
-  subject of the 2.0.0 migrator (§3.3).
-- **Instrument debt**: the Z3 CI-native flake (#884/#859); telemetry disposition (#792 — the code is
-  already opt-in via `CALOR_TELEMETRY=1`; verify the documentation half and close).
+  subject of the 2.0.0 migrator (§3.3); if it defers to 0.13.x under the SHOULD rule, landing it
+  becomes a **0.14-entry precondition** — the migrator needs its subject.
+- **Instrument debt**: the Z3 CI-native flake (#884/#859); telemetry docs re-verification (#792 is
+  already **closed** — the code is verified opt-in via `CALOR_TELEMETRY=1`; the residual is
+  re-checking the docs inventory against shipped payloads, not a reopening).
 
 ### 2.3 DEFERRED from 0.13 — named, with destinations
 
@@ -128,9 +139,10 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
 
 - **VS Code channel — external dependency, not an engineering item.** The one blocker is the
   expired publisher PAT, a maintainer-only action, for a channel that has failed on **every release
-  since v0.4.0 (~19 releases; marketplace stuck at 0.3.8)** — the corrected record, per the
-  CHANGELOG's Unreleased section (PR #887), which also established that the expired token was a
-  second, older blocker masked behind the IL3000 build failure. Escalation rule: if the PAT is not
+  since v0.4.0 — 27 releases by the release list; marketplace stuck at 0.3.8**. (The CHANGELOG's
+  corrected entry says "roughly nineteen", itself a ~30% undercount — an erratum to file with this
+  plan.) Per that corrected record (PR #887), the expired token was a second, older blocker masked
+  behind the IL3000 build failure. Escalation rule: if the PAT is not
   minted by 0.13 freeze, the 0.13 release notes state the channel is down and why — the
   registry-verification discipline applied to our one unfixable-by-code channel.
 - **Z3 asset chain finished**: resolve the mislabeled `osx-x64` dylib (upstream ships an arm64
@@ -143,12 +155,18 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
 
 ### 2.5 Release gates — each names instrument, denominator, and freeze point
 
+Gates on SHOULD-tier deliverables are **conditional**: if the deliverable defers to 0.13.x under
+§2's rule, its gate moves to 0.13.x with it — deferral is a tier decision, not a gate failure.
+Conditional in this sense: gate 2's index and review-packet legs, gate 3, and gate 8. Unconditional:
+gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
+
 1. **Binding totality**: on a pinned measurement corpus (in-repo `.calr` fixtures + the three
-   A-1.5.3-pinned conversion subjects), **zero `<unsupported:...>` fallbacks for the construct
-   classes enumerated in #762's definition-of-done** (a list frozen in the issue before any
-   measurement); the residual incomplete-fraction outside those classes is **published per release,
-   reported-not-adjudicated** (the M-S2/PP-L4 route). The escape category is thereby bounded: the
-   gate cannot be passed by marking DoD constructs "incomplete".
+   A-1.5.3-pinned conversion subjects), **zero `<unsupported:...>` fallbacks for the registered
+   construct-class list** (§2.1 — the list is registered before binder work merges; it does not yet
+   exist, and registering it is the freeze event); the residual incomplete-fraction outside those
+   classes is **published per release, reported-not-adjudicated** (the M-S2/PP-L4 route). The
+   escape category is thereby bounded: the gate cannot be passed by marking registered constructs
+   "incomplete".
 2. **Full-vs-incremental identity**: byte-identical diagnostics, index contents, and review packets
    (after canonical ordering) across a **registered edit-script corpus** that includes the #883
    reproduction — plus an **incrementality witness** (the incremental path demonstrably reuses the
@@ -160,7 +178,9 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
    claim.
 4. **Rename**: edits target exact identifier tokens and survive **apply-recompile-and-test** (a
    behavior oracle, not compile-success — capture/collision renames compile) on a pinned rename
-   corpus including shadowing cases.
+   corpus including shadowing cases. Instrument: a harness command applying SymbolId-addressed
+   renames, shipping with the spine — the deferred LSP (§2.3) later consumes the same identities;
+   this gate does not wait for it.
 5. **Differential program (elision opt-in)**: the #779 suite exists, runs in CI against the pinned
    `verification-modeled-forms.md` denominator, and the elision-coverage fraction is published.
    Zero-mismatch is the 0.14 re-enable bar, not a 0.13 blocker (§2.1).
@@ -190,8 +210,10 @@ the compiler stays pre-1.0 — and a break is only honest if the plan budgets fo
 The component that can sink 0.14 is not the flow checker (which has the TIER1A gate) but
 **metadata-backed .NET binding** — exact receiver type, overload resolution, parameter/return
 types, generic substitution, nullable annotations — a slice of Roslyn's binder, and the exact area
-where this repo's own postmortem records systematic underestimation (tier1a-postmortem §7.1: the
-"3–5 days, not 1–2" spike, the 18 overloads of `Console.WriteLine`). Before 0.14's gates freeze:
+where this repo's own postmortem records systematic underestimation (tier1a-postmortem §7.1 V4:
+overload resolution — 18 overloads on `Console.WriteLine` — absent from the original estimate; V3's
+"3–5 days, not 1–2" spike-size correction is the same lesson on the adjacent TIER2D spike). Before
+0.14's gates freeze:
 bind a **pre-registered set of BCL call shapes** (generic substitution, extension methods, `params`
 arrays, nullable-annotated signatures, `ref`/`out`) through real metadata. **Exit ramp, planned
 rather than accidental**: ship exact-signature binding for the resolved subset with explicit
@@ -231,10 +253,11 @@ that degradation.
 
 ### 3.3 The 2.0.0 self-migration workstream — the break's own bill
 
-The blast surface in this repo alone: ~1,600 `.calr` files (tests, samples, benchmarks, plus the
-SelfTest resources that ship inside the tool), 869 golden files under `tests/TestData`, 147
-parse-checked ```` ```calor ```` blocks across docs and website, the 217-program benchmark corpus
-behind the published 1.32× number, and the 0.13 dogfood utility. Four decisions, made here:
+The blast surface in this repo alone: ~1,500 `.calr` files on disk, of which **~800 are committed**
+(tests 424, bench 359, samples 11, the 10 SelfTest resources that ship inside the tool, benchmarks
+7 — the on-disk remainder is gitignored epoch fixtures), 869 golden files under `tests/TestData`,
+~145 parse-checked ```` ```calor ```` blocks across docs and website, the 217-program benchmark
+corpus behind the published 1.32× number, and the 0.13 dogfood utility. Four decisions, made here:
 
 1. **Version mechanics**: `SemanticsVersion.cs` today hard-codes `Major = 1` and only rejects
    files declaring a *newer* version — a 2.0.0 compiler would **silently reinterpret** 1.x files.
@@ -243,7 +266,8 @@ behind the published 1.32× number, and the 0.13 dogfood utility. Four decisions
    declaring nothing get the compiler's major with a diagnostic nudge to declare.
 2. **An automated `.calr` migrator** (nullable-annotation insertion), whose **first gate is
    migrating the 0.13 dogfood utility** — the plan's only real "user" is also its first migration
-   subject.
+   subject. (If the utility deferred out of 0.13, landing it is a 0.14-entry precondition, per
+   §2.2.)
 3. **Golden-file regeneration** for `tests/TestData` and the SelfTest resources is budgeted as its
    own PR series, mechanically regenerated + spot-audited, not hand-edited.
 4. **The benchmark corpus migrates**, and the 1.32× number is re-baselined at 2.0.0 semantics with
@@ -354,8 +378,9 @@ first-order ceiling for the common case. The 0.14 flow checker got exactly this 
    over the registered edit-script corpus (extending §2.5 gate 2).
 4. **The probe adjudicates at its frozen thresholds** under its registered four-valued outcome —
    any of the four values is a result; only an unregistered one isn't.
-5. **Compatibility**: existing first-order `§E` code (at 2.0.0 semantics) remains
-   source-compatible.
+5. **Compatibility**: the repo's migrated `.calr` corpus at a commit frozen at the 0.15 branch cut
+   (denominator + freeze point) builds and tests green under the 0.15 compiler (instrument).
+   First-order `§E` compatibility is claimed over that corpus, not universally.
 
 ## 5. Explicitly not in these three releases — and the backlog dispositioned
 
@@ -401,14 +426,15 @@ first-order ceiling for the common case. The 0.14 flow checker got exactly this 
 | #785 | **0.15** (§4.2) |
 | #787 (functional Sdk) | Substantially closed by v0.12.1's first publish; residual = Sdk docs + the §2.2 dogfood proving the consumption path |
 | #788 (MSBuild determinism) | **Program, not an item**: #883 (its live instance) is 0.13 MUST; #788 closes when §2.5 gate 2 holds on the registered corpus |
-| #789 (hermetic natives, P1) | Substantially landed v0.12.1; residual = §2.4's osx decisions + arch assertion |
+| #789 (hermetic natives, P1) | **Partially** landed v0.12.1 (checksum/provenance subset only); residual = §2.4's osx decisions + arch assertion **plus** the still-open hermetic items: no-network ordinary builds, the hard-coded deps.json mutation, SelfTest copy-back, SBOM/provenance artifacts, lockfiles — deferred, revisit at 0.14 |
 | #790 (truthful release gates) | **Executed by this plan's gate rewrite** (§2.5/§3.5/§4.4 instrument-denominator-freeze triples); closes when 0.13 ships with those gates in CI |
 | #791 (generated exhaustive infra, P2) | Deferred; natural companion to the #762 rebuild if it pays for itself there |
-| #792 (telemetry opt-in) | **0.13** — code already opt-in; verify docs half, close (§2.2) |
+| #792 (telemetry opt-in) | Already **closed** on GitHub; 0.13 re-verifies the docs inventory against shipped payloads (§2.2) |
 | #793 (audit epic) | Tracking issue; this table is its disposition |
 | #851 (task-gen filter precision) | Retired with the venue; re-opens only under §4.3's re-entry conditions |
 | #859, #884 (Z3 CI flake) | **0.13** (§2.2) |
 | #874, #879, #883 | **0.13 MUST** (§2.1) |
+| #875 | **0.14** (§3.2) — the issue covers `str` only; arrays and user reference types are this plan's extension |
 | #881 (agent token metrics 55× under-count) | **0.15 prerequisite** for the probe's cost leg (§4.3) |
 
 ## 6. Cross-cutting disciplines (tuition already paid)
@@ -467,3 +493,29 @@ Three independent adversarial lenses on Draft v1; all returned NEEDS-FIXES. Appl
   adjudicator, effect-gate phrasing, §7 claim hygiene → all applied.
 
 Declined findings: none — every finding survived verification and was applied.
+
+## 9. Review record — round 2 (2026-08-10, on Draft v2)
+
+Two rotated lenses on the revised draft; both NEEDS-FIXES; all findings applied in Draft v3:
+
+- **Internal consistency (75%)**: CRITICAL — gates 2/3/8 gated the release on SHOULD-tier
+  deliverables with no conditionality (→ §2.5 preamble: conditional gates move to 0.13.x with the
+  deferral). Majors — dogfood/migrator dependency dangle (→ §2.2 + §3.3.2: deferral makes it a
+  0.14-entry precondition), #875 scheduled in body but missing from the "exhaustive" §5.2 table
+  (→ row added — the one-site-fix failure mode recurring one round after it was named), §4.4 gate 5
+  missing its instrument/denominator/freeze triple (→ rewritten over the frozen migrated corpus).
+  Minors — effects-facet timing (0.15, not "0.14/0.15"), rename instrument named, header wording,
+  D15 status clause → applied.
+- **New-claims evidence (85%)**: CRITICAL — the binding-totality gate cited "construct classes
+  enumerated in #762's DoD", but the issue's DoD is universal and contains no class list; the pin
+  asserted did not exist (→ §2.1/§2.5.1: registering the list is 0.13's first to-do and the freeze
+  event). Majors — "~19 releases" re-laundered the CHANGELOG's own undercount (release list shows
+  27; erratum to file), #789 "substantially landed" overstated (five hermetic items still open →
+  row corrected). Minors — blast surface ~800 committed vs ~1,600 headline, #792 already closed,
+  the `§PROOF` obligation-elision third path added to the differential denominator, postmortem
+  citation sharpened to V4. Verified clean at count precision: 61 expression classes, 869 golden
+  files, 217-program corpus, A-1.5.3's three pinned subjects, `SemanticsVersion.CheckCompatibility`
+  silent-reinterpretation, no pre-existing index machinery (gate 8's "frozen before the index
+  exists" framing is sound).
+
+Declined findings: none.
