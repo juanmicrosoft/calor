@@ -723,11 +723,11 @@ public class SyntaxHelpTelemetryTests
 
         // Filter by feature name to isolate from concurrent non-collection tests
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
-            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["featureLength"] == "contracts".Length.ToString()));
+            .Where(e => e.Name == "SyntaxHelpQuery" && e.Metrics["featureLength"] == "contracts".Length));
         Assert.Equal("contracts", evt.Properties["resolvedCategory"]);
-        Assert.Equal("True", evt.Properties["isHit"]);
-        Assert.True(int.Parse(evt.Properties["resultCount"]) > 0);
-        Assert.True(evt.Properties.ContainsKey("matchedSections"));
+        Assert.Equal("true", evt.Properties["isHit"]);
+        Assert.True(evt.Metrics["resultCount"] > 0);
+        Assert.True(evt.Metrics["matchedSectionCount"] > 0);
     }
 
     [Fact]
@@ -743,10 +743,10 @@ public class SyntaxHelpTelemetryTests
 
         // Filter by feature name to isolate from concurrent non-collection tests
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
-            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["featureLength"] == "unknown_feature_xyz".Length.ToString()));
+            .Where(e => e.Name == "SyntaxHelpQuery" && e.Metrics["featureLength"] == "unknown_feature_xyz".Length));
         Assert.Equal("none", evt.Properties["resolvedCategory"]);
-        Assert.Equal("False", evt.Properties["isHit"]);
-        Assert.Equal("0", evt.Properties["resultCount"]);
+        Assert.Equal("false", evt.Properties["isHit"]);
+        Assert.Equal(0, evt.Metrics["resultCount"]);
         Assert.False(evt.Properties.ContainsKey("matchedSections"));
     }
 
@@ -764,7 +764,7 @@ public class SyntaxHelpTelemetryTests
 
         // Filter by feature name to isolate from concurrent non-collection tests
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
-            .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["featureLength"] == "await".Length.ToString()));
+            .Where(e => e.Name == "SyntaxHelpQuery" && e.Metrics["featureLength"] == "await".Length));
         Assert.Equal("async", evt.Properties["resolvedCategory"]);
     }
 
@@ -789,11 +789,12 @@ public class SyntaxHelpTelemetryTests
         Assert.Equal("SyntaxHelpQuery", evt.Name);
         // W1 Slice 2 (#834 review M2): the raw query text is never sent.
         Assert.False(evt.Properties.ContainsKey("feature"));
-        Assert.Equal("6", evt.Properties["featureLength"]);
+        Assert.Equal(6, evt.Metrics["featureLength"]);
         Assert.Equal("structs", evt.Properties["resolvedCategory"]);
-        Assert.Equal("2", evt.Properties["resultCount"]);
-        Assert.Equal("True", evt.Properties["isHit"]);
-        Assert.Equal("Struct Definition;Value Types", evt.Properties["matchedSections"]);
+        Assert.Equal(2, evt.Metrics["resultCount"]);
+        Assert.Equal("true", evt.Properties["isHit"]);
+        Assert.Equal(2, evt.Metrics["matchedSectionCount"]);
+        Assert.False(evt.Properties.ContainsKey("matchedSections"));
     }
 
     [Fact]
@@ -806,8 +807,8 @@ public class SyntaxHelpTelemetryTests
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
         Assert.Equal("SyntaxHelpQuery", evt.Name);
         Assert.Equal("none", evt.Properties["resolvedCategory"]);
-        Assert.Equal("0", evt.Properties["resultCount"]);
-        Assert.Equal("False", evt.Properties["isHit"]);
+        Assert.Equal(0, evt.Metrics["resultCount"]);
+        Assert.Equal("false", evt.Properties["isHit"]);
         Assert.False(evt.Properties.ContainsKey("matchedSections"));
     }
 
@@ -834,10 +835,9 @@ public class SyntaxHelpTelemetryTests
             await tool.ExecuteAsync(args);
 
             var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
-                .Where(e => e.Name == "SyntaxHelpQuery" && e.Properties["featureLength"] == "testtopic".Length.ToString()));
-            Assert.Equal("8", evt.Properties["resultCount"]);
-            var sectionCount = evt.Properties["matchedSections"].Split(';').Length;
-            Assert.Equal(5, sectionCount);
+                .Where(e => e.Name == "SyntaxHelpQuery" && e.Metrics["featureLength"] == "testtopic".Length));
+            Assert.Equal(8, evt.Metrics["resultCount"]);
+            Assert.Equal(5, evt.Metrics["matchedSectionCount"]);
         }
         finally
         {

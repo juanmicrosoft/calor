@@ -61,7 +61,7 @@ public class W1Slice2TrustSurfaceTests
     }
 
     [Fact]
-    public void Telemetry_OptInEnvironmentVariable_Enables()
+    public void Telemetry_OptInWithoutEndpointConfiguration_RemainsDisabled()
     {
         using var reset = WithDisabledSingletonAfter();
         using var optIn = WithEnv("CALOR_TELEMETRY", "1");
@@ -69,7 +69,7 @@ public class W1Slice2TrustSurfaceTests
 
         var telemetry = CalorTelemetry.Initialize(noTelemetryFlag: false);
 
-        Assert.True(telemetry.IsEnabled);
+        Assert.False(telemetry.IsEnabled);
     }
 
     [Fact]
@@ -97,23 +97,24 @@ public class W1Slice2TrustSurfaceTests
     }
 
     [Fact]
-    public void TrackDiagnostic_SendsCodeOnly_NeverMessageText()
+    public void TrackDiagnosticEvent_SendsStructuredCodeOnly()
     {
         var (telemetry, channel) = CreateTestTelemetry();
 
-        telemetry.TrackDiagnostic("Calor0410",
-            "Undeclared effect 'fs:w' in function 'WriteSecrets' at /Users/someone/private/file.calr:12",
-            SeverityLevel.Error);
+        telemetry.TrackDiagnosticEvent("Calor0410", "Error", "Effect");
 
-        var trace = Assert.IsType<TraceTelemetry>(Assert.Single(channel.Items));
-        Assert.DoesNotContain("WriteSecrets", trace.Message);
-        Assert.DoesNotContain("/Users/", trace.Message);
-        Assert.Contains("Calor0410", trace.Message);
-        Assert.Equal("Calor0410", trace.Properties["diagnosticCode"]);
+        var evt = Assert.IsType<EventTelemetry>(Assert.Single(channel.Items));
+        Assert.Equal("DiagnosticOccurrence", evt.Name);
+        Assert.Equal("Calor0410", evt.Properties["code"]);
+        Assert.All(evt.Properties.Values, value =>
+        {
+            Assert.DoesNotContain("WriteSecrets", value);
+            Assert.DoesNotContain("/Users/", value);
+        });
     }
 
     [Fact]
-    public void TrackException_SendsTypeNameOnly_NeverMessageOrStack()
+    public void TrackException_SendsCategoryOnly_NeverTypeMessageOrStack()
     {
         var (telemetry, channel) = CreateTestTelemetry();
 
@@ -132,7 +133,9 @@ public class W1Slice2TrustSurfaceTests
         var item = Assert.Single(channel.Items);
         // Never an ExceptionTelemetry (which carries message + parsed stack).
         var evt = Assert.IsType<EventTelemetry>(item);
-        Assert.Equal("System.InvalidOperationException", evt.Properties["exceptionType"]);
+        Assert.Equal("invalid-operation", evt.Properties["exceptionCategory"]);
+        Assert.DoesNotContain(evt.Properties.Values,
+            value => value.Contains(nameof(InvalidOperationException), StringComparison.Ordinal));
         Assert.All(evt.Properties.Values, v => Assert.DoesNotContain("/Users/", v));
     }
 
@@ -257,14 +260,13 @@ public class W1Slice2TrustSurfaceTests
     }
 
     [Fact]
-    public void CompilationDeterminism_SendsNothing()
+    public void CompilationOutcome_SendsNoContentHashes()
     {
         // #834 review M2: input/output SHA hashes are derived from file content
         // and enable exact-file identification — retired to a no-op.
         var (telemetry, channel) = CreateTestTelemetry();
 
-        telemetry.TrackCompilationDeterminism("aabbcc", "ddeeff");
-        telemetry.TrackCompilationOutcome("aabbcc", success: true, errorCount: 0, warningCount: 0);
+        telemetry.TrackCompilationOutcome(success: true, errorCount: 0, warningCount: 0);
 
         Assert.DoesNotContain(channel.Items, i =>
             i is EventTelemetry e && (e.Properties.ContainsKey("inputHash") || e.Properties.ContainsKey("outputHash")));

@@ -35,7 +35,7 @@ public class TelemetryUpgradeTests
     }
 
     [Fact]
-    public void TrackCommand_EmitsDurationInBothPropertiesAndMetrics()
+    public void TrackCommand_EmitsDurationOnlyAsSchemaMetric()
     {
         var (telemetry, channel) = CreateTestTelemetry();
         telemetry.SetCommand("compile");
@@ -43,8 +43,8 @@ public class TelemetryUpgradeTests
         telemetry.TrackCommand("compile", 0);
 
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
-        Assert.True(evt.Properties.ContainsKey("durationMs"), "durationMs should still be in Properties for backward compat");
-        Assert.True(evt.Metrics.ContainsKey("durationMs"), "durationMs should also be in Metrics for KQL");
+        Assert.False(evt.Properties.ContainsKey("durationMs"));
+        Assert.True(evt.Metrics.ContainsKey("durationMs"));
     }
 
     [Fact]
@@ -59,12 +59,11 @@ public class TelemetryUpgradeTests
 
         telemetry.TrackUnsupportedFeatures(features, 7);
 
-        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
+        var evt = Assert.Single(channel.Items.OfType<EventTelemetry>()
+            .Where(e => e.Name == "UnsupportedFeatures"));
         Assert.Equal(7.0, evt.Metrics["totalUnsupportedCount"]);
         Assert.Equal(2.0, evt.Metrics["distinctFeatureCount"]);
-        // Backward compat: still in Properties
-        Assert.Equal("7", evt.Properties["totalUnsupportedCount"]);
-        Assert.Equal("2", evt.Properties["distinctFeatureCount"]);
+        Assert.False(evt.Properties.ContainsKey("totalUnsupportedCount"));
     }
 
     #endregion
@@ -183,7 +182,9 @@ public class TelemetryUpgradeTests
 
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
         Assert.Equal("DiagnosticCoOccurrence", evt.Name);
-        Assert.Equal("3", evt.Properties["pair:Calor0001+Calor0002"]);
+        Assert.Equal("Calor0001", evt.Properties["codeA"]);
+        Assert.Equal("Calor0002", evt.Properties["codeB"]);
+        Assert.Equal(3.0, evt.Metrics["count"]);
     }
 
     #endregion
@@ -199,7 +200,7 @@ public class TelemetryUpgradeTests
 
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
         Assert.Equal("SessionStarted", evt.Name);
-        Assert.True(evt.Properties.ContainsKey("version"));
+        Assert.False(evt.Properties.ContainsKey("version"));
     }
 
     [Fact]
@@ -265,7 +266,7 @@ public class TelemetryUpgradeTests
         Assert.Equal(250.0, evt.Metrics["durationMs"]);
         Assert.Equal(2.0, evt.Metrics["issueCount"]);
         Assert.Equal(1.0, evt.Metrics["unsupportedCount"]);
-        Assert.Equal("True", evt.Properties["success"]);
+        Assert.Equal("true", evt.Properties["success"]);
     }
 
     [Fact]
@@ -277,8 +278,8 @@ public class TelemetryUpgradeTests
 
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
         Assert.Equal("ConversionGap", evt.Name);
-        Assert.Equal("goto", evt.Properties["gapName"]);
-        Assert.Equal("42", evt.Properties["line"]);
+        Assert.Equal("goto", evt.Properties["feature"]);
+        Assert.Equal(42.0, evt.Metrics["line"]);
     }
 
     [Fact]
@@ -308,26 +309,14 @@ public class TelemetryUpgradeTests
         // user's source and enables exact-file identification - not sent.
         var (telemetry, channel) = CreateTestTelemetry();
 
-        telemetry.TrackCompilationOutcome("abc123def456", true, 0, 2);
+        telemetry.TrackCompilationOutcome(true, 0, 2);
 
         var evt = Assert.Single(channel.Items.OfType<EventTelemetry>());
         Assert.Equal("CompilationOutcome", evt.Name);
         Assert.False(evt.Properties.ContainsKey("inputHash"));
-        Assert.Equal("True", evt.Properties["success"]);
+        Assert.Equal("true", evt.Properties["success"]);
         Assert.Equal(0.0, evt.Metrics["errorCount"]);
         Assert.Equal(2.0, evt.Metrics["warningCount"]);
-    }
-
-    [Fact]
-    public void CompilationDeterminism_IsRetired_SendsNothing()
-    {
-        // W1 Slice 2 (#834 review M2): determinism tracking sent SHA hashes of
-        // the user's source AND the generated output - retired to a no-op.
-        var (telemetry, channel) = CreateTestTelemetry();
-
-        telemetry.TrackCompilationDeterminism("inputhash123456", "outputhash654321");
-
-        Assert.Empty(channel.Items);
     }
 
     #endregion
@@ -482,7 +471,7 @@ public class TelemetryUpgradeTests
     {
         var (telemetry, _) = CreateTestTelemetry();
 
-        var exception = Record.Exception(() => telemetry.TrackCompilationOutcome("hash", true, 0, 0));
+        var exception = Record.Exception(() => telemetry.TrackCompilationOutcome(true, 0, 0));
         Assert.Null(exception);
     }
 
