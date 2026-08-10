@@ -476,7 +476,10 @@ public sealed class Binder
                         InterpolatedStringExpressionNode ex => new BoundInterpolationPart(
                             null, b.BindExpression(ex.Expression),
                             ex.FormatSpecifier, ex.AlignmentClause, ex.Span),
-                        _ => new BoundInterpolationPart(null, null, null, null, p.Span),
+                        // Fail LOUD if a third part subclass ever appears (B4 review
+                        // minor 3) — a silent empty part would vanish from BoundChildren.
+                        _ => throw new NotSupportedException(
+                            $"Unknown interpolation part: {p.GetType().Name}"),
                     }).ToList());
                 },
             [typeof(StringBuilderOperationNode)] = (b, e) =>

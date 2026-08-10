@@ -814,6 +814,10 @@ public sealed class BoundStringOperation : BoundExpression
                 or StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace
                 or StringOp.Equals or StringOp.RegexTest => "BOOL",
             StringOp.Split or StringOp.RegexSplit => "str[]",
+            // Emits Regex.Match (a Match object). Calor has no Match type-string; OBJECT
+            // is the honest placeholder but note it collides with the incomplete-node
+            // spelling (B4 review minor 2) — revisit with the pre-B6 vocabulary
+            // normalization decision (scoping doc §5).
             StringOp.RegexMatch => "OBJECT",
             _ => "STRING",
         };
