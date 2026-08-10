@@ -18,6 +18,13 @@ public static class BoundNodeHelpers
 
         switch (expression)
         {
+            default:
+                // #762 B2: B-series bound nodes recurse via the shared enumeration.
+                foreach (var child in BoundChildren.Of(expression))
+                    foreach (var v in GetUsedVariables(child))
+                        yield return v;
+                break;
+
             case BoundVariableExpression varExpr:
                 yield return varExpr.Variable;
                 break;
@@ -289,6 +296,13 @@ public static class BoundNodeHelpers
                     if (ContainsDivision(arg, out divisionExpr))
                         return true;
                 break;
+
+            default:
+                // #762 B2: B-series bound nodes recurse via the shared enumeration.
+                foreach (var child in BoundChildren.Of(expression))
+                    if (ContainsDivision(child, out divisionExpr))
+                        return true;
+                break;
         }
 
         return false;
@@ -316,6 +330,12 @@ public static class BoundNodeHelpers
 
             case BoundUnaryExpression unaryExpr:
                 return ContainsArrayAccess(unaryExpr.Operand, out arrayExpr, out indexExpr);
+
+            default:
+                foreach (var child in BoundChildren.Of(expression))
+                    if (ContainsArrayAccess(child, out arrayExpr, out indexExpr))
+                        return true;
+                break;
 
             case BoundCallExpression callExpr:
                 foreach (var arg in callExpr.Arguments)

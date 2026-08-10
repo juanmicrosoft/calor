@@ -2461,12 +2461,17 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        // Result should be either Proven (if Z3 is fast enough) or Unproven (timeout)
-        // Both are valid - the test verifies no exception is thrown
+        // Under i32 BIT-VECTOR semantics the UNBOUNDED x*x >= 0 is FALSE (x = 46341
+        // overflows negative — the sibling ProvesSquareNonNegative test adds x <= 46340
+        // for exactly this reason), so the legitimate outcomes are Unproven (the 1ms
+        // budget expired) or Disproven (Z3 found the wraparound counterexample fast —
+        // observed on fast CI runners). Proven is IMPOSSIBLE for this claim; the old
+        // tolerance set {Proven, Unproven} excluded the correct verdict and included an
+        // unreachable one, making the test a machine-speed lottery.
         Assert.True(
-            result.Status == ContractVerificationStatus.Proven ||
-            result.Status == ContractVerificationStatus.Unproven,
-            $"Expected Proven or Unproven but got {result.Status}");
+            result.Status == ContractVerificationStatus.Unproven ||
+            result.Status == ContractVerificationStatus.Disproven,
+            $"Expected Unproven (timeout) or Disproven (wraparound counterexample) but got {result.Status}");
     }
 
     [SkippableFact]

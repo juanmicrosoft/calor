@@ -323,7 +323,10 @@ public class CompilerBugFixTests
     {
         // Unsupported expression types should produce an opaque BoundCallExpression,
         // NOT BoundIntLiteral(0) which causes false positives in bug pattern checkers
-        var someExpr = new SomeExpressionNode(DummySpan, new IntLiteralNode(DummySpan, 42));
+        // Probe construct must be one that STAYS unbound: SomeExpressionNode (the
+        // original probe) gained a real binder in #762 B2. AddressOfNode is F-1 Tier B
+        // (unsafe family, out of 0.13 binding scope) — stable through B8.
+        var someExpr = new AddressOfNode(DummySpan, new IntLiteralNode(DummySpan, 42));
 
         var func = MakeFunction("Foo", "INT",
             body: new List<StatementNode> { new ReturnStatementNode(DummySpan, someExpr) });

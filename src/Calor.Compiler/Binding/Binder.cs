@@ -306,7 +306,11 @@ public sealed class Binder
     /// have broken no-op Accept dispatch until item 8 lands (B8) — visitor traversal is
     /// the mechanism that cannot be trusted here yet.
     /// </summary>
-    /// <summary>F-1 Tier B residuals and their registered reasons (scoping doc D7 owns their disposition in B8).
+    /// <summary>Registered incomplete-reason table: F-1 Tier B residuals PLUS F-1 dormant
+    /// Tier A classes (currently SelfRefNode). NOTE for any future mechanized gate: this is
+    /// NOT a pure Tier B list — a zero-Tier-A-incomplete check must exclude only the six
+    /// Tier B classes, never treat membership here as exemption (review of B2, minor 4).
+    /// Scoping doc D7 owns the Tier B disposition in B8.
     /// Declared BEFORE ExpressionDispatch: static fields initialize in declaration order,
     /// and the dispatch builder reads this table.</summary>
     private static readonly IReadOnlyDictionary<string, string> s_tierBReasons = new Dictionary<string, string>
@@ -317,6 +321,11 @@ public sealed class Binder
         ["SizeOfNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
         ["GenericTypeNode"] = "helper-node candidate — #762 item 8 disposition lands in B8",
         ["KeywordArgNode"] = "helper-node candidate — #762 item 8 disposition lands in B8",
+        // B2: dormant per F-1 — the parser rejects '#' outside refinement predicates, so no
+        // legal program places a SelfRefNode in a binder-visible position; a binder for it
+        // would be vacuously green. Promoted to live WITH a corpus obligation if a
+        // construction path ever returns (F-1's dormant rule).
+        ["SelfRefNode"] = "F-1 dormant: not constructible in binder-visible positions",
     };
 
     internal static readonly IReadOnlyDictionary<Type, Func<Binder, ExpressionNode, BoundExpression>> ExpressionDispatch =
@@ -351,6 +360,41 @@ public sealed class Binder
             [typeof(NewExpressionNode)] = (b, e) => b.BindNewExpression((NewExpressionNode)e),
             [typeof(TypeOperationNode)] = (b, e) => b.BindTypeOperation((TypeOperationNode)e),
             [typeof(IsPatternNode)] = (b, e) => b.BindIsPattern((IsPatternNode)e),
+            // #762 B2 — the core-9 family (SelfRefNode excepted: dormant, see s_tierBReasons).
+            [typeof(SomeExpressionNode)] = (b, e) =>
+                { var n = (SomeExpressionNode)e; return new BoundSomeExpression(n.Span, b.BindExpression(n.Value)); },
+            [typeof(OkExpressionNode)] = (b, e) =>
+                { var n = (OkExpressionNode)e; return new BoundOkExpression(n.Span, b.BindExpression(n.Value)); },
+            [typeof(ErrExpressionNode)] = (b, e) =>
+                { var n = (ErrExpressionNode)e; return new BoundErrExpression(n.Span, b.BindExpression(n.Error)); },
+            [typeof(ExpressionCallNode)] = (b, e) =>
+                {
+                    var n = (ExpressionCallNode)e;
+                    return new BoundExpressionCall(n.Span, b.BindExpression(n.TargetExpression),
+                        n.Arguments.Select(b.BindExpression).ToList());
+                },
+            [typeof(AnonymousObjectCreationNode)] = (b, e) =>
+                {
+                    var n = (AnonymousObjectCreationNode)e;
+                    return new BoundAnonymousObjectCreation(n.Span,
+                        n.Initializers.Select(i => new BoundNamedValue(i.PropertyName, b.BindExpression(i.Value), i.Value.Span)).ToList());
+                },
+            [typeof(RecordCreationNode)] = (b, e) =>
+                {
+                    var n = (RecordCreationNode)e;
+                    // FieldAssignmentNode is a broken-Accept helper class (#762 item 8) —
+                    // bound through its properties, never through visitor dispatch.
+                    return new BoundRecordCreation(n.Span, n.TypeName,
+                        n.Fields.Select(f => new BoundNamedValue(f.FieldName, b.BindExpression(f.Value), f.Span)).ToList());
+                },
+            [typeof(WithExpressionNode)] = (b, e) =>
+                {
+                    var n = (WithExpressionNode)e;
+                    return new BoundWithExpression(n.Span, b.BindExpression(n.Target),
+                        n.Assignments.Select(a => new BoundNamedValue(a.PropertyName, b.BindExpression(a.Value), a.Span)).ToList());
+                },
+            [typeof(ThrowExpressionNode)] = (b, e) =>
+                { var n = (ThrowExpressionNode)e; return new BoundThrowExpression(n.Span, b.BindExpression(n.Exception)); },
         };
 
         // Every remaining concrete ExpressionNode subclass dispatches to BindIncomplete.

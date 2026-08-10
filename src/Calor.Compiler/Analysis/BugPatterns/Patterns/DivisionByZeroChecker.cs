@@ -200,6 +200,12 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
                 CheckExpression(condExpr.WhenTrue, function, diagnostics, pathConditions);
                 CheckExpression(condExpr.WhenFalse, function, diagnostics, pathConditions);
                 break;
+
+            default:
+                // #762 B2: B-series bound nodes recurse via the shared enumeration.
+                foreach (var child in BoundChildren.Of(expr))
+                    CheckExpression(child, function, diagnostics, pathConditions);
+                break;
         }
     }
 
