@@ -1,3 +1,4 @@
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 
@@ -408,33 +409,26 @@ public static class WhileConditionAnalyzer
         List<string> read,
         List<string> arrays)
     {
-        switch (expr)
+        if (expr is BoundVariableExpression varExpr)
         {
-            case BoundVariableExpression varExpr:
-                read.Add(varExpr.Variable.Name);
-                break;
-
-            case BoundBinaryExpression binExpr:
-                CollectReadVariables(binExpr.Left, read, arrays);
-                CollectReadVariables(binExpr.Right, read, arrays);
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                CollectReadVariables(unaryExpr.Operand, read, arrays);
-                break;
-
-            case BoundCallExpression callExpr:
-                // Heuristic: calls with [] or .get might be array access
-                if (callExpr.Target.Contains("[]") || callExpr.Target.Contains(".get"))
-                {
-                    var arrayName = callExpr.Target.Split(new[] { '[', '.' })[0];
-                    if (!string.IsNullOrEmpty(arrayName))
-                        arrays.Add(arrayName);
-                }
-                foreach (var arg in callExpr.Arguments)
-                    CollectReadVariables(arg, read, arrays);
-                break;
+            read.Add(varExpr.Variable.Name);
+            return;
         }
+
+        if (expr is BoundCallExpression callExpr
+            && (callExpr.Target.Contains("[]") || callExpr.Target.Contains(".get")))
+        {
+            var arrayName = callExpr.Target.Split(new[] { '[', '.' })[0];
+            if (!string.IsNullOrEmpty(arrayName))
+                arrays.Add(arrayName);
+        }
+        else if (expr is BoundArrayAccessExpression { Array: BoundVariableExpression array })
+        {
+            arrays.Add(array.Variable.Name);
+        }
+
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            CollectReadVariables(child, read, arrays);
     }
 
     private static string? GetConditionString(BoundExpression condition)

@@ -237,7 +237,8 @@ public sealed class ContractInferencePass
         HashSet<string> paramNames,
         HashSet<string> divisorParams)
     {
-        if (BoundNodeHelpers.ContainsDivision(expr, out var divisionExpr) && divisionExpr != null)
+        if (expr is BoundBinaryExpression divisionExpr
+            && divisionExpr.Operator is BinaryOperator.Divide or BinaryOperator.Modulo)
         {
             var divisor = BoundNodeHelpers.GetDivisor(divisionExpr);
             if (divisor is BoundVariableExpression varExpr && paramNames.Contains(varExpr.Variable.Name))
@@ -246,26 +247,7 @@ public sealed class ContractInferencePass
             }
         }
 
-        // Recurse into subexpressions
-        switch (expr)
-        {
-            case BoundBinaryExpression binExpr:
-                FindDivisorParamsInExpression(binExpr.Left, paramNames, divisorParams);
-                FindDivisorParamsInExpression(binExpr.Right, paramNames, divisorParams);
-                break;
-            case BoundUnaryExpression unaryExpr:
-                FindDivisorParamsInExpression(unaryExpr.Operand, paramNames, divisorParams);
-                break;
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                    FindDivisorParamsInExpression(arg, paramNames, divisorParams);
-                break;
-
-            case BoundConditionalExpression condExpr:
-                FindDivisorParamsInExpression(condExpr.Condition, paramNames, divisorParams);
-                FindDivisorParamsInExpression(condExpr.WhenTrue, paramNames, divisorParams);
-                FindDivisorParamsInExpression(condExpr.WhenFalse, paramNames, divisorParams);
-                break;
-        }
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            FindDivisorParamsInExpression(child, paramNames, divisorParams);
     }
 }

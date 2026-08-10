@@ -462,27 +462,14 @@ public sealed class TaintAnalysis
 
     private void AnalyzeExpression(BoundExpression expr)
     {
-        switch (expr)
+        if (expr is BoundCallExpression callExpr)
         {
-            case BoundCallExpression callExpr:
-                AnalyzeCall(callExpr.Target, callExpr.Arguments, callExpr.Span);
-                break;
-
-            case BoundBinaryExpression binExpr:
-                AnalyzeExpression(binExpr.Left);
-                AnalyzeExpression(binExpr.Right);
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                AnalyzeExpression(unaryExpr.Operand);
-                break;
-
-            case BoundConditionalExpression condExpr:
-                AnalyzeExpression(condExpr.Condition);
-                AnalyzeExpression(condExpr.WhenTrue);
-                AnalyzeExpression(condExpr.WhenFalse);
-                break;
+            AnalyzeCall(callExpr.Target, callExpr.Arguments, callExpr.Span);
+            return;
         }
+
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            AnalyzeExpression(child);
     }
 
     private TaintLabel? CheckForTaintSource(string target, TextSpan location)
@@ -760,44 +747,22 @@ public sealed class TaintAnalysis
 
     private IEnumerable<TaintLabel> GetTaintLabelsFromExpression(BoundExpression expr)
     {
-        switch (expr)
+        if (expr is BoundVariableExpression varExpr)
         {
-            case BoundVariableExpression varExpr:
-                if (_taintedVariables.TryGetValue(varExpr.Variable.Name, out var labels))
-                {
-                    foreach (var label in labels)
-                        yield return label;
-                }
-                break;
-
-            case BoundBinaryExpression binExpr:
-                // Taint propagates through operations (conservative)
-                foreach (var label in GetTaintLabelsFromExpression(binExpr.Left))
+            if (_taintedVariables.TryGetValue(varExpr.Variable.Name, out var labels))
+            {
+                foreach (var label in labels)
                     yield return label;
-                foreach (var label in GetTaintLabelsFromExpression(binExpr.Right))
-                    yield return label;
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                foreach (var label in GetTaintLabelsFromExpression(unaryExpr.Operand))
-                    yield return label;
-                break;
-
-            case BoundCallExpression callExpr:
-                // Check if call is a sanitizer
-                if (IsSanitizer(callExpr.Target))
-                {
-                    yield break; // Sanitizer removes taint
-                }
-
-                // Otherwise, propagate taint from arguments
-                foreach (var arg in callExpr.Arguments)
-                {
-                    foreach (var label in GetTaintLabelsFromExpression(arg))
-                        yield return label;
-                }
-                break;
+            }
+            yield break;
         }
+
+        if (expr is BoundCallExpression callExpr && IsSanitizer(callExpr.Target))
+            yield break;
+
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            foreach (var label in GetTaintLabelsFromExpression(child))
+                yield return label;
     }
 
     private static bool IsSanitizer(string target)

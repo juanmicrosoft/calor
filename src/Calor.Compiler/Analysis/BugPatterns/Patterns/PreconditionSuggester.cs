@@ -1,4 +1,5 @@
 using Calor.Compiler.Analysis.Dataflow;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 
@@ -133,7 +134,8 @@ public sealed class PreconditionSuggester : IBugPatternChecker
         HashSet<string>? guardedParams,
         DiagnosticBag diagnostics)
     {
-        if (BoundNodeHelpers.ContainsDivision(expr, out var divisionExpr) && divisionExpr != null)
+        if (expr is BoundBinaryExpression divisionExpr
+            && divisionExpr.Operator is BinaryOperator.Divide or BinaryOperator.Modulo)
         {
             var divisor = BoundNodeHelpers.GetDivisor(divisionExpr);
             if (divisor is BoundVariableExpression varExpr && paramNames.Contains(varExpr.Variable.Name))
@@ -161,20 +163,7 @@ public sealed class PreconditionSuggester : IBugPatternChecker
             }
         }
 
-        // Recurse into subexpressions
-        switch (expr)
-        {
-            case BoundBinaryExpression binExpr:
-                CheckExpression(binExpr.Left, paramNames, guardedParams, diagnostics);
-                CheckExpression(binExpr.Right, paramNames, guardedParams, diagnostics);
-                break;
-            case BoundUnaryExpression unaryExpr:
-                CheckExpression(unaryExpr.Operand, paramNames, guardedParams, diagnostics);
-                break;
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                    CheckExpression(arg, paramNames, guardedParams, diagnostics);
-                break;
-        }
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            CheckExpression(child, paramNames, guardedParams, diagnostics);
     }
 }

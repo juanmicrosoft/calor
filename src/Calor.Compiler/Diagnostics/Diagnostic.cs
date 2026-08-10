@@ -639,7 +639,7 @@ public static class DiagnosticCode
     public const string AnalysisSkipped = "Calor0930";
 
     /// <summary>
-    /// Info: A statement type is not fully supported in analysis and is treated as opaque.
+    /// Info: An AST node type is not fully supported in analysis and is retained structurally.
     /// Deduplicated per NodeTypeName per file.
     /// </summary>
     public const string AnalysisUnsupportedNode = "Calor0931";

@@ -673,8 +673,9 @@ public class ClassMemberBindingTests
         Assert.IsType<BoundBinaryExpression>(ret.Expression);
         var div = (BoundBinaryExpression)ret.Expression!;
         // The RHS (DEC:100) should NOT be zero
-        Assert.IsType<BoundFloatLiteral>(div.Right);
-        Assert.NotEqual(0.0, ((BoundFloatLiteral)div.Right).Value);
+        var literal = Assert.IsType<BoundDecimalLiteral>(div.Right);
+        Assert.Equal(100m, literal.Value);
+        Assert.Equal("DECIMAL", literal.TypeName);
     }
 
     #endregion

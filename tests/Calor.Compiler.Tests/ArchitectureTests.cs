@@ -151,6 +151,27 @@ public class ArchitectureTests
         Assert.False(typeof(AstNode).IsAssignableFrom(typeof(KeywordArgNode)));
     }
 
+    [Fact]
+    public void BinderRegistry_CoversEveryConcreteExpressionNode()
+    {
+        var concreteExpressions = typeof(ExpressionNode).Assembly
+            .GetTypes()
+            .Where(type => !type.IsAbstract && typeof(ExpressionNode).IsAssignableFrom(type))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+
+        var property = typeof(Calor.Compiler.Binding.Binder).GetProperty(
+            "RegisteredExpressionNodeTypes",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var registeredExpressions = Assert.IsAssignableFrom<IEnumerable<Type>>(
+                property?.GetValue(null))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(60, concreteExpressions.Length);
+        Assert.Equal(concreteExpressions, registeredExpressions);
+    }
+
     /// <summary>
     /// Lists all current visitor implementations for documentation purposes.
     /// If this test fails, update this list and ensure all visitors are properly documented.

@@ -319,10 +319,8 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void Binder_FallbackExpression_ReturnsOpaqueExpression()
+    public void Binder_OptionExpression_RetainsItsValue()
     {
-        // Unsupported expression types should produce an opaque BoundCallExpression,
-        // NOT BoundIntLiteral(0) which causes false positives in bug pattern checkers
         var someExpr = new SomeExpressionNode(DummySpan, new IntLiteralNode(DummySpan, 42));
 
         var func = MakeFunction("Foo", "INT",
@@ -334,10 +332,11 @@ public class CompilerBugFixTests
         var bound = binder.Bind(module);
 
         Assert.NotNull(bound);
-        // Fallback should NOT report an error (was causing noise)
         var ret = bound.Functions.First().Body.OfType<BoundReturnStatement>().First();
-        Assert.IsType<BoundCallExpression>(ret.Expression);
-        // The opaque call should NOT be mistaken for a zero literal
+        var option = Assert.IsType<BoundStructuralExpression>(ret.Expression);
+        Assert.Equal(nameof(SomeExpressionNode), option.NodeTypeName);
+        Assert.Equal("OPTION[inner=INT]", option.TypeName);
+        Assert.IsType<BoundIntLiteral>(Assert.Single(option.Children));
         Assert.False(BoundNodeHelpers.IsLiteralZero(ret.Expression));
     }
 

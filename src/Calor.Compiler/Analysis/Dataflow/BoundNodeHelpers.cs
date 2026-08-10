@@ -9,56 +9,78 @@ namespace Calor.Compiler.Analysis.Dataflow;
 public static class BoundNodeHelpers
 {
     /// <summary>
+    /// Enumerates a bound node and every structurally retained descendant.
+    /// </summary>
+    public static IEnumerable<BoundNode> DescendantsAndSelf(BoundNode? node)
+    {
+        if (node == null)
+            yield break;
+
+        yield return node;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
+        }
+    }
+
+    /// <summary>
+    /// Gets the nearest child expressions below a node, traversing through
+    /// structural helper nodes such as match cases, patterns, and initializers.
+    /// </summary>
+    public static IEnumerable<BoundExpression> GetChildExpressions(BoundNode node)
+    {
+        foreach (var child in node.ChildNodes)
+        {
+            if (child is BoundExpression expression)
+            {
+                yield return expression;
+                continue;
+            }
+
+            foreach (var nested in GetChildExpressions(child))
+                yield return nested;
+        }
+    }
+
+    /// <summary>
     /// Gets all variable references (uses) in an expression.
     /// </summary>
     public static IEnumerable<VariableSymbol> GetUsedVariables(BoundExpression? expression)
     {
         if (expression == null)
-            yield break;
+            return Array.Empty<VariableSymbol>();
 
-        switch (expression)
+        return GetUsedVariablesCore(expression, new HashSet<VariableSymbol>());
+    }
+
+    private static IEnumerable<VariableSymbol> GetUsedVariablesCore(
+        BoundNode node,
+        HashSet<VariableSymbol> locallyBound)
+    {
+        if (node is BoundVariableExpression variable)
         {
-            case BoundVariableExpression varExpr:
-                yield return varExpr.Variable;
-                break;
+            if (!locallyBound.Contains(variable.Variable))
+                yield return variable.Variable;
+            yield break;
+        }
 
-            case BoundBinaryExpression binExpr:
-                foreach (var v in GetUsedVariables(binExpr.Left))
-                    yield return v;
-                foreach (var v in GetUsedVariables(binExpr.Right))
-                    yield return v;
-                break;
+        var nestedLocals = locallyBound;
+        if (node is BoundLambdaExpression lambda)
+        {
+            nestedLocals = new HashSet<VariableSymbol>(locallyBound);
+            nestedLocals.UnionWith(lambda.Parameters);
+        }
+        else if (node is BoundQuantifierExpression quantifier)
+        {
+            nestedLocals = new HashSet<VariableSymbol>(locallyBound);
+            nestedLocals.UnionWith(quantifier.BoundVariables);
+        }
 
-            case BoundUnaryExpression unaryExpr:
-                foreach (var v in GetUsedVariables(unaryExpr.Operand))
-                    yield return v;
-                break;
-
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                    foreach (var v in GetUsedVariables(arg))
-                        yield return v;
-                break;
-
-            case BoundFieldAccessExpression fieldAccess:
-                foreach (var v in GetUsedVariables(fieldAccess.Target))
-                    yield return v;
-                break;
-
-            case BoundNewExpression newExpr:
-                foreach (var arg in newExpr.Arguments)
-                    foreach (var v in GetUsedVariables(arg))
-                        yield return v;
-                break;
-
-            case BoundConditionalExpression condExpr:
-                foreach (var v in GetUsedVariables(condExpr.Condition))
-                    yield return v;
-                foreach (var v in GetUsedVariables(condExpr.WhenTrue))
-                    yield return v;
-                foreach (var v in GetUsedVariables(condExpr.WhenFalse))
-                    yield return v;
-                break;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var used in GetUsedVariablesCore(child, nestedLocals))
+                yield return used;
         }
     }
 
@@ -71,7 +93,11 @@ public static class BoundNodeHelpers
         {
             BoundBindStatement bind => bind.Variable,
             BoundAssignmentStatement assign when assign.Target is BoundVariableExpression varExpr => varExpr.Variable,
+            BoundAssignmentStatement assign when assign.Target is BoundFieldAccessExpression { ResolvedField: not null } field =>
+                field.ResolvedField,
             BoundCompoundAssignment compound when compound.Target is BoundVariableExpression varExpr => varExpr.Variable,
+            BoundCompoundAssignment compound when compound.Target is BoundFieldAccessExpression { ResolvedField: not null } field =>
+                field.ResolvedField,
             BoundForeachStatement forEach => forEach.LoopVariable,
             BoundUsingStatement usingStmt => usingStmt.Resource,
             _ => null
@@ -263,35 +289,11 @@ public static class BoundNodeHelpers
     /// </summary>
     public static bool ContainsDivision(BoundExpression? expression, out BoundBinaryExpression? divisionExpr)
     {
-        divisionExpr = null;
-        if (expression == null)
-            return false;
-
-        switch (expression)
-        {
-            case BoundBinaryExpression binExpr:
-                if (binExpr.Operator == BinaryOperator.Divide || binExpr.Operator == BinaryOperator.Modulo)
-                {
-                    divisionExpr = binExpr;
-                    return true;
-                }
-                if (ContainsDivision(binExpr.Left, out divisionExpr))
-                    return true;
-                if (ContainsDivision(binExpr.Right, out divisionExpr))
-                    return true;
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                return ContainsDivision(unaryExpr.Operand, out divisionExpr);
-
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                    if (ContainsDivision(arg, out divisionExpr))
-                        return true;
-                break;
-        }
-
-        return false;
+        divisionExpr = DescendantsAndSelf(expression)
+            .OfType<BoundBinaryExpression>()
+            .FirstOrDefault(binary =>
+                binary.Operator is BinaryOperator.Divide or BinaryOperator.Modulo);
+        return divisionExpr != null;
     }
 
     /// <summary>
@@ -302,29 +304,15 @@ public static class BoundNodeHelpers
         arrayExpr = null;
         indexExpr = null;
 
-        // Note: BoundNodes don't have BoundArrayAccessExpression yet
-        // This is a placeholder for when it's added
-        if (expression == null)
+        var access = DescendantsAndSelf(expression)
+            .OfType<BoundArrayAccessExpression>()
+            .FirstOrDefault();
+        if (access == null)
             return false;
 
-        switch (expression)
-        {
-            case BoundBinaryExpression binExpr:
-                if (ContainsArrayAccess(binExpr.Left, out arrayExpr, out indexExpr))
-                    return true;
-                return ContainsArrayAccess(binExpr.Right, out arrayExpr, out indexExpr);
-
-            case BoundUnaryExpression unaryExpr:
-                return ContainsArrayAccess(unaryExpr.Operand, out arrayExpr, out indexExpr);
-
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                    if (ContainsArrayAccess(arg, out arrayExpr, out indexExpr))
-                        return true;
-                break;
-        }
-
-        return false;
+        arrayExpr = access.Array;
+        indexExpr = access.Indices.FirstOrDefault();
+        return true;
     }
 
     /// <summary>
@@ -346,6 +334,7 @@ public static class BoundNodeHelpers
         {
             BoundIntLiteral intLit => intLit.Value == 0,
             BoundFloatLiteral floatLit => floatLit.Value == 0.0,
+            BoundDecimalLiteral decimalLiteral => decimalLiteral.Value == 0m,
             _ => false
         };
     }
@@ -355,7 +344,11 @@ public static class BoundNodeHelpers
     /// </summary>
     public static bool IsConstant(BoundExpression? expression)
     {
-        return expression is BoundIntLiteral or BoundFloatLiteral or BoundBoolLiteral or BoundStringLiteral;
+        return expression is BoundIntLiteral
+            or BoundFloatLiteral
+            or BoundDecimalLiteral
+            or BoundBoolLiteral
+            or BoundStringLiteral;
     }
 
     /// <summary>

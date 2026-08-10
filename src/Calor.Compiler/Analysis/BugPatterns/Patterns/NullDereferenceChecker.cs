@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 
@@ -179,27 +180,20 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
         HashSet<string> checkedVariables,
         List<BoundExpression> pathConditions)
     {
-        switch (expr)
+        if (expr is BoundCallExpression callExpr)
         {
-            case BoundCallExpression callExpr:
-                CheckCallExpression(callExpr.Target, callExpr.Arguments, callExpr.Span, function, diagnostics, checkedVariables, pathConditions);
-                break;
-
-            case BoundBinaryExpression binExpr:
-                CheckExpression(binExpr.Left, function, diagnostics, checkedVariables, pathConditions);
-                CheckExpression(binExpr.Right, function, diagnostics, checkedVariables, pathConditions);
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                CheckExpression(unaryExpr.Operand, function, diagnostics, checkedVariables, pathConditions);
-                break;
-
-            case BoundConditionalExpression condExpr:
-                CheckExpression(condExpr.Condition, function, diagnostics, checkedVariables, pathConditions);
-                CheckExpression(condExpr.WhenTrue, function, diagnostics, checkedVariables, pathConditions);
-                CheckExpression(condExpr.WhenFalse, function, diagnostics, checkedVariables, pathConditions);
-                break;
+            CheckCallExpression(
+                callExpr.Target,
+                callExpr.Arguments,
+                callExpr.Span,
+                function,
+                diagnostics,
+                checkedVariables,
+                pathConditions);
         }
+
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            CheckExpression(child, function, diagnostics, checkedVariables, pathConditions);
     }
 
     private void CheckCallExpression(

@@ -8,6 +8,76 @@ namespace Calor.Compiler.Binding;
 /// </summary>
 public sealed class Binder
 {
+    private delegate BoundExpression ExpressionBinder(Binder binder, ExpressionNode expression);
+
+    private static readonly IReadOnlyDictionary<Type, ExpressionBinder> ExpressionBinders =
+        new Dictionary<Type, ExpressionBinder>
+        {
+            [typeof(AddressOfNode)] = static (binder, expression) => binder.BindAddressOf((AddressOfNode)expression),
+            [typeof(AnonymousObjectCreationNode)] = static (binder, expression) => binder.BindAnonymousObjectCreation((AnonymousObjectCreationNode)expression),
+            [typeof(ArrayAccessNode)] = static (binder, expression) => binder.BindArrayAccess((ArrayAccessNode)expression),
+            [typeof(ArrayCreationNode)] = static (binder, expression) => binder.BindArrayCreation((ArrayCreationNode)expression),
+            [typeof(ArrayLengthNode)] = static (binder, expression) => binder.BindArrayLength((ArrayLengthNode)expression),
+            [typeof(AwaitExpressionNode)] = static (binder, expression) => binder.BindAwaitExpression((AwaitExpressionNode)expression),
+            [typeof(BaseExpressionNode)] = static (binder, expression) => binder.BindBaseExpression((BaseExpressionNode)expression),
+            [typeof(BinaryOperationNode)] = static (binder, expression) => binder.BindBinaryOperation((BinaryOperationNode)expression),
+            [typeof(BoolLiteralNode)] = static (_, expression) => new BoundBoolLiteral(expression.Span, ((BoolLiteralNode)expression).Value),
+            [typeof(CallExpressionNode)] = static (binder, expression) => binder.BindCallExpression((CallExpressionNode)expression),
+            [typeof(CharOperationNode)] = static (binder, expression) => binder.BindCharOperation((CharOperationNode)expression),
+            [typeof(CollectionContainsNode)] = static (binder, expression) => binder.BindCollectionContains((CollectionContainsNode)expression),
+            [typeof(CollectionCountNode)] = static (binder, expression) => binder.BindCollectionCount((CollectionCountNode)expression),
+            [typeof(ConditionalExpressionNode)] = static (binder, expression) => binder.BindConditionalExpression((ConditionalExpressionNode)expression),
+            [typeof(DecimalLiteralNode)] = static (_, expression) => new BoundDecimalLiteral(expression.Span, ((DecimalLiteralNode)expression).Value),
+            [typeof(DictionaryCreationNode)] = static (binder, expression) => binder.BindDictionaryCreation((DictionaryCreationNode)expression),
+            [typeof(ErrExpressionNode)] = static (binder, expression) => binder.BindErrExpression((ErrExpressionNode)expression),
+            [typeof(ExistsExpressionNode)] = static (binder, expression) => binder.BindExistsExpression((ExistsExpressionNode)expression),
+            [typeof(ExpressionCallNode)] = static (binder, expression) => binder.BindExpressionCall((ExpressionCallNode)expression),
+            [typeof(FallbackExpressionNode)] = static (binder, expression) => binder.BindFallbackInterop((FallbackExpressionNode)expression),
+            [typeof(FieldAccessNode)] = static (binder, expression) => binder.BindFieldAccess((FieldAccessNode)expression),
+            [typeof(FloatLiteralNode)] = static (binder, expression) => binder.BindFloatLiteral((FloatLiteralNode)expression),
+            [typeof(ForallExpressionNode)] = static (binder, expression) => binder.BindForallExpression((ForallExpressionNode)expression),
+            [typeof(GenericTypeNode)] = static (binder, expression) => binder.BindGenericType((GenericTypeNode)expression),
+            [typeof(ImplicationExpressionNode)] = static (binder, expression) => binder.BindImplicationExpression((ImplicationExpressionNode)expression),
+            [typeof(IndexFromEndNode)] = static (binder, expression) => binder.BindIndexFromEnd((IndexFromEndNode)expression),
+            [typeof(IntLiteralNode)] = static (binder, expression) => binder.BindIntLiteral((IntLiteralNode)expression),
+            [typeof(InterpolatedStringNode)] = static (binder, expression) => binder.BindInterpolatedString((InterpolatedStringNode)expression),
+            [typeof(IsPatternNode)] = static (binder, expression) => binder.BindIsPattern((IsPatternNode)expression),
+            [typeof(LambdaExpressionNode)] = static (binder, expression) => binder.BindLambdaExpression((LambdaExpressionNode)expression),
+            [typeof(ListCreationNode)] = static (binder, expression) => binder.BindListCreation((ListCreationNode)expression),
+            [typeof(MatchExpressionNode)] = static (binder, expression) => binder.BindMatchExpression((MatchExpressionNode)expression),
+            [typeof(MultiDimArrayAccessNode)] = static (binder, expression) => binder.BindMultiDimArrayAccess((MultiDimArrayAccessNode)expression),
+            [typeof(MultiDimArrayCreationNode)] = static (binder, expression) => binder.BindMultiDimArrayCreation((MultiDimArrayCreationNode)expression),
+            [typeof(NameOfExpressionNode)] = static (_, expression) => new BoundStringLiteral(expression.Span, ((NameOfExpressionNode)expression).Name),
+            [typeof(NewExpressionNode)] = static (binder, expression) => binder.BindNewExpression((NewExpressionNode)expression),
+            [typeof(NoneExpressionNode)] = static (binder, expression) => binder.BindNoneExpression((NoneExpressionNode)expression),
+            [typeof(NullCoalesceNode)] = static (binder, expression) => binder.BindNullCoalesce((NullCoalesceNode)expression),
+            [typeof(NullConditionalNode)] = static (binder, expression) => binder.BindNullConditional((NullConditionalNode)expression),
+            [typeof(OkExpressionNode)] = static (binder, expression) => binder.BindOkExpression((OkExpressionNode)expression),
+            [typeof(PointerDereferenceNode)] = static (binder, expression) => binder.BindPointerDereference((PointerDereferenceNode)expression),
+            [typeof(RangeExpressionNode)] = static (binder, expression) => binder.BindRangeExpression((RangeExpressionNode)expression),
+            [typeof(RawCSharpExpressionNode)] = static (binder, expression) => binder.BindRawCSharpInterop((RawCSharpExpressionNode)expression),
+            [typeof(RecordCreationNode)] = static (binder, expression) => binder.BindRecordCreation((RecordCreationNode)expression),
+            [typeof(ReferenceNode)] = static (binder, expression) => binder.BindReferenceExpression((ReferenceNode)expression),
+            [typeof(SelfRefNode)] = static (binder, expression) => binder.BindSelfReference((SelfRefNode)expression),
+            [typeof(SetCreationNode)] = static (binder, expression) => binder.BindSetCreation((SetCreationNode)expression),
+            [typeof(SizeOfNode)] = static (binder, expression) => binder.BindSizeOf((SizeOfNode)expression),
+            [typeof(SomeExpressionNode)] = static (binder, expression) => binder.BindSomeExpression((SomeExpressionNode)expression),
+            [typeof(StackAllocNode)] = static (binder, expression) => binder.BindStackAlloc((StackAllocNode)expression),
+            [typeof(StringBuilderOperationNode)] = static (binder, expression) => binder.BindStringBuilderOperation((StringBuilderOperationNode)expression),
+            [typeof(StringLiteralNode)] = static (binder, expression) => binder.BindStringLiteral((StringLiteralNode)expression),
+            [typeof(StringOperationNode)] = static (binder, expression) => binder.BindStringOperation((StringOperationNode)expression),
+            [typeof(ThisExpressionNode)] = static (binder, expression) => binder.BindThisExpression((ThisExpressionNode)expression),
+            [typeof(ThrowExpressionNode)] = static (binder, expression) => binder.BindThrowExpression((ThrowExpressionNode)expression),
+            [typeof(TupleLiteralNode)] = static (binder, expression) => binder.BindTupleLiteral((TupleLiteralNode)expression),
+            [typeof(TypeOfExpressionNode)] = static (binder, expression) => binder.BindTypeOf((TypeOfExpressionNode)expression),
+            [typeof(TypeOperationNode)] = static (binder, expression) => binder.BindTypeOperation((TypeOperationNode)expression),
+            [typeof(UnaryOperationNode)] = static (binder, expression) => binder.BindUnaryOperation((UnaryOperationNode)expression),
+            [typeof(WithExpressionNode)] = static (binder, expression) => binder.BindWithExpression((WithExpressionNode)expression),
+        };
+
+    internal static IReadOnlyCollection<Type> RegisteredExpressionNodeTypes =>
+        ExpressionBinders.Keys.ToArray();
+
     private readonly DiagnosticBag _diagnostics;
     private Scope _scope;
     private string? _currentClassName;
@@ -296,84 +366,840 @@ public sealed class Binder
 
     private BoundExpression BindExpression(ExpressionNode expr)
     {
-        return expr switch
-        {
-            IntLiteralNode intLit => new BoundIntLiteral(intLit.Span, intLit.Value),
-            StringLiteralNode strLit => new BoundStringLiteral(strLit.Span, strLit.Value),
-            BoolLiteralNode boolLit => new BoundBoolLiteral(boolLit.Span, boolLit.Value),
-            FloatLiteralNode floatLit => new BoundFloatLiteral(floatLit.Span, floatLit.Value),
-            DecimalLiteralNode decLit => new BoundFloatLiteral(decLit.Span, (double)decLit.Value),
-            ReferenceNode refNode => BindReferenceExpression(refNode),
-            BinaryOperationNode binOp => BindBinaryOperation(binOp),
-            UnaryOperationNode unaryOp => BindUnaryOperation(unaryOp),
-            CallExpressionNode callExpr => BindCallExpression(callExpr),
-            ConditionalExpressionNode condExpr => BindConditionalExpression(condExpr),
-            NameOfExpressionNode nameOf => new BoundStringLiteral(nameOf.Span, nameOf.Name),
-            NoneExpressionNode none => new BoundNoneLiteral(none.Span, none.TypeName),
-            // Class member expression types
-            ThisExpressionNode thisExpr => _isStaticContext
-                ? BindFallbackExpression(thisExpr) // 'this' not valid in static context
-                : new BoundThisExpression(thisExpr.Span, _currentClassName ?? "UNKNOWN"),
-            BaseExpressionNode baseExpr => new BoundBaseExpression(baseExpr.Span),
-            FieldAccessNode fieldAccess => BindFieldAccess(fieldAccess),
-            NewExpressionNode newExpr => BindNewExpression(newExpr),
-            TypeOperationNode typeOp => BindTypeOperation(typeOp),
-            IsPatternNode isPattern => BindIsPattern(isPattern),
-            _ => BindFallbackExpression(expr)
-        };
+        ArgumentNullException.ThrowIfNull(expr);
+        return ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
+            ? binder(this, expr)
+            : BindUnsupportedExpression(expr);
+    }
+
+    private BoundExpression BindIntLiteral(IntLiteralNode literal)
+    {
+        var typeName = literal.IsUnsigned
+            ? literal.IsLong || literal.UnsignedValue > uint.MaxValue ? "ULONG" : "UINT"
+            : literal.IsLong || literal.Value is > int.MaxValue or < int.MinValue ? "LONG" : "INT";
+        return new BoundIntLiteral(
+            literal.Span,
+            literal.Value,
+            literal.UnsignedValue,
+            literal.IsUnsigned,
+            typeName);
+    }
+
+    private BoundExpression BindFloatLiteral(FloatLiteralNode literal)
+    {
+        if (literal.IsDecimal)
+            return new BoundDecimalLiteral(literal.Span, (decimal)literal.Value);
+
+        var typeName = literal.IsSingle ? "FLOAT[bits=32]" : "FLOAT";
+        var value = literal.IsSingle ? (double)(float)literal.Value : literal.Value;
+        return new BoundFloatLiteral(literal.Span, value, typeName);
+    }
+
+    private BoundExpression BindStringLiteral(StringLiteralNode literal) =>
+        new BoundStringLiteral(
+            literal.Span,
+            literal.Value,
+            literal.IsMultiline,
+            literal.IsUtf8);
+
+    private BoundExpression BindThisExpression(ThisExpressionNode expression)
+    {
+        if (!_isStaticContext && _currentClassName != null)
+            return new BoundThisExpression(expression.Span, _currentClassName);
+
+        return BindUnsupportedExpression(
+            expression,
+            _currentClassName ?? "UNKNOWN",
+            reason: _isStaticContext
+                ? "'this' is unavailable in a static context"
+                : "'this' is unavailable outside an instance member");
+    }
+
+    private BoundExpression BindBaseExpression(BaseExpressionNode expression)
+    {
+        if (!_isStaticContext && _currentClassName != null)
+            return new BoundBaseExpression(expression.Span);
+
+        return BindUnsupportedExpression(
+            expression,
+            reason: _isStaticContext
+                ? "'base' is unavailable in a static context"
+                : "'base' is unavailable outside an instance member");
     }
 
     private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess)
     {
         var target = BindExpression(fieldAccess.Target);
+        VariableSymbol? resolvedField = null;
 
-        // If accessing via 'this', resolve the field name from CLASS scope directly
-        // (not _scope which is the method scope — that would let parameters shadow fields)
+        // Resolve this.field from the class scope, but retain the field-access
+        // shape and target instead of collapsing it to a bare variable.
         if (fieldAccess.Target is ThisExpressionNode && _currentClassScope != null)
         {
             var symbol = _currentClassScope.LookupLocal(fieldAccess.FieldName);
             if (symbol is VariableSymbol varSymbol)
-                return new BoundVariableExpression(fieldAccess.Span, varSymbol);
+                resolvedField = varSymbol;
         }
 
-        return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName, "OBJECT");
+        return new BoundFieldAccessExpression(
+            fieldAccess.Span,
+            target,
+            fieldAccess.FieldName,
+            resolvedField?.TypeName ?? "OBJECT",
+            resolvedField);
     }
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
     {
         var operand = BindExpression(typeOp.Operand);
-        return typeOp.Operation switch
-        {
-            // Cast: bind inner expression and return it — the value is preserved,
-            // type changes to TargetType. This prevents (cast f64 nonZeroExpr)
-            // from becoming BoundIntLiteral(0) via the fallback path.
-            TypeOp.Cast => operand,
-            // Is: result is always BOOL
-            TypeOp.Is => new BoundBoolLiteral(typeOp.Span, true),
-            // As: result has the target type (nullable), bind inner
-            TypeOp.As => operand,
-            _ => BindFallbackExpression(typeOp)
-        };
+        return new BoundTypeOperationExpression(
+            typeOp.Span,
+            typeOp.Operation,
+            operand,
+            typeOp.TargetType);
     }
 
     private BoundExpression BindIsPattern(IsPatternNode isPattern)
     {
-        BindExpression(isPattern.Operand); // bind for side effects
-        return new BoundBoolLiteral(isPattern.Span, true);
+        var operand = BindExpression(isPattern.Operand);
+        return new BoundIsPatternExpression(
+            isPattern.Span,
+            operand,
+            isPattern.TargetType,
+            isPattern.VariableName);
     }
 
     private BoundExpression BindNewExpression(NewExpressionNode newExpr)
     {
-        var boundArgs = new List<BoundExpression>();
-        foreach (var arg in newExpr.Arguments)
-            boundArgs.Add(BindExpression(arg));
+        var boundArgs = BindExpressions(newExpr.Arguments);
+        var initializers = newExpr.Initializers
+            .Select(initializer => new BoundObjectInitializer(
+                initializer.Value.Span,
+                initializer.PropertyName,
+                BindExpression(initializer.Value)))
+            .ToArray();
 
-        // Also bind object initializer value expressions so they're visible to checkers
-        // (e.g., new Foo { P = 1 / x } — the division must be analyzed)
-        foreach (var init in newExpr.Initializers)
-            BindExpression(init.Value);
+        return new BoundNewExpression(
+            newExpr.Span,
+            newExpr.TypeName,
+            newExpr.TypeArguments,
+            boundArgs,
+            initializers);
+    }
 
-        return new BoundNewExpression(newExpr.Span, newExpr.TypeName, boundArgs);
+    private BoundExpression BindArrayAccess(ArrayAccessNode arrayAccess)
+    {
+        var array = BindExpression(arrayAccess.Array);
+        var index = BindExpression(arrayAccess.Index);
+        return new BoundArrayAccessExpression(
+            arrayAccess.Span,
+            array,
+            [index],
+            GetIndexedElementType(array.TypeName));
+    }
+
+    private BoundExpression BindMultiDimArrayAccess(MultiDimArrayAccessNode arrayAccess)
+    {
+        var array = BindExpression(arrayAccess.Array);
+        var indices = BindExpressions(arrayAccess.Indices);
+        return new BoundArrayAccessExpression(
+            arrayAccess.Span,
+            array,
+            indices,
+            GetIndexedElementType(array.TypeName));
+    }
+
+    private BoundExpression BindArrayCreation(ArrayCreationNode array)
+    {
+        var children = new List<BoundExpression>();
+        if (array.Size != null)
+            children.Add(BindExpression(array.Size));
+        children.AddRange(BindExpressions(array.Initializer));
+
+        return Structural(
+            array,
+            MakeArrayType(array.ElementType, rank: 1),
+            children,
+            new Dictionary<string, object?>
+            {
+                ["Id"] = array.Id,
+                ["Name"] = array.Name,
+                ["ElementType"] = array.ElementType,
+                ["HasSize"] = array.Size != null,
+                ["InitializerCount"] = array.Initializer.Count,
+                ["Attributes"] = array.Attributes,
+            });
+    }
+
+    private BoundExpression BindMultiDimArrayCreation(MultiDimArrayCreationNode array)
+    {
+        var dimensions = BindExpressions(array.DimensionSizes);
+        var initializer = BindExpressions(array.Initializer.SelectMany(row => row));
+        return Structural(
+            array,
+            MakeArrayType(array.ElementType, array.Rank),
+            [.. dimensions, .. initializer],
+            new Dictionary<string, object?>
+            {
+                ["Id"] = array.Id,
+                ["Name"] = array.Name,
+                ["ElementType"] = array.ElementType,
+                ["Rank"] = array.Rank,
+                ["DimensionCount"] = array.DimensionSizes.Count,
+                ["RowLengths"] = array.Initializer.Select(row => row.Count).ToArray(),
+            });
+    }
+
+    private BoundExpression BindArrayLength(ArrayLengthNode arrayLength)
+    {
+        var array = BindExpression(arrayLength.Array);
+        return Structural(arrayLength, "INT", [array]);
+    }
+
+    private BoundExpression BindListCreation(ListCreationNode list)
+    {
+        return Structural(
+            list,
+            $"List<{list.ElementType}>",
+            BindExpressions(list.Elements),
+            new Dictionary<string, object?>
+            {
+                ["Id"] = list.Id,
+                ["Name"] = list.Name,
+                ["ElementType"] = list.ElementType,
+                ["Attributes"] = list.Attributes,
+            });
+    }
+
+    private BoundExpression BindDictionaryCreation(DictionaryCreationNode dictionary)
+    {
+        var children = new List<BoundExpression>(dictionary.Entries.Count * 2);
+        foreach (var entry in dictionary.Entries)
+        {
+            children.Add(BindExpression(entry.Key));
+            children.Add(BindExpression(entry.Value));
+        }
+
+        return Structural(
+            dictionary,
+            $"Dictionary<{dictionary.KeyType},{dictionary.ValueType}>",
+            children,
+            new Dictionary<string, object?>
+            {
+                ["Id"] = dictionary.Id,
+                ["Name"] = dictionary.Name,
+                ["KeyType"] = dictionary.KeyType,
+                ["ValueType"] = dictionary.ValueType,
+                ["EntryCount"] = dictionary.Entries.Count,
+                ["Attributes"] = dictionary.Attributes,
+            });
+    }
+
+    private BoundExpression BindSetCreation(SetCreationNode set)
+    {
+        return Structural(
+            set,
+            $"HashSet<{set.ElementType}>",
+            BindExpressions(set.Elements),
+            new Dictionary<string, object?>
+            {
+                ["Id"] = set.Id,
+                ["Name"] = set.Name,
+                ["ElementType"] = set.ElementType,
+                ["Attributes"] = set.Attributes,
+            });
+    }
+
+    private BoundExpression BindCollectionContains(CollectionContainsNode contains)
+    {
+        var collection = BindReferenceExpression(new ReferenceNode(contains.Span, contains.CollectionName));
+        var value = BindExpression(contains.KeyOrValue);
+        return Structural(
+            contains,
+            "BOOL",
+            [collection, value],
+            new Dictionary<string, object?>
+            {
+                ["CollectionName"] = contains.CollectionName,
+                ["Mode"] = contains.Mode,
+            });
+    }
+
+    private BoundExpression BindCollectionCount(CollectionCountNode count)
+    {
+        var collection = BindExpression(count.Collection);
+        return Structural(count, "INT", [collection]);
+    }
+
+    private BoundExpression BindRecordCreation(RecordCreationNode record)
+    {
+        return Structural(
+            record,
+            record.TypeName,
+            BindExpressions(record.Fields.Select(field => field.Value)),
+            new Dictionary<string, object?>
+            {
+                ["FieldNames"] = record.Fields.Select(field => field.FieldName).ToArray(),
+            });
+    }
+
+    private BoundExpression BindAnonymousObjectCreation(AnonymousObjectCreationNode anonymous)
+    {
+        return Structural(
+            anonymous,
+            "ANONYMOUS",
+            BindExpressions(anonymous.Initializers.Select(initializer => initializer.Value)),
+            new Dictionary<string, object?>
+            {
+                ["MemberNames"] = anonymous.Initializers
+                    .Select(initializer => initializer.PropertyName)
+                    .ToArray(),
+            });
+    }
+
+    private BoundExpression BindWithExpression(WithExpressionNode withExpression)
+    {
+        var target = BindExpression(withExpression.Target);
+        var values = BindExpressions(withExpression.Assignments.Select(assignment => assignment.Value));
+        return Structural(
+            withExpression,
+            target.TypeName,
+            [target, .. values],
+            new Dictionary<string, object?>
+            {
+                ["MemberNames"] = withExpression.Assignments
+                    .Select(assignment => assignment.PropertyName)
+                    .ToArray(),
+            });
+    }
+
+    private BoundExpression BindSomeExpression(SomeExpressionNode some)
+    {
+        var value = BindExpression(some.Value);
+        return Structural(some, MakeOptionType(value.TypeName), [value]);
+    }
+
+    private BoundExpression BindNoneExpression(NoneExpressionNode none)
+    {
+        var innerType = string.IsNullOrWhiteSpace(none.TypeName) ? "OBJECT" : none.TypeName!;
+        return new BoundNoneLiteral(none.Span, MakeOptionType(innerType));
+    }
+
+    private BoundExpression BindOkExpression(OkExpressionNode ok)
+    {
+        var value = BindExpression(ok.Value);
+        return Structural(ok, MakeResultType(value.TypeName, "OBJECT"), [value]);
+    }
+
+    private BoundExpression BindErrExpression(ErrExpressionNode err)
+    {
+        var error = BindExpression(err.Error);
+        return Structural(err, MakeResultType("OBJECT", error.TypeName), [error]);
+    }
+
+    private BoundExpression BindAwaitExpression(AwaitExpressionNode awaitExpression)
+    {
+        var awaited = BindExpression(awaitExpression.Awaited);
+        return Structural(
+            awaitExpression,
+            UnwrapAwaitedType(awaited.TypeName),
+            [awaited],
+            new Dictionary<string, object?>
+            {
+                ["ConfigureAwait"] = awaitExpression.ConfigureAwait,
+            });
+    }
+
+    private BoundExpression BindNullCoalesce(NullCoalesceNode coalesce)
+    {
+        var left = BindExpression(coalesce.Left);
+        var right = BindExpression(coalesce.Right);
+        var leftValueType = UnwrapOptionOrNullable(left.TypeName);
+        return Structural(
+            coalesce,
+            GetCommonType(leftValueType, right.TypeName),
+            [left, right]);
+    }
+
+    private BoundExpression BindNullConditional(NullConditionalNode conditional)
+    {
+        var target = BindExpression(conditional.Target);
+        return Structural(
+            conditional,
+            "OBJECT",
+            [target],
+            new Dictionary<string, object?>
+            {
+                ["MemberName"] = conditional.MemberName,
+                ["TargetType"] = target.TypeName,
+            });
+    }
+
+    private BoundExpression BindRangeExpression(RangeExpressionNode range)
+    {
+        var children = new List<BoundExpression>(2);
+        if (range.Start != null)
+            children.Add(BindExpression(range.Start));
+        if (range.End != null)
+            children.Add(BindExpression(range.End));
+
+        return Structural(
+            range,
+            "RANGE",
+            children,
+            new Dictionary<string, object?>
+            {
+                ["HasStart"] = range.Start != null,
+                ["HasEnd"] = range.End != null,
+            });
+    }
+
+    private BoundExpression BindIndexFromEnd(IndexFromEndNode index)
+    {
+        var offset = BindExpression(index.Offset);
+        return Structural(index, "INDEX", [offset]);
+    }
+
+    private BoundExpression BindTupleLiteral(TupleLiteralNode tuple)
+    {
+        var elements = BindExpressions(tuple.Elements);
+        return Structural(
+            tuple,
+            $"({string.Join(",", elements.Select(element => element.TypeName))})",
+            elements);
+    }
+
+    private BoundExpression BindTypeOf(TypeOfExpressionNode typeOf)
+    {
+        return Structural(
+            typeOf,
+            "TYPE",
+            metadata: new Dictionary<string, object?>
+            {
+                ["OperandType"] = typeOf.TypeName,
+            });
+    }
+
+    private BoundExpression BindGenericType(GenericTypeNode genericType)
+    {
+        return Structural(
+            genericType,
+            $"{genericType.TypeName}<{string.Join(",", genericType.TypeArguments)}>",
+            metadata: new Dictionary<string, object?>
+            {
+                ["GenericTypeName"] = genericType.TypeName,
+                ["TypeArguments"] = genericType.TypeArguments.ToArray(),
+            });
+    }
+
+    private BoundExpression BindSelfReference(SelfRefNode selfReference) =>
+        Structural(selfReference, "OBJECT");
+
+    private BoundExpression BindThrowExpression(ThrowExpressionNode throwExpression)
+    {
+        var exception = BindExpression(throwExpression.Exception);
+        return Structural(throwExpression, "NEVER", [exception]);
+    }
+
+    private BoundExpression BindInterpolatedString(InterpolatedStringNode interpolated)
+    {
+        var parts = new List<BoundInterpolatedStringPart>(interpolated.Parts.Count);
+        foreach (var part in interpolated.Parts)
+        {
+            switch (part)
+            {
+                case InterpolatedStringTextNode text:
+                    parts.Add(new BoundInterpolatedStringPart(text.Span, text.Text, null));
+                    break;
+                case InterpolatedStringExpressionNode expression:
+                    parts.Add(new BoundInterpolatedStringPart(
+                        expression.Span,
+                        null,
+                        BindExpression(expression.Expression),
+                        expression.FormatSpecifier,
+                        expression.AlignmentClause));
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unknown interpolated string part '{part.GetType().Name}'");
+            }
+        }
+
+        return new BoundInterpolatedStringExpression(interpolated.Span, parts);
+    }
+
+    private BoundExpression BindLambdaExpression(LambdaExpressionNode lambda)
+    {
+        using var _scopeGuard = PushScope(_scope.CreateChild());
+        using var _staticGuard = PushStaticContext(lambda.IsStatic);
+
+        var parameters = new List<VariableSymbol>(lambda.Parameters.Count);
+        foreach (var parameter in lambda.Parameters)
+        {
+            var symbol = new VariableSymbol(
+                parameter.Name,
+                parameter.TypeName ?? "OBJECT",
+                isMutable: false,
+                isParameter: true);
+            if (!_scope.TryDeclare(symbol))
+            {
+                _diagnostics.ReportError(
+                    parameter.Span,
+                    DiagnosticCode.DuplicateDefinition,
+                    $"Lambda parameter '{parameter.Name}' is already defined");
+            }
+            parameters.Add(symbol);
+        }
+
+        var expressionBody = lambda.ExpressionBody != null
+            ? BindExpression(lambda.ExpressionBody)
+            : null;
+        var statementBody = lambda.StatementBody != null
+            ? BindStatements(lambda.StatementBody)
+            : null;
+        var returnType = expressionBody?.TypeName
+            ?? GetCommonType(CollectReturnTypes(statementBody))
+            ?? "VOID";
+        var effects = lambda.Effects?.Effects
+            .Select(effect => $"{effect.Key}:{effect.Value}")
+            .ToArray()
+            ?? Array.Empty<string>();
+
+        return new BoundLambdaExpression(
+            lambda.Span,
+            lambda.Id,
+            parameters,
+            effects,
+            lambda.Attributes,
+            lambda.IsAsync,
+            lambda.IsStatic,
+            expressionBody,
+            statementBody,
+            returnType);
+    }
+
+    private BoundExpression BindMatchExpression(MatchExpressionNode match)
+    {
+        var target = BindExpression(match.Target);
+        var cases = BindMatchCases(match.Cases);
+        var resultType = GetCommonType(
+                cases.Where(matchCase => matchCase.Result != null)
+                    .Select(matchCase => matchCase.Result!.TypeName))
+            ?? "OBJECT";
+        return new BoundMatchExpression(
+            match.Span,
+            match.Id,
+            target,
+            cases,
+            match.Attributes,
+            resultType);
+    }
+
+    private IReadOnlyList<BoundMatchCase> BindMatchCases(IReadOnlyList<MatchCaseNode> cases)
+    {
+        var boundCases = new List<BoundMatchCase>(cases.Count);
+        foreach (var matchCase in cases)
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            var pattern = BindPattern(matchCase.Pattern);
+            var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
+            var body = BindStatements(matchCase.Body);
+            var result = body.LastOrDefault() is BoundReturnStatement { Expression: not null } returnStatement
+                ? returnStatement.Expression
+                : null;
+            boundCases.Add(new BoundMatchCase(
+                matchCase.Span,
+                pattern,
+                matchCase.Pattern is WildcardPatternNode,
+                guard,
+                body,
+                result));
+        }
+        return boundCases;
+    }
+
+    private BoundPattern BindPattern(PatternNode pattern)
+    {
+        switch (pattern)
+        {
+            case WildcardPatternNode:
+                return Pattern(pattern);
+            case VariablePatternNode variable:
+                if (!variable.Name.Contains('.', StringComparison.Ordinal))
+                    DeclarePatternVariable(variable.Span, variable.Name, "OBJECT");
+                return Pattern(
+                    variable,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["Name"] = variable.Name,
+                        ["IsConstant"] = variable.Name.Contains('.', StringComparison.Ordinal),
+                    });
+            case VarPatternNode variable:
+                DeclarePatternVariable(variable.Span, variable.Name, "OBJECT");
+                return Pattern(
+                    variable,
+                    metadata: new Dictionary<string, object?> { ["Name"] = variable.Name });
+            case TypePatternNode typePattern:
+                if (typePattern.BindingName != null)
+                    DeclarePatternVariable(typePattern.Span, typePattern.BindingName, typePattern.TypeName);
+                return Pattern(
+                    typePattern,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["TypeName"] = typePattern.TypeName,
+                        ["BindingName"] = typePattern.BindingName,
+                    });
+            case LiteralPatternNode literal:
+                return Pattern(literal, expressions: [BindExpression(literal.Literal)]);
+            case ConstantPatternNode constant:
+                return Pattern(constant, expressions: [BindExpression(constant.Value)]);
+            case RelationalPatternNode relational:
+                return Pattern(
+                    relational,
+                    metadata: new Dictionary<string, object?> { ["Operator"] = relational.Operator },
+                    expressions: [BindExpression(relational.Value)]);
+            case SomePatternNode some:
+                return Pattern(some, patterns: [BindPattern(some.InnerPattern)]);
+            case NonePatternNode:
+                return Pattern(pattern);
+            case OkPatternNode ok:
+                return Pattern(ok, patterns: [BindPattern(ok.InnerPattern)]);
+            case ErrPatternNode err:
+                return Pattern(err, patterns: [BindPattern(err.InnerPattern)]);
+            case PositionalPatternNode positional:
+                return Pattern(
+                    positional,
+                    metadata: new Dictionary<string, object?> { ["TypeName"] = positional.TypeName },
+                    patterns: positional.Patterns.Select(BindPattern).ToArray());
+            case PropertyPatternNode property:
+                return Pattern(
+                    property,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["TypeName"] = property.TypeName,
+                        ["PropertyNames"] = property.Matches.Select(match => match.PropertyName).ToArray(),
+                    },
+                    patterns: property.Matches.Select(match => BindPattern(match.Pattern)).ToArray());
+            case ListPatternNode list:
+                var listPatterns = list.Patterns.Select(BindPattern).ToList();
+                if (list.SlicePattern != null)
+                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count), BindPattern(list.SlicePattern));
+                return Pattern(
+                    list,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["SliceIndex"] = list.SliceIndex,
+                        ["HasSlice"] = list.SlicePattern != null,
+                    },
+                    patterns: listPatterns);
+            case NegatedPatternNode negated:
+                return Pattern(negated, patterns: [BindPattern(negated.Inner)]);
+            case OrPatternNode orPattern:
+                return Pattern(orPattern, patterns: [BindPattern(orPattern.Left), BindPattern(orPattern.Right)]);
+            case AndPatternNode andPattern:
+                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left), BindPattern(andPattern.Right)]);
+            default:
+                return Pattern(
+                    pattern,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["AnalysisIncomplete"] = true,
+                    });
+        }
+    }
+
+    private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName)
+    {
+        if (_scope.LookupLocal(name) is VariableSymbol existing
+            && string.Equals(existing.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (!_scope.TryDeclare(new VariableSymbol(name, typeName, isMutable: false)))
+        {
+            _diagnostics.ReportError(
+                span,
+                DiagnosticCode.DuplicateDefinition,
+                $"Pattern variable '{name}' is already defined");
+        }
+    }
+
+    private static BoundPattern Pattern(
+        PatternNode pattern,
+        IReadOnlyDictionary<string, object?>? metadata = null,
+        IReadOnlyList<BoundPattern>? patterns = null,
+        IReadOnlyList<BoundExpression>? expressions = null) =>
+        new(pattern.Span, pattern.GetType().Name, metadata, patterns, expressions);
+
+    private BoundExpression BindForallExpression(ForallExpressionNode forall) =>
+        BindQuantifier(forall, forall.BoundVariables, forall.Body);
+
+    private BoundExpression BindExistsExpression(ExistsExpressionNode exists) =>
+        BindQuantifier(exists, exists.BoundVariables, exists.Body);
+
+    private BoundExpression BindQuantifier(
+        ExpressionNode quantifier,
+        IReadOnlyList<QuantifierVariableNode> variables,
+        ExpressionNode body)
+    {
+        using var _ = PushScope(_scope.CreateChild());
+        var symbols = new List<VariableSymbol>(variables.Count);
+        foreach (var variable in variables)
+        {
+            var symbol = new VariableSymbol(variable.Name, variable.TypeName, isMutable: false);
+            if (!_scope.TryDeclare(symbol))
+            {
+                _diagnostics.ReportError(
+                    variable.Span,
+                    DiagnosticCode.DuplicateDefinition,
+                    $"Quantifier variable '{variable.Name}' is already defined");
+            }
+            symbols.Add(symbol);
+        }
+
+        return new BoundQuantifierExpression(
+            quantifier.Span,
+            quantifier.GetType().Name,
+            symbols,
+            BindExpression(body));
+    }
+
+    private BoundExpression BindImplicationExpression(ImplicationExpressionNode implication)
+    {
+        var antecedent = BindExpression(implication.Antecedent);
+        var consequent = BindExpression(implication.Consequent);
+        return Structural(implication, "BOOL", [antecedent, consequent]);
+    }
+
+    private BoundExpression BindStringOperation(StringOperationNode operation)
+    {
+        var resultType = operation.Operation switch
+        {
+            StringOp.Length or StringOp.IndexOf => "INT",
+            StringOp.Contains or StringOp.StartsWith or StringOp.EndsWith
+                or StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace
+                or StringOp.Equals or StringOp.RegexTest => "BOOL",
+            StringOp.Split or StringOp.RegexSplit => "STRING[]",
+            StringOp.RegexMatch => "REGEX_MATCH",
+            _ => "STRING",
+        };
+        return Structural(
+            operation,
+            resultType,
+            BindExpressions(operation.Arguments),
+            new Dictionary<string, object?>
+            {
+                ["Operation"] = operation.Operation,
+                ["ComparisonMode"] = operation.ComparisonMode,
+            });
+    }
+
+    private BoundExpression BindCharOperation(CharOperationNode operation)
+    {
+        var resultType = operation.Operation switch
+        {
+            CharOp.CharCode => "INT",
+            CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace
+                or CharOp.IsUpper or CharOp.IsLower => "BOOL",
+            _ => "CHAR",
+        };
+        return Structural(
+            operation,
+            resultType,
+            BindExpressions(operation.Arguments),
+            new Dictionary<string, object?> { ["Operation"] = operation.Operation });
+    }
+
+    private BoundExpression BindStringBuilderOperation(StringBuilderOperationNode operation)
+    {
+        var resultType = operation.Operation switch
+        {
+            StringBuilderOp.ToString => "STRING",
+            StringBuilderOp.Length => "INT",
+            _ => "STRING_BUILDER",
+        };
+        return Structural(
+            operation,
+            resultType,
+            BindExpressions(operation.Arguments),
+            new Dictionary<string, object?> { ["Operation"] = operation.Operation });
+    }
+
+    private BoundExpression BindStackAlloc(StackAllocNode stackAlloc)
+    {
+        var children = new List<BoundExpression>();
+        if (stackAlloc.Size != null)
+            children.Add(BindExpression(stackAlloc.Size));
+        children.AddRange(BindExpressions(stackAlloc.Initializer));
+        return Structural(
+            stackAlloc,
+            $"Span<{stackAlloc.ElementType}>",
+            children,
+            new Dictionary<string, object?>
+            {
+                ["ElementType"] = stackAlloc.ElementType,
+                ["HasSize"] = stackAlloc.Size != null,
+                ["InitializerCount"] = stackAlloc.Initializer.Count,
+            });
+    }
+
+    private BoundExpression BindAddressOf(AddressOfNode addressOf)
+    {
+        var operand = BindExpression(addressOf.Operand);
+        return Structural(addressOf, $"{operand.TypeName}*", [operand]);
+    }
+
+    private BoundExpression BindPointerDereference(PointerDereferenceNode dereference)
+    {
+        var operand = BindExpression(dereference.Operand);
+        var resultType = operand.TypeName.EndsWith('*')
+            ? operand.TypeName[..^1]
+            : "OBJECT";
+        return Structural(dereference, resultType, [operand]);
+    }
+
+    private BoundExpression BindSizeOf(SizeOfNode sizeOf)
+    {
+        return Structural(
+            sizeOf,
+            "INT",
+            metadata: new Dictionary<string, object?> { ["OperandType"] = sizeOf.TypeName });
+    }
+
+    private BoundExpression BindExpressionCall(ExpressionCallNode call)
+    {
+        var target = BindExpression(call.TargetExpression);
+        var arguments = BindExpressions(call.Arguments);
+        ReportAnalysisIncomplete(call, "Expression-target call resolution is incomplete");
+        return new BoundExpressionCallExpression(call.Span, target, arguments);
+    }
+
+    private BoundExpression BindFallbackInterop(FallbackExpressionNode fallback)
+    {
+        ReportAnalysisIncomplete(fallback, $"Interop fallback feature '{fallback.FeatureName}'");
+        return new BoundInteropExpression(
+            fallback.Span,
+            nameof(FallbackExpressionNode),
+            fallback.OriginalCSharp,
+            "OBJECT",
+            metadata: new Dictionary<string, object?>
+            {
+                ["FeatureName"] = fallback.FeatureName,
+                ["Suggestion"] = fallback.Suggestion,
+            });
+    }
+
+    private BoundExpression BindRawCSharpInterop(RawCSharpExpressionNode raw)
+    {
+        ReportAnalysisIncomplete(raw, "Raw C# expression is opaque to Calor analysis");
+        return new BoundInteropExpression(
+            raw.Span,
+            nameof(RawCSharpExpressionNode),
+            raw.CSharpCode,
+            "OBJECT",
+            metadata: new Dictionary<string, object?>
+            {
+                ["CSharpCode"] = raw.CSharpCode,
+            });
     }
 
     private BoundExpression BindReferenceExpression(ReferenceNode refNode)
@@ -431,24 +1257,22 @@ public sealed class Binder
         return new BoundBinaryExpression(binOp.Span, binOp.Operator, left, right, resultType);
     }
 
-    private string GetBinaryOperationResultType(BinaryOperator op, string leftType, string rightType)
+    private static string GetBinaryOperationResultType(BinaryOperator op, string leftType, string rightType)
     {
-        // Comparison operators always return BOOL
         if (op is BinaryOperator.Equal or BinaryOperator.NotEqual
             or BinaryOperator.LessThan or BinaryOperator.LessOrEqual
             or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual
             or BinaryOperator.And or BinaryOperator.Or)
-        {
             return "BOOL";
-        }
 
-        // Arithmetic operators return the wider type
-        if (leftType == "FLOAT" || rightType == "FLOAT")
-        {
-            return "FLOAT";
-        }
+        if (op == BinaryOperator.Add
+            && (NormalizeTypeName(leftType) == "STRING" || NormalizeTypeName(rightType) == "STRING"))
+            return "STRING";
 
-        return leftType;
+        if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift)
+            return NormalizeTypeName(leftType);
+
+        return GetCommonType(leftType, rightType);
     }
 
     private BoundUnaryExpression BindUnaryOperation(UnaryOperationNode unaryOp)
@@ -466,11 +1290,7 @@ public sealed class Binder
 
     private BoundCallExpression BindCallExpression(CallExpressionNode callExpr)
     {
-        var args = new List<BoundExpression>();
-        foreach (var arg in callExpr.Arguments)
-        {
-            args.Add(BindExpression(arg));
-        }
+        var args = BindExpressions(callExpr.Arguments);
 
         // Try arity-aware lookup first (resolves overloaded sibling methods)
         string returnType;
@@ -482,7 +1302,7 @@ public sealed class Binder
         else
         {
             var symbol = _scope.Lookup(callExpr.Target);
-            returnType = symbol is FunctionSymbol fs ? fs.ReturnType : "INT";
+            returnType = symbol is FunctionSymbol fs ? fs.ReturnType : "OBJECT";
         }
 
         // Populate structured type info for effect resolution
@@ -498,8 +1318,16 @@ public sealed class Binder
                 : typePart;
         }
 
-        return new BoundCallExpression(callExpr.Span, callExpr.Target, args, returnType,
-            resolvedTypeName, resolvedMethodName);
+        return new BoundCallExpression(
+            callExpr.Span,
+            callExpr.Target,
+            args,
+            returnType,
+            resolvedTypeName,
+            resolvedMethodName,
+            argumentNames: callExpr.ArgumentNames,
+            argumentModifiers: callExpr.ArgumentModifiers,
+            typeArguments: callExpr.TypeArguments);
     }
 
     private BoundExpression BindConditionalExpression(ConditionalExpressionNode condExpr)
@@ -508,19 +1336,308 @@ public sealed class Binder
         var whenTrue = BindExpression(condExpr.WhenTrue);
         var whenFalse = BindExpression(condExpr.WhenFalse);
 
-        return new BoundConditionalExpression(condExpr.Span, condition, whenTrue, whenFalse);
+        return new BoundConditionalExpression(
+            condExpr.Span,
+            condition,
+            whenTrue,
+            whenFalse,
+            GetCommonType(whenTrue.TypeName, whenFalse.TypeName));
     }
 
-    private BoundExpression BindFallbackExpression(ExpressionNode expr)
+    private static BoundStructuralExpression Structural(
+        ExpressionNode expression,
+        string typeName,
+        IReadOnlyList<BoundExpression>? children = null,
+        IReadOnlyDictionary<string, object?>? metadata = null)
     {
-        // Return an opaque expression for unsupported types.
-        // CRITICAL: Do NOT return BoundIntLiteral(0) — that causes the division-by-zero
-        // checker to report false positives for every unhandled expression used as a divisor
-        // (e.g., cast expressions, array length, string operations, indexers).
-        // Instead, return a call expression with an opaque target that no checker will
-        // confuse with a zero literal or constant.
-        return new BoundCallExpression(expr.Span, $"<unsupported:{expr.GetType().Name}>",
-            Array.Empty<BoundExpression>(), "OBJECT");
+        return new BoundStructuralExpression(
+            expression.Span,
+            expression.GetType().Name,
+            typeName,
+            children,
+            metadata);
+    }
+
+    private BoundUnsupportedExpression BindUnsupportedExpression(
+        ExpressionNode expression,
+        string typeName = "OBJECT",
+        IReadOnlyList<BoundExpression>? children = null,
+        IReadOnlyDictionary<string, object?>? metadata = null,
+        string reason = "Analysis support is incomplete")
+    {
+        children ??= BindReflectedExpressionChildren(expression);
+        ReportAnalysisIncomplete(expression, reason);
+        return new BoundUnsupportedExpression(
+            expression.Span,
+            expression.GetType().Name,
+            typeName,
+            children,
+            metadata,
+            reason);
+    }
+
+    private IReadOnlyList<BoundExpression> BindReflectedExpressionChildren(ExpressionNode expression)
+    {
+        var children = new List<BoundExpression>();
+        foreach (var property in expression.GetType().GetProperties())
+        {
+            if (property.GetIndexParameters().Length != 0 || property.Name == nameof(AstNode.Span))
+                continue;
+
+            var value = property.GetValue(expression);
+            if (value is ExpressionNode child)
+            {
+                children.Add(BindExpression(child));
+            }
+            else if (value is IEnumerable<ExpressionNode> expressionChildren)
+            {
+                children.AddRange(BindExpressions(expressionChildren));
+            }
+        }
+        return children;
+    }
+
+    private void ReportAnalysisIncomplete(ExpressionNode expression, string detail)
+    {
+        var typeName = expression.GetType().Name;
+        if (_unsupportedNodeTypes.Add(typeName))
+        {
+            _diagnostics.ReportInfo(
+                expression.Span,
+                DiagnosticCode.AnalysisUnsupportedNode,
+                $"Expression type '{typeName}' has incomplete analysis support; {detail}");
+        }
+    }
+
+    private IReadOnlyList<BoundExpression> BindExpressions(IEnumerable<ExpressionNode> expressions) =>
+        expressions.Select(BindExpression).ToArray();
+
+    private static string MakeArrayType(string elementType, int rank) =>
+        $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
+
+    private static string MakeOptionType(string innerType) =>
+        $"OPTION[inner={innerType}]";
+
+    private static string MakeResultType(string okType, string errorType) =>
+        $"RESULT[ok={okType}][err={errorType}]";
+
+    private static string UnwrapAwaitedType(string typeName)
+    {
+        foreach (var prefix in new[] { "Task<", "ValueTask<", "TASK<", "VALUETASK<" })
+        {
+            if (typeName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                && typeName.EndsWith('>'))
+                return typeName[prefix.Length..^1];
+        }
+
+        return typeName.Equals("Task", StringComparison.OrdinalIgnoreCase)
+            || typeName.Equals("ValueTask", StringComparison.OrdinalIgnoreCase)
+            ? "VOID"
+            : "OBJECT";
+    }
+
+    private static string UnwrapOptionOrNullable(string typeName)
+    {
+        const string optionPrefix = "OPTION[inner=";
+        if (typeName.StartsWith(optionPrefix, StringComparison.OrdinalIgnoreCase)
+            && typeName.EndsWith(']'))
+            return typeName[optionPrefix.Length..^1];
+        if (typeName.EndsWith("?", StringComparison.Ordinal))
+            return typeName[..^1];
+        return typeName;
+    }
+
+    private static string GetIndexedElementType(string typeName)
+    {
+        const string arrayPrefix = "ARRAY[element=";
+        if (typeName.StartsWith(arrayPrefix, StringComparison.OrdinalIgnoreCase)
+            && typeName.EndsWith(']'))
+            return typeName[arrayPrefix.Length..^1];
+
+        var bracket = typeName.LastIndexOf('[');
+        if (bracket > 0 && typeName.EndsWith(']'))
+            return typeName[..bracket];
+
+        var genericStart = typeName.IndexOf('<');
+        if (genericStart > 0 && typeName.EndsWith('>'))
+        {
+            var genericName = typeName[..genericStart];
+            var arguments = SplitTopLevelTypeArguments(typeName[(genericStart + 1)..^1]);
+            if (genericName.Contains("Dictionary", StringComparison.OrdinalIgnoreCase)
+                || genericName.Equals("Dict", StringComparison.OrdinalIgnoreCase))
+                return arguments.Count > 1 ? arguments[1] : "OBJECT";
+            return arguments.Count > 0 ? arguments[0] : "OBJECT";
+        }
+
+        return "OBJECT";
+    }
+
+    private static IReadOnlyList<string> SplitTopLevelTypeArguments(string text)
+    {
+        var result = new List<string>();
+        var depth = 0;
+        var start = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            switch (text[index])
+            {
+                case '<':
+                case '[':
+                    depth++;
+                    break;
+                case '>':
+                case ']':
+                    depth--;
+                    break;
+                case ',' when depth == 0:
+                    result.Add(text[start..index].Trim());
+                    start = index + 1;
+                    break;
+            }
+        }
+        result.Add(text[start..].Trim());
+        return result;
+    }
+
+    private static string GetCommonType(string leftType, string rightType)
+    {
+        var left = NormalizeTypeName(leftType);
+        var right = NormalizeTypeName(rightType);
+
+        if (left == right)
+            return left;
+        if (left == "NEVER")
+            return right;
+        if (right == "NEVER")
+            return left;
+        if (left == "OBJECT" || right == "OBJECT")
+            return "OBJECT";
+
+        var leftRank = GetNumericRank(left);
+        var rightRank = GetNumericRank(right);
+        if (leftRank >= 0 && rightRank >= 0)
+        {
+            if ((left == "DECIMAL" && right.StartsWith("FLOAT", StringComparison.Ordinal))
+                || (right == "DECIMAL" && left.StartsWith("FLOAT", StringComparison.Ordinal)))
+                return "OBJECT";
+            return leftRank >= rightRank ? left : right;
+        }
+
+        return "OBJECT";
+    }
+
+    private static string? GetCommonType(IEnumerable<string>? types)
+    {
+        if (types == null)
+            return null;
+
+        using var enumerator = types.GetEnumerator();
+        if (!enumerator.MoveNext())
+            return null;
+
+        var result = enumerator.Current;
+        while (enumerator.MoveNext())
+            result = GetCommonType(result, enumerator.Current);
+        return NormalizeTypeName(result);
+    }
+
+    private static int GetNumericRank(string typeName) => typeName switch
+    {
+        "INT[bits=8][signed=true]" or "INT[bits=8][signed=false]" => 0,
+        "INT[bits=16][signed=true]" or "INT[bits=16][signed=false]" => 1,
+        "INT" or "UINT" => 2,
+        "LONG" or "ULONG" or "INT[bits=64][signed=true]" or "INT[bits=64][signed=false]" => 3,
+        "FLOAT[bits=32]" => 4,
+        "FLOAT" => 5,
+        "DECIMAL" => 6,
+        _ => -1,
+    };
+
+    private static string NormalizeTypeName(string typeName)
+    {
+        var trimmed = typeName.Trim();
+        return trimmed.ToLowerInvariant() switch
+        {
+            "i8" or "sbyte" => "INT[bits=8][signed=true]",
+            "int[bits=8][signed=true]" => "INT[bits=8][signed=true]",
+            "u8" or "byte" => "INT[bits=8][signed=false]",
+            "int[bits=8][signed=false]" => "INT[bits=8][signed=false]",
+            "i16" or "short" => "INT[bits=16][signed=true]",
+            "int[bits=16][signed=true]" => "INT[bits=16][signed=true]",
+            "u16" or "ushort" => "INT[bits=16][signed=false]",
+            "int[bits=16][signed=false]" => "INT[bits=16][signed=false]",
+            "i32" or "int" or "int32" => "INT",
+            "int[bits=32][signed=true]" => "INT",
+            "u32" or "uint" or "uint32" => "UINT",
+            "int[bits=32][signed=false]" => "UINT",
+            "i64" or "long" or "int64" => "LONG",
+            "int[bits=64][signed=true]" => "LONG",
+            "u64" or "ulong" or "uint64" => "ULONG",
+            "int[bits=64][signed=false]" => "ULONG",
+            "f32" or "single" => "FLOAT[bits=32]",
+            "float[bits=32]" => "FLOAT[bits=32]",
+            "f64" or "float" or "double" => "FLOAT",
+            "dec" or "decimal" => "DECIMAL",
+            "str" or "string" => "STRING",
+            "bool" or "boolean" => "BOOL",
+            "any" or "object" or "unknown" => "OBJECT",
+            "never" => "NEVER",
+            _ => trimmed,
+        };
+    }
+
+    private static IEnumerable<string> CollectReturnTypes(IReadOnlyList<BoundStatement>? statements)
+    {
+        if (statements == null)
+            yield break;
+
+        foreach (var statement in statements)
+        {
+            switch (statement)
+            {
+                case BoundReturnStatement { Expression: not null } returnStatement:
+                    yield return returnStatement.Expression.TypeName;
+                    break;
+                case BoundIfStatement ifStatement:
+                    foreach (var type in CollectReturnTypes(ifStatement.ThenBody))
+                        yield return type;
+                    foreach (var clause in ifStatement.ElseIfClauses)
+                        foreach (var type in CollectReturnTypes(clause.Body))
+                            yield return type;
+                    foreach (var type in CollectReturnTypes(ifStatement.ElseBody))
+                        yield return type;
+                    break;
+                case BoundWhileStatement whileStatement:
+                    foreach (var type in CollectReturnTypes(whileStatement.Body))
+                        yield return type;
+                    break;
+                case BoundForStatement forStatement:
+                    foreach (var type in CollectReturnTypes(forStatement.Body))
+                        yield return type;
+                    break;
+                case BoundForeachStatement foreachStatement:
+                    foreach (var type in CollectReturnTypes(foreachStatement.Body))
+                        yield return type;
+                    break;
+                case BoundDoWhileStatement doWhileStatement:
+                    foreach (var type in CollectReturnTypes(doWhileStatement.Body))
+                        yield return type;
+                    break;
+                case BoundUsingStatement usingStatement:
+                    foreach (var type in CollectReturnTypes(usingStatement.Body))
+                        yield return type;
+                    break;
+                case BoundTryStatement tryStatement:
+                    foreach (var type in CollectReturnTypes(tryStatement.TryBody))
+                        yield return type;
+                    foreach (var clause in tryStatement.CatchClauses)
+                        foreach (var type in CollectReturnTypes(clause.Body))
+                            yield return type;
+                    foreach (var type in CollectReturnTypes(tryStatement.FinallyBody))
+                        yield return type;
+                    break;
+            }
+        }
     }
 
     /// <summary>
@@ -584,54 +1701,7 @@ public sealed class Binder
     private BoundMatchStatement BindMatchStatement(MatchStatementNode matchStmt)
     {
         var target = BindExpression(matchStmt.Target);
-
-        var cases = new List<BoundMatchCase>();
-        foreach (var matchCase in matchStmt.Cases)
-        {
-            using var _caseScope = PushScope(_scope.CreateChild());
-
-            // Bind pattern (if not a wildcard)
-            BoundExpression? pattern = null;
-            var isDefault = false;
-
-            // Check for wildcard pattern
-            if (matchCase.Pattern is WildcardPatternNode)
-            {
-                isDefault = true;
-            }
-            else if (matchCase.Pattern is LiteralPatternNode literalPattern)
-            {
-                pattern = BindExpression(literalPattern.Literal);
-            }
-            else if (matchCase.Pattern is ConstantPatternNode constantPattern)
-            {
-                pattern = BindExpression(constantPattern.Value);
-            }
-            else if (matchCase.Pattern is VariablePatternNode varPattern)
-            {
-                // Variable pattern captures a value - treat as default for now
-                // TODO: Add variable binding to scope
-                isDefault = true;
-            }
-            else
-            {
-                // For other pattern types, mark as default for now
-                isDefault = true;
-            }
-
-            // Bind guard if present
-            BoundExpression? guard = null;
-            if (matchCase.Guard != null)
-            {
-                guard = BindExpression(matchCase.Guard);
-            }
-
-            var body = BindStatements(matchCase.Body);
-
-            cases.Add(new BoundMatchCase(matchCase.Span, pattern, isDefault, guard, body));
-        }
-
-        return new BoundMatchStatement(matchStmt.Span, target, cases);
+        return new BoundMatchStatement(matchStmt.Span, target, BindMatchCases(matchStmt.Cases));
     }
 
     // ===== New statement binders for class member bodies =====

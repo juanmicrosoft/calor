@@ -167,7 +167,8 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
         DiagnosticBag diagnostics,
         List<BoundExpression> pathConditions)
     {
-        if (BoundNodeHelpers.ContainsDivision(expr, out var divisionExpr) && divisionExpr != null)
+        if (expr is BoundBinaryExpression divisionExpr
+            && divisionExpr.Operator is BinaryOperator.Divide or BinaryOperator.Modulo)
         {
             var divisor = BoundNodeHelpers.GetDivisor(divisionExpr);
             if (divisor != null)
@@ -176,31 +177,8 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
             }
         }
 
-        // Recursively check subexpressions
-        switch (expr)
-        {
-            case BoundBinaryExpression binExpr:
-                CheckExpression(binExpr.Left, function, diagnostics, pathConditions);
-                CheckExpression(binExpr.Right, function, diagnostics, pathConditions);
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                CheckExpression(unaryExpr.Operand, function, diagnostics, pathConditions);
-                break;
-
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                {
-                    CheckExpression(arg, function, diagnostics, pathConditions);
-                }
-                break;
-
-            case BoundConditionalExpression condExpr:
-                CheckExpression(condExpr.Condition, function, diagnostics, pathConditions);
-                CheckExpression(condExpr.WhenTrue, function, diagnostics, pathConditions);
-                CheckExpression(condExpr.WhenFalse, function, diagnostics, pathConditions);
-                break;
-        }
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            CheckExpression(child, function, diagnostics, pathConditions);
     }
 
     private void CheckDivisor(
