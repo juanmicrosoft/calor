@@ -2738,6 +2738,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(MethodNode node)
     {
+        // #879: the postcondition-elision key is a mutable cursor
+        // (_currentFunctionId, _currentPostconditionIndex) that every emission path
+        // visiting contracts MUST maintain. Before this was set here, class-method
+        // postconditions never elided even when Proven, §MT contract violations
+        // reported "unknown" (or a foreign id) as the failing function, and — had
+        // §EEXT contracts ever been verified — a method's check could have been
+        // deleted on an unrelated function's proof.
+        _currentFunctionId = node.Id;
+        _currentPostconditionIndex = 0;
+
         // Clear declared variables tracking for new method scope
         ResetDeclScopes(node.Parameters);
 
@@ -5712,6 +5722,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     case Verification.Obligations.ObligationStatus.Boundary:
                     case Verification.Obligations.ObligationStatus.Failed:
                     case Verification.Obligations.ObligationStatus.Timeout:
+                    // #879 ride-along: Unsupported keeps its runtime guard by design.
+                    // Previously it fell through to the no-guard TODO comment — and
+                    // Assumed's guard survived only because ToObligationStatus maps it
+                    // onto Timeout. An obligation the solver cannot model must keep its
+                    // check (#779 posture: guards stay until verification proves).
+                    case Verification.Obligations.ObligationStatus.Unsupported:
                         // Emit runtime guard
                         var condition = node.Condition.Accept(this);
                         AppendLine($"if (!({condition})) throw new InvalidOperationException(" +
