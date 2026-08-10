@@ -105,7 +105,7 @@ Use `--verify` to enable Z3 static contract verification:
 calor -i MyModule.calr -o MyModule.g.cs --verify
 ```
 
-When enabled, the compiler uses the Z3 SMT solver to attempt proving contracts at compile time. Proven contracts may have their runtime checks elided.
+When enabled, the compiler uses the Z3 SMT solver to attempt proving contracts at compile time. Verdicts are diagnostic by default: proven contracts keep their runtime checks unless you also pass `--elide-proven-guards` (elision is opt-in as of v0.13).
 
 Example output:
 

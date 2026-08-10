@@ -488,11 +488,47 @@ public sealed class ObligationTests
                 obl.Status = ObligationStatus.Discharged;
         }
 
-        var emitter = new CSharpEmitter(ContractMode.Debug, null, null, tracker);
+        // Elision is opt-in as of v0.13 (roadmap §2.1); this test pins the machinery.
+        var emitter = new CSharpEmitter(ContractMode.Debug, null, null, tracker)
+        {
+            ElideProvenGuards = true
+        };
         var csharp = emitter.Emit(module);
 
         Assert.Contains("// PROVEN:", csharp);
         Assert.DoesNotContain("// TODO:", csharp);
+    }
+
+    [Fact]
+    public void CSharpEmit_DischargedObligation_DefaultKeepsGuard()
+    {
+        // v0.13 default: verification is diagnostic. Without the opt-in, a Discharged
+        // obligation keeps its runtime check.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        var genr = new ObligationGenerator(tracker);
+        genr.Generate(module);
+        foreach (var obl in tracker.Obligations)
+        {
+            if (obl.Kind == ObligationKind.ProofObligation)
+                obl.Status = ObligationStatus.Discharged;
+        }
+
+        var emitter = new CSharpEmitter(ContractMode.Debug, null, null, tracker);
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("throw new InvalidOperationException", csharp);
+        Assert.DoesNotContain("// PROVEN:", csharp);
     }
 
     [Fact]
