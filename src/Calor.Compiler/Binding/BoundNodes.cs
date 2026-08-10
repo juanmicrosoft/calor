@@ -472,6 +472,20 @@ public static class BoundChildren
         BoundRecordCreation rec => rec.Fields.Select(f => f.Value),
         BoundWithExpression with => [with.Target, .. with.Assignments.Select(a => a.Value)],
         BoundThrowExpression thr => [thr.Exception],
+        // #762 B3 — arrays/indexes + collections.
+        BoundArrayCreation ac => ac.Size is null ? ac.Initializer : [ac.Size, .. ac.Initializer],
+        BoundArrayAccess aa => [aa.Array, aa.Index],
+        BoundArrayLength al => [al.Array],
+        BoundMultiDimArrayCreation mc => [.. mc.DimensionSizes, .. mc.InitializerRows.SelectMany(r => r)],
+        BoundMultiDimArrayAccess ma => [ma.Array, .. ma.Indices],
+        BoundIndexFromEnd ie => [ie.Offset],
+        BoundRangeExpression r => new[] { r.Start, r.End }.Where(e => e is not null).Cast<BoundExpression>(),
+        BoundListCreation lc => lc.Elements,
+        BoundSetCreation sc => sc.Elements,
+        BoundDictionaryCreation dc => dc.Entries.SelectMany(e => new[] { e.Key, e.Value }),
+        BoundCollectionContains cc => [cc.KeyOrValue],
+        BoundCollectionCount cn => [cn.Collection],
+        BoundTupleLiteral tl => tl.Elements,
         _ => [],
     };
 }
@@ -573,6 +587,204 @@ public sealed class BoundThrowExpression : BoundExpression
     public override string TypeName => "NEVER";
     public BoundThrowExpression(TextSpan span, BoundExpression exception) : base(span)
         => Exception = exception;
+}
+
+/// <summary>A bound key→value expression pair (dictionary entries).</summary>
+public sealed record BoundPair(BoundExpression Key, BoundExpression Value, TextSpan Span);
+
+/// <summary>#762 B3: array creation — size and initializers are bound children.</summary>
+public sealed class BoundArrayCreation : BoundExpression
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string ElementType { get; }
+    public BoundExpression? Size { get; }
+    public IReadOnlyList<BoundExpression> Initializer { get; }
+    public override string TypeName { get; }
+    public BoundArrayCreation(TextSpan span, string id, string name, string elementType,
+        BoundExpression? size, IReadOnlyList<BoundExpression> initializer) : base(span)
+    {
+        Id = id; Name = name; ElementType = elementType; Size = size; Initializer = initializer;
+        TypeName = $"{elementType}[]";
+    }
+}
+
+/// <summary>#762 B3: array element access. Element type derives from the array's
+/// composed type string when it has the "T[]" shape; "OBJECT" otherwise (0.13 string
+/// types — 0.14's typed representation replaces the derivation).</summary>
+public sealed class BoundArrayAccess : BoundExpression
+{
+    public BoundExpression Array { get; }
+    public BoundExpression Index { get; }
+    public override string TypeName { get; }
+    public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index) : base(span)
+    {
+        Array = array; Index = index;
+        TypeName = array.TypeName.EndsWith("[]", StringComparison.Ordinal)
+            ? array.TypeName[..^2]
+            : "OBJECT";
+    }
+}
+
+/// <summary>#762 B3: array length — always INT.</summary>
+public sealed class BoundArrayLength : BoundExpression
+{
+    public BoundExpression Array { get; }
+    public override string TypeName => "INT";
+    public BoundArrayLength(TextSpan span, BoundExpression array) : base(span) => Array = array;
+}
+
+/// <summary>#762 B3: multi-dimensional array creation.</summary>
+public sealed class BoundMultiDimArrayCreation : BoundExpression
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string ElementType { get; }
+    public int Rank { get; }
+    public IReadOnlyList<BoundExpression> DimensionSizes { get; }
+    /// <summary>Row structure RETAINED (B3 review M2): rectangularity/shape-vs-rank
+    /// validation needs it; flattening happens only in BoundChildren.Of.</summary>
+    public IReadOnlyList<IReadOnlyList<BoundExpression>> InitializerRows { get; }
+    public override string TypeName { get; }
+    public BoundMultiDimArrayCreation(TextSpan span, string id, string name, string elementType,
+        int rank, IReadOnlyList<BoundExpression> dimensionSizes,
+        IReadOnlyList<IReadOnlyList<BoundExpression>> initializerRows)
+        : base(span)
+    {
+        Id = id; Name = name; ElementType = elementType; Rank = rank;
+        DimensionSizes = dimensionSizes; InitializerRows = initializerRows;
+        TypeName = $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
+    }
+}
+
+/// <summary>#762 B3: multi-dimensional array access.</summary>
+public sealed class BoundMultiDimArrayAccess : BoundExpression
+{
+    public BoundExpression Array { get; }
+    public IReadOnlyList<BoundExpression> Indices { get; }
+    public override string TypeName { get; }
+    public BoundMultiDimArrayAccess(TextSpan span, BoundExpression array,
+        IReadOnlyList<BoundExpression> indices) : base(span)
+    {
+        Array = array; Indices = indices;
+        // LastIndexOf: on jagged shapes like "i32[][,]" the element type is
+        // everything before the TRAILING bracket group ("i32[]"), not "i32" (B3 review m5).
+        var t = array.TypeName;
+        var open = t.LastIndexOf('[');
+        TypeName = open > 0 ? t[..open] : "OBJECT";
+    }
+}
+
+/// <summary>#762 B3: index-from-end (^n).</summary>
+public sealed class BoundIndexFromEnd : BoundExpression
+{
+    public BoundExpression Offset { get; }
+    public override string TypeName => "INDEX";
+    public BoundIndexFromEnd(TextSpan span, BoundExpression offset) : base(span) => Offset = offset;
+}
+
+/// <summary>#762 B3: range (a..b) — either bound may be absent.</summary>
+public sealed class BoundRangeExpression : BoundExpression
+{
+    public BoundExpression? Start { get; }
+    public BoundExpression? End { get; }
+    public override string TypeName => "RANGE";
+    public BoundRangeExpression(TextSpan span, BoundExpression? start, BoundExpression? end)
+        : base(span)
+    { Start = start; End = end; }
+}
+
+/// <summary>#762 B3: list creation.</summary>
+public sealed class BoundListCreation : BoundExpression
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string ElementType { get; }
+    public IReadOnlyList<BoundExpression> Elements { get; }
+    public override string TypeName { get; }
+    public BoundListCreation(TextSpan span, string id, string name, string elementType,
+        IReadOnlyList<BoundExpression> elements) : base(span)
+    {
+        Id = id; Name = name; ElementType = elementType; Elements = elements;
+        // Spelling matches the PARSER's own vocabulary for the same construct
+        // (B3 review M3: the bind statement types §SET as "HashSet<T>").
+        TypeName = $"List<{elementType}>";
+    }
+}
+
+/// <summary>#762 B3: set creation.</summary>
+public sealed class BoundSetCreation : BoundExpression
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string ElementType { get; }
+    public IReadOnlyList<BoundExpression> Elements { get; }
+    public override string TypeName { get; }
+    public BoundSetCreation(TextSpan span, string id, string name, string elementType,
+        IReadOnlyList<BoundExpression> elements) : base(span)
+    {
+        Id = id; Name = name; ElementType = elementType; Elements = elements;
+        // Spelling matches the PARSER's own vocabulary for the same construct
+        // (B3 review M3: the bind statement types §SET as "HashSet<T>").
+        TypeName = $"HashSet<{elementType}>";
+    }
+}
+
+/// <summary>#762 B3: dictionary creation — entries are bound key/value pairs.</summary>
+public sealed class BoundDictionaryCreation : BoundExpression
+{
+    public string Name { get; }
+    public string KeyType { get; }
+    public string ValueType { get; }
+    public IReadOnlyList<BoundPair> Entries { get; }
+    public override string TypeName { get; }
+    public string Id { get; }
+    public BoundDictionaryCreation(TextSpan span, string id, string name, string keyType,
+        string valueType, IReadOnlyList<BoundPair> entries) : base(span)
+    {
+        Id = id; Name = name; KeyType = keyType; ValueType = valueType; Entries = entries;
+        // No space: matches Parser.cs/RoslynSyntaxVisitor's "Dictionary<K,V>" (review M3).
+        TypeName = $"Dictionary<{keyType},{valueType}>";
+    }
+}
+
+/// <summary>#762 B3: collection membership test — BOOL; the collection itself is a NAME
+/// (metadata, matching the AST shape), the probed key/value is a bound child.</summary>
+public sealed class BoundCollectionContains : BoundExpression
+{
+    public string CollectionName { get; }
+    public BoundExpression KeyOrValue { get; }
+    /// <summary>Value vs Key vs DictValue — THREE different operations (.Contains /
+    /// .ContainsKey / .ContainsValue); dropping this was B3 review's CRITICAL.</summary>
+    public Ast.ContainsMode Mode { get; }
+    // NOTE: the collection itself is a NAME (AST shape) — GetUsedVariables cannot
+    // report it as used; liveness blindness tracked with the #786 checker re-platform.
+    public override string TypeName => "BOOL";
+    public BoundCollectionContains(TextSpan span, string collectionName,
+        BoundExpression keyOrValue, Ast.ContainsMode mode) : base(span)
+    { CollectionName = collectionName; KeyOrValue = keyOrValue; Mode = mode; }
+}
+
+/// <summary>#762 B3: collection count — INT.</summary>
+public sealed class BoundCollectionCount : BoundExpression
+{
+    public BoundExpression Collection { get; }
+    public override string TypeName => "INT";
+    public BoundCollectionCount(TextSpan span, BoundExpression collection) : base(span)
+        => Collection = collection;
+}
+
+/// <summary>#762 B3: tuple literal.</summary>
+public sealed class BoundTupleLiteral : BoundExpression
+{
+    public IReadOnlyList<BoundExpression> Elements { get; }
+    public override string TypeName { get; }
+    public BoundTupleLiteral(TextSpan span, IReadOnlyList<BoundExpression> elements) : base(span)
+    {
+        Elements = elements;
+        // Element types composed rather than discarded (review M3).
+        TypeName = $"Tuple<{string.Join(",", elements.Select(e => e.TypeName))}>";
+    }
 }
 
 /// <summary>
