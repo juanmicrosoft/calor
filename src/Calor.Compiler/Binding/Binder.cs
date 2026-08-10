@@ -395,6 +395,66 @@ public sealed class Binder
                 },
             [typeof(ThrowExpressionNode)] = (b, e) =>
                 { var n = (ThrowExpressionNode)e; return new BoundThrowExpression(n.Span, b.BindExpression(n.Exception)); },
+            // #762 B3 — arrays/indexes + collections (13 classes). Every AST property is
+            // retained (the B2 review's children-retention standard).
+            [typeof(ArrayCreationNode)] = (b, e) =>
+                {
+                    var n = (ArrayCreationNode)e;
+                    return new BoundArrayCreation(n.Span, n.Name, n.ElementType,
+                        n.Size is null ? null : b.BindExpression(n.Size),
+                        n.Initializer.Select(b.BindExpression).ToList());
+                },
+            [typeof(ArrayAccessNode)] = (b, e) =>
+                { var n = (ArrayAccessNode)e; return new BoundArrayAccess(n.Span, b.BindExpression(n.Array), b.BindExpression(n.Index)); },
+            [typeof(ArrayLengthNode)] = (b, e) =>
+                { var n = (ArrayLengthNode)e; return new BoundArrayLength(n.Span, b.BindExpression(n.Array)); },
+            [typeof(MultiDimArrayCreationNode)] = (b, e) =>
+                {
+                    var n = (MultiDimArrayCreationNode)e;
+                    return new BoundMultiDimArrayCreation(n.Span, n.Name, n.ElementType, n.Rank,
+                        n.DimensionSizes.Select(b.BindExpression).ToList(),
+                        n.Initializer.SelectMany(row => row).Select(b.BindExpression).ToList());
+                },
+            [typeof(MultiDimArrayAccessNode)] = (b, e) =>
+                {
+                    var n = (MultiDimArrayAccessNode)e;
+                    return new BoundMultiDimArrayAccess(n.Span, b.BindExpression(n.Array),
+                        n.Indices.Select(b.BindExpression).ToList());
+                },
+            [typeof(IndexFromEndNode)] = (b, e) =>
+                { var n = (IndexFromEndNode)e; return new BoundIndexFromEnd(n.Span, b.BindExpression(n.Offset)); },
+            [typeof(RangeExpressionNode)] = (b, e) =>
+                {
+                    var n = (RangeExpressionNode)e;
+                    return new BoundRangeExpression(n.Span,
+                        n.Start is null ? null : b.BindExpression(n.Start),
+                        n.End is null ? null : b.BindExpression(n.End));
+                },
+            [typeof(ListCreationNode)] = (b, e) =>
+                {
+                    var n = (ListCreationNode)e;
+                    return new BoundListCreation(n.Span, n.Name, n.ElementType,
+                        n.Elements.Select(b.BindExpression).ToList());
+                },
+            [typeof(SetCreationNode)] = (b, e) =>
+                {
+                    var n = (SetCreationNode)e;
+                    return new BoundSetCreation(n.Span, n.Name, n.ElementType,
+                        n.Elements.Select(b.BindExpression).ToList());
+                },
+            [typeof(DictionaryCreationNode)] = (b, e) =>
+                {
+                    var n = (DictionaryCreationNode)e;
+                    return new BoundDictionaryCreation(n.Span, n.Name, n.KeyType, n.ValueType,
+                        n.Entries.Select(kv => new BoundPair(
+                            b.BindExpression(kv.Key), b.BindExpression(kv.Value), kv.Span)).ToList());
+                },
+            [typeof(CollectionContainsNode)] = (b, e) =>
+                { var n = (CollectionContainsNode)e; return new BoundCollectionContains(n.Span, n.CollectionName, b.BindExpression(n.KeyOrValue)); },
+            [typeof(CollectionCountNode)] = (b, e) =>
+                { var n = (CollectionCountNode)e; return new BoundCollectionCount(n.Span, b.BindExpression(n.Collection)); },
+            [typeof(TupleLiteralNode)] = (b, e) =>
+                { var n = (TupleLiteralNode)e; return new BoundTupleLiteral(n.Span, n.Elements.Select(b.BindExpression).ToList()); },
         };
 
         // Every remaining concrete ExpressionNode subclass dispatches to BindIncomplete.
