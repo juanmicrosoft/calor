@@ -2652,7 +2652,7 @@ public sealed class Parser
                 _ => args[0].ToString() ?? ""
             };
             var callArgs = args.Skip(1).ToList();
-            return new CallExpressionNode(span, target, callArgs);
+            return new CallExpressionNode(span, target, RejectKeywordArgs(target, callArgs));
         }
 
         // Fallback: if the "operator" is a complex expression like (expr as Type),
@@ -2680,7 +2680,7 @@ public sealed class Parser
         // Fallback: treat unknown operator with args as a method call on first arg
         if (opText.Contains('.') && args.Count >= 0)
         {
-            return new CallExpressionNode(span, opText, args);
+            return new CallExpressionNode(span, opText, RejectKeywordArgs(opText, args));
         }
 
         // Unknown operator — check if this looks like a C# construct the converter
@@ -2714,7 +2714,37 @@ public sealed class Parser
         }
 
         // Recover by treating as a method call
-        return new CallExpressionNode(span, opText, args);
+        return new CallExpressionNode(span, opText, RejectKeywordArgs(opText, args));
+    }
+
+    /// <summary>
+    /// KeywordArgNode is internal to parsing: string operations consume comparison-mode
+    /// keywords, and no other node type accepts them. Any KeywordArgNode still present when
+    /// an argument list reaches a generic CallExpressionNode recovery is an error the user
+    /// can act on — not a node that may escape into the AST, where its no-op Accept turns
+    /// into a null child and an unlocatable NullReferenceException downstream (#874).
+    /// </summary>
+    private List<ExpressionNode> RejectKeywordArgs(string callTarget, List<ExpressionNode> args)
+    {
+        if (!args.Any(a => a is KeywordArgNode))
+            return args;
+
+        var kept = new List<ExpressionNode>(args.Count);
+        foreach (var arg in args)
+        {
+            if (arg is KeywordArgNode kw)
+            {
+                _diagnostics.ReportError(kw.Span, DiagnosticCode.InvalidLispExpression,
+                    $"Keyword argument ':{kw.Name}' is not supported on call '{callTarget}'. " +
+                    "Comparison-mode keywords are only valid on the built-in string operations " +
+                    "(e.g. starts, contains, equals — the lowercase forms).");
+            }
+            else
+            {
+                kept.Add(arg);
+            }
+        }
+        return kept;
     }
 
     private (TokenKind kind, string text, TextSpan span) ParseLispOperator()
