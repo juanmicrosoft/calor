@@ -29,9 +29,10 @@ configured Application Insights resource. For redistributed or internally
 hosted builds, the party setting `CALOR_TELEMETRY_CONNECTION_STRING` is the
 operator and data recipient.
 
-Endpoint/channel failures never affect compiler behavior. Configuration,
-schema validation, value redaction, serialization, or send failures all fail
-closed to no telemetry.
+Endpoint/channel failures never affect compiler behavior. Missing/invalid
+configuration disables telemetry. Schema or value validation drops the
+affected event without sending it; serialization or channel failures disable
+the remaining telemetry session.
 
 ## Preview
 

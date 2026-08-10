@@ -472,7 +472,6 @@ public sealed class CalorTelemetry : IDisposable
                     eventName, properties, metrics, _context, out var payload)
                 || payload == null)
             {
-                _failed = true;
                 return;
             }
 

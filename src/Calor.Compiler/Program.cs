@@ -279,10 +279,11 @@ public class Program
         rootCommand.AddCommand(TestCommand.Create());
         rootCommand.AddCommand(WatchCommand.Create());
 
-        // Initialize telemetry for subcommands
-        // Parse --no-telemetry early from args
-        var noTelemetryEarly = HasEnabledFlag(args, "--no-telemetry");
-        var telemetryPreviewEarly = HasEnabledFlag(args, "--telemetry-preview");
+        // Parse telemetry options through System.CommandLine so every accepted
+        // delimiter/form has the same behavior as command execution.
+        var earlyParseResult = rootCommand.Parse(args);
+        var noTelemetryEarly = earlyParseResult.GetValueForOption(noTelemetryOption);
+        var telemetryPreviewEarly = earlyParseResult.GetValueForOption(telemetryPreviewOption);
         if (!CalorTelemetry.IsInitialized || telemetryPreviewEarly)
         {
             CalorTelemetry.Initialize(noTelemetryEarly, telemetryPreviewEarly);
@@ -302,12 +303,6 @@ public class Program
 
         return result;
     }
-
-    private static bool HasEnabledFlag(IEnumerable<string> args, string optionName) =>
-        args.Any(arg =>
-            arg.Equals(optionName, StringComparison.Ordinal)
-            || arg.Equals($"{optionName}=true", StringComparison.OrdinalIgnoreCase)
-            || arg.Equals($"{optionName}=1", StringComparison.Ordinal));
 
     private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text")
         => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format));
@@ -973,40 +968,15 @@ public class Program
 
         foreach (var diag in diagnostics.Errors)
         {
-            telemetry.TrackDiagnosticEvent(diag.Code, "Error", GetDiagnosticCategory(diag.Code));
+            telemetry.TrackDiagnosticEvent(
+                diag.Code, "Error", TelemetrySchema.GetDiagnosticCategory(diag.Code));
         }
 
         foreach (var diag in diagnostics.Warnings)
         {
-            telemetry.TrackDiagnosticEvent(diag.Code, "Warning", GetDiagnosticCategory(diag.Code));
+            telemetry.TrackDiagnosticEvent(
+                diag.Code, "Warning", TelemetrySchema.GetDiagnosticCategory(diag.Code));
         }
-    }
-
-    private static string GetDiagnosticCategory(string code)
-    {
-        // Extract numeric part from codes like "Calor0001"
-        if (code.Length > 5 && int.TryParse(code.AsSpan(5), out var num))
-        {
-            return num switch
-            {
-                < 100 => "Lexer",
-                < 200 => "Parser",
-                < 300 => "Semantic",
-                < 400 => "Contract",
-                < 500 => "Effect",
-                < 600 => "Pattern",
-                < 700 => "ApiStrictness",
-                < 800 => "Verification",
-                < 900 => "Import",
-                < 1000 => "Conversion",
-                < 1100 => "CodeGen",
-                < 1200 => "Verification",
-                < 1300 => "Experimental",
-                < 1400 => "Cli",
-                _ => "Other"
-            };
-        }
-        return "Unknown";
     }
 }
 

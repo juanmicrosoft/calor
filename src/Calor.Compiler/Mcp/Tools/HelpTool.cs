@@ -293,6 +293,8 @@ public sealed class HelpTool : McpToolBase
         ["overview"] = ["overview", "all", "summary", "syntax", "reference", "cheatsheet", "cheat sheet"],
     };
 
+    internal static IReadOnlyCollection<string> TelemetryCategories => FeatureAliases.Keys;
+
     private Task<McpToolResult> HandleSyntaxHelp(string feature)
     {
         try

@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Migration;
 
 namespace Calor.Compiler.Telemetry;
@@ -104,18 +106,20 @@ internal static partial class TelemetrySchema
         Set("Error", "Warning", "Info", "Hidden");
 
     private static readonly IReadOnlySet<string> DiagnosticCategories =
-        Set("Lexer", "Parser", "Semantic", "Contracts", "Effects", "Patterns",
-            "ApiStrictness", "SemanticsVersion", "IdValidation", "Other");
+        Set("Lexer", "Parser", "Semantic", "Contract", "Effect", "Pattern",
+            "ApiStrictness", "Verification", "Import", "Conversion", "CodeGen",
+            "Experimental", "Cli", "Other", "Unknown");
 
-    private static readonly IReadOnlySet<string> HelpCategories = Set(
-        "none", "overview", "async", "contracts", "effects", "loops", "conditionals",
-        "functions", "classes", "generics", "collections", "patterns", "exceptions",
-        "lambdas", "strings", "types", "records", "enums", "constructors",
-        "properties", "structs", "operators", "nullable", "linq", "events", "using",
-        "modifiers", "indexers", "yield", "tuples", "preprocessor");
+    private static readonly IReadOnlySet<string> HelpCategories =
+        HelpTool.TelemetryCategories.Append("none").ToHashSet(StringComparer.Ordinal);
 
     private static readonly IReadOnlySet<string> KnownFeatures =
-        FeatureSupport.GetAllFeatures().Select(f => f.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        FeatureSupport.GetAllFeatures().Select(f => f.Name)
+            .Concat(["unsupported-member", "preprocessor-disabled", "post-validation-fallback"])
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly IReadOnlySet<string> Architectures =
+        Enum.GetNames<Architecture>().ToHashSet(StringComparer.Ordinal);
 
     internal static bool TryCreatePayload(
         string eventName,
@@ -185,6 +189,37 @@ internal static partial class TelemetrySchema
 
     internal static bool IsKnownFeature(string feature) => KnownFeatures.Contains(feature);
 
+    internal static bool IsKnownHelpCategory(string category) => HelpCategories.Contains(category);
+
+    internal static bool IsKnownArchitecture(string architecture) =>
+        Architectures.Contains(architecture);
+
+    internal static string GetDiagnosticCategory(string code)
+    {
+        if (code.Length > 5 && int.TryParse(code.AsSpan(5), out var number))
+        {
+            return number switch
+            {
+                < 100 => "Lexer",
+                < 200 => "Parser",
+                < 300 => "Semantic",
+                < 400 => "Contract",
+                < 500 => "Effect",
+                < 600 => "Pattern",
+                < 700 => "ApiStrictness",
+                < 800 => "Verification",
+                < 900 => "Import",
+                < 1000 => "Conversion",
+                < 1100 => "CodeGen",
+                < 1200 => "Verification",
+                < 1300 => "Experimental",
+                < 1400 => "Cli",
+                _ => "Other"
+            };
+        }
+        return "Unknown";
+    }
+
     internal static string ExportSnapshot()
     {
         var snapshot = new
@@ -245,8 +280,7 @@ internal static partial class TelemetrySchema
         {
             "schemaVersion" => value == Version,
             "os" => value is "windows" or "macos" or "linux" or "other",
-            "architecture" => value is "X86" or "X64" or "Arm" or "Arm64" or "Wasm"
-                or "S390x" or "LoongArch64" or "Armv6" or "Ppc64le",
+            "architecture" => Architectures.Contains(value),
             "dotnetVersion" or "calorVersion" or "semanticsVersion" =>
                 VersionRegex().IsMatch(value),
             "operationId" => OperationIdRegex().IsMatch(value),

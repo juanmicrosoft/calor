@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Telemetry;
 using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.Channel;
@@ -43,7 +45,7 @@ public sealed class TelemetryPrivacyTests
         var writer = new StringWriter();
         var telemetry = new CalorTelemetry(writer);
         telemetry.SetCommand("compile");
-        telemetry.TrackDiagnosticEvent("Calor0410", "Error", "Effects");
+        telemetry.TrackDiagnosticEvent("Calor0410", "Error", "Effect");
 
         Assert.False(telemetry.IsEnabled);
         Assert.True(telemetry.IsPreview);
@@ -59,7 +61,7 @@ public sealed class TelemetryPrivacyTests
     }
 
     [Fact]
-    public void ArbitraryCallerFieldsAndInvalidAllowedValuesFailClosed()
+    public void InvalidEventsAreDroppedWithoutDisablingLaterValidTelemetry()
     {
         var (telemetry, channel) = CreateTestTelemetry();
         telemetry.SetCommand("compile");
@@ -75,7 +77,57 @@ public sealed class TelemetryPrivacyTests
         telemetry.TrackEvent($"event-{Canary}", new Dictionary<string, string>());
 
         Assert.Empty(channel.Items);
-        Assert.False(telemetry.IsEnabled);
+        Assert.True(telemetry.IsEnabled);
+
+        telemetry.TrackCommand("compile", 0);
+
+        Assert.Single(channel.Items);
+        Assert.True(telemetry.IsEnabled);
+    }
+
+    [Fact]
+    public void ProducerRegistriesAreAcceptedBySchema()
+    {
+        var diagnosticCodes = new[]
+        {
+            "Calor0001", "Calor0100", "Calor0200", "Calor0300", "Calor0400",
+            "Calor0500", "Calor0600", "Calor0700", "Calor0800", "Calor0900",
+            "Calor1000", "Calor1100", "Calor1200", "Calor1300", "Calor1400",
+            "invalid"
+        };
+        Assert.All(diagnosticCodes, code =>
+        {
+            var category = TelemetrySchema.GetDiagnosticCategory(code);
+            var (telemetry, channel) = CreateTestTelemetry();
+            telemetry.SetCommand("compile");
+            telemetry.TrackDiagnosticEvent(
+                code == "invalid" ? "Calor9999" : code,
+                "Error",
+                category);
+            Assert.Single(channel.Items);
+            Assert.True(telemetry.IsEnabled);
+        });
+
+        Assert.All(
+            HelpTool.TelemetryCategories,
+            category => Assert.True(TelemetrySchema.IsKnownHelpCategory(category)));
+        Assert.All(
+            Enum.GetNames<Architecture>(),
+            architecture => Assert.True(TelemetrySchema.IsKnownArchitecture(architecture)));
+
+        foreach (var feature in new[]
+                 {
+                     "unsupported-member",
+                     "preprocessor-disabled",
+                     "post-validation-fallback"
+                 })
+        {
+            var (telemetry, channel) = CreateTestTelemetry();
+            telemetry.SetCommand("convert");
+            telemetry.TrackConversionGap(feature, 1);
+            Assert.Single(channel.Items);
+            Assert.True(telemetry.IsEnabled);
+        }
     }
 
     [Fact]
@@ -257,6 +309,64 @@ public sealed class TelemetryPrivacyTests
                 document.RootElement.GetProperty("schemaVersion").GetString());
         });
         Assert.NotNull(stdout);
+    }
+
+    [Fact]
+    public void ColonDelimitedOptOutOverridesPreview()
+    {
+        var startInfo = CreateCliStartInfo(
+            "feature-check",
+            "--list",
+            "--no-telemetry:true",
+            "--telemetry-preview");
+        startInfo.Environment["CALOR_TELEMETRY"] = "1";
+        startInfo.Environment["CALOR_TELEMETRY_CONNECTION_STRING"] =
+            "InstrumentationKey=00000000-0000-0000-0000-000000000001;" +
+            "IngestionEndpoint=https://localhost/";
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Failed to start calor CLI.");
+        var stderr = process.StandardError.ReadToEnd();
+        Assert.True(process.WaitForExit(30_000));
+
+        Assert.DoesNotContain("\"eventName\"", stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ColonDelimitedPreviewUsesLocalSink()
+    {
+        var startInfo = CreateCliStartInfo(
+            "feature-check",
+            "--list",
+            "--telemetry-preview:true");
+        startInfo.Environment["CALOR_TELEMETRY"] = "1";
+        startInfo.Environment.Remove(CalorTelemetry.ConnectionStringEnvironmentVariable);
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Failed to start calor CLI.");
+        var stderr = process.StandardError.ReadToEnd();
+        Assert.True(process.WaitForExit(30_000));
+
+        Assert.Contains("\"eventName\"", stderr, StringComparison.Ordinal);
+    }
+
+    private static ProcessStartInfo CreateCliStartInfo(params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            WorkingDirectory = CliTestHarness.FindRepoRoot(),
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add(typeof(Program).Assembly.Location);
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+        return startInfo;
     }
 
     private static (CalorTelemetry Telemetry, CapturingTelemetryChannel Channel)
