@@ -324,6 +324,13 @@ public class Program
         var structuredOutput = !format.Equals("text", StringComparison.OrdinalIgnoreCase);
         var diagnosticSink = structuredOutput ? new DiagnosticBag() : null;
         var declarationIds = structuredOutput ? new Ids.DeclarationIdResolver() : null;
+
+        if (elideProvenGuards && !verify)
+        {
+            Console.Error.WriteLine(
+                "warning: --elide-proven-guards has no effect without --verify " +
+                "(there are no verification verdicts to elide on).");
+        }
         var structuredEmitted = false;
 
         // In structured mode a JSON/SARIF document is ALWAYS emitted to stdout,
@@ -883,6 +890,7 @@ public class Program
             var verificationOptions = new VerificationOptions
             {
                 Verbose = options.Verbose,
+                ElideProvenGuards = options.ElideProvenGuards,
                 TimeoutMs = options.VerificationTimeoutMs,
                 CacheOptions = options.VerificationCacheOptions ?? VerificationCacheOptions.Default,
                 CancellationToken = options.CancellationToken

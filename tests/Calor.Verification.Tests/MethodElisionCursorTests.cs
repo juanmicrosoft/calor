@@ -206,12 +206,21 @@ public class MethodElisionCursorTests
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
             VerifyContracts = true,
-            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+            // Verbose surfaces the Calor0713 Proven diagnostic the vacuity check needs.
+            Verbose = true,
+            StatusWriter = TextWriter.Null
         });
 
         Assert.False(result.HasErrors);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
         Assert.Contains("ContractViolationException", result.GeneratedCode);
+        // The verdict must actually be Proven — otherwise this test passes vacuously
+        // for a source whose verification degraded to Assumed/Timeout. The message must
+        // also say the check was KEPT: the verbose diagnostic used to claim "elided"
+        // unconditionally, which is false without the opt-in.
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.PostconditionProven && d.Message.Contains("kept"));
     }
 
     private static CompilationOptions NoCache() => new()

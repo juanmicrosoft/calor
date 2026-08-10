@@ -33,7 +33,7 @@ public class IntegrationTests
         var options = new CompilationOptions
         {
             VerifyContracts = true,
-        ElideProvenGuards = true
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);
@@ -211,7 +211,7 @@ public class IntegrationTests
         var options = new CompilationOptions
         {
             VerifyContracts = true,
-        ElideProvenGuards = true
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);
@@ -241,7 +241,7 @@ public class IntegrationTests
         var options = new CompilationOptions
         {
             VerifyContracts = true,
-        ElideProvenGuards = true
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);
@@ -268,7 +268,7 @@ public class IntegrationTests
         var options = new CompilationOptions
         {
             VerifyContracts = true,
-        ElideProvenGuards = true
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);
@@ -323,7 +323,7 @@ public class IntegrationTests
         var options = new CompilationOptions
         {
             VerifyContracts = true,
-        ElideProvenGuards = true
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);

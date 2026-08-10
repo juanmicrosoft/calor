@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
   seven false-`Proven` vectors to date and its differential gate (freeze registration F-4) is
   not yet built; elision re-enables by default only when that gate is green (roadmap §3.5
   gate 6). The `run`/`test` execution paths always keep guards regardless of the flag.
+  Note: `§PROOF` obligation guards have always ignored `--contract-mode` (pre-existing for
+  Failed/Timeout); with the flip, a Discharged obligation under `--contract-mode off` now
+  also emits its guard unless the opt-in is set — Off-mode output is guard-free by mode
+  only for `§Q`/`§S` contracts, not obligations.
 
 ### Corrected
 - **The v0.12.1 notes below understated the VS Code outage by about six times, and implied a
