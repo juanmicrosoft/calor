@@ -2359,11 +2359,20 @@ public sealed class Parser
         var args = new List<ExpressionNode>();
         while (!Check(TokenKind.CloseParen) && !IsAtEnd)
         {
-            args.Add(ParseLispArgument());
+            args.Add(ParseLispArgument(allowKeyword: true));
         }
 
         var endToken = Expect(TokenKind.CloseParen);
         var span = startToken.Span.Union(endToken.Span);
+
+        // #874: KeywordArgNode is produced only by ParseLispArgument, and the only legal
+        // position for one is as the FINAL argument of a recognized string operation (its
+        // comparison mode, consumed by the string-op branch below). Enforce that here, at
+        // the single point where every operator branch receives its arguments. Per-branch
+        // handling leaves escape routes (binary/ternary/unary operands, mid-position or
+        // doubled keywords, CALL targets), each ending in a null child from the node's
+        // no-op Accept and an unlocatable NRE — or silently invalid emitted C#.
+        args = FilterKeywordArgs(opText, args);
 
         // Handle ternary conditional: (? cond then else)
         if (opText == "?" && args.Count == 3)
@@ -2717,6 +2726,44 @@ public sealed class Parser
         return new CallExpressionNode(span, opText, args);
     }
 
+    /// <summary>
+    /// KeywordArgNode is internal to parsing: the only legal position for one is as the
+    /// final argument of a recognized string operation, where it is the comparison mode.
+    /// Every other occurrence is rejected with a diagnostic and dropped, so the node can
+    /// never escape into the AST — where its no-op Accept turns into a null child and an
+    /// unlocatable NullReferenceException, or silently invalid emitted C# (#874).
+    /// Called once, at the single choke point where the lisp argument list is complete.
+    /// </summary>
+    private List<ExpressionNode> FilterKeywordArgs(string opText, List<ExpressionNode> args)
+    {
+        if (!args.Any(a => a is KeywordArgNode))
+            return args;
+
+        // A single trailing keyword on a recognized string operation is legal; the
+        // string-op branch consumes it and validates the mode name and operation support.
+        var lastLegalIndex =
+            StringOpExtensions.FromString(opText).HasValue && args[^1] is KeywordArgNode
+                ? args.Count - 1
+                : -1;
+
+        var kept = new List<ExpressionNode>(args.Count);
+        for (int i = 0; i < args.Count; i++)
+        {
+            if (args[i] is KeywordArgNode kw && i != lastLegalIndex)
+            {
+                _diagnostics.ReportError(kw.Span, DiagnosticCode.InvalidLispExpression,
+                    $"Keyword argument ':{kw.Name}' is not valid here. A comparison-mode " +
+                    "keyword is only allowed as the final argument of a built-in string " +
+                    "operation (e.g. starts, contains, equals — the lowercase forms).");
+            }
+            else
+            {
+                kept.Add(args[i]);
+            }
+        }
+        return kept;
+    }
+
     private (TokenKind kind, string text, TextSpan span) ParseLispOperator()
     {
         var token = Current;
@@ -2933,8 +2980,13 @@ public sealed class Parser
     /// Can be a literal, identifier (bare variable), or nested Lisp expression.
     /// Supports trailing member access (e.g., §C[...] §/C.Length)
     /// Also handles 'is' pattern expressions: expr is Type [variable]
+    /// KeywordArgNode is minted here and ONLY here; `allowKeyword` is opted into solely by
+    /// the main operator-argument loop (whose FilterKeywordArgs choke point then validates
+    /// position). Every direct caller — implication operands, quantifier bodies, is/as/cast
+    /// operands — gets a diagnostic and a recovery node instead, so the keyword node can
+    /// never leak into the AST through a side entrance (#874).
     /// </summary>
-    private ExpressionNode ParseLispArgument()
+    private ExpressionNode ParseLispArgument(bool allowKeyword = false)
     {
         // Handle keyword argument syntax: :keyword or :hyphenated-keyword
         if (Check(TokenKind.Colon))
@@ -2956,6 +3008,14 @@ public sealed class Parser
                 }
 
                 var span = colonToken.Span.Union(endSpan);
+                if (!allowKeyword)
+                {
+                    _diagnostics.ReportError(span, DiagnosticCode.InvalidLispExpression,
+                        $"Keyword argument ':{keywordName}' is not valid here. A comparison-mode " +
+                        "keyword is only allowed as the final argument of a built-in string " +
+                        "operation (e.g. starts, contains, equals — the lowercase forms).");
+                    return new IntLiteralNode(span, 0);
+                }
                 return new KeywordArgNode(span, keywordName);
             }
             // Standalone colon - error
