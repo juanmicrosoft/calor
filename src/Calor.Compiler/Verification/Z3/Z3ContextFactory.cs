@@ -107,6 +107,10 @@ public static class Z3ContextFactory
         return IntPtr.Zero;
     }
 
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+        "SingleFile", "IL3000",
+        Justification = "Empty Location is expected under single-file and is guarded; " +
+                        "AppContext.BaseDirectory is the primary probe root.")]
     internal static IReadOnlyList<string> GetNativeLibraryProbePaths()
     {
         // Probe roots, in order:
