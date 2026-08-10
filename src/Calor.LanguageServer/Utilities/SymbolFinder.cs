@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.Parsing;
 
 namespace Calor.LanguageServer.Utilities;
@@ -14,6 +15,7 @@ public sealed class SymbolLookupResult
     public TextSpan Span { get; }
     public TextSpan? DefinitionSpan { get; }
     public AstNode? Node { get; }
+    public SymbolId? SymbolId { get; }
 
     /// <summary>
     /// For member access (e.g., person.name), this contains the type name of the target (e.g., "Person").
@@ -21,7 +23,15 @@ public sealed class SymbolLookupResult
     /// </summary>
     public string? ContainingTypeName { get; }
 
-    public SymbolLookupResult(string name, string kind, string? type, TextSpan span, TextSpan? definitionSpan = null, AstNode? node = null, string? containingTypeName = null)
+    public SymbolLookupResult(
+        string name,
+        string kind,
+        string? type,
+        TextSpan span,
+        TextSpan? definitionSpan = null,
+        AstNode? node = null,
+        string? containingTypeName = null,
+        SymbolId? symbolId = null)
     {
         Name = name;
         Kind = kind;
@@ -30,6 +40,7 @@ public sealed class SymbolLookupResult
         DefinitionSpan = definitionSpan;
         Node = node;
         ContainingTypeName = containingTypeName;
+        SymbolId = symbolId;
     }
 }
 
@@ -42,7 +53,37 @@ public static class SymbolFinder
     /// Find the symbol at a given position in the AST.
     /// Uses a combination of source text analysis and AST traversal.
     /// </summary>
-    public static SymbolLookupResult? FindSymbolAtPosition(ModuleNode ast, int line, int column, string source)
+    public static SymbolLookupResult? FindSymbolAtPosition(
+        ModuleNode ast,
+        int line,
+        int column,
+        string source,
+        BoundModule? boundModule = null)
+    {
+        var result = FindSymbolAtPositionCore(ast, line, column, source);
+        if (result == null || boundModule == null)
+            return result;
+
+        var offset = GetOffset(source, line, column);
+        var symbolId = FindBoundSymbolId(boundModule, result, offset);
+        return symbolId == null
+            ? result
+            : new SymbolLookupResult(
+                result.Name,
+                result.Kind,
+                result.Type,
+                result.Span,
+                result.DefinitionSpan,
+                result.Node,
+                result.ContainingTypeName,
+                symbolId);
+    }
+
+    private static SymbolLookupResult? FindSymbolAtPositionCore(
+        ModuleNode ast,
+        int line,
+        int column,
+        string source)
     {
         var offset = GetOffset(source, line, column);
 
@@ -75,6 +116,68 @@ public static class SymbolFinder
 
         // Search for the identifier in the context
         return FindIdentifierInContext(identifier, context, ast, line, source);
+    }
+
+    public static FunctionSymbol? FindResolvedCall(
+        BoundModule? boundModule,
+        int offset,
+        string? target = null)
+    {
+        if (boundModule == null)
+            return null;
+
+        return Descendants(boundModule)
+            .Select(node => node switch
+            {
+                BoundCallExpression expression when expression.Span.Contains(offset)
+                    && (target == null || expression.Target == target) =>
+                    (Span: expression.Span, Symbol: expression.ResolvedSymbol),
+                BoundCallStatement statement when statement.Span.Contains(offset)
+                    && (target == null || statement.Target == target) =>
+                    (Span: statement.Span, Symbol: statement.ResolvedSymbol),
+                _ => (Span: TextSpan.Empty, Symbol: (FunctionSymbol?)null),
+            })
+            .Where(item => item.Symbol != null)
+            .OrderBy(item => item.Span.Length)
+            .Select(item => item.Symbol)
+            .FirstOrDefault();
+    }
+
+    private static SymbolId? FindBoundSymbolId(
+        BoundModule boundModule,
+        SymbolLookupResult result,
+        int offset)
+    {
+        var call = FindResolvedCall(boundModule, offset);
+        if (call != null)
+            return call.Id;
+
+        var variable = Descendants(boundModule)
+            .OfType<BoundVariableExpression>()
+            .Where(expression => expression.Span.Contains(offset))
+            .OrderBy(expression => expression.Span.Length)
+            .FirstOrDefault();
+        if (variable != null)
+            return variable.SymbolId.IsNone ? null : variable.SymbolId;
+
+        var definitionSpan = result.DefinitionSpan ?? result.Span;
+        return boundModule.SymbolsById.Values
+            .Where(symbol => symbol.DeclarationSpan == definitionSpan)
+            .Where(symbol =>
+                string.Equals(symbol.Name, result.Name, StringComparison.Ordinal)
+                || symbol.Name.EndsWith("." + result.Name, StringComparison.Ordinal))
+            .Select(symbol => (SymbolId?)symbol.Id)
+            .FirstOrDefault();
+    }
+
+    private static IEnumerable<BoundNode> Descendants(BoundNode node)
+    {
+        yield return node;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var descendant in Descendants(child))
+                yield return descendant;
+        }
     }
 
     /// <summary>

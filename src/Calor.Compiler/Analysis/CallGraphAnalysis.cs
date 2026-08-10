@@ -1,7 +1,32 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Analysis;
+
+public sealed record ResolvedCallSite(SymbolId Callee, string Target, TextSpan Span);
+public sealed record UnresolvedCallSite(SymbolId Caller, string Target, TextSpan Span);
+
+/// <summary>
+/// Bound call graph keyed by stable symbol identity. The legacy AST call graph
+/// remains available for AST-only consumers.
+/// </summary>
+public sealed class ResolvedSymbolCallGraph
+{
+    public IReadOnlyDictionary<SymbolId, IReadOnlyList<ResolvedCallSite>> ForwardGraph { get; }
+    public IReadOnlyDictionary<SymbolId, IReadOnlyList<SymbolId>> ReverseGraph { get; }
+    public IReadOnlyList<UnresolvedCallSite> UnresolvedCalls { get; }
+
+    internal ResolvedSymbolCallGraph(
+        IReadOnlyDictionary<SymbolId, IReadOnlyList<ResolvedCallSite>> forwardGraph,
+        IReadOnlyDictionary<SymbolId, IReadOnlyList<SymbolId>> reverseGraph,
+        IReadOnlyList<UnresolvedCallSite> unresolvedCalls)
+    {
+        ForwardGraph = forwardGraph;
+        ReverseGraph = reverseGraph;
+        UnresolvedCalls = unresolvedCalls;
+    }
+}
 
 /// <summary>
 /// Reusable call graph analysis extracted from EffectEnforcementPass.
@@ -10,6 +35,84 @@ namespace Calor.Compiler.Analysis;
 /// </summary>
 public sealed class CallGraphAnalysis
 {
+    /// <summary>
+    /// Builds an overload-precise graph from bound calls. External calls remain
+    /// explicitly unresolved instead of being projected onto an internal name.
+    /// </summary>
+    public static ResolvedSymbolCallGraph BuildResolved(BoundModule module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+
+        var forward = module.Functions.ToDictionary(
+            function => function.SymbolId,
+            _ => new List<ResolvedCallSite>());
+        var reverse = module.Functions.ToDictionary(
+            function => function.SymbolId,
+            _ => new List<SymbolId>());
+        var unresolved = new List<UnresolvedCallSite>();
+
+        foreach (var function in module.Functions)
+        {
+            foreach (var node in DescendantsAndSelf(function))
+            {
+                string? target = null;
+                TextSpan span = default;
+                SymbolId? callee = null;
+
+                switch (node)
+                {
+                    case BoundCallStatement statement:
+                        target = statement.Target;
+                        span = statement.Span;
+                        callee = statement.ResolvedSymbolId;
+                        break;
+                    case BoundCallExpression expression:
+                        target = expression.Target;
+                        span = expression.Span;
+                        callee = expression.ResolvedSymbolId;
+                        break;
+                }
+
+                if (target == null)
+                    continue;
+
+                if (callee is { } resolved && !resolved.IsNone)
+                {
+                    forward[function.SymbolId].Add(new ResolvedCallSite(resolved, target, span));
+                    if (!reverse.TryGetValue(resolved, out var callers))
+                    {
+                        callers = new List<SymbolId>();
+                        reverse[resolved] = callers;
+                    }
+                    callers.Add(function.SymbolId);
+                }
+                else
+                {
+                    unresolved.Add(new UnresolvedCallSite(function.SymbolId, target, span));
+                }
+            }
+        }
+
+        return new ResolvedSymbolCallGraph(
+            forward.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyList<ResolvedCallSite>)pair.Value),
+            reverse.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyList<SymbolId>)pair.Value),
+            unresolved);
+    }
+
+    private static IEnumerable<BoundNode> DescendantsAndSelf(BoundNode node)
+    {
+        yield return node;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
+        }
+    }
+
     /// <summary>
     /// Forward graph: caller → list of (callee name, call site span).
     /// </summary>

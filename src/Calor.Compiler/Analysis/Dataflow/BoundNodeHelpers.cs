@@ -51,16 +51,16 @@ public static class BoundNodeHelpers
         if (expression == null)
             return Array.Empty<VariableSymbol>();
 
-        return GetUsedVariablesCore(expression, new HashSet<VariableSymbol>());
+        return GetUsedVariablesCore(expression, new HashSet<string>(StringComparer.Ordinal));
     }
 
     private static IEnumerable<VariableSymbol> GetUsedVariablesCore(
         BoundNode node,
-        HashSet<VariableSymbol> locallyBound)
+        HashSet<string> locallyBound)
     {
         if (node is BoundVariableExpression variable)
         {
-            if (!locallyBound.Contains(variable.Variable))
+            if (!locallyBound.Contains(variable.Variable.IdentityKey))
                 yield return variable.Variable;
             yield break;
         }
@@ -68,13 +68,13 @@ public static class BoundNodeHelpers
         var nestedLocals = locallyBound;
         if (node is BoundLambdaExpression lambda)
         {
-            nestedLocals = new HashSet<VariableSymbol>(locallyBound);
-            nestedLocals.UnionWith(lambda.Parameters);
+            nestedLocals = new HashSet<string>(locallyBound, StringComparer.Ordinal);
+            nestedLocals.UnionWith(lambda.Parameters.Select(parameter => parameter.IdentityKey));
         }
         else if (node is BoundQuantifierExpression quantifier)
         {
-            nestedLocals = new HashSet<VariableSymbol>(locallyBound);
-            nestedLocals.UnionWith(quantifier.BoundVariables);
+            nestedLocals = new HashSet<string>(locallyBound, StringComparer.Ordinal);
+            nestedLocals.UnionWith(quantifier.BoundVariables.Select(variable => variable.IdentityKey));
         }
 
         foreach (var child in node.ChildNodes)
@@ -197,7 +197,15 @@ public static class BoundNodeHelpers
     public static bool DefinesVariable(BoundStatement statement, VariableSymbol variable)
     {
         var defined = GetDefinedVariable(statement);
-        return defined != null && defined.Name == variable.Name;
+        return defined != null && SameSymbol(defined, variable);
+    }
+
+    public static bool SameSymbol(Symbol left, Symbol right)
+    {
+        if (!left.Id.IsNone && !right.Id.IsNone)
+            return left.Id == right.Id;
+        return ReferenceEquals(left, right)
+            || string.Equals(left.Name, right.Name, StringComparison.Ordinal);
     }
 
     /// <summary>

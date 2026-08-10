@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Utilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -36,6 +37,15 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
         if (callContext == null)
         {
             return Task.FromResult<SignatureHelp?>(null);
+        }
+
+        var resolvedSymbol = SymbolFinder.FindResolvedCall(
+            state.BoundModule,
+            offset);
+        if (resolvedSymbol != null)
+        {
+            return Task.FromResult<SignatureHelp?>(
+                BuildSignatureHelp(resolvedSymbol, callContext.ArgumentIndex));
         }
 
         // Find the function definition
@@ -76,6 +86,37 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
             }),
             Parameters = new Container<ParameterInformation>(parameters),
             ActiveParameter = Math.Min(activeParameter, parameters.Count - 1)
+        };
+
+        return new SignatureHelp
+        {
+            Signatures = new Container<SignatureInformation>(signature),
+            ActiveSignature = 0,
+            ActiveParameter = activeParameter
+        };
+    }
+
+    private static SignatureHelp BuildSignatureHelp(
+        FunctionSymbol function,
+        int activeParameter)
+    {
+        var parameters = function.Parameters.Select(parameter => new ParameterInformation
+        {
+            Label = $"{parameter.Name}: {parameter.TypeName}",
+            Documentation = new StringOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = $"**{parameter.Name}**: `{parameter.TypeName}`"
+            })
+        }).ToList();
+
+        var signature = new SignatureInformation
+        {
+            Label = $"{function.DisplaySignature} -> {function.ReturnType}",
+            Parameters = new Container<ParameterInformation>(parameters),
+            ActiveParameter = parameters.Count == 0
+                ? 0
+                : Math.Min(activeParameter, parameters.Count - 1)
         };
 
         return new SignatureHelp

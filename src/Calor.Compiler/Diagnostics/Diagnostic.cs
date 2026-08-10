@@ -124,6 +124,23 @@ public static class DiagnosticCode
     /// </summary>
     public const string ReturnValueInVoidOwner = "Calor0205";
 
+    /// <summary>
+    /// Error: two internal callables declare the same name, generic arity,
+    /// parameter modifiers, and exact parameter types.
+    /// </summary>
+    public const string DuplicateFunctionSignature = "Calor0206";
+
+    /// <summary>
+    /// Error: more than one internal overload is applicable to a call.
+    /// </summary>
+    public const string AmbiguousOverload = "Calor0207";
+
+    /// <summary>
+    /// Error: an internal callable name is known, but none of its overloads
+    /// matches the call's generic arity, argument arity, modifiers, and types.
+    /// </summary>
+    public const string NoMatchingOverload = "Calor0208";
+
     // Bind inference diagnostics (Calor0250-0259) — RFC v0.6 bind-inference-formalization
 
     /// <summary>

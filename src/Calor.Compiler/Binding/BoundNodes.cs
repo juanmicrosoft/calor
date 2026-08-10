@@ -44,13 +44,19 @@ public sealed class BoundModule : BoundNode
 {
     public string Name { get; }
     public IReadOnlyList<BoundFunction> Functions { get; }
+    public IReadOnlyDictionary<SymbolId, Symbol> SymbolsById { get; }
     public override IEnumerable<BoundNode> ChildNodes => Functions;
 
-    public BoundModule(TextSpan span, string name, IReadOnlyList<BoundFunction> functions)
+    public BoundModule(
+        TextSpan span,
+        string name,
+        IReadOnlyList<BoundFunction> functions,
+        IReadOnlyDictionary<SymbolId, Symbol>? symbolsById = null)
         : base(span)
     {
         Name = name;
         Functions = functions;
+        SymbolsById = symbolsById ?? new Dictionary<SymbolId, Symbol>();
     }
 }
 
@@ -81,6 +87,7 @@ public enum BoundMemberKind
 public sealed class BoundFunction : BoundNode
 {
     public FunctionSymbol Symbol { get; }
+    public SymbolId SymbolId => Symbol.Id;
     public IReadOnlyList<BoundStatement> Body { get; }
     public Scope Scope { get; }
     /// <summary>
@@ -129,6 +136,7 @@ public sealed class BoundFunction : BoundNode
 public sealed class BoundBindStatement : BoundStatement
 {
     public VariableSymbol Variable { get; }
+    public SymbolId SymbolId => Variable.Id;
     public BoundExpression? Initializer { get; }
     public override IEnumerable<BoundNode> ChildNodes =>
         Initializer != null ? [Initializer] : Array.Empty<BoundNode>();
@@ -147,6 +155,7 @@ public sealed class BoundBindStatement : BoundStatement
 public sealed class BoundVariableExpression : BoundExpression
 {
     public VariableSymbol Variable { get; }
+    public SymbolId SymbolId => Variable.Id;
     public override string TypeName => Variable.TypeName;
 
     public BoundVariableExpression(TextSpan span, VariableSymbol variable)
@@ -163,13 +172,26 @@ public sealed class BoundCallStatement : BoundStatement
 {
     public string Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
+    public FunctionSymbol? ResolvedSymbol { get; }
+    public SymbolId? ResolvedSymbolId => ResolvedSymbol?.Id;
+    public IReadOnlyList<string?>? ArgumentNames { get; }
+    public IReadOnlyList<string?>? ArgumentModifiers { get; }
     public override IEnumerable<BoundNode> ChildNodes => Arguments;
 
-    public BoundCallStatement(TextSpan span, string target, IReadOnlyList<BoundExpression> arguments)
+    public BoundCallStatement(
+        TextSpan span,
+        string target,
+        IReadOnlyList<BoundExpression> arguments,
+        FunctionSymbol? resolvedSymbol = null,
+        IReadOnlyList<string?>? argumentNames = null,
+        IReadOnlyList<string?>? argumentModifiers = null)
         : base(span)
     {
         Target = target;
         Arguments = arguments;
+        ResolvedSymbol = resolvedSymbol;
+        ArgumentNames = argumentNames;
+        ArgumentModifiers = argumentModifiers;
     }
 }
 
@@ -487,6 +509,8 @@ public sealed class BoundCallExpression : BoundExpression
 {
     public string Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
+    public FunctionSymbol? ResolvedSymbol { get; }
+    public SymbolId? ResolvedSymbolId => ResolvedSymbol?.Id;
     public override string TypeName { get; }
     public override IReadOnlyList<BoundExpression> Children => Arguments;
 
@@ -526,11 +550,13 @@ public sealed class BoundCallExpression : BoundExpression
         IReadOnlyList<string>? resolvedParameterTypes = null,
         IReadOnlyList<string?>? argumentNames = null,
         IReadOnlyList<string?>? argumentModifiers = null,
-        IReadOnlyList<string>? typeArguments = null)
+        IReadOnlyList<string>? typeArguments = null,
+        FunctionSymbol? resolvedSymbol = null)
         : base(span)
     {
         Target = target;
         Arguments = arguments;
+        ResolvedSymbol = resolvedSymbol;
         TypeName = resultType;
         ResolvedTypeName = resolvedTypeName;
         ResolvedMethodName = resolvedMethodName;
@@ -938,6 +964,7 @@ public sealed class BoundFieldAccessExpression : BoundExpression
     public BoundExpression Target { get; }
     public string FieldName { get; }
     public VariableSymbol? ResolvedField { get; }
+    public SymbolId? ResolvedSymbolId => ResolvedField?.Id;
     public override string TypeName { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
 

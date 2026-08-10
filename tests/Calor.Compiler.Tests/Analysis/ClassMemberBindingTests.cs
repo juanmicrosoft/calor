@@ -251,16 +251,15 @@ public class ClassMemberBindingTests
     }
 
     [Fact]
-    public void ArityAwareLookup_FallsBackToFirstOverload()
+    public void ArityAwareLookup_DoesNotFallbackToIncompatibleOverload()
     {
         var scope = new Scope();
         scope.DeclareOverload(new FunctionSymbol("Bar", "i32",
             new List<VariableSymbol> { new("x", "str", false, true) }));
 
-        // No 0-arg overload, should fall back to first
+        // No 0-arg overload: an incompatible declaration must never be returned.
         var result = scope.LookupByArity("Bar", 0);
-        Assert.NotNull(result);
-        Assert.Equal("i32", result.ReturnType);
+        Assert.Null(result);
     }
 
     [Fact]

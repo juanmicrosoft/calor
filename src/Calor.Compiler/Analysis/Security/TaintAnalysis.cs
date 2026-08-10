@@ -245,7 +245,7 @@ public sealed class TaintAnalysis
             if (source != null)
             {
                 var label = new TaintLabel(source.Value, param.Name, _function.Span);
-                AddTaint(param.Name, label);
+                AddTaint(param, label);
             }
         }
     }
@@ -344,7 +344,7 @@ public sealed class TaintAnalysis
                 {
                     var sourceLabels = GetTaintLabelsFromExpression(assign.Value);
                     foreach (var label in sourceLabels)
-                        AddTaint(targetVar.Variable.Name, label with { Hops = label.Hops + 1 });
+                        AddTaint(targetVar.Variable, label with { Hops = label.Hops + 1 });
                 }
                 break;
 
@@ -358,7 +358,7 @@ public sealed class TaintAnalysis
                 // Propagate taint from collection to loop variable (increment hop count)
                 var collectionLabels = GetTaintLabelsFromExpression(forEach.Collection);
                 foreach (var label in collectionLabels)
-                    AddTaint(forEach.LoopVariable.Name, label with { Hops = label.Hops + 1 });
+                    AddTaint(forEach.LoopVariable, label with { Hops = label.Hops + 1 });
                 foreach (var s in forEach.Body)
                     AnalyzeStatement(s);
                 break;
@@ -421,7 +421,7 @@ public sealed class TaintAnalysis
         // Propagate taint to the variable being defined
         foreach (var label in sourceLabels)
         {
-            AddTaint(bind.Variable.Name, label);
+            AddTaint(bind.Variable, label);
         }
     }
 
@@ -749,7 +749,7 @@ public sealed class TaintAnalysis
     {
         if (expr is BoundVariableExpression varExpr)
         {
-            if (_taintedVariables.TryGetValue(varExpr.Variable.Name, out var labels))
+            if (_taintedVariables.TryGetValue(varExpr.Variable.IdentityKey, out var labels))
             {
                 foreach (var label in labels)
                     yield return label;
@@ -777,12 +777,12 @@ public sealed class TaintAnalysis
                lowerTarget.Contains("parameterize");
     }
 
-    private void AddTaint(string variableName, TaintLabel label)
+    private void AddTaint(VariableSymbol variable, TaintLabel label)
     {
-        if (!_taintedVariables.TryGetValue(variableName, out var labels))
+        if (!_taintedVariables.TryGetValue(variable.IdentityKey, out var labels))
         {
             labels = new HashSet<TaintLabel>();
-            _taintedVariables[variableName] = labels;
+            _taintedVariables[variable.IdentityKey] = labels;
         }
         labels.Add(label);
     }

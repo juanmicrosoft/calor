@@ -32,10 +32,30 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
         var (line, column) = PositionConverter.ToCalorPosition(request.Position);
 
         // Find symbol at position
-        var result = SymbolFinder.FindSymbolAtPosition(state.Ast, line, column, state.Source);
+        var result = SymbolFinder.FindSymbolAtPosition(
+            state.Ast,
+            line,
+            column,
+            state.Source,
+            state.BoundModule);
         if (result == null)
         {
             return Task.FromResult<LocationOrLocationLinks?>(null);
+        }
+
+        if (result.SymbolId is { } symbolId
+            && state.BoundModule?.SymbolsById.TryGetValue(symbolId, out var boundSymbol) == true)
+        {
+            var definitionRange = PositionConverter.ToLspRange(
+                boundSymbol.DeclarationSpan,
+                state.Source);
+            var location = new Location
+            {
+                Uri = request.TextDocument.Uri,
+                Range = definitionRange
+            };
+            return Task.FromResult<LocationOrLocationLinks?>(
+                new LocationOrLocationLinks(new[] { new LocationOrLocationLink(location) }));
         }
 
         // If we found a definition in the same file, return it
