@@ -9,7 +9,9 @@ All notable changes to this project will be documented in this file.
   publish that did not happen.** They said the extension "can be published again" after "three
   consecutive releases" (v0.9.0, v0.10.0, v0.12.0). Both parts were wrong. The publish has failed
   on **every release since v0.4.0 (2026-03-09)** — the last success was v0.3.8 and the marketplace
-  has been stuck there for roughly nineteen releases across five months. The claim was also
+  has been stuck there for twenty-seven releases across five months. (Erratum 2026-08-10: this
+  correction originally said "roughly nineteen"; the release list v0.4.0–v0.12.1 counts 27,
+  excluding the z3-binaries asset tag.) The claim was also
   self-refuting: had only three failed, the marketplace would read v0.8.0. And v0.12.1 itself did
   not publish either — the `IL3000` build failure was fixed, but the publish step then hit an
   expired marketplace token, a second and older blocker that the build failure had been masking.
