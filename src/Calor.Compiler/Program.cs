@@ -13,6 +13,7 @@ using Calor.Compiler.Telemetry;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
+using TelemetrySchema = Calor.Compiler.Telemetry.CalorTelemetry.TelemetrySchema;
 
 namespace Calor.Compiler;
 

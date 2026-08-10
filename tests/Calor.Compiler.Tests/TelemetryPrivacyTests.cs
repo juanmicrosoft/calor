@@ -9,6 +9,7 @@ using Microsoft.ApplicationInsights.Channel;
 using Microsoft.ApplicationInsights.DataContracts;
 using Microsoft.ApplicationInsights.Extensibility;
 using Xunit;
+using TelemetrySchema = Calor.Compiler.Telemetry.CalorTelemetry.TelemetrySchema;
 
 namespace Calor.Compiler.Tests;
 
