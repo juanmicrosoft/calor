@@ -58,6 +58,18 @@ gate gets marked green while a soundness hole ships.
 | 8 | **#770 eject-contract** — documented degradation spec | `docs/guides/adoption-playbook.md` §"The eject story (tested)" (`:139-157`) — per-construct degradation table | ✅ |
 | 9 | **#761 flip stance** — `EnableTypeChecking` default-on **lands in the W2/W3 window** with a CHANGELOG note | **Delivered at v0.12 (#877), outside the window.** The flip is in, with the CHANGELOG note the item names. It was blocked not by the flip but by 92 defects in the checker itself — every one a working program it refused, and all of them live for agents already, since `calor_check`/`calor_refine` set the flag | ✅ *(delivered v0.12, outside window — see below)* |
 
+> **Supersession note (2026-08-10) — item 3's disclosed residual is retired.** The row above is
+> left as adjudicated; this note records what changed after it. The residual it discloses — the
+> ARM64-macOS branch at `download-z3.sh:59-64` exec'ing `build-z3-from-source.sh`, which cloned a
+> **mutable tag** with no commit pin and no verification — no longer exists. ARM64 macOS now takes
+> the same checksum-verified upstream archives as every other platform, and
+> `build-z3-from-source.sh` has been **deleted**. The line references in the row (`:29`, `:122`,
+> `:157`, `:59-64`) are therefore stale against current `download-z3.sh` and should be read as
+> historical. One unverified input remains, and it is a different one: `build-z3.yml` still clones
+> the tag inside the workflow to build the `osx-arm64` release asset. Retiring the residual was not
+> the goal of that work — it fell out of removing a ~20-minute source build whose stated
+> justification did not survive scrutiny.
+
 ## Item 6 — the row-by-row re-audit the first version owed
 
 The bar is *known-divergence-free* and the known set is the **whole** divergence table — **all

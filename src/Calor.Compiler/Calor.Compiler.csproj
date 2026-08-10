@@ -63,8 +63,15 @@
     </Reference>
   </ItemGroup>
 
-  <!-- Download Z3 libraries before build if not present -->
-  <Target Name="DownloadZ3" BeforeTargets="BeforeBuild" Condition="!Exists('$(Z3Dir)/Microsoft.Z3.dll') OR !Exists('$(Z3RuntimesDir)/osx-arm64/native/libz3.dylib')">
+  <!-- Download Z3 libraries before build if not present or not current.
+       The osx-arm64 native used to be the sentinel here, which was exactly the
+       one RID the old ARM64-macOS source build produced: a checkout left over
+       from that path satisfied the condition, so this target never ran, the
+       other six RIDs were never populated, and a local `dotnet pack` produced a
+       nupkg missing six RIDs and carrying the Debug source-built wrapper.
+       Keying on the provenance stamp instead makes "already downloaded" mean
+       "downloaded from what we currently designate", and is RID-agnostic. -->
+  <Target Name="DownloadZ3" BeforeTargets="BeforeBuild" Condition="!Exists('$(Z3Dir)/.provenance') OR !Exists('$(Z3Dir)/Microsoft.Z3.dll') OR !Exists('$(Z3RuntimesDir)')">
     <Message Importance="high" Text="Downloading Z3 libraries..." />
     <Exec Command="bash &quot;$(MSBuildThisFileDirectory)scripts/download-z3.sh&quot;" Condition="'$(OS)' != 'Windows_NT'" />
     <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)scripts\download-z3.ps1&quot;" Condition="'$(OS)' == 'Windows_NT'" />

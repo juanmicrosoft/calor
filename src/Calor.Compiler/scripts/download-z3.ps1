@@ -61,6 +61,30 @@ Write-Host "====================="
 Write-Host "Version: $Z3_VERSION"
 Write-Host ""
 
+# Provenance stamp and stale-artifact invalidation. Mirrors download-z3.sh:
+# z3/ and runtimes/ are gitignored build artifacts and every check below is a
+# bare existence test, so an artifact was previously kept regardless of where it
+# came from. The stamp records which upstream archive supplied the wrapper; if
+# it is absent or different, everything is discarded and refetched, so "present"
+# and "current" cannot diverge. Calor.Compiler.csproj also gates the DownloadZ3
+# target on this file, so it must be written here too or Windows re-runs this
+# script on every build.
+$PROVENANCE_FILE = Join-Path $Z3_DIR ".provenance"
+$EXPECTED_PROVENANCE = "upstream $Z3_VERSION managed=$MANAGED_DLL_ARCHIVE"
+
+if ((Test-Path (Join-Path $Z3_DIR "Microsoft.Z3.dll")) -or (Test-Path $RUNTIMES_DIR)) {
+    $actualProvenance = if (Test-Path $PROVENANCE_FILE) { (Get-Content $PROVENANCE_FILE -Raw).Trim() } else { "" }
+    if ($actualProvenance -ne $EXPECTED_PROVENANCE) {
+        Write-Host "Existing Z3 artifacts do not carry the current provenance stamp:"
+        Write-Host "  expected: $EXPECTED_PROVENANCE"
+        Write-Host "  found:    $(if ($actualProvenance) { $actualProvenance } else { '<unstamped: pre-stamp or source-built checkout>' })"
+        Write-Host "Discarding them and refetching from the verified upstream archives."
+        Write-Host ""
+        Remove-Item -Path (Join-Path $Z3_DIR "Microsoft.Z3.dll") -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $RUNTIMES_DIR -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 # Check if managed DLL exists
 $managedDllPath = Join-Path $Z3_DIR "Microsoft.Z3.dll"
 $managedDllExists = Test-Path $managedDllPath
@@ -99,8 +123,13 @@ if (-not $managedDllExists) {
     # Extract
     Expand-Archive -Path $zipFile -DestinationPath $TEMP_DIR -Force
 
-    # Find and copy Microsoft.Z3.dll
-    $foundDll = Get-ChildItem -Path $TEMP_DIR -Recurse -Filter "Microsoft.Z3.dll" | Select-Object -First 1
+    # Search only THIS archive's extract. Several archives contain a
+    # Microsoft.Z3.dll and they are not interchangeable — the x64-win one is
+    # PE32+/AMD64 and cannot load in an arm64 process — so a recursive search
+    # over the shared temp dir could pick a wrapper from a different archive
+    # depending only on enumeration order.
+    $managedExtract = Join-Path $TEMP_DIR $MANAGED_DLL_ARCHIVE
+    $foundDll = Get-ChildItem -Path $managedExtract -Recurse -Filter "Microsoft.Z3.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($foundDll) {
         Copy-Item -Path $foundDll.FullName -Destination $managedDllPath -Force
         Write-Host "[Managed] Done."
@@ -140,8 +169,12 @@ foreach ($platform in $PLATFORMS) {
     # Create target directory
     New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
 
-    # Find and copy the library
-    $foundLib = Get-ChildItem -Path $TEMP_DIR -Recurse -Filter $lib | Select-Object -First 1
+    # Search only THIS archive's extract, not the whole temp dir. The library
+    # names are not unique across archives (three ship a libz3.dll, two a
+    # libz3.so, two a libz3.dylib), so a shared-directory search could install
+    # another RID's binary here — e.g. an arm64 libz3.dll under win-x64. The
+    # checksum guard would not catch it: it verifies the ZIP, not the extract.
+    $foundLib = Get-ChildItem -Path $extractDir -Recurse -Filter $lib -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($foundLib) {
         Copy-Item -Path $foundLib.FullName -Destination $targetFile -Force
         Write-Host "[$rid] Done."
@@ -149,6 +182,11 @@ foreach ($platform in $PLATFORMS) {
         Write-Warning "[$rid] Could not find $lib in archive"
     }
 }
+
+# Record what these artifacts are, so a later run can tell "present" from
+# "current". Written only after every download succeeded.
+New-Item -ItemType Directory -Force -Path $Z3_DIR | Out-Null
+Set-Content -Path $PROVENANCE_FILE -Value $EXPECTED_PROVENANCE -NoNewline
 
 # Cleanup
 Remove-Item -Path $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue

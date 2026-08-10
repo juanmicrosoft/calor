@@ -3,9 +3,16 @@
 # verify each archive against this file before extracting. Computed
 # 2026-07-31 (trust-on-first-use) from
 # https://github.com/Z3Prover/z3/releases/download/z3-4.15.7/ .
-# KNOWN RESIDUAL: the ARM64-macOS path builds Z3 from a git clone pinned to
-# the z3-4.15.7 TAG (tags are mutable); commit-pinning that clone is a
-# recorded follow-up under #789.
+# RESIDUAL RETIRED: this header previously disclosed that the ARM64-macOS path
+# built Z3 from a git clone pinned to the z3-4.15.7 TAG (tags are mutable), with
+# commit-pinning recorded as a follow-up under #789. That path no longer exists.
+# ARM64 macOS now takes the same checksum-verified upstream archives as every
+# other platform, and build-z3-from-source.sh — the only unverified fetch in the
+# toolchain — has been deleted. Every archive consumed by download-z3.sh,
+# download-z3.ps1 and build-z3.yml is now verified against this manifest.
+# (build-z3.yml still builds osx-arm64 from source for the RELEASE assets; that
+# clone is inside the workflow itself and remains tag-pinned. It is the last
+# unverified input and is tracked separately.)
 dabee41164abf080ae3bc312d80d1d8700ef49fbfc593c8d8fa4f3cdaf7d6551  z3-4.15.7-arm64-glibc-2.38.zip
 1f4aefb345bded8b6cd6a5a92b6bb2e34110b373779bfb38145200ceeb4fa626  z3-4.15.7-arm64-osx-15.7.3.zip
 e6ef5a4f8749c0b3214a1ad72e6c5655bbda2eeebe9177277514df1fa7eed571  z3-4.15.7-arm64-win.zip

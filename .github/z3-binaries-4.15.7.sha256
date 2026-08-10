@@ -8,10 +8,21 @@
 # extractions from upstream Z3Prover archives that the same run verified against
 # scripts/z3-upstream-4.15.7.sha256, so they are reproducible: all seven were
 # predicted from the pinned archives BEFORE the run and matched byte for byte.
-# The eighth, libz3-osx-arm64.dylib, is still built from source (upstream's
-# arm64-osx archive has assembly-loading problems) and is the only entry not
-# derivable from a pinned input — though it has now reproduced bit-identically
-# across three separate runs.
+# The eighth, libz3-osx-arm64.dylib, is still built from source and is the only
+# entry not derivable from a pinned input — though it has now reproduced
+# bit-identically across three separate runs. It was previously annotated here
+# as necessary because "upstream's arm64-osx archive has assembly-loading
+# problems"; that justification does not hold — the upstream arm64-osx native is
+# verified working on ARM64 macOS (Calor.Verification.Tests 359/359, zero skips)
+# and download-z3.sh now uses it. Switching build-z3.yml to match is pending a
+# deliberate republish, bundled with the unresolved osx-x64 question below.
+#
+# ⚠ KNOWN DEFECT, NOT FIXED: libz3-osx-x64.dylib is an ARM64 binary. Upstream's
+# z3-4.15.7-x64-osx-15.7.3.zip and z3-4.15.7-arm64-osx-15.7.3.zip ship a
+# byte-identical arm64 libz3.dylib, so the hash below is correct for the bytes
+# we publish but the bytes themselves are mislabeled at the RID. Intel Macs get
+# a native that cannot load and lose verification silently (it fails soft to
+# "Z3 unavailable"). Inherited from upstream; the remedy is an open decision.
 #
 # This replaces a 2026-07-31 trust-on-first-use manifest that had drifted. Two
 # entries changed, and neither because upstream changed:

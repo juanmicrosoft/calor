@@ -4,6 +4,60 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Corrected
+- **The v0.12.1 notes below understated the VS Code outage by about six times, and implied a
+  publish that did not happen.** They said the extension "can be published again" after "three
+  consecutive releases" (v0.9.0, v0.10.0, v0.12.0). Both parts were wrong. The publish has failed
+  on **every release since v0.4.0 (2026-03-09)** — the last success was v0.3.8 and the marketplace
+  has been stuck there for roughly nineteen releases across five months. The claim was also
+  self-refuting: had only three failed, the marketplace would read v0.8.0. And v0.12.1 itself did
+  not publish either — the `IL3000` build failure was fixed, but the publish step then hit an
+  expired marketplace token, a second and older blocker that the build failure had been masking.
+  The v0.12.1 entry has been amended in place.
+
+### Fixed
+- **ARM64 macOS no longer builds Z3 from source**, cutting `download-z3.sh` from roughly 20
+  minutes to under 15 seconds there. The workaround it replaces was justified as "pre-built Z3
+  binaries have compatibility issues" on that platform; whatever the original failure was, it is
+  not reproducible from the record, and the upstream `arm64-osx` native is verified working today
+  (`Calor.Verification.Tests` 359/359, zero skips, on a suite that *skips* rather than passes when
+  Z3 cannot load). This was the sole reason the VS Code publish workflow took ~23 minutes.
+- **Z3 downloads can no longer install a native under the wrong RID.** Both download scripts
+  selected the extracted library with a recursive search over one shared scratch directory, but
+  the library names are not unique across archives — three ship a `libz3.dll`, two a `libz3.so`,
+  two a `libz3.dylib`. A leftover extract could therefore be picked for a different RID, giving
+  (for instance) an arm64 `libz3.dll` to `win-x64`. The checksum guard cannot catch this: it
+  verifies the *archive*, never the file that lands in `runtimes/`. Extraction is now isolated per
+  RID, and the scratch directory is cleaned on failure as well as success.
+- **Stale Z3 artifacts are now detected and replaced.** `z3/` and `runtimes/` are gitignored, and
+  every check was a bare existence test, so artifacts were kept regardless of origin. A checkout
+  that had run the old ARM64-macOS source build kept its Debug, source-compiled wrapper
+  indefinitely while newly added RIDs came from upstream — a silent mix, from which a local
+  `dotnet pack` shipped the Debug wrapper. A provenance stamp now records which upstream archive
+  supplied the wrapper, and a mismatch discards and refetches everything. `Calor.Compiler.csproj`
+  gates on that stamp instead of on a single RID's native, which it previously did — and that RID
+  was precisely the one the old source build produced, so the download step never ran on exactly
+  the machines that needed it.
+- **`publish-vscode` no longer strands platforms after the first failure.** The publish loop ran
+  under `bash -e` with no error handling, so one failing target aborted the step and the remaining
+  platforms were never attempted. Every target is now attempted, an already-published target
+  counts as success (making retries idempotent), and the step fails at the end with a list.
+
+### Removed
+- **`build-z3-from-source.sh`**, now unreferenced by any executable path. It cloned a **mutable
+  git tag** with no commit pin and no checksum — the only unverified fetch left in the toolchain,
+  and a documented residual under #789 — and produced exactly the Debug wrapper v0.12.1 was cut to
+  stop shipping. Its removal retires that residual; the disclosure in
+  `scripts/z3-upstream-4.15.7.sha256` is updated accordingly.
+
+### Known issues
+- **`libz3-osx-x64.dylib` is an arm64 binary and ships that way.** Upstream's
+  `z3-4.15.7-x64-osx-15.7.3.zip` and `z3-4.15.7-arm64-osx-15.7.3.zip` contain a byte-identical
+  arm64 `libz3.dylib`, so the `osx-x64` native is mislabeled at the RID. Intel Macs get a library
+  that cannot load and lose static verification silently — it degrades to "Z3 unavailable" rather
+  than failing loudly. Inherited from upstream, not introduced here; the remedy (source-build on
+  an Intel runner, drop the RID, or cross-compile) is undecided.
+
 ## [0.12.1] - 2026-08-07
 
 **A packaging release. v0.12.0 was tagged but never installable** — both publish workflows
@@ -28,9 +82,10 @@ deterministic static analysis, and this release changes no analyzed code path. T
 confidence intervals carry the same defect disclosed in v0.12.0 and are still not fixed.
 
 ### Fixed
-- **The VS Code extension can be published again.** It had failed to publish for **three
-  consecutive releases** (v0.9.0, v0.10.0, v0.12.0) without anyone noticing, which is why the
-  marketplace still served `0.3.8`. The language server is packed with `PublishSingleFile=true`,
+- **The VS Code extension builds again** — though it still did not publish; see the correction
+  note under Unreleased. The `IL3000` build failure below is fixed and all six platform packages
+  are produced, but the publish step then failed on an expired marketplace token, so the
+  marketplace remains at `0.3.8`. The language server is packed with `PublishSingleFile=true`,
   which promotes `Assembly.Location` to an `IL3000` error under `TreatWarningsAsErrors`. Fixed at
   both sites: `Z3ContextFactory` carries a justified suppression (the empty location is a
   supported input there and is already guarded), and `ImportCommand` now uses
