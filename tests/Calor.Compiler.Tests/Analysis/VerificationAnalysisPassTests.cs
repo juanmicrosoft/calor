@@ -78,6 +78,45 @@ public class VerificationAnalysisPassTests
         Assert.True(options.Z3TimeoutMs <= 30000);
     }
 
+    [Fact]
+    public void PreconditionFacts_AreScopedToExactOverloadSymbol()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Divide:pub}
+                §I{i32:x}
+                §I{i32:y}
+                §O{i32}
+                §Q (!= y INT:0)
+                §R (/ x y)
+              §F{f002:Divide:pub}
+                §I{i64:x}
+                §I{i64:y}
+                §O{i64}
+                §R (/ x y)
+            """;
+        var module = Parse(source, out var parseDiagnostics);
+        Assert.False(parseDiagnostics.HasErrors);
+        var diagnostics = new DiagnosticBag();
+
+        new VerificationAnalysisPass(
+                diagnostics,
+                new VerificationAnalysisOptions
+                {
+                    EnableDataflow = false,
+                    EnableBugPatterns = true,
+                    EnableTaintAnalysis = false,
+                    EnableContractInference = false,
+                    EnableKInduction = false,
+                    UseZ3Verification = false,
+                })
+            .Analyze(module);
+
+        Assert.Single(
+            diagnostics.Where(diagnostic =>
+                diagnostic.Code == DiagnosticCode.MissingPrecondition));
+    }
+
     #endregion
 
     #region Result Tests

@@ -182,7 +182,9 @@ public sealed class TaintAnalysis
     private readonly BoundFunction _function;
     private readonly TaintAnalysisOptions _options;
     private readonly List<TaintVulnerability> _vulnerabilities = new();
-    private readonly Dictionary<string, HashSet<TaintLabel>> _taintedVariables = new();
+    private readonly Dictionary<SymbolId, HashSet<TaintLabel>> _taintedVariables = new();
+    public IReadOnlyList<BoundNode> IncompleteNodes { get; }
+    public bool IsComplete => IncompleteNodes.Count == 0;
 
     /// <summary>
     /// Effect declarations for the function (populated from AST).
@@ -200,6 +202,7 @@ public sealed class TaintAnalysis
         _function = function ?? throw new ArgumentNullException(nameof(function));
         _options = options ?? TaintAnalysisOptions.Default;
         _declaredEffects = declaredEffects ?? Array.Empty<string>();
+        IncompleteNodes = BoundNodeHelpers.GetAnalysisIncompleteNodes(function).ToArray();
 
         Analyze();
     }
@@ -394,6 +397,13 @@ public sealed class TaintAnalysis
                     foreach (var s in tryStmt.FinallyBody)
                         AnalyzeStatement(s);
                 break;
+
+            default:
+                foreach (var expression in BoundNodeHelpers.GetImmediateExpressions(stmt))
+                    AnalyzeExpression(expression);
+                foreach (var statement in BoundNodeHelpers.GetImmediateStatements(stmt))
+                    AnalyzeStatement(statement);
+                break;
         }
     }
 
@@ -407,16 +417,6 @@ public sealed class TaintAnalysis
 
         // Check if the initializer is a taint source
         var sourceLabels = GetTaintLabelsFromExpression(bind.Initializer);
-
-        // Check if the initializer is a call that introduces taint
-        if (bind.Initializer is BoundCallExpression callExpr)
-        {
-            var newTaint = CheckForTaintSource(callExpr.Target, callExpr.Span);
-            if (newTaint != null)
-            {
-                sourceLabels = sourceLabels.Append(newTaint.Value);
-            }
-        }
 
         // Propagate taint to the variable being defined
         foreach (var label in sourceLabels)
@@ -453,11 +453,6 @@ public sealed class TaintAnalysis
             }
         }
 
-        // Also recursively analyze arguments
-        foreach (var arg in arguments)
-        {
-            AnalyzeExpression(arg);
-        }
     }
 
     private void AnalyzeExpression(BoundExpression expr)
@@ -465,7 +460,6 @@ public sealed class TaintAnalysis
         if (expr is BoundCallExpression callExpr)
         {
             AnalyzeCall(callExpr.Target, callExpr.Arguments, callExpr.Span);
-            return;
         }
 
         foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
@@ -749,7 +743,7 @@ public sealed class TaintAnalysis
     {
         if (expr is BoundVariableExpression varExpr)
         {
-            if (_taintedVariables.TryGetValue(varExpr.Variable.IdentityKey, out var labels))
+            if (_taintedVariables.TryGetValue(varExpr.Variable.Id, out var labels))
             {
                 foreach (var label in labels)
                     yield return label;
@@ -757,8 +751,15 @@ public sealed class TaintAnalysis
             yield break;
         }
 
-        if (expr is BoundCallExpression callExpr && IsSanitizer(callExpr.Target))
-            yield break;
+        if (expr is BoundCallExpression callExpr)
+        {
+            if (IsSanitizer(callExpr.Target))
+                yield break;
+
+            var source = CheckForTaintSource(callExpr.Target, callExpr.Span);
+            if (source != null)
+                yield return source.Value;
+        }
 
         foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
             foreach (var label in GetTaintLabelsFromExpression(child))
@@ -779,10 +780,13 @@ public sealed class TaintAnalysis
 
     private void AddTaint(VariableSymbol variable, TaintLabel label)
     {
-        if (!_taintedVariables.TryGetValue(variable.IdentityKey, out var labels))
+        if (variable.Id.IsNone)
+            return;
+
+        if (!_taintedVariables.TryGetValue(variable.Id, out var labels))
         {
             labels = new HashSet<TaintLabel>();
-            _taintedVariables[variable.IdentityKey] = labels;
+            _taintedVariables[variable.Id] = labels;
         }
         labels.Add(label);
     }

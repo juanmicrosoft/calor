@@ -138,38 +138,10 @@ public sealed class TypeSuggester
         HashSet<string> paramNames,
         Dictionary<string, HashSet<string>> patterns)
     {
-        switch (stmt)
+        foreach (var node in DescendantsAndSelf(stmt))
         {
-            case CallStatementNode call:
-                foreach (var arg in call.Arguments)
-                    AnalyzeExpression(arg, paramNames, patterns);
-                break;
-
-            case ReturnStatementNode ret:
-                if (ret.Expression != null)
-                    AnalyzeExpression(ret.Expression, paramNames, patterns);
-                break;
-
-            case BindStatementNode bind:
-                if (bind.Initializer != null)
-                    AnalyzeExpression(bind.Initializer, paramNames, patterns);
-                break;
-
-            case IfStatementNode ifStmt:
-                AnalyzeExpression(ifStmt.Condition, paramNames, patterns);
-                foreach (var s in ifStmt.ThenBody) AnalyzeStatement(s, paramNames, patterns);
-                if (ifStmt.ElseBody != null)
-                    foreach (var s in ifStmt.ElseBody) AnalyzeStatement(s, paramNames, patterns);
-                break;
-
-            case ForStatementNode forStmt:
-                foreach (var s in forStmt.Body) AnalyzeStatement(s, paramNames, patterns);
-                break;
-
-            case WhileStatementNode whileStmt:
-                AnalyzeExpression(whileStmt.Condition, paramNames, patterns);
-                foreach (var s in whileStmt.Body) AnalyzeStatement(s, paramNames, patterns);
-                break;
+            if (node is ExpressionNode expression)
+                AnalyzeExpression(expression, paramNames, patterns);
         }
     }
 
@@ -178,61 +150,53 @@ public sealed class TypeSuggester
         HashSet<string> paramNames,
         Dictionary<string, HashSet<string>> patterns)
     {
-        switch (expr)
+        if (expr is BinaryOperationNode binOp)
         {
-            case BinaryOperationNode binOp:
-                // Check if a parameter is used as a divisor
-                if (binOp.Operator is BinaryOperator.Divide or BinaryOperator.Modulo)
+            // Check if a parameter is used as a divisor
+            if (binOp.Operator is BinaryOperator.Divide or BinaryOperator.Modulo)
+            {
+                if (binOp.Right is ReferenceNode divisorRef && paramNames.Contains(divisorRef.Name))
                 {
-                    if (binOp.Right is ReferenceNode divisorRef && paramNames.Contains(divisorRef.Name))
-                    {
-                        AddPattern(patterns, divisorRef.Name, "used_as_divisor");
-                    }
+                    AddPattern(patterns, divisorRef.Name, "used_as_divisor");
                 }
+            }
 
-                // Check if a parameter is compared with >= 0
-                if (binOp.Operator == BinaryOperator.GreaterOrEqual)
+            // Check if a parameter is compared with >= 0
+            if (binOp.Operator == BinaryOperator.GreaterOrEqual)
+            {
+                if (binOp.Left is ReferenceNode leftRef && paramNames.Contains(leftRef.Name)
+                    && binOp.Right is IntLiteralNode { Value: 0 })
                 {
-                    if (binOp.Left is ReferenceNode leftRef && paramNames.Contains(leftRef.Name)
-                        && binOp.Right is IntLiteralNode { Value: 0 })
-                    {
-                        AddPattern(patterns, leftRef.Name, "compared_geq_zero");
-                    }
+                    AddPattern(patterns, leftRef.Name, "compared_geq_zero");
                 }
+            }
 
-                // Check if a parameter is compared with > 0
-                if (binOp.Operator == BinaryOperator.GreaterThan)
+            // Check if a parameter is compared with > 0
+            if (binOp.Operator == BinaryOperator.GreaterThan)
+            {
+                if (binOp.Left is ReferenceNode gtRef && paramNames.Contains(gtRef.Name)
+                    && binOp.Right is IntLiteralNode { Value: 0 })
                 {
-                    if (binOp.Left is ReferenceNode gtRef && paramNames.Contains(gtRef.Name)
-                        && binOp.Right is IntLiteralNode { Value: 0 })
-                    {
-                        AddPattern(patterns, gtRef.Name, "compared_gt_zero");
-                    }
+                    AddPattern(patterns, gtRef.Name, "compared_gt_zero");
                 }
+            }
+        }
 
-                AnalyzeExpression(binOp.Left, paramNames, patterns);
-                AnalyzeExpression(binOp.Right, paramNames, patterns);
-                break;
+        if (expr is ArrayAccessNode arrayAccess
+            && arrayAccess.Index is ReferenceNode indexRef
+            && paramNames.Contains(indexRef.Name))
+        {
+            AddPattern(patterns, indexRef.Name, "used_as_index");
+        }
+    }
 
-            case ArrayAccessNode arrayAccess:
-                // Check if a parameter is used as an array index
-                if (arrayAccess.Index is ReferenceNode indexRef && paramNames.Contains(indexRef.Name))
-                {
-                    AddPattern(patterns, indexRef.Name, "used_as_index");
-                }
-                AnalyzeExpression(arrayAccess.Array, paramNames, patterns);
-                AnalyzeExpression(arrayAccess.Index, paramNames, patterns);
-                break;
-
-            case UnaryOperationNode unaryOp:
-                AnalyzeExpression(unaryOp.Operand, paramNames, patterns);
-                break;
-
-            case ConditionalExpressionNode cond:
-                AnalyzeExpression(cond.Condition, paramNames, patterns);
-                AnalyzeExpression(cond.WhenTrue, paramNames, patterns);
-                AnalyzeExpression(cond.WhenFalse, paramNames, patterns);
-                break;
+    private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
+    {
+        yield return node;
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
         }
     }
 
@@ -312,19 +276,10 @@ public sealed class TypeSuggester
 
     private static void CollectGuardedParams(ExpressionNode condition, HashSet<string> guarded)
     {
-        switch (condition)
+        foreach (var node in DescendantsAndSelf(condition))
         {
-            case BinaryOperationNode binOp:
-                if (binOp.Left is ReferenceNode refNode)
-                    guarded.Add(refNode.Name);
-                if (binOp.Right is ReferenceNode rightRef)
-                    guarded.Add(rightRef.Name);
-                if (binOp.Operator is BinaryOperator.And or BinaryOperator.Or)
-                {
-                    CollectGuardedParams(binOp.Left, guarded);
-                    CollectGuardedParams(binOp.Right, guarded);
-                }
-                break;
+            if (node is ReferenceNode reference)
+                guarded.Add(reference.Name);
         }
     }
 }

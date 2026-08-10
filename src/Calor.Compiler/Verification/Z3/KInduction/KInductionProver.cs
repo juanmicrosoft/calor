@@ -345,7 +345,7 @@ public sealed class KInductionProver : IDisposable
             var loopVarName = loopInfo.LoopVariable!;
 
             // Step 2: Analyze body for transition patterns
-            var transition = WhileConditionAnalyzer.AnalyzeTransition(loop.Body, loopVarName);
+            var transition = WhileConditionAnalyzer.AnalyzeTransition(loop.Body, loopInfo);
             if (transition == null || !transition.IsWellFormed)
             {
                 // Can't determine how loop variable changes

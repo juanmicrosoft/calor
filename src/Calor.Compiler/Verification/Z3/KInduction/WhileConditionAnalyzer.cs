@@ -18,7 +18,8 @@ public static class WhileConditionAnalyzer
         long? UpperBound,
         bool IsDecrementing,
         string? ConditionOperator,
-        BoundExpression? BoundValue)
+        BoundExpression? BoundValue,
+        SymbolId? LoopVariableId = null)
     {
         /// <summary>
         /// Whether the loop has enough information for k-induction.
@@ -32,7 +33,8 @@ public static class WhileConditionAnalyzer
     public sealed record TransitionInfo(
         string Variable,
         TransitionKind Kind,
-        long? Delta)
+        long? Delta,
+        SymbolId? VariableId = null)
     {
         /// <summary>
         /// Whether this is a well-understood transition.
@@ -82,7 +84,7 @@ public static class WhileConditionAnalyzer
             var rightInfo = Analyze(binExpr.Right);
 
             if (leftInfo != null && rightInfo != null &&
-                leftInfo.LoopVariable == rightInfo.LoopVariable)
+                SameLoopVariable(leftInfo, rightInfo))
             {
                 // Combine bounds
                 return new WhileLoopInfo(
@@ -91,7 +93,8 @@ public static class WhileConditionAnalyzer
                     leftInfo.UpperBound ?? rightInfo.UpperBound,
                     leftInfo.IsDecrementing || rightInfo.IsDecrementing,
                     leftInfo.ConditionOperator,
-                    leftInfo.BoundValue ?? rightInfo.BoundValue);
+                    leftInfo.BoundValue ?? rightInfo.BoundValue,
+                    leftInfo.LoopVariableId ?? rightInfo.LoopVariableId);
             }
 
             // Return whichever one is valid
@@ -113,20 +116,34 @@ public static class WhileConditionAnalyzer
     private static WhileLoopInfo? AnalyzeLessThan(BoundBinaryExpression binExpr)
     {
         // Pattern: i < n (incrementing loop)
-        var varName = GetVariableName(binExpr.Left);
+        var variable = GetVariable(binExpr.Left);
         var upperBound = GetIntValue(binExpr.Right);
 
-        if (varName != null)
+        if (variable != null)
         {
-            return new WhileLoopInfo(varName, null, upperBound, false, "<", binExpr.Right);
+            return new WhileLoopInfo(
+                variable.Name,
+                null,
+                upperBound,
+                false,
+                "<",
+                binExpr.Right,
+                variable.Id);
         }
 
         // Pattern: n < i is unusual but possible (decrementing)
-        varName = GetVariableName(binExpr.Right);
+        variable = GetVariable(binExpr.Right);
         var lowerBound = GetIntValue(binExpr.Left);
-        if (varName != null && lowerBound != null)
+        if (variable != null && lowerBound != null)
         {
-            return new WhileLoopInfo(varName, lowerBound + 1, null, true, "<", binExpr.Left);
+            return new WhileLoopInfo(
+                variable.Name,
+                lowerBound + 1,
+                null,
+                true,
+                "<",
+                binExpr.Left,
+                variable.Id);
         }
 
         return null;
@@ -135,12 +152,19 @@ public static class WhileConditionAnalyzer
     private static WhileLoopInfo? AnalyzeLessOrEqual(BoundBinaryExpression binExpr)
     {
         // Pattern: i <= n (incrementing loop)
-        var varName = GetVariableName(binExpr.Left);
+        var variable = GetVariable(binExpr.Left);
         var upperBound = GetIntValue(binExpr.Right);
 
-        if (varName != null)
+        if (variable != null)
         {
-            return new WhileLoopInfo(varName, null, upperBound, false, "<=", binExpr.Right);
+            return new WhileLoopInfo(
+                variable.Name,
+                null,
+                upperBound,
+                false,
+                "<=",
+                binExpr.Right,
+                variable.Id);
         }
 
         return null;
@@ -149,12 +173,19 @@ public static class WhileConditionAnalyzer
     private static WhileLoopInfo? AnalyzeGreaterThan(BoundBinaryExpression binExpr)
     {
         // Pattern: i > 0 (decrementing loop)
-        var varName = GetVariableName(binExpr.Left);
+        var variable = GetVariable(binExpr.Left);
         var lowerBound = GetIntValue(binExpr.Right);
 
-        if (varName != null)
+        if (variable != null)
         {
-            return new WhileLoopInfo(varName, lowerBound != null ? lowerBound + 1 : null, null, true, ">", binExpr.Right);
+            return new WhileLoopInfo(
+                variable.Name,
+                lowerBound != null ? lowerBound + 1 : null,
+                null,
+                true,
+                ">",
+                binExpr.Right,
+                variable.Id);
         }
 
         return null;
@@ -163,12 +194,19 @@ public static class WhileConditionAnalyzer
     private static WhileLoopInfo? AnalyzeGreaterOrEqual(BoundBinaryExpression binExpr)
     {
         // Pattern: i >= 1 (decrementing loop)
-        var varName = GetVariableName(binExpr.Left);
+        var variable = GetVariable(binExpr.Left);
         var lowerBound = GetIntValue(binExpr.Right);
 
-        if (varName != null)
+        if (variable != null)
         {
-            return new WhileLoopInfo(varName, lowerBound, null, true, ">=", binExpr.Right);
+            return new WhileLoopInfo(
+                variable.Name,
+                lowerBound,
+                null,
+                true,
+                ">=",
+                binExpr.Right,
+                variable.Id);
         }
 
         return null;
@@ -177,13 +215,20 @@ public static class WhileConditionAnalyzer
     private static WhileLoopInfo? AnalyzeNotEqual(BoundBinaryExpression binExpr)
     {
         // Pattern: i != n (direction unknown without body analysis)
-        var varName = GetVariableName(binExpr.Left) ?? GetVariableName(binExpr.Right);
+        var variable = GetVariable(binExpr.Left) ?? GetVariable(binExpr.Right);
         var boundValue = GetIntValue(binExpr.Left) ?? GetIntValue(binExpr.Right);
-        var boundExpr = GetVariableName(binExpr.Left) != null ? binExpr.Right : binExpr.Left;
+        var boundExpr = GetVariable(binExpr.Left) != null ? binExpr.Right : binExpr.Left;
 
-        if (varName != null)
+        if (variable != null)
         {
-            return new WhileLoopInfo(varName, null, boundValue, false, "!=", boundExpr);
+            return new WhileLoopInfo(
+                variable.Name,
+                null,
+                boundValue,
+                false,
+                "!=",
+                boundExpr,
+                variable.Id);
         }
 
         return null;
@@ -196,10 +241,23 @@ public static class WhileConditionAnalyzer
     /// <param name="loopVariable">The loop variable name to track.</param>
     /// <returns>Transition information for the loop variable.</returns>
     public static TransitionInfo? AnalyzeTransition(IReadOnlyList<BoundStatement> body, string loopVariable)
+        => AnalyzeTransition(body, loopVariable, null);
+
+    public static TransitionInfo? AnalyzeTransition(
+        IReadOnlyList<BoundStatement> body,
+        WhileLoopInfo loop)
+        => loop.LoopVariable == null
+            ? null
+            : AnalyzeTransition(body, loop.LoopVariable, loop.LoopVariableId);
+
+    private static TransitionInfo? AnalyzeTransition(
+        IReadOnlyList<BoundStatement> body,
+        string loopVariable,
+        SymbolId? loopVariableId)
     {
         foreach (var stmt in body)
         {
-            var transition = AnalyzeStatementTransition(stmt, loopVariable);
+            var transition = AnalyzeStatementTransition(stmt, loopVariable, loopVariableId);
             if (transition != null)
                 return transition;
         }
@@ -207,25 +265,29 @@ public static class WhileConditionAnalyzer
         return null;
     }
 
-    private static TransitionInfo? AnalyzeStatementTransition(BoundStatement stmt, string loopVariable)
+    private static TransitionInfo? AnalyzeStatementTransition(
+        BoundStatement stmt,
+        string loopVariable,
+        SymbolId? loopVariableId)
     {
         switch (stmt)
         {
-            case BoundBindStatement bind when bind.Variable.Name == loopVariable:
-                return AnalyzeBindingTransition(bind, loopVariable);
+            case BoundBindStatement bind
+                when MatchesVariable(bind.Variable, loopVariable, loopVariableId):
+                return AnalyzeBindingTransition(bind, loopVariable, loopVariableId);
 
             case BoundIfStatement ifStmt:
                 // Check all branches
                 foreach (var s in ifStmt.ThenBody)
                 {
-                    var t = AnalyzeStatementTransition(s, loopVariable);
+                    var t = AnalyzeStatementTransition(s, loopVariable, loopVariableId);
                     if (t != null) return t;
                 }
                 foreach (var elseIf in ifStmt.ElseIfClauses)
                 {
                     foreach (var s in elseIf.Body)
                     {
-                        var t = AnalyzeStatementTransition(s, loopVariable);
+                        var t = AnalyzeStatementTransition(s, loopVariable, loopVariableId);
                         if (t != null) return t;
                     }
                 }
@@ -233,7 +295,7 @@ public static class WhileConditionAnalyzer
                 {
                     foreach (var s in ifStmt.ElseBody)
                     {
-                        var t = AnalyzeStatementTransition(s, loopVariable);
+                        var t = AnalyzeStatementTransition(s, loopVariable, loopVariableId);
                         if (t != null) return t;
                     }
                 }
@@ -242,7 +304,7 @@ public static class WhileConditionAnalyzer
             case BoundForStatement forStmt:
                 foreach (var s in forStmt.Body)
                 {
-                    var t = AnalyzeStatementTransition(s, loopVariable);
+                    var t = AnalyzeStatementTransition(s, loopVariable, loopVariableId);
                     if (t != null) return t;
                 }
                 break;
@@ -250,7 +312,7 @@ public static class WhileConditionAnalyzer
             case BoundWhileStatement whileStmt:
                 foreach (var s in whileStmt.Body)
                 {
-                    var t = AnalyzeStatementTransition(s, loopVariable);
+                    var t = AnalyzeStatementTransition(s, loopVariable, loopVariableId);
                     if (t != null) return t;
                 }
                 break;
@@ -259,7 +321,10 @@ public static class WhileConditionAnalyzer
         return null;
     }
 
-    private static TransitionInfo? AnalyzeBindingTransition(BoundBindStatement bind, string loopVariable)
+    private static TransitionInfo? AnalyzeBindingTransition(
+        BoundBindStatement bind,
+        string loopVariable,
+        SymbolId? loopVariableId)
     {
         if (bind.Initializer == null)
             return null;
@@ -268,28 +333,40 @@ public static class WhileConditionAnalyzer
         if (bind.Initializer is BoundBinaryExpression binExpr)
         {
             // Check if one side is the loop variable
-            var leftVar = GetVariableName(binExpr.Left);
-            var rightVar = GetVariableName(binExpr.Right);
+            var leftVar = GetVariable(binExpr.Left);
+            var rightVar = GetVariable(binExpr.Right);
 
-            if (leftVar == loopVariable)
+            if (leftVar != null && MatchesVariable(leftVar, loopVariable, loopVariableId))
             {
                 var delta = GetIntValue(binExpr.Right);
                 if (delta != null)
                 {
                     return binExpr.Operator switch
                     {
-                        BinaryOperator.Add => new TransitionInfo(loopVariable, TransitionKind.AddConstant, delta),
-                        BinaryOperator.Subtract => new TransitionInfo(loopVariable, TransitionKind.SubConstant, delta),
+                        BinaryOperator.Add => new TransitionInfo(
+                            loopVariable,
+                            TransitionKind.AddConstant,
+                            delta,
+                            loopVariableId),
+                        BinaryOperator.Subtract => new TransitionInfo(
+                            loopVariable,
+                            TransitionKind.SubConstant,
+                            delta,
+                            loopVariableId),
                         _ => null
                     };
                 }
             }
-            else if (rightVar == loopVariable)
+            else if (rightVar != null && MatchesVariable(rightVar, loopVariable, loopVariableId))
             {
                 var delta = GetIntValue(binExpr.Left);
                 if (delta != null && binExpr.Operator == BinaryOperator.Add)
                 {
-                    return new TransitionInfo(loopVariable, TransitionKind.AddConstant, delta);
+                    return new TransitionInfo(
+                        loopVariable,
+                        TransitionKind.AddConstant,
+                        delta,
+                        loopVariableId);
                 }
             }
         }
@@ -300,13 +377,29 @@ public static class WhileConditionAnalyzer
         return null;
     }
 
-    private static string? GetVariableName(BoundExpression expr)
+    private static VariableSymbol? GetVariable(BoundExpression expr) =>
+        (expr as BoundVariableExpression)?.Variable;
+
+    private static bool MatchesVariable(
+        VariableSymbol variable,
+        string name,
+        SymbolId? symbolId) =>
+        symbolId is { IsNone: false }
+            ? variable.Id == symbolId
+            : string.Equals(variable.Name, name, StringComparison.Ordinal);
+
+    private static bool SameLoopVariable(WhileLoopInfo left, WhileLoopInfo right)
     {
-        return expr switch
+        if (left.LoopVariableId is { IsNone: false } leftId
+            && right.LoopVariableId is { IsNone: false } rightId)
         {
-            BoundVariableExpression varExpr => varExpr.Variable.Name,
-            _ => null
-        };
+            return leftId == rightId;
+        }
+
+        return string.Equals(
+            left.LoopVariable,
+            right.LoopVariable,
+            StringComparison.Ordinal);
     }
 
     private static long? GetIntValue(BoundExpression expr)

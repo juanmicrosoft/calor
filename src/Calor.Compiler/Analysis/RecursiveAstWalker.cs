@@ -25,7 +25,8 @@ namespace Calor.Compiler.Analysis;
 /// </summary>
 public static class RecursiveAstWalker
 {
-    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> Cache = new();
+    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> NonExpressionCache = new();
+    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> AllChildrenCache = new();
 
     /// <summary>
     /// Enumerates the direct child <see cref="AstNode"/>s of
@@ -84,9 +85,57 @@ public static class RecursiveAstWalker
     /// in a deterministic order.
     /// </summary>
     public static PropertyInfo[] GetChildProperties(Type type) =>
-        Cache.GetOrAdd(type, static t =>
+        NonExpressionCache.GetOrAdd(type, static t =>
             t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.GetIndexParameters().Length == 0 && CanHoldChildAstNode(p.PropertyType))
+                .OrderBy(p => p.MetadataToken)
+                .ThenBy(p => p.Name, StringComparer.Ordinal)
+                .ToArray());
+
+    /// <summary>
+    /// Enumerates every direct AST child, including expression subtrees. This is
+    /// the universal traversal surface for analyses that must not hide nested
+    /// calls or diagnostic seeds inside newly added expression wrappers.
+    /// </summary>
+    public static IEnumerable<AstNode> GetAllChildren(AstNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        var yielded = new HashSet<AstNode>(ReferenceEqualityComparer.Instance);
+
+        foreach (var prop in GetAllChildProperties(node.GetType()))
+        {
+            object? value;
+            try
+            {
+                value = prop.GetValue(node);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (value is AstNode single)
+            {
+                if (yielded.Add(single))
+                    yield return single;
+                continue;
+            }
+
+            if (value is not IEnumerable sequence)
+                continue;
+
+            foreach (var item in sequence)
+            {
+                if (item is AstNode child && yielded.Add(child))
+                    yield return child;
+            }
+        }
+    }
+
+    public static PropertyInfo[] GetAllChildProperties(Type type) =>
+        AllChildrenCache.GetOrAdd(type, static t =>
+            t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(p => p.GetIndexParameters().Length == 0 && CanHoldAnyAstNode(p.PropertyType))
                 .OrderBy(p => p.MetadataToken)
                 .ThenBy(p => p.Name, StringComparer.Ordinal)
                 .ToArray());
@@ -108,6 +157,15 @@ public static class RecursiveAstWalker
         }
 
         return !typeof(ExpressionNode).IsAssignableFrom(element);
+    }
+
+    private static bool CanHoldAnyAstNode(Type propertyType)
+    {
+        if (typeof(AstNode).IsAssignableFrom(propertyType))
+            return true;
+
+        var element = GetEnumerableElementType(propertyType);
+        return element != null && typeof(AstNode).IsAssignableFrom(element);
     }
 
     private static Type? GetEnumerableElementType(Type type)

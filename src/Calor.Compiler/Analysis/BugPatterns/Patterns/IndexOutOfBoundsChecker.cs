@@ -153,6 +153,13 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
                     CheckExpression(throwStmt.Expression, function, diagnostics, pathConditions);
                 }
                 break;
+
+            default:
+                foreach (var expression in BoundNodeHelpers.GetImmediateExpressions(stmt))
+                    CheckExpression(expression, function, diagnostics, pathConditions);
+                foreach (var statement in BoundNodeHelpers.GetImmediateStatements(stmt))
+                    CheckStatement(statement, function, diagnostics, pathConditions);
+                break;
         }
     }
 
@@ -249,7 +256,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
         if (indexExpr is not BoundVariableExpression varExpr)
             return false;
 
-        var indexName = varExpr.Variable.Name;
+        var indexVariable = varExpr.Variable;
 
         foreach (var condition in pathConditions)
         {
@@ -258,7 +265,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
                 // Check for i >= 0
                 if (binExpr.Operator == BinaryOperator.GreaterOrEqual)
                 {
-                    if (IsVariableAndZero(binExpr.Left, binExpr.Right, indexName))
+                    if (IsVariableAndZero(binExpr.Left, binExpr.Right, indexVariable))
                         return true;
                 }
 
@@ -267,7 +274,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
                     binExpr.Operator == BinaryOperator.LessOrEqual)
                 {
                     if (binExpr.Left is BoundVariableExpression leftVar &&
-                        leftVar.Variable.Name == indexName)
+                        BoundNodeHelpers.SameSymbol(leftVar.Variable, indexVariable))
                     {
                         return true; // Assumes comparison with some length
                     }
@@ -291,7 +298,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
             // Declare parameters
             foreach (var param in function.Symbol.Parameters)
             {
-                translator.DeclareVariable(param.Name, param.TypeName);
+                translator.DeclareVariable(param);
             }
 
             // Translate path conditions
@@ -339,10 +346,13 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
         }
     }
 
-    private static bool IsVariableAndZero(BoundExpression maybeVar, BoundExpression maybeZero, string variableName)
+    private static bool IsVariableAndZero(
+        BoundExpression maybeVar,
+        BoundExpression maybeZero,
+        VariableSymbol variable)
     {
         return maybeVar is BoundVariableExpression varExpr &&
-               varExpr.Variable.Name == variableName &&
+               BoundNodeHelpers.SameSymbol(varExpr.Variable, variable) &&
                maybeZero is BoundIntLiteral intLit &&
                intLit.Value == 0;
     }

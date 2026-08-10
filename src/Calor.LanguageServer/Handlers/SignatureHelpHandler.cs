@@ -48,6 +48,22 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
                 BuildSignatureHelp(resolvedSymbol, callContext.ArgumentIndex));
         }
 
+        var boundCall = SymbolFinder.FindBoundCallAtOffset(
+            state.BoundModule,
+            offset,
+            callContext.FunctionName);
+        var projectCall = _workspace.ResolveProjectCall(boundCall);
+        if (projectCall.Symbol != null)
+        {
+            return Task.FromResult<SignatureHelp?>(
+                BuildSignatureHelp(projectCall.Symbol, callContext.ArgumentIndex));
+        }
+
+        if (boundCall != null)
+        {
+            return Task.FromResult<SignatureHelp?>(null);
+        }
+
         // Find the function definition
         var func = SymbolFinder.FindFunction(state.Ast, callContext.FunctionName);
         if (func == null)

@@ -44,11 +44,13 @@ public sealed class BindValidationPass
     // array-vs-collection check (Calor0254) can see when an initializer call
     // returns an array (e.g. §F ... -> [str]). Rebuilt on every Check(module).
     private readonly Dictionary<string, string> _userReturnTypes = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _ambiguousUserReturnTypes = new(StringComparer.Ordinal);
 
     // Parameter types of each user function/method, keyed by "name/arity" (and
     // "Type.Method/arity"), so an array passed to a concrete-collection parameter
     // at a call site can be flagged (#725). Rebuilt on every Check(module).
     private readonly Dictionary<string, List<string>> _userParamTypes = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _ambiguousUserParamTypes = new(StringComparer.Ordinal);
 
     // Lexical scope stack of name → declared type for the body currently being
     // walked, so the array-vs-collection check can validate §ASSIGN targets without
@@ -763,33 +765,29 @@ public sealed class BindValidationPass
     /// Recursively finds every call in <paramref name="expr"/> and checks each
     /// argument against the callee's declared parameter types (#725 — argument
     /// position). Only user functions/methods are resolved (BCL callees have no
-    /// parameter-type registry, a conservative false negative). The walker covers
-    /// the common composite expressions; unhandled node types simply stop the
-    /// descent (a safe false negative, never a false positive).
+    /// parameter-type registry, a conservative false negative). Structural AST
+    /// traversal covers every retained expression wrapper, so newly added wrappers
+    /// cannot hide nested call arguments from this check.
     /// </summary>
     private void ScanExpressionForCalls(ExpressionNode? expr)
     {
-        switch (expr)
+        if (expr == null)
+            return;
+
+        foreach (var node in DescendantsAndSelf(expr))
         {
-            case CallExpressionNode call:
+            if (node is CallExpressionNode call)
                 CheckCallArguments(call.Target, call.Arguments);
-                foreach (var arg in call.Arguments) ScanExpressionForCalls(arg);
-                break;
-            case BinaryOperationNode bin:
-                ScanExpressionForCalls(bin.Left);
-                ScanExpressionForCalls(bin.Right);
-                break;
-            case UnaryOperationNode un:
-                ScanExpressionForCalls(un.Operand);
-                break;
-            case ConditionalExpressionNode cond:
-                ScanExpressionForCalls(cond.Condition);
-                ScanExpressionForCalls(cond.WhenTrue);
-                ScanExpressionForCalls(cond.WhenFalse);
-                break;
-            case TypeOperationNode typeOp:
-                ScanExpressionForCalls(typeOp.Operand);
-                break;
+        }
+    }
+
+    private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
+    {
+        yield return node;
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
         }
     }
 
@@ -822,24 +820,52 @@ public sealed class BindValidationPass
     // callee is unknown (BCL / cross-module): a conservative false negative.
     private bool TryResolveReturnType(string target, out string returnType)
     {
-        if (_currentClassName != null &&
-            _userReturnTypes.TryGetValue($"{_currentClassName}.{target}", out returnType!))
+        if (_currentClassName != null)
         {
-            return true;
+            var qualified = $"{_currentClassName}.{target}";
+            if (_ambiguousUserReturnTypes.Contains(qualified))
+            {
+                returnType = string.Empty;
+                return false;
+            }
+            if (_userReturnTypes.TryGetValue(qualified, out returnType!))
+                return true;
         }
 
+        if (_ambiguousUserReturnTypes.Contains(target))
+        {
+            returnType = string.Empty;
+            return false;
+        }
         return _userReturnTypes.TryGetValue(target, out returnType!);
     }
 
     private bool TryResolveParamTypes(string target, int arity, out List<string> paramTypes)
     {
-        if (_currentClassName != null &&
-            _userParamTypes.TryGetValue($"{_currentClassName}.{target}/{arity}", out paramTypes!))
+        if (_currentClassName != null)
         {
-            return true;
+            var qualified = $"{_currentClassName}.{target}/{arity}";
+            if (_ambiguousUserParamTypes.Contains(qualified))
+            {
+                paramTypes = [];
+                return false;
+            }
+            if (_userParamTypes.TryGetValue(qualified, out paramTypes!))
+                return true;
         }
 
-        return _userParamTypes.TryGetValue($"{target}/{arity}", out paramTypes!);
+        return TryResolveParamTypesCore($"{target}/{arity}", out paramTypes);
+    }
+
+    private bool TryResolveParamTypesCore(string key, out List<string> paramTypes)
+    {
+        if (_ambiguousUserParamTypes.Contains(key))
+        {
+            paramTypes = [];
+            return false;
+        }
+
+        return _userParamTypes.TryGetValue(key, out paramTypes!);
     }
 
     /// <summary>
@@ -884,13 +910,15 @@ public sealed class BindValidationPass
     private void BuildUserSignatures(ModuleNode module)
     {
         _userReturnTypes.Clear();
+        _ambiguousUserReturnTypes.Clear();
         _userParamTypes.Clear();
+        _ambiguousUserParamTypes.Clear();
 
         foreach (var func in module.Functions)
         {
             if (func.Output?.TypeName is { } rt)
             {
-                _userReturnTypes[func.Name] = rt;
+                RegisterReturnType(func.Name, rt);
             }
 
             RegisterParams(func.Name, func.Parameters);
@@ -903,7 +931,7 @@ public sealed class BindValidationPass
                 var key = $"{cls.Name}.{method.Name}";
                 if (method.Output?.TypeName is { } rt)
                 {
-                    _userReturnTypes[key] = rt;
+                    RegisterReturnType(key, rt);
                 }
 
                 RegisterParams(key, method.Parameters);
@@ -915,8 +943,31 @@ public sealed class BindValidationPass
     {
         // ParameterNode.TypeName is non-null (parser invariant); the ?? guard keeps
         // a future nullable-annotation change from feeding null into the check.
-        _userParamTypes[$"{name}/{parameters.Count}"] =
-            parameters.Select(p => p.TypeName ?? "").ToList();
+        var key = $"{name}/{parameters.Count}";
+        if (_ambiguousUserParamTypes.Contains(key))
+            return;
+        if (_userParamTypes.ContainsKey(key))
+        {
+            _userParamTypes.Remove(key);
+            _ambiguousUserParamTypes.Add(key);
+            return;
+        }
+
+        _userParamTypes[key] = parameters.Select(p => p.TypeName ?? "").ToList();
+    }
+
+    private void RegisterReturnType(string name, string returnType)
+    {
+        if (_ambiguousUserReturnTypes.Contains(name))
+            return;
+        if (_userReturnTypes.ContainsKey(name))
+        {
+            _userReturnTypes.Remove(name);
+            _ambiguousUserReturnTypes.Add(name);
+            return;
+        }
+
+        _userReturnTypes[name] = returnType;
     }
 
     private static bool IsArrayTypeName(string? typeName)

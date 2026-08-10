@@ -1,4 +1,7 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Effects;
 
@@ -30,7 +33,8 @@ public sealed record RawCall(string CallerName, string Target, bool IsConstructo
 /// <summary>
 /// Walks the Calor AST to collect external method invocations.
 /// Covers top-level functions, class methods, and constructors.
-/// Resolves variable types via §NEW initializer scanning.
+/// Resolves receiver types from bound SymbolId identities first, with §NEW
+/// initializer scanning retained for AST-only compatibility.
 ///
 /// Two collection modes share the traversal logic:
 ///
@@ -52,6 +56,7 @@ public sealed class ExternalCallCollector
     private readonly List<CollectedCall> _calls = new();
     private readonly List<RawCall> _rawCalls = new();
     private readonly Dictionary<string, string> _variableTypeMap = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<(int Start, int End, string Target), string> _boundReceiverTypes = new();
 
     // Set by CollectPerFunctionWithBareNames before visiting each function's body,
     // so TryAddCall can tag RawCalls with the enclosing caller identity.
@@ -68,19 +73,20 @@ public sealed class ExternalCallCollector
     public static List<CollectedCall> Collect(ModuleNode module)
     {
         var collector = new ExternalCallCollector();
+        collector.IndexBoundCallReceivers(module);
 
         foreach (var function in module.Functions)
         {
             collector.CollectFromFunctionBody(function.Body);
         }
 
-        foreach (var cls in module.Classes)
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
-            foreach (var method in cls.Methods)
+            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
             {
                 collector.CollectFromFunctionBody(method.Body);
             }
-            foreach (var ctor in cls.Constructors)
+            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
             {
                 collector.CollectFromFunctionBody(ctor.Body);
             }
@@ -97,6 +103,7 @@ public sealed class ExternalCallCollector
     public static List<RawCall> CollectPerFunctionWithBareNames(ModuleNode module)
     {
         var collector = new ExternalCallCollector { _rawMode = true };
+        collector.IndexBoundCallReceivers(module);
 
         foreach (var function in module.Functions)
         {
@@ -104,14 +111,14 @@ public sealed class ExternalCallCollector
             collector.CollectFromFunctionBody(function.Body);
         }
 
-        foreach (var cls in module.Classes)
+        foreach (var cls in CallGraphAnalysis.EnumerateClasses(module))
         {
-            foreach (var method in cls.Methods)
+            foreach (var method in CallGraphAnalysis.EnumerateMethods(cls))
             {
                 collector._currentCaller = $"{cls.Name}.{method.Name}";
                 collector.CollectFromFunctionBody(method.Body);
             }
-            foreach (var ctor in cls.Constructors)
+            foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
             {
                 collector._currentCaller = $"{cls.Name}..ctor";
                 collector.CollectFromFunctionBody(ctor.Body);
@@ -134,148 +141,53 @@ public sealed class ExternalCallCollector
     private void ScanVariableTypes(IEnumerable<StatementNode> statements)
     {
         foreach (var stmt in statements)
-        {
-            if (stmt is BindStatementNode bind && bind.Initializer is NewExpressionNode newExpr)
+            ScanVariableTypes(stmt);
+    }
+
+    private void ScanVariableTypes(AstNode node)
+    {
+        if (node is BindStatementNode
             {
-                _variableTypeMap[bind.Name] = EffectEnforcementPass.MapShortTypeNameToFullName(newExpr.TypeName);
-            }
+                Initializer: NewExpressionNode creation,
+            } bind)
+        {
+            _variableTypeMap[bind.Name] =
+                EffectEnforcementPass.MapShortTypeNameToFullName(creation.TypeName);
         }
+
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            ScanVariableTypes(child);
     }
 
     private void CollectFromStatements(IEnumerable<StatementNode> statements)
     {
         foreach (var statement in statements)
-            CollectFromStatement(statement);
+            CollectFromNode(statement);
     }
 
-    private void CollectFromStatement(StatementNode statement)
+    private void CollectFromNode(AstNode node)
     {
-        switch (statement)
+        switch (node)
         {
             case CallStatementNode call:
-                TryAddCall(call.Target, CallKind.Method);
-                CollectFromExpressions(call.Arguments);
+                TryAddCall(call.Target, CallKind.Method, call.Span);
                 break;
-            case IfStatementNode ifStmt:
-                CollectFromExpression(ifStmt.Condition);
-                CollectFromStatements(ifStmt.ThenBody);
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                {
-                    CollectFromExpression(elseIf.Condition);
-                    CollectFromStatements(elseIf.Body);
-                }
-                if (ifStmt.ElseBody != null)
-                    CollectFromStatements(ifStmt.ElseBody);
-                break;
-            case ForStatementNode forStmt:
-                CollectFromStatements(forStmt.Body);
-                break;
-            case WhileStatementNode whileStmt:
-                CollectFromExpression(whileStmt.Condition);
-                CollectFromStatements(whileStmt.Body);
-                break;
-            case DoWhileStatementNode doWhile:
-                CollectFromStatements(doWhile.Body);
-                CollectFromExpression(doWhile.Condition);
-                break;
-            case ForeachStatementNode foreach_:
-                CollectFromExpression(foreach_.Collection);
-                CollectFromStatements(foreach_.Body);
-                break;
-            case MatchStatementNode matchStmt:
-                CollectFromExpression(matchStmt.Target);
-                foreach (var matchCase in matchStmt.Cases)
-                    CollectFromStatements(matchCase.Body);
-                break;
-            case TryStatementNode tryStmt:
-                CollectFromStatements(tryStmt.TryBody);
-                foreach (var catchClause in tryStmt.CatchClauses)
-                    CollectFromStatements(catchClause.Body);
-                if (tryStmt.FinallyBody != null)
-                    CollectFromStatements(tryStmt.FinallyBody);
-                break;
-            case ReturnStatementNode ret:
-                if (ret.Expression != null)
-                    CollectFromExpression(ret.Expression);
-                break;
-            case BindStatementNode bind:
-                if (bind.Initializer != null)
-                    CollectFromExpression(bind.Initializer);
-                break;
-            case AssignmentStatementNode assign:
-                CollectFromExpression(assign.Target);
-                CollectFromExpression(assign.Value);
-                break;
-            case DictionaryForeachNode dictForeach:
-                CollectFromStatements(dictForeach.Body);
-                break;
-        }
-    }
-
-    private void CollectFromExpressions(IEnumerable<ExpressionNode> expressions)
-    {
-        foreach (var expr in expressions)
-            CollectFromExpression(expr);
-    }
-
-    private void CollectFromExpression(ExpressionNode expr)
-    {
-        switch (expr)
-        {
             case CallExpressionNode call:
-                TryAddCall(call.Target, CallKind.Method);
-                CollectFromExpressions(call.Arguments);
-                break;
-            case BinaryOperationNode binOp:
-                CollectFromExpression(binOp.Left);
-                CollectFromExpression(binOp.Right);
-                break;
-            case UnaryOperationNode unOp:
-                CollectFromExpression(unOp.Operand);
-                break;
-            case ConditionalExpressionNode cond:
-                CollectFromExpression(cond.Condition);
-                CollectFromExpression(cond.WhenTrue);
-                CollectFromExpression(cond.WhenFalse);
-                break;
-            case MatchExpressionNode match:
-                CollectFromExpression(match.Target);
-                foreach (var matchCase in match.Cases)
-                    CollectFromStatements(matchCase.Body);
+                TryAddCall(call.Target, CallKind.Method, call.Span);
                 break;
             case NewExpressionNode newExpr:
-                TryAddCall(newExpr.TypeName, CallKind.Constructor);
-                CollectFromExpressions(newExpr.Arguments);
+                TryAddCall(newExpr.TypeName, CallKind.Constructor, newExpr.Span);
                 break;
-            case FieldAccessNode field:
-                CollectFromExpression(field.Target);
-                break;
-            case ArrayAccessNode array:
-                CollectFromExpression(array.Array);
-                CollectFromExpression(array.Index);
-                break;
-            case LambdaExpressionNode lambda:
-                if (lambda.ExpressionBody != null)
-                    CollectFromExpression(lambda.ExpressionBody);
-                if (lambda.StatementBody != null)
-                    CollectFromStatements(lambda.StatementBody);
-                break;
-            case AwaitExpressionNode await_:
-                CollectFromExpression(await_.Awaited);
-                break;
-            case SomeExpressionNode some:
-                CollectFromExpression(some.Value);
-                break;
-            case OkExpressionNode ok:
-                CollectFromExpression(ok.Value);
-                break;
-            case ErrExpressionNode err:
-                CollectFromExpression(err.Error);
+            case ExpressionCallNode:
+                TryAddCall("<expression-call>", CallKind.Method, node.Span);
                 break;
         }
+
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            CollectFromNode(child);
     }
 
-    private void TryAddCall(string target, CallKind defaultKind)
+    private void TryAddCall(string target, CallKind defaultKind, TextSpan span)
     {
         // Record the raw target (including bare names) when running in per-function mode.
         // The cross-module pass needs to see bare-name calls to resolve them against the registry.
@@ -298,6 +210,8 @@ public sealed class ExternalCallCollector
 
         var methodName = target[(lastDot + 1)..];
         var typePart = target[..lastDot];
+        var boundReceiverType = _boundReceiverTypes.GetValueOrDefault(
+            (span.Start, span.End, target));
 
         // Detect call kind from method name patterns
         var kind = defaultKind;
@@ -312,8 +226,14 @@ public sealed class ExternalCallCollector
             methodName = methodName[4..]; // strip set_ prefix
         }
 
-        // Resolve type: try short name mapping first, then variable type map
-        if (!typePart.Contains('.'))
+        // Prefer the exact bound receiver symbol. The AST name map remains a
+        // compatibility fallback for source shapes the Binder cannot represent.
+        if (boundReceiverType != null)
+        {
+            typePart = EffectEnforcementPass.MapShortTypeNameToFullName(
+                GetNominalTypeName(boundReceiverType));
+        }
+        else if (!typePart.Contains('.'))
         {
             var mapped = EffectEnforcementPass.MapShortTypeNameToFullName(typePart);
             if (mapped != typePart)
@@ -340,5 +260,55 @@ public sealed class ExternalCallCollector
         {
             _calls.Add(new CollectedCall(typePart, methodName, kind));
         }
+    }
+
+    private void IndexBoundCallReceivers(ModuleNode module)
+    {
+        try
+        {
+            var bound = new Binder(new Calor.Compiler.Diagnostics.DiagnosticBag()).Bind(module);
+            foreach (var node in Descendants(bound))
+            {
+                switch (node)
+                {
+                    case BoundCallStatement { ReceiverSymbol: not null } statement:
+                        _boundReceiverTypes[
+                            (statement.Span.Start, statement.Span.End, statement.Target)] =
+                            statement.ReceiverSymbol.TypeName;
+                        break;
+                    case BoundCallExpression { ReceiverSymbol: not null } expression:
+                        _boundReceiverTypes[
+                            (expression.Span.Start, expression.Span.End, expression.Target)] =
+                            expression.ReceiverSymbol.TypeName;
+                        break;
+                }
+            }
+        }
+        catch
+        {
+            // Raw per-function mode still keeps the unresolved target explicit.
+        }
+    }
+
+    private static IEnumerable<BoundNode> Descendants(BoundNode node)
+    {
+        yield return node;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var descendant in Descendants(child))
+                yield return descendant;
+        }
+    }
+
+    private static string GetNominalTypeName(string typeName)
+    {
+        var type = typeName.Trim().TrimStart('?');
+        var generic = type.IndexOf('<');
+        if (generic > 0)
+            type = type[..generic];
+        var array = type.IndexOf('[');
+        if (array > 0)
+            type = type[..array];
+        return type.TrimEnd('?', '*');
     }
 }

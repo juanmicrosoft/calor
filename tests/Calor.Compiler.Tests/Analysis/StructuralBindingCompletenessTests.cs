@@ -285,6 +285,35 @@ public sealed class StructuralBindingCompletenessTests
     }
 
     [Fact]
+    public void MatchResult_RemainsReachableThroughChildNodes()
+    {
+        var match = new MatchExpressionNode(
+            Span,
+            "m",
+            new IntLiteralNode(Span, 1),
+            [
+                new MatchCaseNode(
+                    Span,
+                    new WildcardPatternNode(Span),
+                    null,
+                    [
+                        new ReturnStatementNode(
+                            Span,
+                            new BinaryOperationNode(
+                                Span,
+                                BinaryOperator.Divide,
+                                new IntLiteralNode(Span, 1),
+                                new IntLiteralNode(Span, 0))),
+                    ]),
+            ],
+            new AttributeCollection());
+
+        var bound = Bind(match, out _);
+
+        Assert.True(BoundNodeHelpers.ContainsDivision(bound, out _));
+    }
+
+    [Fact]
     public void UsedVariableTraversal_ExcludesLambdaAndQuantifierBoundVariables()
     {
         var lambda = new LambdaExpressionNode(

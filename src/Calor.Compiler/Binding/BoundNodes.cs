@@ -174,6 +174,8 @@ public sealed class BoundCallStatement : BoundStatement
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public FunctionSymbol? ResolvedSymbol { get; }
     public SymbolId? ResolvedSymbolId => ResolvedSymbol?.Id;
+    public VariableSymbol? ReceiverSymbol { get; }
+    public SymbolId? ReceiverSymbolId => ReceiverSymbol?.Id;
     public IReadOnlyList<string?>? ArgumentNames { get; }
     public IReadOnlyList<string?>? ArgumentModifiers { get; }
     public override IEnumerable<BoundNode> ChildNodes => Arguments;
@@ -184,7 +186,8 @@ public sealed class BoundCallStatement : BoundStatement
         IReadOnlyList<BoundExpression> arguments,
         FunctionSymbol? resolvedSymbol = null,
         IReadOnlyList<string?>? argumentNames = null,
-        IReadOnlyList<string?>? argumentModifiers = null)
+        IReadOnlyList<string?>? argumentModifiers = null,
+        VariableSymbol? receiverSymbol = null)
         : base(span)
     {
         Target = target;
@@ -192,6 +195,7 @@ public sealed class BoundCallStatement : BoundStatement
         ResolvedSymbol = resolvedSymbol;
         ArgumentNames = argumentNames;
         ArgumentModifiers = argumentModifiers;
+        ReceiverSymbol = receiverSymbol;
     }
 }
 
@@ -511,6 +515,8 @@ public sealed class BoundCallExpression : BoundExpression
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public FunctionSymbol? ResolvedSymbol { get; }
     public SymbolId? ResolvedSymbolId => ResolvedSymbol?.Id;
+    public VariableSymbol? ReceiverSymbol { get; }
+    public SymbolId? ReceiverSymbolId => ReceiverSymbol?.Id;
     public override string TypeName { get; }
     public override IReadOnlyList<BoundExpression> Children => Arguments;
 
@@ -551,7 +557,8 @@ public sealed class BoundCallExpression : BoundExpression
         IReadOnlyList<string?>? argumentNames = null,
         IReadOnlyList<string?>? argumentModifiers = null,
         IReadOnlyList<string>? typeArguments = null,
-        FunctionSymbol? resolvedSymbol = null)
+        FunctionSymbol? resolvedSymbol = null,
+        VariableSymbol? receiverSymbol = null)
         : base(span)
     {
         Target = target;
@@ -564,6 +571,7 @@ public sealed class BoundCallExpression : BoundExpression
         ArgumentNames = argumentNames;
         ArgumentModifiers = argumentModifiers;
         TypeArguments = typeArguments;
+        ReceiverSymbol = receiverSymbol;
     }
 }
 
@@ -746,6 +754,12 @@ public sealed class BoundMatchCase : BoundNode
                 yield return Guard;
             foreach (var statement in Body)
                 yield return statement;
+            if (Result != null
+                && !Body.OfType<BoundReturnStatement>()
+                    .Any(statement => ReferenceEquals(statement.Expression, Result)))
+            {
+                yield return Result;
+            }
         }
     }
 
@@ -1007,6 +1021,8 @@ public sealed class BoundNewExpression : BoundExpression
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<BoundObjectInitializer> Initializers { get; }
+    public FunctionSymbol? ResolvedConstructor { get; }
+    public SymbolId? ResolvedSymbolId => ResolvedConstructor?.Id;
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IEnumerable<BoundNode> ChildNodes =>
         Arguments.Cast<BoundNode>().Concat(Initializers);
@@ -1026,13 +1042,15 @@ public sealed class BoundNewExpression : BoundExpression
         string typeName,
         IReadOnlyList<string> typeArguments,
         IReadOnlyList<BoundExpression> arguments,
-        IReadOnlyList<BoundObjectInitializer> initializers)
+        IReadOnlyList<BoundObjectInitializer> initializers,
+        FunctionSymbol? resolvedConstructor = null)
         : base(span)
     {
         TypeName = typeName ?? "OBJECT";
         TypeArguments = typeArguments ?? Array.Empty<string>();
         Arguments = arguments ?? Array.Empty<BoundExpression>();
         Initializers = initializers ?? Array.Empty<BoundObjectInitializer>();
+        ResolvedConstructor = resolvedConstructor;
         Children = [.. Arguments, .. Initializers.Select(initializer => initializer.Value)];
     }
 }

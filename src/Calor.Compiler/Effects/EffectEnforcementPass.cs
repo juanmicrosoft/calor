@@ -220,6 +220,7 @@ public sealed class EffectEnforcementPass
             _callGraphAnalysis.Functions,
             _callGraphAnalysis.FunctionNameToId,
             _callGraphAnalysis.MethodNameToIds,
+            _callGraphAnalysis,
             sccMembers, _policy, _strictEffects, _diagnostics, function.Id,
             _crossModuleFunctionNames,
             _classesByName, _interfacesByName, _delegateTypeNames,
@@ -802,7 +803,10 @@ public sealed class EffectEnforcementPass
                 foreach (var (calleeName, span) in calls)
                 {
                     // Resolve callee name to ID for internal calls (handles cross-class method calls)
-                    var calleeId = ResolveToInternalId(calleeName);
+                    var calleeId = _callGraphAnalysis.ResolveCallSite(
+                        currentId,
+                        calleeName,
+                        span);
 
                     // Check external calls via manifest resolver
                     if (calleeId == null)
@@ -843,6 +847,7 @@ public sealed class EffectEnforcementPass
         public Dictionary<string, FunctionNode> Functions { get; }
         public Dictionary<string, string> FunctionNameToId { get; }
         public Dictionary<string, List<string>> MethodNameToIds { get; }
+        public CallGraphAnalysis CallGraph { get; }
         public HashSet<string> SccMembers { get; }
         public UnknownCallPolicy Policy { get; }
         public bool StrictEffects { get; }
@@ -866,6 +871,7 @@ public sealed class EffectEnforcementPass
             Dictionary<string, FunctionNode> functions,
             Dictionary<string, string> functionNameToId,
             Dictionary<string, List<string>> methodNameToIds,
+            CallGraphAnalysis callGraph,
             HashSet<string> sccMembers,
             UnknownCallPolicy policy,
             bool strictEffects,
@@ -883,6 +889,7 @@ public sealed class EffectEnforcementPass
             Functions = functions;
             FunctionNameToId = functionNameToId;
             MethodNameToIds = methodNameToIds;
+            CallGraph = callGraph;
             SccMembers = sccMembers;
             Policy = policy;
             StrictEffects = strictEffects;
@@ -1036,12 +1043,17 @@ public sealed class EffectEnforcementPass
                     .Union(pp.ElseBody != null ? InferFromStatements(pp.ElseBody) : EffectSet.Empty),
                 // No-effect control-flow / declaration-only constructs
                 BreakStatementNode or ContinueStatementNode or GotoStatementNode or LabelStatementNode
-                    or YieldBreakStatementNode or ProofObligationNode => EffectSet.Empty,
+                    or YieldBreakStatementNode => EffectSet.Empty,
+                ProofObligationNode => InferFromStructuralChildren(statement),
                 // D-W2.3: interop content — effects are assumed, not silently pure
-                RawCSharpNode => RecordAssumption("contains a raw C# interop statement (§CSHARP)"),
-                FallbackCommentNode => RecordAssumption("contains an unconverted C# fallback statement"),
+                RawCSharpNode => InferFromStructuralChildren(statement)
+                    .Union(RecordAssumption("contains a raw C# interop statement (§CSHARP)")),
+                FallbackCommentNode => InferFromStructuralChildren(statement)
+                    .Union(RecordAssumption("contains an unconverted C# fallback statement")),
                 // D-W2.6: fail-loud catch-all
-                _ => RecordAssumption($"contains an unrecognized statement construct '{statement.GetType().Name}' whose effects cannot be inferred")
+                _ => InferFromStructuralChildren(statement)
+                    .Union(RecordAssumption(
+                        $"contains an unrecognized statement construct '{statement.GetType().Name}' whose effects cannot be inferred"))
             };
         }
 
@@ -1128,6 +1140,23 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromCallTarget(string target, TextSpan span)
         {
+            var exactInternalId = _context.CallGraph.ResolveCallSite(
+                _context.CurrentFunctionId,
+                target,
+                span);
+            if (exactInternalId != null
+                && _context.Functions.ContainsKey(exactInternalId))
+            {
+                if (_context.ComputedEffects.TryGetValue(exactInternalId, out var exactEffects))
+                    return exactEffects;
+                if (_context.SccMembers.Contains(exactInternalId))
+                {
+                    return _context.ComputedEffects.GetValueOrDefault(
+                        exactInternalId,
+                        EffectSet.Empty);
+                }
+            }
+
             // Bare (no-dot) targets: either a value invocation (delegate — D-W2.1),
             // an internal function/method, or an unresolvable free name.
             // Value resolution runs FIRST, mirroring C# scoping: a parameter,
@@ -1789,15 +1818,36 @@ public sealed class EffectEnforcementPass
                     or ThisExpressionNode or BaseExpressionNode or SelfRefNode
                     or GenericTypeNode or TypeOfExpressionNode or NameOfExpressionNode
                     or SizeOfNode => EffectSet.Empty,
-                // Contract-form quantifiers evaluate over pure predicates
-                ForallExpressionNode or ExistsExpressionNode or ImplicationExpressionNode => EffectSet.Empty,
+                // Contract-form wrappers are pure themselves, but their retained
+                // predicates still need traversal so nested calls cannot disappear.
+                ForallExpressionNode or ExistsExpressionNode or ImplicationExpressionNode
+                    => InferFromStructuralChildren(expr),
                 // D-W2.3: interop / unconverted content — assumed, not silently pure
-                RawCSharpExpressionNode => RecordAssumption("contains a raw C# interop expression (§CS)"),
-                FallbackExpressionNode fallback => RecordAssumption(
-                    $"contains an unconverted C# fallback expression ('{fallback.FeatureName}')"),
+                RawCSharpExpressionNode => InferFromStructuralChildren(expr)
+                    .Union(RecordAssumption("contains a raw C# interop expression (§CS)")),
+                FallbackExpressionNode fallback => InferFromStructuralChildren(expr)
+                    .Union(RecordAssumption(
+                        $"contains an unconverted C# fallback expression ('{fallback.FeatureName}')")),
                 // D-W2.6: fail-loud catch-all
-                _ => RecordAssumption($"contains an unrecognized expression construct '{expr.GetType().Name}' whose effects cannot be inferred")
+                _ => InferFromStructuralChildren(expr)
+                    .Union(RecordAssumption(
+                        $"contains an unrecognized expression construct '{expr.GetType().Name}' whose effects cannot be inferred"))
             };
+        }
+
+        private EffectSet InferFromStructuralChildren(AstNode node)
+        {
+            var effects = EffectSet.Empty;
+            foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+            {
+                effects = child switch
+                {
+                    ExpressionNode expression => effects.Union(InferFromExpression(expression)),
+                    StatementNode statement => effects.Union(InferFromStatement(statement)),
+                    _ => effects.Union(InferFromStructuralChildren(child)),
+                };
+            }
+            return effects;
         }
 
         private EffectSet InferFromMany(IEnumerable<ExpressionNode> expressions)

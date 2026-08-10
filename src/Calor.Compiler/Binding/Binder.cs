@@ -610,6 +610,7 @@ public sealed class Binder
     private BoundCallStatement BindCallStatement(CallStatementNode call)
     {
         var args = BindExpressions(call.Arguments);
+        var receiverSymbol = ResolveCallReceiver(call.Target);
         var resolution = ResolveCall(
             call.Span,
             call.Target,
@@ -624,7 +625,8 @@ public sealed class Binder
             args,
             resolution.Function,
             call.ArgumentNames,
-            call.ArgumentModifiers);
+            call.ArgumentModifiers,
+            receiverSymbol);
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -854,6 +856,13 @@ public sealed class Binder
     private BoundExpression BindNewExpression(NewExpressionNode newExpr)
     {
         var boundArgs = BindExpressions(newExpr.Arguments);
+        var resolution = ResolveCall(
+            newExpr.Span,
+            $"{newExpr.TypeName}..ctor",
+            boundArgs,
+            argumentNames: null,
+            argumentModifiers: null,
+            typeArguments: null);
         var initializers = newExpr.Initializers
             .Select(initializer => new BoundObjectInitializer(
                 initializer.Value.Span,
@@ -866,7 +875,8 @@ public sealed class Binder
             newExpr.TypeName,
             newExpr.TypeArguments,
             boundArgs,
-            initializers);
+            initializers,
+            resolution.Function);
     }
 
     private BoundExpression BindArrayAccess(ArrayAccessNode arrayAccess)
@@ -1698,6 +1708,7 @@ public sealed class Binder
     private BoundCallExpression BindCallExpression(CallExpressionNode callExpr)
     {
         var args = BindExpressions(callExpr.Arguments);
+        var receiverSymbol = ResolveCallReceiver(callExpr.Target);
         var resolution = ResolveCall(
             callExpr.Span,
             callExpr.Target,
@@ -1715,7 +1726,10 @@ public sealed class Binder
         {
             resolvedMethodName = callExpr.Target[(lastDot + 1)..];
             var typePart = callExpr.Target[..lastDot];
-            resolvedTypeName = !typePart.Contains('.')
+            resolvedTypeName = receiverSymbol != null
+                ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(
+                    GetNominalTypeName(receiverSymbol.TypeName))
+                : !typePart.Contains('.')
                 ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(typePart)
                 : typePart;
         }
@@ -1733,7 +1747,18 @@ public sealed class Binder
             argumentNames: callExpr.ArgumentNames,
             argumentModifiers: callExpr.ArgumentModifiers,
             typeArguments: callExpr.TypeArguments,
-            resolvedSymbol: resolution.Function);
+            resolvedSymbol: resolution.Function,
+            receiverSymbol: receiverSymbol);
+    }
+
+    private VariableSymbol? ResolveCallReceiver(string target)
+    {
+        var firstDot = target.IndexOf('.');
+        if (firstDot <= 0)
+            return _scope.Lookup(target) as VariableSymbol;
+
+        var receiverName = target[..firstDot];
+        return _scope.Lookup(receiverName) as VariableSymbol;
     }
 
     private OverloadResolutionResult ResolveCall(

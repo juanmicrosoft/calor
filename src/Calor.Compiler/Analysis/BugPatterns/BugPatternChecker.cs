@@ -111,6 +111,14 @@ public sealed class BugPatternOptions
     /// </summary>
     public Dictionary<string, HashSet<string>>? PreconditionGuardedParams { get; init; }
 
+    /// <summary>
+    /// Bound-symbol equivalent of <see cref="PreconditionGuardedParams"/>.
+    /// This is authoritative when available so overloads and shadowed parameters
+    /// cannot share contract facts by name.
+    /// </summary>
+    public IReadOnlyDictionary<SymbolId, IReadOnlySet<SymbolId>>?
+        PreconditionGuardedParameterIds { get; init; }
+
     public static BugPatternOptions Default => new();
 
     public static BugPatternOptions Fast => new()

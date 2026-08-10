@@ -1,3 +1,5 @@
+using Calor.Compiler.Binding;
+using Calor.Compiler.Parsing;
 using Calor.LanguageServer.Tests.Helpers;
 using Calor.LanguageServer.Utilities;
 using Xunit;
@@ -6,6 +8,62 @@ namespace Calor.LanguageServer.Tests.Utilities;
 
 public class SymbolFinderTests
 {
+    [Fact]
+    public void FindBoundReferences_SameNameSymbolsRemainSeparatedBySymbolId()
+    {
+        var firstId = SymbolId.Create("module", "function", "local:first");
+        var secondId = SymbolId.Create("module", "function", "local:second");
+        var first = new VariableSymbol(
+            firstId,
+            "value",
+            "INT",
+            isMutable: true,
+            declarationSpan: new TextSpan(1, 2, 1, 1));
+        var second = new VariableSymbol(
+            secondId,
+            "value",
+            "INT",
+            isMutable: true,
+            declarationSpan: new TextSpan(3, 4, 1, 3));
+        var functionSymbol = new FunctionSymbol(
+            SymbolId.Create("module", "function"),
+            "Test",
+            "INT",
+            [],
+            declarationSpan: new TextSpan(0, 20, 1, 0));
+        var function = new BoundFunction(
+            functionSymbol.DeclarationSpan,
+            functionSymbol,
+            [
+                new BoundBindStatement(first.DeclarationSpan, first, new BoundIntLiteral(first.DeclarationSpan, 1)),
+                new BoundBindStatement(second.DeclarationSpan, second, new BoundIntLiteral(second.DeclarationSpan, 2)),
+                new BoundExpressionStatement(
+                    new TextSpan(10, 11, 1, 10),
+                    new BoundVariableExpression(new TextSpan(10, 11, 1, 10), first)),
+                new BoundExpressionStatement(
+                    new TextSpan(12, 13, 1, 12),
+                    new BoundVariableExpression(new TextSpan(12, 13, 1, 12), second)),
+            ],
+            new Scope());
+        var module = new BoundModule(
+            functionSymbol.DeclarationSpan,
+            "Module",
+            [function],
+            new Dictionary<SymbolId, Symbol>
+            {
+                [functionSymbol.Id] = functionSymbol,
+                [first.Id] = first,
+                [second.Id] = second,
+            });
+
+        Assert.Equal(
+            [first.DeclarationSpan, new TextSpan(10, 11, 1, 10)],
+            SymbolFinder.FindBoundReferences(module, firstId, includeDeclaration: true));
+        Assert.Equal(
+            [second.DeclarationSpan, new TextSpan(12, 13, 1, 12)],
+            SymbolFinder.FindBoundReferences(module, secondId, includeDeclaration: true));
+    }
+
     [Fact]
     public void FindDefinition_Function_ReturnsFunction()
     {

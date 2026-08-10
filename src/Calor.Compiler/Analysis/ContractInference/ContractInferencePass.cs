@@ -2,6 +2,7 @@ using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using BinaryOperator = Calor.Compiler.Ast.BinaryOperator;
 
 namespace Calor.Compiler.Analysis.ContractInference;
@@ -30,11 +31,11 @@ public sealed class ContractInferencePass
         var contractsInferred = 0;
 
         // Build set of functions that already have contracts
-        var functionsWithContracts = new HashSet<string>();
+        var functionsWithContracts = new HashSet<TextSpan>();
         foreach (var func in astModule.Functions)
         {
             if (func.HasContracts)
-                functionsWithContracts.Add(func.Name);
+                functionsWithContracts.Add(func.Span);
         }
 
         foreach (var boundFunc in boundModule.Functions)
@@ -43,7 +44,7 @@ public sealed class ContractInferencePass
             if (boundFunc.MemberKind != BoundMemberKind.TopLevelFunction)
                 continue;
 
-            if (functionsWithContracts.Contains(boundFunc.Symbol.Name))
+            if (functionsWithContracts.Contains(boundFunc.Symbol.DeclarationSpan))
                 continue;
 
             contractsInferred += InferForFunction(boundFunc);
@@ -97,12 +98,12 @@ public sealed class ContractInferencePass
 
         var retExpr = returns[0].Expression!;
         var parameterIds = function.Symbol.Parameters
-            .Select(parameter => parameter.IdentityKey)
-            .ToHashSet(StringComparer.Ordinal);
+            .Select(parameter => parameter.Id)
+            .ToHashSet();
 
         // Pattern: function returns a parameter directly → §S (== result paramName)
         if (retExpr is BoundVariableExpression varExpr
-            && parameterIds.Contains(varExpr.Variable.IdentityKey))
+            && parameterIds.Contains(varExpr.Variable.Id))
         {
             var contractText = $"§S (== result {varExpr.Variable.Name})";
             var fix = new SuggestedFix(
@@ -126,7 +127,7 @@ public sealed class ContractInferencePass
             binExpr.Left is BoundVariableExpression leftVar &&
             binExpr.Right is BoundVariableExpression rightVar &&
             BoundNodeHelpers.SameSymbol(leftVar.Variable, rightVar.Variable) &&
-            parameterIds.Contains(leftVar.Variable.IdentityKey))
+            parameterIds.Contains(leftVar.Variable.Id))
         {
             // x * x is always non-negative for integers
             var contractText = $"§S (>= result 0)";
@@ -153,107 +154,23 @@ public sealed class ContractInferencePass
     private static HashSet<string> FindDivisorParameters(BoundFunction function)
     {
         var parameterIds = function.Symbol.Parameters
-            .Select(parameter => parameter.IdentityKey)
-            .ToHashSet(StringComparer.Ordinal);
+            .Select(parameter => parameter.Id)
+            .ToHashSet();
         var divisorParams = new HashSet<string>();
 
-        foreach (var stmt in function.Body)
+        foreach (var division in BoundNodeHelpers.DescendantsAndSelf(function)
+                     .OfType<BoundBinaryExpression>()
+                     .Where(binary =>
+                         binary.Operator is BinaryOperator.Divide or BinaryOperator.Modulo))
         {
-            FindDivisorParamsInStatement(stmt, parameterIds, divisorParams);
-        }
-
-        return divisorParams;
-    }
-
-    private static void FindDivisorParamsInStatement(
-        BoundStatement stmt,
-        HashSet<string> parameterIds,
-        HashSet<string> divisorParams)
-    {
-        switch (stmt)
-        {
-            case BoundBindStatement bind:
-                if (bind.Initializer != null)
-                    FindDivisorParamsInExpression(bind.Initializer, parameterIds, divisorParams);
-                break;
-            case BoundReturnStatement ret:
-                if (ret.Expression != null)
-                    FindDivisorParamsInExpression(ret.Expression, parameterIds, divisorParams);
-                break;
-            case BoundCallStatement call:
-                foreach (var arg in call.Arguments)
-                    FindDivisorParamsInExpression(arg, parameterIds, divisorParams);
-                break;
-            case BoundIfStatement ifStmt:
-                FindDivisorParamsInExpression(ifStmt.Condition, parameterIds, divisorParams);
-                foreach (var s in ifStmt.ThenBody)
-                    FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                    foreach (var s in elseIf.Body)
-                        FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                if (ifStmt.ElseBody != null)
-                    foreach (var s in ifStmt.ElseBody)
-                        FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                break;
-            case BoundWhileStatement whileStmt:
-                foreach (var s in whileStmt.Body)
-                    FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                break;
-            case BoundForStatement forStmt:
-                foreach (var s in forStmt.Body)
-                    FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                break;
-            case BoundAssignmentStatement assign:
-                FindDivisorParamsInExpression(assign.Value, parameterIds, divisorParams);
-                break;
-            case BoundCompoundAssignment compound:
-                FindDivisorParamsInExpression(compound.Value, parameterIds, divisorParams);
-                break;
-            case BoundExpressionStatement exprStmt:
-                FindDivisorParamsInExpression(exprStmt.Expression, parameterIds, divisorParams);
-                break;
-            case BoundForeachStatement forEach:
-                foreach (var s in forEach.Body)
-                    FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                break;
-            case BoundDoWhileStatement doWhile:
-                foreach (var s in doWhile.Body)
-                    FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                break;
-            case BoundUsingStatement usingStmt:
-                foreach (var s in usingStmt.Body)
-                    FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                break;
-            case BoundTryStatement tryStmt:
-                foreach (var s in tryStmt.TryBody)
-                    FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                foreach (var catchClause in tryStmt.CatchClauses)
-                    foreach (var s in catchClause.Body)
-                        FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                if (tryStmt.FinallyBody != null)
-                    foreach (var s in tryStmt.FinallyBody)
-                        FindDivisorParamsInStatement(s, parameterIds, divisorParams);
-                break;
-        }
-    }
-
-    private static void FindDivisorParamsInExpression(
-        BoundExpression expr,
-        HashSet<string> parameterIds,
-        HashSet<string> divisorParams)
-    {
-        if (expr is BoundBinaryExpression divisionExpr
-            && divisionExpr.Operator is BinaryOperator.Divide or BinaryOperator.Modulo)
-        {
-            var divisor = BoundNodeHelpers.GetDivisor(divisionExpr);
-            if (divisor is BoundVariableExpression varExpr
-                && parameterIds.Contains(varExpr.Variable.IdentityKey))
+            var divisor = BoundNodeHelpers.GetDivisor(division);
+            if (divisor is BoundVariableExpression variable
+                && parameterIds.Contains(variable.Variable.Id))
             {
-                divisorParams.Add(varExpr.Variable.Name);
+                divisorParams.Add(variable.Variable.Name);
             }
         }
 
-        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
-            FindDivisorParamsInExpression(child, parameterIds, divisorParams);
+        return divisorParams;
     }
 }

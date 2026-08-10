@@ -34,13 +34,76 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
         var (line, column) = PositionConverter.ToCalorPosition(request.Position);
 
         // Find the symbol at the cursor position
-        var result = SymbolFinder.FindSymbolAtPosition(state.Ast, line, column, state.Source);
+        var result = SymbolFinder.FindSymbolAtPosition(
+            state.Ast,
+            line,
+            column,
+            state.Source,
+            state.BoundModule);
         if (result == null || string.IsNullOrEmpty(result.Name))
         {
             return Task.FromResult<LocationContainer?>(null);
         }
 
         var locations = new List<Location>();
+
+        if (result.SymbolId is { IsNone: false } symbolId)
+        {
+            if (state.BoundModule?.SymbolsById.TryGetValue(symbolId, out var symbol) == true
+                && symbol is Calor.Compiler.Binding.FunctionSymbol function)
+            {
+                foreach (var (doc, span) in _workspace.FindProjectFunctionReferences(
+                             function,
+                             request.Context.IncludeDeclaration))
+                {
+                    locations.Add(new Location
+                    {
+                        Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(doc.Uri),
+                        Range = PositionConverter.ToLspRange(span, doc.Source),
+                    });
+                }
+            }
+            else if (state.BoundModule != null)
+            {
+                foreach (var span in SymbolFinder.FindBoundReferences(
+                             state.BoundModule,
+                             symbolId,
+                             request.Context.IncludeDeclaration))
+                {
+                    locations.Add(new Location
+                    {
+                        Uri = request.TextDocument.Uri,
+                        Range = PositionConverter.ToLspRange(span, state.Source),
+                    });
+                }
+            }
+
+            return Task.FromResult<LocationContainer?>(
+                locations.Count == 0 ? null : new LocationContainer(locations));
+        }
+
+        var offset = PositionConverter.ToOffset(request.Position, state.Source);
+        var boundCall = SymbolFinder.FindBoundCallAtOffset(state.BoundModule, offset);
+        var projectCall = _workspace.ResolveProjectCall(boundCall);
+        if (projectCall.Symbol != null)
+        {
+            foreach (var (doc, span) in _workspace.FindProjectFunctionReferences(
+                         projectCall.Symbol,
+                         request.Context.IncludeDeclaration))
+            {
+                locations.Add(new Location
+                {
+                    Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(doc.Uri),
+                    Range = PositionConverter.ToLspRange(span, doc.Source),
+                });
+            }
+
+            return Task.FromResult<LocationContainer?>(
+                locations.Count == 0 ? null : new LocationContainer(locations));
+        }
+        if (boundCall != null)
+            return Task.FromResult<LocationContainer?>(null);
+
         var symbolName = result.Name;
 
         // Search for references in all open documents

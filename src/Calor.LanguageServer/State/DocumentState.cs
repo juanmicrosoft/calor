@@ -105,9 +105,12 @@ public sealed class DocumentState
                     var binder = new Binder(Diagnostics);
                     BoundModule = binder.Bind(Ast);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // Binding can fail on malformed AST, continue without bound module
+                    Diagnostics.ReportInfo(
+                        Ast.Span,
+                        DiagnosticCode.AnalysisSkipped,
+                        $"Bound symbol analysis did not complete: {ex.GetType().Name}");
                 }
             }
 

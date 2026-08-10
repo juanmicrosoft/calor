@@ -1307,13 +1307,13 @@ public static class FunctionBodyEncoder
         }
     }
 
-    private static int CountNodes(ExpressionNode expr) => expr switch
-    {
-        BinaryOperationNode b => 1 + CountNodes(b.Left) + CountNodes(b.Right),
-        UnaryOperationNode u => 1 + CountNodes(u.Operand),
-        ConditionalExpressionNode c => 1 + CountNodes(c.Condition) + CountNodes(c.WhenTrue) + CountNodes(c.WhenFalse),
-        _ => 1
-    };
+    private static int CountNodes(ExpressionNode expr) =>
+        1 + Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(expr)
+            .Sum(CountAstNodes);
+
+    private static int CountAstNodes(AstNode node) =>
+        1 + Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node)
+            .Sum(CountAstNodes);
 
     /// <summary>
     /// True when the expression references the special <c>result</c> identifier — bare or
@@ -1325,33 +1325,35 @@ public static class FunctionBodyEncoder
 
     private static bool ReferencesName(ExpressionNode expr, string name)
     {
-        switch (expr)
+        if (expr is ReferenceNode reference)
         {
-            case ReferenceNode r:
-                return r.Name == name || r.Name.StartsWith(name + ".", StringComparison.Ordinal);
-            case BinaryOperationNode b:
-                return ReferencesName(b.Left, name) || ReferencesName(b.Right, name);
-            case UnaryOperationNode u:
-                return ReferencesName(u.Operand, name);
-            case ConditionalExpressionNode c:
-                return ReferencesName(c.Condition, name) || ReferencesName(c.WhenTrue, name) || ReferencesName(c.WhenFalse, name);
-            case ImplicationExpressionNode i:
-                return ReferencesName(i.Antecedent, name) || ReferencesName(i.Consequent, name);
-            case ForallExpressionNode f:
-                return !f.BoundVariables.Any(v => v.Name == name) && ReferencesName(f.Body, name);
-            case ExistsExpressionNode e:
-                return !e.BoundVariables.Any(v => v.Name == name) && ReferencesName(e.Body, name);
-            case ArrayAccessNode a:
-                return ReferencesName(a.Array, name) || ReferencesName(a.Index, name);
-            case ArrayLengthNode al:
-                return ReferencesName(al.Array, name);
-            case FieldAccessNode fa:
-                return ReferencesName(fa.Target, name);
-            case StringOperationNode s:
-                return s.Arguments.Any(arg => ReferencesName(arg, name));
-            default:
-                return false;
+            return reference.Name == name
+                   || reference.Name.StartsWith(name + ".", StringComparison.Ordinal);
         }
+
+        if (expr is ForallExpressionNode forall
+            && forall.BoundVariables.Any(variable => variable.Name == name))
+        {
+            return false;
+        }
+
+        if (expr is ExistsExpressionNode exists
+            && exists.BoundVariables.Any(variable => variable.Name == name))
+        {
+            return false;
+        }
+
+        return Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(expr)
+            .Any(child => ReferencesNameInNode(child, name));
+    }
+
+    private static bool ReferencesNameInNode(AstNode node, string name)
+    {
+        if (node is ExpressionNode expression)
+            return ReferencesName(expression, name);
+
+        return Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node)
+            .Any(child => ReferencesNameInNode(child, name));
     }
 
 }

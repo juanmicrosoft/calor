@@ -123,23 +123,36 @@ public static class SymbolFinder
         int offset,
         string? target = null)
     {
+        return FindBoundCallAtOffset(boundModule, offset, target) switch
+        {
+            BoundCallExpression expression => expression.ResolvedSymbol,
+            BoundCallStatement statement => statement.ResolvedSymbol,
+            BoundNewExpression creation => creation.ResolvedConstructor,
+            _ => null,
+        };
+    }
+
+    public static BoundNode? FindBoundCallAtOffset(
+        BoundModule? boundModule,
+        int offset,
+        string? target = null)
+    {
         if (boundModule == null)
             return null;
 
         return Descendants(boundModule)
-            .Select(node => node switch
+            .Where(node => node switch
             {
-                BoundCallExpression expression when expression.Span.Contains(offset)
-                    && (target == null || expression.Target == target) =>
-                    (Span: expression.Span, Symbol: expression.ResolvedSymbol),
-                BoundCallStatement statement when statement.Span.Contains(offset)
-                    && (target == null || statement.Target == target) =>
-                    (Span: statement.Span, Symbol: statement.ResolvedSymbol),
-                _ => (Span: TextSpan.Empty, Symbol: (FunctionSymbol?)null),
+                BoundCallExpression expression => expression.Span.Contains(offset)
+                    && (target == null || expression.Target == target),
+                BoundCallStatement statement => statement.Span.Contains(offset)
+                    && (target == null || statement.Target == target),
+                BoundNewExpression creation => creation.Span.Contains(offset)
+                    && (target == null || creation.TypeName == target),
+                BoundExpressionCallExpression expressionCall => expressionCall.Span.Contains(offset),
+                _ => false,
             })
-            .Where(item => item.Symbol != null)
-            .OrderBy(item => item.Span.Length)
-            .Select(item => item.Symbol)
+            .OrderBy(node => node.Span.Length)
             .FirstOrDefault();
     }
 
@@ -148,17 +161,62 @@ public static class SymbolFinder
         SymbolLookupResult result,
         int offset)
     {
-        var call = FindResolvedCall(boundModule, offset);
-        if (call != null)
-            return call.Id;
-
         var variable = Descendants(boundModule)
             .OfType<BoundVariableExpression>()
             .Where(expression => expression.Span.Contains(offset))
+            .Where(expression => string.Equals(
+                expression.Variable.Name,
+                result.Name,
+                StringComparison.Ordinal))
             .OrderBy(expression => expression.Span.Length)
             .FirstOrDefault();
         if (variable != null)
             return variable.SymbolId.IsNone ? null : variable.SymbolId;
+
+        var field = Descendants(boundModule)
+            .OfType<BoundFieldAccessExpression>()
+            .Where(expression => expression.Span.Contains(offset))
+            .Where(expression => string.Equals(
+                expression.FieldName,
+                result.Name,
+                StringComparison.Ordinal))
+            .OrderBy(expression => expression.Span.Length)
+            .FirstOrDefault();
+        if (field?.ResolvedSymbolId is { IsNone: false } fieldId)
+            return fieldId;
+
+        var boundCall = FindBoundCallAtOffset(boundModule, offset);
+        switch (boundCall)
+        {
+            case BoundCallExpression expression:
+                if (expression.ReceiverSymbol is { } expressionReceiver
+                    && string.Equals(expressionReceiver.Name, result.Name, StringComparison.Ordinal))
+                {
+                    return expressionReceiver.Id.IsNone ? null : expressionReceiver.Id;
+                }
+                if (CallTargetMatchesName(expression.Target, result.Name)
+                    && expression.ResolvedSymbolId is { IsNone: false } expressionId)
+                {
+                    return expressionId;
+                }
+                break;
+            case BoundCallStatement statement:
+                if (statement.ReceiverSymbol is { } statementReceiver
+                    && string.Equals(statementReceiver.Name, result.Name, StringComparison.Ordinal))
+                {
+                    return statementReceiver.Id.IsNone ? null : statementReceiver.Id;
+                }
+                if (CallTargetMatchesName(statement.Target, result.Name)
+                    && statement.ResolvedSymbolId is { IsNone: false } statementId)
+                {
+                    return statementId;
+                }
+                break;
+            case BoundNewExpression creation
+                when string.Equals(creation.TypeName, result.Name, StringComparison.Ordinal)
+                     && creation.ResolvedSymbolId is { IsNone: false } constructorId:
+                return constructorId;
+        }
 
         var definitionSpan = result.DefinitionSpan ?? result.Span;
         return boundModule.SymbolsById.Values
@@ -168,6 +226,67 @@ public static class SymbolFinder
                 || symbol.Name.EndsWith("." + result.Name, StringComparison.Ordinal))
             .Select(symbol => (SymbolId?)symbol.Id)
             .FirstOrDefault();
+    }
+
+    public static IReadOnlyList<TextSpan> FindBoundReferences(
+        BoundModule boundModule,
+        SymbolId symbolId,
+        bool includeDeclaration)
+    {
+        ArgumentNullException.ThrowIfNull(boundModule);
+        if (symbolId.IsNone)
+            return Array.Empty<TextSpan>();
+
+        var references = new List<TextSpan>();
+        if (includeDeclaration
+            && boundModule.SymbolsById.TryGetValue(symbolId, out var declaration))
+        {
+            references.Add(declaration.DeclarationSpan);
+        }
+
+        foreach (var node in Descendants(boundModule))
+        {
+            switch (node)
+            {
+                case BoundVariableExpression variable when variable.SymbolId == symbolId:
+                    references.Add(variable.Span);
+                    break;
+                case BoundFieldAccessExpression field when field.ResolvedSymbolId == symbolId:
+                    references.Add(field.Span);
+                    break;
+                case BoundCallExpression call when call.ResolvedSymbolId == symbolId:
+                    references.Add(call.Span);
+                    break;
+                case BoundCallExpression call when call.ReceiverSymbolId == symbolId:
+                    references.Add(call.Span);
+                    break;
+                case BoundCallStatement call when call.ResolvedSymbolId == symbolId:
+                    references.Add(call.Span);
+                    break;
+                case BoundCallStatement call when call.ReceiverSymbolId == symbolId:
+                    references.Add(call.Span);
+                    break;
+                case BoundNewExpression creation when creation.ResolvedSymbolId == symbolId:
+                    references.Add(creation.Span);
+                    break;
+            }
+        }
+
+        return references
+            .Distinct()
+            .OrderBy(span => span.Start)
+            .ThenBy(span => span.End)
+            .ToArray();
+    }
+
+    private static bool CallTargetMatchesName(string target, string name)
+    {
+        if (string.Equals(target, name, StringComparison.Ordinal))
+            return true;
+
+        var lastDot = target.LastIndexOf('.');
+        return lastDot >= 0
+            && string.Equals(target[(lastDot + 1)..], name, StringComparison.Ordinal);
     }
 
     private static IEnumerable<BoundNode> Descendants(BoundNode node)

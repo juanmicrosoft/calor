@@ -152,6 +152,13 @@ public sealed class OverflowChecker : IBugPatternChecker
                     CheckExpression(throwStmt.Expression, function, diagnostics, pathConditions);
                 }
                 break;
+
+            default:
+                foreach (var expression in BoundNodeHelpers.GetImmediateExpressions(stmt))
+                    CheckExpression(expression, function, diagnostics, pathConditions);
+                foreach (var statement in BoundNodeHelpers.GetImmediateStatements(stmt))
+                    CheckStatement(statement, function, diagnostics, pathConditions);
+                break;
         }
     }
 
@@ -336,7 +343,7 @@ public sealed class OverflowChecker : IBugPatternChecker
             // Declare parameters
             foreach (var param in function.Symbol.Parameters)
             {
-                translator.DeclareVariable(param.Name, param.TypeName);
+                translator.DeclareVariable(param);
             }
 
             // Translate path conditions
@@ -409,7 +416,7 @@ public sealed class OverflowChecker : IBugPatternChecker
 
             foreach (var param in function.Symbol.Parameters)
             {
-                translator.DeclareVariable(param.Name, param.TypeName);
+                translator.DeclareVariable(param);
             }
 
             var pathConstraints = new List<BoolExpr>();

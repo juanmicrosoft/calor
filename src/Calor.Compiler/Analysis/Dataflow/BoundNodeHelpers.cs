@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 
@@ -44,6 +45,46 @@ public static class BoundNodeHelpers
     }
 
     /// <summary>
+    /// Gets expressions evaluated directly by a statement or helper node without
+    /// descending into nested statements, which are analyzed at their own CFG point.
+    /// </summary>
+    public static IEnumerable<BoundExpression> GetImmediateExpressions(BoundNode node)
+    {
+        foreach (var child in node.ChildNodes)
+        {
+            if (child is BoundExpression expression)
+            {
+                yield return expression;
+            }
+            else if (child is not BoundStatement)
+            {
+                foreach (var nested in GetImmediateExpressions(child))
+                    yield return nested;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets directly nested statements through structural helper nodes such as
+    /// catch clauses and match cases, without entering expression-owned bodies.
+    /// </summary>
+    public static IEnumerable<BoundStatement> GetImmediateStatements(BoundNode node)
+    {
+        foreach (var child in node.ChildNodes)
+        {
+            if (child is BoundStatement statement)
+            {
+                yield return statement;
+            }
+            else if (child is not BoundExpression)
+            {
+                foreach (var nested in GetImmediateStatements(child))
+                    yield return nested;
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets all variable references (uses) in an expression.
     /// </summary>
     public static IEnumerable<VariableSymbol> GetUsedVariables(BoundExpression? expression)
@@ -51,36 +92,75 @@ public static class BoundNodeHelpers
         if (expression == null)
             return Array.Empty<VariableSymbol>();
 
-        return GetUsedVariablesCore(expression, new HashSet<string>(StringComparer.Ordinal));
+        return GetUsedVariablesCore(
+                expression,
+                new HashSet<VariableSymbol>(VariableSymbolIdentityComparer.Instance))
+            .Distinct(VariableSymbolIdentityComparer.Instance);
     }
 
     private static IEnumerable<VariableSymbol> GetUsedVariablesCore(
         BoundNode node,
-        HashSet<string> locallyBound)
+        HashSet<VariableSymbol> locallyBound)
     {
         if (node is BoundVariableExpression variable)
         {
-            if (!locallyBound.Contains(variable.Variable.IdentityKey))
+            if (!locallyBound.Contains(variable.Variable))
                 yield return variable.Variable;
             yield break;
+        }
+
+        if (node is BoundCallExpression { ReceiverSymbol: not null } call
+            && !locallyBound.Contains(call.ReceiverSymbol))
+        {
+            yield return call.ReceiverSymbol;
         }
 
         var nestedLocals = locallyBound;
         if (node is BoundLambdaExpression lambda)
         {
-            nestedLocals = new HashSet<string>(locallyBound, StringComparer.Ordinal);
-            nestedLocals.UnionWith(lambda.Parameters.Select(parameter => parameter.IdentityKey));
+            nestedLocals = new HashSet<VariableSymbol>(
+                locallyBound,
+                VariableSymbolIdentityComparer.Instance);
+            nestedLocals.UnionWith(lambda.Parameters);
+            nestedLocals.UnionWith(GetDeclaredVariables(lambda));
         }
         else if (node is BoundQuantifierExpression quantifier)
         {
-            nestedLocals = new HashSet<string>(locallyBound, StringComparer.Ordinal);
-            nestedLocals.UnionWith(quantifier.BoundVariables.Select(variable => variable.IdentityKey));
+            nestedLocals = new HashSet<VariableSymbol>(
+                locallyBound,
+                VariableSymbolIdentityComparer.Instance);
+            nestedLocals.UnionWith(quantifier.BoundVariables);
         }
 
         foreach (var child in node.ChildNodes)
         {
             foreach (var used in GetUsedVariablesCore(child, nestedLocals))
                 yield return used;
+        }
+    }
+
+    private static IEnumerable<VariableSymbol> GetDeclaredVariables(BoundNode node)
+    {
+        foreach (var descendant in DescendantsAndSelf(node))
+        {
+            switch (descendant)
+            {
+                case BoundBindStatement bind:
+                    yield return bind.Variable;
+                    break;
+                case BoundForStatement forStatement:
+                    yield return forStatement.LoopVariable;
+                    break;
+                case BoundForeachStatement forEach:
+                    yield return forEach.LoopVariable;
+                    break;
+                case BoundUsingStatement { Resource: not null } usingStatement:
+                    yield return usingStatement.Resource;
+                    break;
+                case BoundCatchClause { ExceptionVariable: not null } catchClause:
+                    yield return catchClause.ExceptionVariable;
+                    break;
+            }
         }
     }
 
@@ -109,85 +189,33 @@ public static class BoundNodeHelpers
     /// </summary>
     public static IEnumerable<VariableSymbol> GetUsedVariables(BoundStatement statement)
     {
-        switch (statement)
+        var seen = new HashSet<VariableSymbol>(VariableSymbolIdentityComparer.Instance);
+        if (statement is BoundCallStatement { ReceiverSymbol: not null } call
+            && seen.Add(call.ReceiverSymbol))
         {
-            case BoundBindStatement bind:
-                foreach (var v in GetUsedVariables(bind.Initializer))
-                    yield return v;
-                break;
+            yield return call.ReceiverSymbol;
+        }
 
-            case BoundCallStatement call:
-                foreach (var arg in call.Arguments)
-                    foreach (var v in GetUsedVariables(arg))
-                        yield return v;
-                break;
+        if (statement is BoundAssignmentStatement
+            {
+                Target: BoundVariableExpression,
+            } assignment)
+        {
+            foreach (var variable in GetUsedVariables(assignment.Value))
+            {
+                if (seen.Add(variable))
+                    yield return variable;
+            }
+            yield break;
+        }
 
-            case BoundReturnStatement ret:
-                foreach (var v in GetUsedVariables(ret.Expression))
-                    yield return v;
-                break;
-
-            case BoundIfStatement ifStmt:
-                foreach (var v in GetUsedVariables(ifStmt.Condition))
-                    yield return v;
-                break;
-
-            case BoundWhileStatement whileStmt:
-                foreach (var v in GetUsedVariables(whileStmt.Condition))
-                    yield return v;
-                break;
-
-            case BoundForStatement forStmt:
-                foreach (var v in GetUsedVariables(forStmt.From))
-                    yield return v;
-                foreach (var v in GetUsedVariables(forStmt.To))
-                    yield return v;
-                if (forStmt.Step != null)
-                    foreach (var v in GetUsedVariables(forStmt.Step))
-                        yield return v;
-                break;
-
-            case BoundAssignmentStatement assign:
-                // For simple variable targets (x = expr), the target is defined, not used.
-                // Only yield uses from sub-expressions of the target (e.g., this.field → yield this).
-                if (assign.Target is not BoundVariableExpression)
-                    foreach (var v in GetUsedVariables(assign.Target))
-                        yield return v;
-                foreach (var v in GetUsedVariables(assign.Value))
-                    yield return v;
-                break;
-
-            case BoundCompoundAssignment compound:
-                foreach (var v in GetUsedVariables(compound.Target))
-                    yield return v;
-                foreach (var v in GetUsedVariables(compound.Value))
-                    yield return v;
-                break;
-
-            case BoundForeachStatement forEach:
-                foreach (var v in GetUsedVariables(forEach.Collection))
-                    yield return v;
-                break;
-
-            case BoundUsingStatement usingStmt:
-                foreach (var v in GetUsedVariables(usingStmt.ResourceExpression))
-                    yield return v;
-                break;
-
-            case BoundThrowStatement throwStmt:
-                foreach (var v in GetUsedVariables(throwStmt.Expression))
-                    yield return v;
-                break;
-
-            case BoundDoWhileStatement doWhile:
-                foreach (var v in GetUsedVariables(doWhile.Condition))
-                    yield return v;
-                break;
-
-            case BoundExpressionStatement exprStmt:
-                foreach (var v in GetUsedVariables(exprStmt.Expression))
-                    yield return v;
-                break;
+        foreach (var expression in GetImmediateExpressions(statement))
+        {
+            foreach (var variable in GetUsedVariables(expression))
+            {
+                if (seen.Add(variable))
+                    yield return variable;
+            }
         }
     }
 
@@ -204,8 +232,7 @@ public static class BoundNodeHelpers
     {
         if (!left.Id.IsNone && !right.Id.IsNone)
             return left.Id == right.Id;
-        return ReferenceEquals(left, right)
-            || string.Equals(left.Name, right.Name, StringComparison.Ordinal);
+        return ReferenceEquals(left, right);
     }
 
     /// <summary>
@@ -213,83 +240,49 @@ public static class BoundNodeHelpers
     /// </summary>
     public static IEnumerable<VariableSymbol> GetAllDefinedVariables(BoundFunction function)
     {
-        foreach (var stmt in function.Body)
+        foreach (var node in DescendantsAndSelf(function))
         {
-            foreach (var v in GetAllDefinedVariablesInStatement(stmt))
-                yield return v;
+            switch (node)
+            {
+                case BoundBindStatement bind:
+                    yield return bind.Variable;
+                    break;
+                case BoundForStatement forStatement:
+                    yield return forStatement.LoopVariable;
+                    break;
+                case BoundForeachStatement forEach:
+                    yield return forEach.LoopVariable;
+                    break;
+                case BoundUsingStatement { Resource: not null } usingStatement:
+                    yield return usingStatement.Resource;
+                    break;
+                case BoundCatchClause { ExceptionVariable: not null } catchClause:
+                    yield return catchClause.ExceptionVariable;
+                    break;
+            }
         }
     }
 
-    private static IEnumerable<VariableSymbol> GetAllDefinedVariablesInStatement(BoundStatement statement)
+    public static IEnumerable<BoundNode> GetAnalysisIncompleteNodes(BoundNode node)
     {
-        switch (statement)
-        {
-            case BoundBindStatement bind:
-                yield return bind.Variable;
-                break;
+        return DescendantsAndSelf(node)
+            .Where(descendant =>
+                descendant is BoundUnsupportedExpression
+                    or BoundInteropExpression
+                    or BoundUnsupportedStatement);
+    }
 
-            case BoundIfStatement ifStmt:
-                foreach (var s in ifStmt.ThenBody)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                    foreach (var s in elseIf.Body)
-                        foreach (var v in GetAllDefinedVariablesInStatement(s))
-                            yield return v;
-                if (ifStmt.ElseBody != null)
-                    foreach (var s in ifStmt.ElseBody)
-                        foreach (var v in GetAllDefinedVariablesInStatement(s))
-                            yield return v;
-                break;
+    private sealed class VariableSymbolIdentityComparer : IEqualityComparer<VariableSymbol>
+    {
+        public static VariableSymbolIdentityComparer Instance { get; } = new();
 
-            case BoundWhileStatement whileStmt:
-                foreach (var s in whileStmt.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
+        public bool Equals(VariableSymbol? x, VariableSymbol? y) =>
+            x != null && y != null && SameSymbol(x, y);
 
-            case BoundForStatement forStmt:
-                yield return forStmt.LoopVariable;
-                foreach (var s in forStmt.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
-
-            case BoundForeachStatement forEach:
-                yield return forEach.LoopVariable;
-                foreach (var s in forEach.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
-
-            case BoundDoWhileStatement doWhile:
-                foreach (var s in doWhile.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
-
-            case BoundUsingStatement usingStmt:
-                if (usingStmt.Resource != null)
-                    yield return usingStmt.Resource;
-                foreach (var s in usingStmt.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
-
-            case BoundTryStatement tryStmt:
-                foreach (var s in tryStmt.TryBody)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                foreach (var catchClause in tryStmt.CatchClauses)
-                    foreach (var s in catchClause.Body)
-                        foreach (var v in GetAllDefinedVariablesInStatement(s))
-                            yield return v;
-                if (tryStmt.FinallyBody != null)
-                    foreach (var s in tryStmt.FinallyBody)
-                        foreach (var v in GetAllDefinedVariablesInStatement(s))
-                            yield return v;
-                break;
-        }
+        public int GetHashCode(VariableSymbol obj) =>
+            obj.Id.IsNone
+                ? RuntimeHelpers.GetHashCode(obj)
+                : obj.Id.GetHashCode();
     }
 
     /// <summary>

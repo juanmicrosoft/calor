@@ -138,52 +138,50 @@ public sealed class ContractVerifier
     /// </summary>
     private void VerifyQuantifierTypes(ExpressionNode expr, int nestingDepth = 0)
     {
-        switch (expr)
+        if (expr is ForallExpressionNode forall)
         {
-            case ForallExpressionNode forall:
-                ValidateQuantifierVariableTypes(forall.BoundVariables, forall.Span);
-                // Warn about nested quantifiers (multiple variables count as nested)
-                var forallDepth = nestingDepth + forall.BoundVariables.Count;
-                if (forallDepth > 1)
-                {
-                    _diagnostics.Report(
-                        forall.Span,
-                        DiagnosticCode.QuantifierNestedComplexity,
-                        $"Nested quantifier with {forallDepth} bound variables may result in O(n^{forallDepth}) runtime checks. Consider optimizing if performance is critical.",
-                        DiagnosticSeverity.Info);
-                }
-                VerifyQuantifierTypes(forall.Body, forallDepth);
-                break;
-            case ExistsExpressionNode exists:
-                ValidateQuantifierVariableTypes(exists.BoundVariables, exists.Span);
-                var existsDepth = nestingDepth + exists.BoundVariables.Count;
-                if (existsDepth > 1)
-                {
-                    _diagnostics.Report(
-                        exists.Span,
-                        DiagnosticCode.QuantifierNestedComplexity,
-                        $"Nested quantifier with {existsDepth} bound variables may result in O(n^{existsDepth}) runtime checks. Consider optimizing if performance is critical.",
-                        DiagnosticSeverity.Info);
-                }
-                VerifyQuantifierTypes(exists.Body, existsDepth);
-                break;
-            case ImplicationExpressionNode impl:
-                VerifyQuantifierTypes(impl.Antecedent, nestingDepth);
-                VerifyQuantifierTypes(impl.Consequent, nestingDepth);
-                break;
-            case BinaryOperationNode binOp:
-                VerifyQuantifierTypes(binOp.Left, nestingDepth);
-                VerifyQuantifierTypes(binOp.Right, nestingDepth);
-                break;
-            case UnaryOperationNode unaryOp:
-                VerifyQuantifierTypes(unaryOp.Operand, nestingDepth);
-                break;
-            case ConditionalExpressionNode condExpr:
-                VerifyQuantifierTypes(condExpr.Condition, nestingDepth);
-                VerifyQuantifierTypes(condExpr.WhenTrue, nestingDepth);
-                VerifyQuantifierTypes(condExpr.WhenFalse, nestingDepth);
-                break;
+            ValidateQuantifierVariableTypes(forall.BoundVariables, forall.Span);
+            var depth = nestingDepth + forall.BoundVariables.Count;
+            ReportNestedQuantifier(forall.Span, depth);
+            VerifyQuantifierTypes(forall.Body, depth);
+            return;
         }
+
+        if (expr is ExistsExpressionNode exists)
+        {
+            ValidateQuantifierVariableTypes(exists.BoundVariables, exists.Span);
+            var depth = nestingDepth + exists.BoundVariables.Count;
+            ReportNestedQuantifier(exists.Span, depth);
+            VerifyQuantifierTypes(exists.Body, depth);
+            return;
+        }
+
+        foreach (var child in RecursiveAstWalker.GetAllChildren(expr))
+            VerifyQuantifierTypesInNode(child, nestingDepth);
+    }
+
+    private void VerifyQuantifierTypesInNode(AstNode node, int nestingDepth)
+    {
+        if (node is ExpressionNode expression)
+        {
+            VerifyQuantifierTypes(expression, nestingDepth);
+            return;
+        }
+
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            VerifyQuantifierTypesInNode(child, nestingDepth);
+    }
+
+    private void ReportNestedQuantifier(TextSpan span, int depth)
+    {
+        if (depth <= 1)
+            return;
+
+        _diagnostics.Report(
+            span,
+            DiagnosticCode.QuantifierNestedComplexity,
+            $"Nested quantifier with {depth} bound variables may result in O(n^{depth}) runtime checks. Consider optimizing if performance is critical.",
+            DiagnosticSeverity.Info);
     }
 
     /// <summary>
@@ -275,79 +273,46 @@ public sealed class ContractVerifier
 
     private void CollectReferencesInternal(ExpressionNode expr, HashSet<string> references, HashSet<string> boundVariables)
     {
-        switch (expr)
+        if (expr is ReferenceNode reference)
         {
-            case ReferenceNode refNode:
-                // Only add if not a bound variable from a quantifier
-                if (!boundVariables.Contains(refNode.Name))
-                    references.Add(refNode.Name);
-                break;
-            case BinaryOperationNode binOp:
-                CollectReferencesInternal(binOp.Left, references, boundVariables);
-                CollectReferencesInternal(binOp.Right, references, boundVariables);
-                break;
-            case UnaryOperationNode unaryOp:
-                CollectReferencesInternal(unaryOp.Operand, references, boundVariables);
-                break;
-            case ConditionalExpressionNode condExpr:
-                CollectReferencesInternal(condExpr.Condition, references, boundVariables);
-                CollectReferencesInternal(condExpr.WhenTrue, references, boundVariables);
-                CollectReferencesInternal(condExpr.WhenFalse, references, boundVariables);
-                break;
-            case ForallExpressionNode forall:
-                // Collect bound variables, then recurse into body
-                var forallBound = new HashSet<string>(boundVariables, StringComparer.Ordinal);
-                foreach (var bv in forall.BoundVariables)
-                    forallBound.Add(bv.Name);
-                CollectReferencesInternal(forall.Body, references, forallBound);
-                break;
-            case ExistsExpressionNode exists:
-                // Collect bound variables, then recurse into body
-                var existsBound = new HashSet<string>(boundVariables, StringComparer.Ordinal);
-                foreach (var bv in exists.BoundVariables)
-                    existsBound.Add(bv.Name);
-                CollectReferencesInternal(exists.Body, references, existsBound);
-                break;
-            case ImplicationExpressionNode impl:
-                CollectReferencesInternal(impl.Antecedent, references, boundVariables);
-                CollectReferencesInternal(impl.Consequent, references, boundVariables);
-                break;
-            case ArrayAccessNode arrayAccess:
-                CollectReferencesInternal(arrayAccess.Array, references, boundVariables);
-                CollectReferencesInternal(arrayAccess.Index, references, boundVariables);
-                break;
-            case SomeExpressionNode someExpr:
-                CollectReferencesInternal(someExpr.Value, references, boundVariables);
-                break;
-            case OkExpressionNode okExpr:
-                CollectReferencesInternal(okExpr.Value, references, boundVariables);
-                break;
-            case ErrExpressionNode errExpr:
-                CollectReferencesInternal(errExpr.Error, references, boundVariables);
-                break;
-            case FieldAccessNode fieldAccess:
-                CollectReferencesInternal(fieldAccess.Target, references, boundVariables);
-                break;
-            // Review #833 m1 (defensive): these arms were missing, so a reference
-            // inside `(len xs)` or a string operation escaped the undeclared-
-            // variable check (Calor0200) and leaned on the translator's own
-            // refusal as the only backstop.
-            case ArrayLengthNode arrayLength:
-                CollectReferencesInternal(arrayLength.Array, references, boundVariables);
-                break;
-            case StringOperationNode stringOp:
-                foreach (var arg in stringOp.Arguments)
-                {
-                    CollectReferencesInternal(arg, references, boundVariables);
-                }
-                break;
-            case RecordCreationNode recordCreate:
-                foreach (var field in recordCreate.Fields)
-                {
-                    CollectReferencesInternal(field.Value, references, boundVariables);
-                }
-                break;
+            if (!boundVariables.Contains(reference.Name))
+                references.Add(reference.Name);
+            return;
         }
+
+        if (expr is ForallExpressionNode forall)
+        {
+            var nested = new HashSet<string>(boundVariables, StringComparer.Ordinal);
+            nested.UnionWith(forall.BoundVariables.Select(variable => variable.Name));
+            CollectReferencesInternal(forall.Body, references, nested);
+            return;
+        }
+
+        if (expr is ExistsExpressionNode exists)
+        {
+            var nested = new HashSet<string>(boundVariables, StringComparer.Ordinal);
+            nested.UnionWith(exists.BoundVariables.Select(variable => variable.Name));
+            CollectReferencesInternal(exists.Body, references, nested);
+            return;
+        }
+
+        foreach (var child in RecursiveAstWalker.GetAllChildren(expr))
+            CollectReferencesInNode(child, references, boundVariables);
+    }
+
+    private void CollectReferencesInNode(
+        AstNode node,
+        HashSet<string> references,
+        HashSet<string> boundVariables)
+    {
+        if (node is ExpressionNode expression)
+        {
+            CollectReferencesInternal(expression, references, boundVariables);
+            return;
+        }
+
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+            CollectReferencesInNode(child, references, boundVariables);
     }
 }
 

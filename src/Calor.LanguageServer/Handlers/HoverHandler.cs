@@ -43,7 +43,12 @@ public sealed class HoverHandler : HoverHandlerBase
         // Fall back to symbol-based hover (when we have AST)
         if (state.Ast != null)
         {
-            var result = SymbolFinder.FindSymbolAtPosition(state.Ast, line, column, state.Source);
+            var result = SymbolFinder.FindSymbolAtPosition(
+                state.Ast,
+                line,
+                column,
+                state.Source,
+                state.BoundModule);
             if (result != null)
             {
                 var content = BuildHoverContent(result, state.Ast);

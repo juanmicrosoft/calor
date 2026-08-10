@@ -6,6 +6,7 @@ using Calor.Compiler.Analysis.Security;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3.KInduction;
 
 namespace Calor.Compiler.Analysis;
@@ -154,9 +155,23 @@ public sealed class VerificationAnalysisPass
         var bindingDiagnostics = new DiagnosticBag();
         var binder = new Binder(bindingDiagnostics);
         var boundModule = binder.Bind(module);
+        foreach (var diagnostic in bindingDiagnostics
+                     .Where(diagnostic => diagnostic.Code == DiagnosticCode.AnalysisUnsupportedNode))
+        {
+            if (!_diagnostics.Any(existing =>
+                    existing.Code == diagnostic.Code
+                    && existing.Span == diagnostic.Span
+                    && existing.Message == diagnostic.Message))
+            {
+                _diagnostics.Add(diagnostic);
+            }
+        }
 
         // Run analyses on the bound module with contract info
-        var result = AnalyzeBound(boundModule, guardedParams);
+        var result = AnalyzeBoundCore(
+            boundModule,
+            guardedParams,
+            BuildGuardedParameterIds(module, boundModule));
 
         // Run contract inference if enabled
         var contractsInferred = 0;
@@ -167,9 +182,11 @@ public sealed class VerificationAnalysisPass
                 var inferencePass = new ContractInferencePass(_diagnostics);
                 contractsInferred = inferencePass.Infer(module, boundModule);
             }
-            catch
+            catch (Exception ex)
             {
-                // Contract inference failures are non-fatal
+                ReportAnalysisIncomplete(
+                    module.Span,
+                    $"Contract inference did not complete: {ex.GetType().Name}");
             }
         }
 
@@ -304,27 +321,20 @@ public sealed class VerificationAnalysisPass
         HashSet<string> paramNames,
         HashSet<string> collected)
     {
-        switch (expr)
+        foreach (var node in DescendantsAndSelf(expr))
         {
-            case Ast.ReferenceNode refNode:
-                if (paramNames.Contains(refNode.Name))
-                    collected.Add(refNode.Name);
-                break;
+            if (node is Ast.ReferenceNode reference && paramNames.Contains(reference.Name))
+                collected.Add(reference.Name);
+        }
+    }
 
-            case Ast.BinaryOperationNode binOp:
-                CollectReferencedNames(binOp.Left, paramNames, collected);
-                CollectReferencedNames(binOp.Right, paramNames, collected);
-                break;
-
-            case Ast.UnaryOperationNode unary:
-                CollectReferencedNames(unary.Operand, paramNames, collected);
-                break;
-
-            case Ast.ConditionalExpressionNode cond:
-                CollectReferencedNames(cond.Condition, paramNames, collected);
-                CollectReferencedNames(cond.WhenTrue, paramNames, collected);
-                CollectReferencedNames(cond.WhenFalse, paramNames, collected);
-                break;
+    private static IEnumerable<Ast.AstNode> DescendantsAndSelf(Ast.AstNode node)
+    {
+        yield return node;
+        foreach (var child in RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
         }
     }
 
@@ -333,6 +343,12 @@ public sealed class VerificationAnalysisPass
     /// </summary>
     public VerificationAnalysisResult AnalyzeBound(BoundModule module,
         Dictionary<string, HashSet<string>>? preconditionGuardedParams = null)
+        => AnalyzeBoundCore(module, preconditionGuardedParams, null);
+
+    private VerificationAnalysisResult AnalyzeBoundCore(
+        BoundModule module,
+        Dictionary<string, HashSet<string>>? preconditionGuardedParams,
+        IReadOnlyDictionary<SymbolId, IReadOnlySet<SymbolId>>? guardedParameterIds)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var dataflowIssues = 0;
@@ -342,6 +358,15 @@ public sealed class VerificationAnalysisPass
 
         foreach (var function in module.Functions)
         {
+            var incomplete = BoundNodeHelpers.GetAnalysisIncompleteNodes(function).FirstOrDefault();
+            if (incomplete != null)
+            {
+                ReportAnalysisIncomplete(
+                    incomplete.Span,
+                    $"Analysis of '{function.Symbol.DisplaySignature}' is incomplete because " +
+                    $"the bound tree contains '{incomplete.GetType().Name}'");
+            }
+
             // Dataflow analysis
             if (_options.EnableDataflow)
             {
@@ -351,12 +376,9 @@ public sealed class VerificationAnalysisPass
             // Bug pattern detection
             if (_options.EnableBugPatterns)
             {
-                var bugOptions = _options.BugPatternOptions ?? new BugPatternOptions
-                {
-                    UseZ3Verification = _options.UseZ3Verification,
-                    Z3TimeoutMs = _options.Z3TimeoutMs,
-                    PreconditionGuardedParams = preconditionGuardedParams
-                };
+                var bugOptions = CreateBugPatternOptions(
+                    preconditionGuardedParams,
+                    guardedParameterIds);
                 var bugRunner = new BugPatternRunner(_diagnostics, bugOptions);
                 var beforeCount = _diagnostics.Count;
                 bugRunner.CheckFunction(function);
@@ -400,6 +422,106 @@ public sealed class VerificationAnalysisPass
         };
     }
 
+    private BugPatternOptions CreateBugPatternOptions(
+        Dictionary<string, HashSet<string>>? guardedNames,
+        IReadOnlyDictionary<SymbolId, IReadOnlySet<SymbolId>>? guardedIds)
+    {
+        var configured = _options.BugPatternOptions;
+        return new BugPatternOptions
+        {
+            CheckDivisionByZero = configured?.CheckDivisionByZero ?? true,
+            CheckIndexOutOfBounds = configured?.CheckIndexOutOfBounds ?? true,
+            CheckNullDereference = configured?.CheckNullDereference ?? true,
+            CheckOverflow = configured?.CheckOverflow ?? true,
+            CheckMissingPreconditions = configured?.CheckMissingPreconditions ?? true,
+            CheckOffByOne = configured?.CheckOffByOne ?? true,
+            ReportOnlyVerified = configured?.ReportOnlyVerified ?? false,
+            UseZ3Verification = configured?.UseZ3Verification ?? _options.UseZ3Verification,
+            Z3TimeoutMs = configured?.Z3TimeoutMs ?? _options.Z3TimeoutMs,
+            PreconditionGuardedParams = configured?.PreconditionGuardedParams ?? guardedNames,
+            PreconditionGuardedParameterIds =
+                configured?.PreconditionGuardedParameterIds ?? guardedIds,
+        };
+    }
+
+    private static IReadOnlyDictionary<SymbolId, IReadOnlySet<SymbolId>>
+        BuildGuardedParameterIds(ModuleNode module, BoundModule boundModule)
+    {
+        var namesByDeclaration = new Dictionary<TextSpan, HashSet<string>>();
+        foreach (var node in DescendantsAndSelf(module))
+        {
+            switch (node)
+            {
+                case FunctionNode function:
+                    Register(
+                        function.Span,
+                        function.Parameters,
+                        function.Preconditions);
+                    break;
+                case MethodNode method:
+                    Register(
+                        method.Span,
+                        method.Parameters,
+                        method.Preconditions);
+                    break;
+                case ConstructorNode constructor:
+                    Register(
+                        constructor.Span,
+                        constructor.Parameters,
+                        constructor.Preconditions);
+                    break;
+                case OperatorOverloadNode operatorOverload:
+                    Register(
+                        operatorOverload.Span,
+                        operatorOverload.Parameters,
+                        operatorOverload.Preconditions);
+                    break;
+                case PropertyAccessorNode accessor
+                    when accessor.Kind is PropertyAccessorNode.AccessorKind.Set
+                        or PropertyAccessorNode.AccessorKind.Init:
+                    Register(
+                        accessor.Span,
+                        [new ParameterNode(
+                            accessor.Span,
+                            "value",
+                            "OBJECT",
+                            new AttributeCollection())],
+                        accessor.Preconditions);
+                    break;
+            }
+        }
+
+        var result = new Dictionary<SymbolId, IReadOnlySet<SymbolId>>();
+        foreach (var function in boundModule.Functions)
+        {
+            if (!namesByDeclaration.TryGetValue(function.Symbol.DeclarationSpan, out var guardedNames))
+                continue;
+
+            result[function.SymbolId] = function.Symbol.Parameters
+                .Where(parameter => guardedNames.Contains(parameter.Name))
+                .Select(parameter => parameter.Id)
+                .ToHashSet();
+        }
+
+        return result;
+
+        void Register(
+            TextSpan span,
+            IReadOnlyList<ParameterNode> parameters,
+            IReadOnlyList<RequiresNode> preconditions)
+        {
+            if (preconditions.Count == 0)
+                return;
+
+            var parameterNames = parameters.Select(parameter => parameter.Name).ToHashSet();
+            var guarded = new HashSet<string>();
+            foreach (var precondition in preconditions)
+                CollectReferencedNames(precondition.Condition, parameterNames, guarded);
+            if (guarded.Count > 0)
+                namesByDeclaration[span] = guarded;
+        }
+    }
+
     private int RunDataflowAnalysis(BoundFunction function)
     {
         var issueCount = 0;
@@ -410,33 +532,48 @@ public sealed class VerificationAnalysisPass
             var cfg = ControlFlowGraph.Build(function);
 
             // Get parameter names for initialization analysis
-            var paramNames = function.Symbol.Parameters.Select(p => p.Name);
-
             // Uninitialized variable analysis
-            var uninitAnalysis = new UninitializedVariablesAnalysis(cfg, paramNames);
+            var uninitAnalysis = new UninitializedVariablesAnalysis(cfg, function.Symbol.Parameters);
             uninitAnalysis.ReportDiagnostics(_diagnostics);
             issueCount += uninitAnalysis.UninitializedUses.Count;
 
             // Live variable analysis for dead store detection
             var liveAnalysis = new LiveVariablesAnalysis(cfg);
-            foreach (var (block, stmt, variable) in liveAnalysis.FindDeadAssignments())
+            foreach (var (_, stmt, variable) in liveAnalysis.FindDeadAssignmentsWithSymbols())
             {
                 // Skip loop variables and parameters
-                if (function.Symbol.Parameters.Any(p => p.Name == variable))
+                if (function.Symbol.Parameters.Any(parameter =>
+                        BoundNodeHelpers.SameSymbol(parameter, variable)))
                     continue;
 
                 _diagnostics.ReportWarning(
                     stmt.Span,
                     DiagnosticCode.DeadStore,
-                    $"Assignment to '{variable}' is never read (dead store)");
+                    $"Assignment to '{variable.Name}' is never read (dead store)");
                 issueCount++;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore analysis failures - continue with other analyses
+            ReportAnalysisIncomplete(
+                function.Span,
+                $"Dataflow analysis of '{function.Symbol.DisplaySignature}' did not complete: " +
+                ex.GetType().Name);
         }
 
         return issueCount;
+    }
+
+    private void ReportAnalysisIncomplete(TextSpan span, string message)
+    {
+        if (_diagnostics.Any(diagnostic =>
+                (diagnostic.Code == DiagnosticCode.AnalysisSkipped
+                 || diagnostic.Code == DiagnosticCode.AnalysisUnsupportedNode)
+                && diagnostic.Span == span))
+        {
+            return;
+        }
+
+        _diagnostics.ReportInfo(span, DiagnosticCode.AnalysisSkipped, message);
     }
 }

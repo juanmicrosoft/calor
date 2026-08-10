@@ -1082,6 +1082,11 @@ public sealed class SymbolFinderVisitor
                 break;
 
             case FieldAccessNode fieldAccess:
+                if (SpanContainsOffset(fieldAccess.Target.Span))
+                {
+                    VisitExpression(fieldAccess.Target);
+                    break;
+                }
                 // Resolve the type of the target expression to enable cross-file lookup
                 var targetType = ResolveExpressionType(fieldAccess.Target);
                 _result = new SymbolLookupResult(
@@ -1101,6 +1106,14 @@ public sealed class SymbolFinderVisitor
                 break;
 
             case NewExpressionNode newExpr:
+                foreach (var argument in newExpr.Arguments)
+                {
+                    if (SpanContainsOffset(argument.Span))
+                    {
+                        VisitExpression(argument);
+                        return;
+                    }
+                }
                 _result = new SymbolLookupResult(
                     newExpr.TypeName, "constructor call", newExpr.TypeName,
                     newExpr.Span, null, newExpr);
@@ -1490,10 +1503,38 @@ public sealed class SymbolFinderVisitor
                 break;
 
             case CollectionCountNode countNode:
+                if (SpanContainsOffset(countNode.Collection.Span))
+                {
+                    VisitExpression(countNode.Collection);
+                    break;
+                }
                 _result = new SymbolLookupResult(
                     "Count", "count", "i32",
                     countNode.Span, null, countNode);
                 break;
+
+            default:
+                VisitNestedExpressionChild(expr);
+                break;
+        }
+    }
+
+    private void VisitNestedExpressionChild(AstNode node)
+    {
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            if (!SpanContainsOffset(child.Span))
+                continue;
+
+            if (child is ExpressionNode expression)
+            {
+                VisitExpression(expression);
+                return;
+            }
+
+            VisitNestedExpressionChild(child);
+            if (_result != null)
+                return;
         }
     }
 

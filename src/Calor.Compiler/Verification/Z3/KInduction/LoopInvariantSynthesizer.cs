@@ -101,7 +101,7 @@ public sealed class LoopInvariantSynthesizer : IDisposable
         }
 
         // Step 2: Analyze transition patterns in the body
-        var transition = WhileConditionAnalyzer.AnalyzeTransition(loop.Body, loopInfo.LoopVariable!);
+        var transition = WhileConditionAnalyzer.AnalyzeTransition(loop.Body, loopInfo);
 
         // Step 3: Create loop context for template generation
         var context = WhileConditionAnalyzer.CreateLoopContext(loop, loopInfo, transition);

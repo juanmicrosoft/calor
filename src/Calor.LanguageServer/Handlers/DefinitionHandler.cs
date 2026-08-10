@@ -44,10 +44,10 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
         }
 
         if (result.SymbolId is { } symbolId
-            && state.BoundModule?.SymbolsById.TryGetValue(symbolId, out var boundSymbol) == true)
+            && state.BoundModule?.SymbolsById.TryGetValue(symbolId, out var localSymbol) == true)
         {
             var definitionRange = PositionConverter.ToLspRange(
-                boundSymbol.DeclarationSpan,
+                localSymbol.DeclarationSpan,
                 state.Source);
             var location = new Location
             {
@@ -56,6 +56,27 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
             };
             return Task.FromResult<LocationOrLocationLinks?>(
                 new LocationOrLocationLinks(new[] { new LocationOrLocationLink(location) }));
+        }
+
+        var offset = PositionConverter.ToOffset(request.Position, state.Source);
+        var boundCall = SymbolFinder.FindBoundCallAtOffset(state.BoundModule, offset);
+        var projectCall = _workspace.ResolveProjectCall(boundCall);
+        if (projectCall.Doc != null && projectCall.Symbol != null)
+        {
+            var location = new Location
+            {
+                Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(projectCall.Doc.Uri),
+                Range = PositionConverter.ToLspRange(
+                    projectCall.Symbol.DeclarationSpan,
+                    projectCall.Doc.Source),
+            };
+            return Task.FromResult<LocationOrLocationLinks?>(
+                new LocationOrLocationLinks(new[] { new LocationOrLocationLink(location) }));
+        }
+
+        if (boundCall != null)
+        {
+            return Task.FromResult<LocationOrLocationLinks?>(null);
         }
 
         // If we found a definition in the same file, return it

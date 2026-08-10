@@ -166,18 +166,20 @@ public sealed class FactCollector
 
     private static void CollectReferencedNames(ExpressionNode expr, HashSet<string> names)
     {
-        switch (expr)
+        foreach (var node in DescendantsAndSelf(expr))
         {
-            case ReferenceNode reference:
+            if (node is ReferenceNode reference)
                 names.Add(reference.Name);
-                break;
-            case BinaryOperationNode binOp:
-                CollectReferencedNames(binOp.Left, names);
-                CollectReferencedNames(binOp.Right, names);
-                break;
-            case UnaryOperationNode unOp:
-                CollectReferencedNames(unOp.Operand, names);
-                break;
+        }
+    }
+
+    private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
+    {
+        yield return node;
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
         }
     }
 

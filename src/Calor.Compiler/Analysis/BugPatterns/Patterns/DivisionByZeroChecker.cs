@@ -158,6 +158,13 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
                     CheckExpression(throwStmt.Expression, function, diagnostics, pathConditions);
                 }
                 break;
+
+            default:
+                foreach (var expression in BoundNodeHelpers.GetImmediateExpressions(stmt))
+                    CheckExpression(expression, function, diagnostics, pathConditions);
+                foreach (var statement in BoundNodeHelpers.GetImmediateStatements(stmt))
+                    CheckStatement(statement, function, diagnostics, pathConditions);
+                break;
         }
     }
 
@@ -207,14 +214,14 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
         // Simple constant propagation: if divisor is a variable initialized to a non-zero constant, it's safe
         if (divisor is BoundVariableExpression constVarExpr)
         {
-            var initValue = FindVariableInitializer(constVarExpr.Variable.Name, function);
+            var initValue = FindVariableInitializer(constVarExpr.Variable, function);
             if (initValue != null && BoundNodeHelpers.IsConstant(initValue) && !BoundNodeHelpers.IsLiteralZero(initValue))
             {
                 return;
             }
 
             // Loop bound tracking: if divisor is a loop variable with lower bound > 0, it's safe
-            var lowerBound = FindLoopLowerBound(constVarExpr.Variable.Name, function);
+            var lowerBound = FindLoopLowerBound(constVarExpr.Variable, function);
             if (lowerBound is BoundIntLiteral lowerLit && lowerLit.Value > 0)
             {
                 return;
@@ -249,7 +256,7 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
             if (divisor is BoundVariableExpression varExpr)
             {
                 // Check if there's a guard in the path conditions
-                var hasGuard = HasZeroGuard(varExpr.Variable.Name, pathConditions);
+                var hasGuard = HasZeroGuard(varExpr.Variable, pathConditions);
                 if (!hasGuard)
                 {
                     diagnostics.ReportWarning(
@@ -274,7 +281,7 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
             // Declare parameters
             foreach (var param in function.Symbol.Parameters)
             {
-                translator.DeclareVariable(param.Name, param.TypeName);
+                translator.DeclareVariable(param);
             }
 
             // Translate path conditions
@@ -329,7 +336,9 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
         }
     }
 
-    private static bool HasZeroGuard(string variableName, List<BoundExpression> pathConditions)
+    private static bool HasZeroGuard(
+        VariableSymbol variable,
+        List<BoundExpression> pathConditions)
     {
         // Check if any path condition is of the form "variableName != 0" or "variableName > 0"
         foreach (var condition in pathConditions)
@@ -339,8 +348,8 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
                 // Check for x != 0
                 if (binExpr.Operator == BinaryOperator.NotEqual)
                 {
-                    if (IsVariableAndZero(binExpr.Left, binExpr.Right, variableName) ||
-                        IsVariableAndZero(binExpr.Right, binExpr.Left, variableName))
+                    if (IsVariableAndZero(binExpr.Left, binExpr.Right, variable) ||
+                        IsVariableAndZero(binExpr.Right, binExpr.Left, variable))
                     {
                         return true;
                     }
@@ -350,8 +359,8 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
                 if (binExpr.Operator == BinaryOperator.GreaterThan ||
                     binExpr.Operator == BinaryOperator.LessThan)
                 {
-                    if (IsVariableAndZero(binExpr.Left, binExpr.Right, variableName) ||
-                        IsVariableAndZero(binExpr.Right, binExpr.Left, variableName))
+                    if (IsVariableAndZero(binExpr.Left, binExpr.Right, variable) ||
+                        IsVariableAndZero(binExpr.Right, binExpr.Left, variable))
                     {
                         return true;
                     }
@@ -367,17 +376,21 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
     /// Searches recursively into if/loop/try blocks.
     /// Returns null if not found or if the variable is reassigned.
     /// </summary>
-    private static BoundExpression? FindVariableInitializer(string variableName, BoundFunction function)
+    private static BoundExpression? FindVariableInitializer(
+        VariableSymbol variable,
+        BoundFunction function)
     {
-        return FindVariableInitializerInStatements(variableName, function.Body);
+        return FindVariableInitializerInStatements(variable, function.Body);
     }
 
-    private static BoundExpression? FindVariableInitializerInStatements(string variableName, IReadOnlyList<BoundStatement> statements)
+    private static BoundExpression? FindVariableInitializerInStatements(
+        VariableSymbol variable,
+        IReadOnlyList<BoundStatement> statements)
     {
         foreach (var stmt in statements)
         {
             if (stmt is BoundBindStatement bind &&
-                bind.Variable.Name == variableName &&
+                BoundNodeHelpers.SameSymbol(bind.Variable, variable) &&
                 bind.Initializer != null)
             {
                 return bind.Initializer;
@@ -385,41 +398,41 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
 
             if (stmt is BoundIfStatement ifStmt)
             {
-                var thenResult = FindVariableInitializerInStatements(variableName, ifStmt.ThenBody);
+                var thenResult = FindVariableInitializerInStatements(variable, ifStmt.ThenBody);
                 if (thenResult != null) return thenResult;
                 foreach (var elseIf in ifStmt.ElseIfClauses)
                 {
-                    var elseIfResult = FindVariableInitializerInStatements(variableName, elseIf.Body);
+                    var elseIfResult = FindVariableInitializerInStatements(variable, elseIf.Body);
                     if (elseIfResult != null) return elseIfResult;
                 }
                 if (ifStmt.ElseBody != null)
                 {
-                    var elseResult = FindVariableInitializerInStatements(variableName, ifStmt.ElseBody);
+                    var elseResult = FindVariableInitializerInStatements(variable, ifStmt.ElseBody);
                     if (elseResult != null) return elseResult;
                 }
             }
             else if (stmt is BoundForStatement forStmt)
             {
-                var forResult = FindVariableInitializerInStatements(variableName, forStmt.Body);
+                var forResult = FindVariableInitializerInStatements(variable, forStmt.Body);
                 if (forResult != null) return forResult;
             }
             else if (stmt is BoundWhileStatement whileStmt)
             {
-                var whileResult = FindVariableInitializerInStatements(variableName, whileStmt.Body);
+                var whileResult = FindVariableInitializerInStatements(variable, whileStmt.Body);
                 if (whileResult != null) return whileResult;
             }
             else if (stmt is BoundTryStatement tryStmt)
             {
-                var tryResult = FindVariableInitializerInStatements(variableName, tryStmt.TryBody);
+                var tryResult = FindVariableInitializerInStatements(variable, tryStmt.TryBody);
                 if (tryResult != null) return tryResult;
                 foreach (var catchClause in tryStmt.CatchClauses)
                 {
-                    var catchResult = FindVariableInitializerInStatements(variableName, catchClause.Body);
+                    var catchResult = FindVariableInitializerInStatements(variable, catchClause.Body);
                     if (catchResult != null) return catchResult;
                 }
                 if (tryStmt.FinallyBody != null)
                 {
-                    var finallyResult = FindVariableInitializerInStatements(variableName, tryStmt.FinallyBody);
+                    var finallyResult = FindVariableInitializerInStatements(variable, tryStmt.FinallyBody);
                     if (finallyResult != null) return finallyResult;
                 }
             }
@@ -431,48 +444,55 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
     /// Finds the enclosing for-loop for a variable and returns the lower bound if it's a positive constant.
     /// Returns null if not found or if the lower bound is not a positive constant.
     /// </summary>
-    private static BoundExpression? FindLoopLowerBound(string variableName, BoundFunction function)
+    private static BoundExpression? FindLoopLowerBound(
+        VariableSymbol variable,
+        BoundFunction function)
     {
-        return FindLoopLowerBoundInStatements(variableName, function.Body);
+        return FindLoopLowerBoundInStatements(variable, function.Body);
     }
 
-    private static BoundExpression? FindLoopLowerBoundInStatements(string variableName, IReadOnlyList<BoundStatement> statements)
+    private static BoundExpression? FindLoopLowerBoundInStatements(
+        VariableSymbol variable,
+        IReadOnlyList<BoundStatement> statements)
     {
         foreach (var stmt in statements)
         {
             if (stmt is BoundForStatement forStmt)
             {
-                if (forStmt.LoopVariable.Name == variableName)
+                if (BoundNodeHelpers.SameSymbol(forStmt.LoopVariable, variable))
                 {
                     return forStmt.From;
                 }
                 // Check nested statements
-                var nested = FindLoopLowerBoundInStatements(variableName, forStmt.Body);
+                var nested = FindLoopLowerBoundInStatements(variable, forStmt.Body);
                 if (nested != null) return nested;
             }
             else if (stmt is BoundIfStatement ifStmt)
             {
-                var thenResult = FindLoopLowerBoundInStatements(variableName, ifStmt.ThenBody);
+                var thenResult = FindLoopLowerBoundInStatements(variable, ifStmt.ThenBody);
                 if (thenResult != null) return thenResult;
                 if (ifStmt.ElseBody != null)
                 {
-                    var elseResult = FindLoopLowerBoundInStatements(variableName, ifStmt.ElseBody);
+                    var elseResult = FindLoopLowerBoundInStatements(variable, ifStmt.ElseBody);
                     if (elseResult != null) return elseResult;
                 }
             }
             else if (stmt is BoundWhileStatement whileStmt)
             {
-                var whileResult = FindLoopLowerBoundInStatements(variableName, whileStmt.Body);
+                var whileResult = FindLoopLowerBoundInStatements(variable, whileStmt.Body);
                 if (whileResult != null) return whileResult;
             }
         }
         return null;
     }
 
-    private static bool IsVariableAndZero(BoundExpression maybeVar, BoundExpression maybeZero, string variableName)
+    private static bool IsVariableAndZero(
+        BoundExpression maybeVar,
+        BoundExpression maybeZero,
+        VariableSymbol variable)
     {
         return maybeVar is BoundVariableExpression varExpr &&
-               varExpr.Variable.Name == variableName &&
+               BoundNodeHelpers.SameSymbol(varExpr.Variable, variable) &&
                BoundNodeHelpers.IsLiteralZero(maybeZero);
     }
 }
@@ -483,20 +503,23 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
 internal sealed class BoundExpressionTranslator
 {
     private readonly Context _ctx;
-    private readonly Dictionary<string, (Expr Expr, string Type)> _variables = new();
+    private readonly Dictionary<SymbolId, (Expr Expr, string Type)> _variables = new();
 
     public BoundExpressionTranslator(Context ctx)
     {
         _ctx = ctx;
     }
 
-    public bool DeclareVariable(string name, string typeName)
+    public bool DeclareVariable(VariableSymbol variable)
     {
-        var expr = CreateVariableForType(name, typeName);
+        if (variable.Id.IsNone)
+            return false;
+
+        var expr = CreateVariableForType(GetSolverName(variable), variable.TypeName);
         if (expr == null)
             return false;
 
-        _variables[name] = (expr, typeName);
+        _variables[variable.Id] = (expr, variable.TypeName);
         return true;
     }
 
@@ -588,14 +611,22 @@ internal sealed class BoundExpressionTranslator
 
     private Expr? TranslateVariable(BoundVariableExpression varExpr)
     {
-        if (_variables.TryGetValue(varExpr.Variable.Name, out var variable))
+        if (_variables.TryGetValue(varExpr.Variable.Id, out var variable))
             return variable.Expr;
 
         // Try to declare the variable
-        if (DeclareVariable(varExpr.Variable.Name, varExpr.Variable.TypeName))
-            return _variables[varExpr.Variable.Name].Expr;
+        if (DeclareVariable(varExpr.Variable))
+            return _variables[varExpr.Variable.Id].Expr;
 
         return null;
+    }
+
+    private static string GetSolverName(VariableSymbol variable)
+    {
+        var suffix = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(variable.Id.Value)))[..12];
+        return $"{variable.Name}_{suffix}";
     }
 
     private Expr? TranslateBinaryOp(BoundBinaryExpression binExpr)

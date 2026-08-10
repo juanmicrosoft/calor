@@ -35,7 +35,12 @@ public sealed class RenameHandler : RenameHandlerBase
         var (line, column) = PositionConverter.ToCalorPosition(request.Position);
 
         // Find the symbol at the cursor position
-        var result = SymbolFinder.FindSymbolAtPosition(state.Ast, line, column, state.Source);
+        var result = SymbolFinder.FindSymbolAtPosition(
+            state.Ast,
+            line,
+            column,
+            state.Source,
+            state.BoundModule);
         if (result == null || string.IsNullOrEmpty(result.Name))
         {
             return Task.FromResult<WorkspaceEdit?>(null);
@@ -51,6 +56,64 @@ public sealed class RenameHandler : RenameHandlerBase
         }
 
         var changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>();
+
+        if (result.SymbolId is { IsNone: false } symbolId)
+        {
+            if (state.BoundModule?.SymbolsById.TryGetValue(symbolId, out var symbol) == true
+                && symbol is Calor.Compiler.Binding.FunctionSymbol function)
+            {
+                foreach (var group in _workspace.FindProjectFunctionReferences(
+                             function,
+                             includeDeclaration: true)
+                         .GroupBy(item => item.Doc))
+                {
+                    changes[DocumentUri.From(group.Key.Uri)] = group.Select(item => new TextEdit
+                    {
+                        Range = PositionConverter.ToLspRange(item.Span, group.Key.Source),
+                        NewText = newName,
+                    }).ToArray();
+                }
+            }
+            else if (state.BoundModule != null)
+            {
+                changes[request.TextDocument.Uri] = SymbolFinder.FindBoundReferences(
+                        state.BoundModule,
+                        symbolId,
+                        includeDeclaration: true)
+                    .Select(span => new TextEdit
+                    {
+                        Range = PositionConverter.ToLspRange(span, state.Source),
+                        NewText = newName,
+                    })
+                    .ToArray();
+            }
+
+            return Task.FromResult<WorkspaceEdit?>(
+                changes.Count == 0 ? null : new WorkspaceEdit { Changes = changes });
+        }
+
+        var offset = PositionConverter.ToOffset(request.Position, state.Source);
+        var boundCall = SymbolFinder.FindBoundCallAtOffset(state.BoundModule, offset);
+        var projectCall = _workspace.ResolveProjectCall(boundCall);
+        if (projectCall.Symbol != null)
+        {
+            foreach (var group in _workspace.FindProjectFunctionReferences(
+                         projectCall.Symbol,
+                         includeDeclaration: true)
+                     .GroupBy(item => item.Doc))
+            {
+                changes[DocumentUri.From(group.Key.Uri)] = group.Select(item => new TextEdit
+                {
+                    Range = PositionConverter.ToLspRange(item.Span, group.Key.Source),
+                    NewText = newName,
+                }).ToArray();
+            }
+
+            return Task.FromResult<WorkspaceEdit?>(
+                changes.Count == 0 ? null : new WorkspaceEdit { Changes = changes });
+        }
+        if (boundCall != null)
+            return Task.FromResult<WorkspaceEdit?>(null);
 
         // Find all references across all open documents and create text edits
         foreach (var doc in _workspace.GetAllDocuments())

@@ -1,5 +1,6 @@
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
+using Calor.LanguageServer.Utilities;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using Xunit;
 
@@ -11,6 +12,90 @@ namespace Calor.LanguageServer.Tests.Integration;
 /// </summary>
 public class CrossFileResolutionTests
 {
+    [Fact]
+    public void ResolveProjectCall_UsesExactOverloadSymbolId()
+    {
+        var workspace = new WorkspaceState();
+        var definitions = """
+            §M{m001:Utils}
+              §F{f001:Pick:pub}
+                §I{i32:value}
+                §O{i32}
+                §R value
+              §F{f002:Pick:pub}
+                §I{str:value}
+                §O{str}
+                §R value
+            """;
+        var use = """
+            §M{m002:Main}
+              §F{f003:Run:pub}
+                §O{i32}
+                §R §C{Pick} §A INT:1 §/C
+            """;
+        var definitionsState = workspace.GetOrCreate(
+            DocumentUri.From("file:///utils.calr"),
+            definitions);
+        var useState = workspace.GetOrCreate(
+            DocumentUri.From("file:///main.calr"),
+            use);
+
+        Assert.NotNull(definitionsState.BoundModule);
+        Assert.NotNull(useState.BoundModule);
+        var call = SymbolFinder.FindBoundCallAtOffset(
+            useState.BoundModule,
+            use.IndexOf("Pick", StringComparison.Ordinal));
+        var resolved = workspace.ResolveProjectCall(call);
+
+        Assert.NotNull(resolved.Symbol);
+        Assert.Equal("INT", resolved.Symbol.Parameters[0].TypeName);
+        Assert.Equal(
+            definitionsState.BoundModule.Functions[0].SymbolId,
+            resolved.Symbol.Id);
+        Assert.NotEqual(
+            definitionsState.BoundModule.Functions[1].SymbolId,
+            resolved.Symbol.Id);
+
+        var references = workspace.FindProjectFunctionReferences(
+                resolved.Symbol,
+                includeDeclaration: true)
+            .ToArray();
+        Assert.Contains(references, reference => reference.Doc == definitionsState);
+        Assert.Contains(references, reference => reference.Doc == useState);
+    }
+
+    [Fact]
+    public void ResolveProjectCall_DoesNotNameResolveIncompatibleOverload()
+    {
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(
+            DocumentUri.From("file:///utils.calr"),
+            """
+            §M{m001:Utils}
+              §F{f001:Pick:pub}
+                §I{str:value}
+                §O{str}
+                §R value
+            """);
+        var use = """
+            §M{m002:Main}
+              §F{f002:Run:pub}
+                §O{i32}
+                §R §C{Pick} §A INT:1 §/C
+            """;
+        var useState = workspace.GetOrCreate(
+            DocumentUri.From("file:///main.calr"),
+            use);
+        var call = SymbolFinder.FindBoundCallAtOffset(
+            useState.BoundModule,
+            use.IndexOf("Pick", StringComparison.Ordinal));
+
+        var resolved = workspace.ResolveProjectCall(call);
+
+        Assert.Null(resolved.Doc);
+        Assert.Null(resolved.Symbol);
+    }
+
     #region WorkspaceState Tests
 
     [Fact]
