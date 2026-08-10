@@ -315,8 +315,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             return string.Empty;
         try
         {
-            var normalized = Path.GetFullPath(path).Replace('\\', '/').TrimEnd('/');
-            return OperatingSystem.IsWindows() ? normalized.ToUpperInvariant() : normalized;
+            return Path.GetFullPath(path).Replace('\\', '/').TrimEnd('/');
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException
                                    or PathTooLongException)

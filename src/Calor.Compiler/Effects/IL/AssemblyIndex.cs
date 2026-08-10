@@ -154,7 +154,8 @@ public sealed class AssemblyIndex : IDisposable
                                 (MethodDefinitionHandle)attr.Constructor).GetDeclaringType()),
                         _ => null
                     };
-                    if (attributeName == "ReferenceAssemblyAttribute")
+                    if (attributeName
+                        == "System.Runtime.CompilerServices.ReferenceAssemblyAttribute")
                         return true;
                 }
                 return false;
@@ -170,8 +171,9 @@ public sealed class AssemblyIndex : IDisposable
             MemberReference constructor)
             => constructor.Parent.Kind switch
             {
-                HandleKind.TypeReference => reader.GetString(
-                    reader.GetTypeReference((TypeReferenceHandle)constructor.Parent).Name),
+                HandleKind.TypeReference => GetTypeReferenceFullName(
+                    reader,
+                    (TypeReferenceHandle)constructor.Parent),
                 HandleKind.TypeDefinition => GetTypeDefinitionName(
                     reader,
                     (TypeDefinitionHandle)constructor.Parent),
@@ -181,7 +183,27 @@ public sealed class AssemblyIndex : IDisposable
         private static string GetTypeDefinitionName(
             MetadataReader reader,
             TypeDefinitionHandle handle)
-            => reader.GetString(reader.GetTypeDefinition(handle).Name);
+        {
+            var type = reader.GetTypeDefinition(handle);
+            return GetFullTypeName(
+                reader.GetString(type.Namespace),
+                reader.GetString(type.Name));
+        }
+
+        private static string GetTypeReferenceFullName(
+            MetadataReader reader,
+            TypeReferenceHandle handle)
+        {
+            var type = reader.GetTypeReference(handle);
+            return GetFullTypeName(
+                reader.GetString(type.Namespace),
+                reader.GetString(type.Name));
+        }
+
+        private static string GetFullTypeName(string typeNamespace, string typeName)
+            => string.IsNullOrEmpty(typeNamespace)
+                ? typeName
+                : $"{typeNamespace}.{typeName}";
 
         private static string? TryRefToLibSwap(string refPath)
         {
