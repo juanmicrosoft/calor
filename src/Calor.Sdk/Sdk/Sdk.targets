@@ -74,6 +74,7 @@
         EnforceEffects="$(CalorEnforceEffects)"
         TypeCheck="$(CalorTypeCheck)"
         Verify="$(CalorVerify)"
+        ElideProvenGuards="$(CalorElideProvenGuards)"
         EnableILAnalysis="$(CalorEnableILAnalysis)"
         ReferencedAssemblies="@(ReferencePath)"
         RuntimeDirectory="$(_CalorRuntimeDir)"

@@ -7,8 +7,8 @@ export function CatchBugs() {
   const codeRef = useScrollReveal<HTMLDivElement>({ direction: 'left' });
   const errorRef = useScrollReveal<HTMLDivElement>({ direction: 'right' });
 
-  const calorCode = `§M{m1:Orders}
-  §F{f_01A8X:ProcessOrder:pub} (Order:order) -> bool
+  const calorCode = `§M{m001:Orders}
+  §F{f001:ProcessOrder:pub} (Order:order) -> bool
     §E{db}
     §C{SaveOrder} §A order §/C
     §C{NotifyCustomer} §A order §/C`;
@@ -75,7 +75,7 @@ export function CatchBugs() {
               <p className="text-muted-foreground font-body">
                 <strong className="text-foreground">What happened:</strong> Your AI wrote code that calls <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">NotifyCustomer</code>, which
                 calls <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">SendEmail</code>, which makes a network request. The compiler caught that
-                you didn&apos;t declare the network access—before you ran anything. In most languages, this bug ships to production.
+                you didn&apos;t declare the network access—before you ran anything. Without effect enforcement, this mismatch would rely on review or tests.
               </p>
             </div>
           </div>
@@ -83,7 +83,7 @@ export function CatchBugs() {
           {/* Static Analysis section */}
           <div className="mt-20 mx-auto max-w-2xl text-center">
             <h3 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Static Analysis Finds What C# Misses
+              Additional Static Analysis
             </h3>
             <p className="mt-4 text-lg text-muted-foreground font-body">
               Run <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">calor --analyze</code> to
@@ -117,20 +117,20 @@ export function CatchBugs() {
 
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="text-center p-4 rounded-lg border bg-background">
-                <div className="text-2xl font-bold text-calor-cerulean">51</div>
-                <div className="text-xs text-muted-foreground mt-1">Projects scanned</div>
+                <div className="text-2xl font-bold text-calor-cerulean">On</div>
+                <div className="text-xs text-muted-foreground mt-1">Effect checks by default</div>
               </div>
               <div className="text-center p-4 rounded-lg border bg-background">
-                <div className="text-2xl font-bold text-calor-cerulean">262K</div>
-                <div className="text-xs text-muted-foreground mt-1">Files analyzed</div>
+                <div className="text-2xl font-bold text-calor-cerulean">On</div>
+                <div className="text-xs text-muted-foreground mt-1">Type checks by default</div>
               </div>
               <div className="text-center p-4 rounded-lg border bg-background">
-                <div className="text-2xl font-bold text-calor-salmon">23</div>
-                <div className="text-xs text-muted-foreground mt-1">Verified findings</div>
+                <div className="text-2xl font-bold text-calor-salmon">7</div>
+                <div className="text-xs text-muted-foreground mt-1">Verification statuses</div>
               </div>
               <div className="text-center p-4 rounded-lg border bg-background">
-                <div className="text-2xl font-bold text-green-500">~90%</div>
-                <div className="text-xs text-muted-foreground mt-1">True positive rate</div>
+                <div className="text-2xl font-bold text-green-500">Clean</div>
+                <div className="text-xs text-muted-foreground mt-1">Verified findings default</div>
               </div>
             </div>
           </div>

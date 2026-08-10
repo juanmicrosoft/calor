@@ -50,7 +50,7 @@ binding is immutable (cannot be reassigned).
 4. **The reported type is the binder's internal name.** Literal
    initializers produce `INT`, `STRING`, `BOOL`, `FLOAT`. Calling code
    that needs to write the equivalent type annotation uses the
-   user-facing names instead — see [Types](/syntax-reference/types/)
+   user-facing names instead — see [Types](/docs/syntax-reference/types/)
    for the mapping (`i32`, `str`, `bool`, `f64`, …).
 5. **Inferred bindings emit `var` in C#; explicit bindings emit the
    named type.** Writing `§B{x} INT:0` produces `var x = 0;`; writing
@@ -77,7 +77,7 @@ no `:type` annotation is present is on the right.
 
 The literal-type names on the right (`INT`, `STRING`, …) are the
 binder's internal type identifiers. They appear in tool output and
-diagnostics. The corresponding [type annotation](/syntax-reference/types/)
+diagnostics. The corresponding [type annotation](/docs/syntax-reference/types/)
 you would write in source is the lowercase user-facing name
 (`i32`, `str`, `bool`, `f64`).
 
@@ -165,14 +165,14 @@ Fix by adding one or the other:
 
 **Pre-v0.6 behavior:** the binder silently defaulted to `INT` in this
 case, producing wrong-typed code with no diagnostic. The diagnostic
-was added in v0.6 and is enforced through the main `calor compile`
+was added in v0.6 and is enforced through the root `calor -i` compile
 pipeline by `BindValidationPass`.
 
 ### Strict-mode diagnostics (default-on since v0.6.3)
 
 The following diagnostics are reserved in the `Calor0250-0259` range
 and are enforced **by default** as of v0.6.3 (RFC §6). To opt out
-during migration, pass `--no-strict-bind-inference` to `calor compile`
+during migration, pass `--no-strict-bind-inference` to the root compile command
 or set `CompilationOptions.StrictBindInference = false`.
 
 | Code | Title | Fires on |
@@ -209,7 +209,7 @@ source did have.
 
 ## See also
 
-- [Types](/syntax-reference/types/) — primitive type names and their C# equivalents
-- [Structure Tags](/syntax-reference/structure-tags/) — `§F`, `§I`, `§O` and the surrounding function structure
-- [Expressions](/syntax-reference/expressions/) — initializer expressions in Lisp-prefix form
-- [Calls](/syntax-reference/calls/) — `§C` calls as binding initializers
+- [Types](/docs/syntax-reference/types/) — primitive type names and their C# equivalents
+- [Structure Tags](/docs/syntax-reference/structure-tags/) — `§F`, `§I`, `§O` and the surrounding function structure
+- [Expressions](/docs/syntax-reference/expressions/) — initializer expressions in Lisp-prefix form
+- [Calls](/docs/syntax-reference/calls/) — `§C` calls as binding initializers

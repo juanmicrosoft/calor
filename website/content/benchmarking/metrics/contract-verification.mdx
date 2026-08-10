@@ -6,28 +6,32 @@ order: 10
 
 
 **Feature:** Z3 static contract verification
-**Related metric:** [Safety](/benchmarking/metrics/safety/) (measures contract enforcement effectiveness)
+**Related metric:** [Safety](/docs/benchmarking/metrics/safety/) (measures contract enforcement effectiveness)
 **C# equivalent:** None (C# Code Contracts was abandoned)
 
 ---
 
 ## Overview
 
-Calor uses Microsoft's Z3 SMT solver to prove contracts at compile time. When you write a precondition or postcondition, the compiler can mathematically verify that it holds for all possible inputs—catching bugs before the code ever runs.
+Calor uses Z3 to verify contract obligations inside an explicitly modeled
+subset. A result is always labeled with one of seven statuses, so a conditional
+or unavailable proof cannot be mistaken for a clean proof.
 
-This is fundamentally different from constrained decoding approaches, which only ensure syntactic validity. Z3 verification proves semantic correctness.
+This is different from syntax-constrained generation: it analyzes semantic
+obligations. It does not establish whole-program correctness.
 
 ---
 
 ## Why It Matters
 
-Static contract verification catches entire categories of bugs at compile time:
+Static contract verification can surface these bugs before execution when the
+relevant invariant is expressed and its forms are modeled:
 
-- **Division by zero** - Z3 proves divisors are never zero
-- **Bounds violations** - Array indices proven within range
-- **Integer overflow** - Arithmetic proven to stay within bounds
-- **Null dereferences** - References proven non-null before use
-- **Invalid state** - Invariants proven to hold
+- **Division by zero** - modeled obligations can prove a divisor nonzero or expose a counterexample
+- **Bounds violations** - modeled index constraints can be proved or refuted
+- **Integer overflow** - fixed-width arithmetic can be checked within the supported subset
+- **Null dereferences** - modeled reference facts can establish non-null use
+- **Invalid state** - modeled invariants can be proved or refuted
 
 These bugs cannot be caught by grammar-constrained generation—syntax doesn't encode invariants.
 
@@ -35,14 +39,17 @@ These bugs cannot be caught by grammar-constrained generation—syntax doesn't e
 
 ## How It's Measured
 
-Contracts fall into four categories after verification:
+Contracts use the schema 2.0 seven-status vocabulary:
 
 | Result | Meaning | Runtime Check |
 |:-------|:--------|:--------------|
-| **Proven** | Z3 mathematically proved the contract always holds | Elided (optional) |
-| **Unproven** | Z3 couldn't determine (timeout or complexity) | Preserved |
-| **Disproven** | Z3 found a counterexample | Preserved + Warning |
-| **Unsupported** | Contract uses unsupported constructs | Preserved |
+| `proven` | The obligation holds under the modeled semantics | v0.12.1 removes an eligible guard only when non-vacuous and assumption-free |
+| `refuted` | A violation exists | Preserved + counterexample when available |
+| `assumed` | The proof depends on named assumptions | Preserved |
+| `unknown` | Z3 could not decide | Preserved |
+| `timeout` | Solver budget exhausted | Preserved |
+| `unsupported` | Form or runtime semantics outside the model | Preserved |
+| `unavailable` | No solver was available | Preserved |
 
 The metric tracks the distribution across these categories.
 
@@ -50,35 +57,30 @@ The metric tracks the distribution across these categories.
 
 ## Example
 
-Consider a division function with a precondition:
+The repository includes a deliberately refutable postcondition fixture:
 
 ```calor
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)              // Precondition: b must not be zero
-  §R (/ a b)
+§M{m1:OutcomeRefuted}
+  §F{f1:Dec:pub} (i32:x) -> i32
+    §Q (> x 0)
+    §S (> result 10)
+    §R (- x 1)
 ```
 
-When compiled with `--verify`, Z3 checks whether the division can ever fail:
+When compiled with `--verify`, Z3 binds `result` to the body expression and
+checks whether the postcondition can fail:
 
 ```bash
 calor -i math.calr -o math.g.cs --verify
 ```
 
-If code calls `Divide` with a potentially-zero argument:
+The fixture produces `Calor0712` (`PostconditionMayBeViolated`) with status
+`refuted`. Its regression test requires a non-empty structured counterexample
+with a `result` binding. The renderer begins that model with `Counterexample:`;
+the exact bindings and formatting are solver-dependent.
 
-```calor
-§V{v001:i32:result} §C{Divide} x (- y y) §/C    // (y - y) = 0!
-```
-
-Z3 detects this at compile time:
-
-```
-warning Calor0702: Precondition may be violated in call to 'Divide'.
-  Counterexample: y=5 (b = y - y = 0)
-```
+This is an implementation-postcondition check. It should not be read as a
+claim that v0.12.1 proves arbitrary preconditions at every call site.
 
 ---
 
@@ -88,27 +90,26 @@ warning Calor0702: Precondition may be violated in call to 'Divide'.
 
 | Bug Category | Contract | Detection |
 |:-------------|:---------|:----------|
-| Division by zero | `§Q (!= divisor 0)` | Proven safe or counterexample |
-| Negative index | `§Q (>= index 0)` | Proven safe or counterexample |
-| Out of bounds | `§Q (< index len)` | Proven safe or counterexample |
-| Invalid range | `§S (>= result 0)` | Postcondition verified |
-| Integer overflow | `§S (< result MAX_INT)` | Arithmetic bounds checked |
+| Division by zero | `§Q (!= divisor 0)` | `proven`/`refuted` when modeled; otherwise a non-proven status |
+| Negative index | `§Q (>= index 0)` | `proven`/`refuted` when modeled; otherwise a non-proven status |
+| Out of bounds | `§Q (< index len)` | Array facts are conservatively `assumed` where models diverge |
+| Invalid range | `§S (>= result 0)` | Postcondition receives one of the seven statuses |
+| Integer overflow | `§S (< result MAX_INT)` | Checked with fixed-width semantics in supported forms |
 
 ### Postcondition Verification
 
 Z3 can prove that implementations satisfy their postconditions:
 
 ```calor
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
+§F{f001:Square:pub} (i32:x) -> i32
+  §E{}
   §Q (>= x 0)
-  §S (>= result 0)         // Z3 proves: x² ≥ 0 when x ≥ 0
+  §S (>= result 0)         // Candidate for proof within the modeled subset
   §R (* x x)
 ```
 
 ```
-// PROVEN: Postcondition statically verified: (result >= 0)
+// Example outcome: PROVEN, provided the proof is non-vacuous and assumption-free
 ```
 
 ---
@@ -130,13 +131,18 @@ Z3 verification supports:
 | `(<= a b)` | `a ≤ b` | Less or equal |
 | `(> a b)` | `a > b` | Greater than |
 | `(>= a b)` | `a ≥ b` | Greater or equal |
-| `(and p q)` | `p ∧ q` | Logical and |
-| `(or p q)` | `p ∨ q` | Logical or |
-| `(not p)` | `¬p` | Logical not |
+| `(&& p q)` | `p ∧ q` | Logical and |
+| `(\|\| p q)` | `p ∨ q` | Logical or |
+| `(! p)` | `¬p` | Logical not |
 
-**Supported types:** `i32`, `i64`, `bool`
+Integers use fixed-width bit-vectors and supported C# promotion rules. Selected
+boolean, string, array, quantifier, implication, and registered user-field
+forms are also modeled.
 
-**Unsupported:** Function calls, strings, floating-point, arrays, objects
+In v0.12, string-, array-, and user-type-carried proofs are demoted to
+`assumed` where the Z3 and .NET null/length models diverge. Function calls in
+contracts, floating point, computed array bases, and forms outside the positive
+whitelist report `unsupported`.
 
 ---
 
@@ -146,10 +152,13 @@ Z3 verification supports:
 |:-------|:-------------|:-----------------|
 | When bugs found | At runtime | At compile time |
 | Verification cost | None | Compile time (cached) |
-| Runtime overhead | Always | Reduced for proven contracts |
+| Runtime overhead | Always | v0.12.1 removes eligible clean proven guards; all other guards remain |
 | Coverage | All contracts | Supported constructs |
 
-Static verification complements runtime checking—it doesn't replace it. Unproven and unsupported contracts still have runtime checks.
+Static verification complements runtime checking; it does not replace it. All
+non-proven statuses keep runtime checks. `Calor1001` loudly reports the known
+early/nested-return lowering shape where a postcondition runtime check cannot
+currently be emitted.
 
 ---
 
@@ -161,7 +170,9 @@ C# Code Contracts (2008-2015) attempted similar verification but was abandoned:
 - Developers didn't write contracts consistently
 - No integration with the language syntax
 
-Calor's advantage: when AI agents write code, they generate contracts for free. The annotation burden that killed C# Code Contracts doesn't exist.
+Calor makes contracts first-class syntax, which lets agents generate and inspect
+them as part of normal source authoring. They still require review: a solver can
+only verify the obligation that was written and modeled.
 
 ---
 
@@ -172,7 +183,7 @@ Calor's advantage: when AI agents write code, they generate contracts for free. 
 calor -i app.calr -o app.g.cs --verify
 
 # Custom timeout (default: 5 seconds per contract)
-calor -i app.calr -o app.g.cs --verify --verification-timeout 10
+calor -i app.calr -o app.g.cs --verify --verification-timeout 10000
 
 # Skip caching (for debugging)
 calor -i app.calr -o app.g.cs --verify --no-cache
@@ -182,4 +193,5 @@ calor -i app.calr -o app.g.cs --verify --no-cache
 
 ## Next
 
-- [Effect Soundness](/benchmarking/metrics/effect-soundness/) - Verifying declared effects match actual behavior
+- [Effect Soundness](/docs/benchmarking/metrics/effect-soundness/) - Verifying declared effects match actual behavior
+- [Verification Guarantees](/docs/guides/verification-guarantees/) - Soundness boundaries and runtime-check rules

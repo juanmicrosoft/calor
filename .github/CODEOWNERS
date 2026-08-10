@@ -5,4 +5,6 @@
 **/*.cs @juanmicrosoft
 /scripts/check-calor-first-diff.sh @juanmicrosoft
 /scripts/check-calor-first-diff-tests.sh @juanmicrosoft
+/scripts/check-d-s1.5-fixtures.sh @juanmicrosoft
+/bench/phase0-agent-native/fixtures/d-s1.5/ @juanmicrosoft
 /.github/workflows/test.yml @juanmicrosoft

@@ -17,7 +17,7 @@ export function WhatsNewBanner() {
           <p className="text-center">
             <span className="font-semibold text-calor-cerulean">v0.12.1</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The soundness release of v0.12.0 is now actually installable. Both publish channels were broken — the extension had failed to publish for three consecutive releases — so <code>calor</code> is back on NuGet and the VS Code extension is back on the marketplace. Along the way: the shipped Z3 wrapper is now upstream&apos;s Release build rather than a Debug artifact, it loads on ARM64 again, and CI exercises both release-only paths so neither failure can reach release day unseen.</span>
+            <span className="text-foreground">The v0.12.0 soundness feature set is now installable from NuGet through v0.12.1. The VS Code Marketplace is still at v0.3.8 after the v0.12.1 publish hit an expired token; current extension packages build successfully but have not been published. Z3 packaging and ARM64 loading were also repaired.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"

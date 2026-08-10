@@ -49,7 +49,13 @@ calor convert MyService.cs --benchmark
 | `--output` | `-o` | Auto-detected | Output file path |
 | `--benchmark` | `-b` | `false` | Include benchmark metrics comparison |
 | `--verbose` | `-v` | `false` | Enable verbose output |
+| `--explain` | `-e` | `false` | Explain unsupported features in detail |
+| `--no-fallback` | — | `false` | Fail on unsupported constructs instead of emitting fallback TODOs |
+| `--validate` | — | `false` | Parse generated Calor before writing and report errors |
+| `--passthrough` | — | `false` | Preserve unconvertible C# members as `§CSHARP` interop blocks |
+| `--timeout` | `-t` | `0` | Conversion timeout in seconds; 0 disables it |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). |
+| `--format` | — | `text` | `text` or schema 2.0 `json`; there is no `-f` alias |
 
 ---
 
@@ -66,11 +72,22 @@ If `--output` is not specified:
 
 ## Supported Constructs
 
+The converter validates generated C# before claiming a fully successful
+conversion. It reports semantic losses with `file:line` locations and exposes
+the same list as `data.lossCount` and `data.losses[]` in JSON. Unknown
+operators, patterns, compound assignments, namespace handling, and local
+functions no longer silently substitute a different construct.
+
+When native conversion is impossible, the containing member is preserved as a
+`§CSHARP` interop block and counted. `--passthrough` broadens that preservation
+path. "Conversion successful" is printed only when there are no recorded
+losses and requested validation passed.
+
 | C# Construct | Calor Equivalent |
 |:-------------|:----------------|
 | `namespace` | `§M{id:Name}` module |
 | `class` | `§CL{id:Name:vis}` class |
-| `method` | `§F{id:Name:vis}` function |
+| class `method` | `§MT{id:Name:vis}` method |
 | `property` | `§PROP{id:Name:vis:type}` property |
 | `field` | `§FLD{id:type:name}` field |
 | `if/else if/else` | `§IF{id}` / `§EI` / `§EL` branches (end at dedent) |
@@ -87,17 +104,9 @@ Use `--benchmark` to see how the Calor version compares to C#:
 calor convert PaymentService.cs --benchmark
 ```
 
-Output:
-```
-Benchmark Comparison:
-┌─────────────────┬────────┬────────┬──────────┐
-│ Metric          │ C#     │ Calor   │ Savings  │
-├─────────────────┼────────┼────────┼──────────┤
-│ Tokens          │ 1,245  │ 842    │ 32.4%    │
-│ Lines           │ 156    │ 98     │ 37.2%    │
-│ Characters      │ 4,521  │ 2,891  │ 36.1%    │
-└─────────────────┴────────┴────────┴──────────┘
-```
+This is a local source-pair comparison, not the published 217-program v0.12
+dashboard. Keep its metric output with the conversion report rather than
+assuming it reproduces the website headline.
 
 ---
 
@@ -105,14 +114,13 @@ Benchmark Comparison:
 
 | Code | Meaning |
 |:-----|:--------|
-| `0` | Conversion successful |
-| `1` | Conversion completed with warnings |
-| `2` | Error - file not found, parse error, etc. |
+| `0` | Conversion completed; inspect the loss report to distinguish fully native from preserved interop |
+| `1` | Missing input, unsupported route without fallback, timeout, or conversion failure |
 
 ---
 
 ## See Also
 
-- [calor migrate](/cli/migrate/) - Convert entire projects
-- [calor analyze](/cli/analyze/) - Find best conversion candidates
-- [calor benchmark](/cli/benchmark/) - Detailed metrics comparison
+- [calor migrate](/docs/cli/migrate/) - Convert entire projects
+- [calor assess](/docs/cli/analyze/) - Find best conversion candidates
+- [calor benchmark](/docs/cli/benchmark/) - Detailed metrics comparison

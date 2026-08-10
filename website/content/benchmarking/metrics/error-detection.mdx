@@ -6,7 +6,7 @@ order: 4
 
 
 **Category:** Error Detection
-**Result:** Calor wins (1.45x)
+**v0.12 result:** Calor wins (1.49x across 217 programs)
 **What it measures:** Bug identification and contract violation detection
 
 ---
@@ -218,7 +218,9 @@ public static Result<int, string> SafeDivide(int a, int b)
 
 ## Interpretation
 
-The 1.45x advantage indicates that Calor's first-class contracts provide substantially better bug detection signals.
+The v0.12 aggregate is 1.49x. It shows that the calculator finds more explicit
+bug-detection signals in the paired Calor corpus; it does not by itself prove a
+1.49x reduction in production defects.
 
 The advantage is highest when:
 - Functions have explicit preconditions and postconditions
@@ -229,4 +231,4 @@ The advantage is highest when:
 
 ## Next
 
-- [Edit Precision](/benchmarking/metrics/edit-precision/) - How IDs enable precise changes
+- [Edit Precision](/docs/benchmarking/metrics/edit-precision/) - How IDs enable precise changes

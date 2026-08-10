@@ -1,0 +1,32 @@
+---
+title: "fix"
+section: "cli"
+order: 18
+description: "Apply reversible mechanical source migrations"
+---
+
+```bash
+calor fix <root> <operation-option> [options]
+```
+
+Exactly one operation is required:
+
+| Operation | Rewrite |
+|:----------|:--------|
+| `--heal-closers` | Delete removed structural closers such as `§/F` and `§/M` while leaving strings and comments untouched |
+| `--elide-call-closers` | Elide `§/C` for safe zero- and one-argument same-line calls |
+| `--compact-ids` | Convert legacy 26-character ULID payloads to compact IDs with collision detection |
+| `--drop-structural-ids` | Historical intermediate migration that removes IDs from old closer tags |
+
+```bash
+calor fix src/ --heal-closers --dry-run
+calor fix src/ --heal-closers --log .calor/closers.json
+calor fix src/ --heal-closers --revert --log .calor/closers.json
+```
+
+`--dry-run` (`-n`) reports changes without writing. `--log` records removed
+UTF-8 byte ranges, and `--revert` restores the original bytes. `--format json`
+(`-f`) emits a schema 2.0 envelope.
+
+Use this command—not format or lint—to heal structural closer syntax, because
+those tools must parse the file and `Calor0830` rejects the closer first.

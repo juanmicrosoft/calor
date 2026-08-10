@@ -1,0 +1,67 @@
+---
+title: "String Operations"
+section: "syntax-reference"
+order: 11
+---
+
+Calor string operations use the same prefix notation as other expressions and
+emit the corresponding .NET operations.
+
+## Core Operations
+
+| Operation | Syntax | C# equivalent |
+|:----------|:-------|:--------------|
+| Length | `(len s)` | `s.Length` |
+| Case | `(upper s)`, `(lower s)` | `s.ToUpper()`, `s.ToLower()` |
+| Trim | `(trim s)` | `s.Trim()` |
+| Search | `(contains s sub)`, `(starts s prefix)`, `(ends s suffix)` | Matching string methods |
+| Index | `(indexof s sub)` | `s.IndexOf(sub)` |
+| Slice | `(substr s start len)` | `s.Substring(start, len)` |
+| Replace | `(replace s old new)` | `s.Replace(old, new)` |
+| Concatenate | `(concat a b)` | `a + b` |
+| Equality | `(equals a b)` | `a.Equals(b)` |
+
+```calor
+§B{length:i32} (len "hello")
+§B{found:bool} (contains "hello world" "world")
+§B{sub:str} (substr "hello" 1 3)
+```
+
+## Comparison Modes
+
+`contains`, `starts`, `ends`, `indexof`, and `equals` accept an optional mode:
+
+| Mode | .NET comparison |
+|:-----|:----------------|
+| `:ordinal` | `StringComparison.Ordinal` |
+| `:ignore-case` | `StringComparison.OrdinalIgnoreCase` |
+| `:invariant` | `StringComparison.InvariantCulture` |
+| `:invariant-ignore-case` | `StringComparison.InvariantCultureIgnoreCase` |
+
+Omitting a mode is not uniform in .NET. `contains` and instance `equals` are
+ordinal, while `starts`, `ends`, and `indexof` use the current culture. Specify
+`:ordinal` when culture-independent runtime behavior is required.
+
+### v0.12 verification boundary
+
+The verifier refuses non-ordinal comparison modes. It also refuses bare
+`starts`, `ends`, and `indexof`, because those overloads are culture-sensitive.
+Those obligations are `unsupported`, and their runtime checks remain.
+
+Even ordinal string obligations cannot produce an elision-authorizing proof in
+v0.12. Z3 strings are null-free and measure UTF-8 units, while .NET strings are
+nullable references whose `Length` counts UTF-16 code units. Any otherwise
+modeled proof that depends on the Z3 string sort is therefore demoted to
+`assumed`, and the runtime check remains. See [verification guarantees](/docs/guides/verification-guarantees/).
+
+## Regex, Character, and StringBuilder Operations
+
+- Regex: `regex-test`, `regex-match`, `regex-replace`, `regex-split`
+- Character access and classification: `char-at`, `char-code`,
+  `char-from-code`, `is-letter`, `is-digit`, `is-whitespace`, `is-upper`,
+  `is-lower`, `char-upper`, `char-lower`
+- StringBuilder: `sb-new`, `sb-append`, `sb-appendline`, `sb-insert`,
+  `sb-remove`, `sb-clear`, `sb-tostring`, `sb-length`
+
+Backslashes in regex patterns must be escaped in Calor strings, so regex `\d`
+is written as `"\\d"`.

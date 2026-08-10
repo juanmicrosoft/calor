@@ -45,10 +45,10 @@ The init command also configures an **MCP (Model Context Protocol) server** that
 When you open the project in Claude Code, the MCP server starts automatically. Claude can then use tools like:
 
 ```
-calor_typecheck     - Check for type errors
+calor_check         - Diagnose, lint, type check, or validate
 calor_verify        - Verify function contracts
-calor_goto_definition - Navigate to symbol definitions
-calor_find_references - Find all usages of a symbol
+calor_navigate      - Definitions, references, symbols, and scope
+calor_structure     - Outlines, call graphs, and impact
 ```
 
 ### Example: Contract Verification
@@ -62,26 +62,26 @@ You: Does this function have any contract violations?
   §I{i32:a}
   §I{i32:b}
   §O{i32}
+  §E{}
   §Q (!= b 0)
   §R (/ a b)
 
-Claude: [Uses calor_verify_contracts tool]
-The precondition §Q (!= b 0) is proven correct by Z3.
-This ensures division by zero cannot occur.
+Claude: [Uses calor_verify]
+The precondition is satisfiable and excludes b = 0 for valid callers.
+It is assumed while verifying the body; the runtime precondition check remains.
 ```
 
 ### Available Tools
 
 | Tool | Purpose |
 |:-----|:--------|
-| `calor_typecheck` | Semantic type checking with error categorization |
-| `calor_verify_contracts` | Z3-based contract verification |
-| `calor_goto_definition` | Navigate to symbol definitions |
-| `calor_find_references` | Find all usages of a symbol |
-| `calor_document_outline` | Get file structure |
+| `calor_check` | Diagnose, lint, type check, or validate a snippet via `action` |
+| `calor_verify` | Seven-status Z3 contract verification |
+| `calor_navigate` | Definition, reference, symbol, type, and scope actions |
+| `calor_structure` | Outline, call graph, and impact actions |
 | `calor_analyze` | Advanced bug detection |
 
-See [calor mcp](/cli/mcp/) for the complete list of 19 available tools.
+See [calor mcp](/docs/cli/mcp/) for the complete 18-tool surface.
 
 ---
 
@@ -222,7 +222,7 @@ Calor code:
       // ...
 ```
 
-Every scope has explicit open and close tags with matching IDs. No ambiguity.
+Every scope begins with an explicit, stable ID and ends when indentation returns to the parent level. Structural closer tags are intentionally rejected.
 
 ### 2. Precise Edit Targeting
 
@@ -395,7 +395,7 @@ In PaymentService.calr:
 
 ## Next Steps
 
-- [Syntax Reference](/syntax-reference/) - Complete language reference
-- [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/) - Migration guide
-- [calor init](/cli/init/) - Full init command documentation
-- [Benchmarking](/benchmarking/) - See how Calor compares to C#
+- [Syntax Reference](/docs/syntax-reference/) - Complete language reference
+- [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/) - Migration guide
+- [calor init](/docs/cli/init/) - Full init command documentation
+- [Benchmarking](/docs/benchmarking/) - See how Calor compares to C#

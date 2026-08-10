@@ -80,6 +80,11 @@ public class Program
             aliases: ["--verify"],
             description: "Enable static contract verification with Z3 SMT solver");
 
+        var elideProvenGuardsOption = new Option<bool>(
+            aliases: ["--elide-proven-guards"],
+            description: "Opt in to deleting runtime contract guards on Proven verdicts (v0.13 flips the old default: verification is diagnostic unless this is set)",
+            getDefaultValue: () => false);
+
         var cacheOption = new Option<bool>(
             aliases: ["--cache"],
             description: "Enable the incremental-build cache (.calor-build-state.json next to the outputs): unchanged files are skipped and report 'Up-to-date (cached)'. Opt-in for plain compiles; 'calor watch' always caches.");
@@ -157,6 +162,7 @@ public class Program
             permissiveEffectsOption,
             contractModeOption,
             verifyOption,
+            elideProvenGuardsOption,
             cacheOption,
             noCacheOption,
             clearCacheOption,
@@ -199,6 +205,7 @@ public class Program
             var permissiveEffects = ctx.ParseResult.GetValueForOption(permissiveEffectsOption);
             var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
             var verify = ctx.ParseResult.GetValueForOption(verifyOption);
+            var elideProvenGuards = ctx.ParseResult.GetValueForOption(elideProvenGuardsOption);
             var cache = ctx.ParseResult.GetValueForOption(cacheOption);
             var noCache = ctx.ParseResult.GetValueForOption(noCacheOption);
             var clearCache = ctx.ParseResult.GetValueForOption(clearCacheOption);
@@ -230,7 +237,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format);
+                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards);
             }
             catch (Exception ex)
             {
@@ -305,10 +312,10 @@ public class Program
         return result;
     }
 
-    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text")
-        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format));
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = false)
+        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards));
 
-    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text")
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = false)
     {
         // Structured diagnostic output (--format json|sarif): diagnostics are
         // aggregated across files and serialized once through the shared
@@ -317,6 +324,13 @@ public class Program
         var structuredOutput = !format.Equals("text", StringComparison.OrdinalIgnoreCase);
         var diagnosticSink = structuredOutput ? new DiagnosticBag() : null;
         var declarationIds = structuredOutput ? new Ids.DeclarationIdResolver() : null;
+
+        if (elideProvenGuards && !verify)
+        {
+            Console.Error.WriteLine(
+                "warning: --elide-proven-guards has no effect without --verify " +
+                "(there are no verification verdicts to elide on).");
+        }
         var structuredEmitted = false;
 
         // In structured mode a JSON/SARIF document is ALWAYS emitted to stdout,
@@ -428,6 +442,7 @@ public class Program
                         UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
                         ContractMode = parsedContractMode,
                         VerifyContracts = verify,
+                        ElideProvenGuards = elideProvenGuards,
                         ProjectDirectory = Path.GetDirectoryName(file.FullName),
                         VerificationCacheOptions = cacheOptions,
                         VerificationTimeoutMs = (uint)verificationTimeout,
@@ -875,6 +890,7 @@ public class Program
             var verificationOptions = new VerificationOptions
             {
                 Verbose = options.Verbose,
+                ElideProvenGuards = options.ElideProvenGuards,
                 TimeoutMs = options.VerificationTimeoutMs,
                 CacheOptions = options.VerificationCacheOptions ?? VerificationCacheOptions.Default,
                 CancellationToken = options.CancellationToken
@@ -917,7 +933,10 @@ public class Program
 
         // Code generation
         phaseSw.Restart();
-        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult, options.ObligationResults, diagnostics);
+        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult, options.ObligationResults, diagnostics)
+        {
+            ElideProvenGuards = options.ElideProvenGuards
+        };
         emitter.CrossModuleFunctionModules = options.CrossModuleFunctionModules;
         if (options.EmitLineDirectives && !string.IsNullOrEmpty(filePath))
         {
@@ -1066,6 +1085,15 @@ public sealed class CompilationOptions
     /// Enable static contract verification with Z3 SMT solver.
     /// </summary>
     public bool VerifyContracts { get; init; }
+
+    /// <summary>
+    /// Opt IN to deleting runtime contract guards on a Proven verdict (roadmap v0.13
+    /// §2.1: elision is opt-in; verification is diagnostic by default). Off, a Proven
+    /// postcondition or Discharged §PROOF obligation keeps its runtime check — the
+    /// verdict is reported, never silently acted on. The zero-mismatch differential
+    /// gate (freeze registration F-4) is the bar for flipping this default back on.
+    /// </summary>
+    public bool ElideProvenGuards { get; init; }
 
     /// <summary>
     /// Options for verification result caching.

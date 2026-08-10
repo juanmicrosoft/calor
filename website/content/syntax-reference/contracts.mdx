@@ -7,6 +7,12 @@ order: 5
 
 Contracts are first-class citizens in Calor. They define what a function requires (preconditions) and guarantees (postconditions).
 
+Contract verification has seven explicit outcomes: `proven`, `refuted`,
+`assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`. Verification
+in released v0.12.1 automatically removes an eligible runtime guard only for a
+clean, non-vacuous, assumption-free `proven` postcondition. `assumed` and every
+inconclusive status always keep the guard.
+
 ---
 
 ## Preconditions (`§Q`)
@@ -221,13 +227,19 @@ Recommended order in function definition:
 
 ## See Also: Refinement Types
 
-Contracts define what a function requires and guarantees. **Refinement types** extend this idea to the type level — instead of writing `§Q (>= x 0)` at the function, you declare `§I{i32:x} | (>= # INT:0)` on the parameter itself. The constraint becomes part of the type, and the obligation engine verifies it automatically.
+Contracts define what a function requires and guarantees. **Refinement types**
+extend this idea to the type level — instead of writing `§Q (>= x 0)` at the
+function, you declare `§I{i32:x} | (>= # INT:0)` on the parameter itself. The
+constraint becomes part of the type and the obligation engine analyzes it.
+Refinement obligations are compile-time analysis only; they do not emit runtime
+guards.
 
-- [Refinement Types](/syntax-reference/refinement-types/) — Type-level constraints with `§RTYPE`, inline `|`, and `§PROOF`
-- [Dependent Types Tutorial](/guides/dependent-types-tutorial/) — Progressive walkthrough
+- [Verification guarantees and limits](/docs/guides/verification-guarantees/) — The v0.12 proof boundary and runtime-check rules
+- [Refinement Types](/docs/syntax-reference/refinement-types/) — Type-level constraints with `§RTYPE`, inline `|`, and `§PROOF`
+- [Dependent Types Tutorial](/docs/guides/dependent-types-tutorial/) — Progressive walkthrough
 
 ---
 
 ## Next
 
-- [Effects](/syntax-reference/effects/) - Declaring side effects
+- [Effects](/docs/syntax-reference/effects/) - Declaring side effects

@@ -15,12 +15,12 @@ const comparisons = [
       },
       {
         feature: 'References',
-        calor: 'Unique IDs (f001, m001)',
+        calor: 'Optional stable IDs (f001, m001)',
         others: 'Line numbers, fragile paths',
       },
       {
         feature: 'Scope Boundaries',
-        calor: 'Matched open/close tags',
+        calor: 'Indentation-defined blocks',
         others: 'Braces, indentation rules',
       },
       {
@@ -62,7 +62,7 @@ const comparisons = [
     rows: [
       {
         feature: 'Modern Ecosystem',
-        calor: '.NET, NuGet, full interop',
+        calor: '.NET and NuGet through generated C# and explicit interop',
         others: 'Limited package ecosystem',
       },
       {
@@ -72,7 +72,7 @@ const comparisons = [
       },
       {
         feature: 'AI Optimization',
-        calor: 'Unique IDs, explicit structure',
+        calor: 'Optional stable IDs, explicit structure',
         others: 'Human-readable syntax only',
       },
       {
@@ -88,12 +88,12 @@ const comparisons = [
     rows: [
       {
         feature: 'Primary Purpose',
-        calor: 'Verified software engineering',
+        calor: 'Contract-checked .NET software',
         others: 'Mathematical theorem proving',
       },
       {
         feature: 'Developer Effort',
-        calor: 'Write contracts, Z3 verifies automatically',
+        calor: 'Write contracts; Z3 classifies supported obligations',
         others: 'Write proofs (tactics, lemmas, induction)',
       },
       {
@@ -103,7 +103,7 @@ const comparisons = [
       },
       {
         feature: 'When Verification Fails',
-        calor: 'Falls back to runtime check (safe)',
+        calor: 'Keeps runtime checks when lowering is supported',
         others: 'Blocks compilation until proof complete',
       },
       {
@@ -119,12 +119,12 @@ const comparisons = [
     rows: [
       {
         feature: 'Output Guarantee',
-        calor: 'Syntactically and semantically correct',
+        calor: 'Syntax plus explicit semantic checks',
         others: 'Syntactically correct only',
       },
       {
         feature: 'Contract Verification',
-        calor: 'Z3 proves contracts at compile time',
+        calor: 'Z3 proves supported obligations',
         others: 'No contract awareness',
       },
       {
@@ -134,12 +134,12 @@ const comparisons = [
       },
       {
         feature: 'Division by Zero',
-        calor: 'Caught at compile time via §Q',
+        calor: 'Expressed via §Q; checked or verified',
         others: 'Runtime crash',
       },
       {
         feature: 'Invariant Violations',
-        calor: 'Counterexample from Z3',
+        calor: 'Counterexample when Z3 refutes the obligation',
         others: 'Silent bug in production',
       },
     ],

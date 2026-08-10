@@ -1,0 +1,100 @@
+---
+title: "Verification Guarantees and Limits"
+section: "guides"
+order: 2
+description: "How to interpret v0.12.1 verification results and guard elision safely"
+---
+
+Calor verifies individual contract obligations under a positive, enumerated
+model of .NET behavior. It does not claim whole-program correctness, and the
+number of soundness gaps that have not yet been found is not knowable.
+
+## The Seven Statuses
+
+| Status | What it says | Eligible for opt-in runtime postcondition guard removal? |
+|:-------|:-------------|:---------------------------------------------------------|
+| `proven` | The obligation holds under the modeled semantics | Only when non-vacuous and assumption-free |
+| `refuted` | A violation exists | No; a counterexample is included when available |
+| `assumed` | The result depends on named modeling assumptions | Never |
+| `unknown` | Z3 could not decide | Never |
+| `timeout` | The solver exceeded its budget | Never |
+| `unsupported` | Translation or runtime semantics are outside the model | Never |
+| `unavailable` | No solver was available | Never |
+
+Preconditions are never elided from satisfiability results. A vacuous proof is
+reported with a flag and also keeps its runtime check.
+
+In released v0.12.1, compiling with `--verify` automatically removes an
+eligible runtime guard after a clean, non-vacuous, assumption-free proof.
+`assumed` and all inconclusive outcomes keep their guards.
+
+## What Changed in v0.12
+
+v0.12 closed a class of false `proven` results by changing the mechanism: if a
+proof is carried by a Z3 sort that is total where the .NET value may be null,
+the result is `assumed`, not `proven`.
+
+### Strings
+
+Proofs touching Z3 string theory are `assumed`. Two semantic differences make
+elision unsafe today:
+
+- Z3 strings have no null value; .NET `string` references may be null.
+- Z3 counts UTF-8 bytes; .NET `string.Length` counts UTF-16 code units.
+
+Non-ordinal comparison modes are `unsupported`. Mode-less `StartsWith`,
+`EndsWith`, and `IndexOf` are also refused because their .NET overloads use the
+current culture. State `StringComparison.Ordinal` when that is the intended
+semantics.
+
+### Arrays and User Types
+
+Array and user-type sorts are total in Z3 but nullable references in .NET.
+Postcondition proofs for signatures naming those types are therefore
+`assumed`, even when a particular postcondition mentions only `result`. This is
+intentionally conservative: it costs an optimization instead of deleting a
+runtime check on a false proof.
+
+### Arithmetic and Expressions
+
+- Division and remainder add divisor and signed-overflow side conditions. A
+  proof that needs them is `assumed`; some conditionally evaluated positions
+  are `unsupported`.
+- Narrow integer arithmetic is refused where C# promotion would diverge from
+  the solver model.
+- Shift counts are masked as C# masks them.
+- Unregistered user fields and unmodeled contract calls are `unsupported`, not
+  guessed.
+
+## Runtime Lowering Is a Separate Boundary
+
+A sound static proof and correct runtime-check placement are different
+problems. v0.12 fixed a quantified-contract lowering bug that had discarded
+part of an implication. Bodies with early, nested, or raw-C# returns remain a
+known stopgap: the emitter reports `Calor1001` and does not emit postcondition
+runtime checks for that body shape. It fails loudly rather than placing a check
+incorrectly.
+
+## Type and Effect Defaults
+
+Type checking is on by default in v0.12. Use `--no-type-check` on the root
+build command, `CALOR_NO_TYPE_CHECK=1` on other entry points, or
+`CalorTypeCheck=false` in MSBuild only as explicit migration opt-outs.
+
+Effect enforcement is also on by default. Interop assumptions propagate,
+delegate calls fail loud, and override/interface effect variance is checked.
+`--no-enforce-effects` disables the gate; `--permissive-effects` assumes unknown
+calls are pure and therefore voids the guarantee.
+
+## Review Checklist
+
+1. In v0.12.1, remember that `--verify` automatically elides eligible guards.
+2. Treat only a non-vacuous, assumption-free `proven` as eligible for elision.
+3. Read every named assumption on `assumed` results.
+4. Keep `unsupported`, `unknown`, `timeout`, and `unavailable` distinct; their
+   remedies differ.
+5. Check for `Calor1001` before relying on postcondition runtime enforcement.
+6. Record any effect or contract waiver in review.
+
+Use [calor verify](/docs/cli/verify/) for raw results and
+[calor review-packet](/docs/cli/review-packet/) for a change-oriented report.

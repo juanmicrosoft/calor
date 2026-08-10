@@ -28,6 +28,18 @@ A packaging release. **v0.12.0 was tagged but never installable** — both publi
 
 The soundness release. **This entry covers the v0.11 range as well** — there is no `v0.11.0` tag; the maintainer folded v0.11 forward, so everything below ships together.
 
+### Benchmark and release gates
+
+- **217-program micro-benchmark:** overall 1.32x Calor/C#, with Calor ahead in
+  seven of eight metrics. Comprehension is 1.84x, error detection 1.49x, token
+  economics 1.42x, and information density 0.98x (C# wins).
+- **Statistics caveat:** all 30 runs are identical deterministic static
+  analyses. Zero-width confidence intervals and the reported p-values describe
+  no run-to-run variance; they do not measure uncertainty over the corpus.
+- **These numbers are not the release gates.** PP-A1 passed all nine adoption
+  items. PP-W5 recorded a 1.0016 point estimate as "no large tax detected",
+  explicitly not a proof of parity.
+
 Six distinct false-proof vectors were closed — cases where a proof deleted a runtime check that would have failed. Enumerated so the count is checkable: (1) **D4** non-ordinal string comparison modes; (2) **D4** bare `StartsWith`/`EndsWith`/`IndexOf`, which use the *current culture* in .NET and so diverge with no mode argument present to signal it; (3) **D3**, Z3 strings are null-free; (4) **D12**, Z3 models strings as UTF-8 bytes where .NET counts UTF-16 units; (5) **D14**, array and user-type sorts are total and non-null; (6) the third `$length` mint site, which the D14 fix's own first cut missed.
 
 Items (1), (2), (3), (4) and the array half of (5) carry a recorded `calor run` versus `calor run --verify` reproduction. Only the user-type half of (5) rests on inspection of the encoding; item (6) is not reachable from `--verify` at all — it served a false proof to agents through the MCP refine tool, which is how it surfaced. That is six closures, not six review rounds, and the number of vectors *still unfound* is not knowable and is not claimed to be zero.
@@ -39,14 +51,37 @@ What closed the class was a change of mechanism, not a better enumeration. Hand-
 - **`calor review-packet`** leads with the unproven remainder: seven-status counts, assumption lists, vacuity flags, counterexamples, and per-module interop/waiver fractions with waiver disclosure on the first line.
 - **Adoption playbook and a tested eject path** — an 11-test suite that compiles *and executes* ejected C# to pin exactly what survives leaving Calor.
 - **Effect soundness (WS-W2).** Invoking a delegate held in a value is now an error rather than an assumed-pure no-op; effect variance is checked on both the override and interface legs; interop is `Assumed` and propagates transitively; the known-pure list no longer contains mutators; and both silent `=> Empty` catch-alls are replaced by exhaustive switches. `--enforce-effects` defaults on.
+- **A self-contained `Calor.Sdk` package.** The SDK carries its build task,
+  compiler/runtime dependency closure, and per-RID Z3 natives. CI installs the
+  packed SDK into a project with no project references and requires a real Z3
+  counterexample from the MSBuild task.
+- **Telemetry is opt-in and metadata-only.** Default invocations send nothing.
+  Enabled telemetry excludes source, paths, diagnostic/exception text, stack
+  traces, hostnames, help queries, and content hashes.
 
 ### Changed
 - **Postcondition elision is withdrawn for any signature naming an array or a non-primitive type.** Z3's array and user-type sorts are total and non-null; .NET's are nullable references. Coarse on purpose — being wrong in the narrow direction deletes a runtime check, being wrong in the broad direction costs an optimization. Contract *proving* and reporting are unchanged.
 - **The type checker is on by default**, which required first fixing the checker: turning it on produced **92 test failures**, every one of them a working program the checker refused. They trace to roughly eight defect classes — `char` alone accounts for 37 of the 92 — covering `object`, `decimal`, every sized integer, arrays, string concatenation and static member access. `--no-type-check` opts out on `build`; `CALOR_NO_TYPE_CHECK=1` opts out everywhere, including `run`, `test`, `watch` and the MSBuild task inside the SDK.
 - **Conversion no longer substitutes silently.** Unknown operators, patterns, and compound assignments escalate to loud interop blocks instead of quietly becoming something else.
+- **Conversion success is loss-aware.** Generated output is compile-validated;
+  the success line appears only for zero-loss output, while text and JSON name
+  every semantic loss and preserved interop member.
+
+### Fixed
+
+- A quantified-contract lowering bug that discarded implication antecedents
+  was fixed before release. It demonstrated that encoding soundness and runtime
+  lowering soundness are separate surfaces.
+- Direct self-recursion no longer fails as an unknown effect target.
+- `calor_refine` no longer reports success after a failed compile.
+- Z3-backed CI tests can no longer silently turn green by skipping when the
+  native solver is unavailable.
+- The VS Code package now includes `vscode-languageclient`, fixing its
+  long-standing activation defect. The Marketplace publish itself did not
+  succeed; the listing remains at v0.3.8.
 
 ### Known limitations shipping with this release
-All pre-existing rather than regressions: `§MT` contract violations report the wrong function id; a contract call carrying a keyword argument crashes the translator instead of diagnosing it; `str` is not yet non-nullable at the binder, which is what would let the string demotion be lifted.
+All pre-existing rather than regressions: `§MT` contract violations report the wrong function id; a contract call carrying a keyword argument crashes the translator instead of diagnosing it; `str` is not yet non-nullable at the binder, which is what would let the string demotion be lifted; and IL-analysis inputs are not all included in the MSBuild task's warm-cache options hash.
 
 ## [0.10.0] - 2026-07-30
 
@@ -166,7 +201,7 @@ The agent dev-loop release: Phase 1 of the agent-native strategy complete — si
 - **The `TokenEconomics` benchmark metric now reports the composite it computes (the discarded-composite bug, [#668](https://github.com/juanmicrosoft/calor/issues/668)).** The calculator computed a composite advantage — the geometric mean of the token, character, and line ratios — and then *discarded it*, reporting the raw token-count ratio only despite the metric being named `CompositeTokenEconomics`. The category now reports the composite. The metric is deterministic, so its 95% CI equals its point estimate. This lifts the headline numbers — TokenEconomics from `1.11×` (token-only) to `1.42×` (composite) and overall from `1.28×` to `1.32×` — purely as a **measurement correction, not a Calor improvement**. The honest caveat stands: Calor still uses *more raw tokens* than C# on small programs (the `§`-sigil premium), but is more compact once character and line counts are included.
 
 ### Changed
-- **The deferred v0.7 `TokenEconomics` gate was recalibrated against the corrected metric.** The old token-only target (`lower-95%-CI > 1.122`) is superseded by a composite gate of **≥ 1.40×**, anchored to the measured 1.42× baseline. The public [Token Economics metric page](/benchmarking/metrics/token-economics/) was corrected — it had previously and incorrectly reported the category as "C# wins".
+- **The deferred v0.7 `TokenEconomics` gate was recalibrated against the corrected metric.** The old token-only target (`lower-95%-CI > 1.122`) is superseded by a composite gate of **≥ 1.40×**, anchored to the measured 1.42× baseline. The public [Token Economics metric page](/docs/benchmarking/metrics/token-economics/) was corrected — it had previously and incorrectly reported the category as "C# wins".
 
 ## [0.6.4] - 2026-06-16
 
@@ -227,7 +262,7 @@ The agent dev-loop release: Phase 1 of the agent-native strategy complete — si
 
 ### Fixed
 - **Parser: `§C` standard form no longer swallows trailing `Dedent`.** Previously, a zero-arg `§C` immediately followed by the end of its enclosing block could corrupt the structural parse of the surrounding method or `§IF` body. Now correctly distinguished from indent-aware block terminators.
-- **Parser: `§C` no longer absorbs a same-column sibling structural opener on the next line.** A sibling `§IF` / `§MATCH` / `§NEW` on the next line at the same indent is no longer silently absorbed as the call's inline argument. Both `ParseCallExpression` and `ParseCallStatement` now gate the inline-arg form on the candidate argument starting on the *same source line* as `§C{target}`. See [Calls reference](/syntax-reference/calls/) rule 6.
+- **Parser: `§C` no longer absorbs a same-column sibling structural opener on the next line.** A sibling `§IF` / `§MATCH` / `§NEW` on the next line at the same indent is no longer silently absorbed as the call's inline argument. Both `ParseCallExpression` and `ParseCallStatement` now gate the inline-arg form on the candidate argument starting on the *same source line* as `§C{target}`. See [Calls reference](/docs/syntax-reference/calls/) rule 6.
 - **Emitter: zero-arg `§C` inside an inline-sibling context now keeps explicit `§/C`.** With the new default, naively eliding `§/C` from a zero-arg call emitted inside another call's `§A` chain or inside an array/`§ARR`/`§ROW`/`§SALLOC`/`§IDX2D` initializer caused silent AST corruption (e.g. `M(A(), 2)` round-tripping as `M(A(2))`). The emitter now tracks an inline-sibling-context counter; zero-arg `§/C` elision is suppressed whenever a call is emitted inside such a context. Top-level / leaf-position calls (binding initializers, return values) still elide as before.
 - **Parser: `§C` statement form now supports zero-arg implicit close before sibling statements.** Previously a zero-arg `§C{target}` followed by a sibling statement on the next line at the same indent reported `Calor0100`. The statement-form parser now recognizes the zero-arg implicit close when the current token is not `§A`, `§/C`, `Dedent`, or `Eof`.
 
@@ -236,16 +271,16 @@ The agent dev-loop release: Phase 1 of the agent-native strategy complete — si
 ## [0.6.0] - 2026-06-04
 
 ### Added
-- **`§C` call-closer elision (RFC `v0.6-call-closer-elision`).** Expression-context `§C{target}` calls may now omit the trailing `§/C` in two cases: (1) zero arguments — `§B{n} §C{items.Count}` is equivalent to `§B{n} §C{items.Count} §/C`; (2) exactly one inline argument (no `§A`) — `§B{y} §C{Math.Abs} x` is equivalent to `§B{y} §C{Math.Abs} §A x §/C`. The parser disambiguates nested elided calls (e.g., `§C{Foo.bar} §C{Baz.qux} y` ≡ `Foo.bar(Baz.qux(y))`) by counting consecutive `§/C` closers relative to enclosing `§A` depth. Trailing member access on inline arguments binds to the argument (`§C{Identity} obj?.Length` ≡ `Identity(obj?.Length)`); trailing member access on zero-arg calls binds to the call result (`§C{Maybe}?.Length` ≡ `Maybe()?.Length`). The explicit `§A` / `§/C` form continues to parse unchanged. See [Calls reference](/syntax-reference/calls/).
+- **`§C` call-closer elision (RFC `v0.6-call-closer-elision`).** Expression-context `§C{target}` calls may now omit the trailing `§/C` in two cases: (1) zero arguments — `§B{n} §C{items.Count}` is equivalent to `§B{n} §C{items.Count} §/C`; (2) exactly one inline argument (no `§A`) — `§B{y} §C{Math.Abs} x` is equivalent to `§B{y} §C{Math.Abs} §A x §/C`. The parser disambiguates nested elided calls (e.g., `§C{Foo.bar} §C{Baz.qux} y` ≡ `Foo.bar(Baz.qux(y))`) by counting consecutive `§/C` closers relative to enclosing `§A` depth. Trailing member access on inline arguments binds to the argument (`§C{Identity} obj?.Length` ≡ `Identity(obj?.Length)`); trailing member access on zero-arg calls binds to the call result (`§C{Maybe}?.Length` ≡ `Maybe()?.Length`). The explicit `§A` / `§/C` form continues to parse unchanged. See [Calls reference](/docs/syntax-reference/calls/).
 - **`Calor0150 AmbiguousCallContinuation`** — New diagnostic in the reserved `Calor0150-0159` range. Fires when an elided `§C` already consumed one inline argument and is followed by either a second expression-start token or a `§A` token. The fix message recommends the explicit form.
 - **`ConversionContext.UseImplicitCallCloser` emitter flag.** Opt-in property on `Migration/ConversionContext`. When `true`, `CalorEmitter` elides `§/C` for zero-argument calls. Default `false` for backward compatibility. One-argument elision is intentionally deferred to v0.6.1 pending context-aware tracking inside Lisp argument lists.
-- **`§B` bind-inference formalization (RFC `v0.6-bind-inference-formalization`).** The four supported `§B` forms — `§B{name}` (requires initializer), `§B{name} initializer` (inferred), `§B{name:type}` (explicit, no initializer), `§B{name:type} initializer` (explicit wins) — and the binder's shallow inference rule are now documented at [Bindings](/syntax-reference/binding/).
+- **`§B` bind-inference formalization (RFC `v0.6-bind-inference-formalization`).** The four supported `§B` forms — `§B{name}` (requires initializer), `§B{name} initializer` (inferred), `§B{name:type}` (explicit, no initializer), `§B{name:type} initializer` (explicit wins) — and the binder's shallow inference rule are now documented at [Bindings](/docs/syntax-reference/binding/).
 - **`Calor0250 BindRequiresTypeOrInitializer`** — `§B{name}` with no `:type` and no initializer is now a hard error reported through `BindValidationPass`. Replaces the pre-v0.6 silent fallback that bound `x` as `INT` and produced wrong-typed C# with no diagnostic.
 - **`Calor0251` / `Calor0252` / `Calor0253` strict-mode bind-inference diagnostics (opt-in via `--strict-bind-inference`).** Three new diagnostics in the `Calor0250-0259` range, each silenced by an explicit `:type` annotation, scheduled to become default-on in v0.7:
   - **`Calor0251 BindCannotInferNullLiteral`** — fires on `§B{x} §NN` or `§B{x} null`.
   - **`Calor0252 BindCannotInferGenericReturn`** — fires on `§B{x} §C{Vec.empty} §/C` and other well-known generic factory targets.
   - **`Calor0253 BindAmbiguousNumeric`** — fires on `§B{x} (+ INT:0 FLOAT:0.0)` — a binary op mixing integer and floating-point literal operands.
-- **Two new syntax-reference pages** — [Bindings](/syntax-reference/binding/) and [Calls](/syntax-reference/calls/), with full disambiguation tables, examples, and diagnostic catalogues.
+- **Two new syntax-reference pages** — [Bindings](/docs/syntax-reference/binding/) and [Calls](/docs/syntax-reference/calls/), with full disambiguation tables, examples, and diagnostic catalogues.
 - **v6 compact stable identifiers (default).** `IdGenerator.Generate(IdKind)` now mints 12-char Crockford-lowercase compact IDs (`f_7k9m2npqrstv`). The legacy 26-char Crockford-uppercase ULID form (`f_01J5X7K9M2NPQRSTABWXYZ12`) remains accepted by the parser, validator, and migration tooling. Saves ~9.7 tokens per ID in agent-facing serialisations.
 - **`calor fix --compact-ids <root>`** — bulk repo-wide migrator from legacy ULID payloads to v6 compact payloads. Two-pass design with deterministic compact derivation, within-file and cross-file collision detection, and byte-exact revert via `--revert --log <file>`. Idempotent on already-migrated source.
 - **`IdValidator` accepts both compact and legacy ULID forms.** New predicates `IsCompactId`, `IsLegacyUlidId`, and `IsCanonicalId`. New `Calor0821 LegacyUlidPayload` diagnostic code reserved for the opt-in lint that flags ULID payloads.
@@ -294,12 +329,12 @@ The agent dev-loop release: Phase 1 of the agent-native strategy complete — si
 ## [0.4.9] - 2026-04-21
 
 ### Added
-- **Cross-assembly IL analysis** — Opt-in compile-time analysis that traces method calls through referenced .NET assemblies to discover effects not covered by manifests. Enabled via `<CalorEnableILAnalysis>true</CalorEnableILAnalysis>`. Handles async state machines, iterator methods, delegate creation, and virtual dispatch. See [Cross-Assembly IL Analysis guide](/guides/il-analysis/).
+- **Cross-assembly IL analysis** — Opt-in compile-time analysis that traces method calls through referenced .NET assemblies to discover effects not covered by manifests. Enabled via `<CalorEnableILAnalysis>true</CalorEnableILAnalysis>`. Handles async state machines, iterator methods, delegate creation, and virtual dispatch. See [Cross-Assembly IL Analysis guide](/docs/guides/il-analysis/).
 - **Cross-module effect propagation** — Multi-file Calor projects now verify effect contracts at file boundaries. A caller that invokes a public function declared in another module must declare that callee's effects. Violations produce `Calor0410`; public functions without `§E` produce the new `Calor0417` warning.
 - **Multi-file CLI** — `calor --input a.calr --input b.calr` compiles multiple files and runs the cross-module effect pass across them. Single-file invocations are unchanged.
 - **MSBuild cross-module enforcement** — The `CompileCalor` task runs the cross-module pass over every `.calr` in the project. Works correctly on warm builds via persistent per-module effect summaries in the build cache.
 - **Effect summary cache (schema v2.0)** — Each module's public function declarations, internal names, and call-site listings are cached alongside the content hash, so incremental builds retain complete cross-module coverage without re-parsing skipped files.
-- **[Cross-Module Effect Propagation guide](/guides/cross-module-effect-propagation/)** — Contract model, bare-name vs. qualified calls, incremental build semantics, CLI + MSBuild integration.
+- **[Cross-Module Effect Propagation guide](/docs/guides/cross-module-effect-propagation/)** — Contract model, bare-name vs. qualified calls, incremental build semantics, CLI + MSBuild integration.
 
 ### Changed
 - **`--input` option** in the `calor` CLI now accepts multiple values.
@@ -315,7 +350,7 @@ The agent dev-loop release: Phase 1 of the agent-native strategy complete — si
 - **`calor effects suggest` CLI command** — Analyzes Calor source files and generates a `.calor-effects.suggested.json` manifest template for unresolved external calls. Supports `--json` for agent consumption, `--merge` for additive updates to existing manifests.
 - **Shared `ExternalCallCollector`** — Extracted from `InteropEffectCoverageCalculator`, extended to walk class methods and constructors. Resolves variable types via `§NEW` initializer scanning.
 - **Incremental build benchmark** — Measures cold, warm (no changes), and warm (1 file changed) build times
-- **[Effect manifests .NET ecosystem guide](/guides/effect-manifests-dotnet-ecosystem/)** — ~170 covered types, resolution mechanics, custom manifest authoring, CLI tools
+- **[Effect manifests .NET ecosystem guide](/docs/guides/effect-manifests-dotnet-ecosystem/)** — ~170 covered types, resolution mechanics, custom manifest authoring, CLI tools
 
 ---
 
@@ -330,7 +365,7 @@ The agent dev-loop release: Phase 1 of the agent-native strategy complete — si
 - **Constructor initializer binding** — `: base()`/`: this()` arguments visible to bug pattern checkers
 - **33 new unit tests** for class member binding, scope, overloads, dataflow, and end-to-end analysis
 - **New `--all-findings` CLI flag** for showing all analysis findings including inconclusive results
-- **New [static analysis documentation](/cli/static-analysis/)** page
+- **New [static analysis documentation](/docs/cli/static-analysis/)** page
 
 ### Fixed
 - **False positive elimination** — Unhandled expression types return opaque expressions instead of literal zero, eliminating false division-by-zero reports

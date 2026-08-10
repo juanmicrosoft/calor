@@ -30,6 +30,7 @@ public class OutcomeCorpusTests
         var options = new CompilationOptions
         {
             VerifyContracts = true,
+            ElideProvenGuards = true,
             Verbose = verbose,
             StatusWriter = TextWriter.Null,
             VerificationTimeoutMs = timeoutMs,

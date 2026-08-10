@@ -1,0 +1,20 @@
+---
+title: "self-check docs"
+section: "cli"
+order: 19
+description: "Check agent-facing documentation against compiler keywords, diagnostics, effects, examples, and version rules"
+---
+
+```bash
+calor self-check docs [--root <repository>] [--format text|json] [--fix]
+```
+
+The check verifies documented section keywords, diagnostic codes and bands,
+effect codes, fenced Calor programs, exemplar C# compilation, version-text
+rules, and generated instruction mirrors. It exits 1 on drift and emits
+`Calor1320`–`Calor1331` diagnostics.
+
+`--fix` regenerates supported mirrors such as `AGENTS.md` from their canonical
+source. It does not rewrite arbitrary prose.
+
+JSON mode emits the shared [schema 2.0 envelope](/docs/cli/envelope-schema/).

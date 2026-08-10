@@ -32,7 +32,8 @@ public class IntegrationTests
 
         var options = new CompilationOptions
         {
-            VerifyContracts = true
+            VerifyContracts = true,
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);
@@ -187,6 +188,7 @@ public class IntegrationTests
     private static CompilationOptions NoCache() => new()
     {
         VerifyContracts = true,
+        ElideProvenGuards = true,
         VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
     };
 
@@ -208,7 +210,8 @@ public class IntegrationTests
 
         var options = new CompilationOptions
         {
-            VerifyContracts = true
+            VerifyContracts = true,
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);
@@ -237,7 +240,8 @@ public class IntegrationTests
 
         var options = new CompilationOptions
         {
-            VerifyContracts = true
+            VerifyContracts = true,
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);
@@ -263,7 +267,8 @@ public class IntegrationTests
 
         var options = new CompilationOptions
         {
-            VerifyContracts = true
+            VerifyContracts = true,
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);
@@ -317,7 +322,8 @@ public class IntegrationTests
 
         var options = new CompilationOptions
         {
-            VerifyContracts = true
+            VerifyContracts = true,
+            ElideProvenGuards = true
         };
 
         var result = Program.Compile(source, "test.calr", options);
@@ -398,7 +404,7 @@ public class IntegrationTests
       §S (>= result LONG:0)
       §R x";
 
-        var options = new CompilationOptions { VerifyContracts = true };
+        var options = new CompilationOptions { VerifyContracts = true, ElideProvenGuards = true };
         var result = Program.Compile(source, "test.calr", options);
 
         // Verification runs to completion — the width markers neither crash the

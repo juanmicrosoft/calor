@@ -5,7 +5,10 @@ order: 4
 ---
 
 
-Calor supports static contract verification using Microsoft's Z3 SMT (Satisfiability Modulo Theories) solver. This enables proving contracts at compile time, potentially eliding runtime checks for proven contracts.
+Calor uses Z3 to verify contracts inside an explicitly modeled subset. The
+result is one of seven statuses. In released v0.12.1, `--verify` automatically
+removes an eligible runtime guard only for a clean, non-vacuous,
+assumption-free `proven` result. Every other result keeps its guard.
 
 ---
 
@@ -14,15 +17,16 @@ Calor supports static contract verification using Microsoft's Z3 SMT (Satisfiabi
 When you write contracts in Calor:
 
 ```calor
-§F{f001:Square:pub}
-  §I{i32:x}
-  §O{i32}
+§F{f001:Square:pub} (i32:x) -> i32
   §Q (>= x 0)
   §S (>= result 0)
   §R (* x x)
 ```
 
-The compiler can use Z3 to prove that the postcondition `(>= result 0)` always holds when the precondition `(>= x 0)` is satisfied. This is mathematically provable: the square of a non-negative number is always non-negative.
+For this integer-only signature, the compiler can prove that the postcondition
+holds under the precondition and encoded body. That is a proof of this
+obligation under Calor's modeled semantics—not a proof that the whole program
+is correct.
 
 ---
 
@@ -34,40 +38,28 @@ Use the `--verify` flag when compiling:
 calor -i MyModule.calr -o MyModule.g.cs --verify
 ```
 
----
-
-## Verification Spectrum
-
-Contracts fall into four categories after verification:
-
-### Proven
-
-The contract is mathematically proven to always hold. The runtime check can be safely elided.
-
-```
-// PROVEN: Postcondition statically verified: (result >= 0)
-```
-
-### Unproven
-
-Z3 couldn't determine if the contract always holds (timeout, complexity limit, or non-linear arithmetic). The runtime check is preserved.
-
-### Disproven
-
-Z3 found a counterexample showing the contract can be violated. A warning is emitted with the counterexample, and the runtime check is preserved.
-
-```
-warning Calor0702: Postcondition may be violated in function 'BadFunc'.
-  Counterexample: x=0, b=1
-```
-
-### Unsupported
-
-The contract contains constructs Z3 doesn't support (function calls, strings, floating-point). The runtime check is silently preserved.
+In v0.12.1 this also enables automatic removal of eligible proven guards.
 
 ---
 
-## Supported Constructs
+## Seven Verification Outcomes
+
+| Status | Meaning | Runtime postcondition check |
+|:-------|:--------|:----------------------------|
+| `proven` | The obligation holds under the modeled semantics | In v0.12.1, automatically removed only when non-vacuous and free of assumptions |
+| `refuted` | Z3 found a violation; a counterexample is included when available | Kept; `calor verify` exits 1 |
+| `assumed` | The proof depends on a named modeling assumption | Always kept |
+| `unknown` | Z3 could not decide | Kept |
+| `timeout` | The solver exceeded its per-contract budget | Kept |
+| `unsupported` | The expression or runtime semantics are outside the modeled subset | Kept |
+| `unavailable` | Z3 was not available to attempt the proof | Kept |
+
+Vacuous proofs carry a separate flag and keep their runtime checks.
+Preconditions are never elided on a satisfiability result.
+
+---
+
+## Modeled Surface
 
 Z3 verification supports:
 
@@ -84,13 +76,18 @@ Z3 verification supports:
 | `(<= a b)` | `a ≤ b` | Less or equal |
 | `(> a b)` | `a > b` | Greater than |
 | `(>= a b)` | `a ≥ b` | Greater or equal |
-| `(and p q)` | `p ∧ q` | Logical and |
-| `(or p q)` | `p ∨ q` | Logical or |
-| `(not p)` | `¬p` | Logical not |
+| `(&& p q)` | `p ∧ q` | Logical and |
+| `(\|\| p q)` | `p ∨ q` | Logical or |
+| `(! p)` | `¬p` | Logical not |
 
-**Supported types:** `i32`, `i64`, `bool`
+Integer arithmetic is modeled with fixed-width bit-vectors and C#-compatible
+promotion rules where supported—not arbitrary-precision integers. Boolean,
+integer, selected string, array, quantifier, implication, and registered
+user-field forms are modeled with the restrictions below.
 
-**Unsupported:** Function calls, strings, floating-point, arrays, objects
+Function calls in contracts, floating-point contracts, unregistered fields,
+computed array bases, and forms outside the positive whitelist report
+`unsupported`.
 
 ---
 
@@ -103,22 +100,25 @@ The verification process for postconditions:
 3. **Assert** the negation of the postcondition
 4. **Check** satisfiability:
    - **UNSAT**: No counterexample exists → Proven
-   - **SAT**: Found counterexample → Disproven
-   - **UNKNOWN**: Timeout or too complex → Unproven
+   - **SAT**: Found counterexample → `refuted`
+   - **UNKNOWN**: Timeout or too complex → `timeout` or `unknown`
 
-This approach proves correctness by showing there's no way for the contract to be violated when preconditions are met.
+For supported expressions, this proves the specific postcondition obligation
+under the encoded preconditions and modeled semantics. It does not prove the
+whole program correct.
 
 ---
 
 ## Timeouts
 
-Z3 verification has a 5-second timeout per function. Complex contracts with non-linear arithmetic may timeout and be marked as "Unproven".
+The default solver budget is 5 seconds per contract. Use `--timeout` with
+`calor verify`, or `--verification-timeout` on the compile command.
 
 ---
 
 ## Limitations
 
-### No Function Call Support
+### Function Calls
 
 Contracts referencing other functions cannot be verified:
 
@@ -126,17 +126,36 @@ Contracts referencing other functions cannot be verified:
 §S (> (strlen s) 0)  ; Unsupported - function call
 ```
 
-### Integer Only
+### Floating Point
 
-Floating-point contracts aren't verified due to Z3's floating-point theory complexity.
+Floating-point contracts report `unsupported`.
 
-### No Array Support
+### Strings and Nullable References
 
-Array operations and loop invariants are not supported.
+In v0.12, any proof that touches Z3's string sort is demoted to `assumed`.
+Z3 strings are null-free and byte-counted while .NET strings are nullable
+references whose length counts UTF-16 units. Array- and user-type-carried
+proofs are also `assumed` because Z3's sorts are total while .NET references
+may be null.
 
-### Bounded Verification
+Non-ordinal string comparison modes are refused. Bare `StartsWith`,
+`EndsWith`, and `IndexOf` are also refused because .NET uses current-culture
+semantics for those overloads; state `StringComparison.Ordinal` explicitly.
 
-Z3 uses arbitrary-precision integers, so it doesn't model 32-bit overflow. A contract proven correct in Z3 could theoretically fail at runtime due to integer overflow.
+### Exceptional Arithmetic
+
+Division and remainder carry divisor and signed-overflow side conditions. A
+proof that needs those conditions is `assumed`; conditional evaluation shapes
+that cannot preserve them are `unsupported`. Narrow arithmetic and signed/
+unsigned combinations that do not match C# promotion are refused rather than
+guessed.
+
+### Runtime Lowering
+
+Bodies with early, nested, or raw-C# returns can trigger `Calor1001`. In that
+case the compiler leaves the body untransformed and warns that postcondition
+runtime checks were not emitted. Static verification is separate from that
+lowering limitation.
 
 ---
 
@@ -164,9 +183,11 @@ Split complex contracts into multiple simpler ones:
 §S (< result 100)
 ```
 
-### Accept Unproven Contracts
+### Treat Every Non-Proven Status as Information
 
-Not all contracts can be statically proven. An "Unproven" result doesn't mean the code is wrong—it means Z3 couldn't prove it within time limits.
+`assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable` mean different
+things and have different remedies. None means the code is wrong, and none is
+allowed to remove a runtime check.
 
 ---
 
@@ -175,11 +196,13 @@ Not all contracts can be statically proven. An "Unproven" result doesn't mean th
 | Aspect | Runtime Only | Static + Runtime |
 |:-------|:-------------|:-----------------|
 | Verification cost | 0 | Compile time |
-| Runtime cost | Always | Reduced for proven |
+| Runtime cost | Always | In v0.12.1, eligible proven guards are removed; all others remain |
 | Bug detection | At runtime | At compile time |
 | Coverage | All contracts | Supported constructs |
 
-Static verification complements runtime checking—it doesn't replace it. Unproven and unsupported contracts still have runtime checks.
+Static verification complements runtime checking—it does not replace it. See
+[Verification Guarantees](/docs/guides/verification-guarantees/) for the v0.12
+boundary and [calor verify](/docs/cli/verify/) for the command contract.
 
 ---
 
@@ -190,7 +213,7 @@ Calor is **not** a proof assistant like LEAN, Isabelle, or Rocq. The distinction
 | Aspect | Proof Assistants | Calor |
 |:-------|:-----------------|:------|
 | You write | Proofs (tactics, lemmas) | Contracts (§Q, §S) |
-| Verification | Must complete to compile | Falls back to runtime if unproven |
+| Verification | Must complete to compile | Reports seven verdicts; v0.12.1 removes only eligible clean proven guards |
 | Scope | Arbitrary mathematical properties | Practical software contracts |
 | Expertise | Type theory, proof tactics | Software engineering |
 
@@ -203,23 +226,25 @@ theorem sqrt_positive (x : ℝ) (h : x ≥ 0) : √x ≥ 0 := by
   exact Real.sqrt_nonneg x
 ```
 
-In Calor, you declare the contract and Z3 handles verification automatically:
+In Calor, you declare the contract and Z3 attempts verification automatically.
+This floating-point example reports `unsupported`, which is an honest result:
 
 ```calor
 §F{f001:Sqrt}(x: f64) -> f64
   §Q (>= x 0.0)
   §S (>= result 0.0)
-  (* x x)
+  §R (* x x)
 ```
 
-If Z3 can't prove it, the runtime check remains. Your code compiles and runs safely.
+If Z3 cannot prove it, the runtime check remains where the emitter can lower it.
+Always treat `Calor1001` as a loud exception to that runtime-check guarantee.
 
 ### Lightweight by Design
 
 Calor's verification is deliberately bounded:
 
-- **5-second timeout** per contract (configurable via `--verification-timeout`)
-- **Arithmetic and boolean logic** (not arbitrary math)
+- **5-second timeout** per contract (configurable via `--verification-timeout` on compile or `--timeout` on `calor verify`)
+- **A positive modeled-forms whitelist** rather than arbitrary math
 - **Graceful degradation** to runtime checks
 
 This is a feature, not a limitation. Verification never blocks your build indefinitely, and you don't need expertise in formal methods to benefit from it.
@@ -231,8 +256,8 @@ This is a feature, not a limitation. Verification never blocks your build indefi
 Z3 is bundled with the Calor compiler via the `Microsoft.Z3` NuGet package. No separate installation is required.
 
 If Z3 native libraries are missing on your platform, the compiler will:
-1. Log an informational message
-2. Skip static verification
+1. Report `unavailable`
+2. Skip the Z3 attempt
 3. Continue compilation normally with all runtime checks
 
 ---
@@ -243,9 +268,12 @@ Z3 verification results are automatically cached to disk. When you recompile a f
 
 - **Faster incremental builds**: Unchanged contracts verify in milliseconds instead of seconds
 - **Reduced CI load**: Build servers benefit from cached results across runs
-- **Deterministic results**: Same contract always produces same verification outcome
+- **Deterministic cache keys**: The same normalized obligation, settings,
+  compiler semantics, and solver version reuse the same result
 
-The cache is keyed by a SHA256 hash of the contract expression and parameter types. When you modify a contract, its hash changes, and the cache misses—ensuring correctness.
+The cache includes contract and parameter shape, compiler and semantics
+versions, verification settings, and a format version. v0.12 bumped the format
+as proof semantics changed so older `proven` entries could not be reused.
 
 To disable caching (e.g., for debugging), use `--no-cache`. To clear the cache, use `--clear-cache`.
 
@@ -262,15 +290,18 @@ The obligation engine is an evolution of the assume-negate-check pattern describ
 3. **Guard Discovery** — For failed obligations, the engine discovers the simplest guard that would discharge them, validated by Z3
 4. **Policy** — Configurable policies (default, strict, permissive) control whether failures are errors, warnings, or runtime guards
 
-Where contracts are function-level assertions, refinement types are type-level invariants that propagate across function boundaries. A parameter typed `Port` (an `i32` between 1 and 65535) carries its constraint everywhere it flows — no manual validation at each call site.
+Where contracts are function-level assertions, refinement types are type-level
+constraints that feed the obligation engine. Refinement obligations are
+compile-time analysis only and do not emit runtime guards; review packets
+repeat that disclosure on every run that contains refinements.
 
-- [Refinement Types Reference](/syntax-reference/refinement-types/)
-- [Dependent Types Tutorial](/guides/dependent-types-tutorial/)
+- [Refinement Types Reference](/docs/syntax-reference/refinement-types/)
+- [Dependent Types Tutorial](/docs/guides/dependent-types-tutorial/)
 
 ---
 
 ## See Also
 
-- [Contracts in Calor](/language/contracts/)
-- [Compile Command](/cli/compile/)
+- [Contracts in Calor](/docs/syntax-reference/contracts/)
+- [Compile Command](/docs/cli/compile/)
 - [Z3 Prover](https://github.com/Z3Prover/z3)

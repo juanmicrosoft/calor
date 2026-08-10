@@ -12,7 +12,17 @@ Practical guides for common Calor workflows and tasks.
 
 ## Available Guides
 
-### [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/)
+### [Adoption Playbook](/docs/guides/adoption-playbook/)
+
+The v0.12 adopter workflow: package setup, dependency import, review packets,
+waiver disclosure, and the tested C# eject path.
+
+### [Verification Guarantees and Limits](/docs/guides/verification-guarantees/)
+
+How to read the seven proof statuses, which v0.12 soundness boundaries force an
+`assumed` or `unsupported` result, and when runtime checks remain.
+
+### [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/)
 
 A comprehensive guide for integrating Calor into an existing C# codebase. Covers:
 
@@ -21,7 +31,7 @@ A comprehensive guide for integrating Calor into an existing C# codebase. Covers
 - Converting files gradually
 - Using Claude Code for assisted migration
 
-### [Dependent Types Tutorial](/guides/dependent-types-tutorial/)
+### [Dependent Types Tutorial](/docs/guides/dependent-types-tutorial/)
 
 A progressive tutorial on refinement types and the MCP-guided agent repair loop. Covers:
 
@@ -29,7 +39,7 @@ A progressive tutorial on refinement types and the MCP-guided agent repair loop.
 - Financial calculations with proof obligations and Z3 verification
 - The MCP agent workflow: suggest types → check obligations → discover guards → diagnose and repair
 
-### [Effect Manifests: .NET Ecosystem Coverage](/guides/effect-manifests-dotnet-ecosystem/)
+### [Effect Manifests: .NET Ecosystem Coverage](/docs/guides/effect-manifests-dotnet-ecosystem/)
 
 How Calor knows the effects of .NET framework and ecosystem library calls. Covers:
 
@@ -38,7 +48,7 @@ How Calor knows the effects of .NET framework and ecosystem library calls. Cover
 - Adding custom manifests for your own types
 - Effect code reference and CLI tools
 
-### [Cross-Assembly IL Analysis](/guides/il-analysis/)
+### [Cross-Assembly IL Analysis](/docs/guides/il-analysis/)
 
 Automatic effect discovery through referenced .NET assemblies. Covers:
 
@@ -47,7 +57,7 @@ Automatic effect discovery through referenced .NET assemblies. Covers:
 - Enabling IL analysis with one MSBuild property
 - Performance, diagnostics, and interaction with manifests
 
-### [Cross-Module Effect Propagation](/guides/cross-module-effect-propagation/)
+### [Cross-Module Effect Propagation](/docs/guides/cross-module-effect-propagation/)
 
 How Calor verifies effect declarations stay consistent across files in a multi-file project. Covers:
 
@@ -57,8 +67,12 @@ How Calor verifies effect declarations stay consistent across files in a multi-f
 - Warm-build correctness via cached effect summaries
 - Multi-file CLI and MSBuild integration
 
+### [Telemetry and Privacy](/docs/guides/telemetry/)
+
+The opt-in default, exact metadata inventory, and the data Calor never sends.
+
 ---
 
 ## Getting Started
 
-If you're new to Calor, start with the [Getting Started](/getting-started/) section instead. These guides assume familiarity with Calor basics.
+If you're new to Calor, start with the [Getting Started](/docs/getting-started/) section instead. These guides assume familiarity with Calor basics.

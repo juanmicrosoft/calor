@@ -1,0 +1,28 @@
+---
+title: "calor test"
+section: "cli"
+order: 20
+---
+
+Compile Calor sources and run xUnit tests without creating a project file.
+
+```bash
+calor test <path> [options]
+```
+
+`path` can be a `.calr` file or a directory. A directory may contain a
+`tests/` subdirectory of `*.cs` xUnit tests. Source discovery excludes `bin/`,
+`obj/`, and `reference/`.
+
+| Option | Description |
+|:-------|:------------|
+| `--permissive` | Relax effect enforcement for converted or partially adopted code |
+| `--keep-temp` | Preserve and print the temporary test project path |
+| `--verbose`, `-v` | Show compilation details and stream test output |
+| `--enforce-effects <bool>` | Enable effect enforcement; defaults to `true` |
+| `--verify` | Run Z3 contract verification before the tests |
+| `--contract-mode <mode>` | Runtime checks: `off`, `debug`, or `release`; defaults to `debug` |
+| `--timeout <seconds>` | Per-child-process timeout; defaults to 600 seconds |
+
+The command does not replace repository-level `dotnet test`; it is a compact
+execution path for a Calor file or source directory.

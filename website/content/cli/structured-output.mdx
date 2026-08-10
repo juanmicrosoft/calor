@@ -1,0 +1,54 @@
+---
+title: "Structured Output"
+section: "cli"
+order: 15
+description: "Machine-readable JSON, SARIF, and NDJSON output contracts"
+---
+
+Diagnostic-producing commands emit a shared schema 2.0 envelope. In structured
+mode, stdout contains exactly one parseable document; progress and status text
+go to stderr. Early failures also produce an envelope.
+
+```bash
+calor --input file.calr --format json
+calor --input file.calr --format sarif
+calor lint file.calr --format json
+calor watch src/ --format json
+```
+
+Root compile supports `-f`; on lint, spell out `--format` because `-f` means
+`--fix`. Watch produces NDJSON: one compact envelope per line for every rebuild.
+
+## Envelope Shape
+
+```json
+{
+  "version": "2.0",
+  "command": "verify",
+  "diagnostics": [
+    {
+      "code": "Calor0712",
+      "message": "Postcondition refuted",
+      "severity": "warning",
+      "location": { "file": "Math.calr", "line": 4, "column": 5 },
+      "declarationId": "f001",
+      "verification": {
+        "status": "refuted",
+        "counterexample": {
+          "bindings": [{ "name": "x", "value": "1" }]
+        }
+      }
+    }
+  ],
+  "summary": { "total": 1, "errors": 0, "warnings": 1, "info": 0 },
+  "data": {}
+}
+```
+
+Fields that do not apply are omitted. `diagnostics[].fix.edits[]` carries
+machine-applicable, 1-based, end-exclusive source edits when a diagnostic has a
+fix. Command-specific results live under `data`.
+
+Exit codes do not change with the output format: tools must inspect both the
+process exit code and the document. See [Envelope Schema](/docs/cli/envelope-schema/)
+for field-level details.

@@ -1,0 +1,29 @@
+---
+title: "calor effects"
+section: "cli"
+order: 21
+---
+
+Inspect and maintain effect manifests used for external .NET calls.
+
+| Command | Purpose |
+|:--------|:--------|
+| `calor effects resolve <signature>` | Show the resolved effects for a method signature |
+| `calor effects validate` | Validate every manifest in the search path |
+| `calor effects list` | List types with effect declarations |
+| `calor effects suggest --input <files>` | Generate a template for unresolved calls |
+
+`resolve`, `validate`, `list`, and `suggest` accept `--project` and
+`--solution` to add project- or solution-level manifests to the search path.
+`resolve` and `list` support `--json`; `list` also supports `--type`.
+
+```bash
+calor effects resolve System.Console.WriteLine --json
+calor effects validate --project ./src/MyApp
+calor effects suggest --input src/App.calr --output .calor-effects.suggested.json
+```
+
+With `--merge`, `suggest` updates `.calor-effects.json`; review that generated
+file before committing it. For package-wide inference and provenance, use
+[`calor import`](/docs/cli/import/). See the [effect-manifest guide](/docs/guides/effect-manifests-dotnet-ecosystem/)
+for resolution order and manifest format.

@@ -1,0 +1,18 @@
+---
+title: "calor self-test"
+section: "cli"
+order: 26
+---
+
+Compile embedded reference programs and compare the generated output with the
+compiler's golden files.
+
+```bash
+calor self-test
+calor self-test --scenario 01_hello_world --verbose
+```
+
+`--scenario`, or `-s`, selects one named scenario. `--verbose`, or `-v`, shows
+detailed output and diffs for failures. This checks compiler distribution
+integrity; it is separate from [`calor self-check`](/docs/cli/self-check/),
+which checks agent-facing artifacts and documentation.

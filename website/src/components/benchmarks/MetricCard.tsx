@@ -56,7 +56,7 @@ const metricInterpretations: Record<string, { calor: string; csharp: string; tie
     tie: 'Both languages equally understandable',
   },
   EditPrecision: {
-    calor: 'Unique IDs enable targeted changes',
+    calor: 'Explicit IDs and markers aid targeting',
     csharp: 'Established editing patterns',
     tie: 'Similar edit precision',
   },

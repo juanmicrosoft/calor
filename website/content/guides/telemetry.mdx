@@ -1,0 +1,48 @@
+---
+title: "Telemetry and Privacy"
+section: "guides"
+order: 6
+description: "Calor v0.12.1 telemetry is opt-in, metadata-only, and off by default"
+---
+
+Calor v0.12.1 CLI telemetry is **off by default**. A normal invocation sends
+nothing.
+
+## Enable or Disable It
+
+| Action | Setting |
+|:-------|:--------|
+| Enable | `CALOR_TELEMETRY=1` or `CALOR_TELEMETRY=true` |
+| Force-disable | `--no-telemetry` or `CALOR_TELEMETRY_OPTOUT=1` |
+
+The force-disable settings win when both are present.
+
+## Metadata Sent When Enabled
+
+- Command names, session command sequence, exit codes, and durations
+- Diagnostic **codes**, severities, counts, and code co-occurrence—not messages
+- Exception type names—not exception messages or stack traces
+- Aggregate input size, line count, token estimate, and feature-presence flags
+- Fixed-vocabulary compiler modes and success/error counts
+- Conversion feature names, counts, and line numbers from the feature registry
+- Help-query length and hit/miss—not the query text
+- Hook decision, file extension, and agent name
+- OS/process architecture and .NET, Calor, and semantics versions
+
+The operation ID is random per invocation. Application Insights role and node
+names are pinned to `calor-cli` so the SDK cannot attach the machine hostname.
+
+## Never Sent
+
+Source code, file paths, file names, identifiers, diagnostic messages,
+exception messages, stack traces, environment variables, machine hostnames, or
+content hashes are not sent. Earlier builds used source/output hashes for
+determinism tracking; v0.12 removes them because they can identify an exact
+file.
+
+Enabled telemetry goes to the Calor project's Azure Application Insights
+instance through the connection bundled with v0.12.1. This release does not
+provide `--telemetry-preview` or a connection-string environment override.
+Before the v0.11 work folded into v0.12, telemetry was default-on and included
+raw diagnostic messages and full exception payloads. v0.12 reverses that
+posture and strips the payload.

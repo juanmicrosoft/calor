@@ -1,0 +1,43 @@
+---
+title: "Envelope Schema 2.0"
+section: "cli"
+order: 16
+description: "The shared machine-readable contract used by CLI commands and MCP tools"
+---
+
+Schema 2.0 standardizes diagnostics and command data across the CLI and MCP
+surface.
+
+## Top-Level Fields
+
+| Field | Meaning |
+|:------|:--------|
+| `version` | Envelope schema version, currently `2.0` |
+| `command` | Producing command or tool |
+| `diagnostics` | Stable codes, severity, location, declaration context, fixes, and optional verification payload |
+| `summary` | Total/error/warning/info counts over `diagnostics` |
+| `data` | Command-specific result; omitted or null when unavailable |
+
+## Verification Payload
+
+Schema 2.0 uses the closed seven-status vocabulary:
+
+```text
+proven | refuted | assumed | unknown | timeout | unsupported | unavailable
+```
+
+An `assumed` result includes its named `assumptions`. A `refuted` result may
+include a structured `counterexample.bindings` array. A `proven` result may
+carry `vacuous: true`; vacuous proofs never remove runtime checks.
+
+## Stream Rules
+
+- Single-shot JSON commands write exactly one envelope to stdout.
+- Human-readable progress goes to stderr.
+- Error paths still emit a valid document.
+- `calor watch --format json` writes one compact envelope per line (NDJSON).
+- SARIF is supported where documented, but is not an envelope and has no
+  streaming watch form.
+
+See [Structured Output](/docs/cli/structured-output/) for examples and command
+differences.

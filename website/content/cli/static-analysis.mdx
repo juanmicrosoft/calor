@@ -141,7 +141,7 @@ Class fields are in scope for all member bodies, preventing false uninitialized-
 
 ## Integration with CI/CD
 
-For machine-readable diagnostics in CI/CD pipelines, use the `calor_check` MCP tool (`action: "diagnose"`) via the [`calor mcp`](/cli/mcp/) server. The MCP tool returns JSON-formatted diagnostics with structured location and severity information suitable for downstream tooling.
+For machine-readable diagnostics in CI/CD pipelines, use the `calor_check` MCP tool (`action: "diagnose"`) via the [`calor mcp`](/docs/cli/mcp/) server. The MCP tool returns JSON-formatted diagnostics with structured location and severity information suitable for downstream tooling.
 
 ```bash
 # Combine compile with static analysis output
