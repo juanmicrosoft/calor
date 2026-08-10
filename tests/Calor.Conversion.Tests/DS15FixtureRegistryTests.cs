@@ -41,11 +41,25 @@ public class DS15FixtureRegistryTests
     {
         // A single fact rather than a MemberData theory: the registry is legitimately
         // empty until the first SupportLevel promotion, and xUnit fails a theory with
-        // zero data rows. Every assertion message names the fixture.
+        // zero data rows. Errors are COLLECTED across all fixtures (not fail-fast), so
+        // one bad fixture does not hide the others' defects.
         var root = RegistryPath();
         if (!Directory.Exists(root)) return;
+
+        var failures = new List<string>();
         foreach (var dir in Directory.GetDirectories(root))
-            ValidateFixture(dir, Path.GetFileName(dir));
+        {
+            try
+            {
+                ValidateFixture(dir, Path.GetFileName(dir));
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{Path.GetFileName(dir)}: {ex.Message}");
+            }
+        }
+        Assert.True(failures.Count == 0,
+            "Fixture defects (indeterminate = failing):\n" + string.Join("\n", failures));
     }
 
     private static void ValidateFixture(string dir, string name)
@@ -61,11 +75,12 @@ public class DS15FixtureRegistryTests
         var testPath = Path.Combine(dir, "test.calr");
         Assert.True(File.Exists(testPath), $"{name}: test.calr missing");
 
-        // 2. Manifest: featureKey named and directory-consistent.
+        // 2. Manifest: featureKey named; the DIRECTORY is the sanitized form of the key
+        // (keys may contain spaces/parens/slashes — see README) and must match it.
         using var doc = JsonDocument.Parse(File.ReadAllText(manifestPath));
         var featureKey = doc.RootElement.GetProperty("featureKey").GetString();
         Assert.False(string.IsNullOrWhiteSpace(featureKey), $"{name}: featureKey empty");
-        Assert.Equal(name, featureKey);
+        Assert.Equal(SanitizeKey(featureKey!), name);
 
         // 3. Conversion match: input.cs converts to exactly expected.calr.
         var converter = new CSharpToCalorConverter(new ConversionOptions
@@ -93,4 +108,18 @@ public class DS15FixtureRegistryTests
 
     private static string Normalize(string s) =>
         s.Replace("\r\n", "\n").TrimEnd('\n');
+
+    /// <summary>README rule: every char outside [a-z0-9-] becomes '-', runs collapsed.</summary>
+    private static string SanitizeKey(string key)
+    {
+        var chars = key.ToLowerInvariant()
+            .Select(c => (char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-') ? c : '-');
+        var collapsed = new System.Text.StringBuilder();
+        foreach (var c in chars)
+        {
+            if (c == '-' && collapsed.Length > 0 && collapsed[^1] == '-') continue;
+            collapsed.Append(c);
+        }
+        return collapsed.ToString().Trim('-');
+    }
 }
