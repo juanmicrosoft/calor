@@ -4,7 +4,8 @@ description: >-
     Automate the Calor release process end-to-end: bump version across Directory.Build.props,
     VSCode extension, website, and changelog files; run the statistical benchmark suite
     (30 runs); open and merge a release PR; create the GitHub release with proper pre-release
-    tagging; and trigger the website deploy. Use when the user asks to "cut a release",
+    tagging; trigger the website deploy; and verify both packages actually reached nuget.org
+    and the VS Code marketplace. Use when the user asks to "cut a release",
     "create a release", "ship a version", "release vX.Y.Z", or "do a release".
 allowed-tools: Bash, Read, Write, Edit
 user-invocable: true
@@ -12,7 +13,7 @@ user-invocable: true
 
 # /create-release - Create a New Calor Release
 
-This skill automates the release process: bump versions across all components, run benchmarks, create a PR, merge it, and create a GitHub release with proper tagging.
+This skill automates the release process: bump versions across all components, run benchmarks, create a PR, merge it, create a GitHub release with proper tagging, and **confirm the packages actually published**. Step 8 is not optional — creating the release only *triggers* the publish workflows, and in this repo they have failed silently for long stretches.
 
 ## Steps to Perform
 
@@ -21,8 +22,10 @@ This skill automates the release process: bump versions across all components, r
 Read the current version from `Directory.Build.props`:
 
 ```bash
-grep -oP '(?<=<Version>)[^<]+' Directory.Build.props
+sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' Directory.Build.props
 ```
+
+(Not `grep -oP` — BSD grep on macOS has no `-P` and exits 2.)
 
 Calculate the next version using patch increment logic:
 - Patch increment: `0.1.6` → `0.1.7` → ... → `0.1.9`
@@ -153,31 +156,51 @@ First, extract the changelog content for this version from CHANGELOG.md. The con
 
 Determine if this is a pre-release (any version < 1.0.0 is pre-release).
 
-Write the extracted notes to a file and pass `--notes-file`; the notes contain backticks and
-`$`, which a shell-quoted `--notes` string will mangle.
-
-Create the release:
+**First sync local `main`** — step 5 merged the PR on the remote, and `gh pr merge --delete-branch`
+makes no promise of fast-forwarding your local branch:
 
 ```bash
-awk '/^## \[X\.Y\.Z\]/{f=1} /^## \[/{if(f && !/X\.Y\.Z/) exit} f' CHANGELOG.md > /tmp/notes.md
-
-# For pre-release (version < 1.0.0):
-gh release create vX.Y.Z --title "vX.Y.Z" --notes-file /tmp/notes.md --prerelease
-
-# For stable release (version >= 1.0.0):
-gh release create vX.Y.Z --title "vX.Y.Z" --notes-file /tmp/notes.md
+git checkout main && git pull --ff-only
+sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' Directory.Build.props   # MUST show the new version
 ```
 
-**If you pass `--target`, it must be a FULL 40-character SHA.** A short SHA is rejected with
+Do not skip that check. If you tag a stale `main`, the tag lands on the **pre-bump** commit,
+`publish-nuget` checks out the tag, `Directory.Build.props` still holds the previous version, and
+`dotnet nuget push --skip-duplicate` silently no-ops — a release that reports success and ships
+nothing. Recovering means deleting the release and tag and re-cutting.
+
+Extract the notes. Write them to a file and pass `--notes-file`; the notes contain backticks and
+`$`, which a shell-quoted `--notes` string will mangle. **Replace `0.12.1` below with the version
+you are cutting**, and then check the result is non-empty — a version string that matches nothing
+yields a silent empty file and a release with an empty body:
+
+```bash
+VER=0.12.1                                    # <-- the version being released
+awk -v v="$VER" '$0 ~ "^## \\[" v "\\]" {f=1; print; next} f && /^## \[/ {exit} f' \
+    CHANGELOG.md > /tmp/notes.md
+test -s /tmp/notes.md || { echo "ERROR: no CHANGELOG section for $VER"; exit 1; }
+head -1 /tmp/notes.md                          # sanity: should be "## [$VER] - YYYY-MM-DD"
+```
+
+Create the release (omit `--target` — it defaults to the default branch's head, which you have
+just verified):
+
+```bash
+# For pre-release (version < 1.0.0):
+gh release create "v$VER" --title "v$VER" --notes-file /tmp/notes.md --prerelease
+
+# For stable release (version >= 1.0.0):
+gh release create "v$VER" --title "v$VER" --notes-file /tmp/notes.md
+```
+
+**If you do pass `--target`, it must be a FULL 40-character SHA** — use
+`--target "$(git rev-parse origin/main)"` after a `git fetch origin main`. A short SHA is rejected
+with a message that points at the tag rather than the target, and is easy to misread:
 
 ```
 tag_name is not a valid tag
-Publishing releases must have a valid tag
 Release.target_commitish is invalid
 ```
-
-which points at the tag and not at the real problem. Use `--target "$(git rev-parse main)"`, or
-omit `--target` entirely to release from the default branch's current head.
 
 ### 7. Cleanup and Return to Main Branch
 
@@ -202,48 +225,91 @@ gh workflow run nextjs-gh-pages.yml
 
 **Creating the release triggers `publish-nuget` and `publish-vscode`; it does not make them
 succeed.** Both have failed silently while the tag and the website went out normally, so the
-release *looks* complete. The VS Code extension failed for three consecutive releases (v0.9.0,
-v0.10.0, v0.12.0) before anyone noticed, and the marketplace sat at `0.3.8` the whole time.
+release *looks* complete. The VS Code publish failed on **every release from v0.4.0 (2026-03-09)
+through v0.12.1** — the last success was v0.3.8, and the marketplace sat at `0.3.8` for five
+months and roughly nineteen releases before anyone noticed. Verify with
+`gh run list --workflow=publish-vscode.yml --limit 40` before assuming any of this is historical.
 
-A green workflow list is not sufficient evidence either — check the registries themselves:
+**Wait for the workflows first.** They are not fast: on v0.12.1 `publish-nuget` took ~4 min and
+`publish-vscode` ~23 min. Querying the registries before they finish shows the *previous* version
+and looks like failure.
 
 ```bash
-gh run list --event release --limit 4 \
-  --json workflowName,status,conclusion \
-  --jq '.[] | "\(.workflowName)\t\(.status)\t\(.conclusion)"'
+VER=0.12.1   # the version you cut
 
-# nuget.org — must list the version you just cut
-curl -s https://api.nuget.org/v3-flatcontainer/calor/index.json \
-  | python3 -c "import sys,json;print(json.load(sys.stdin)['versions'][-3:])"
-curl -s https://api.nuget.org/v3-flatcontainer/calor.sdk/index.json \
-  | python3 -c "import sys,json;print(json.load(sys.stdin)['versions'][-3:])"
+# Watch both publishes to completion (get the run ids for THIS tag)
+gh run list --event release --limit 10 \
+  --json databaseId,workflowName,headBranch,status,conclusion \
+  --jq ".[] | select(.headBranch==\"v$VER\") | \"\(.databaseId)\t\(.workflowName)\t\(.status)\t\(.conclusion)\""
+# then, for each publish run id:
+gh run watch <run-id>
+```
 
-# VS Code marketplace — must report the version you just cut
+A green workflow is still not sufficient evidence — check the registries themselves. Note
+nuget.org's flat-container index can lag a successful push by several minutes, so re-check before
+concluding it failed:
+
+```bash
+# nuget.org — both packages must list $VER
+curl -s https://api.nuget.org/v3-flatcontainer/calor/index.json     | jq -r '.versions[-3:][]'
+curl -s https://api.nuget.org/v3-flatcontainer/calor.sdk/index.json | jq -r '.versions[-3:][]'
+
+# VS Code marketplace — must report $VER
 curl -s -X POST "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json;api-version=7.2-preview.1" \
   -d '{"filters":[{"criteria":[{"filterType":7,"value":"calor-dev.calor"}]}],"flags":914}' \
-  | python3 -c "import sys,json;print(json.load(sys.stdin)['results'][0]['extensions'][0]['versions'][0]['version'])"
+  | jq -r '.results[0].extensions[0].versions[0].version // "NOT FOUND"'
 ```
 
 Strongest check for NuGet — install the published tool and exercise Z3, which is the part most
 likely to be broken by a packaging change:
 
 ```bash
-dotnet tool install --tool-path /tmp/calorcheck calor --version X.Y.Z
+rm -rf /tmp/calorcheck          # else a stale/newer install makes this a no-op
+dotnet tool install --tool-path /tmp/calorcheck calor --version "$VER"
 /tmp/calorcheck/calor --version
-/tmp/calorcheck/calor verify <some.calr>   # expect real Proven counts, not "Z3 not available"
+/tmp/calorcheck/calor verify samples/Verification/proven-contracts.calr
 ```
+
+Expect `Proven: 14`, **`Skipped: 0`**, exit 0. A package whose Z3 is broken does **not** print
+"Z3 not available" (that string only ever appears in test-skip messages) — it emits diagnostic
+`Calor0710`, *"Static contract verification skipped: Z3 SMT solver is not available"*, and a
+nonzero `Skipped:` count. Do not pick a different sample casually:
+`samples/Contracts/contracts.calr` exits 1 **by design** (it contains a deliberately disproven
+postcondition) and will look like a broken package.
 
 Known failure modes, so they are recognised rather than re-diagnosed:
 
-| Symptom | Cause | Who can fix |
+| Symptom | Cause | Fix |
 |---|---|---|
-| `sha256sum: WARNING: N computed checksums did NOT match` | The pinned `z3-binaries` release drifted | Republish via `build-z3.yml` (`workflow_dispatch`) and commit the manifest it prints. **Never rehash the live assets.** |
+| `sha256sum: WARNING: N computed checksums did NOT match` | The pinned `z3-binaries` release drifted | Republish via `build-z3.yml` (`workflow_dispatch`), commit the manifest it prints, **then re-publish via `workflow_dispatch`, not `gh run rerun`** — see below. **Never rehash the live assets.** |
 | `error IL3000` during the VSIX build | `Assembly.Location` under single-file publish | Code fix. `test.yml`'s `vsix-single-file-publish` job should have caught this on the PR. |
-| `Access Denied: The Personal Access Token used has expired` | `VSCE_PAT` secret expired | **Maintainer only** — mint at https://aka.ms/vscodepat, update the secret, then re-run just the `publish` job. The built VSIXes are already uploaded as artifacts. |
+| `Access Denied: The Personal Access Token used has expired` | `VSCE_PAT` secret expired | **Maintainer only** — mint at https://aka.ms/vscodepat, update the secret, then re-run the `publish` job. The built VSIXes are already uploaded as artifacts, so no rebuild is needed. |
 
-Report the release as shipped only after the registries confirm it.
+#### Retrying a failed publish (do NOT re-cut the version)
+
+A failed publish is not a reason to delete the tag or bump the version. Fix the cause and re-run
+the failing channel only.
+
+- **NuGet.** `gh run rerun` re-runs at the **tag's** commit, and `publish-nuget.yml` reads
+  `.github/z3-binaries-<ver>.sha256` from the checked-out tree. So if the fix was a manifest
+  change committed to `main`, a rerun re-reads the *old* manifest off the tag and fails
+  identically. Use the dispatch path instead, which checks out the default branch and takes a
+  version override: `gh workflow run publish-nuget.yml -f version=$VER`. Safe to repeat — the push
+  uses `--skip-duplicate`.
+- **VS Code.** Re-run the `publish` job on the existing run once the PAT is valid. The publish
+  step attempts every target and treats an already-published one as success, so a partial publish
+  can be completed by re-running.
+- **Partial release is normal and recoverable.** One channel landing while the other fails is the
+  common case here. Record which channel is live, fix only the broken one, and do not touch the
+  tag.
+
+Note that republishing `z3-binaries` retroactively changes what **every past tag** resolves to, so
+older tags' manifests become invalid. That is a reason to prefer fixing forward.
+
+Report the release as shipped only after the registries confirm it — and if only one channel
+landed, say exactly which one.
 
 ## Version Calculation Logic
 

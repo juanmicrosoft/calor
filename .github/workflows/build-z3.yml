@@ -36,13 +36,27 @@ env:
   MANAGED_DLL_ARCHIVE: x64-glibc-2.39
 
 jobs:
-  # Build Z3 from source on ARM64 macOS ONLY. The upstream arm64-osx archive has
-  # assembly-loading problems on that platform (same exception download-z3.sh
-  # makes at its Darwin/arm64 branch). Every other RID — including linux-arm64,
-  # which download-z3.sh has always taken from the upstream arm64-glibc-2.38
-  # archive — uses the checksum-verified prebuilt path below, because a
-  # from-source C++ build is not reproducible and silently re-drifts the pin on
-  # every run.
+  # Build Z3 from source on ARM64 macOS ONLY.
+  #
+  # ⚠ THE STATED JUSTIFICATION FOR THIS JOB NO LONGER HOLDS. It used to read
+  # "the upstream arm64-osx archive has assembly-loading problems on that
+  # platform (same exception download-z3.sh makes at its Darwin/arm64 branch)".
+  # That branch is gone: download-z3.sh now takes the upstream arm64-osx native
+  # on ARM64 macOS, and it is verified working there (Calor.Verification.Tests
+  # 359/359, zero skips, on a SkippableFact-gated suite). So this job is now the
+  # ONLY producer of a non-reproducible asset, and it makes the shipped
+  # osx-arm64 native differ from the one every ARM64 macOS developer builds
+  # against.
+  #
+  # It is left in place for now only because switching it changes a published
+  # asset and so requires a deliberate republish + repin, which is bundled with
+  # the unresolved osx-x64 decision (upstream's x64-osx archive contains an
+  # arm64 binary — see the note on the prebuilt job below).
+  #
+  # Every other RID — including linux-arm64, which download-z3.sh has always
+  # taken from the upstream arm64-glibc-2.38 archive — uses the
+  # checksum-verified prebuilt path below, because a from-source C++ build is
+  # not reproducible and silently re-drifts the pin on every run.
   build-z3-arm64:
     strategy:
       fail-fast: false

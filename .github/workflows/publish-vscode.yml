@@ -104,13 +104,51 @@ jobs:
         with:
           node-version: '20'
 
+      # Every target is attempted, then the step fails if any of them failed.
+      # The previous loop ran under `bash -e` with no error handling, so the
+      # FIRST failing target aborted the step and the remaining platforms were
+      # never published — turning a one-platform problem into a silent partial
+      # release. That matters most on a retry: once one target has published,
+      # re-running would abort on its "already exists" error and strand the rest.
+      # An already-published target is therefore treated as success, which also
+      # makes the whole step idempotent and safe to re-run.
       - name: Publish all platforms
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
           npm install -g @vscode/vsce
-          for vsix in vsix-packages/**/*.vsix; do
-            echo "Publishing $vsix"
-            vsce publish --packagePath "$vsix" -p ${{ secrets.VSCE_PAT }}
+
+          shopt -s nullglob globstar
+          vsixes=(vsix-packages/**/*.vsix)
+          if [ ${#vsixes[@]} -eq 0 ]; then
+            echo "::error::no .vsix files found under vsix-packages/ — the build job produced nothing to publish"
+            exit 1
+          fi
+          echo "Found ${#vsixes[@]} VSIX package(s) to publish."
+
+          failed=()
+          for vsix in "${vsixes[@]}"; do
+            echo "::group::Publishing $vsix"
+            if out="$(vsce publish --packagePath "$vsix" -p "$VSCE_PAT" 2>&1)"; then
+              echo "$out"
+              echo "published: $vsix"
+            elif grep -qiE 'already exists|already published' <<<"$out"; then
+              echo "$out"
+              echo "already published, treating as success: $vsix"
+            else
+              echo "$out"
+              echo "::error::failed to publish $vsix"
+              failed+=("$vsix")
+            fi
+            echo "::endgroup::"
           done
+
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::${#failed[@]} of ${#vsixes[@]} target(s) failed to publish:"
+            printf '  %s\n' "${failed[@]}"
+            exit 1
+          fi
+          echo "All ${#vsixes[@]} target(s) published."
 
       - name: Upload all VSIX artifacts
         uses: actions/upload-artifact@v4
