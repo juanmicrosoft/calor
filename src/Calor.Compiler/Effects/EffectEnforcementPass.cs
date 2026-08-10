@@ -846,13 +846,13 @@ public sealed class EffectEnforcementPass
                 foreach (var (calleeName, span) in calls)
                 {
                     // Resolve callee name to ID for internal calls (handles cross-class method calls)
-                    var calleeId = _callGraphAnalysis.ResolveCallSite(
+                    var calleeIds = _callGraphAnalysis.ResolveCallSites(
                         currentId,
                         calleeName,
                         span);
 
                     // Check external calls via manifest resolver
-                    if (calleeId == null)
+                    if (calleeIds.Count == 0)
                     {
                         var (typeName, methodName) = ParseCallTargetForChain(calleeName);
                         if (!string.IsNullOrEmpty(typeName) && !string.IsNullOrEmpty(methodName))
@@ -867,11 +867,19 @@ public sealed class EffectEnforcementPass
                         }
                     }
                     // Check internal calls
-                    else if (!visited.Contains(calleeId))
+                    else
                     {
-                        visited.Add(calleeId);
-                        var newPath = new List<string>(path) { _callGraphAnalysis.Functions[calleeId].Name };
-                        queue.Enqueue((calleeId, newPath));
+                        foreach (var calleeId in calleeIds)
+                        {
+                            if (!visited.Add(calleeId))
+                                continue;
+
+                            var newPath = new List<string>(path)
+                            {
+                                _callGraphAnalysis.Functions[calleeId].Name,
+                            };
+                            queue.Enqueue((calleeId, newPath));
+                        }
                     }
                 }
             }
@@ -1183,25 +1191,36 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromCallTarget(string target, TextSpan span)
         {
-            var exactInternalId = _context.CallGraph.ResolveCallSite(
+            var exactInternalIds = _context.CallGraph.ResolveCallSites(
                 _context.CurrentFunctionId,
                 target,
                 span);
-            if (exactInternalId != null
-                && _context.Functions.ContainsKey(exactInternalId))
+            if (exactInternalIds.Count > 0)
             {
-                if (_context.ComputedEffects.TryGetValue(exactInternalId, out var exactEffects))
-                    return exactEffects;
-                if (_context.SccMembers.Contains(exactInternalId))
+                var effects = EffectSet.Empty;
+                foreach (var exactInternalId in exactInternalIds)
                 {
-                    return _context.ComputedEffects.GetValueOrDefault(
-                        exactInternalId,
-                        EffectSet.Empty);
+                    if (!_context.Functions.TryGetValue(exactInternalId, out var function))
+                        continue;
+
+                    if (_context.ComputedEffects.TryGetValue(exactInternalId, out var exactEffects))
+                    {
+                        effects = effects.Union(exactEffects);
+                    }
+                    else if (_context.SccMembers.Contains(exactInternalId))
+                    {
+                        effects = effects.Union(_context.ComputedEffects.GetValueOrDefault(
+                            exactInternalId,
+                            EffectSet.Empty));
+                    }
+                    else
+                    {
+                        effects = effects.Union(GetDeclaredEffects(function.Effects));
+                    }
                 }
 
-                return GetDeclaredEffects(_context.Functions[exactInternalId].Effects);
+                return effects;
             }
-
             // Bare (no-dot) targets: either a value invocation (delegate — D-W2.1),
             // an internal function/method, or an unresolvable free name.
             // Value resolution runs FIRST, mirroring C# scoping: a parameter,

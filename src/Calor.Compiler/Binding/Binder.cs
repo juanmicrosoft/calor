@@ -293,10 +293,10 @@ public sealed class Binder
             }
         }
 
-        var methods = EnumerateMethods(cls).ToArray();
+        var methods = EnumerateMethodRegistrations(cls).ToArray();
         for (var methodIndex = 0; methodIndex < methods.Length; methodIndex++)
         {
-            var method = methods[methodIndex];
+            var (method, conditionalAlternative) = methods[methodIndex];
             var lookupName = GetCallableLookupName(method.Name);
             var qualifiedLookupName = $"{qualifiedClassName}.{lookupName}";
             var symbol = CreateFunctionSymbol(
@@ -310,7 +310,8 @@ public sealed class Binder
                 method.IdentifierSpan,
                 method.Visibility,
                 qualifiedClassName,
-                method.Span);
+                method.Span,
+                conditionalAlternative);
             _functionSymbols.Add(method, symbol);
 
             if (!classScope.TryDeclareOverload(lookupName, symbol, out var duplicate))
@@ -386,6 +387,27 @@ public sealed class Binder
     private static IEnumerable<MethodNode> EnumerateMethods(ClassDefinitionNode cls) =>
         cls.Methods.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Methods));
 
+    private static IEnumerable<(MethodNode Method, ConditionalAlternative? Alternative)>
+        EnumerateMethodRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var method in cls.Methods)
+            yield return (method, null);
+
+        for (var blockIndex = 0; blockIndex < cls.PreprocessorBlocks.Count; blockIndex++)
+        {
+            var groupId = $"{cls.Id}:member-pp:{blockIndex}";
+            var branchIndex = 0;
+            for (var branch = cls.PreprocessorBlocks[blockIndex];
+                 branch != null;
+                 branch = branch.ElseBranch)
+            {
+                var alternative = new ConditionalAlternative(groupId, branchIndex++);
+                foreach (var method in branch.Methods)
+                    yield return (method, alternative);
+            }
+        }
+    }
+
     private static IEnumerable<EventDefinitionNode> EnumerateEvents(ClassDefinitionNode cls) =>
         cls.Events.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Events));
 
@@ -402,7 +424,8 @@ public sealed class Binder
         Parsing.TextSpan declarationSpan,
         Visibility visibility,
         string? containingTypeName,
-        Parsing.TextSpan definitionSpan)
+        Parsing.TextSpan definitionSpan,
+        ConditionalAlternative? conditionalAlternative = null)
     {
         var parameterSymbols = parameters
             .Select((parameter, index) => CreateVariable(
@@ -424,7 +447,8 @@ public sealed class Binder
             declarationSpan,
             visibility,
             containingTypeName,
-            definitionSpan);
+            definitionSpan,
+            conditionalAlternative);
         TrackSymbol(symbol);
         return symbol;
     }
@@ -719,7 +743,11 @@ public sealed class Binder
             resolution.Function,
             call.ArgumentNames,
             call.ArgumentModifiers,
-            receiverSymbol);
+            receiverSymbol,
+            resolution.Functions,
+            call.CalleeSpan,
+            call.ReceiverSpan,
+            resolution.Kind == OverloadResolutionKind.Inaccessible);
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -1959,7 +1987,11 @@ public sealed class Binder
             argumentModifiers: callExpr.ArgumentModifiers,
             typeArguments: callExpr.TypeArguments,
             resolvedSymbol: resolution.Function,
-            receiverSymbol: receiverSymbol);
+            receiverSymbol: receiverSymbol,
+            resolvedSymbols: resolution.Functions,
+            calleeSpan: callExpr.CalleeSpan,
+            receiverSpan: callExpr.ReceiverSpan,
+            isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible);
     }
 
     private VariableSymbol? ResolveCallReceiver(string target)
@@ -1988,7 +2020,7 @@ public sealed class Binder
             .ToArray();
         foreach (var lookupName in GetCallLookupNames(target).Distinct(StringComparer.Ordinal))
         {
-            var resolution = _scope.ResolveOverload(
+            var resolution = ResolveAccessibleOverload(
                 lookupName,
                 argumentTypes,
                 argumentNames,
@@ -2021,36 +2053,152 @@ public sealed class Binder
         return OverloadResolutionResult.NotFound();
     }
 
+    private OverloadResolutionResult ResolveAccessibleOverload(
+        string lookupName,
+        IReadOnlyList<string> argumentTypes,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers,
+        IReadOnlyList<string>? typeArguments)
+    {
+        var candidates = _scope.GetOverloads(lookupName)
+            .ToArray();
+        if (candidates.Length == 0)
+            return OverloadResolutionResult.NotFound();
+
+        var accessibleCandidates = candidates
+            .Where(IsFunctionAccessible)
+            .ToArray();
+        if (accessibleCandidates.Length == 0)
+            return OverloadResolutionResult.Inaccessible(candidates);
+
+        var accessibleScope = new Scope();
+        foreach (var candidate in accessibleCandidates)
+            accessibleScope.TryDeclareOverload(lookupName, candidate, out _);
+
+        return accessibleScope.ResolveOverload(
+            lookupName,
+            argumentTypes,
+            argumentNames,
+            argumentModifiers,
+            typeArguments);
+    }
+
+    private bool IsFunctionAccessible(FunctionSymbol function)
+    {
+        if (function.ContainingTypeName == null)
+            return true;
+
+        return function.Visibility switch
+        {
+            Visibility.Private =>
+                string.Equals(
+                    function.ContainingTypeName,
+                    _currentClassName,
+                    StringComparison.Ordinal),
+            Visibility.Protected =>
+                _currentClass != null
+                && IsSameOrDerivedClass(_currentClass, function.ContainingTypeName),
+            _ => true,
+        };
+    }
+
+    private bool IsSameOrDerivedClass(
+        ClassDefinitionNode cls,
+        string expectedBaseName)
+    {
+        var current = cls;
+        var visited = new HashSet<ClassDefinitionNode>();
+        while (visited.Add(current))
+        {
+            if (string.Equals(
+                    _qualifiedClassNames[current],
+                    expectedBaseName,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            var baseClass = ResolveBaseClass(current);
+            if (baseClass == null)
+                return false;
+            current = baseClass;
+        }
+
+        return false;
+    }
+
     private IEnumerable<string> GetCallLookupNames(string target)
     {
-        yield return target;
-
         if (target.StartsWith("this.", StringComparison.Ordinal) && _currentClassName != null)
         {
-            yield return $"{_currentClassName}.{target["this.".Length..]}";
+            foreach (var lookupName in EnumerateHierarchyLookupNames(
+                         _currentClass,
+                         target["this.".Length..]))
+            {
+                yield return lookupName;
+            }
             yield break;
         }
 
         if (target.StartsWith("base.", StringComparison.Ordinal))
         {
             var baseClass = ResolveBaseClass(_currentClass);
-            if (baseClass != null)
+            foreach (var lookupName in EnumerateHierarchyLookupNames(
+                         baseClass,
+                         target["base.".Length..]))
             {
-                yield return $"{_qualifiedClassNames[baseClass]}.{target["base.".Length..]}";
+                yield return lookupName;
             }
             yield break;
         }
 
         var firstDot = target.IndexOf('.');
         if (firstDot <= 0)
+        {
+            if (_currentClass != null)
+            {
+                foreach (var lookupName in EnumerateHierarchyLookupNames(
+                             _currentClass,
+                             target))
+                {
+                    yield return lookupName;
+                }
+            }
+
+            yield return target;
             yield break;
+        }
 
         var receiverName = target[..firstDot];
         if (_scope.Lookup(receiverName) is VariableSymbol receiver)
         {
             var receiverType = GetNominalTypeName(receiver.TypeName);
-            if (!string.IsNullOrEmpty(receiverType))
-                yield return $"{receiverType}.{target[(firstDot + 1)..]}";
+            var receiverClass = ResolveClass(receiverType);
+            if (receiverClass != null)
+            {
+                foreach (var lookupName in EnumerateHierarchyLookupNames(
+                             receiverClass,
+                             target[(firstDot + 1)..]))
+                {
+                    yield return lookupName;
+                }
+                yield break;
+            }
+        }
+
+        yield return target;
+    }
+
+    private IEnumerable<string> EnumerateHierarchyLookupNames(
+        ClassDefinitionNode? start,
+        string memberName)
+    {
+        var current = start;
+        var visited = new HashSet<ClassDefinitionNode>();
+        while (current != null && visited.Add(current))
+        {
+            yield return $"{_qualifiedClassNames[current]}.{memberName}";
+            current = ResolveBaseClass(current);
         }
     }
 

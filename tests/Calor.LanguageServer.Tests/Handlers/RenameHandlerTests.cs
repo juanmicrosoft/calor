@@ -1,6 +1,7 @@
 using Calor.LanguageServer.Handlers;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
+using Calor.LanguageServer.Utilities;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Xunit;
@@ -42,7 +43,7 @@ public class RenameHandlerTests
     }
 
     [Fact]
-    public async Task RenameWithNonExactReferenceSpan_IsRefusedRatherThanCorruptingSourceAsync()
+    public async Task RenameFunctionCall_UsesExactCalleeSpanAsync()
     {
         var source = """
             §M{m001:TestModule}
@@ -67,7 +68,15 @@ public class RenameHandlerTests
             },
             CancellationToken.None);
 
-        Assert.Null(edit);
+        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.Equal(2, edits.Length);
+        Assert.All(edits, textEdit =>
+        {
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+            Assert.Equal("Compute", source[start..end]);
+            Assert.Equal("Calculate", textEdit.NewText);
+        });
     }
 
     [Fact]

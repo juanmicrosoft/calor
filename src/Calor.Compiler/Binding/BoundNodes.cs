@@ -174,8 +174,12 @@ public sealed class BoundCallStatement : BoundStatement
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public FunctionSymbol? ResolvedSymbol { get; }
     public SymbolId? ResolvedSymbolId => ResolvedSymbol?.Id;
+    public IReadOnlyList<FunctionSymbol> ResolvedSymbols { get; }
     public VariableSymbol? ReceiverSymbol { get; }
     public SymbolId? ReceiverSymbolId => ReceiverSymbol?.Id;
+    public TextSpan CalleeSpan { get; }
+    public TextSpan? ReceiverSpan { get; }
+    public bool IsInaccessibleCall { get; }
     public IReadOnlyList<string?>? ArgumentNames { get; }
     public IReadOnlyList<string?>? ArgumentModifiers { get; }
     public override IEnumerable<BoundNode> ChildNodes => Arguments;
@@ -187,15 +191,24 @@ public sealed class BoundCallStatement : BoundStatement
         FunctionSymbol? resolvedSymbol = null,
         IReadOnlyList<string?>? argumentNames = null,
         IReadOnlyList<string?>? argumentModifiers = null,
-        VariableSymbol? receiverSymbol = null)
+        VariableSymbol? receiverSymbol = null,
+        IReadOnlyList<FunctionSymbol>? resolvedSymbols = null,
+        TextSpan? calleeSpan = null,
+        TextSpan? receiverSpan = null,
+        bool isInaccessibleCall = false)
         : base(span)
     {
         Target = target;
         Arguments = arguments;
         ResolvedSymbol = resolvedSymbol;
+        ResolvedSymbols = resolvedSymbols
+            ?? (resolvedSymbol == null ? Array.Empty<FunctionSymbol>() : [resolvedSymbol]);
         ArgumentNames = argumentNames;
         ArgumentModifiers = argumentModifiers;
         ReceiverSymbol = receiverSymbol;
+        CalleeSpan = calleeSpan ?? span;
+        ReceiverSpan = receiverSpan;
+        IsInaccessibleCall = isInaccessibleCall;
     }
 }
 
@@ -515,8 +528,12 @@ public sealed class BoundCallExpression : BoundExpression
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public FunctionSymbol? ResolvedSymbol { get; }
     public SymbolId? ResolvedSymbolId => ResolvedSymbol?.Id;
+    public IReadOnlyList<FunctionSymbol> ResolvedSymbols { get; }
     public VariableSymbol? ReceiverSymbol { get; }
     public SymbolId? ReceiverSymbolId => ReceiverSymbol?.Id;
+    public TextSpan CalleeSpan { get; }
+    public TextSpan? ReceiverSpan { get; }
+    public bool IsInaccessibleCall { get; }
     public override string TypeName { get; }
     public override IReadOnlyList<BoundExpression> Children => Arguments;
 
@@ -558,12 +575,18 @@ public sealed class BoundCallExpression : BoundExpression
         IReadOnlyList<string?>? argumentModifiers = null,
         IReadOnlyList<string>? typeArguments = null,
         FunctionSymbol? resolvedSymbol = null,
-        VariableSymbol? receiverSymbol = null)
+        VariableSymbol? receiverSymbol = null,
+        IReadOnlyList<FunctionSymbol>? resolvedSymbols = null,
+        TextSpan? calleeSpan = null,
+        TextSpan? receiverSpan = null,
+        bool isInaccessibleCall = false)
         : base(span)
     {
         Target = target;
         Arguments = arguments;
         ResolvedSymbol = resolvedSymbol;
+        ResolvedSymbols = resolvedSymbols
+            ?? (resolvedSymbol == null ? Array.Empty<FunctionSymbol>() : [resolvedSymbol]);
         TypeName = resultType;
         ResolvedTypeName = resolvedTypeName;
         ResolvedMethodName = resolvedMethodName;
@@ -572,6 +595,9 @@ public sealed class BoundCallExpression : BoundExpression
         ArgumentModifiers = argumentModifiers;
         TypeArguments = typeArguments;
         ReceiverSymbol = receiverSymbol;
+        CalleeSpan = calleeSpan ?? span;
+        ReceiverSpan = receiverSpan;
+        IsInaccessibleCall = isInaccessibleCall;
     }
 }
 

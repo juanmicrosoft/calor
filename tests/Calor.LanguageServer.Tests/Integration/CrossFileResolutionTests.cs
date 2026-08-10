@@ -138,8 +138,51 @@ public class CrossFileResolutionTests
             source).BoundModule!.Functions).Symbol;
 
         Assert.Equal(firstSymbol.Id, secondSymbol.Id);
-        Assert.Contains("workspace%3Asrc%2Fshared.calr", firstSymbol.Id.Value);
+        Assert.Contains("workspace%3Aroot0%3Asrc%2Fshared.calr", firstSymbol.Id.Value);
         Assert.DoesNotContain("/checkout/one", firstSymbol.Id.Value);
+    }
+
+    [Fact]
+    public void MultipleWorkspaceRoots_DisambiguateIdenticalRelativePathsPortably()
+    {
+        const string source = """
+            §M{m001:Shared}
+              §F{f001:Same:pub}
+                §O{void}
+            """;
+        var firstWorkspace = new WorkspaceState();
+        firstWorkspace.ConfigureWorkspaceRoots(
+        [
+            new Uri("file:///checkout/first"),
+            new Uri("file:///checkout/second"),
+        ]);
+        var secondWorkspace = new WorkspaceState();
+        secondWorkspace.ConfigureWorkspaceRoots(
+        [
+            new Uri("file:///relocated/first"),
+            new Uri("file:///relocated/second"),
+        ]);
+
+        var firstRootSymbol = Assert.Single(firstWorkspace.GetOrCreate(
+            DocumentUri.FromFileSystemPath("/checkout/first/src/shared.calr"),
+            source).BoundModule!.Functions).Symbol;
+        var secondRootSymbol = Assert.Single(firstWorkspace.GetOrCreate(
+            DocumentUri.FromFileSystemPath("/checkout/second/src/shared.calr"),
+            source).BoundModule!.Functions).Symbol;
+        var relocatedFirst = Assert.Single(secondWorkspace.GetOrCreate(
+            DocumentUri.FromFileSystemPath("/relocated/first/src/shared.calr"),
+            source).BoundModule!.Functions).Symbol;
+        var relocatedSecond = Assert.Single(secondWorkspace.GetOrCreate(
+            DocumentUri.FromFileSystemPath("/relocated/second/src/shared.calr"),
+            source).BoundModule!.Functions).Symbol;
+
+        Assert.NotEqual(firstRootSymbol.Id, secondRootSymbol.Id);
+        Assert.Equal(firstRootSymbol.Id, relocatedFirst.Id);
+        Assert.Equal(secondRootSymbol.Id, relocatedSecond.Id);
+        Assert.Contains("workspace%3Aroot0%3Asrc%2Fshared.calr", firstRootSymbol.Id.Value);
+        Assert.Contains("workspace%3Aroot1%3Asrc%2Fshared.calr", secondRootSymbol.Id.Value);
+        Assert.DoesNotContain("/checkout/", firstRootSymbol.Id.Value);
+        Assert.DoesNotContain("/relocated/", relocatedFirst.Id.Value);
     }
 
     [Fact]

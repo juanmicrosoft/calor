@@ -190,11 +190,13 @@ public static class SymbolFinder
         {
             case BoundCallExpression expression:
                 if (expression.ReceiverSymbol is { } expressionReceiver
+                    && expression.ReceiverSpan?.Contains(offset) == true
                     && string.Equals(expressionReceiver.Name, result.Name, StringComparison.Ordinal))
                 {
                     return expressionReceiver.Id.IsNone ? null : expressionReceiver.Id;
                 }
-                if (CallTargetMatchesName(expression.Target, result.Name)
+                if (expression.CalleeSpan.Contains(offset)
+                    && CallTargetMatchesName(expression.Target, result.Name)
                     && expression.ResolvedSymbolId is { IsNone: false } expressionId)
                 {
                     return expressionId;
@@ -202,11 +204,13 @@ public static class SymbolFinder
                 break;
             case BoundCallStatement statement:
                 if (statement.ReceiverSymbol is { } statementReceiver
+                    && statement.ReceiverSpan?.Contains(offset) == true
                     && string.Equals(statementReceiver.Name, result.Name, StringComparison.Ordinal))
                 {
                     return statementReceiver.Id.IsNone ? null : statementReceiver.Id;
                 }
-                if (CallTargetMatchesName(statement.Target, result.Name)
+                if (statement.CalleeSpan.Contains(offset)
+                    && CallTargetMatchesName(statement.Target, result.Name)
                     && statement.ResolvedSymbolId is { IsNone: false } statementId)
                 {
                     return statementId;
@@ -268,17 +272,19 @@ public static class SymbolFinder
                 case BoundFieldAccessExpression field when field.ResolvedSymbolId == symbolId:
                     references.Add(field.Span);
                     break;
-                case BoundCallExpression call when call.ResolvedSymbolId == symbolId:
-                    references.Add(call.Span);
+                case BoundCallExpression call
+                    when call.ResolvedSymbols.Any(symbol => symbol.Id == symbolId):
+                    references.Add(call.CalleeSpan);
                     break;
                 case BoundCallExpression call when call.ReceiverSymbolId == symbolId:
-                    references.Add(call.Span);
+                    references.Add(call.ReceiverSpan ?? call.Span);
                     break;
-                case BoundCallStatement call when call.ResolvedSymbolId == symbolId:
-                    references.Add(call.Span);
+                case BoundCallStatement call
+                    when call.ResolvedSymbols.Any(symbol => symbol.Id == symbolId):
+                    references.Add(call.CalleeSpan);
                     break;
                 case BoundCallStatement call when call.ReceiverSymbolId == symbolId:
-                    references.Add(call.Span);
+                    references.Add(call.ReceiverSpan ?? call.Span);
                     break;
                 case BoundNewExpression creation when creation.ResolvedSymbolId == symbolId:
                     references.Add(creation.Span);

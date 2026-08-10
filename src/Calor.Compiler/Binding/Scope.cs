@@ -453,6 +453,7 @@ public sealed class FunctionSymbol : Symbol
     public IReadOnlyList<string> TypeParameters { get; }
     public Visibility Visibility { get; }
     public string? ContainingTypeName { get; }
+    public ConditionalAlternative? ConditionalAlternative { get; }
     public int GenericArity => TypeParameters.Count;
 
     public string SignatureKey => string.Join(
@@ -487,7 +488,8 @@ public sealed class FunctionSymbol : Symbol
         TextSpan declarationSpan = default,
         Visibility visibility = Visibility.Public,
         string? containingTypeName = null,
-        TextSpan? definitionSpan = null)
+        TextSpan? definitionSpan = null,
+        ConditionalAlternative? conditionalAlternative = null)
         : base(id, name, declarationSpan, definitionSpan)
     {
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
@@ -495,6 +497,7 @@ public sealed class FunctionSymbol : Symbol
         TypeParameters = typeParameters?.ToArray() ?? Array.Empty<string>();
         Visibility = visibility;
         ContainingTypeName = containingTypeName;
+        ConditionalAlternative = conditionalAlternative;
     }
 
     public FunctionSymbol(
@@ -521,6 +524,13 @@ public sealed class FunctionSymbol : Symbol
     }
 }
 
+public readonly record struct ConditionalAlternative(string GroupId, int BranchIndex)
+{
+    public bool IsMutuallyExclusiveWith(ConditionalAlternative other) =>
+        string.Equals(GroupId, other.GroupId, StringComparison.Ordinal)
+        && BranchIndex != other.BranchIndex;
+}
+
 public sealed class TypeSymbol : Symbol
 {
     public string QualifiedName { get; }
@@ -543,6 +553,7 @@ public sealed class TypeSymbol : Symbol
 public enum OverloadResolutionKind
 {
     NotFound,
+    Inaccessible,
     NoMatch,
     Ambiguous,
     Resolved,
@@ -554,21 +565,28 @@ public sealed class OverloadResolutionResult
     public FunctionSymbol? Function { get; }
     public string? ResolvedReturnType { get; }
     public IReadOnlyList<FunctionSymbol> Candidates { get; }
+    public IReadOnlyList<FunctionSymbol> Functions { get; }
 
     private OverloadResolutionResult(
         OverloadResolutionKind kind,
         FunctionSymbol? function,
         string? resolvedReturnType,
-        IReadOnlyList<FunctionSymbol> candidates)
+        IReadOnlyList<FunctionSymbol> candidates,
+        IReadOnlyList<FunctionSymbol>? functions = null)
     {
         Kind = kind;
         Function = function;
         ResolvedReturnType = resolvedReturnType;
         Candidates = candidates;
+        Functions = functions ?? Array.Empty<FunctionSymbol>();
     }
 
     public static OverloadResolutionResult NotFound() =>
         new(OverloadResolutionKind.NotFound, null, null, Array.Empty<FunctionSymbol>());
+
+    public static OverloadResolutionResult Inaccessible(
+        IReadOnlyList<FunctionSymbol> candidates) =>
+        new(OverloadResolutionKind.Inaccessible, null, null, candidates);
 
     public static OverloadResolutionResult NoMatch(IReadOnlyList<FunctionSymbol> candidates) =>
         new(OverloadResolutionKind.NoMatch, null, null, candidates);
@@ -577,7 +595,23 @@ public sealed class OverloadResolutionResult
         new(OverloadResolutionKind.Ambiguous, null, null, candidates);
 
     public static OverloadResolutionResult Resolved(FunctionSymbol function, string returnType) =>
-        new(OverloadResolutionKind.Resolved, function, returnType, [function]);
+        new(OverloadResolutionKind.Resolved, function, returnType, [function], [function]);
+
+    public static OverloadResolutionResult ResolvedAlternatives(
+        IReadOnlyList<FunctionSymbol> functions,
+        string returnType)
+    {
+        ArgumentNullException.ThrowIfNull(functions);
+        if (functions.Count == 0)
+            throw new ArgumentException("At least one resolved function is required.", nameof(functions));
+
+        return new(
+            OverloadResolutionKind.Resolved,
+            functions[0],
+            returnType,
+            functions,
+            functions);
+    }
 }
 
 /// <summary>
@@ -609,8 +643,9 @@ public sealed class Scope
         TryDeclareOverload(symbol.Name, symbol, out _);
 
     /// <summary>
-    /// Declares a function under a lookup name. Duplicate signatures are rejected,
-    /// but the caller retains the canonical symbol and can still bind its body.
+    /// Declares a function under a lookup name. Duplicate signatures are rejected
+    /// unless every same-signature declaration is in a different branch of the
+    /// same conditional-compilation group.
     /// </summary>
     public bool TryDeclareOverload(
         string lookupName,
@@ -631,7 +666,8 @@ public sealed class Scope
         }
 
         duplicate = overloads.FirstOrDefault(candidate =>
-            string.Equals(candidate.SignatureKey, symbol.SignatureKey, StringComparison.Ordinal));
+            string.Equals(candidate.SignatureKey, symbol.SignatureKey, StringComparison.Ordinal)
+            && !AreMutuallyExclusiveAlternatives(candidate, symbol));
         if (duplicate != null)
             return false;
 
@@ -707,9 +743,27 @@ public sealed class Scope
 
         var bestScore = applicable.Min(item => item.Score);
         var best = applicable.Where(item => item.Score == bestScore).ToArray();
-        return best.Length == 1
-            ? OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType)
-            : OverloadResolutionResult.Ambiguous(best.Select(item => item.Function).ToArray());
+        if (best.Length == 1)
+            return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType);
+
+        var bestFunctions = best.Select(item => item.Function).ToArray();
+        if (bestFunctions
+            .Skip(1)
+            .All(candidate =>
+                string.Equals(
+                    candidate.SignatureKey,
+                    bestFunctions[0].SignatureKey,
+                    StringComparison.Ordinal)
+                && bestFunctions
+                    .Where(other => !ReferenceEquals(other, candidate))
+                    .All(other => AreMutuallyExclusiveAlternatives(candidate, other))))
+        {
+            return OverloadResolutionResult.ResolvedAlternatives(
+                bestFunctions,
+                best[0].ReturnType);
+        }
+
+        return OverloadResolutionResult.Ambiguous(bestFunctions);
     }
 
     public IReadOnlyList<FunctionSymbol> GetOverloads(string name)
@@ -741,6 +795,13 @@ public sealed class Scope
     {
         return new Scope(this);
     }
+
+    private static bool AreMutuallyExclusiveAlternatives(
+        FunctionSymbol left,
+        FunctionSymbol right) =>
+        left.ConditionalAlternative is { } leftAlternative
+        && right.ConditionalAlternative is { } rightAlternative
+        && leftAlternative.IsMutuallyExclusiveWith(rightAlternative);
 
     /// <summary>
     /// Gets all symbols visible from this scope (including parent scopes).

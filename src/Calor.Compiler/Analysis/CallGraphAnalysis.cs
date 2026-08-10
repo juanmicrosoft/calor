@@ -42,7 +42,7 @@ public sealed class CallGraphAnalysis
         int Start,
         int End);
 
-    private readonly IReadOnlyDictionary<AstCallKey, string> _resolvedCallIds;
+    private readonly IReadOnlyDictionary<AstCallKey, IReadOnlyList<string>> _resolvedCallIds;
     private readonly IReadOnlySet<AstCallKey> _boundCallSites;
 
     /// <summary>
@@ -67,24 +67,26 @@ public sealed class CallGraphAnalysis
             {
                 string? target = null;
                 TextSpan span = default;
-                SymbolId? callee = null;
+                IReadOnlyList<FunctionSymbol>? callees = null;
 
                 switch (node)
                 {
                     case BoundCallStatement statement:
                         target = statement.Target;
                         span = statement.Span;
-                        callee = statement.ResolvedSymbolId;
+                        callees = statement.ResolvedSymbols;
                         break;
                     case BoundCallExpression expression:
                         target = expression.Target;
                         span = expression.Span;
-                        callee = expression.ResolvedSymbolId;
+                        callees = expression.ResolvedSymbols;
                         break;
                     case BoundNewExpression creation:
                         target = $"{creation.TypeName}..ctor";
                         span = creation.Span;
-                        callee = creation.ResolvedSymbolId;
+                        callees = creation.ResolvedConstructor == null
+                            ? Array.Empty<FunctionSymbol>()
+                            : [creation.ResolvedConstructor];
                         break;
                     case BoundExpressionCallExpression expressionCall:
                         target = "<expression-call>";
@@ -95,15 +97,24 @@ public sealed class CallGraphAnalysis
                 if (target == null)
                     continue;
 
-                if (callee is { } resolved && !resolved.IsNone)
+                var resolvedCallees = callees?
+                    .Where(callee => !callee.Id.IsNone)
+                    .Select(callee => callee.Id)
+                    .Distinct()
+                    .ToArray()
+                    ?? Array.Empty<SymbolId>();
+                if (resolvedCallees.Length > 0)
                 {
-                    forward[function.SymbolId].Add(new ResolvedCallSite(resolved, target, span));
-                    if (!reverse.TryGetValue(resolved, out var callers))
+                    foreach (var resolved in resolvedCallees)
                     {
-                        callers = new List<SymbolId>();
-                        reverse[resolved] = callers;
+                        forward[function.SymbolId].Add(new ResolvedCallSite(resolved, target, span));
+                        if (!reverse.TryGetValue(resolved, out var callers))
+                        {
+                            callers = new List<SymbolId>();
+                            reverse[resolved] = callers;
+                        }
+                        callers.Add(function.SymbolId);
                     }
-                    callers.Add(function.SymbolId);
                 }
                 else
                 {
@@ -176,7 +187,7 @@ public sealed class CallGraphAnalysis
         Dictionary<string, string> functionNameToId,
         Dictionary<string, List<string>> methodNameToIds,
         IReadOnlyList<AstUnresolvedCallSite> unresolvedCalls,
-        IReadOnlyDictionary<AstCallKey, string> resolvedCallIds,
+        IReadOnlyDictionary<AstCallKey, IReadOnlyList<string>> resolvedCallIds,
         IReadOnlySet<AstCallKey> boundCallSites,
         bool isBoundResolutionComplete,
         List<List<string>> sccs)
@@ -358,8 +369,8 @@ public sealed class CallGraphAnalysis
             foreach (var (callee, span) in calls)
             {
                 var key = new AstCallKey(function.Id, callee, span.Start, span.End);
-                List<string> calleeIds = resolvedCallIds.TryGetValue(key, out var exactId)
-                    ? [exactId]
+                List<string> calleeIds = resolvedCallIds.TryGetValue(key, out var exactIds)
+                    ? exactIds.ToList()
                     : boundCallSites.Contains(key)
                         ? []
                         : ResolveToAllInternalIds(
@@ -403,14 +414,14 @@ public sealed class CallGraphAnalysis
     }
 
     private static (
-        Dictionary<AstCallKey, string> Resolved,
+        Dictionary<AstCallKey, IReadOnlyList<string>> Resolved,
         HashSet<AstCallKey> BoundCallSites,
         bool Complete)
         ResolveBoundCallSites(
             ModuleNode ast,
             IReadOnlyDictionary<string, FunctionNode> functions)
     {
-        var resolved = new Dictionary<AstCallKey, string>();
+        var resolved = new Dictionary<AstCallKey, IReadOnlyList<string>>();
         var boundCallSites = new HashSet<AstCallKey>();
 
         try
@@ -441,24 +452,29 @@ public sealed class CallGraphAnalysis
                 foreach (var node in DescendantsAndSelf(function))
                 {
                     string? target = null;
-                    SymbolId? calleeId = null;
+                    IReadOnlyList<FunctionSymbol>? callees = null;
                     VariableSymbol? receiver = null;
+                    var inaccessibleCall = false;
                     var expressionTargetCall = false;
                     switch (node)
                     {
                         case BoundCallStatement statement:
                             target = statement.Target;
-                            calleeId = statement.ResolvedSymbolId;
+                            callees = statement.ResolvedSymbols;
                             receiver = statement.ReceiverSymbol;
+                            inaccessibleCall = statement.IsInaccessibleCall;
                             break;
                         case BoundCallExpression expression:
                             target = expression.Target;
-                            calleeId = expression.ResolvedSymbolId;
+                            callees = expression.ResolvedSymbols;
                             receiver = expression.ReceiverSymbol;
+                            inaccessibleCall = expression.IsInaccessibleCall;
                             break;
                         case BoundNewExpression creation:
                             target = $"{creation.TypeName}..ctor";
-                            calleeId = creation.ResolvedSymbolId;
+                            callees = creation.ResolvedConstructor == null
+                                ? Array.Empty<FunctionSymbol>()
+                                : [creation.ResolvedConstructor];
                             break;
                         case BoundExpressionCallExpression:
                             target = "<expression-call>";
@@ -470,14 +486,22 @@ public sealed class CallGraphAnalysis
                         continue;
 
                     var key = new AstCallKey(callerId, target, node.Span.Start, node.Span.End);
-                    if (calleeId is { IsNone: false } exactSymbolId
-                        && legacyIds.TryGetValue(exactSymbolId, out var calleeLegacyId))
+                    var calleeLegacyIds = callees?
+                        .Select(callee => callee.Id)
+                        .Where(calleeId => !calleeId.IsNone)
+                        .Where(legacyIds.ContainsKey)
+                        .Select(calleeId => legacyIds[calleeId])
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray()
+                        ?? Array.Empty<string>();
+                    if (calleeLegacyIds.Length > 0)
                     {
                         boundCallSites.Add(key);
-                        resolved[key] = calleeLegacyId;
+                        resolved[key] = calleeLegacyIds;
                     }
                     else if (expressionTargetCall
                              || receiver != null
+                             || inaccessibleCall
                              || incompatibleCallSpans.Contains((node.Span.Start, node.Span.End)))
                     {
                         boundCallSites.Add(key);
@@ -553,20 +577,39 @@ public sealed class CallGraphAnalysis
 
         foreach (var (callee, span) in calls)
         {
-            var resolvedId = ResolveCallSite(functionId, callee, span);
-            result.Add((resolvedId ?? callee, callee, span));
+            var resolvedIds = ResolveCallSiteIds(functionId, callee, span);
+            if (resolvedIds.Count == 0)
+                result.Add((callee, callee, span));
+            else
+                result.AddRange(resolvedIds.Select(resolvedId => (resolvedId, callee, span)));
         }
         return result;
     }
 
     public string? ResolveCallSite(string callerId, string target, TextSpan span)
     {
+        var resolved = ResolveCallSiteIds(callerId, target, span);
+        return resolved.Count == 1 ? resolved[0] : null;
+    }
+
+    public IReadOnlyList<string> ResolveCallSites(
+        string callerId,
+        string target,
+        TextSpan span) =>
+        ResolveCallSiteIds(callerId, target, span);
+
+    private IReadOnlyList<string> ResolveCallSiteIds(
+        string callerId,
+        string target,
+        TextSpan span)
+    {
         var key = new AstCallKey(callerId, target, span.Start, span.End);
         if (_resolvedCallIds.TryGetValue(key, out var resolved))
             return resolved;
         if (_boundCallSites.Contains(key))
-            return null;
-        return ResolveToInternalId(target);
+            return Array.Empty<string>();
+        var fallback = ResolveToInternalId(target);
+        return fallback == null ? Array.Empty<string>() : [fallback];
     }
 
     private static FunctionNode ToFunctionNode(MethodNode method, string className)
@@ -659,7 +702,7 @@ public sealed class CallGraphAnalysis
         Dictionary<string, List<(string Callee, TextSpan Span)>> forwardGraph,
         Dictionary<string, string> functionNameToId,
         Dictionary<string, List<string>> methodNameToIds,
-        IReadOnlyDictionary<AstCallKey, string> resolvedCallIds,
+        IReadOnlyDictionary<AstCallKey, IReadOnlyList<string>> resolvedCallIds,
         IReadOnlySet<AstCallKey> boundCallSites)
     {
         var sccs = new List<List<string>>();
@@ -694,7 +737,7 @@ public sealed class CallGraphAnalysis
         Dictionary<string, List<(string Callee, TextSpan Span)>> forwardGraph,
         Dictionary<string, string> functionNameToId,
         Dictionary<string, List<string>> methodNameToIds,
-        IReadOnlyDictionary<AstCallKey, string> resolvedCallIds,
+        IReadOnlyDictionary<AstCallKey, IReadOnlyList<string>> resolvedCallIds,
         IReadOnlySet<AstCallKey> boundCallSites)
     {
         indices[v] = index;
@@ -707,42 +750,38 @@ public sealed class CallGraphAnalysis
         {
             foreach (var (calleeName, span) in calls)
             {
-                // Resolve to single internal ID
                 var key = new AstCallKey(v, calleeName, span.Start, span.End);
-                string? calleeId = resolvedCallIds.GetValueOrDefault(key);
-                if (calleeId == null && boundCallSites.Contains(key))
+                IReadOnlyList<string> calleeIds;
+                if (resolvedCallIds.TryGetValue(key, out var exactIds))
+                {
+                    calleeIds = exactIds;
+                }
+                else if (boundCallSites.Contains(key))
+                {
                     continue;
-                if (calleeId == null
-                    && functionNameToId.TryGetValue(calleeName, out var id)
-                    && functions.ContainsKey(id))
-                    calleeId = id;
-                else if (calleeId == null && functions.ContainsKey(calleeName))
-                    calleeId = calleeName;
-                else if (calleeId == null)
+                }
+                else
                 {
-                    var lastDot = calleeName.LastIndexOf('.');
-                    if (lastDot > 0)
+                    calleeIds = ResolveToAllInternalIds(
+                        calleeName,
+                        functions,
+                        functionNameToId,
+                        methodNameToIds);
+                }
+
+                foreach (var calleeId in calleeIds)
+                {
+                    if (!indices.ContainsKey(calleeId))
                     {
-                        var bare = calleeName[(lastDot + 1)..];
-                        if (methodNameToIds.TryGetValue(bare, out var candidates) && candidates.Count == 1)
-                            calleeId = candidates[0];
-                        else if (functionNameToId.TryGetValue(bare, out var bareId) && functions.ContainsKey(bareId))
-                            calleeId = bareId;
+                        Strongconnect(calleeId, ref index, indices, lowlinks, onStack, stack, sccs,
+                            functions, forwardGraph, functionNameToId, methodNameToIds,
+                            resolvedCallIds, boundCallSites);
+                        lowlinks[v] = Math.Min(lowlinks[v], lowlinks[calleeId]);
                     }
-                }
-
-                if (calleeId == null) continue;
-
-                if (!indices.ContainsKey(calleeId))
-                {
-                    Strongconnect(calleeId, ref index, indices, lowlinks, onStack, stack, sccs,
-                        functions, forwardGraph, functionNameToId, methodNameToIds,
-                        resolvedCallIds, boundCallSites);
-                    lowlinks[v] = Math.Min(lowlinks[v], lowlinks[calleeId]);
-                }
-                else if (onStack.Contains(calleeId))
-                {
-                    lowlinks[v] = Math.Min(lowlinks[v], indices[calleeId]);
+                    else if (onStack.Contains(calleeId))
+                    {
+                        lowlinks[v] = Math.Min(lowlinks[v], indices[calleeId]);
+                    }
                 }
             }
         }

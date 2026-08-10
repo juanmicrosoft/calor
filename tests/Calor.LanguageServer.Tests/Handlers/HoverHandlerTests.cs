@@ -17,6 +17,37 @@ public class HoverHandlerTests
     {
         _handler = new HoverHandler(_workspace);
     }
+
+    [Fact]
+    public void BuildHover_UsesOneCapturedAnalysisSnapshot()
+    {
+        const string original = """
+            §M{m001:TestModule}
+              §F{f001:Original:pub} () -> i32
+                §R 1
+            """;
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(
+            "file:///snapshot-hover.calr");
+        var state = _workspace.GetOrCreate(uri, original, version: 1);
+        var captured = state.Snapshot;
+        var offset = original.IndexOf("Original", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(original, offset);
+        _workspace.Update(
+            uri,
+            "§M{m002:Changed}\n  §F{f002:New:pub} () -> i32\n    §R 2\n",
+            version: 2);
+
+        var hover = HoverHandler.BuildHover(
+            captured,
+            new Position(line - 1, column - 1));
+
+        Assert.NotNull(hover);
+        var markup = Assert.IsType<MarkupContent>(hover.Contents.MarkupContent);
+        Assert.Contains("Original", markup.Value, StringComparison.Ordinal);
+        Assert.Equal(1, captured.Version);
+        Assert.Equal(2, state.Version);
+    }
+
     [Fact]
     public void Hover_Function_ReturnsSymbolInfo()
     {

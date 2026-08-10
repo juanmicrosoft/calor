@@ -3,6 +3,7 @@ using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -524,6 +525,186 @@ public sealed class SymbolAndOverloadBindingTests
     }
 
     [Fact]
+    public void MutuallyExclusivePreprocessorMethods_ShareSignatureWithoutFalseDuplicate()
+    {
+        var feature = Method(
+            "feature",
+            "Pick",
+            Visibility.Public,
+            [new ReturnStatementNode(Span, new IntLiteralNode(Span, 1))]);
+        var fallback = Method(
+            "fallback",
+            "Pick",
+            Visibility.Public,
+            [
+                new PrintStatementNode(Span, new StringLiteralNode(Span, "fallback")),
+                new ReturnStatementNode(Span, new IntLiteralNode(Span, 2)),
+            ],
+            new EffectsNode(
+                Span,
+                new Dictionary<string, string> { ["io"] = "console_write" }));
+        var runMethod = Method(
+            "run",
+            "Run",
+            Visibility.Public,
+            [new ReturnStatementNode(Span, Call("Pick", []))]);
+        var module = Module(
+        [
+            Class(
+                "c1",
+                "Worker",
+                [runMethod],
+                preprocessorBlocks:
+                [
+                    MemberPreprocessor(
+                        [feature],
+                        MemberPreprocessor([fallback])),
+                ]),
+        ]);
+
+        var bound = Bind(module, out var diagnostics);
+        var alternatives = bound.Functions
+            .Where(function => function.Symbol.Name == "Worker.Pick")
+            .ToArray();
+        var run = bound.Functions.Single(function =>
+            function.Symbol.Name == "Worker.Run");
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(run.Body)).Expression);
+        var graphEdges = CallGraphAnalysis.BuildResolved(bound).ForwardGraph[run.SymbolId];
+
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.DuplicateFunctionSignature);
+        Assert.Equal(2, alternatives.Length);
+        Assert.Equal(
+            alternatives.Select(function => function.SymbolId).OrderBy(id => id.Value).ToArray(),
+            call.ResolvedSymbols.Select(symbol => symbol.Id).OrderBy(id => id.Value).ToArray());
+        Assert.Equal(
+            alternatives.Select(function => function.SymbolId).OrderBy(id => id.Value).ToArray(),
+            graphEdges.Select(edge => edge.Callee).OrderBy(id => id.Value).ToArray());
+
+        var effectDiagnostics = new DiagnosticBag();
+        new EffectEnforcementPass(effectDiagnostics).Enforce(module);
+        Assert.Contains(effectDiagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Run", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DuplicatePreprocessorMethods_InSameBranchRemainErrors()
+    {
+        var module = Module(
+        [
+            Class(
+                "c1",
+                "Worker",
+                [],
+                preprocessorBlocks:
+                [
+                    MemberPreprocessor(
+                        [
+                            Method(
+                                "first",
+                                "Pick",
+                                Visibility.Public,
+                                [new ReturnStatementNode(
+                                    Span,
+                                    new IntLiteralNode(Span, 1))]),
+                            Method(
+                                "second",
+                                "Pick",
+                                Visibility.Public,
+                                [new ReturnStatementNode(
+                                    Span,
+                                    new IntLiteralNode(Span, 2))]),
+                        ],
+                        MemberPreprocessor(
+                        [
+                            Method(
+                                "fallback",
+                                "Pick",
+                                Visibility.Public,
+                                [new ReturnStatementNode(
+                                    Span,
+                                    new IntLiteralNode(Span, 3))]),
+                        ])),
+                ]),
+        ]);
+
+        _ = Bind(module, out var diagnostics);
+
+        Assert.Single(diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.DuplicateFunctionSignature));
+    }
+
+    [Fact]
+    public void InheritedBareAndThisCalls_ResolveExactAccessibleBaseMember()
+    {
+        const string source = """
+            §M{m1:Test}
+              §CL{c1:Base:pub}
+                §MT{pick:Pick:prot} (i32:value) -> i32
+                  §E{cw}
+                  §P STR:"pick"
+                  §R value
+                §MT{hidden:Hidden:pri} () -> i32
+                  §R 0
+              §CL{c2:Derived:Base:pub}
+                §MT{use:Use:pub} () -> i32
+                  §B{first:i32} §C{Pick} §A INT:1 §/C
+                  §B{second:i32} §C{this.Pick} §A INT:2 §/C
+                  §C{Hidden} §/C
+                  §R (+ first second)
+            """;
+
+        var bound = ParseAndBind(source, out var diagnostics);
+        var basePick = bound.Functions.Single(function =>
+            function.Symbol.Name == "Base.Pick");
+        var use = bound.Functions.Single(function =>
+            function.Symbol.Name == "Derived.Use");
+        var calls = BoundNodeHelpers.DescendantsAndSelf(use)
+            .Where(node => node is BoundCallExpression or BoundCallStatement)
+            .ToArray();
+        var resolvedPickCalls = calls
+            .Select(node => node switch
+            {
+                BoundCallExpression expression => expression.ResolvedSymbol,
+                BoundCallStatement statement => statement.ResolvedSymbol,
+                _ => null,
+            })
+            .Where(symbol => symbol?.Name == "Base.Pick")
+            .ToArray();
+        var hiddenCall = Assert.Single(calls.OfType<BoundCallStatement>());
+
+        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
+        Assert.Equal(2, resolvedPickCalls.Length);
+        Assert.All(resolvedPickCalls, symbol => Assert.Same(basePick.Symbol, symbol));
+        Assert.Null(hiddenCall.ResolvedSymbol);
+        Assert.Equal(
+            new[] { basePick.SymbolId, basePick.SymbolId },
+            CallGraphAnalysis.BuildResolved(bound).ForwardGraph[use.SymbolId]
+                .Select(edge => edge.Callee)
+                .ToArray());
+
+        var effectDiagnostics = new DiagnosticBag();
+        var module = Parse(source, effectDiagnostics);
+        var callGraph = CallGraphAnalysis.Build(module);
+        var legacyUse = callGraph.Functions.Values.Single(function =>
+            function.Name == "Use");
+        var legacyHidden = callGraph.Functions.Values.Single(function =>
+            function.Name == "Hidden");
+        Assert.True(callGraph.IsBoundResolutionComplete);
+        Assert.Contains(callGraph.UnresolvedCalls, call =>
+            call.CallerId == legacyUse.Id && call.Target == "Hidden");
+        Assert.DoesNotContain(
+            legacyUse.Id,
+            callGraph.ReverseGraph[legacyHidden.Id]);
+        new EffectEnforcementPass(effectDiagnostics).Enforce(module);
+        Assert.Contains(effectDiagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect
+            && diagnostic.Message.Contains("Use", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void PreprocessorWrappedConstructorsAndProperties_AreBoundIntoModule()
     {
         const string source = """
@@ -618,11 +799,16 @@ public sealed class SymbolAndOverloadBindingTests
     private static BoundModule ParseAndBind(string source, out DiagnosticBag diagnostics)
     {
         diagnostics = new DiagnosticBag();
-        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
-        var module = new Parser(tokens, diagnostics).Parse();
+        var module = Parse(source, diagnostics);
         Assert.DoesNotContain(diagnostics, diagnostic =>
             diagnostic.Code.StartsWith("Calor01", StringComparison.Ordinal));
         return new Binder(diagnostics).Bind(module);
+    }
+
+    private static ModuleNode Parse(string source, DiagnosticBag diagnostics)
+    {
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        return new Parser(tokens, diagnostics).Parse();
     }
 
     private static ModuleNode Module(IReadOnlyList<FunctionNode> functions) =>
@@ -632,6 +818,84 @@ public sealed class SymbolAndOverloadBindingTests
             "Test",
             Array.Empty<UsingDirectiveNode>(),
             functions,
+            new AttributeCollection());
+
+    private static ModuleNode Module(IReadOnlyList<ClassDefinitionNode> classes) =>
+        new(
+            Span,
+            "m1",
+            "Test",
+            Array.Empty<UsingDirectiveNode>(),
+            Array.Empty<InterfaceDefinitionNode>(),
+            classes,
+            Array.Empty<FunctionNode>(),
+            new AttributeCollection());
+
+    private static ClassDefinitionNode Class(
+        string id,
+        string name,
+        IReadOnlyList<MethodNode> methods,
+        string? baseClass = null,
+        IReadOnlyList<MemberPreprocessorBlockNode>? preprocessorBlocks = null) =>
+        new(
+            Span,
+            id,
+            name,
+            isAbstract: false,
+            isSealed: false,
+            isPartial: false,
+            isStatic: false,
+            baseClass,
+            Array.Empty<string>(),
+            Array.Empty<TypeParameterNode>(),
+            Array.Empty<ClassFieldNode>(),
+            Array.Empty<PropertyNode>(),
+            Array.Empty<ConstructorNode>(),
+            methods,
+            Array.Empty<EventDefinitionNode>(),
+            Array.Empty<OperatorOverloadNode>(),
+            new AttributeCollection(),
+            Array.Empty<CalorAttributeNode>(),
+            visibility: Visibility.Public,
+            preprocessorBlocks: preprocessorBlocks);
+
+    private static MemberPreprocessorBlockNode MemberPreprocessor(
+        IReadOnlyList<MethodNode> methods,
+        MemberPreprocessorBlockNode? elseBranch = null) =>
+        new(
+            Span,
+            "FEATURE",
+            Array.Empty<ClassFieldNode>(),
+            Array.Empty<PropertyNode>(),
+            Array.Empty<ConstructorNode>(),
+            methods,
+            Array.Empty<EventDefinitionNode>(),
+            Array.Empty<OperatorOverloadNode>(),
+            elseBranch);
+
+    private static MethodNode Method(
+        string id,
+        string name,
+        Visibility visibility,
+        IReadOnlyList<StatementNode> body,
+        EffectsNode? effects = null) =>
+        new(
+            new TextSpan(
+                100 + id.Aggregate(0, (value, character) => value + character),
+                10,
+                1,
+                1),
+            id,
+            name,
+            visibility,
+            MethodModifiers.None,
+            Array.Empty<TypeParameterNode>(),
+            Array.Empty<ParameterNode>(),
+            new OutputNode(Span, "i32"),
+            effects,
+            Array.Empty<RequiresNode>(),
+            Array.Empty<EnsuresNode>(),
+            body,
             new AttributeCollection());
 
     private static FunctionNode Function(

@@ -938,6 +938,8 @@ public sealed class CallExpressionNode : ExpressionNode
 {
     public string Target { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
+    public TextSpan CalleeSpan { get; }
+    public TextSpan? ReceiverSpan { get; }
 
     /// <summary>
     /// Optional named argument labels, parallel to Arguments list.
@@ -959,30 +961,29 @@ public sealed class CallExpressionNode : ExpressionNode
     public IReadOnlyList<string>? TypeArguments { get; }
 
     public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments)
-        : base(span)
+        : this(span, target, arguments, null, null, null)
     {
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
     }
 
     public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames)
-        : base(span)
+        : this(span, target, arguments, argumentNames, null, null)
     {
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
-        ArgumentNames = argumentNames;
     }
 
     public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames, IReadOnlyList<string?>? argumentModifiers)
-        : base(span)
+        : this(span, target, arguments, argumentNames, argumentModifiers, null)
     {
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
-        ArgumentNames = argumentNames;
-        ArgumentModifiers = argumentModifiers;
     }
 
-    public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames, IReadOnlyList<string?>? argumentModifiers, IReadOnlyList<string>? typeArguments)
+    public CallExpressionNode(
+        TextSpan span,
+        string target,
+        IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers,
+        IReadOnlyList<string>? typeArguments,
+        TextSpan? calleeSpan = null,
+        TextSpan? receiverSpan = null)
         : base(span)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
@@ -990,6 +991,8 @@ public sealed class CallExpressionNode : ExpressionNode
         ArgumentNames = argumentNames;
         ArgumentModifiers = argumentModifiers;
         TypeArguments = typeArguments;
+        CalleeSpan = calleeSpan ?? span;
+        ReceiverSpan = receiverSpan;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

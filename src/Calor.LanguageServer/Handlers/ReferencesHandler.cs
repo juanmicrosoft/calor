@@ -336,10 +336,13 @@ public sealed class ReferenceCollector
                 break;
 
             case CallStatementNode call:
-                if (call.Target == _symbolName || call.Target.EndsWith("." + _symbolName))
+                if (CallCalleeMatches(call.Target, _symbolName))
                 {
-                    _references.Add(call.Span);
+                    _references.Add(call.CalleeSpan);
                 }
+                if (call.ReceiverSpan is { } statementReceiver
+                    && CallReceiverMatches(call.Target, _symbolName))
+                    _references.Add(statementReceiver);
                 foreach (var arg in call.Arguments)
                 {
                     VisitExpression(arg);
@@ -491,10 +494,13 @@ public sealed class ReferenceCollector
                 break;
 
             case CallExpressionNode callExpr:
-                if (callExpr.Target == _symbolName || callExpr.Target.EndsWith("." + _symbolName))
+                if (CallCalleeMatches(callExpr.Target, _symbolName))
                 {
-                    _references.Add(callExpr.Span);
+                    _references.Add(callExpr.CalleeSpan);
                 }
+                if (callExpr.ReceiverSpan is { } expressionReceiver
+                    && CallReceiverMatches(callExpr.Target, _symbolName))
+                    _references.Add(expressionReceiver);
                 foreach (var arg in callExpr.Arguments)
                 {
                     VisitExpression(arg);
@@ -696,5 +702,21 @@ public sealed class ReferenceCollector
                 }
                 break;
         }
+    }
+
+    private static bool CallCalleeMatches(string target, string symbolName)
+    {
+        var lastDot = target.LastIndexOf('.');
+        return string.Equals(
+            lastDot < 0 ? target : target[(lastDot + 1)..],
+            symbolName,
+            StringComparison.Ordinal);
+    }
+
+    private static bool CallReceiverMatches(string target, string symbolName)
+    {
+        var firstDot = target.IndexOf('.');
+        return firstDot > 0
+            && string.Equals(target[..firstDot], symbolName, StringComparison.Ordinal);
     }
 }

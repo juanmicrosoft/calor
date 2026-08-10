@@ -90,14 +90,14 @@ public sealed class Parser
     private Token? _lastIfToken;
 
     /// <summary>
-    /// Phase 4d — TokenKinds whose textual form is a legacy structural
+    /// Phase 4d -- TokenKinds whose textual form is a legacy structural
     /// closing tag (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …) that indent
     /// form has fully replaced. Encountering any of these in the token
     /// stream produces a <c>Calor0830 LegacyCloserForm</c> error.
     ///
-    /// Closers that still carry payload — <see cref="TokenKind.EndDo"/>
+    /// Closers that still carry payload -- <see cref="TokenKind.EndDo"/>
     /// (carries the do-while condition), <see cref="TokenKind.EndCase"/>
-    /// (match case delimiter), and the preprocessor <c>§/PP</c> — are
+    /// (match case delimiter), and the preprocessor <c>§/PP</c> -- are
     /// intentionally NOT in this set. Inline expression closers
     /// (<c>§/C</c>, <c>§/T</c>, <c>§/NEW</c>, <c>§/A</c>, <c>§/LIST</c>,
     /// <c>§/DICT</c>, <c>§/HSET</c>, <c>§/ARR</c>, <c>§/LAM</c>,
@@ -162,7 +162,7 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Phase 3 (indent-aware) — if the current token is a Dedent followed by
+    /// Phase 3 (indent-aware) -- if the current token is a Dedent followed by
     /// one of the given continuation tokens (e.g. ElseIf, Else, Catch,
     /// Finally), consume the Dedent. This lets a block-body loop end on
     /// Dedent without leaving it dangling for the chain continuation check.
@@ -195,7 +195,7 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Phase 3 (indent-aware) — returns true if the current token is a block
+    /// Phase 3 (indent-aware) -- returns true if the current token is a block
     /// terminator: either the explicit closer (e.g. EndFunc) or a Dedent
     /// emitted by the indent-aware lexer.
     ///
@@ -207,7 +207,7 @@ public sealed class Parser
         => Check(explicitCloser) || Check(TokenKind.Dedent) || Check(TokenKind.Eof);
 
     /// <summary>
-    /// v0.6.4 — returns true when the current token is a Dedent and the
+    /// v0.6.4 -- returns true when the current token is a Dedent and the
     /// following run of contiguous Dedents is terminated by an explicit
     /// <c>§/C</c> (EndCall). Used by <see cref="ParseCallStatement"/> to
     /// distinguish "Dedent that terminates a legacy multi-line §C body"
@@ -223,21 +223,21 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Phase 3 (indent-aware) — overload accepting two alternative closers
+    /// Phase 3 (indent-aware) -- overload accepting two alternative closers
     /// (used for sites like §F/§AF that share a body parser).
     /// </summary>
     private bool IsBlockEnd(TokenKind closer1, TokenKind closer2)
         => Check(closer1) || Check(closer2) || Check(TokenKind.Dedent) || Check(TokenKind.Eof);
 
     /// <summary>
-    /// Phase 3 (indent-aware) — consumes the block-end marker and returns
+    /// Phase 3 (indent-aware) -- consumes the block-end marker and returns
     /// the consumed token (for AST span end calculation).
     ///
     /// Behavior:
     /// 1. If the current token is the explicit closer, consume and return it.
     /// 2. If the current token is a Dedent and the explicit closer follows
     ///    after any number of contiguous Dedents (closer-form code parsed
-    ///    via the indent-aware lexer — multiple lexer-level dedents may
+    ///    via the indent-aware lexer -- multiple lexer-level dedents may
     ///    correspond to a single block-end at the parser level), consume
     ///    ALL of those Dedents and then the explicit closer.
     /// 3. Otherwise (indent-only mode, no explicit closer present),
@@ -269,7 +269,7 @@ public sealed class Parser
         if (Check(TokenKind.Eof))
         {
             // Indent-only at EOF: any unclosed block ends implicitly here.
-            // Do NOT consume the Eof — callers and the outer Parse loop
+            // Do NOT consume the Eof -- callers and the outer Parse loop
             // still need it to recognize end-of-input.
             return Current;
         }
@@ -277,7 +277,7 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Phase 4d — emit <c>Calor0830</c> unconditionally whenever the
+    /// Phase 4d -- emit <c>Calor0830</c> unconditionally whenever the
     /// parser is about to consume a structural legacy closer token.
     /// Closer form was removed from the language in Phase 4d, so any
     /// occurrence of one of the <see cref="StructuralLegacyClosers"/>
@@ -296,7 +296,7 @@ public sealed class Parser
             closerToken.Span,
             DiagnosticCode.LegacyCloserForm,
             $"Legacy structural closing tag '{closerToken.Text}' was removed in Phase 4d and is no longer accepted. " +
-            "A block now ends at the dedent of its body, so delete the closer line — " +
+            "A block now ends at the dedent of its body, so delete the closer line -- " +
             "the indentation already marks where the block ends.",
             fix);
     }
@@ -355,7 +355,7 @@ public sealed class Parser
     /// Detects the malformed four-field function header
     /// <c>§F{id:name:type:vis}</c> / <c>§AF{id:name:type:vis}</c> and reports
     /// <see cref="DiagnosticCode.MalformedFunctionHeader"/> (Calor0116). Only
-    /// <c>§F</c>/<c>§AF</c> are checked — <c>§MT</c>/<c>§AMT</c> legitimately
+    /// <c>§F</c>/<c>§AF</c> are checked -- <c>§MT</c>/<c>§AMT</c> legitimately
     /// take a fourth modifier field. The detection is deliberately narrow:
     /// exactly four positional fields whose fourth is a visibility token, which
     /// uniquely identifies the "return type placed in the header" mistake. Left
@@ -408,7 +408,7 @@ public sealed class Parser
         };
 
         // Only inject a signature when nothing already follows the header on
-        // this line — an inline signature `(...)` or a type-parameter list
+        // this line -- an inline signature `(...)` or a type-parameter list
         // `<...>` means we must not append a second one.
         var followsSignatureOrTypeParams = Check(TokenKind.OpenParen) || Check(TokenKind.Less);
         if (!followsSignatureOrTypeParams)
@@ -424,7 +424,7 @@ public sealed class Parser
             startToken.Span.Union(headerClose.Span),
             DiagnosticCode.MalformedFunctionHeader,
             $"'{startToken.Text}' header has four fields ({{{id}:{name}:{type}:{visRaw}}}), but §F/§AF headers take at most {{id:name:visibility}}. " +
-            $"The third field '{type}' is a return type — declare it in the signature as '(...) -> {type}', not in the header. " +
+            $"The third field '{type}' is a return type -- declare it in the signature as '(...) -> {type}', not in the header. " +
             "A four-field header silently drops the return type and emits a void method.",
             fix);
     }
@@ -435,7 +435,7 @@ public sealed class Parser
     }
 
     /// <summary>
-    /// Phase 3 — returns true when the current token starts a sibling class /
+    /// Phase 3 -- returns true when the current token starts a sibling class /
     /// interface member (method, property, field, ctor, op, indexer, event,
     /// nested type) at the parent's indent level. Used by inline-signature
     /// method/property parsers to terminate an implicit empty body when the
@@ -455,9 +455,9 @@ public sealed class Parser
             || Check(TokenKind.Extends) || Check(TokenKind.Implements);
 
     /// <summary>
-    /// Phase 3 — block-end check for class/interface members. Returns true
+    /// Phase 3 -- block-end check for class/interface members. Returns true
     /// when the member body should terminate: explicit closer, Dedent, or
-    /// a sibling member opener (implicit empty body — no Indent→Dedent
+    /// a sibling member opener (implicit empty body -- no Indent→Dedent
     /// pair was produced by the lexer because the body had no indented
     /// content).
     /// </summary>
@@ -465,7 +465,7 @@ public sealed class Parser
         => IsBlockEnd(explicitCloser) || IsClassMemberOpener();
 
     /// <summary>
-    /// Phase 3 — consume the end of a class / interface member body and
+    /// Phase 3 -- consume the end of a class / interface member body and
     /// (if the explicit closer was present) any post-closer attributes.
     /// Returns true when the closer was consumed; false when the body
     /// ended implicitly (caller should skip the ParseAttributes /
@@ -491,7 +491,7 @@ public sealed class Parser
                 endToken = ExpectBlockEnd(explicitCloser);
                 return true;
             }
-            // No body content was parsed — this Dedent belongs to the parent.
+            // No body content was parsed -- this Dedent belongs to the parent.
             endToken = signatureStart;
             return false;
         }
@@ -655,7 +655,7 @@ public sealed class Parser
         }
 
         // Phase 3 (indent-aware): in indent mode, the module body loop exits
-        // on the first Dedent — which may be an INNER block's dedent, not the
+        // on the first Dedent -- which may be an INNER block's dedent, not the
         // module-ending one. If any non-trivia tokens remain after the module
         // close, they are orphan tags (e.g. an injected §/NEW between the last
         // member and §/M) or stray content. Report them.
@@ -1397,7 +1397,7 @@ public sealed class Parser
     private StatementNode? ParseStatement()
     {
         // Statement nesting (deep §IF chains etc.) recurses outside the
-        // expression depth counter — convert an imminent stack overflow into
+        // expression depth counter -- convert an imminent stack overflow into
         // a catchable exception rather than a process abort.
         System.Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack();
 
@@ -1517,7 +1517,7 @@ public sealed class Parser
         }
         else if (Check(TokenKind.Array2D))
         {
-            // §ARR2D as statement — wrap the expression as an expression statement
+            // §ARR2D as statement -- wrap the expression as an expression statement
             var expr = ParseMultiDimArrayCreation();
             return new ExpressionStatementNode(expr.Span, expr);
         }
@@ -1600,7 +1600,7 @@ public sealed class Parser
     /// <summary>
     /// Error recovery for a <c>§EI</c>/<c>§EL</c> clause encountered in
     /// statement position (Calor0117). The clause's indentation did not
-    /// align with any open <c>§IF</c> — almost always because it was
+    /// align with any open <c>§IF</c> -- almost always because it was
     /// dedented too far. Emits a machine-applicable fix that re-indents the
     /// clause line to the column of the most recently parsed <c>§IF</c>,
     /// then consumes the clause header so the following body parses as
@@ -1610,14 +1610,14 @@ public sealed class Parser
     /// function/method boundary, so a stray clause in a function with no
     /// <c>§IF</c> never gets a fix pointing at a different function's
     /// <c>§IF</c>; and a fix is only emitted when applying it would actually
-    /// change the line — a no-op fix (clause already at the target column)
+    /// change the line -- a no-op fix (clause already at the target column)
     /// would send an agent apply→recheck loop into an infinite cycle.
     /// </summary>
     private StatementNode? ParseMisalignedElseClause()
     {
         var clauseToken = Advance(); // §EI or §EL
         var tag = clauseToken.Kind == TokenKind.ElseIf ? "§EI" : "§EL";
-        var message = $"'{tag}' is not aligned with any open §IF — the if-chain already closed at a " +
+        var message = $"'{tag}' is not aligned with any open §IF -- the if-chain already closed at a " +
             "shallower indent level. Indent the clause to the same column as its §IF.";
 
         // The edit replaces the clause line's leading columns with spaces;
@@ -1675,6 +1675,8 @@ public sealed class Parser
 
         // Interpret call attributes
         var (target, fallible) = AttributeHelper.InterpretCallAttributes(attrs);
+        var targetSpan = attrs.GetSpan("_pos0") ?? startToken.Span;
+        var (receiverSpan, calleeSpan) = GetCallTargetIdentifierSpans(target, targetSpan);
         if (string.IsNullOrEmpty(target))
         {
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "CALL", "target");
@@ -1694,17 +1696,26 @@ public sealed class Parser
         // with an expression-starter token (e.g. §IF/§MATCH on the next line
         // at the same indent) would be wrongly absorbed because
         // IsExpressionStart returns true for §IF/§MATCH/§NEW/etc. RFC v0.6
-        // §3.2 / v0.6.1 — mirrors the guard in ParseCallExpression.
+        // §3.2 / v0.6.1 -- mirrors the guard in ParseCallExpression.
         bool inlineArgOnSameLine = Current.Span.Line == startToken.Span.Line;
         if (inlineArgOnSameLine && IsExpressionStart() && !Check(TokenKind.Arg))
         {
             arguments.Add(ParseExpression());
             var span = startToken.Span.Union(arguments[0].Span);
-            return new CallStatementNode(span, target, fallible, arguments, attrs);
+            return new CallStatementNode(
+                span,
+                target,
+                fallible,
+                arguments,
+                attrs,
+                argumentNames: null,
+                argumentModifiers: null,
+                calleeSpan: calleeSpan,
+                receiverSpan: receiverSpan);
         }
 
         // Zero-arg implicit close: §C{target} followed by anything other than
-        // §A, §/C, or a Dedent-run terminated by §/C — including:
+        // §A, §/C, or a Dedent-run terminated by §/C -- including:
         //   - a sibling statement opener on the next line (same-indent body)
         //   - a Dedent ending the parent block (this call is the last body stmt)
         //   - Eof at end of input
@@ -1720,7 +1731,16 @@ public sealed class Parser
         if (!Check(TokenKind.Arg) && !Check(TokenKind.EndCall)
             && !DedentRunEndsAtEndCall())
         {
-            return new CallStatementNode(startToken.Span, target, fallible, arguments, attrs);
+            return new CallStatementNode(
+                startToken.Span.Union(targetSpan),
+                target,
+                fallible,
+                arguments,
+                attrs,
+                argumentNames: null,
+                argumentModifiers: null,
+                calleeSpan: calleeSpan,
+                receiverSpan: receiverSpan);
         }
 
         // Standard format with explicit §A and (optionally) §/C
@@ -1775,8 +1795,16 @@ public sealed class Parser
 
         // Only pass argument names if any are non-null
         var hasNames = argumentNames.Any(n => n != null);
-        return new CallStatementNode(span2, target, fallible, arguments, attrs,
-            hasNames ? argumentNames : null);
+        return new CallStatementNode(
+            span2,
+            target,
+            fallible,
+            arguments,
+            attrs,
+            hasNames ? argumentNames : null,
+            argumentModifiers: null,
+            calleeSpan: calleeSpan,
+            receiverSpan: receiverSpan);
     }
 
     private ExpressionNode ParseArgument()
@@ -2212,7 +2240,7 @@ public sealed class Parser
     {
         var startToken = Expect(TokenKind.OpenParen);
 
-        // If the next token is ( — this is a parenthesized sub-expression, not a Lisp form.
+        // If the next token is ( -- this is a parenthesized sub-expression, not a Lisp form.
         // Parse the inner expression and consume the closing ).
         if (Check(TokenKind.OpenParen))
         {
@@ -2346,7 +2374,7 @@ public sealed class Parser
         }
         if (opText == "??" && args.Count == 1)
         {
-            // Tolerate single-operand ?? from converter output — treat as identity
+            // Tolerate single-operand ?? from converter output -- treat as identity
             return args[0];
         }
         if (opText == "??")
@@ -2359,7 +2387,7 @@ public sealed class Parser
         // Handle null-conditional access: (?. target "member")
         if (opText == "?." && args.Count == 2)
         {
-            // Second arg is the member name — either a string literal or reference
+            // Second arg is the member name -- either a string literal or reference
             var memberName = args[1] switch
             {
                 StringLiteralNode strNode => strNode.Value,
@@ -2585,8 +2613,8 @@ public sealed class Parser
             }
 
             // Extract type name and operand based on operator
-            // cast: (cast Type expr) — type is args[0], operand is args[1]
-            // is/as: (is expr Type) / (as expr Type) — operand is args[0], type is args[1]
+            // cast: (cast Type expr) -- type is args[0], operand is args[1]
+            // is/as: (is expr Type) / (as expr Type) -- operand is args[0], type is args[1]
             var (typeArg, operandArg) = typeOp.Value == TypeOp.Cast
                 ? (args[0], args[1])
                 : (args[1], args[0]);
@@ -2605,7 +2633,7 @@ public sealed class Parser
         // Handle function calls: (CALL target arg1 arg2 ...)
         if (opText.Equals("CALL", StringComparison.OrdinalIgnoreCase) && args.Count >= 1)
         {
-            // First arg is the target — extract dotted name from AST node
+            // First arg is the target -- extract dotted name from AST node
             var target = args[0] switch
             {
                 ReferenceNode r => r.Name,
@@ -2617,7 +2645,7 @@ public sealed class Parser
         }
 
         // Fallback: if the "operator" is a complex expression like (expr as Type),
-        // reinterpret — the converter may have emitted C#-style cast syntax
+        // reinterpret -- the converter may have emitted C#-style cast syntax
         if (args.Count >= 1)
         {
             for (int i = 0; i < args.Count; i++)
@@ -2644,7 +2672,7 @@ public sealed class Parser
             return new CallExpressionNode(span, opText, args);
         }
 
-        // Unknown operator — check if this looks like a C# construct the converter
+        // Unknown operator -- check if this looks like a C# construct the converter
         // couldn't decompose (PascalCase names like EqualsExpression, IsExpression).
         // Treat those as non-error recoveries to avoid failing on converted code.
         var isPascalCase = opText.Length > 0 && char.IsUpper(opText[0]) && opText.Any(char.IsLower);
@@ -2713,7 +2741,7 @@ public sealed class Parser
                     _diagnostics.ReportError(kw.Span, DiagnosticCode.InvalidLispExpression,
                         $"Keyword argument ':{kw.Name}' is not valid here. A comparison-mode " +
                         "keyword is only allowed as the final argument of a built-in string " +
-                        "operation (e.g. starts, contains, equals — the lowercase forms).");
+                        "operation (e.g. starts, contains, equals -- the lowercase forms).");
                 }
             }
             else
@@ -2946,8 +2974,8 @@ public sealed class Parser
     /// Also handles 'is' pattern expressions: expr is Type [variable]
     /// KeywordArgNode is minted here and ONLY here; `allowKeyword` is opted into solely by
     /// the main operator-argument loop (whose FilterKeywordArgs choke point then validates
-    /// position). Every direct caller — implication operands, quantifier bodies, is/as/cast
-    /// operands — gets a diagnostic and a recovery node instead, so the keyword node can
+    /// position). Every direct caller -- implication operands, quantifier bodies, is/as/cast
+    /// operands -- gets a diagnostic and a recovery node instead, so the keyword node can
     /// never leak into the AST through a side entrance (#874).
     /// </summary>
     private ExpressionNode ParseLispArgument()
@@ -2980,7 +3008,7 @@ public sealed class Parser
                     _diagnostics.ReportError(span, DiagnosticCode.InvalidLispExpression,
                         $"Keyword argument ':{keywordName}' is not valid here. A comparison-mode " +
                         "keyword is only allowed as the final argument of a built-in string " +
-                        "operation (e.g. starts, contains, equals — the lowercase forms).");
+                        "operation (e.g. starts, contains, equals -- the lowercase forms).");
                     return new IntLiteralNode(span, 0);
                 }
                 return new KeywordArgNode(span, keywordName);
@@ -3815,7 +3843,7 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Lambda))
             {
-                // Lambda-only case body (no arrow) — from converter output where
+                // Lambda-only case body (no arrow) -- from converter output where
                 // inline lambdas appear directly after the pattern.
                 var expr = ParseExpression();
                 body.Add(new ReturnStatementNode(expr.Span, expr));
@@ -4027,7 +4055,7 @@ public sealed class Parser
                 return new WildcardPatternNode(token.Span);
             }
 
-            // Handle dotted identifier (e.g., Status.OK — enum member constant)
+            // Handle dotted identifier (e.g., Status.OK -- enum member constant)
             var patName = token.Text;
             if (Check(TokenKind.Dot))
             {
@@ -4065,7 +4093,7 @@ public sealed class Parser
             if (Check(TokenKind.OpenParen))
             {
                 var inner = ParseParenExpressionOrInlineLambda();
-                // Treat inner as an opaque sub-pattern — the exact value doesn't matter
+                // Treat inner as an opaque sub-pattern -- the exact value doesn't matter
                 // for compilation since this is a C# construct wrapped for round-tripping.
                 return new ConstantPatternNode(token.Span, new CallExpressionNode(
                     token.Span, patName, new List<ExpressionNode> { inner }));
@@ -4171,7 +4199,7 @@ public sealed class Parser
 
             if (containsPatternToken)
             {
-                // This is a parenthesized pattern group — consume balanced parens
+                // This is a parenthesized pattern group -- consume balanced parens
                 _position = saved;
                 var openParen = Advance(); // consume (
                 var depth = 1;
@@ -4572,7 +4600,7 @@ public sealed class Parser
             // body block (i.e. no §EI/§EL chain present and no explicit
             // §/I closer following) self-terminates after the inline
             // statement. Only call ExpectBlockEnd if there is actually a
-            // block-end to consume — otherwise the next token may be a
+            // block-end to consume -- otherwise the next token may be a
             // sibling statement (e.g. another §IF at the same indent).
             Token endToken;
             bool hasChain = elseIfClauses.Count > 0 || elseBody != null;
@@ -4589,7 +4617,7 @@ public sealed class Parser
             }
             else
             {
-                // Arrow-only IF with no chain — span ends at the inline statement.
+                // Arrow-only IF with no chain -- span ends at the inline statement.
                 endToken = singleStmt?.Span is { } stmtSpan
                     ? new Token(TokenKind.Eof, "", stmtSpan)
                     : startToken;
@@ -4687,12 +4715,12 @@ public sealed class Parser
         {
             if (Check(TokenKind.If) && !IsExpressionIfAhead())
             {
-                // Block IF — leave for statement parser
+                // Block IF -- leave for statement parser
             }
             else
             {
                 initializer = ParseExpression();
-                // If the initializer is a dotted reference followed by ( — this is raw C# method
+                // If the initializer is a dotted reference followed by ( -- this is raw C# method
                 // call syntax the converter couldn't decompose. The lexer includes dots in
                 // identifiers (cache.Get → single token), so check ReferenceNode with dots.
                 if (initializer is ReferenceNode dottedRef && dottedRef.Name.Contains('.') && Check(TokenKind.OpenParen))
@@ -4750,7 +4778,7 @@ public sealed class Parser
                     Advance();
                 } while (!IsAtEnd && depth > 0);
             }
-            // Now skip the condition expression — look for → before any block-level tokens
+            // Now skip the condition expression -- look for → before any block-level tokens
             var parenDepth = 0;
             for (int i = 0; i < 200 && !IsAtEnd; i++)
             {
@@ -4766,7 +4794,7 @@ public sealed class Parser
                 else if (Check(TokenKind.CloseParen)) { if (parenDepth > 0) parenDepth--; }
                 Advance();
             }
-            return false; // No arrow found — treat as block IF
+            return false; // No arrow found -- treat as block IF
         }
         finally
         {
@@ -4851,6 +4879,31 @@ public sealed class Parser
             length,
             span.Line,
             span.Column + leadingCharacters);
+    }
+
+    private static (TextSpan? Receiver, TextSpan Callee) GetCallTargetIdentifierSpans(
+        string target,
+        TextSpan targetSpan)
+    {
+        if (string.IsNullOrEmpty(target) || targetSpan.Length == 0)
+            return (null, targetSpan);
+
+        var firstDot = target.IndexOf('.');
+        TextSpan? receiver = firstDot > 0
+            ? new TextSpan(targetSpan.Start, firstDot, targetSpan.Line, targetSpan.Column)
+            : null;
+
+        var lastDot = target.LastIndexOf('.');
+        var calleeOffset = lastDot >= 0 ? lastDot + 1 : 0;
+        var calleeLength = Math.Min(
+            target.Length - calleeOffset,
+            Math.Max(0, targetSpan.Length - calleeOffset));
+        var callee = new TextSpan(
+            targetSpan.Start + calleeOffset,
+            calleeLength,
+            targetSpan.Line,
+            targetSpan.Column + calleeOffset);
+        return (receiver, callee);
     }
 
     /// <summary>
@@ -5045,7 +5098,7 @@ public sealed class Parser
         }
 
         // Parse the main value (identifier, literal, or compound identifier)
-        // Handle @identifier (C# verbatim identifier prefix) — strip @ and use identifier
+        // Handle @identifier (C# verbatim identifier prefix) -- strip @ and use identifier
         if (Check(TokenKind.At))
         {
             Advance(); // consume @
@@ -5626,7 +5679,7 @@ public sealed class Parser
 
     private bool MatchColon()
     {
-        // Don't match single ':' if followed by another ':' — that's '::' (alias qualifier)
+        // Don't match single ':' if followed by another ':' -- that's '::' (alias qualifier)
         if (Check(TokenKind.Colon) && Peek(1).Kind != TokenKind.Colon)
         {
             Advance();
@@ -5652,7 +5705,7 @@ public sealed class Parser
             // Parse optional target prefix: [@target:Name(args)]
             // Accept any identifier before ':' as a target, matching C# grammar.
             // The identifier after ':' must also be present (the attribute name).
-            // Exclude '::' (alias-qualified names like global::System...) — only match single ':'.
+            // Exclude '::' (alias-qualified names like global::System...) -- only match single ':'.
             string? target = null;
             if (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Colon
                 && Peek(2).Kind != TokenKind.Colon
@@ -6146,17 +6199,17 @@ public sealed class Parser
         ExpressionNode array;
         if (!string.IsNullOrEmpty(pos0))
         {
-            // §IDX{varName} index — attribute contains the array reference
+            // §IDX{varName} index -- attribute contains the array reference
             array = new ReferenceNode(startToken.Span, pos0);
         }
         else
         {
-            // §IDX target index — two separate expressions
+            // §IDX target index -- two separate expressions
             array = ParseExpression();
         }
 
         // If next token is a closing tag (§/LAM, §/C, §B, §EL, etc.), the "target" was actually
-        // the index — the converter dropped the real target. Swap and use placeholder.
+        // the index -- the converter dropped the real target. Swap and use placeholder.
         ExpressionNode index;
         if (IsBlockEnd(TokenKind.EndLambda) || IsBlockEnd(TokenKind.EndCall) || IsBlockEnd(TokenKind.EndNew)
             || Check(TokenKind.Bind) || Check(TokenKind.Assign) || Check(TokenKind.Else)
@@ -6416,7 +6469,7 @@ public sealed class Parser
         {
             if (Check(TokenKind.Bind))
             {
-                // Hoisted temp binding inside set — parse and add initializer to elements
+                // Hoisted temp binding inside set -- parse and add initializer to elements
                 var bindStmt = ParseBindStatement();
                 if (bindStmt?.Initializer != null)
                     elements.Add(bindStmt.Initializer);
@@ -7355,7 +7408,7 @@ public sealed class Parser
         }
 
         // Disambiguate positionals:
-        // 4 positionals (pos3 exists): pos2 is visibility, pos3 is modifiers — OR pos2 is baseClass, pos3 is modifiers
+        // 4 positionals (pos3 exists): pos2 is visibility, pos3 is modifiers -- OR pos2 is baseClass, pos3 is modifiers
         // 3 positionals (pos3 null): if pos2 is all known modifiers/visibility → modifiers; else baseClass
         string modifiers;
         string? baseClass = null;
@@ -7387,7 +7440,7 @@ public sealed class Parser
             }
             else
             {
-                // Not a known modifier — treat as base class
+                // Not a known modifier -- treat as base class
                 baseClass = string.IsNullOrEmpty(pos2) ? null : pos2;
                 modifiers = "";
             }
@@ -8023,7 +8076,7 @@ public sealed class Parser
             }
         }
 
-        // Handle optional empty parens: §NEW{X}() — consume silently
+        // Handle optional empty parens: §NEW{X}() -- consume silently
         if (Check(TokenKind.OpenParen))
         {
             var saved = _position;
@@ -8034,7 +8087,7 @@ public sealed class Parser
             }
             else
             {
-                _position = saved; // not empty parens — backtrack
+                _position = saved; // not empty parens -- backtrack
             }
         }
 
@@ -8111,7 +8164,7 @@ public sealed class Parser
                     // Handle empty initializer values: "Prop = " followed by §/NEW or next property
                     if (IsBlockEnd(TokenKind.EndNew) || (Check(TokenKind.Identifier) && Peek(1).Kind == TokenKind.Equals))
                     {
-                        // Empty value — use null as placeholder
+                        // Empty value -- use null as placeholder
                         initializers.Add(new ObjectInitializerAssignment(identToken.Text,
                             new ReferenceNode(identToken.Span, "null")));
                     }
@@ -8123,7 +8176,7 @@ public sealed class Parser
                 }
                 else
                 {
-                    // Not an initializer — backtrack
+                    // Not an initializer -- backtrack
                     _position = saved;
                     break;
                 }
@@ -8222,8 +8275,8 @@ public sealed class Parser
     /// Parses a call expression.
     /// Canonical form: <c>§C{target} §A arg1 §A arg2 §/C</c>.
     /// Phase 1 of v0.6 call-closer-elision RFC also accepts:
-    ///   <c>§C{target}</c>             — zero-arg, no <c>§/C</c>
-    ///   <c>§C{target} primary_expr</c> — one inline-arg, no <c>§/C</c>
+    ///   <c>§C{target}</c>             -- zero-arg, no <c>§/C</c>
+    ///   <c>§C{target} primary_expr</c> -- one inline-arg, no <c>§/C</c>
     /// See <c>docs/plans/v0.6-call-closer-elision.md</c>.
     /// </summary>
     private ExpressionNode ParseCallExpression()
@@ -8233,6 +8286,7 @@ public sealed class Parser
 
         // Positional: [target]
         var target = attrs["_pos0"] ?? "";
+        var targetSpan = attrs.GetSpan("_pos0") ?? startToken.Span;
 
         // If no bracket attribute target and next token starts an expression,
         // parse expression-based call target: §C §NEW{object}§/NEW.GetType §/C
@@ -8278,7 +8332,7 @@ public sealed class Parser
         // Phase 1 (v0.6 call-closer-elision): try implicit-close forms first.
         // Skip the implicit path only when the next token is §A or §/C
         // (canonical forms still apply). Note: §C is an inline expression,
-        // not an indent-aware block — Dedent/Eof must NOT terminate the
+        // not an indent-aware block -- Dedent/Eof must NOT terminate the
         // implicit path (they signal that we're at the call's end and the
         // zero-arg implicit close should be taken). RFC v0.6 §3.2 / v0.6.1.
         //
@@ -8286,7 +8340,7 @@ public sealed class Parser
         // belongs to an outer call's argument list (e.g. §BASE / §THIS / §NEW
         // emit each §A on its own indented line), not to this call. Without
         // this guard, the standard-form branch would greedily consume the
-        // outer's §A as if it were this call's argument — silent corruption
+        // outer's §A as if it were this call's argument -- silent corruption
         // when emitter elides §/C by default.
         bool nextArgIsOnSameLine = Check(TokenKind.Arg)
                                 && Current.Span.Line == startToken.Span.Line;
@@ -8314,7 +8368,7 @@ public sealed class Parser
 
         if (tryImplicit && !isTrailingMember && inlineArgOnSameLine && IsExpressionStart())
         {
-            // §C{target} primary_expr — one inline argument, implicit close.
+            // §C{target} primary_expr -- one inline argument, implicit close.
             var argExpr = ParseExpression();
             arguments.Add(argExpr);
             argumentNames.Add(null);
@@ -8350,11 +8404,11 @@ public sealed class Parser
                 // Two consecutive expression-start tokens on the SAME line in
                 // inline-arg form: Calor0150 (RFC v0.6 call-closer-elision §3.2
                 // case B). Recovery: stop here without consuming the second
-                // expression — let the caller see and recover from it.
+                // expression -- let the caller see and recover from it.
                 //
                 // If the next expression-start is on a NEW line it is the start
                 // of a sibling statement (e.g. `§B{p} §C{f} §IDX{a} i\n§IF ...`),
-                // not a continuation — take the implicit-close path silently.
+                // not a continuation -- take the implicit-close path silently.
                 // The expr-context one-arg elision (v0.6.3) relies on this:
                 // emitted args like `§IDX{a} i` parse correctly because §IDX's
                 // own ParseExpression() consumes the trailing index, but the
@@ -8366,7 +8420,7 @@ public sealed class Parser
             else if (Check(TokenKind.Arg))
             {
                 // User started the inline form (one positional arg, no §A) and
-                // then continued with §A — they likely intended the explicit
+                // then continued with §A -- they likely intended the explicit
                 // form. Calor0150 also covers this confusion: the inline form
                 // has consumed one arg and cannot accept a second one.
                 _diagnostics.ReportAmbiguousCallContinuation(Current.Span, target);
@@ -8380,7 +8434,7 @@ public sealed class Parser
         }
         else if (tryImplicit)
         {
-            // §C{target} <terminator> — zero arguments, implicit close.
+            // §C{target} <terminator> -- zero arguments, implicit close.
             // The } of §C{target} was already consumed inside ParseAttributes;
             // anchor the span end at the token just before _position.
             var lastConsumed = _position > 0 ? _tokens[_position - 1] : startToken;
@@ -8448,7 +8502,16 @@ public sealed class Parser
 
         // Only pass argument names if any are non-null
         var hasNames = argumentNames.Any(n => n != null);
-        ExpressionNode expr = new CallExpressionNode(finalSpan, target, arguments, hasNames ? argumentNames : null, null, typeArguments);
+        var (receiverSpan, calleeSpan) = GetCallTargetIdentifierSpans(target, targetSpan);
+        ExpressionNode expr = new CallExpressionNode(
+            finalSpan,
+            target,
+            arguments,
+            hasNames ? argumentNames : null,
+            argumentModifiers: null,
+            typeArguments: typeArguments,
+            calleeSpan: calleeSpan,
+            receiverSpan: receiverSpan);
 
         // Handle trailing member access (e.g., §C[Method]§/C.Property)
         return ParseTrailingMemberAccess(expr);
@@ -8480,7 +8543,7 @@ public sealed class Parser
 
         // --- Compact syntax: optional ID ---
         // Only shift for 4-part format (§PROP{Name:type:vis:accessors}) where ID was omitted.
-        // 3-part format (§PROP{id:name:type}) is the old format — don't shift.
+        // 3-part format (§PROP{id:name:type}) is the old format -- don't shift.
         var posCount = int.TryParse(attrs["_posCount"], out var pc) ? pc : 0;
         if (posCount >= 4 && !IsIdPattern(id))
         {
@@ -9412,9 +9475,9 @@ public sealed class Parser
 
     /// <summary>
     /// Parses a goto statement.
-    /// §GOTO{labelName}       — goto label;
-    /// §GOTO{CASE:expression} — goto case expression;
-    /// §GOTO{DEFAULT}         — goto default;
+    /// §GOTO{labelName}       -- goto label;
+    /// §GOTO{CASE:expression} -- goto case expression;
+    /// §GOTO{DEFAULT}         -- goto default;
     /// </summary>
     private GotoStatementNode ParseGotoStatement()
     {
@@ -9553,7 +9616,7 @@ public sealed class Parser
             }
             else
             {
-                // #else — parse members directly with empty condition
+                // #else -- parse members directly with empty condition
                 var elseFields = new List<ClassFieldNode>();
                 var elseProperties = new List<PropertyNode>();
                 var elseConstructors = new List<ConstructorNode>();
@@ -9832,7 +9895,7 @@ public sealed class Parser
                 if (Check(TokenKind.Arrow) && pDepth == 0 && callDepth == 0) break;
                 if (Check(TokenKind.Call)) callDepth++;
                 else if (IsBlockEnd(TokenKind.EndCall)) callDepth = Math.Max(0, callDepth - 1);
-                // Stop at statement tokens outside calls — indicates block IF, not ternary
+                // Stop at statement tokens outside calls -- indicates block IF, not ternary
                 if (callDepth == 0 && pDepth == 0 &&
                     (Check(TokenKind.Bind) || Check(TokenKind.Assign) || Check(TokenKind.Return) || Check(TokenKind.Foreach)))
                     break;
@@ -9842,14 +9905,14 @@ public sealed class Parser
             }
             if (Check(TokenKind.Arrow))
             {
-                // Arrow found — this might be a ternary. Check if §EL appears before §/I
+                // Arrow found -- this might be a ternary. Check if §EL appears before §/I
                 ifIsStatement = true; // default to statement
                 var scanPos = _position;
                 while (scanPos < _tokens.Count && _tokens[scanPos].Kind != TokenKind.EndIf && _tokens[scanPos].Kind != TokenKind.EndLambda)
                 {
                     if (_tokens[scanPos].Kind == TokenKind.Else)
                     {
-                        // Found §EL — this is a ternary expression
+                        // Found §EL -- this is a ternary expression
                         ifIsStatement = false;
                         break;
                     }
@@ -10221,7 +10284,7 @@ public sealed class Parser
         ExpressionNode? start = null;
         ExpressionNode? end = null;
 
-        // Parse start if present — only accept lightweight expressions (not §IF, §C, etc.)
+        // Parse start if present -- only accept lightweight expressions (not §IF, §C, etc.)
         if (IsRangeOperandStart())
         {
             start = ParseExpression();
@@ -10241,7 +10304,7 @@ public sealed class Parser
 
     /// <summary>
     /// Returns true if the current token can start a range operand expression.
-    /// More restrictive than IsExpressionStart — excludes section markers like §IF, §C, etc.
+    /// More restrictive than IsExpressionStart -- excludes section markers like §IF, §C, etc.
     /// Also excludes identifiers followed by '=' (property assignments in §NEW initializers).
     /// </summary>
     private bool IsRangeOperandStart()
@@ -10409,7 +10472,7 @@ public sealed class Parser
             {
                 sliceIndex = patterns.Count;
                 var restToken = Expect(TokenKind.Rest);
-                // Only consume one {name} attribute block — ParseAttributes would
+                // Only consume one {name} attribute block -- ParseAttributes would
                 // greedily consume a following property pattern { Prop: val } as attributes
                 string restName = "_";
                 TextSpan? restNameSpan = null;
@@ -10424,7 +10487,7 @@ public sealed class Parser
             }
             else if (Check(TokenKind.Call))
             {
-                // §C{SyntaxKind.WhitespaceTrivia} §/C — property sub-condition in list pattern
+                // §C{SyntaxKind.WhitespaceTrivia} §/C -- property sub-condition in list pattern
                 // Consume the call and its close as an opaque pattern element.
                 // Track nesting depth for §C{T} §A §C{K} §/C §/C patterns.
                 var callToken = Advance();
@@ -10881,7 +10944,7 @@ public sealed class Parser
             }
         }
 
-        // §REJECTED has no explicit closer — its indented §REASON list is
+        // §REJECTED has no explicit closer -- its indented §REASON list is
         // implicitly closed by the next sibling or the parent's closer.
         // In the indent-aware lexer the §REASON body emits a Dedent before
         // the next §DC content keyword (or §/DC). Swallow it here so the
@@ -11346,11 +11409,11 @@ public sealed class Parser
             // Could be a parenthesized subexpression or a cast: (int)value
             var saved = _position;
             Advance(); // consume (
-            var inner = ParseEnumMemberValue(); // recursive — full expression inside parens
+            var inner = ParseEnumMemberValue(); // recursive -- full expression inside parens
             if (inner != null && Check(TokenKind.CloseParen))
             {
                 Advance(); // consume )
-                // Check if this is a cast: (type)operand — if next token can be an operand
+                // Check if this is a cast: (type)operand -- if next token can be an operand
                 // Only treat as cast if inner looks like a type name (no operators, not a number)
                 var looksLikeCast = IsEnumOperandStart()
                     && inner != null
@@ -11366,7 +11429,7 @@ public sealed class Parser
                 }
                 return $"({inner})";
             }
-            // Failed to parse inside parens — restore and fall through
+            // Failed to parse inside parens -- restore and fall through
             _position = saved;
         }
         return null;
@@ -11559,7 +11622,7 @@ public sealed class Parser
     private static bool IsClassModifierOrVisibility(string value)
     {
         if (string.IsNullOrEmpty(value))
-            return true; // empty string is "no modifiers" — treat as modifiers field
+            return true; // empty string is "no modifiers" -- treat as modifiers field
 
         // value may be comma-separated ("abs,sealed") or space-separated ("abs seal")
         foreach (var part in value.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries))
@@ -11659,7 +11722,7 @@ public sealed class Parser
         // syntax and are already flagged + auto-healed by Calor0830, whose fix
         // DELETES the entire closer line. Reporting a redundant Calor0101 id
         // mismatch here would attach a second, conflicting fix (inserting the
-        // opener id into a closer that is being deleted) — applying both fixes
+        // opener id into a closer that is being deleted) -- applying both fixes
         // scrambles the source. The closer is going away entirely, so any id
         // mismatch on it is moot; let Calor0830 own these tokens.
         if (StructuralLegacyClosers.Contains(endToken.Kind))

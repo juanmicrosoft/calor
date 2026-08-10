@@ -25,36 +25,44 @@ public sealed class HoverHandler : HoverHandlerBase
     public override Task<Hover?> Handle(HoverParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state == null)
+        var snapshot = state?.Snapshot;
+        if (snapshot == null)
         {
             return Task.FromResult<Hover?>(null);
         }
 
-        var (line, column) = PositionConverter.ToCalorPosition(request.Position);
+        return Task.FromResult(BuildHover(snapshot, request.Position));
+    }
+
+    internal static Hover? BuildHover(
+        DocumentAnalysisSnapshot snapshot,
+        Position position)
+    {
+        var (line, column) = PositionConverter.ToCalorPosition(position);
 
         // Try tag documentation hover FIRST - educational docs for Calor syntax tags
         // This takes priority because users hovering over § tags want syntax help
-        var tagHover = TryGetTagHover(state.Source, request.Position);
+        var tagHover = TryGetTagHover(snapshot.Source, position);
         if (tagHover != null)
         {
-            return Task.FromResult<Hover?>(tagHover);
+            return tagHover;
         }
 
         // Fall back to symbol-based hover (when we have AST)
-        if (state.Ast != null)
+        if (snapshot.Ast != null)
         {
             var result = SymbolFinder.FindSymbolAtPosition(
-                state.Ast,
+                snapshot.Ast,
                 line,
                 column,
-                state.Source,
-                state.BoundModule);
+                snapshot.Source,
+                snapshot.BoundModule);
             if (result != null)
             {
-                var content = BuildHoverContent(result, state.Ast);
-                var range = PositionConverter.ToLspRange(result.Span, state.Source);
+                var content = BuildHoverContent(result, snapshot.Ast);
+                var range = PositionConverter.ToLspRange(result.Span, snapshot.Source);
 
-                return Task.FromResult<Hover?>(new Hover
+                return new Hover
                 {
                     Contents = new MarkedStringsOrMarkupContent(new MarkupContent
                     {
@@ -62,11 +70,11 @@ public sealed class HoverHandler : HoverHandlerBase
                         Value = content
                     }),
                     Range = range
-                });
+                };
             }
         }
 
-        return Task.FromResult<Hover?>(null);
+        return null;
     }
 
     /// <summary>

@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Calor.Compiler\Calor.Compiler.csproj" />
+    <InternalsVisibleTo Include="Calor.LanguageServer.Tests" />
   </ItemGroup>
 
   <!-- Exclude Z3 native libraries from publish - LSP doesn't use verification features -->

@@ -94,6 +94,97 @@ public class SymbolFinderTests
     }
 
     [Fact]
+    public void CallReceiverAndCallee_ResolveAndReferenceExactIdentifierSpans()
+    {
+        const string source = """
+            §M{m001:TestModule}
+              §CL{c1:Worker:pub}
+                §MT{m1:Pick:pub} (i32:value) -> i32
+                  §R value
+                §MT{m2:Ping:pub} () -> void
+                  §P STR:"ping"
+              §F{f1:Use:pub} (Worker:worker) -> i32
+                §C{worker.Ping}
+                §R §C{worker.Pick} §A INT:1 §/C
+            """;
+        var workspace = new Calor.LanguageServer.State.WorkspaceState();
+        var state = workspace.GetOrCreate(
+            OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///calls.calr"),
+            source);
+        var receiverOffset = source.IndexOf("worker.Pick", StringComparison.Ordinal);
+        var calleeOffset = receiverOffset + "worker.".Length;
+        var (receiverLine, receiverColumn) =
+            LspTestHarness.GetLineColumn(source, receiverOffset);
+        var (calleeLine, calleeColumn) =
+            LspTestHarness.GetLineColumn(source, calleeOffset);
+
+        var receiver = SymbolFinder.FindSymbolAtPosition(
+            state.Ast!,
+            receiverLine,
+            receiverColumn,
+            source,
+            state.BoundModule);
+        var callee = SymbolFinder.FindSymbolAtPosition(
+            state.Ast!,
+            calleeLine,
+            calleeColumn,
+            source,
+            state.BoundModule);
+        var parameter = state.BoundModule!.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.Name == "worker");
+        var method = state.BoundModule.Functions
+            .Single(function => function.Symbol.Name == "Worker.Pick")
+            .Symbol;
+        var pingOffset = source.IndexOf("worker.Ping", StringComparison.Ordinal)
+            + "worker.".Length;
+        var (pingLine, pingColumn) =
+            LspTestHarness.GetLineColumn(source, pingOffset);
+        var ping = SymbolFinder.FindSymbolAtPosition(
+            state.Ast!,
+            pingLine,
+            pingColumn,
+            source,
+            state.BoundModule);
+        var pingMethod = state.BoundModule.Functions
+            .Single(function => function.Symbol.Name == "Worker.Ping")
+            .Symbol;
+
+        Assert.Equal("worker", receiver?.Name);
+        Assert.Equal(parameter.Id, receiver?.SymbolId);
+        Assert.Equal("worker", source.Substring(
+            receiver!.Span.Start,
+            receiver.Span.Length));
+        Assert.Equal("Pick", callee?.Name);
+        Assert.Equal(method.Id, callee?.SymbolId);
+        Assert.Equal("Pick", source.Substring(callee!.Span.Start, callee.Span.Length));
+        Assert.Equal("Ping", ping?.Name);
+        Assert.Equal(pingMethod.Id, ping?.SymbolId);
+        Assert.Equal("Ping", source.Substring(ping!.Span.Start, ping.Span.Length));
+
+        Assert.All(
+            SymbolFinder.FindBoundReferences(
+                state.BoundModule,
+                parameter.Id,
+                includeDeclaration: true),
+            span => Assert.Equal("worker", source.Substring(span.Start, span.Length)));
+        Assert.All(
+            workspace.FindProjectFunctionReferences(method, includeDeclaration: true),
+            reference => Assert.Equal(
+                "Pick",
+                reference.Snapshot.Source.Substring(
+                    reference.Span.Start,
+                    reference.Span.Length)));
+        Assert.All(
+            workspace.FindProjectFunctionReferences(pingMethod, includeDeclaration: true),
+            reference => Assert.Equal(
+                "Ping",
+                reference.Snapshot.Source.Substring(
+                    reference.Span.Start,
+                    reference.Span.Length)));
+    }
+
+    [Fact]
     public void NestedLocalDeclarationSpans_AreIdentifierTokens()
     {
         var source = """

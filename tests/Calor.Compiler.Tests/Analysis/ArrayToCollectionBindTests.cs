@@ -324,6 +324,30 @@ public class ArrayToCollectionBindTests
     }
 
     [Fact]
+    public void ReturnTypeLookup_UsesExactSameArityOverloadParameterTypes()
+    {
+        var arraySelected = Validate(
+            "§M{m:T}\n" +
+            "  §F{array:Load:pub} (i32:selector) -> [str]\n" +
+            "    §R §C{File.ReadAllLines} §A STR:\"data.txt\" §/C\n" +
+            "  §F{list:Load:pub} (str:selector) -> List<str>\n" +
+            "    §R §NEW{List<str>} §/NEW\n" +
+            "  §F{use:Use:pub} () -> void\n" +
+            "    §B{items:List<str>} §C{Load} §A INT:1 §/C\n");
+        var listSelected = Validate(
+            "§M{m:T}\n" +
+            "  §F{array:Load:pub} (i32:selector) -> [str]\n" +
+            "    §R §C{File.ReadAllLines} §A STR:\"data.txt\" §/C\n" +
+            "  §F{list:Load:pub} (str:selector) -> List<str>\n" +
+            "    §R §NEW{List<str>} §/NEW\n" +
+            "  §F{use:Use:pub} () -> void\n" +
+            "    §B{items:List<str>} §C{Load} §A STR:\"list\" §/C\n");
+
+        Assert.True(HasArrayTrap(arraySelected));
+        Assert.False(HasArrayTrap(listSelected));
+    }
+
+    [Fact]
     public void FreeFunctionSharingMethodName_IsNotClobbered()
     {
         // PR #728 review finding 1: a method must not clobber a same-name/arity

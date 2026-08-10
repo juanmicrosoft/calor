@@ -44,9 +44,12 @@ public static class Program
                 .WithHandler<SemanticTokensHandler>()
                 .OnInitialize((server, request, token) =>
                 {
-                    if (request.WorkspaceFolders?.FirstOrDefault()?.Uri is { } workspaceFolderUri)
+                    var workspaceFolders = request.WorkspaceFolders?
+                        .Select(folder => folder.Uri.ToUri())
+                        .ToArray();
+                    if (workspaceFolders is { Length: > 0 })
                     {
-                        workspace.ConfigureWorkspaceRoot(workspaceFolderUri.ToUri());
+                        workspace.ConfigureWorkspaceRoots(workspaceFolders);
                     }
                     else if (request.RootUri is { } rootUri)
                     {

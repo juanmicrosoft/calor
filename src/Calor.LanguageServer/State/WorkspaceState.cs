@@ -29,8 +29,11 @@ public sealed record ProjectReferenceLocation(
 /// </summary>
 public sealed class WorkspaceState
 {
+    private sealed record WorkspaceRoot(string Path, string Identity);
+
     private readonly ConcurrentDictionary<DocumentUri, DocumentState> _documents = new();
-    private string? _workspaceRootPath;
+    private readonly object _workspaceRootsGate = new();
+    private WorkspaceRoot[] _workspaceRoots = [];
 
     public WorkspaceState(string? workspaceRootPath = null)
     {
@@ -42,16 +45,44 @@ public sealed class WorkspaceState
         if (string.IsNullOrWhiteSpace(workspaceRootPath))
             return;
 
-        Volatile.Write(
-            ref _workspaceRootPath,
-            Path.GetFullPath(workspaceRootPath)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var normalized = NormalizeWorkspaceRoot(workspaceRootPath);
+        lock (_workspaceRootsGate)
+        {
+            var current = Volatile.Read(ref _workspaceRoots);
+            if (current.Any(root =>
+                    string.Equals(root.Path, normalized, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            Volatile.Write(
+                ref _workspaceRoots,
+                current
+                    .Append(new WorkspaceRoot(normalized, $"root{current.Length}"))
+                    .ToArray());
+        }
     }
 
     public void ConfigureWorkspaceRoot(Uri? workspaceRoot)
     {
         if (workspaceRoot?.IsFile == true)
             ConfigureWorkspaceRoot(workspaceRoot.LocalPath);
+    }
+
+    public void ConfigureWorkspaceRoots(IEnumerable<Uri> workspaceRoots)
+    {
+        ArgumentNullException.ThrowIfNull(workspaceRoots);
+        var normalized = workspaceRoots
+            .Where(root => root.IsFile)
+            .Select(root => NormalizeWorkspaceRoot(root.LocalPath))
+            .Distinct(StringComparer.Ordinal)
+            .Select((path, index) => new WorkspaceRoot(path, $"root{index}"))
+            .ToArray();
+        if (normalized.Length == 0)
+            return;
+
+        lock (_workspaceRootsGate)
+            Volatile.Write(ref _workspaceRoots, normalized);
     }
 
     /// <summary>
@@ -311,12 +342,13 @@ public sealed class WorkspaceState
                     document.Document,
                     document.Analysis,
                     node);
-                if (resolved.Symbol?.Id == target.Id)
+                if (GetResolvedFunctions(node).Any(symbol => symbol.Id == target.Id)
+                    || resolved.Symbol?.Id == target.Id)
                 {
                     references.Add(new ProjectReferenceLocation(
                         document.Document,
                         document.Analysis,
-                        node.Span));
+                        GetCallReferenceSpan(node)));
                 }
             }
         }
@@ -352,6 +384,24 @@ public sealed class WorkspaceState
             BoundCallExpression expression => expression.ResolvedSymbol,
             BoundNewExpression creation => creation.ResolvedConstructor,
             _ => null,
+        };
+
+    private static IReadOnlyList<FunctionSymbol> GetResolvedFunctions(BoundNode call) =>
+        call switch
+        {
+            BoundCallStatement statement => statement.ResolvedSymbols,
+            BoundCallExpression expression => expression.ResolvedSymbols,
+            BoundNewExpression creation when creation.ResolvedConstructor != null =>
+                [creation.ResolvedConstructor],
+            _ => Array.Empty<FunctionSymbol>(),
+        };
+
+    private static TextSpan GetCallReferenceSpan(BoundNode call) =>
+        call switch
+        {
+            BoundCallStatement statement => statement.CalleeSpan,
+            BoundCallExpression expression => expression.CalleeSpan,
+            _ => call.Span,
         };
 
     private static bool TryGetCallShape(
@@ -581,20 +631,27 @@ public sealed class WorkspaceState
 
     private string GetCanonicalSourceIdentity(Uri uri)
     {
-        var root = Volatile.Read(ref _workspaceRootPath);
-        if (uri.IsFile && root != null)
+        var roots = Volatile.Read(ref _workspaceRoots);
+        if (uri.IsFile && roots.Length > 0)
         {
             var fullPath = Path.GetFullPath(uri.LocalPath);
-            var relative = Path.GetRelativePath(root, fullPath).Replace('\\', '/');
-            if (relative != ".."
-                && !relative.StartsWith("../", StringComparison.Ordinal))
+            foreach (var root in roots.OrderByDescending(root => root.Path.Length))
             {
-                return $"workspace:{relative}";
+                var relative = Path.GetRelativePath(root.Path, fullPath).Replace('\\', '/');
+                if (relative != ".."
+                    && !relative.StartsWith("../", StringComparison.Ordinal))
+                {
+                    return $"workspace:{root.Identity}:{relative}";
+                }
             }
         }
 
         return SymbolSourceIdentity.Canonicalize(uri.ToString());
     }
+
+    private static string NormalizeWorkspaceRoot(string workspaceRootPath) =>
+        Path.GetFullPath(workspaceRootPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
     /// <summary>
     /// Find a symbol definition across all open documents.
