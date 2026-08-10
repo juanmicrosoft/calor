@@ -132,6 +132,54 @@ jobs:
             exit 1
           fi
 
+  d-s1.5-fixtures:
+    # PP-S4's instrument (A-1.5.7; roadmap v0.13 §2.5 gate 6): every SupportLevel
+    # promotion toward Full and every net ConversionLossKind removal must carry a
+    # registered fixture. The script's --self-test runs FIRST on every invocation,
+    # so the gate is demonstrated to fail on a fixture-less promotion continuously,
+    # not once (the discriminating pin, per pins-must-discriminate).
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Self-test (discriminating pin)
+        run: bash scripts/check-d-s1.5-fixtures.sh --self-test
+
+      - name: Check promotions and loss-kind removals against the registry
+        env:
+          CALOR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          BASE="${CALOR_BASE_SHA:-}"
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            BASE=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
+          fi
+          bash scripts/check-d-s1.5-fixtures.sh "$BASE" HEAD
+
+      - name: Detect registered fixtures
+        id: fixtures
+        run: |
+          if ls bench/phase0-agent-native/fixtures/d-s1.5/*/fixture.json >/dev/null 2>&1; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup .NET
+        if: steps.fixtures.outputs.present == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Validate registered fixtures (indeterminate = failing)
+        if: steps.fixtures.outputs.present == 'true'
+        run: |
+          dotnet test tests/Calor.Conversion.Tests -c Release \
+            --filter "FullyQualifiedName~DS15FixtureRegistry" --verbosity detailed
+
   semantics-tests:
     runs-on: ubuntu-latest
 
