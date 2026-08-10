@@ -294,33 +294,82 @@ public sealed class Binder
         return new BoundBindStatement(bind.Span, variable, initializer);
     }
 
+    /// <summary>
+    /// #762 B1 (scoping doc D1): the ONE authoritative expression dispatch table. Built
+    /// once: the class-matched binder arms are registered explicitly, then every other
+    /// concrete ExpressionNode subclass is registered to BindIncomplete by reflection —
+    /// a new node class is dispatched (as incomplete, with a diagnostic) the moment it
+    /// exists, never silently dropped. The reflection completeness test pins that the
+    /// table covers the concrete subclass set exactly. A Type-keyed table rather than a
+    /// new IAstVisitor implementation because the visitor interface carries ~236 methods
+    /// per implementer (#791's change-amplification complaint) and eight AST classes
+    /// have broken no-op Accept dispatch until item 8 lands (B8) — visitor traversal is
+    /// the mechanism that cannot be trusted here yet.
+    /// </summary>
+    /// <summary>F-1 Tier B residuals and their registered reasons (scoping doc D7 owns their disposition in B8).
+    /// Declared BEFORE ExpressionDispatch: static fields initialize in declaration order,
+    /// and the dispatch builder reads this table.</summary>
+    private static readonly IReadOnlyDictionary<string, string> s_tierBReasons = new Dictionary<string, string>
+    {
+        ["AddressOfNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
+        ["PointerDereferenceNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
+        ["StackAllocNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
+        ["SizeOfNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
+        ["GenericTypeNode"] = "helper-node candidate — #762 item 8 disposition lands in B8",
+        ["KeywordArgNode"] = "helper-node candidate — #762 item 8 disposition lands in B8",
+    };
+
+    internal static readonly IReadOnlyDictionary<Type, Func<Binder, ExpressionNode, BoundExpression>> ExpressionDispatch =
+        BuildExpressionDispatch();
+
+    private static Dictionary<Type, Func<Binder, ExpressionNode, BoundExpression>> BuildExpressionDispatch()
+    {
+        var table = new Dictionary<Type, Func<Binder, ExpressionNode, BoundExpression>>
+        {
+            [typeof(IntLiteralNode)] = (b, e) => { var n = (IntLiteralNode)e; return new BoundIntLiteral(n.Span, n.Value); },
+            [typeof(StringLiteralNode)] = (b, e) => { var n = (StringLiteralNode)e; return new BoundStringLiteral(n.Span, n.Value); },
+            [typeof(BoolLiteralNode)] = (b, e) => { var n = (BoolLiteralNode)e; return new BoundBoolLiteral(n.Span, n.Value); },
+            [typeof(FloatLiteralNode)] = (b, e) => { var n = (FloatLiteralNode)e; return new BoundFloatLiteral(n.Span, n.Value); },
+            // Known defect, preserved verbatim until B5 (#762 item 4): decimals downcast.
+            [typeof(DecimalLiteralNode)] = (b, e) => { var n = (DecimalLiteralNode)e; return new BoundFloatLiteral(n.Span, (double)n.Value); },
+            [typeof(ReferenceNode)] = (b, e) => b.BindReferenceExpression((ReferenceNode)e),
+            [typeof(BinaryOperationNode)] = (b, e) => b.BindBinaryOperation((BinaryOperationNode)e),
+            [typeof(UnaryOperationNode)] = (b, e) => b.BindUnaryOperation((UnaryOperationNode)e),
+            [typeof(CallExpressionNode)] = (b, e) => b.BindCallExpression((CallExpressionNode)e),
+            [typeof(ConditionalExpressionNode)] = (b, e) => b.BindConditionalExpression((ConditionalExpressionNode)e),
+            [typeof(NameOfExpressionNode)] = (b, e) => { var n = (NameOfExpressionNode)e; return new BoundStringLiteral(n.Span, n.Name); },
+            [typeof(NoneExpressionNode)] = (b, e) => { var n = (NoneExpressionNode)e; return new BoundNoneLiteral(n.Span, n.TypeName); },
+            [typeof(ThisExpressionNode)] = (b, e) => b._isStaticContext
+                ? b.BindIncomplete(e, "'this' is not valid in a static context")
+                : new BoundThisExpression(e.Span, b._currentClassName ?? "UNKNOWN"),
+            [typeof(BaseExpressionNode)] = (b, e) => new BoundBaseExpression(e.Span),
+            [typeof(FieldAccessNode)] = (b, e) => b.BindFieldAccess((FieldAccessNode)e),
+            [typeof(NewExpressionNode)] = (b, e) => b.BindNewExpression((NewExpressionNode)e),
+            [typeof(TypeOperationNode)] = (b, e) => b.BindTypeOperation((TypeOperationNode)e),
+            [typeof(IsPatternNode)] = (b, e) => b.BindIsPattern((IsPatternNode)e),
+        };
+
+        // Every remaining concrete ExpressionNode subclass dispatches to BindIncomplete.
+        foreach (var type in typeof(ExpressionNode).Assembly.GetTypes())
+        {
+            if (!type.IsAbstract && typeof(ExpressionNode).IsAssignableFrom(type) && !table.ContainsKey(type))
+            {
+                var reason = s_tierBReasons.TryGetValue(type.Name, out var r)
+                    ? r
+                    : "binding for this construct lands in the #762 family PRs (F-1 Tier A)";
+                table[type] = (b, e) => b.BindIncomplete(e, reason);
+            }
+        }
+        return table;
+    }
+
     private BoundExpression BindExpression(ExpressionNode expr)
     {
-        return expr switch
-        {
-            IntLiteralNode intLit => new BoundIntLiteral(intLit.Span, intLit.Value),
-            StringLiteralNode strLit => new BoundStringLiteral(strLit.Span, strLit.Value),
-            BoolLiteralNode boolLit => new BoundBoolLiteral(boolLit.Span, boolLit.Value),
-            FloatLiteralNode floatLit => new BoundFloatLiteral(floatLit.Span, floatLit.Value),
-            DecimalLiteralNode decLit => new BoundFloatLiteral(decLit.Span, (double)decLit.Value),
-            ReferenceNode refNode => BindReferenceExpression(refNode),
-            BinaryOperationNode binOp => BindBinaryOperation(binOp),
-            UnaryOperationNode unaryOp => BindUnaryOperation(unaryOp),
-            CallExpressionNode callExpr => BindCallExpression(callExpr),
-            ConditionalExpressionNode condExpr => BindConditionalExpression(condExpr),
-            NameOfExpressionNode nameOf => new BoundStringLiteral(nameOf.Span, nameOf.Name),
-            NoneExpressionNode none => new BoundNoneLiteral(none.Span, none.TypeName),
-            // Class member expression types
-            ThisExpressionNode thisExpr => _isStaticContext
-                ? BindFallbackExpression(thisExpr) // 'this' not valid in static context
-                : new BoundThisExpression(thisExpr.Span, _currentClassName ?? "UNKNOWN"),
-            BaseExpressionNode baseExpr => new BoundBaseExpression(baseExpr.Span),
-            FieldAccessNode fieldAccess => BindFieldAccess(fieldAccess),
-            NewExpressionNode newExpr => BindNewExpression(newExpr),
-            TypeOperationNode typeOp => BindTypeOperation(typeOp),
-            IsPatternNode isPattern => BindIsPattern(isPattern),
-            _ => BindFallbackExpression(expr)
-        };
+        return ExpressionDispatch.TryGetValue(expr.GetType(), out var bind)
+            ? bind(this, expr)
+            // Unreachable for assembly-local node classes (the table is reflection-complete);
+            // fail loud rather than silently degrade if an external node type ever appears.
+            : BindIncomplete(expr, "expression class missing from the dispatch table");
     }
 
     private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess)
@@ -512,15 +561,23 @@ public sealed class Binder
     }
 
     private BoundExpression BindFallbackExpression(ExpressionNode expr)
+        => BindIncomplete(expr, "no structural binder for this construct yet");
+
+    /// <summary>
+    /// #762 B1 (scoping doc D2, zero-child phase): the explicit successor to the silent
+    /// fallback. The returned node preserves the historical opaque shape exactly (see
+    /// BoundIncompleteExpression — do NOT return a constant; the div-by-zero checker
+    /// false-positives on constant-looking divisors), and the Calor0259 diagnostic is
+    /// the incomplete-fraction instrument. Info severity until B8: the LSP binds every
+    /// open document live, and 37 Tier A classes are incomplete until the family PRs land.
+    /// </summary>
+    private BoundExpression BindIncomplete(ExpressionNode expr, string reason)
     {
-        // Return an opaque expression for unsupported types.
-        // CRITICAL: Do NOT return BoundIntLiteral(0) — that causes the division-by-zero
-        // checker to report false positives for every unhandled expression used as a divisor
-        // (e.g., cast expressions, array length, string operations, indexers).
-        // Instead, return a call expression with an opaque target that no checker will
-        // confuse with a zero literal or constant.
-        return new BoundCallExpression(expr.Span, $"<unsupported:{expr.GetType().Name}>",
-            Array.Empty<BoundExpression>(), "OBJECT");
+        _diagnostics.ReportInfo(expr.Span, DiagnosticCode.AnalysisIncomplete,
+            $"Analysis incomplete: '{expr.GetType().Name}' has no structural binding yet " +
+            $"({reason}). Analyses treat this expression as an opaque value; its sub-expressions " +
+            "are not yet visible to them.");
+        return new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason);
     }
 
     /// <summary>

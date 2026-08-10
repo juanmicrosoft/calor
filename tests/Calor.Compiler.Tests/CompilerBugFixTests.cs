@@ -334,11 +334,20 @@ public class CompilerBugFixTests
         var bound = binder.Bind(module);
 
         Assert.NotNull(bound);
-        // Fallback should NOT report an error (was causing noise)
         var ret = bound.Functions.First().Body.OfType<BoundReturnStatement>().First();
-        Assert.IsType<BoundCallExpression>(ret.Expression);
+        // #762 B1: the fallback is now BoundIncompleteExpression — a BoundCallExpression
+        // SUBCLASS preserving the opaque shape bit-for-bit (checkers see the same node
+        // family), plus the explicit incomplete marker.
+        Assert.IsAssignableFrom<BoundCallExpression>(ret.Expression);
+        Assert.IsType<BoundIncompleteExpression>(ret.Expression);
         // The opaque call should NOT be mistaken for a zero literal
         Assert.False(BoundNodeHelpers.IsLiteralZero(ret.Expression));
+        // The fallback must not report ERRORS (the original noise complaint) — but it now
+        // reports exactly one Info-severity Calor0259, which IS the incomplete-fraction
+        // instrument. Both properties pinned.
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        Assert.Contains(diagnostics,
+            d => d.Code == DiagnosticCode.AnalysisIncomplete && d.Severity == DiagnosticSeverity.Info);
     }
 
     #endregion
