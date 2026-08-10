@@ -58,8 +58,73 @@ public class MethodElisionCursorTests
         var result = Program.Compile(source, "test.calr", new CompilationOptions());
 
         Assert.False(result.HasErrors);
-        Assert.Contains("mt001", result.GeneratedCode);
+        // Anchored to the exception's function-id argument position, not any occurrence.
+        Assert.Contains("\"mt001\", Calor.Runtime.ContractKind", result.GeneratedCode);
         Assert.DoesNotContain("\"unknown\"", result.GeneratedCode);
+    }
+
+    [SkippableFact]
+    public void OperatorPostcondition_NeverElidesOnForeignMethodProof()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // The review-of-the-fix repro: operators emit AFTER methods and are never
+        // verified. Pick's §S is Proven but non-lowerable (nested returns), leaving the
+        // postcondition index at 0 — without the operator's own cursor reset, the
+        // operator's FALSE §S elides on Pick's proof. It must keep its guard.
+        const string source = @"
+§M{m001:Test}
+  §CL{c001:Calc:pub}
+    §MT{mt001:Pick:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x 0)
+      §S (>= result 0)
+      §IF{if1} (>= x 5)
+        §R x
+      §EL
+        §R INT:0
+    §OP{op001:+:pub}
+      §I{i32:left}
+      §I{i32:right}
+      §O{i32}
+      §S (>= result 100)
+      §R INT:0";
+
+        var result = Program.Compile(source, "test.calr", NoCache());
+
+        Assert.False(result.HasErrors);
+        Assert.Contains("__result__ >= 100)) throw", result.GeneratedCode);
+        Assert.DoesNotContain(
+            "// PROVEN: Postcondition statically verified: __result__ >= 100",
+            result.GeneratedCode);
+    }
+
+    [Fact]
+    public void ConstructorPrecondition_ReportsOwnId_NotForeignMethodId()
+    {
+        // Cross-class misattribution: pre-fix the cursor carried First.Inc's id into
+        // Second's constructor guard (pre-#879 it was "unknown"; the first fix upgraded
+        // it to a confidently WRONG id). The constructor's own id is the honest key.
+        const string source = @"
+§M{m001:Test}
+  §CL{c001:First:pub}
+    §MT{mt001:Inc:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x 0)
+      §S (>= result 1)
+      §R (+ x 1)
+  §CL{c002:Second:pub}
+    §CTOR{ct001:pub}
+      §I{i32:size}
+      §Q (> size 0)";
+
+        var result = Program.Compile(source, "test.calr", new CompilationOptions());
+
+        Assert.False(result.HasErrors);
+        Assert.Contains("\"ct001\", Calor.Runtime.ContractKind", result.GeneratedCode);
+        Assert.DoesNotContain("size > 0\", \"mt001\"", result.GeneratedCode);
     }
 
     [SkippableFact]
@@ -84,6 +149,9 @@ public class MethodElisionCursorTests
 
         Assert.False(result.HasErrors);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
+        // The guard must be PRESENT — a regression through the not-lowered path (guard
+        // silently dropped, Calor1001 only warns) would otherwise pass this test.
+        Assert.Contains("ContractViolationException", result.GeneratedCode);
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.ContractVerificationUnsupported);
     }
@@ -111,6 +179,8 @@ public class MethodElisionCursorTests
 
         Assert.False(result.HasErrors);
         Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
+        // Guard presence pinned for the same reason as the array test above.
+        Assert.Contains("ContractViolationException", result.GeneratedCode);
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
     }
 

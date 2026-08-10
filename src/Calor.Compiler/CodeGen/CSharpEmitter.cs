@@ -3322,6 +3322,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(PropertyAccessorNode node)
     {
+        // #879: property accessors are never verified (EnumerateContractBearers covers
+        // functions and class methods only), and this node carries no id. A stale cursor
+        // here would attribute an accessor precondition failure to a foreign method — or,
+        // worse, elide on a foreign proof. Null is the honest key: lookup misses, guard
+        // kept, id reported as "unknown".
+        _currentFunctionId = null;
+        _currentPostconditionIndex = 0;
+
         var accessorKeyword = node.Kind switch
         {
             PropertyAccessorNode.AccessorKind.Get => "get",
@@ -3371,6 +3379,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ConstructorNode node)
     {
+        // #879: constructors are never verified, so their own id is the honest cursor
+        // key — the results lookup misses (guard kept) and violations report this
+        // constructor, not whatever method the cursor last pointed at.
+        _currentFunctionId = node.Id;
+        _currentPostconditionIndex = 0;
+
         // Clear declared variables tracking for new constructor scope
         ResetDeclScopes(node.Parameters);
 
@@ -3427,6 +3441,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(OperatorOverloadNode node)
     {
+        // #879: operators are never verified, and they emit AFTER methods — without
+        // this, an operator inherits the last method's verified id, and a Proven result
+        // there deletes the operator's own, never-verified postcondition (the foreign-
+        // proof elision the issue described as latent; review of this fix reproduced it
+        // live). The operator's own id makes the lookup miss: guard kept, right id.
+        _currentFunctionId = node.Id;
+        _currentPostconditionIndex = 0;
+
         ResetDeclScopes(node.Parameters);
 
         EmitCSharpAttributes(node.CSharpAttributes);
@@ -5722,12 +5744,16 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     case Verification.Obligations.ObligationStatus.Boundary:
                     case Verification.Obligations.ObligationStatus.Failed:
                     case Verification.Obligations.ObligationStatus.Timeout:
-                    // #879 ride-along: Unsupported keeps its runtime guard by design.
-                    // Previously it fell through to the no-guard TODO comment — and
-                    // Assumed's guard survived only because ToObligationStatus maps it
-                    // onto Timeout. An obligation the solver cannot model must keep its
-                    // check (#779 posture: guards stay until verification proves).
+                    // #879 ride-along: Unsupported and Pending keep their runtime guards
+                    // by design. Previously both fell through to the no-guard TODO
+                    // comment — and Assumed's guard survived only because
+                    // ToObligationStatus maps it onto Timeout. Pending-with-tracker is
+                    // reachable (--verify-refinements with Z3 unavailable attaches the
+                    // tracker without solving). An obligation not proven must keep its
+                    // check (#779 posture: guards stay until verification proves); the
+                    // no-guard TODO now means exactly "no tracker ran".
                     case Verification.Obligations.ObligationStatus.Unsupported:
+                    case Verification.Obligations.ObligationStatus.Pending:
                         // Emit runtime guard
                         var condition = node.Condition.Accept(this);
                         AppendLine($"if (!({condition})) throw new InvalidOperationException(" +

@@ -527,6 +527,69 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_UnsupportedProofObligation_EmitsRuntimeGuard()
+    {
+        // #879 ride-along: an obligation the solver cannot model keeps its runtime
+        // check. Pre-fix, Unsupported fell through to the no-guard TODO comment.
+        var source = """
+            §M{m001:Test}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        var genr = new ObligationGenerator(tracker);
+        genr.Generate(module);
+
+        foreach (var obl in tracker.Obligations)
+        {
+            if (obl.Kind == ObligationKind.ProofObligation)
+                obl.Status = ObligationStatus.Unsupported;
+        }
+
+        var emitter = new CSharpEmitter(ContractMode.Debug, null, null, tracker);
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("throw new InvalidOperationException", csharp);
+        Assert.DoesNotContain("// TODO:", csharp);
+        Assert.DoesNotContain("// PROVEN:", csharp);
+    }
+
+    [Fact]
+    public void CSharpEmit_PendingProofObligation_EmitsRuntimeGuard()
+    {
+        // #879 ride-along: Pending-with-tracker is reachable (--verify-refinements with
+        // Z3 unavailable attaches the tracker without solving) and must keep its guard.
+        // The no-guard TODO now means exactly "no tracker ran".
+        var source = """
+            §M{m001:Test}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        var genr = new ObligationGenerator(tracker);
+        genr.Generate(module);
+        // Generate leaves ProofObligation status at Pending — no override needed.
+
+        var emitter = new CSharpEmitter(ContractMode.Debug, null, null, tracker);
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("throw new InvalidOperationException", csharp);
+        Assert.DoesNotContain("// TODO:", csharp);
+    }
+
+    [Fact]
     public void CSharpEmit_NoTracker_EmitsTodoComment()
     {
         var source = """
