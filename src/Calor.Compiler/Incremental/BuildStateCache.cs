@@ -404,7 +404,7 @@ internal static class BuildStateCache
         }
 
         var manifestFiles = new List<(string Scope, string Path)>();
-        var seen = new HashSet<string>(GetPathComparer());
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var root in roots)
         {
             if (!Directory.Exists(root.Directory))
@@ -443,10 +443,7 @@ internal static class BuildStateCache
     }
 
     private static string NormalizePathForOrdering(string path)
-    {
-        var normalized = Path.GetFullPath(path).Replace('\\', '/');
-        return OperatingSystem.IsWindows() ? normalized.ToUpperInvariant() : normalized;
-    }
+        => Path.GetFullPath(path).Replace('\\', '/');
 
     public static bool IsFileUpToDate(BuildFileEntry? cached, string filePath)
     {

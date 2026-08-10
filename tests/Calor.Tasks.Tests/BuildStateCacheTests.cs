@@ -898,14 +898,20 @@ public class BuildStateCacheTests : IDisposable
         File.WriteAllText(
             Path.Combine(directory, "a.calor-effects.json"),
             """{"version":"1.0","mappings":[]}""");
+        File.WriteAllText(
+            Path.Combine(directory, "A.calor-effects.json"),
+            """{"version":"1.0","mappings":[]}""");
 
         var loader = new Calor.Compiler.Effects.Manifests.ManifestLoader();
         loader.LoadManifestsFromDirectory(
             directory,
             Calor.Compiler.Effects.Manifests.ManifestPriority.UserLevel);
 
+        var expected = Directory.GetFiles(directory, "*.calor-effects.json")
+            .Select(Path.GetFileName)
+            .OrderBy(name => name, StringComparer.Ordinal);
         Assert.Equal(
-            ["a.calor-effects.json", "z.calor-effects.json"],
+            expected,
             loader.LoadedManifests.Select(item => Path.GetFileName(item.Source.FilePath)));
     }
 

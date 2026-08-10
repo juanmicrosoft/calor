@@ -140,11 +140,7 @@ public sealed class ManifestLoader
         try
         {
             var files = Directory.GetFiles(directory, "*.calor-effects.json", SearchOption.TopDirectoryOnly);
-            Array.Sort(
-                files,
-                OperatingSystem.IsWindows()
-                    ? StringComparer.OrdinalIgnoreCase
-                    : StringComparer.Ordinal);
+            Array.Sort(files, StringComparer.Ordinal);
             foreach (var file in files)
             {
                 LoadManifestFromFile(file, priority);
