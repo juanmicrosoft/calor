@@ -3,8 +3,10 @@
 # The managed Microsoft.Z3.dll must come from the same Z3 release as the native libraries
 # to ensure compatibility (NuGet package 4.12.2 doesn't work with Z3 4.15.7 natives)
 #
-# NOTE: On ARM64 macOS, the pre-built binaries have assembly loading issues.
-# This script will redirect to build-z3-from-source.sh on that platform.
+# Every platform uses the checksum-verified upstream binaries, including ARM64
+# macOS. This script used to divert that platform to build-z3-from-source.sh on
+# the grounds that "the pre-built binaries have assembly loading issues" — see
+# the note below on why that diagnosis was wrong.
 set -e
 
 Z3_VERSION="4.15.7"
@@ -55,13 +57,19 @@ RUNTIMES_DIR="$SCRIPT_DIR/../runtimes"
 Z3_DIR="$SCRIPT_DIR/../z3"
 TEMP_DIR="$SCRIPT_DIR/../.z3-temp"
 
-# Check for ARM64 macOS - pre-built binaries don't work there, need to build from source
-if [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ]; then
-    echo "Detected ARM64 macOS - pre-built Z3 binaries have compatibility issues."
-    echo "Building Z3 from source instead..."
-    echo ""
-    exec "$SCRIPT_DIR/build-z3-from-source.sh"
-fi
+# NO ARM64-macOS SOURCE-BUILD DIVERSION. There used to be one here, justified as
+# "pre-built Z3 binaries have compatibility issues" on that platform. The
+# symptom was real; the diagnosis was not. The failure was an ASSEMBLY load
+# error, and it came from the MANAGED wrapper, not from the native library: this
+# script pinned MANAGED_DLL_ARCHIVE to the x64-win archive, whose Microsoft.Z3.dll
+# is PE32+/AMD64 and cannot load in an arm64 process. Building everything from
+# source masked it by producing an architecture-neutral wrapper as a side effect.
+#
+# With MANAGED_DLL_ARCHIVE corrected to an architecture-neutral archive, the
+# upstream arm64-osx native works: verified on ARM64 macOS with the upstream
+# prebuilt libz3.dylib in place, Calor.Verification.Tests is 359/359 with zero
+# skips. Removing the diversion cuts roughly 20 minutes off every ARM64-macOS
+# build, which was the entire reason the VS Code publish workflow took ~23min.
 
 # Platform mappings: "rid|archive_name|lib_name_in_archive|lib_name_output"
 PLATFORMS=(

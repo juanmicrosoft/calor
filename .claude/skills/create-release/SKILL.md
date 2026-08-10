@@ -153,15 +153,31 @@ First, extract the changelog content for this version from CHANGELOG.md. The con
 
 Determine if this is a pre-release (any version < 1.0.0 is pre-release).
 
+Write the extracted notes to a file and pass `--notes-file`; the notes contain backticks and
+`$`, which a shell-quoted `--notes` string will mangle.
+
 Create the release:
 
 ```bash
+awk '/^## \[X\.Y\.Z\]/{f=1} /^## \[/{if(f && !/X\.Y\.Z/) exit} f' CHANGELOG.md > /tmp/notes.md
+
 # For pre-release (version < 1.0.0):
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "CHANGELOG_CONTENT" --prerelease
+gh release create vX.Y.Z --title "vX.Y.Z" --notes-file /tmp/notes.md --prerelease
 
 # For stable release (version >= 1.0.0):
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "CHANGELOG_CONTENT"
+gh release create vX.Y.Z --title "vX.Y.Z" --notes-file /tmp/notes.md
 ```
+
+**If you pass `--target`, it must be a FULL 40-character SHA.** A short SHA is rejected with
+
+```
+tag_name is not a valid tag
+Publishing releases must have a valid tag
+Release.target_commitish is invalid
+```
+
+which points at the tag and not at the real problem. Use `--target "$(git rev-parse main)"`, or
+omit `--target` entirely to release from the default branch's current head.
 
 ### 7. Cleanup and Return to Main Branch
 
@@ -181,6 +197,53 @@ Trigger the website deploy (the `nextjs-gh-pages` workflow runs on release creat
 ```bash
 gh workflow run nextjs-gh-pages.yml
 ```
+
+### 8. Verify the packages actually published — DO NOT SKIP
+
+**Creating the release triggers `publish-nuget` and `publish-vscode`; it does not make them
+succeed.** Both have failed silently while the tag and the website went out normally, so the
+release *looks* complete. The VS Code extension failed for three consecutive releases (v0.9.0,
+v0.10.0, v0.12.0) before anyone noticed, and the marketplace sat at `0.3.8` the whole time.
+
+A green workflow list is not sufficient evidence either — check the registries themselves:
+
+```bash
+gh run list --event release --limit 4 \
+  --json workflowName,status,conclusion \
+  --jq '.[] | "\(.workflowName)\t\(.status)\t\(.conclusion)"'
+
+# nuget.org — must list the version you just cut
+curl -s https://api.nuget.org/v3-flatcontainer/calor/index.json \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['versions'][-3:])"
+curl -s https://api.nuget.org/v3-flatcontainer/calor.sdk/index.json \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['versions'][-3:])"
+
+# VS Code marketplace — must report the version you just cut
+curl -s -X POST "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json;api-version=7.2-preview.1" \
+  -d '{"filters":[{"criteria":[{"filterType":7,"value":"calor-dev.calor"}]}],"flags":914}' \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['results'][0]['extensions'][0]['versions'][0]['version'])"
+```
+
+Strongest check for NuGet — install the published tool and exercise Z3, which is the part most
+likely to be broken by a packaging change:
+
+```bash
+dotnet tool install --tool-path /tmp/calorcheck calor --version X.Y.Z
+/tmp/calorcheck/calor --version
+/tmp/calorcheck/calor verify <some.calr>   # expect real Proven counts, not "Z3 not available"
+```
+
+Known failure modes, so they are recognised rather than re-diagnosed:
+
+| Symptom | Cause | Who can fix |
+|---|---|---|
+| `sha256sum: WARNING: N computed checksums did NOT match` | The pinned `z3-binaries` release drifted | Republish via `build-z3.yml` (`workflow_dispatch`) and commit the manifest it prints. **Never rehash the live assets.** |
+| `error IL3000` during the VSIX build | `Assembly.Location` under single-file publish | Code fix. `test.yml`'s `vsix-single-file-publish` job should have caught this on the PR. |
+| `Access Denied: The Personal Access Token used has expired` | `VSCE_PAT` secret expired | **Maintainer only** — mint at https://aka.ms/vscodepat, update the secret, then re-run just the `publish` job. The built VSIXes are already uploaded as artifacts. |
+
+Report the release as shipped only after the registries confirm it.
 
 ## Version Calculation Logic
 
