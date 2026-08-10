@@ -34,8 +34,10 @@
   <Target Name="_CalorComputeDefaults" BeforeTargets="CompileCalorFiles;CleanCalorFiles">
     <PropertyGroup>
       <CalorOutputDirectory Condition="'$(CalorOutputDirectory)' == ''">$(IntermediateOutputPath)calor\</CalorOutputDirectory>
-      <!-- IL analysis: resolve runtime directory for BCL implementation assemblies -->
-      <_CalorRuntimeDir Condition="'$(CalorEnableILAnalysis)' == 'true' and '$(_CalorRuntimeDir)' == '' and '$(NetCoreTargetingPackRoot)' != ''">$([System.IO.Path]::GetFullPath('$(NetCoreTargetingPackRoot)\..\..\..\shared\Microsoft.NETCore.App\$(BundledNETCoreAppTargetFrameworkVersion)'))\</_CalorRuntimeDir>
+      <!-- The task runs in the MSBuild host runtime, whose exact patch version
+           contains the BCL implementation assemblies corresponding to ReferencePath. -->
+      <_CalorHostRuntimeVersion Condition="'$(CalorEnableILAnalysis)' == 'true'">$([System.Environment]::Version)</_CalorHostRuntimeVersion>
+      <_CalorRuntimeDir Condition="'$(CalorEnableILAnalysis)' == 'true' and '$(_CalorRuntimeDir)' == '' and '$(NetCoreRoot)' != ''">$([System.IO.Path]::Combine('$(NetCoreRoot)', 'shared', 'Microsoft.NETCore.App', '$(_CalorHostRuntimeVersion)'))</_CalorRuntimeDir>
     </PropertyGroup>
   </Target>
 

@@ -32,7 +32,15 @@ public static class Z3ContextFactory
             // Pre-load the native library FIRST
             _z3NativeHandle = TryLoadZ3Native();
 
-            // Register resolver for any future P/Invoke calls
+            // Bind Microsoft.Z3 imports only to the explicit, fingerprinted
+            // probe paths. Throwing for an unavailable Z3 handle prevents the
+            // runtime from silently falling back to an ambient system library.
+            NativeLibrary.SetDllImportResolver(
+                typeof(Microsoft.Z3.Context).Assembly,
+                ResolveZ3DllImport);
+
+            // Retain load-context handlers for hosts that raise resolution
+            // events for transitive unmanaged imports.
             AssemblyLoadContext.Default.ResolvingUnmanagedDll += OnResolvingUnmanagedDll;
 
             // When this assembly is loaded by MSBuild (Calor.Sdk package path),
@@ -47,6 +55,20 @@ public static class Z3ContextFactory
 
             _resolverRegistered = true;
         }
+    }
+
+    private static IntPtr ResolveZ3DllImport(
+        string libraryName,
+        Assembly assembly,
+        DllImportSearchPath? searchPath)
+    {
+        if (!libraryName.Contains("z3", StringComparison.OrdinalIgnoreCase))
+            return IntPtr.Zero;
+        if (_z3NativeHandle != IntPtr.Zero)
+            return _z3NativeHandle;
+
+        throw new DllNotFoundException(
+            "Z3 was not found in Calor's explicit native-library probe paths.");
     }
 
     private static IntPtr OnResolvingUnmanagedDll(Assembly assembly, string libraryName)
@@ -75,6 +97,21 @@ public static class Z3ContextFactory
         Justification = "Empty Location is expected under single-file and is guarded; " +
                         "AppContext.BaseDirectory is the primary probe root.")]
     private static IntPtr TryLoadZ3Native()
+    {
+        foreach (var path in GetNativeLibraryProbePaths())
+        {
+            if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
+                return handle;
+        }
+
+        return IntPtr.Zero;
+    }
+
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+        "SingleFile", "IL3000",
+        Justification = "Empty Location is expected under single-file and is guarded; " +
+                        "AppContext.BaseDirectory is the primary probe root.")]
+    internal static IReadOnlyList<string> GetNativeLibraryProbePaths()
     {
         // Probe roots, in order:
         //  1. AppContext.BaseDirectory — the CLI / test-host case (libz3 copied
@@ -116,13 +153,7 @@ public static class Z3ContextFactory
             }
         }
 
-        foreach (var path in libPaths)
-        {
-            if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
-                return handle;
-        }
-
-        return IntPtr.Zero;
+        return libPaths;
     }
 
     /// <summary>

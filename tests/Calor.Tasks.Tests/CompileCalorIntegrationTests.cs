@@ -176,6 +176,7 @@ public class CompileCalorIntegrationTests : IDisposable
         var msgs = string.Join("\n", ((TestBuildEngine)task2.BuildEngine).Messages);
         Assert.Contains("Compiling", msgs);
         Assert.DoesNotContain("skipping", msgs);
+        Assert.Contains("[output-content-changed]", msgs);
 
         // And the output is restored to what the compiler actually produces.
         Assert.Equal(good, File.ReadAllText(outputPath));
@@ -315,6 +316,7 @@ public class CompileCalorIntegrationTests : IDisposable
         var engine2 = (TestBuildEngine)task2.BuildEngine;
         // Should see "global invalidation" log and compilation, not skip
         Assert.Contains(engine2.Messages, m => m.Contains("global invalidation"));
+        Assert.Contains(engine2.Messages, m => m.Contains("[compiler-changed]"));
     }
 
     // Test 24: Nested outputs: A/foo.calr + B/foo.calr → separate .g.cs, both compiled
@@ -378,19 +380,25 @@ public class CompileCalorIntegrationTests : IDisposable
     [Fact]
     public void ConcurrentBuild_BothCompleteWithoutException()
     {
-        var src1 = CreateSourceFile("Concurrent1.calr", ValidCalorSource);
-        var src2 = CreateSourceFile("Concurrent2.calr", ValidCalorSource.Replace("TestModule", "Mod2")
-            .Replace("m001", "m005").Replace("f001", "f005"));
+        var src = CreateSourceFile("Concurrent.calr", ValidCalorSource);
+        using var barrier = new Barrier(2);
 
         Exception? exception1 = null;
         Exception? exception2 = null;
+        bool? result1 = null;
+        bool? result2 = null;
 
         var thread1 = new Thread(() =>
         {
             try
             {
-                var task = CreateTask(src1);
-                task.Execute();
+                var task = CreateTask(src);
+                task.CacheTestHook = (_, phase) =>
+                {
+                    if (phase == CompileCalorTestPhase.AfterSourceRead)
+                        barrier.SignalAndWait(TimeSpan.FromSeconds(10));
+                };
+                result1 = task.Execute();
             }
             catch (Exception ex) { exception1 = ex; }
         });
@@ -399,8 +407,13 @@ public class CompileCalorIntegrationTests : IDisposable
         {
             try
             {
-                var task = CreateTask(src2);
-                task.Execute();
+                var task = CreateTask(src);
+                task.CacheTestHook = (_, phase) =>
+                {
+                    if (phase == CompileCalorTestPhase.AfterSourceRead)
+                        barrier.SignalAndWait(TimeSpan.FromSeconds(10));
+                };
+                result2 = task.Execute();
             }
             catch (Exception ex) { exception2 = ex; }
         });
@@ -412,6 +425,8 @@ public class CompileCalorIntegrationTests : IDisposable
 
         Assert.Null(exception1);
         Assert.Null(exception2);
+        Assert.True(result1);
+        Assert.True(result2);
 
         // Cache file should be valid JSON
         var cachePath = BuildStateCache.GetCachePath(_outputDir);
@@ -419,6 +434,10 @@ public class CompileCalorIntegrationTests : IDisposable
         var json = File.ReadAllText(cachePath);
         var state = System.Text.Json.JsonSerializer.Deserialize(json, BuildStateJsonContext.Default.BuildState);
         Assert.NotNull(state);
+
+        var warm = CreateTask(src);
+        Assert.True(warm.Execute());
+        Assert.Contains(((TestBuildEngine)warm.BuildEngine).Messages, m => m.Contains("skipping"));
     }
 
     // Cross-module effect enforcement — caller is missing a declared effect the callee requires.
@@ -601,11 +620,12 @@ public class CompileCalorIntegrationTests : IDisposable
         var engine = (TestBuildEngine)task.BuildEngine;
         // Global invalidation should kick in because format version doesn't match.
         Assert.Contains(engine.Messages, m => m.Contains("global invalidation"));
+        Assert.Contains(engine.Messages, m => m.Contains("[schema-version-changed]"));
 
-        // After this build, the cache should be v2.0 and the file should have a summary.
+        // After this build, the cache should use the current schema and have a summary.
         var loaded = BuildStateCache.Load(_outputDir);
         Assert.NotNull(loaded);
-        Assert.Equal("2.1", loaded.FormatVersion);
+        Assert.Equal(BuildStateCache.CurrentFormatVersion, loaded.FormatVersion);
         var entry = Assert.Single(loaded.Files).Value;
         Assert.NotNull(entry.EffectSummary);
         Assert.Equal("TestModule", entry.EffectSummary!.ModuleName);
@@ -613,9 +633,7 @@ public class CompileCalorIntegrationTests : IDisposable
 
     // Phase 0a — verifies the ExperimentalFlags MSBuild property plumbs into the
     // CompileCalor task and compiles cleanly. Per-diagnostic verification (pilot
-    // info diagnostic emitted) lives in Calor.Compiler.Tests.ExperimentalFlagPilotTests;
-    // the task currently drops info diagnostics on successful compile (pre-existing
-    // behavior, out of scope for Phase 0a).
+    // info diagnostic emitted) lives in Calor.Compiler.Tests.ExperimentalFlagPilotTests.
     [Fact]
     public void ExperimentalFlags_PilotFlag_CompilesCleanly()
     {
@@ -689,7 +707,9 @@ public class CompileCalorIntegrationTests : IDisposable
     // every skip — a cached output was produced under a different option set and
     // its (absent) diagnostics would be silently stale.
     [Theory]
+    [InlineData("verbose")]
     [InlineData("enforceEffects")]
+    [InlineData("typeCheck")]
     [InlineData("verify")]
     [InlineData("ilAnalysis")]
     [InlineData("experimental")]
@@ -706,17 +726,29 @@ public class CompileCalorIntegrationTests : IDisposable
 
         // Third build with one option flipped: nothing may skip.
         var flipped = CreateTask(src);
+        var compiled = false;
+        flipped.CacheTestHook = (_, phase) =>
+        {
+            if (phase == CompileCalorTestPhase.AfterSourceRead)
+                compiled = true;
+        };
         switch (option)
         {
+            case "verbose": flipped.Verbose = false; break;
             case "enforceEffects": flipped.EnforceEffects = false; break;
+            case "typeCheck": flipped.TypeCheck = false; break;
             case "verify": flipped.Verify = true; break;
             case "ilAnalysis": flipped.EnableILAnalysis = true; break;
             case "experimental": flipped.ExperimentalFlags = "pilot-hello-world"; break;
         }
         Assert.True(flipped.Execute());
+        Assert.True(compiled);
         var msgs = string.Join("\n", ((TestBuildEngine)flipped.BuildEngine).Messages);
         Assert.DoesNotContain("skipping", msgs);
-        Assert.Contains("Compiling", msgs);
+        if (option != "verbose")
+            Assert.Contains("Compiling", msgs);
+        var cache = BuildStateCache.Load(_outputDir);
+        Assert.NotNull(cache);
     }
 
     [Fact]
@@ -737,13 +769,328 @@ public class CompileCalorIntegrationTests : IDisposable
             m => m.Contains("skipping"));
     }
 
-    // #788 fail-closed note: the IL-analysis init and cross-module enforcement
-    // catch blocks in CompileCalor now FAIL the build instead of warning and
-    // continuing. Neither failure is cheaply reachable with real components
-    // (AssemblyIndex and ManifestLoader are internally defensive and skip
-    // malformed inputs), so the fail-closed branches are covered by review,
-    // not by a fixture — a garbage referenced assembly is deliberately
-    // tolerated (skipped) by design and does not trip them.
+    [Theory]
+    [InlineData("referencedAssembly")]
+    [InlineData("runtimeDirectory")]
+    [InlineData("nuGetPackageRoot")]
+    [InlineData("depsFile")]
+    public void CanonicalInputs_MutatingAnalysisInput_InvalidatesWarmCache(string input)
+    {
+        var src = CreateSourceFile("AnalysisInput.calr", ValidCalorSource);
+        CompileCalor BaseTask()
+        {
+            var task = CreateTask(src);
+            task.EnableILAnalysis = true;
+            task.ReferencedAssemblies =
+            [
+                new TaskItem(typeof(object).Assembly.Location)
+            ];
+            return task;
+        }
+
+        Assert.True(BaseTask().Execute());
+        var warm = BaseTask();
+        Assert.True(warm.Execute());
+        Assert.Contains(((TestBuildEngine)warm.BuildEngine).Messages, m => m.Contains("skipping"));
+
+        var changed = BaseTask();
+        switch (input)
+        {
+            case "referencedAssembly":
+                changed.ReferencedAssemblies =
+                [
+                    new TaskItem(typeof(CompileCalor).Assembly.Location)
+                ];
+                break;
+            case "runtimeDirectory":
+                var runtime = Path.Combine(_tempDir, "runtime");
+                Directory.CreateDirectory(runtime);
+                changed.RuntimeDirectory = runtime;
+                break;
+            case "nuGetPackageRoot":
+                var packages = Path.Combine(_tempDir, "packages");
+                Directory.CreateDirectory(packages);
+                changed.NuGetPackageRoot = packages;
+                break;
+            case "depsFile":
+                changed.DepsFilePath = CreateSourceFile(
+                    "inputs/project.deps.json", """{"runtimeTarget":{"name":"test"}}""");
+                break;
+        }
+
+        Assert.True(changed.Execute());
+        var messages = string.Join("\n", ((TestBuildEngine)changed.BuildEngine).Messages);
+        Assert.Contains("[options-or-inputs-changed]", messages);
+        Assert.DoesNotContain("skipping", messages);
+    }
+
+    [Fact]
+    public void GlobalInvalidation_RemovesOutputsForDeletedSources()
+    {
+        var kept = CreateSourceFile("Kept.calr", ValidCalorSource);
+        var removed = CreateSourceFile(
+            "Removed.calr",
+            ValidCalorSource.Replace("TestModule", "RemovedModule")
+                .Replace("m001", "m002")
+                .Replace("f001", "f002"));
+
+        var cold = CreateTask(kept, removed);
+        Assert.True(cold.Execute());
+        var removedOutput = cold.GeneratedFiles.Single(item =>
+            item.ItemSpec.EndsWith("Removed.g.cs", StringComparison.Ordinal)).ItemSpec;
+        Assert.True(File.Exists(removedOutput));
+
+        File.Delete(removed);
+        var invalidated = CreateTask(kept);
+        invalidated.ExperimentalFlags = "pilot-hello-world";
+        Assert.True(invalidated.Execute());
+
+        Assert.False(File.Exists(removedOutput));
+        Assert.Contains(
+            ((TestBuildEngine)invalidated.BuildEngine).Messages,
+            message => message.Contains("removed orphan output"));
+    }
+
+    [Fact]
+    public void CanonicalInputs_ReferencedAssemblyContentMutation_InvalidatesWarmCache()
+    {
+        var src = CreateSourceFile("ReferenceContent.calr", ValidCalorSource);
+        var reference = Path.Combine(_tempDir, "inputs", "MutableReference.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(reference)!);
+        File.Copy(typeof(object).Assembly.Location, reference);
+
+        CompileCalor Task()
+        {
+            var task = CreateTask(src);
+            task.EnableILAnalysis = true;
+            task.ReferencedAssemblies = [new TaskItem(reference)];
+            return task;
+        }
+
+        Assert.True(Task().Execute());
+        var warm = Task();
+        Assert.True(warm.Execute());
+        Assert.Contains(((TestBuildEngine)warm.BuildEngine).Messages, m => m.Contains("skipping"));
+
+        File.AppendAllText(reference, "reference-v2");
+        var changed = Task();
+        Assert.True(changed.Execute());
+        Assert.Contains(((TestBuildEngine)changed.BuildEngine).Messages,
+            m => m.Contains("[options-or-inputs-changed]"));
+    }
+
+    [Fact]
+    public void CanonicalInputs_DepsFileContentMutation_InvalidatesWarmCache()
+    {
+        var src = CreateSourceFile("DepsContent.calr", ValidCalorSource);
+        var deps = CreateSourceFile(
+            "inputs/mutable.deps.json", """{"runtimeTarget":{"name":"v1"}}""");
+
+        CompileCalor Task()
+        {
+            var task = CreateTask(src);
+            task.EnableILAnalysis = true;
+            task.ReferencedAssemblies = [new TaskItem(typeof(object).Assembly.Location)];
+            task.DepsFilePath = deps;
+            return task;
+        }
+
+        Assert.True(Task().Execute());
+        var warm = Task();
+        Assert.True(warm.Execute());
+        Assert.Contains(((TestBuildEngine)warm.BuildEngine).Messages, m => m.Contains("skipping"));
+
+        File.WriteAllText(deps, """{"runtimeTarget":{"name":"v2"}}""");
+        var changed = Task();
+        Assert.True(changed.Execute());
+        Assert.Contains(((TestBuildEngine)changed.BuildEngine).Messages,
+            m => m.Contains("[options-or-inputs-changed]"));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void SourceEditRace_CacheHashesExactCompiledBytes_AndNextBuildRecompiles(
+        int editPhaseValue)
+    {
+        var editPhase = (CompileCalorTestPhase)editPhaseValue;
+        var original = ValidCalorSource;
+        var edited = ValidCalorSource.Replace("(+ a b)", "(- a b)");
+        var src = CreateSourceFile("Race.calr", original);
+        var task = CreateTask(src);
+        var editedOnce = false;
+        task.CacheTestHook = (_, phase) =>
+        {
+            if (!editedOnce && phase == editPhase)
+            {
+                editedOnce = true;
+                File.WriteAllText(src, edited);
+            }
+        };
+
+        Assert.True(task.Execute());
+        var firstOutput = File.ReadAllText(task.GeneratedFiles.Single().ItemSpec);
+        Assert.Contains("a + b", firstOutput);
+        var racedState = BuildStateCache.Load(_outputDir);
+        Assert.NotNull(racedState);
+        var racedEntry = Assert.Single(racedState.Files).Value;
+        Assert.Equal(
+            BuildStateCache.ComputeContentHash(System.Text.Encoding.UTF8.GetBytes(original)),
+            racedEntry.ContentHash);
+        Assert.NotEqual(BuildStateCache.ComputeFileHash(src), racedEntry.ContentHash);
+
+        var next = CreateTask(src);
+        Assert.True(next.Execute());
+        var messages = string.Join("\n", ((TestBuildEngine)next.BuildEngine).Messages);
+        Assert.Contains("[source-content-changed]", messages);
+        Assert.DoesNotContain("skipping", messages);
+        Assert.Contains("a - b", File.ReadAllText(next.GeneratedFiles.Single().ItemSpec));
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("{}")]
+    public void CorruptOrPartialCache_IsPurged_ColdBuildLogsReason(string cacheContents)
+    {
+        var src = CreateSourceFile("CorruptCache.calr", ValidCalorSource);
+        File.WriteAllText(BuildStateCache.GetCachePath(_outputDir), cacheContents);
+
+        var task = CreateTask(src);
+        Assert.True(task.Execute());
+        var messages = string.Join("\n", ((TestBuildEngine)task.BuildEngine).Messages);
+        Assert.Contains("[corrupt-or-partial-cache]", messages);
+
+        var loaded = BuildStateCache.LoadWithStatus(_outputDir);
+        Assert.Equal(CacheLoadStatus.Loaded, loaded.Status);
+        Assert.NotNull(loaded.State);
+    }
+
+    [Fact]
+    public void StructurallyInvalidCachedDiagnostics_AreNotTrusted()
+    {
+        var src = CreateSourceFile("InvalidDiagnostics.calr", ValidCalorSource);
+        Assert.True(CreateTask(src).Execute());
+        var state = BuildStateCache.Load(_outputDir);
+        Assert.NotNull(state);
+        var entry = Assert.Single(state.Files).Value;
+        entry.Diagnostics =
+        [
+            new Calor.Compiler.Incremental.CachedDiagnostic
+            {
+                Code = "Calor9999",
+                Severity = "error",
+                Message = "must not be replayed as a trusted successful compile"
+            }
+        ];
+        BuildStateCache.Save(state, _outputDir);
+
+        var task = CreateTask(src);
+        Assert.True(task.Execute());
+        var engine = (TestBuildEngine)task.BuildEngine;
+        Assert.Contains(engine.Messages, message => message.Contains("[cache-validation-failed]"));
+        Assert.DoesNotContain(engine.Errors,
+            error => error.Contains("must not be replayed as a trusted successful compile"));
+    }
+
+    [Fact]
+    public void WarningInfoDiagnostics_WarmAndColdOutputsAndDiagnosticsAreIdentical()
+    {
+        var src = CreateSourceFile("Diagnostics.calr", ValidCalorSource);
+
+        CompileCalor Task()
+        {
+            var task = CreateTask(src);
+            task.ExperimentalFlags = "pilot-hello-world";
+            return task;
+        }
+
+        var cold = Task();
+        Assert.True(cold.Execute());
+        var coldBytes = File.ReadAllBytes(cold.GeneratedFiles.Single().ItemSpec);
+        var coldDiagnostics = ((TestBuildEngine)cold.BuildEngine).Messages
+            .Where(message => message.Contains("pilot-hello-world"))
+            .ToList();
+        Assert.NotEmpty(coldDiagnostics);
+
+        var warm = Task();
+        Assert.True(warm.Execute());
+        var warmBytes = File.ReadAllBytes(warm.GeneratedFiles.Single().ItemSpec);
+        var warmEngine = (TestBuildEngine)warm.BuildEngine;
+        var warmDiagnostics = warmEngine.Messages
+            .Where(message => message.Contains("pilot-hello-world"))
+            .ToList();
+
+        Assert.Equal(coldBytes, warmBytes);
+        Assert.Equal(coldDiagnostics, warmDiagnostics);
+        Assert.Contains(warmEngine.Messages, message => message.Contains("skipping"));
+    }
+
+    [Fact]
+    public void ILAnalysisInitializationException_FailsClosed()
+    {
+        var src = CreateSourceFile("StrictIl.calr", ValidCalorSource);
+        var task = CreateTask(src);
+        task.EnableILAnalysis = true;
+        task.ReferencedAssemblies =
+        [
+            new TaskItem(typeof(object).Assembly.Location)
+        ];
+        task.CacheTestHook = (_, phase) =>
+        {
+            if (phase == CompileCalorTestPhase.BeforeILAnalysisInitialization)
+                throw new InvalidOperationException("injected IL initialization failure");
+        };
+
+        Assert.False(task.Execute());
+        Assert.Contains(((TestBuildEngine)task.BuildEngine).Errors,
+            error => error.Contains("fails rather than silently skipping")
+                     && error.Contains("injected IL initialization failure"));
+    }
+
+    [Fact]
+    public void ILAnalysis_UnresolvableManagedReference_FailsClosed()
+    {
+        var runtimeDirectory = new DirectoryInfo(
+            Path.GetDirectoryName(typeof(object).Assembly.Location)!);
+        var dotnetRoot = runtimeDirectory.Parent?.Parent?.Parent
+            ?? throw new DirectoryNotFoundException("Could not locate the dotnet root.");
+        var referenceAssembly = Directory.GetDirectories(Path.Combine(
+                dotnetRoot.FullName, "packs", "Microsoft.NETCore.App.Ref"))
+            .OrderByDescending(path => path, StringComparer.Ordinal)
+            .Select(path => Path.Combine(path, "ref", "net10.0", "System.Runtime.dll"))
+            .First(File.Exists);
+
+        var src = CreateSourceFile("UnresolvedIl.calr", ValidCalorSource);
+        var task = CreateTask(src);
+        task.EnableILAnalysis = true;
+        task.ReferencedAssemblies = [new TaskItem(referenceAssembly)];
+
+        Assert.False(task.Execute());
+        Assert.Contains(
+            ((TestBuildEngine)task.BuildEngine).Errors,
+            error => error.Contains("could not be resolved to implementation assemblies"));
+    }
+
+    [Fact]
+    public void CrossModuleEnforcementException_FailsClosed()
+    {
+        var src1 = CreateSourceFile("StrictCrossA.calr", ValidCalorSource);
+        var src2 = CreateSourceFile(
+            "StrictCrossB.calr",
+            ValidCalorSource.Replace("TestModule", "OtherModule")
+                .Replace("m001", "m002").Replace("f001", "f002"));
+        var task = CreateTask(src1, src2);
+        task.CacheTestHook = (_, phase) =>
+        {
+            if (phase == CompileCalorTestPhase.BeforeCrossModuleEnforcement)
+                throw new InvalidOperationException("injected cross-module failure");
+        };
+
+        Assert.False(task.Execute());
+        Assert.Contains(((TestBuildEngine)task.BuildEngine).Errors,
+            error => error.Contains("fails rather than silently skipping")
+                     && error.Contains("injected cross-module failure"));
+    }
 
     [Fact]
     public void CrossModuleCall_TasksPath_EmitsQualifiedTarget()
