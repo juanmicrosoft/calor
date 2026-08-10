@@ -184,9 +184,40 @@ public class MethodElisionCursorTests
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.ContractVerificationAssumed);
     }
 
+    [SkippableFact]
+    public void ProvenPostcondition_WithoutOptIn_KeepsGuard()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+
+        // The v0.13 default (roadmap §2.1): a Proven verdict is diagnostic; the guard
+        // stays unless ElideProvenGuards is set. Same source as the elide test above,
+        // compiled WITHOUT the opt-in.
+        const string source = @"
+§M{m001:Test}
+  §CL{c001:Calc:pub}
+    §MT{mt001:Square:pub}
+      §I{i32:x}
+      §O{i32}
+      §Q (>= x 0)
+      §Q (<= x 46340)
+      §S (>= result 0)
+      §R (* x x)";
+
+        var result = Program.Compile(source, "test.calr", new CompilationOptions
+        {
+            VerifyContracts = true,
+            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
+        });
+
+        Assert.False(result.HasErrors);
+        Assert.DoesNotContain("// PROVEN: Postcondition", result.GeneratedCode);
+        Assert.Contains("ContractViolationException", result.GeneratedCode);
+    }
+
     private static CompilationOptions NoCache() => new()
     {
         VerifyContracts = true,
+        ElideProvenGuards = true,
         VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
     };
 }

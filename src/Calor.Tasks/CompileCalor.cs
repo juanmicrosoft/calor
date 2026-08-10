@@ -123,6 +123,12 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool Verify { get; set; }
 
     /// <summary>
+    /// Opt in to deleting runtime contract guards on Proven verdicts (MSBuild property
+    /// <c>CalorElideProvenGuards</c>). v0.13 default: off — verification is diagnostic.
+    /// </summary>
+    public bool ElideProvenGuards { get; set; }
+
+    /// <summary>
     /// Semicolon- or comma-separated list of experimental feature flag names to enable.
     /// Plumbed through to <see cref="Calor.Compiler.CompilationOptions.ExperimentalFlags"/>.
     /// Unknown flags are accepted silently — see <see cref="Calor.Compiler.ExperimentalFlags"/>.
@@ -433,7 +439,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     Context = compilationContext,
                     EnableILAnalysis = EnableILAnalysis,
                     ExperimentalFlags = Calor.Compiler.ExperimentalFlags.Parse(ExperimentalFlags),
-                    VerifyContracts = Verify
+                    VerifyContracts = Verify,
+                    ElideProvenGuards = ElideProvenGuards
                 };
                 compileOptions.CrossModuleFunctionModules = crossModuleMap;
                 var result = Program.Compile(source, inputPath, compileOptions);

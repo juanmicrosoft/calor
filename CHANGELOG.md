@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- **Proof-based guard elision is now opt-in** (`--elide-proven-guards` on the CLI,
+  `ElideProvenGuards` on `CompilationOptions` and the MSBuild task). By default a `Proven`
+  postcondition or `Discharged` `§PROOF` obligation keeps its runtime check — verification
+  verdicts are diagnostic. This executes roadmap v0.13 §2.1: the elide surface has produced
+  seven false-`Proven` vectors to date and its differential gate (freeze registration F-4) is
+  not yet built; elision re-enables by default only when that gate is green (roadmap §3.5
+  gate 6). The `run`/`test` execution paths always keep guards regardless of the flag.
+
 ### Corrected
 - **The v0.12.1 notes below understated the VS Code outage by about six times, and implied a
   publish that did not happen.** They said the extension "can be published again" after "three
