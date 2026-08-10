@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Effects.Manifests;
 
 namespace Calor.Compiler.Incremental;
 
@@ -276,34 +277,6 @@ internal static class BuildStateCache
     }
 
     /// <summary>
-    /// MSBuild-task compiler hash over the conventional deployed closure. The
-    /// task itself passes explicitly resolved assembly locations when executing.
-    /// </summary>
-    public static string ComputeCompilerHash(string tasksAssemblyPath)
-    {
-        var tasksDir = Path.GetDirectoryName(tasksAssemblyPath)!;
-        // The compiler project deliberately emits calor.dll, not
-        // Calor.Compiler.dll. Hash the deployed task/compiler/runtime/solver
-        // closure by resolved paths; names and missing markers are included so
-        // deleting or replacing one member also changes the fingerprint.
-        var closureNames = new[]
-        {
-            Path.GetFileName(tasksAssemblyPath),
-            "calor.dll",
-            "Calor.Runtime.dll",
-            "Microsoft.Z3.dll",
-            OperatingSystem.IsWindows() ? "libz3.dll"
-                : OperatingSystem.IsMacOS() ? "libz3.dylib" : "libz3.so"
-        };
-        var paths = closureNames
-            .Select(name => Path.Combine(tasksDir, name))
-            .Distinct(GetPathComparer())
-            .OrderBy(path => Path.GetFileName(path), StringComparer.Ordinal)
-            .ToList();
-        return ComputeCompilerHash(paths);
-    }
-
-    /// <summary>
     /// Compiler hash over an explicit set of assembly files. Missing members are
     /// represented explicitly so removing a dependency invalidates the cache.
     /// </summary>
@@ -413,33 +386,58 @@ internal static class BuildStateCache
     /// files from several directories, each with its own effect manifests).
     /// </summary>
     public static string ComputeManifestHash(IReadOnlyList<string> projectDirectories)
+        => ComputeManifestHash(projectDirectories, ManifestLoader.GetUserManifestsDirectory());
+
+    internal static string ComputeManifestHash(
+        IReadOnlyList<string> projectDirectories,
+        string? userManifestsDirectory)
     {
-        var manifestFiles = new List<string>();
-        var seen = new HashSet<string>(GetPathComparer());
-        foreach (var dir in projectDirectories)
+        var roots = projectDirectories
+            .Where(directory => !string.IsNullOrWhiteSpace(directory))
+            .Select((directory, index) => (
+                Scope: $"project-{index}",
+                Directory: Path.GetFullPath(directory)))
+            .ToList();
+        if (!string.IsNullOrEmpty(userManifestsDirectory))
         {
-            if (!Directory.Exists(dir))
+            roots.Add(("user", Path.GetFullPath(userManifestsDirectory)));
+        }
+
+        var manifestFiles = new List<(string Scope, string Path)>();
+        var seen = new HashSet<string>(GetPathComparer());
+        foreach (var root in roots)
+        {
+            if (!Directory.Exists(root.Directory))
                 continue;
-            foreach (var file in Directory.GetFiles(dir, "*.calor-effects.json", SearchOption.TopDirectoryOnly))
+            foreach (var file in Directory.GetFiles(
+                         root.Directory, "*.calor-effects.json", SearchOption.TopDirectoryOnly))
             {
                 if (seen.Add(Path.GetFullPath(file)))
-                    manifestFiles.Add(file);
+                    manifestFiles.Add((root.Scope, file));
             }
         }
 
         if (manifestFiles.Count == 0)
             return "";
 
-        manifestFiles.Sort((left, right) => StringComparer.Ordinal.Compare(
-            NormalizePathForOrdering(left), NormalizePathForOrdering(right)));
+        manifestFiles.Sort((left, right) =>
+        {
+            var scopeComparison = StringComparer.Ordinal.Compare(left.Scope, right.Scope);
+            return scopeComparison != 0
+                ? scopeComparison
+                : StringComparer.Ordinal.Compare(
+                    NormalizePathForOrdering(left.Path),
+                    NormalizePathForOrdering(right.Path));
+        });
 
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var manifestFile in manifestFiles)
         {
-            AppendLengthPrefixed(sha, Path.GetFileName(manifestFile));
-            AppendLengthPrefixed(sha, new FileInfo(manifestFile).Length.ToString(
+            AppendLengthPrefixed(sha, manifestFile.Scope);
+            AppendLengthPrefixed(sha, Path.GetFileName(manifestFile.Path));
+            AppendLengthPrefixed(sha, new FileInfo(manifestFile.Path).Length.ToString(
                 System.Globalization.CultureInfo.InvariantCulture));
-            HashFileStreaming(sha, manifestFile);
+            HashFileStreaming(sha, manifestFile.Path);
         }
         return Convert.ToHexStringLower(sha.GetHashAndReset());
     }

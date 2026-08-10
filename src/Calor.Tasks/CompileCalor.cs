@@ -179,10 +179,18 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             EnableILAnalysis,
             canonicalExperimentalFlags,
             DescribePath(ProjectDirectory, includeContent: false),
-            referencedAssemblies.Select(reference => reference.Descriptor).ToList(),
-            DescribePath(RuntimeDirectory, includeContent: false),
-            DescribePath(NuGetPackageRoot, includeContent: false),
-            DescribePath(DepsFilePath, includeContent: true));
+            EnableILAnalysis
+                ? referencedAssemblies.Select(reference => reference.Descriptor).ToList()
+                : [],
+            EnableILAnalysis
+                ? DescribePath(RuntimeDirectory, includeContent: false)
+                : "unused",
+            EnableILAnalysis
+                ? DescribePath(NuGetPackageRoot, includeContent: false)
+                : "unused",
+            EnableILAnalysis
+                ? DescribePath(DepsFilePath, includeContent: true)
+                : "unused");
     }
 
     private IReadOnlyList<ResolvedReference> ResolveReferencedAssemblies()
@@ -780,9 +788,9 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         }
 
         // 5. Orphan cleanup (scoped to prior cache entries only)
-        if (priorFiles != null)
+        if (priorCache?.Files != null)
         {
-            foreach (var kvp in priorFiles)
+            foreach (var kvp in priorCache.Files)
             {
                 if (!currentRelativePaths.Contains(kvp.Key))
                 {
@@ -864,7 +872,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
         "SingleFile", "IL3000",
         Justification = "The MSBuild task is deployed as files; missing locations are represented in the cache fingerprint.")]
-    private static IReadOnlyList<string> ResolveCompilerClosurePaths(string tasksAssemblyPath)
+    internal static IReadOnlyList<string> ResolveCompilerClosurePaths(string tasksAssemblyPath)
     {
         var tasksDirectory = Path.GetDirectoryName(tasksAssemblyPath) ?? string.Empty;
         var compilerPath = typeof(Program).Assembly.Location;

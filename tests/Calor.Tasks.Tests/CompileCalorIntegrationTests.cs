@@ -777,17 +777,30 @@ public class CompileCalorIntegrationTests : IDisposable
     public void CanonicalInputs_MutatingAnalysisInput_InvalidatesWarmCache(string input)
     {
         var src = CreateSourceFile("AnalysisInput.calr", ValidCalorSource);
-        Assert.True(CreateTask(src).Execute());
-        var warm = CreateTask(src);
+        CompileCalor BaseTask()
+        {
+            var task = CreateTask(src);
+            task.EnableILAnalysis = true;
+            task.ReferencedAssemblies =
+            [
+                new TaskItem(typeof(object).Assembly.Location)
+            ];
+            return task;
+        }
+
+        Assert.True(BaseTask().Execute());
+        var warm = BaseTask();
         Assert.True(warm.Execute());
         Assert.Contains(((TestBuildEngine)warm.BuildEngine).Messages, m => m.Contains("skipping"));
 
-        var changed = CreateTask(src);
+        var changed = BaseTask();
         switch (input)
         {
             case "referencedAssembly":
-                var reference = CreateSourceFile("inputs/FakeReference.dll", "fake-reference");
-                changed.ReferencedAssemblies = [new TaskItem(reference)];
+                changed.ReferencedAssemblies =
+                [
+                    new TaskItem(typeof(CompileCalor).Assembly.Location)
+                ];
                 break;
             case "runtimeDirectory":
                 var runtime = Path.Combine(_tempDir, "runtime");
@@ -812,14 +825,44 @@ public class CompileCalorIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void GlobalInvalidation_RemovesOutputsForDeletedSources()
+    {
+        var kept = CreateSourceFile("Kept.calr", ValidCalorSource);
+        var removed = CreateSourceFile(
+            "Removed.calr",
+            ValidCalorSource.Replace("TestModule", "RemovedModule")
+                .Replace("m001", "m002")
+                .Replace("f001", "f002"));
+
+        var cold = CreateTask(kept, removed);
+        Assert.True(cold.Execute());
+        var removedOutput = cold.GeneratedFiles.Single(item =>
+            item.ItemSpec.EndsWith("Removed.g.cs", StringComparison.Ordinal)).ItemSpec;
+        Assert.True(File.Exists(removedOutput));
+
+        File.Delete(removed);
+        var invalidated = CreateTask(kept);
+        invalidated.ExperimentalFlags = "pilot-hello-world";
+        Assert.True(invalidated.Execute());
+
+        Assert.False(File.Exists(removedOutput));
+        Assert.Contains(
+            ((TestBuildEngine)invalidated.BuildEngine).Messages,
+            message => message.Contains("removed orphan output"));
+    }
+
+    [Fact]
     public void CanonicalInputs_ReferencedAssemblyContentMutation_InvalidatesWarmCache()
     {
         var src = CreateSourceFile("ReferenceContent.calr", ValidCalorSource);
-        var reference = CreateSourceFile("inputs/MutableReference.dll", "reference-v1");
+        var reference = Path.Combine(_tempDir, "inputs", "MutableReference.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(reference)!);
+        File.Copy(typeof(object).Assembly.Location, reference);
 
         CompileCalor Task()
         {
             var task = CreateTask(src);
+            task.EnableILAnalysis = true;
             task.ReferencedAssemblies = [new TaskItem(reference)];
             return task;
         }
@@ -829,7 +872,7 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.True(warm.Execute());
         Assert.Contains(((TestBuildEngine)warm.BuildEngine).Messages, m => m.Contains("skipping"));
 
-        File.WriteAllText(reference, "reference-v2");
+        File.AppendAllText(reference, "reference-v2");
         var changed = Task();
         Assert.True(changed.Execute());
         Assert.Contains(((TestBuildEngine)changed.BuildEngine).Messages,
@@ -846,6 +889,8 @@ public class CompileCalorIntegrationTests : IDisposable
         CompileCalor Task()
         {
             var task = CreateTask(src);
+            task.EnableILAnalysis = true;
+            task.ReferencedAssemblies = [new TaskItem(typeof(object).Assembly.Location)];
             task.DepsFilePath = deps;
             return task;
         }

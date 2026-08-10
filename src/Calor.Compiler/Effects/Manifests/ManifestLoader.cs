@@ -305,7 +305,7 @@ public sealed class ManifestLoader
     /// <summary>
     /// Gets the user-level manifests directory (~/.calor/manifests/).
     /// </summary>
-    private static string? GetUserManifestsDirectory()
+    internal static string? GetUserManifestsDirectory()
     {
         try
         {

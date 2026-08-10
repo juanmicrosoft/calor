@@ -592,22 +592,32 @@ public class BuildStateCacheTests : IDisposable
     }
 
     [Fact]
-    public void ComputeCompilerHash_TracksDeployedCompilerAndRuntimeClosure()
+    public void ComputeCompilerHash_TracksResolvedCompilerAndRuntimeClosure()
     {
         var dir = Path.Combine(_tempDir, "compiler-closure");
         Directory.CreateDirectory(dir);
-        var tasks = Path.Combine(dir, "Calor.Tasks.dll");
-        var compiler = Path.Combine(dir, "calor.dll");
-        var runtime = Path.Combine(dir, "Calor.Runtime.dll");
-        File.WriteAllText(tasks, "tasks");
-        File.WriteAllText(compiler, "compiler-v1");
-        File.WriteAllText(runtime, "runtime-v1");
+        var resolved = Calor.Tasks.CompileCalor.ResolveCompilerClosurePaths(
+            typeof(Calor.Tasks.CompileCalor).Assembly.Location);
+        Assert.Contains(typeof(Calor.Compiler.Program).Assembly.Location, resolved);
+        Assert.Contains(typeof(Calor.Runtime.Option<int>).Assembly.Location, resolved);
 
-        var baseline = BuildStateCache.ComputeCompilerHash(tasks);
-        File.WriteAllText(compiler, "compiler-v2");
-        var compilerChanged = BuildStateCache.ComputeCompilerHash(tasks);
-        File.WriteAllText(runtime, "runtime-v2");
-        var runtimeChanged = BuildStateCache.ComputeCompilerHash(tasks);
+        var copied = resolved.Select(path =>
+        {
+            var destination = Path.Combine(dir, Path.GetFileName(path));
+            if (File.Exists(path))
+                File.Copy(path, destination);
+            return destination;
+        }).ToList();
+        var compiler = copied.Single(path =>
+            Path.GetFileName(path).Equals("calor.dll", StringComparison.OrdinalIgnoreCase));
+        var runtime = copied.Single(path =>
+            Path.GetFileName(path).Equals("Calor.Runtime.dll", StringComparison.OrdinalIgnoreCase));
+
+        var baseline = BuildStateCache.ComputeCompilerHash(copied);
+        File.AppendAllText(compiler, "compiler-change");
+        var compilerChanged = BuildStateCache.ComputeCompilerHash(copied);
+        File.AppendAllText(runtime, "runtime-change");
+        var runtimeChanged = BuildStateCache.ComputeCompilerHash(copied);
 
         Assert.NotEqual(baseline, compilerChanged);
         Assert.NotEqual(compilerChanged, runtimeChanged);
@@ -791,11 +801,27 @@ public class BuildStateCacheTests : IDisposable
             new Calor.Tasks.CompileCalor
             {
                 ProjectDirectory = _tempDir,
+                EnableILAnalysis = true,
                 ReferencedAssemblies = [new TaskItem(reference)]
             },
-            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, RuntimeDirectory = _tempDir },
-            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, NuGetPackageRoot = _tempDir },
-            new Calor.Tasks.CompileCalor { ProjectDirectory = _tempDir, DepsFilePath = deps }
+            new Calor.Tasks.CompileCalor
+            {
+                ProjectDirectory = _tempDir,
+                EnableILAnalysis = true,
+                RuntimeDirectory = _tempDir
+            },
+            new Calor.Tasks.CompileCalor
+            {
+                ProjectDirectory = _tempDir,
+                EnableILAnalysis = true,
+                NuGetPackageRoot = _tempDir
+            },
+            new Calor.Tasks.CompileCalor
+            {
+                ProjectDirectory = _tempDir,
+                EnableILAnalysis = true,
+                DepsFilePath = deps
+            }
         };
 
         Assert.All(variants, task => Assert.NotEqual(baseline, task.ComputeCacheInputs().Serialize()));
@@ -814,11 +840,13 @@ public class BuildStateCacheTests : IDisposable
         var first = new Calor.Tasks.CompileCalor
         {
             ProjectDirectory = _tempDir,
+            EnableILAnalysis = true,
             ReferencedAssemblies = [new TaskItem(referenceA), new TaskItem(referenceB)]
         };
         var reordered = new Calor.Tasks.CompileCalor
         {
             ProjectDirectory = _tempDir,
+            EnableILAnalysis = true,
             ReferencedAssemblies = [new TaskItem(referenceB), new TaskItem(referenceA)]
         };
 
@@ -827,6 +855,26 @@ public class BuildStateCacheTests : IDisposable
 
         File.WriteAllText(referenceA, "a-v2");
         Assert.NotEqual(baseline, first.ComputeCacheInputs().Serialize());
+    }
+
+    [Fact]
+    public void ManifestHash_IncludesUserLevelManifests_AndDistinguishesScopes()
+    {
+        var project = Path.Combine(_tempDir, "manifest-project");
+        var user = Path.Combine(_tempDir, "manifest-user");
+        Directory.CreateDirectory(project);
+        Directory.CreateDirectory(user);
+        File.WriteAllText(Path.Combine(project, "same.calor-effects.json"), "project-v1");
+        File.WriteAllText(Path.Combine(user, "same.calor-effects.json"), "user-v1");
+
+        var baseline = BuildStateCache.ComputeManifestHash([project], user);
+        File.WriteAllText(Path.Combine(user, "same.calor-effects.json"), "user-v2");
+        var userChanged = BuildStateCache.ComputeManifestHash([project], user);
+        File.WriteAllText(Path.Combine(project, "same.calor-effects.json"), "project-v2");
+        var projectChanged = BuildStateCache.ComputeManifestHash([project], user);
+
+        Assert.NotEqual(baseline, userChanged);
+        Assert.NotEqual(userChanged, projectChanged);
     }
 
 }
