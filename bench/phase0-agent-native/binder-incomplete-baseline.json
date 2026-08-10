@@ -8,6 +8,8 @@
     "Incomplete": 1450,
     "ExpressionsBound": 12307,
     "ConvertedAndBound": 305,
-    "NotConverted": 59
+    "ConvertExceptions": 0,
+    "EmptyOutput": 0,
+    "OutputParseFailures": 59
   }
 }

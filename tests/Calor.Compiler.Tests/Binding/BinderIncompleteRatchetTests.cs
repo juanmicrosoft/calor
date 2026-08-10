@@ -66,6 +66,11 @@ public class BinderIncompleteRatchetTests
     private static string BaselinePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-incomplete-baseline.json");
 
+    // ONE scope string — the two regen writers previously hardcoded different texts,
+    // making the committed file depend on writer order (review minor 5).
+    private const string ScopeText =
+        "both F-2 legs; conversion leg skips when corpus submodules are absent";
+
     [Fact]
     public void InRepoCorpus_IncompleteCount_DoesNotExceedBaseline()
     {
@@ -112,7 +117,7 @@ public class BinderIncompleteRatchetTests
             $"(and the F-2 amendment) in this PR:\n  {string.Join("\n  ", recovered)}");
 
         var measured = new Baseline(incomplete, parsedFiles, parseFailures.Count, expressionsBound,
-            "both F-2 legs; conversion leg skips when corpus submodules are absent");
+            ScopeText);
 
         if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
         {
@@ -160,7 +165,8 @@ public class BinderIncompleteRatchetTests
             .ToList();
         Skip.IfNot(subjects.All(Directory.Exists), "corpus submodules not initialized");
 
-        int incomplete = 0, expressionsBound = 0, convertedAndBound = 0, notConverted = 0;
+        int incomplete = 0, expressionsBound = 0, convertedAndBound = 0;
+        int convertExceptions = 0, emptyOutput = 0, outputParseFailures = 0;
         foreach (var srcDir in subjects)
         {
             var csFiles = Directory.EnumerateFiles(srcDir, "*.cs", SearchOption.AllDirectories)
@@ -180,14 +186,14 @@ public class BinderIncompleteRatchetTests
                             AutoGenerateIds = true
                         }).Convert(File.ReadAllText(cs), Path.GetFileName(cs));
                 }
-                catch { notConverted++; continue; }
-                if (string.IsNullOrEmpty(conv.CalorSource)) { notConverted++; continue; }
+                catch { convertExceptions++; continue; }
+                if (string.IsNullOrEmpty(conv.CalorSource)) { emptyOutput++; continue; }
 
                 var diagnostics = new DiagnosticBag();
                 var lexer = new Lexer(conv.CalorSource.Replace("\r\n", "\n"), diagnostics);
                 var parser = new Parser(lexer.TokenizeAllForParser(), diagnostics);
                 var module = parser.Parse();
-                if (diagnostics.HasErrors) { notConverted++; continue; }
+                if (diagnostics.HasErrors) { outputParseFailures++; continue; }
 
                 var bindBag = new DiagnosticBag();
                 var binder = new Binder(bindBag);
@@ -198,13 +204,19 @@ public class BinderIncompleteRatchetTests
             }
         }
 
-        var measured = new ConversionLeg(incomplete, expressionsBound, convertedAndBound, notConverted);
+        // Three DISTINCT failure modes recorded separately (review Major 3): the single
+        // NotConverted bucket hid that all 59 were converter round-trip validity
+        // failures — Calor the converter emitted that Calor's own parser rejects (#903).
+        var measured = new ConversionLeg(incomplete, expressionsBound, convertedAndBound,
+            convertExceptions, emptyOutput, outputParseFailures);
 
         if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_BASELINE") == "1")
         {
-            var baseline = JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!;
+            var baseline = File.Exists(BaselinePath())
+                ? JsonSerializer.Deserialize<Baseline>(File.ReadAllText(BaselinePath()))!
+                : new Baseline(0, 0, 0, 0, ScopeText);
             File.WriteAllText(BaselinePath(), JsonSerializer.Serialize(
-                baseline with { Conversion = measured, Scope = "both F-2 legs active (in-repo + A-1.5.3 conversion subjects)" },
+                baseline with { Conversion = measured, Scope = ScopeText },
                 new JsonSerializerOptions { WriteIndented = true }) + "\n");
             return;
         }
@@ -219,7 +231,8 @@ public class BinderIncompleteRatchetTests
     }
 
     private sealed record ConversionLeg(
-        int Incomplete, int ExpressionsBound, int ConvertedAndBound, int NotConverted);
+        int Incomplete, int ExpressionsBound, int ConvertedAndBound,
+        int ConvertExceptions, int EmptyOutput, int OutputParseFailures);
 
     private sealed record Baseline(
         int IncompleteCount, int ParsedFiles, int ParseFailures, int ExpressionsBound, string Scope,

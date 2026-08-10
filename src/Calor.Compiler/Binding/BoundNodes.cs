@@ -447,8 +447,34 @@ public sealed class BoundIncompleteExpression : BoundCallExpression
     }
 }
 
-/// <summary>A bound name→value pair (anonymous-object, record, and with-expression members).</summary>
-public sealed record BoundNamedValue(string Name, BoundExpression Value);
+/// <summary>A bound name→value pair (anonymous-object, record, and with-expression members).
+/// Carries the assignment's own span so checkers can point at the field, not just its value.</summary>
+public sealed record BoundNamedValue(string Name, BoundExpression Value, TextSpan Span);
+
+/// <summary>
+/// #762 B2 (review C1): the ONE enumeration of expression children for bound node types
+/// introduced by the B-series. Every traversal switch in the analysis layer uses this as
+/// its default arm, so a new family extends ONE place and every checker's recursion
+/// follows — the growing-switch class (the #879 cursor lesson's sibling) ends here.
+/// Types with dedicated arms in a given traversal (the pre-B2 five) are not listed;
+/// this covers the B-series additions only. Family PRs B3–B7 MUST extend this with
+/// their new types in the same commit that adds them.
+/// </summary>
+public static class BoundChildren
+{
+    public static IEnumerable<BoundExpression> Of(BoundExpression expression) => expression switch
+    {
+        BoundSomeExpression some => [some.Value],
+        BoundOkExpression ok => [ok.Value],
+        BoundErrExpression err => [err.Error],
+        BoundExpressionCall call => [call.Target, .. call.Arguments],
+        BoundAnonymousObjectCreation anon => anon.Initializers.Select(i => i.Value),
+        BoundRecordCreation rec => rec.Fields.Select(f => f.Value),
+        BoundWithExpression with => [with.Target, .. with.Assignments.Select(a => a.Value)],
+        BoundThrowExpression thr => [thr.Exception],
+        _ => [],
+    };
+}
 
 /// <summary>#762 B2: Option construction. Type composes from the payload (string types, D3).</summary>
 public sealed class BoundSomeExpression : BoundExpression

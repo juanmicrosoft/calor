@@ -306,7 +306,11 @@ public sealed class Binder
     /// have broken no-op Accept dispatch until item 8 lands (B8) — visitor traversal is
     /// the mechanism that cannot be trusted here yet.
     /// </summary>
-    /// <summary>F-1 Tier B residuals and their registered reasons (scoping doc D7 owns their disposition in B8).
+    /// <summary>Registered incomplete-reason table: F-1 Tier B residuals PLUS F-1 dormant
+    /// Tier A classes (currently SelfRefNode). NOTE for any future mechanized gate: this is
+    /// NOT a pure Tier B list — a zero-Tier-A-incomplete check must exclude only the six
+    /// Tier B classes, never treat membership here as exemption (review of B2, minor 4).
+    /// Scoping doc D7 owns the Tier B disposition in B8.
     /// Declared BEFORE ExpressionDispatch: static fields initialize in declaration order,
     /// and the dispatch builder reads this table.</summary>
     private static readonly IReadOnlyDictionary<string, string> s_tierBReasons = new Dictionary<string, string>
@@ -373,7 +377,7 @@ public sealed class Binder
                 {
                     var n = (AnonymousObjectCreationNode)e;
                     return new BoundAnonymousObjectCreation(n.Span,
-                        n.Initializers.Select(i => new BoundNamedValue(i.PropertyName, b.BindExpression(i.Value))).ToList());
+                        n.Initializers.Select(i => new BoundNamedValue(i.PropertyName, b.BindExpression(i.Value), i.Value.Span)).ToList());
                 },
             [typeof(RecordCreationNode)] = (b, e) =>
                 {
@@ -381,13 +385,13 @@ public sealed class Binder
                     // FieldAssignmentNode is a broken-Accept helper class (#762 item 8) —
                     // bound through its properties, never through visitor dispatch.
                     return new BoundRecordCreation(n.Span, n.TypeName,
-                        n.Fields.Select(f => new BoundNamedValue(f.FieldName, b.BindExpression(f.Value))).ToList());
+                        n.Fields.Select(f => new BoundNamedValue(f.FieldName, b.BindExpression(f.Value), f.Span)).ToList());
                 },
             [typeof(WithExpressionNode)] = (b, e) =>
                 {
                     var n = (WithExpressionNode)e;
                     return new BoundWithExpression(n.Span, b.BindExpression(n.Target),
-                        n.Assignments.Select(a => new BoundNamedValue(a.PropertyName, b.BindExpression(a.Value))).ToList());
+                        n.Assignments.Select(a => new BoundNamedValue(a.PropertyName, b.BindExpression(a.Value), a.Span)).ToList());
                 },
             [typeof(ThrowExpressionNode)] = (b, e) =>
                 { var n = (ThrowExpressionNode)e; return new BoundThrowExpression(n.Span, b.BindExpression(n.Exception)); },

@@ -141,6 +141,60 @@ public class BinderCoreFamilyTests
     }
 
     [Fact]
+    public void NestedDivision_InsideBoundFamilyNode_ProducesRealFinding_EndToEnd()
+    {
+        // The review-of-B2 CRITICAL: "analyzable again" was false — checkers' closed
+        // traversal switches skipped the new node types' children (a nested /0 produced
+        // NO finding through the full pipeline). The BoundChildren default arms fix it;
+        // this pins the claim END TO END: a division by literal zero inside a Some
+        // payload must produce the actual Calor0920, not merely a bound subtree.
+        const string source = @"
+§M{m001:Test}
+  §F{f001:Trap:pub} () -> void
+    §E{cw}
+    §B{b} §SM (/ 10 0)
+    §P b";
+
+        var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
+        {
+            EnableVerificationAnalyses = true,
+            VerificationAnalysisOptions = new Compiler.Analysis.VerificationAnalysisOptions
+            {
+                BugPatternOptions = new Compiler.Analysis.BugPatterns.BugPatternOptions
+                {
+                    ReportOnlyVerified = false
+                }
+            }
+        });
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.DivisionByZero ||
+                 (d.Code?.StartsWith("Calor0920") ?? false) ||
+                 d.Message.Contains("Division by"));
+    }
+
+    [Fact]
+    public void BoundChildren_EnumeratesEveryB2NodeChild()
+    {
+        // Locks the shared enumeration the traversal default-arms depend on: every
+        // B2 node yields exactly its expression children.
+        var i = new BoundIntLiteral(S, 1);
+        var j = new BoundIntLiteral(S, 2);
+        Assert.Equal([i], BoundChildren.Of(new BoundSomeExpression(S, i)));
+        Assert.Equal([i], BoundChildren.Of(new BoundOkExpression(S, i)));
+        Assert.Equal([i], BoundChildren.Of(new BoundErrExpression(S, i)));
+        Assert.Equal([i, j], BoundChildren.Of(new BoundExpressionCall(S, i, [j])));
+        Assert.Equal([i], BoundChildren.Of(
+            new BoundAnonymousObjectCreation(S, [new BoundNamedValue("a", i, S)])));
+        Assert.Equal([i], BoundChildren.Of(
+            new BoundRecordCreation(S, "R", [new BoundNamedValue("x", i, S)])));
+        Assert.Equal([i, j], BoundChildren.Of(
+            new BoundWithExpression(S, i, [new BoundNamedValue("x", j, S)])));
+        Assert.Equal([i], BoundChildren.Of(new BoundThrowExpression(S, i)));
+        Assert.Empty(BoundChildren.Of(i));
+    }
+
+    [Fact]
     public void SelfRef_StaysExplicitlyIncomplete_WithDormancyReason()
     {
         // F-1 dormant rule: no legal program reaches the binder with a SelfRefNode, so a
