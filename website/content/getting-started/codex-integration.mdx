@@ -5,7 +5,7 @@ order: 5
 ---
 
 
-This guide explains how to use Calor with OpenAI Codex CLI. For Claude Code integration, see [Claude Integration](/getting-started/claude-integration/).
+This guide explains how to use Calor with OpenAI Codex CLI. For Claude Code integration, see [Claude Integration](/docs/getting-started/claude-integration/).
 
 ---
 
@@ -21,9 +21,8 @@ This creates:
 
 | File | Purpose |
 |:-----|:--------|
-| `.codex/skills/calor/SKILL.md` | Teaches Codex Calor syntax |
-| `.codex/skills/calor-convert/SKILL.md` | Teaches Codex C# to Calor conversion |
 | `.codex/config.toml` | MCP server configuration for Calor tools |
+| `.codex/hooks.json` | Codex-native write validation and post-write lint hooks |
 | `AGENTS.md` | Project documentation with Calor-first guidelines |
 
 ---
@@ -53,58 +52,39 @@ args = ["mcp", "--stdio"]
 
 | Tool | Purpose |
 |:-----|:--------|
-| `calor_typecheck` | Semantic type checking with error categorization |
-| `calor_verify_contracts` | Z3-based contract verification |
 | `calor_compile` | Compile Calor source to C# |
+| `calor_check` | Diagnose, lint, type check, or validate snippets via `action` |
+| `calor_verify` | Seven-status Z3 contract verification |
 | `calor_analyze` | Advanced bug detection |
 | `calor_convert` | Convert between C# and Calor |
 | `calor_format` | Format source to canonical style |
-| `calor_lint` | Check agent-optimized format issues |
+| `calor_session_open` / `calor_file_write` | Cross-file checks and transactional writes |
 
-See [calor mcp](/cli/mcp/) for the complete list of 19 available tools.
+See [calor mcp](/docs/cli/mcp/) for the complete 18-tool surface.
 
 ---
 
 ## Enforcement
 
-Codex CLI does not support hooks like Claude Code. However, MCP tools provide direct access to the Calor compiler, and Calor-first development is **guidance-based**, relying on instructions in `AGENTS.md` and the skill files:
+Codex supports project lifecycle hooks. Calor writes a `PreToolUse` hook for
+covered `apply_patch`, Edit, and Write operations plus a `PostToolUse` lint hook
+for changed `.calr` files. Run `/hooks`, review the generated commands, and
+trust the exact project configuration before relying on them.
 
-- MCP tools give Codex native access to compile, verify, and convert Calor code
-- Codex *should* follow the instructions and create `.calr` files
-- Hooks are not supported, so enforcement is not automatic
-- Review file extensions after generation
-- Use `calor analyze` to find any unconverted `.cs` files
+The write hook validates rename destinations and multi-file patches, but it is
+a guardrail rather than a security boundary. Shell commands and specialized
+file-change paths can bypass lifecycle hooks. Run the smoke test in
+`bench/phase0-agent-native/CODEX-SMOKE.md` and keep repository CI checks enabled.
 
 ---
 
-## Available Skills
+## Project Guidance
 
-### The `$calor` Skill
-
-Use `$calor` to activate Calor-aware code generation:
-
-```
-$calor
-
-Write a function that calculates factorial with:
-- Precondition: n >= 0
-- Postcondition: result >= 1
-```
-
-### The `$calor-convert` Skill
-
-Use `$calor-convert` to convert existing C# code to Calor:
-
-```
-$calor-convert
-
-Convert this C# class to Calor:
-
-public class Calculator
-{
-    public int Add(int a, int b) => a + b;
-}
-```
+`calor init --ai codex` writes a managed Calor section into `AGENTS.md`; it
+does not generate project-local Codex skill files. The guidance covers current
+indent-only syntax, contracts, effects, IDs, and the required validation loop.
+Re-running init updates the managed section without replacing unrelated project
+instructions.
 
 ---
 
@@ -112,27 +92,25 @@ public class Calculator
 
 | Feature | Claude Code | Codex CLI |
 |:--------|:------------|:----------|
-| Skills directory | `.claude/skills/` | `.codex/skills/<name>/` |
 | Project instructions | `CLAUDE.md` | `AGENTS.md` |
-| Skill invocation | `/calor` | `$calor` |
 | MCP Tools | Yes | Yes |
-| Enforcement | **Hooks (enforced)** | **Guidance + MCP tools** |
+| Enforcement | Hooks | Hooks for covered tools + `AGENTS.md` |
 
 ---
 
 ## Best Practices
 
-1. **Use MCP tools** - Leverage MCP tools for compilation and verification
-2. **Review generated files** - Check that Codex created `.calr` files, not `.cs`
-3. **Use explicit instructions** - Be specific about wanting Calor output
-4. **Start with skill reference** - Begin prompts with `$calor` or `$calor-convert`
-5. **Run analysis regularly** - Use `calor analyze` to find migration candidates
+1. **Review and trust hooks** - Confirm both lifecycle hooks are active with `/hooks`
+2. **Run the smoke test** - Verify the current Codex tool path triggers the hooks
+3. **Use MCP tools** - Compile, check, and verify through the consolidated v0.12 surface
+4. **Review generated files** - Treat hooks as a guardrail and retain CI backstops
+5. **Run analysis regularly** - Use `calor assess` to find migration candidates
 
 ---
 
 ## See Also
 
-- [Syntax Reference](/syntax-reference/) - Complete language reference
-- [calor init](/cli/init/) - Full init command documentation
-- [calor mcp](/cli/mcp/) - MCP server tool documentation
-- [Claude Integration](/getting-started/claude-integration/) - Alternative with enforced Calor-first
+- [Syntax Reference](/docs/syntax-reference/) - Complete language reference
+- [calor init](/docs/cli/init/) - Full init command documentation
+- [calor mcp](/docs/cli/mcp/) - MCP server tool documentation
+- [Claude Integration](/docs/getting-started/claude-integration/) - Alternative with enforced Calor-first

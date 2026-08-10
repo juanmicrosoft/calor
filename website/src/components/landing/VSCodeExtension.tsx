@@ -44,7 +44,7 @@ export function VSCodeExtension() {
             VS Code Extension
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            First-class editor support for Calor development
+            Editor support, with release availability stated plainly
           </p>
         </div>
 
@@ -79,6 +79,13 @@ export function VSCodeExtension() {
               Install the Calor Language extension to enable syntax highlighting and editor features for <code className="text-calor-cyan">.calr</code> files.
             </p>
 
+            <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-muted-foreground">
+              <strong className="text-foreground">Release status:</strong> the Marketplace currently carries
+              v0.3.8, which has a known activation defect. v0.12.1 packages build successfully, but publishing
+              is still blocked by an expired Marketplace token. Use the repository build instructions when you
+              need the current extension.
+            </div>
+
             {/* Marketplace Button */}
             <a
               href={MARKETPLACE_URL}
@@ -88,13 +95,13 @@ export function VSCodeExtension() {
               className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-calor-navy px-6 py-3 font-medium text-white hover:bg-calor-navy/90 transition-colors"
             >
               <ExternalLink className="h-4 w-4" />
-              View on VS Code Marketplace
+              View legacy Marketplace listing
             </a>
 
             {/* Quick Install Command */}
             <div className="mt-6">
               <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                Or install via command palette
+                Legacy Marketplace install (v0.3.8)
               </span>
               <div className="mt-2 flex items-center justify-between rounded-lg border bg-zinc-950 px-4 py-3">
                 <code className="text-sm text-zinc-100 font-mono">
@@ -123,6 +130,17 @@ export function VSCodeExtension() {
                 </button>
               </div>
             </div>
+
+            <a
+              href="https://github.com/juanmicrosoft/calor/tree/main/editors/vscode"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackOutboundLink('https://github.com/juanmicrosoft/calor/tree/main/editors/vscode')}
+              className="mt-4 flex items-center justify-center gap-2 rounded-lg border px-6 py-3 font-medium hover:bg-muted transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Build the current extension
+            </a>
           </div>
         </div>
       </div>

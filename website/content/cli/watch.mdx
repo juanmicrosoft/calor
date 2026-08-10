@@ -1,0 +1,42 @@
+---
+title: "watch"
+section: "cli"
+order: 17
+description: "Incrementally recompile Calor sources when files or effect manifests change"
+---
+
+```bash
+calor watch <files-or-directories...> [options]
+```
+
+Directories are scanned recursively for `.calr` files. `bin`, `obj`, and
+`reference` directories are excluded. New, deleted, and renamed files are
+re-enumerated on every rebuild, and effect-manifest changes invalidate the
+cache.
+
+```bash
+calor watch src/
+calor watch a.calr b.calr --verbose
+calor watch src/ --format json
+```
+
+| Option | Description |
+|:-------|:------------|
+| `--format`, `-f` | `text` or NDJSON `json` |
+| `--debounce-ms` | Quiet period before rebuilding; default 200 ms |
+| `--no-cache` | Recompile all files on every change |
+| `--clear-cache` | Remove build state before the initial compile |
+| `--verbose`, `-v` | Show compiled and cache-hit files |
+| `--strict-api` | Require breaking-change markers for public API changes |
+| `--require-docs` | Require documentation on public functions and types |
+| `--no-enforce-effects` | Opt out of default-on effect enforcement |
+| `--strict-effects` | Promote unknown external calls to errors |
+| `--permissive-effects` | Assume unknown calls pure and demote effect violations |
+| `--contract-mode` | `off`, `debug`, or `release` |
+
+The cache validates source bytes, generated-output hashes, compiler options,
+and effect summaries. Diagnostic-bearing files are not cached, so their
+messages reappear. Watch is compile-only; it has no `--run` mode.
+
+JSON mode emits one schema 2.0 envelope per line, including clean and failed
+rebuilds. See [Structured Output](/docs/cli/structured-output/).

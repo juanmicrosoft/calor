@@ -1,0 +1,22 @@
+---
+title: "calor analyze-convertibility"
+section: "cli"
+order: 25
+---
+
+Analyze how likely C# source is to convert successfully to Calor.
+
+```bash
+calor analyze-convertibility <path> [options]
+```
+
+| Option | Description |
+|:-------|:------------|
+| `--format`, `-f` | Output `text` or `json`; defaults to `text` |
+| `--output`, `-o` | Write the report to a file instead of stdout |
+| `--quick`, `-q` | Run only stage 1 and skip the conversion attempt |
+| `--verbose`, `-v` | Show a per-file breakdown for directories |
+
+This command estimates conversion success. [`calor assess`](/docs/cli/analyze/)
+instead ranks files by the value of migrating them, while
+[`calor coverage`](/docs/cli/coverage/) explains feature coverage for one file.

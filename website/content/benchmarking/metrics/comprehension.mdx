@@ -6,7 +6,7 @@ order: 3
 
 
 **Category:** Comprehension
-**Result:** Calor wins (1.46x)
+**v0.12 result:** Calor wins (1.84x across 217 programs)
 **What it measures:** Structural clarity and semantic extractability
 
 ---
@@ -118,7 +118,8 @@ namespace Calculator
 
 **Total: 0.65**
 
-**Ratio: 0.95 / 0.65 = 1.46x** (Calor wins)
+**Illustrative ratio: 0.95 / 0.65 = 1.46x.** This single example is not the
+aggregate v0.12 result.
 
 ---
 
@@ -175,7 +176,9 @@ Must analyze:
 
 ## Interpretation
 
-The 1.46x advantage indicates that Calor's explicit structure provides ~46% more structural clarity signals than equivalent C# code.
+The v0.12 aggregate is 1.84x. Under this calculator, Calor source exposes more
+of the structural signals being counted. That measures the calculator's
+defined signals; it is not a direct measurement of human comprehension.
 
 This doesn't mean C# is hard to understand—it means Calor makes structure *more explicit*, which benefits automated analysis.
 
@@ -183,4 +186,4 @@ This doesn't mean C# is hard to understand—it means Calor makes structure *mor
 
 ## Next
 
-- [Error Detection](/benchmarking/metrics/error-detection/) - How contracts help find bugs
+- [Error Detection](/docs/benchmarking/metrics/error-detection/) - How contracts help find bugs

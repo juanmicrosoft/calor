@@ -33,39 +33,39 @@ const metricDisplayInfo: Record<
   { name: string; calorInterpretation: string; csharpInterpretation: string; tieInterpretation: string }
 > = {
   TokenEconomics: {
-    name: 'Code Size',
-    calorInterpretation: 'Calor code is more compact',
-    csharpInterpretation: 'Calor\'s explicit rules add some overhead',
-    tieInterpretation: 'Both languages produce similar code size',
+    name: 'Token Economics',
+    calorInterpretation: 'The token/character/line composite favors Calor; raw tokens do not',
+    csharpInterpretation: 'The token/character/line composite favors C#',
+    tieInterpretation: 'The composite is similar for both languages',
   },
   GenerationAccuracy: {
-    name: 'First-Try Success',
-    calorInterpretation: 'AI generates correct code more often',
-    csharpInterpretation: 'AI knows C# better (for now)',
-    tieInterpretation: 'AI generates correct code at similar rates',
+    name: 'Generation Structure',
+    calorInterpretation: 'Compilation and structural completeness narrowly favor Calor',
+    csharpInterpretation: 'Compilation and structural completeness favor C#',
+    tieInterpretation: 'Compilation and structural completeness are similar',
   },
   Comprehension: {
     name: 'Understanding Code',
-    calorInterpretation: 'AI understands Calor code 1.5x better',
+    calorInterpretation: 'The calculator finds more explicit comprehension signals',
     csharpInterpretation: 'C# familiarity helps AI follow along',
     tieInterpretation: 'AI understands both languages equally well',
   },
   EditPrecision: {
     name: 'Accurate Edits',
-    calorInterpretation: 'AI makes precise changes without breaking things',
+    calorInterpretation: 'Stable IDs improve the measured targeting signals',
     csharpInterpretation: 'C# editing patterns are well-established',
     tieInterpretation: 'AI makes equally precise edits in both languages',
   },
   ErrorDetection: {
     name: 'Finding Bugs',
-    calorInterpretation: 'AI spots 22% more bugs in Calor code',
+    calorInterpretation: 'Contracts and effects add explicit detection signals',
     csharpInterpretation: 'C# has mature debugging tools',
     tieInterpretation: 'AI spots bugs equally well in both languages',
   },
   InformationDensity: {
-    name: 'Meaning Per Line',
+    name: 'Information Density',
     calorInterpretation: 'Each line carries more information',
-    csharpInterpretation: 'Calor trades brevity for clarity',
+    csharpInterpretation: 'C# has slightly more counted semantic elements per token',
     tieInterpretation: 'Both languages convey similar meaning per line',
   },
   TaskCompletion: {
@@ -76,7 +76,7 @@ const metricDisplayInfo: Record<
   },
   RefactoringStability: {
     name: 'Safe Refactoring',
-    calorInterpretation: 'Code stays correct after restructuring',
+    calorInterpretation: 'ID-based references improve the measured stability score',
     csharpInterpretation: 'C# has better refactoring tools',
     tieInterpretation: 'Both languages maintain stability during refactoring',
   },
@@ -94,7 +94,7 @@ const metricDisplayInfo: Record<
   },
   Correctness: {
     name: 'Edge Case Handling',
-    calorInterpretation: 'Contracts help prevent edge case bugs',
+    calorInterpretation: 'Structural correctness signals favor Calor in estimation mode',
     csharpInterpretation: 'Guard clauses require explicit implementation',
     tieInterpretation: 'Both languages handle edge cases equally well',
   },
@@ -209,10 +209,10 @@ export function BenchmarkChart() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center" ref={sectionRef}>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Measured Against Real AI Tasks
+            Measured Across 217 Paired Programs
           </h2>
           <p className="mt-4 text-lg text-muted-foreground font-body">
-            We tested how well AI agents work with Calor vs C#. Here&apos;s what we found.
+            Eight deterministic calculators compare the same programs in Calor and C#.
           </p>
           <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
@@ -278,9 +278,9 @@ export function BenchmarkChart() {
           <div className="mt-12 p-6 rounded-xl border bg-gradient-to-br from-calor-pink/5 to-calor-salmon/5">
             <h3 className="font-semibold mb-2 font-display">The Bottom Line</h3>
             <p className="text-muted-foreground font-body leading-relaxed">
-              <strong className="text-foreground">Calor wins where bugs hurt most:</strong> AI understands code better, catches more errors, and makes safer changes.
-              <strong className="text-foreground"> C# wins on familiarity:</strong> AI has seen more C# code, so it generates it faster. But as AI learns Calor,
-              the familiarity gap shrinks—the safety advantage doesn&apos;t.
+              <strong className="text-foreground">The v0.12 static run favors Calor in seven of eight defined metrics.</strong>{' '}
+              Its strongest scores come from explicit comprehension and error-detection signals; C# narrowly leads information density.
+              These calculators do not directly measure model productivity or production defect rates.
             </p>
           </div>
 

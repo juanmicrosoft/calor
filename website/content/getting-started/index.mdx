@@ -22,13 +22,13 @@ your_code.calr → Calor Compiler → your_code.g.cs → .NET Build → executab
 
 ## What You'll Learn
 
-1. **[Installation](/getting-started/installation/)** - Set up the Calor compiler
-2. **[Hello World](/getting-started/hello-world/)** - Write and run your first Calor program
-3. **[How It Works](/getting-started/how-it-works/)** - How AI agents work with Calor using in-context examples
-4. **[Claude Integration](/getting-started/claude-integration/)** - Use Calor with Claude Code (enforced Calor-first)
-5. **[Codex Integration](/getting-started/codex-integration/)** - Use Calor with OpenAI Codex CLI
-6. **[Gemini Integration](/getting-started/gemini-integration/)** - Use Calor with Google Gemini CLI (enforced Calor-first)
-7. **[GitHub Copilot Integration](/getting-started/github-integration/)** - Use Calor with GitHub Copilot
+1. **[Installation](/docs/getting-started/installation/)** - Set up the Calor compiler
+2. **[Hello World](/docs/getting-started/hello-world/)** - Write and run your first Calor program
+3. **[How It Works](/docs/getting-started/how-it-works/)** - How AI agents work with Calor using in-context examples
+4. **[Claude Integration](/docs/getting-started/claude-integration/)** - Use Calor with Claude Code (enforced Calor-first)
+5. **[Codex Integration](/docs/getting-started/codex-integration/)** - Use Calor with OpenAI Codex CLI
+6. **[Gemini Integration](/docs/getting-started/gemini-integration/)** - Use Calor with Google Gemini CLI (enforced Calor-first)
+7. **[GitHub Copilot Integration](/docs/getting-started/github-integration/)** - Use Calor with GitHub Copilot
 
 ---
 
@@ -82,7 +82,7 @@ For Claude Code (with enforced Calor-first via hooks):
 calor init --ai claude
 ```
 
-For OpenAI Codex CLI (guidance-based):
+For OpenAI Codex CLI (project hooks and MCP):
 ```bash
 calor init --ai codex
 ```
@@ -101,7 +101,10 @@ This adds Calor skills and project documentation that instruct the AI to:
 - Write all new code in Calor (not C#)
 - Analyze existing C# files before modifying them
 
-**Note:** Claude Code and Gemini CLI enforce Calor-first via hooks (blocks `.cs` creation). Codex CLI is guidance-based only. GitHub Copilot is guidance-based with MCP tool support.
+**Note:** Claude Code, Gemini CLI, and Codex can configure Calor-first hooks.
+For Codex, review and trust the generated hooks with `/hooks`, then run the
+generated smoke test because specialized file-change paths may bypass lifecycle
+hooks. GitHub Copilot is guidance-based with MCP tool support.
 
 ### Step 4: Write Calor Code
 
@@ -121,14 +124,14 @@ Then build:
 dotnet build
 ```
 
-See [Hello World](/getting-started/hello-world/) for a detailed explanation of the syntax.
+See [Hello World](/docs/getting-started/hello-world/) for a detailed explanation of the syntax.
 
 ### Step 5: (Optional) Migrate Existing C# Files
 
 For existing C# codebases, analyze which files are good candidates for migration:
 
 ```bash
-calor analyze ./src --top 10
+calor assess ./src --top 10
 ```
 
 Then convert high-scoring files:
@@ -137,7 +140,7 @@ Then convert high-scoring files:
 calor convert HighScoreFile.cs
 ```
 
-See the [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/) guide for the complete walkthrough.
+See the [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/) guide for the complete walkthrough.
 
 ---
 
@@ -162,10 +165,12 @@ See the [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-pro
 
 | Component | Description |
 |:----------|:------------|
-| Codex skills | `$calor` to write Calor code, `$calor-convert` to convert C# |
-| AGENTS.md | Project guidelines (guidance-based, not enforced) |
+| Hook configuration | Validates covered file edits and lints changed `.calr` files |
+| MCP configuration | Direct compiler, verification, analysis, and conversion tools |
+| AGENTS.md | Automatically loaded Calor project guidelines |
 
-**Note:** Codex CLI does not support hooks, so Calor-first is guidance-based only.
+**Note:** Codex hooks require repository and hook trust. They are guardrails;
+builds, tests, and repository-wide checks remain necessary.
 
 ### With Gemini (`calor init --ai gemini`)
 
@@ -191,25 +196,25 @@ See the [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-pro
 
 | Feature | Claude Code | Gemini CLI | Codex CLI | GitHub Copilot |
 |:--------|:------------|:-----------|:----------|:---------------|
-| Skills directory | `.claude/skills/` | `.gemini/skills/` | `.codex/skills/` | `.github/copilot/skills/` |
+| Project-local skills | `.claude/skills/` | `.gemini/skills/` | Not generated; managed `AGENTS.md` guidance | `.github/copilot/skills/` |
 | Project instructions | `CLAUDE.md` | `GEMINI.md` | `AGENTS.md` | `copilot-instructions.md` |
-| Skill invocation | `/calor` | `@calor` | `$calor` | Reference skill name |
-| MCP tools | `~/.claude.json` | N/A | N/A | `.vscode/mcp.json` |
-| Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only | Guidance + MCP tools |
-| Hook mechanism | `PreToolUse` | `BeforeTool` | N/A | MCP tools |
+| Skill invocation | `/calor` | `@calor` | Not applicable | Reference skill name |
+| MCP tools | `~/.claude.json` | `.gemini/settings.json` | `.codex/config.toml` | `.vscode/mcp.json` |
+| Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | **Hooks for covered writes** | Guidance + MCP tools |
+| Hook mechanism | `PreToolUse` | `BeforeTool` | Codex project hooks | None |
 
 ---
 
 ## Manual Installation
 
-For alternative installation methods (global tool only, manual Claude skills setup, or building from source), see the [Installation](/getting-started/installation/) page.
+For alternative installation methods (global tool only, manual Claude skills setup, or building from source), see the [Installation](/docs/getting-started/installation/) page.
 
 ---
 
 ## Next Steps
 
-- [Installation](/getting-started/installation/) - Detailed setup instructions
-- [Hello World](/getting-started/hello-world/) - Understand the hello world program
-- [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/) - Complete migration guide
-- [Syntax Reference](/syntax-reference/) - Complete language reference
-- [CLI Reference](/cli/) - All `calor` commands including migration analysis
+- [Installation](/docs/getting-started/installation/) - Detailed setup instructions
+- [Hello World](/docs/getting-started/hello-world/) - Understand the hello world program
+- [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/) - Complete migration guide
+- [Syntax Reference](/docs/syntax-reference/) - Complete language reference
+- [CLI Reference](/docs/cli/) - All `calor` commands including migration analysis

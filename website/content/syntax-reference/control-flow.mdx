@@ -415,7 +415,7 @@ Match Result types:
   §K §ERR §VAR{e} → (+ "Error: " e)
 ```
 
-### Block Syntax (`§/K`)
+### Block Syntax
 
 For cases with multiple statements, use block syntax:
 
@@ -425,9 +425,10 @@ For cases with multiple statements, use block syntax:
   §K 2
     §P "matched two"         // Block syntax (multiple statements)
     §R "two"
-    §/K
   §K _ → "other"
 ```
+
+The next case dedents to the `§K` column; no case closer is written.
 
 ### Complete Example
 
@@ -468,4 +469,4 @@ The arrow `→` provides:
 
 ## Next
 
-- [Contracts](/syntax-reference/contracts/) - Preconditions and postconditions
+- [Contracts](/docs/syntax-reference/contracts/) - Preconditions and postconditions

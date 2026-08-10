@@ -17,7 +17,9 @@ Computer scientists have known since the 1970s how to make software more reliabl
 - **Design by Contract**: Specify preconditions and postconditions (Meyer, 1986)
 - **Dependent Types**: Encode invariants in the type system (Martin-Löf, 1972)
 
-These techniques can **mathematically prove** that code behaves correctly. They catch entire categories of bugs before the code ever runs.
+These techniques can prove specific obligations inside a precisely modeled
+surface. They do not prove that an entire program is correct. When Calor cannot
+make a clean proof, it reports why and keeps the runtime check.
 
 **So why isn't all software written this way?**
 
@@ -141,7 +143,7 @@ In Calor, effects are explicit in the signature:
   §O{User}
   §E{db,cw,net}                    // EXPLICIT: database, console write, network
 
-  §V{v001:User:user} (§C{GetById} id)
+  §B{user:User} §C{GetById} §A id §/C
   §C{Log} (concat "Retrieved user " (str id))
   §C{CacheSet} user
   §R user
@@ -168,14 +170,17 @@ public static int Divide(int a, int b)
 // In production: DivideByZeroException with no context
 ```
 
-Calor contracts are always enforced:
+Calor preconditions are emitted as runtime checks unless contract checks are
+explicitly disabled with `--contract-mode off`. Postconditions are also emitted
+unless verification produces a clean, non-vacuous `proven` result. Conditional
+or unsupported proofs keep their checks:
 
 ```
 §F{f001:Divide:pub}
   §I{i32:a}
   §I{i32:b}
   §O{i32}
-  §Q{message="divisor must not be zero"} (!= b 0)   // ALWAYS enforced
+  §Q{message="divisor must not be zero"} (!= b 0)
   §R (/ a b)
 ```
 
@@ -239,23 +244,24 @@ When agents both write and verify code, a powerful feedback loop emerges:
 
 1. **Agent generates code** with effect declarations and contracts
 2. **Compiler verifies** effects are properly declared
-3. **Errors include call chains** showing exactly where violations occur
+3. **Errors include resolved call chains** when the analysis can recover them
 4. **Agent fixes violations** with precise information
-5. **Repeat until verified**
+5. **Repeat until checks pass and the remaining assumptions are reviewed**
 
-This cycle happens at machine speed. What would take a human team days of debugging completes in seconds.
+This shortens the feedback loop while keeping unresolved boundaries visible to
+the reviewer.
 
 ---
 
 ## Real-World Impact
 
-### Bug Categories Eliminated
+### Bug Categories Surfaced Earlier
 
 | Bug Category | Traditional Detection | Calor Detection |
 |:-------------|:---------------------|:----------------|
 | Undeclared side effect | Code review (maybe) | Compile error |
-| Missing null check | Runtime NPE | Contract violation |
-| Invalid state transition | Integration test (if lucky) | Contract violation |
+| Missing null check | Runtime NPE | Contract or analysis finding when expressed and modeled |
+| Invalid state transition | Integration test (if lucky) | Contract violation when the contract covers it |
 | Effect leaking through abstraction | Production incident | Compile error with call chain |
 | Contract violation | Silent corruption | Immediate, traced exception |
 
@@ -267,13 +273,13 @@ To see effect and contract enforcement in action:
 
 ```bash
 # Compile with enforcement (enabled by default)
-calor compile myprogram.calr
+calor --input myprogram.calr --output myprogram.g.cs
 
 # See effect violations with call chains
 # error Calor0410: Function 'f001' uses effect 'console_write' but does not declare it
 
 # Disable for migration (not recommended)
-calor compile myprogram.calr --enforce-effects=false
+calor --input myprogram.calr --output myprogram.g.cs --no-enforce-effects
 ```
 
 ---
@@ -282,4 +288,5 @@ calor compile myprogram.calr --enforce-effects=false
 
 - [Effects Reference](/docs/syntax-reference/effects/) - Complete effect syntax and available effect types
 - [Contracts Reference](/docs/syntax-reference/contracts/) - Precondition and postcondition syntax
+- [Verification Guarantees](/docs/guides/verification-guarantees/) - Proof outcomes, modeled forms, and runtime-check retention
 - [Design Principles](/docs/philosophy/design-principles/) - The five principles behind Calor

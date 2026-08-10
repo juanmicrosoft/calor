@@ -8,6 +8,10 @@ order: 9
 
 The Effect Discipline benchmark measures how well code prevents **real-world bugs** caused by hidden side effects.
 
+This is a separate outcome-based runner and is **not included** in the v0.12
+eight-metric dashboard or its 1.32x composite. Any estimation-mode result
+describes the calculator's signals, not an observed production incident rate.
+
 ---
 
 ## Fair Outcome-Based Scoring
@@ -207,6 +211,6 @@ dotnet run --project tests/Calor.Evaluation -- effect-discipline \
 
 ## Learn More
 
-- [Safety Benchmark](/benchmarking/metrics/safety/) - Contract enforcement
-- [Correctness Benchmark](/benchmarking/metrics/correctness/) - Edge case handling
-- [Methodology](/benchmarking/methodology/) - How benchmarks work
+- [Safety Benchmark](/docs/benchmarking/metrics/safety/) - Contract enforcement
+- [Correctness Benchmark](/docs/benchmarking/metrics/correctness/) - Edge case handling
+- [Methodology](/docs/benchmarking/methodology/) - How benchmarks work

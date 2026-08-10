@@ -1,0 +1,48 @@
+---
+title: "review-packet"
+section: "cli"
+order: 13
+description: "Assemble a change-oriented report that leads with what remains unproven"
+---
+
+```bash
+calor review-packet <files...> [options]
+```
+
+The review packet begins with the **unproven remainder**, not a success count.
+It then reports assumptions, vacuity, counterexamples, per-module interop and
+waiver fractions, and caller impact for changed declarations.
+
+## Examples
+
+```bash
+calor review-packet src/Pricing.calr
+calor review-packet src/*.calr --baseline-ref origin/main
+calor review-packet src/Pricing.calr --changed f001 --changed Calculate
+calor review-packet src/Pricing.calr --json
+```
+
+## Options
+
+| Option | Description |
+|:-------|:------------|
+| `--changed` | Declaration ID or name treated as changed; repeatable |
+| `--baseline-ref` | Git ref used to derive changed declarations from zero-context diff ranges |
+| `--permissive-effects` | Record the effect waiver on the packet's first line |
+| `--contract-mode` | `debug`, `release`, or `off`; `off` is disclosed as a waiver |
+| `--timeout`, `-t` | Z3 budget per contract in milliseconds; default 5000 |
+| `--output`, `-o` | Write the Markdown packet to a file |
+| `--json` | Emit the same data in a schema 2.0 envelope |
+
+The seven proof statuses are `proven`, `refuted`, `assumed`, `unknown`,
+`timeout`, `unsupported`, and `unavailable`. A refinement-type note is included
+because refinement obligations are analysis-only and do not emit runtime
+guards (`Calor1356`). A selector that matches no declaration is a warning
+(`Calor1358`), so a typo cannot silently remove caller impact.
+
+`--baseline-ref` maps changed lines to declaration extents. An edit between
+declarations is attributed to the preceding declaration, which can
+over-include impact but does not omit it.
+
+See [Verification Guarantees](/docs/guides/verification-guarantees/) for how to
+interpret each status.

@@ -4,63 +4,22 @@ section: "benchmarking"
 order: 5
 ---
 
+**v0.12 result:** Calor wins (1.36x across 217 paired programs)
 
-**Category:** Edit Precision
-**Result:** Calor wins (1.36x)
-**What it measures:** Targeting accuracy and change isolation
-
----
-
-## Overview
-
-The Edit Precision metric measures how accurately an AI agent can target and modify specific code elements without unintended changes.
+**What the calculator measures:** Heuristic target identifiability and estimated
+collateral-edit risk. It does not run an AI agent or apply real edits.
 
 ---
 
-## Why It Matters
+## Why Targeting Matters
 
-When an agent needs to modify code, it must:
-- Identify the exact element to change
-- Make the change without affecting other code
-- Verify the modification is complete
+An editing tool must find the intended declaration, locate its scope, and avoid
+changing similar code nearby. Calor provides two useful signals:
 
-Unique identifiers enable precise targeting that survives refactoring.
+- explicit structural markers such as `§F`, `§L`, and `§IF`;
+- optional source IDs that can distinguish otherwise similar structural targets.
 
----
-
-## How It's Measured
-
-### Calor Targeting Factors
-
-| Factor | Points | Rationale |
-|:-------|:-------|:----------|
-| Has unique module IDs | 0.15 | Modules can be targeted by ID |
-| Has unique function IDs | 0.20 | Functions can be targeted by ID |
-| Has unique variable IDs | 0.10 | Variables can be targeted by ID |
-| Has indented body | 0.10 | Indent-form scope boundary (every opener is followed by an indented body, terminated by dedent) |
-| Module ID count | Variable | More IDs = better targeting |
-| Function ID count | Variable | More IDs = better targeting |
-
-Base score: 0.50
-
-### C# Targeting Factors
-
-| Factor | Points | Rationale |
-|:-------|:-------|:----------|
-| Has namespace | 0.10 | Namespace provides some targeting |
-| Has class | 0.10 | Class provides some targeting |
-| Method count | 0.15 | Methods can be targeted by name |
-| Brace depth penalty | -0.05 | Deep nesting reduces precision |
-
-Base score: 0.50, cap at 0.85
-
----
-
-## The ID Advantage
-
-### Calor: Unambiguous Targeting
-
-```
+```calor
 §L{for1:i:1:100:1}
   §IF{if1} (> i 50)
     §P i
@@ -70,221 +29,79 @@ Base score: 0.50, cap at 0.85
     §P j
 ```
 
-**Agent instruction:** "Change `for1` to start at 0"
-
-**Result:** Unambiguous. Only `for1` is affected.
-
-### C#: Ambiguous Targeting
-
-```csharp
-for (int i = 1; i <= 100; i++)
-{
-    if (i > 50)
-    {
-        Console.WriteLine(i);
-    }
-}
-
-for (int j = 1; j <= 50; j++)
-{
-    if (j < 25)
-    {
-        Console.WriteLine(j);
-    }
-}
-```
-
-**Agent instruction:** "Change the first for loop to start at 0"
-
-**Ambiguity risks:**
-- Which is "first"? (depends on reading order)
-- What if code is reordered?
-- What if another loop is added above?
+“Change `for1` to start at 0” has a direct syntactic target. In C#, an
+instruction such as “change the first loop” depends on location and surrounding
+context.
 
 ---
 
-## Edit Efficiency Measurement
+## How the Published Metric Is Calculated
 
-When comparing before/after edits:
+The headline score combines two source-based heuristics:
 
-```
-Efficiency = 1 - (ModifiedLines / TotalLines)
-```
+| Component | Weight | What it does |
+|:----------|:-------|:-------------|
+| Structural targeting | 40% | Scores explicit module/function IDs and an indented body; compares those signals with C# namespaces, classes, methods, and brace depth |
+| Simulated task scoring | 60% | Synthesizes edit descriptions and assigns fixed scores from target presence, uniqueness, and source-pattern checks |
 
-Higher efficiency means more precise, targeted changes.
+The task set covers adding a precondition, renaming a function, adding a
+parameter, changing a return type, and—when the detector finds one—changing a
+loop bound. These are calculator estimates, not observed task completions.
 
-### Example Edit
+The structural Calor score starts at 0.50 and adds:
 
-**Task:** Change loop iteration count from 100 to 200
+| Detected factor | Points |
+|:----------------|:-------|
+| At least one explicit module ID | 0.15 |
+| At least one explicit function ID | 0.20 |
+| Indented body present | 0.10 |
+| Legacy `§V` pattern present | 0.10 |
 
-**Calor edit:**
-```diff
-- §L{for1:i:1:100:1}
-+ §L{for1:i:1:200:1}
-```
-- Modified lines: 1
-- Total lines: 10
-- Efficiency: 1 - (1/10) = **0.90**
+That final detector is a known limitation: current variable bindings use `§B`,
+not `§V`, so current source does not earn the legacy-variable bonus. Optional
+name-first declarations also do not earn an explicit-ID bonus until IDs are
+materialized in source.
 
-**C# edit:**
-```diff
-- for (int i = 1; i <= 100; i++)
-+ for (int i = 1; i <= 200; i++)
-```
-- Modified lines: 1
-- Total lines: 10
-- Efficiency: 1 - (1/10) = **0.90**
-
-Similar for simple edits, but Calor's ID provides certainty about which loop.
+The C# structural score starts at 0.50, adds namespace, class, and method
+signals, subtracts for deeper brace structure, and is capped at 0.85.
 
 ---
 
-## Structural Targeting
+## What 1.36x Does—and Does Not—Mean
 
-### Calor: ID-Based
+The result means this deterministic calculator assigned higher targeting scores
+to the Calor representation in the published corpus. It is evidence about the
+calculator's explicit-structure hypothesis. It is **not** a measured 36%
+improvement in production edit success, an agent accuracy experiment, or proof
+that an ID survives a refactor automatically.
 
-```
-"Delete function f002"     → Find §F{f002:…}; the function's body is the indented region after this opener up to the next sibling (dedent). Remove the opener + indented body.
-"Rename function f001"     → Update §F{f001:NewName:vis}
-"Move loop for1"           → Cut §L{for1:…} and its indented body, paste at new indent depth
-"Add contract to f003"     → Insert §Q after §O in §F{f003}
-```
+An explicit ID survives a rename or move only when the editing tool preserves
+it. Copies and extracted declarations need new IDs, and indentation—not closer
+tags—defines structural scope in v0.12.
 
-### C#: Pattern-Based
-
-```
-"Delete function Foo"      → Find method named Foo (hope no overloads)
-"Rename function Bar"      → Find/replace all occurrences (careful with strings!)
-"Move the loop"            → Identify by context, match braces
-"Add assertion to Baz"     → Find method, locate correct position
-```
+For actual agent behavior, use a blinded task suite that performs edits, runs the
+compiler and tests, and measures unintended changes. Keep that evidence separate
+from this static metric.
 
 ---
 
-## Diff Analysis
+## Example Targeting Operations
 
-The metric uses DiffPlex to compare edit precision:
-
-```csharp
-var diff = diffBuilder.BuildDiffModel(before, after);
-var inserted = diff.Lines.Count(l => l.Type == ChangeType.Inserted);
-var deleted = diff.Lines.Count(l => l.Type == ChangeType.Deleted);
-var modified = inserted + deleted;
+```text
+Delete function f002  -> remove its §F opener and indented body
+Rename function f001  -> change the name while preserving the explicit ID
+Move loop for1        -> move its opener and indented body together
+Add contract to f003  -> insert §Q in the function's contract section
 ```
 
-Lower `modified / total` ratio = higher precision.
-
----
-
-## Real-World Scenarios
-
-### Scenario 1: Rename a Function
-
-**Calor:**
-1. Find `§F{f001:OldName:pub}`
-2. Replace with `§F{f001:NewName:pub}`
-3. ID `f001` unchanged, all references still valid
-
-**C#:**
-1. Find method `OldName`
-2. Replace declaration
-3. Find all call sites (hope no false positives)
-4. Update each call site
-
-### Scenario 2: Change Loop Bounds
-
-**Calor:**
-```
-// Instruction: "In for1, change start from 1 to 0"
-§L{for1:i:1:100:1} → §L{for1:i:0:100:1}
-```
-
-**C#:**
-```
-// Instruction: "In the loop, change start from 1 to 0"
-// Which loop? Context-dependent.
-```
-
-### Scenario 3: Add Contract
-
-**Calor:**
-```
-// Instruction: "Add precondition x >= 0 to f001"
-// Insert after §O line in §F{f001}:
-§Q (>= x 0)
-```
-
-**C#:**
-```
-// Instruction: "Add validation that x >= 0"
-// Where? Beginning of method? How to express?
-```
-
----
-
-## Scoring Example
-
-### Calor Code
-
-```
-§M{m001:Calculator}
-  §F{f001:Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (+ a b)
-  §F{f002:Multiply:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R (* a b)
-```
-
-**Score:**
-- Base: 0.50
-- Module IDs: +0.15
-- Function IDs (2): +0.20
-- Closing tags: +0.05
-
-**Total: 0.90**
-
-### C# Equivalent
-
-```csharp
-namespace Calculator
-{
-    public static class Program
-    {
-        public static int Add(int a, int b) => a + b;
-        public static int Multiply(int a, int b) => a * b;
-    }
-}
-```
-
-**Score:**
-- Base: 0.50
-- Namespace: +0.10
-- Class: +0.10
-- Methods (2): +0.15
-- Brace depth (2): -0.05
-
-**Total: 0.80**
-
-**Ratio: 0.90 / 0.80 = 1.125x** (Calor slightly better)
-
----
-
-## Interpretation
-
-The 1.36x advantage indicates that Calor's unique IDs provide meaningfully better targeting precision.
-
-The advantage is most significant when:
-- Multiple similar elements exist (multiple loops, conditionals)
-- Code structure changes during refactoring
-- Precise scope identification is required
+C# has strong IDE and Roslyn refactoring support, which this source-pattern
+calculator does not model. That is another reason not to interpret the ratio as
+a universal tooling comparison.
 
 ---
 
 ## Next
 
-- [Generation Accuracy](/benchmarking/metrics/generation-accuracy/) - Code generation correctness
+- [Benchmark Methodology](/docs/benchmarking/methodology/) - Corpus, calculators, and validity limits
+- [Stable Identifiers](/docs/philosophy/stable-identifiers/) - Optional source IDs and preservation rules
+- [Refactoring Stability](/docs/benchmarking/metrics/refactoring-stability/) - The separate refactoring heuristic

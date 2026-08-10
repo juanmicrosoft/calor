@@ -5,7 +5,7 @@ order: 8
 ---
 
 **Category:** Safety Benchmark
-**Result:** 1.59x Calor advantage (estimation mode)
+**Status:** 1.59x structural estimate; not part of the v0.12 dashboard
 **What it measures:** Contract enforcement effectiveness and error quality
 
 ---
@@ -14,7 +14,10 @@ order: 8
 
 The Safety Benchmark measures how well Calor contracts catch bugs compared to C# guard clauses. Unlike the Task Completion benchmark (which answers "can correct code be written?"), this benchmark answers: **"Does the code catch more bugs?"**
 
-This measures Calor's genuine advantage: contracts enforce correctness at runtime, catching errors that C# guard clauses miss or handle poorly.
+The 1.59x figure on this page comes from estimation mode. It compares the
+signals the calculator rewards; it is not an observed defect-reduction rate.
+Contract behavior also depends on the selected runtime contract mode and on
+whether a static obligation is cleanly proven.
 
 ---
 
@@ -250,5 +253,5 @@ All benchmark data is available:
 
 ## Next
 
-- [Task Completion](/benchmarking/metrics/task-completion/) - Code correctness benchmark
-- [Methodology](/benchmarking/methodology/) - Full benchmark methodology
+- [Task Completion](/docs/benchmarking/metrics/task-completion/) - Code correctness benchmark
+- [Methodology](/docs/benchmarking/methodology/) - Full benchmark methodology

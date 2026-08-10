@@ -1,0 +1,71 @@
+---
+title: "Telemetry and Privacy"
+section: "guides"
+order: 6
+description: "Calor telemetry is opt-in, schema-enforced, and off by default"
+---
+
+Calor telemetry is **off by default** and is not required by the CLI, SDK, MCP
+server, or watch mode. A normal invocation sends nothing.
+
+## Opt In, Opt Out, or Preview
+
+| Action | Configuration |
+|:-------|:--------------|
+| Opt in | `CALOR_TELEMETRY=1` or `CALOR_TELEMETRY=true` |
+| Configure the recipient | Set a valid `CALOR_TELEMETRY_CONNECTION_STRING` for Azure Application Insights |
+| Force opt out | `--no-telemetry` or `CALOR_TELEMETRY_OPTOUT=1` |
+| Preview locally without sending | `--telemetry-preview` |
+
+Opt-in alone does not create a destination. Missing or invalid endpoint
+configuration disables network telemetry. The connection string must contain a
+GUID instrumentation key, and any ingestion endpoint must use HTTPS.
+`--no-telemetry` wins over opt-in and preview.
+
+```bash
+calor convert input.cs --telemetry-preview
+calor --input input.calr --telemetry-preview
+```
+
+Preview writes one sanitized schema payload per line to stderr, creates no
+network client, and preserves machine-readable stdout.
+
+## Schema and Payload
+
+The current application schema is version `1.0` and is mechanically pinned by
+`docs/telemetry-schema-v1.json`. Events outside the fixed schema, arbitrary
+fields, and invalid fixed-vocabulary values are dropped.
+
+Enabled events can contain:
+
+- command category, success/failure, exit code, duration, and bounded option flags;
+- diagnostic codes, severities, categories, counts, and code co-occurrence;
+- fixed exception category and compiler phase—not exception type or text;
+- aggregate line count, token estimate, size category, and feature-presence flags;
+- conversion feature categories, counts, and source line numbers;
+- help-query length, resolved fixed category, and hit/miss—not query text;
+- hook decision, file extension, and normalized agent category;
+- OS/process architecture plus .NET, Calor, and semantics versions.
+
+The operation ID is a random 12-hex-character value per process invocation. It
+does not persist across invocations. Unknown or multiple agent names normalize
+to `none`, and Application Insights role/node tags are pinned to `calor-cli`.
+
+## Never Collected
+
+Calor does not collect source or generated code, literals, identifiers, project
+or file names, paths, command arguments, environment values, diagnostic text,
+exception type/message/stack, machine or user IDs, hostnames, IP addresses, or
+content hashes.
+
+SDK use emits nothing unless its host explicitly initializes telemetry. Network
+or endpoint failures never change compiler behavior; invalid events are dropped,
+and channel failures disable the remainder of that telemetry session.
+
+## Operator and Retention Responsibility
+
+The party that supplies `CALOR_TELEMETRY_CONNECTION_STRING` operates the
+destination and receives the data. Calor does not implement a separate client
+retention period; retention and deletion are governed by that operator's Azure
+Application Insights workspace policy. Leave telemetry disabled if that policy
+is not acceptable or documented for your environment.

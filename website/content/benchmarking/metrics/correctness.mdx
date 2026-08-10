@@ -5,7 +5,7 @@ order: 11
 ---
 
 **Category:** Code Correctness
-**Result:** 1.0x (tie) — both languages achieve 100%
+**v0.12 dashboard result:** Calor wins (1.29x, deterministic estimation mode)
 **What it measures:** Bug prevention through correct edge case handling
 
 ---
@@ -20,7 +20,10 @@ The Correctness Benchmark is a **fair, unbiased comparison** that measures how w
 - C# guard clauses catching a bug = pass
 - Test pass/fail is the only metric
 
-Both languages can achieve 100% on this benchmark through correct code.
+Both languages can achieve 100% in the executable task runner through correct
+code. The published v0.12 dashboard instead uses the calculator's structural
+estimation mode because no LLM provider is configured; that separate result is
+1.29x.
 
 ---
 
@@ -243,7 +246,7 @@ dotnet run --project tests/Calor.Evaluation -- correctness-benchmark --dry-run
 
 ---
 
-## Current Results
+## Separate Executable Task-Runner Example
 
 ### Summary
 
@@ -264,7 +267,8 @@ dotnet run --project tests/Calor.Evaluation -- correctness-benchmark --dry-run
 
 ### Key Finding
 
-Both languages achieve **equal correctness** when benchmarked fairly:
+In this executable task-runner example, both languages achieve equal
+correctness:
 
 - **Calor:** Preconditions (`§Q`) and postconditions (`§S`) provide contract-based protection
 - **C#:** Guard clauses (`ArgumentException`, `ArgumentNullException`) provide equivalent protection
@@ -314,6 +318,6 @@ Use Correctness to evaluate "does it work?" and Safety to evaluate "does it catc
 
 ## Next
 
-- [Safety](/benchmarking/metrics/safety/) - Contract enforcement benchmark
-- [Task Completion](/benchmarking/metrics/task-completion/) - LLM code generation success
-- [Methodology](/benchmarking/methodology/) - Full benchmark methodology
+- [Safety](/docs/benchmarking/metrics/safety/) - Contract enforcement benchmark
+- [Task Completion](/docs/benchmarking/metrics/task-completion/) - LLM code generation success
+- [Methodology](/docs/benchmarking/methodology/) - Full benchmark methodology

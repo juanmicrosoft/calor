@@ -29,10 +29,10 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 | Quality | Calor Approach | Result |
 |:--------|:--------------|:-------|
-| **Comprehension** | Explicit structure and contracts | 1.46x better than C# |
-| **Error Detection** | First-class preconditions/postconditions | 1.45x better than C# |
-| **Edit Precision** | Unique IDs for every element | 1.36x better than C# |
-| **Parseability** | Indentation + prefix notation | Trivial to parse |
+| **Comprehension** | Explicit structure and contracts | 1.84x in the v0.12 calculator |
+| **Error Detection** | First-class preconditions/postconditions | 1.49x in the v0.12 calculator |
+| **Edit Precision** | Optional stable IDs for structural targets | 1.36x in the v0.12 calculator |
+| **Parseability** | Indentation + prefix notation | Regular, compiler-defined grammar |
 | **Verifiability** | Contracts in syntax, not comments | Machine-checkable specs |
 
 ---
@@ -41,11 +41,11 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 | Quality | Impact | Mitigation |
 |:--------|:-------|:-----------|
-| **Token Efficiency** | 0.63x vs C# | Lisp-style expressions minimize overhead |
-| **Information Density** | 0.09x vs C# | Acceptable for agent workflows |
+| **Raw Token Count** | Calor pays a premium on small programs | Evaluate the full token/character/line composite |
+| **Information Density** | 0.98x vs C# | Near parity; C# narrowly leads |
 | **Human Readability** | Unfamiliar syntax | Not the target audience |
-| **Ecosystem** | No libraries | Compiles to C#, interop possible |
-| **Tooling** | No IDE support yet | On the roadmap |
+| **Ecosystem** | .NET interop may require manifests or preserved C# | Import, effect manifests, and interop blocks |
+| **Tooling** | Current VS Code build is not on the Marketplace | Build from the repository or use CLI/LSP directly |
 
 ---
 
@@ -73,7 +73,7 @@ An agent can reason about this function's behavior without reading the implement
 - It modifies database state
 - Amount must be positive
 - Source must have sufficient balance
-- Balance transfer is atomic (from decreases, to increases by same amount)
+- The declared balance relationships are visible for review
 
 ### 2. Agents Need to Detect Contract Violations
 
@@ -107,7 +107,8 @@ An agent can immediately verify:
 §L{for1:i:0:100:1}
 ```
 
-No ambiguity about which loop to modify. No risk of changing the wrong one.
+The ID gives the edit a stable target and reduces the risk of changing the
+wrong loop.
 
 ---
 
@@ -153,14 +154,14 @@ Our evaluation framework measures both sides:
 
 | Metric | Measures | Calor Result |
 |:-------|:---------|:------------|
-| Token Economics | Cost of explicitness | 0.63x (C# wins) |
-| Information Density | Semantic content per token | 0.09x (C# wins) |
-| Comprehension | Benefit of explicitness | 1.46x (Calor wins) |
-| Error Detection | Contract effectiveness | 1.45x (Calor wins) |
+| Token Economics | Token/character/line composite | 1.42x (Calor wins; raw tokens still cost more) |
+| Information Density | Semantic content per token | 0.98x (C# wins) |
+| Comprehension | Benefit of explicitness | 1.84x (Calor wins) |
+| Error Detection | Contract signals | 1.49x (Calor wins) |
 | Edit Precision | ID-based targeting | 1.36x (Calor wins) |
-| Task Completion | End-to-end task success | 0.86x (C# wins) |
-| Generation Accuracy | Code generation correctness | 0.94x (C# wins) |
-| Refactoring Stability | Safe refactoring | 1.46x (Calor wins) |
+| Correctness | Structural estimation signals | 1.29x (Calor wins) |
+| Generation Accuracy | Compilation and structural completeness | 1.02x (Calor wins) |
+| Refactoring Stability | ID-reference preservation | 1.38x (Calor wins) |
 
 The question isn't "which is better" but "which matters more for your use case."
 
@@ -168,5 +169,5 @@ The question isn't "which is better" but "which matters more for your use case."
 
 ## Next
 
-- [Benchmarking Overview](/benchmarking/) - How we measure these tradeoffs
-- [Results](/benchmarking/results/) - Detailed evaluation data
+- [Benchmarking Overview](/docs/benchmarking/) - How we measure these tradeoffs
+- [Results](/docs/benchmarking/results/) - Detailed evaluation data

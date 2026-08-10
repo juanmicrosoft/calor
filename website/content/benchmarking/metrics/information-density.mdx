@@ -6,7 +6,7 @@ order: 9
 
 
 **Category:** Information Density
-**Result:** C# wins (0.09x)
+**v0.12 result:** C# narrowly wins (0.98x Calor/C# across 217 programs)
 **What it measures:** Semantic elements per token
 
 ---
@@ -38,7 +38,7 @@ Languages that pack more meaning into fewer tokens use context windows more effi
 |:--------|:-------------------|
 | Modules (`§M{`) | Namespace/module |
 | Functions (`§F{`) | Function definition |
-| Variables (`§V{`) | Variable binding |
+| Variables (`§B{`) | Variable binding |
 | Type annotations (`§I{`, `§O{`) | Type information |
 | Contracts (`§Q`, `§S`) | Preconditions/postconditions |
 | Effects (`§E{`) | Side effect declarations |
@@ -67,7 +67,7 @@ Higher density = more semantic content per token.
 
 ---
 
-## Why C# Wins (Significantly)
+## Why C# Narrowly Leads
 
 ### 1. Implicit Information
 
@@ -97,7 +97,9 @@ Same semantics, but spread across more tokens.
 
 ### 2. Indent Form Eliminates Most Closing Tags
 
-In Phase 4 indent form, every structural block (`§M{…}`, `§F{…}`, `§CL{…}`, …) is terminated by dedent — no closing tag is emitted, so Calor pays zero token cost for "the block ends here". Only closers that still carry payload (`§/DO` condition, `§/PP` condition, `§/K` case delimiter) and inline expression closers (`§/C`, `§/T`, `§/NEW`, …) remain in the token stream.
+In v0.12 indent form, every structural block (`§M{…}`, `§F{…}`, `§CL{…}`, …)
+is terminated by dedent, so no structural closer is written. Current authored
+source uses only `§/C` for call argument lists and `§/LAM` for block lambdas.
 
 C# closing braces (`}`) carry minimal semantic weight but are still counted as tokens.
 
@@ -191,14 +193,15 @@ Effect declarations / total tokens
 
 ## Interpretation Nuance
 
-The 0.09x ratio seems dramatic, but consider:
+The v0.12 ratio is 0.98x, so the aggregate difference is small. Its meaning
+still depends on what the calculator counts:
 
 ### Calor's "Extra" Semantics
 
 Calor includes semantic elements C# doesn't have:
 - Explicit effects
 - First-class contracts
-- Unique IDs
+- Optional explicit structural IDs
 
 These are counted as semantic elements but have no C# equivalent.
 
@@ -227,8 +230,8 @@ This metric captures Calor's fundamental tradeoff:
 
 | Approach | Density | Explicitness |
 |:---------|:--------|:-------------|
-| C# | High | Low (implicit) |
-| Calor | Low | High (explicit) |
+| C# | Slightly higher in the v0.12 corpus | More implicit |
+| Calor | Slightly lower in the v0.12 corpus | More explicit |
 
 Calor deliberately trades density for explicitness.
 
@@ -247,13 +250,13 @@ Note: Phase 4 already eliminated explicit closing tags via indent form (block bo
 
 ## Summary
 
-The 0.09x ratio reflects Calor's design choice to prioritize explicit semantics over token efficiency.
-
-This is not a flaw but a tradeoff. The value of explicitness must be weighed against the cost of lower density.
+The 0.98x result is the only C# win in the current eight-metric dashboard. It is
+a near-parity result for this specific semantic-elements-per-token definition,
+not a general measure of code quality.
 
 ---
 
 ## Next
 
-- [Results](/benchmarking/results/) - Summary of all metrics
-- [Tradeoffs](/philosophy/tradeoffs/) - Understanding the design decisions
+- [Results](/docs/benchmarking/results/) - Summary of all metrics
+- [Tradeoffs](/docs/philosophy/tradeoffs/) - Understanding the design decisions

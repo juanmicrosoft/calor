@@ -5,8 +5,9 @@ import { cn } from '@/lib/utils';
 import { trackCodeComparisonTab } from '@/lib/analytics';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 
-const calorCode = `§M{m1:Math}
-  §F{f_01J5X7K9M2:Square:pub} (i32:x) -> i32
+const calorCode = `§M{m001:Math}
+  §F{f001:Square:pub} (i32:x) -> i32
+    §E{}
     §Q (>= x 0)
     §S (>= result 0)
     §R (* x x)`;
@@ -22,16 +23,16 @@ const csharpCode = `public static int Square(int x)
 }`;
 
 const calorAnnotations = [
-  { line: 1, text: 'Permanent ID means AI can find this function even after you rename it' },
-  { line: 2, text: 'Rule: input must be >= 0. Compiler enforces this automatically.' },
-  { line: 3, text: 'Rule: output must be >= 0. No way to return invalid results.' },
-  { line: 4, text: 'No database or network calls—guaranteed by the compiler.' },
+  { line: 1, text: 'Stable ID gives agents a durable target across renames and moves' },
+  { line: 3, text: 'The precondition is explicit and checked according to contract mode' },
+  { line: 4, text: 'Verification keeps this guard by default; eligible proof-based elision is opt-in' },
+  { line: 2, text: 'The pure effect declaration is checked against known and manifested calls' },
 ];
 
 const csharpAnnotations = [
   { line: 2, text: 'AI has to read the exception message to understand the rule' },
   { line: 5, text: 'Rules are buried in code—easy for AI to miss or misunderstand' },
-  { line: 0, text: 'If you rename this function, AI references break' },
+  { line: 0, text: 'There is no language-level stable declaration ID' },
 ];
 
 export function CodeComparison() {
@@ -48,7 +49,7 @@ export function CodeComparison() {
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center" ref={sectionRef}>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Why AI Makes Fewer Mistakes in Calor
+            How Calor Makes Rules Explicit
           </h2>
           <p className="mt-4 text-lg text-muted-foreground font-body">
             When the rules are visible in the code, AI doesn&apos;t have to guess them.
@@ -79,7 +80,7 @@ export function CodeComparison() {
                     : 'hover:bg-muted'
                 )}
               >
-                C# - Rules Are Hidden
+                C# - Rules in Control Flow
               </button>
             </div>
           </div>

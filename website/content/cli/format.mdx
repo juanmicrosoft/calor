@@ -25,8 +25,8 @@ The `format` command formats Calor source files according to the canonical Calor
 # Format a single file (output to stdout)
 calor format MyModule.calr
 
-# Format and overwrite the file
-calor format MyModule.calr --write
+# Format and overwrite the file (explicitly acknowledge the experimental writer)
+calor format MyModule.calr --write --experimental
 
 # Check if files are formatted (for CI)
 calor format src/*.calr --check
@@ -42,9 +42,17 @@ calor format MyModule.calr --diff
 | Option | Short | Default | Description |
 |:-------|:------|:--------|:------------|
 | `--check` | `-c` | `false` | Check if files are formatted without modifying (exit 1 if not) |
-| `--write` | `-w` | `false` | Write formatted output back to the file(s) |
+| `--write` | `-w` | `false` | Write back; requires `--experimental` or `CALOR_EXPERIMENTAL_FORMAT_WRITE=1` |
 | `--diff` | `-d` | `false` | Show diff of formatting changes |
 | `--verbose` | `-v` | `false` | Enable verbose output |
+| `--heal` | — | `false` | Best-effort source repair; review every reported control-flow guess |
+| `--format` | — | `text` | `text` or schema 2.0 `json`; no `-f` alias |
+| `--experimental` | — | `false` | Acknowledge known formatter write defects |
+
+> **v0.12 release policy:** the write path can rewrite identifiers and drop
+> comments. `format --write` is refused with `Calor1346` unless you pass
+> `--experimental` or set `CALOR_EXPERIMENTAL_FORMAT_WRITE=1`. Read-only stdout,
+> `--check`, and `--diff` remain available without acknowledgment.
 
 ---
 
@@ -87,4 +95,4 @@ Exit codes:
 
 ## See Also
 
-- [calor compile](/cli/compile/) - Compile Calor to C#
+- [calor compile](/docs/cli/compile/) - Compile Calor to C#

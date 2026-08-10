@@ -1,0 +1,43 @@
+---
+title: "Refactoring Stability"
+section: "benchmarking"
+order: 7
+description: "A static heuristic for structural and reference-preservation signals"
+---
+
+Refactoring Stability estimates how well source structure can survive renames,
+moves, extraction, signature changes, and variable inlining. The current v0.12
+corpus ratio is loaded from the benchmark data shown on the
+[results page](/docs/benchmarking/results/).
+
+## What the Metric Measures
+
+The automated score is a **source heuristic**, not an execution of IDE
+refactorings or a proof that references remained correct.
+
+Calor's score combines:
+
+| Component | Weight | Signal |
+|:----------|:------:|:-------|
+| ID preservation potential | 30% | Stable IDs across modules, types, members, fields, and control flow |
+| Reference validity potential | 25% | Calls, typed declarations, properties, fields, and bindings |
+| Diff minimization potential | 20% | Clear indent-delimited structural boundaries |
+| Semantic-equivalence potential | 25% | Explicit contracts and effects that preserve intent |
+
+C# receives heuristic credit for stable declarations, namespaces/classes, low
+nesting, IDE support, and explicit contract/assert patterns.
+
+## Scenario Helper
+
+The evaluation library also has before/after helpers for rename, extract,
+move, signature-change, and inline-variable scenarios. They compare preserved
+Calor IDs, C# names, and diff size. Those helpers are not the same as running a
+real editor refactoring over the full benchmark corpus.
+
+## Interpretation
+
+A ratio above 1.0 means this heuristic found more stability signals in the
+Calor fixtures. It does not establish that every Calor refactor is safer than
+the corresponding C# refactor. Read it alongside
+[Edit Precision](/docs/benchmarking/metrics/edit-precision/) and the
+[methodology caveats](/docs/benchmarking/methodology/).

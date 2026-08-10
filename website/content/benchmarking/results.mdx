@@ -9,15 +9,26 @@ order: 2
 
 ---
 
-## The Tradeoff
+## Read the Results Carefully
 
-The benchmark results reveal a fundamental tradeoff in language design for AI agents:
+The v0.12 run covers **217 programs**, reports an overall Calor/C# advantage of
+**1.32x**, and has Calor ahead in seven of eight metrics. Comprehension is
+1.84x, error detection is 1.49x, token economics is 1.42x, and information
+density is 0.98x—the one category where C# leads.
 
-**Explicitness vs. Efficiency**
+These measurements need two important caveats:
 
-Calor's design prioritizes explicit semantics—contracts, effect annotations, unique IDs—that enable better reasoning about program invariants. This comes at the cost of token efficiency, as explicit syntax requires more tokens than implicit conventions.
+- The metrics are deterministic static analyses. Thirty runs are thirty
+  identical observations, so the zero-width confidence intervals and p-values
+  measure no run-to-run variance; they do **not** measure sampling uncertainty
+  over the corpus.
+- These C#-versus-Calor micro-benchmarks are not the v0.12 release gates.
+  PP-A1 covered adoption readiness, while PP-W5 measured toolchain tax and
+  concluded only that no large tax was detected—not that parity was proven.
 
-C#'s ecosystem maturity gives it advantages in areas like task completion and generation accuracy, where LLMs benefit from extensive training data. However, Calor's explicit contracts provide measurable benefits for error detection.
+Token economics is a composite of token, character, and line ratios. Calor
+still pays a `§` token premium on small programs even though the current
+composite favors Calor.
 
 ---
 
@@ -26,13 +37,13 @@ C#'s ecosystem maturity gives it advantages in areas like task completion and ge
 Based on results, Calor is most valuable when:
 
 - **Contract verification matters** — The error detection advantage validates explicit contracts
-- **Edit precision is important** — Unique IDs enable targeted modifications
+- **Edit precision is important** — Optional explicit IDs and structural markers provide targeting signals
 - **Agent comprehension is critical** — Explicit structure provides clear signals
-- **Token budget is flexible** — You can afford the overhead of explicitness
+- **Compact source matters across several dimensions** — The composite token,
+  character, and line measure currently favors Calor
 
 Use C# when:
 
-- **Token efficiency is paramount** — Context window is limited
 - **Ecosystem libraries are needed** — Leverage existing tooling
 - **Human readability is priority** — Familiar syntax for human developers
 
@@ -42,11 +53,17 @@ Use C# when:
 
 All benchmarks are automated and reproducible. Each program is evaluated across 8 metrics comparing Calor and C# implementations.
 
-The evaluation framework:
-1. Generates prompts for each program/metric combination
-2. Records LLM responses for both Calor and C# versions
-3. Evaluates responses against ground truth
-4. Computes ratios (greater than 1.0 favors Calor, less than 1.0 favors C#)
+The published dashboard framework:
+
+1. Compiles paired Calor and C# programs.
+2. Applies deterministic metric calculators to source, syntax trees, and
+   compilation results.
+3. Aggregates the per-program Calor/C# ratios.
+4. Repeats the deterministic evaluation 30 times for the reported statistical
+   artifact. Greater than 1.0 favors Calor; less than 1.0 favors C#.
+
+LLM-based task runners exist separately and are not folded into this dashboard
+result.
 
 See [Methodology](/docs/benchmarking/methodology/) for full details on the evaluation framework.
 

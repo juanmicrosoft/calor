@@ -179,7 +179,7 @@ An agent has written code with unconstrained parameters:
 
 ### Step 1: Discover Missing Refinements
 
-The agent calls `calor_suggest_types`:
+The agent calls `calor_refine` with `action: "types"`:
 
 ```json
 {
@@ -219,7 +219,8 @@ The tool analyzed the function bodies and detected that `b` is used as a divisor
 
 ### Step 2: Add Refinements and Check Obligations
 
-The agent applies the suggestions and calls `calor_obligations`:
+The agent applies the suggestions and calls `calor_refine` with
+`action: "obligations"`:
 
 ```json
 {
@@ -261,7 +262,8 @@ Both are `Boundary` — the functions are public, so the compiler can't verify w
 
 ### Step 3: Discover Guards for Failed Obligations
 
-If the agent had private functions with failed obligations, it would call `calor_discover_guards`:
+If the agent had private functions with failed obligations, it would call
+`calor_refine` with `action: "guards"`:
 
 ```json
 {
@@ -299,7 +301,8 @@ Guards are ranked by confidence. The `validated: true` flag means Z3 confirmed t
 
 ### Step 4: The All-in-One Repair Tool
 
-For the full repair loop in a single call, the agent uses `calor_diagnose_refinement`:
+For the full repair loop in a single call, the agent uses `calor_refine` with
+`action: "diagnose"`:
 
 ```json
 {
@@ -344,10 +347,10 @@ The traditional agent approach to fixing a runtime error:
 
 The MCP-guided approach:
 
-1. `calor_suggest_types` → know exactly which parameters need constraints
-2. `calor_obligations` → see all obligation statuses with counterexamples
-3. `calor_discover_guards` → get Z3-validated fix suggestions ranked by confidence
-4. `calor_diagnose_refinement` → get the full repair plan in one call
+1. `calor_refine` / `types` → identify parameters that may need constraints
+2. `calor_refine` / `obligations` → inspect obligation statuses and counterexamples
+3. `calor_refine` / `guards` → request guard candidates for failed obligations
+4. `calor_refine` / `diagnose` → get the combined repair analysis
 
 The tools **prune the agent's search space**. Instead of guessing, the agent gets structured data about what's wrong and exactly how to fix it.
 
@@ -357,17 +360,17 @@ The tools **prune the agent's search space**. Instead of guessing, the agent get
 
 | Tool | Purpose | When to Use |
 |:-----|:--------|:------------|
-| `calor_suggest_types` | Detect parameters needing refinements | First — before adding any refinements |
-| `calor_obligations` | Generate and verify all obligations | After adding refinements — see what's proven |
-| `calor_discover_guards` | Find guards for failed obligations | When obligations fail — get fix candidates |
-| `calor_suggest_fixes` | Get ranked fix strategies | When you need alternative approaches |
-| `calor_diagnose_refinement` | Full repair loop in one call | When you want everything at once |
+| `calor_refine` / `types` | Detect parameters needing refinements | Before adding refinements |
+| `calor_refine` / `obligations` | Generate and verify obligations | After adding refinements |
+| `calor_refine` / `guards` | Find guards for failed obligations | When obligations fail |
+| `calor_refine` / `fixes` | Get ranked fix strategies | When alternatives are needed |
+| `calor_refine` / `diagnose` | Combined repair analysis | For the full loop |
 
 ---
 
 ## See Also
 
-- [Refinement Types Reference](/syntax-reference/refinement-types/) — Complete syntax reference
-- [Contracts](/syntax-reference/contracts/) — Preconditions and postconditions
-- [Static Verification](/philosophy/static-verification/) — Z3-based verification
-- [MCP Server](/cli/mcp/) — All MCP tools
+- [Refinement Types Reference](/docs/syntax-reference/refinement-types/) — Complete syntax reference
+- [Contracts](/docs/syntax-reference/contracts/) — Preconditions and postconditions
+- [Static Verification](/docs/philosophy/static-verification/) — Z3-based verification
+- [MCP Server](/docs/cli/mcp/) — All MCP tools

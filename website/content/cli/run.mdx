@@ -1,0 +1,28 @@
+---
+title: "calor run"
+section: "cli"
+order: 19
+---
+
+Compile and execute a Calor program without creating a project file.
+
+```bash
+calor run <path> [options]
+```
+
+`path` can be a `.calr` file or a directory of Calor sources. The command
+materializes a temporary .NET project, builds it, and runs it. `bin/`, `obj/`,
+and `reference/` directories are excluded from discovery.
+
+| Option | Description |
+|:-------|:------------|
+| `--permissive` | Assume unknown calls are pure and demote forbidden-effect findings to warnings |
+| `--keep-temp` | Preserve and print the temporary project path |
+| `--verbose`, `-v` | Show compilation details and stream build output |
+| `--enforce-effects <bool>` | Enable effect enforcement; defaults to `true` |
+| `--verify` | Run Z3 contract verification |
+| `--contract-mode <mode>` | Runtime checks: `off`, `debug`, or `release`; defaults to `debug` |
+| `--timeout <seconds>` | Per-child-process timeout; defaults to 600 seconds |
+
+Use [`calor test`](/docs/cli/test/) when the directory also contains xUnit
+tests.

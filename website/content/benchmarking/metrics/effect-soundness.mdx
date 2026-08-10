@@ -6,7 +6,7 @@ order: 11
 
 
 **Feature:** Compiler-enforced effect declarations
-**Related metric:** [Effect Discipline](/benchmarking/metrics/effect-discipline/) (measures side effect management quality)
+**Related metric:** [Effect Discipline](/docs/benchmarking/metrics/effect-discipline/) (measures side effect management quality)
 **C# equivalent:** None (no effect system)
 
 ---
@@ -92,7 +92,7 @@ To fix, either:
   §O{i32}
   §E{}                         // Claims to be pure
 
-  §V{v001:i32:rate} §C{FetchExchangeRate} §/C  // ERROR: network!
+  §B{rate:i32} §C{FetchExchangeRate} §/C  // ERROR: network!
   §R (* 100 rate)
 ```
 
@@ -104,7 +104,7 @@ To fix, either:
   §O{User}
   §E{db:r}                     // Claims read-only
 
-  §V{v001:User:user} §C{Repository.GetById} id §/C
+  §B{user:User} §C{Repository.GetById} id §/C
   §C{AuditLog.Write} id        // ERROR: this is db:w!
   §R user
 ```
@@ -216,7 +216,7 @@ public async Task<User> GetUser(int id)
   §O{User}
   §E{db:r,cw,net:rw}           // EXPLICIT: database read, console, network
 
-  §V{v001:User:user} §C{GetById} id §/C
+  §B{user:User} §C{GetById} id §/C
   §C{Log} (concat "Retrieved user " (str id))
   §C{CacheSet} user
   §R user
@@ -251,5 +251,5 @@ Move pure functions anywhere without side-effect concerns:
 
 ## Next
 
-- [Effect Discipline](/benchmarking/metrics/effect-discipline/) - Side effect management benchmark
-- [Correctness](/benchmarking/metrics/correctness/) - Edge case handling benchmark
+- [Effect Discipline](/docs/benchmarking/metrics/effect-discipline/) - Side effect management benchmark
+- [Correctness](/docs/benchmarking/metrics/correctness/) - Edge case handling benchmark

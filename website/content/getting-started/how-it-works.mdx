@@ -83,8 +83,8 @@ Calor wasn't designed arbitrarily. Its syntax choices make it easier for AI to l
 
 | Design Choice | Why It Helps |
 |:--------------|:-------------|
-| Explicit open/close tags | No ambiguous brace matching |
-| Unique IDs on every block | Clear targets for edits |
+| Indentation-defined blocks | Scope is visible without structural closer tags |
+| Optional stable IDs on structural targets | Clear targets when durable identity is needed |
 | Lisp-style expressions | Unambiguous operator precedence |
 | Declared effects | AI knows what side effects are allowed |
 
@@ -100,9 +100,10 @@ When the hook blocks a `.cs` file, Claude doesn't just fail - it learns from the
 
 We've tested this approach extensively:
 
-1. **Hello World** - Claude writes correct Calor on the first try with just CLAUDE.md instructions
-2. **Complex programs** - FizzBuzz, REST APIs, data processing - Claude handles them
-3. **Edge cases** - When Claude makes syntax errors, the compiler catches them and Claude self-corrects
+The repository includes deterministic generation and structure calculators, but
+they are not a substitute for a blinded, live-agent success study. In practice,
+agents should use the compiler feedback loop: generate a small change, run
+`calor check`, and repair any syntax, type, contract, or effect diagnostics.
 
 The combination of instructions + skills + hooks creates a reliable system, not a hopeful one.
 
@@ -124,7 +125,7 @@ Yes and no. Prompt engineering (CLAUDE.md, skills) teaches Claude *what* to do. 
 
 ### "Will this work with other AI models?"
 
-We support Claude Code, Gemini CLI, Codex CLI, and GitHub Copilot. Models that support hooks (Claude, Gemini) get enforcement. Others rely on guidance. See the [integration pages](/getting-started/) for details.
+We support Claude Code, Gemini CLI, Codex CLI, and GitHub Copilot. Models that support hooks (Claude, Gemini) get enforcement. Others rely on guidance. See the [integration pages](/docs/getting-started/) for details.
 
 ---
 
@@ -152,6 +153,6 @@ Then open Claude Code and ask: "Write a function that calculates factorial."
 
 ## Next Steps
 
-- [Claude Integration](/getting-started/claude-integration/) - Detailed setup for Claude Code
-- [Hello World](/getting-started/hello-world/) - See the workflow in action
-- [Syntax Reference](/syntax-reference/) - Understand what Claude generates
+- [Claude Integration](/docs/getting-started/claude-integration/) - Detailed setup for Claude Code
+- [Hello World](/docs/getting-started/hello-world/) - See the workflow in action
+- [Syntax Reference](/docs/syntax-reference/) - Understand what Claude generates

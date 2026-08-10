@@ -1,0 +1,50 @@
+---
+title: "verify"
+section: "cli"
+order: 14
+description: "Run Z3 contract verification and report the seven-status outcome for every obligation"
+---
+
+```bash
+calor verify <files...> [options]
+```
+
+## Examples
+
+```bash
+calor verify src/Math.calr
+calor verify a.calr b.calr --timeout 10000
+calor verify src/Math.calr --format json
+calor verify old.calr new.calr --weakening-check f001
+```
+
+## Options
+
+| Option | Description |
+|:-------|:------------|
+| `--format`, `-f` | `text` or `json` |
+| `--output`, `-o` | Write output to a file instead of stdout |
+| `--verbose`, `-v` | Include detailed verification information |
+| `--timeout`, `-t` | Solver budget per contract in milliseconds; default 5000 |
+| `--no-cache` | Disable verification-result caching |
+| `--clear-cache` | Clear the verification cache first |
+| `--weakening-check` | Compare one declaration across exactly two files for contract weakening |
+
+## Status and Exit Contract
+
+The schema 2.0 wire statuses are `proven`, `refuted`, `assumed`, `unknown`,
+`timeout`, `unsupported`, and `unavailable`. `assumed` carries a named
+assumption list. `refuted` includes structured counterexample bindings when Z3
+produces a model. Vacuity is a separate flag.
+
+| Exit | Meaning |
+|:-----|:--------|
+| `0` | No contract was refuted and compilation succeeded; inconclusive outcomes keep their runtime checks |
+| `1` | A contract was refuted, a file was missing, or compilation failed |
+| `2` | Invalid weakening-check invocation |
+
+`calor verify` reports verdicts; it does not opt compilation into guard
+elision. A clean, non-vacuous `proven` postcondition is merely eligible, and
+the compile path keeps its runtime guard unless `--elide-proven-guards` is set.
+See [Verification Guarantees](/docs/guides/verification-guarantees/) before
+using proof results as a gate.

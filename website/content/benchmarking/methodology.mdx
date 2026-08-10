@@ -13,11 +13,17 @@ How the Calor evaluation framework measures language effectiveness for AI agents
 
 The framework compares Calor and C# implementations of the same programs across multiple dimensions. It combines deterministic static analysis with optional LLM-based evaluation for a comprehensive assessment.
 
+The **published v0.12 dashboard** is narrower than the full framework: it uses
+217 paired programs and eight deterministic metrics. Optional LLM suites are
+separate artifacts and do not contribute to the 1.32x headline.
+
 ### Statistical Rigor
 
 All metrics support statistical analysis mode:
 - Multiple runs (default: n=30) for variance measurement
-- 95% confidence intervals for all ratios
+- 95% confidence intervals for all ratios. In the v0.12 artifact the 30
+  deterministic repetitions are identical, so these intervals have zero width
+  and do not estimate uncertainty over the program corpus.
 - Cohen's d effect size calculations
 - Paired t-tests for statistical significance (p &lt; 0.05)
 
@@ -97,8 +103,8 @@ Both implementations must:
 - Function declarations (`§F{`)
 - Input/output annotations (`§I{`, `§O{`)
 - Effect declarations (`§E{`)
-- Contracts (`§REQ`, `§ENS`)
-- Closing tags (`§/`)
+- Contracts (`§Q`, `§S`)
+- Indented body lines (the v0.12 structural-completeness signal)
 
 **C# factors:**
 - Namespace declarations
@@ -115,7 +121,8 @@ Both implementations must:
 
 **Measures:** Ability to target specific code elements accurately.
 
-**Approach:** Simulates actual edit tasks and measures success rate:
+**Approach:** Synthesizes edit-task descriptions and scores targetability with
+source-pattern heuristics; it does not execute an agent or apply the edits:
 - Change loop bounds by ID
 - Add preconditions to functions
 - Rename functions (ID vs name-based)
@@ -123,8 +130,8 @@ Both implementations must:
 - Modify return types
 
 **Calor advantages:**
-- Unique IDs enable precise targeting (`§F{f001:`)
-- Closing tags define clear boundaries
+- Explicit IDs can enable precise targeting (`§F{f001:`)
+- Indentation defines block boundaries
 - ID-based references don't break on rename
 
 **C# challenges:**
@@ -132,7 +139,10 @@ Both implementations must:
 - Brace nesting creates ambiguity
 - Cascading changes needed for renames
 
-**Scoring:** 40% structural analysis + 60% simulated edit success rate
+**Scoring:** 40% structural analysis + 60% heuristic simulated-task score.
+The current implementation still contains legacy `§V`/`§LOOP` detectors, so
+current `§B`/`§L` syntax does not receive those particular bonuses. Treat this
+as a static representation metric, not observed editing accuracy.
 
 ---
 
@@ -141,9 +151,9 @@ Both implementations must:
 **Measures:** Bug detection capability through explicit contracts.
 
 **Calor factors:**
-- Preconditions (`§REQ`) - +0.25
-- Postconditions (`§ENS`) - +0.20
-- Invariants (`§INV`) - +0.15
+- Preconditions (`§Q`) - +0.25
+- Postconditions (`§S`) - +0.20
+- Invariants - the current calculator still detects legacy `§INV`, not current `§IV`; this is a known measurement limitation
 - Effect declarations - +0.10
 
 **C# factors:**
@@ -168,7 +178,7 @@ Both implementations must:
 
 ### 7. Refactoring Stability
 
-**Measures:** How well unique IDs preserve references during code transformations.
+**Measures:** How well explicit IDs are preserved in modeled code transformations.
 
 **Scenarios tested:**
 | Scenario | What's Measured |
@@ -311,7 +321,9 @@ No bonus for contracts - we measure task completion fairly.
 | Compilation Rate | 100% | 100% |
 | Test Pass Rate | 100% | 100% |
 
-The 1.00x ratio demonstrates that **Calor is as learnable as C#** - LLMs can write correct code in both languages equally well.
+That historical 1.00x run shows parity for its task set and model invocation.
+It does not establish model-independent learnability or feed into the v0.12
+static dashboard.
 
 ### Contract Usage (Qualitative)
 
@@ -473,5 +485,5 @@ The CI pipeline checks for:
 
 ## Next
 
-- [Results](/benchmarking/results/) - Detailed results table
-- [Individual Metrics](/benchmarking/metrics/comprehension/) - Deep dive into each metric
+- [Results](/docs/benchmarking/results/) - Detailed results table
+- [Individual Metrics](/docs/benchmarking/metrics/comprehension/) - Deep dive into each metric

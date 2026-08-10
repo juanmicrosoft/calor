@@ -169,7 +169,10 @@ Refinement types are a **compile-time construct**. In the emitted C#, they are e
 | `§PROOF{p1:check} (cond)` (Discharged) | Runtime guard (default); `// PROVEN: proof obligation [p1: check]` with `--elide-proven-guards` |
 | `§PROOF{p1:check} (cond)` (Failed) | `if (!(cond)) throw new InvalidOperationException(...)` |
 
-The refinement constrains what values are valid. The obligation engine verifies those constraints and emits runtime guards only where verification fails.
+The refinement constrains what values are valid. The obligation engine verifies
+those constraints and keeps runtime guards by default. Only
+`--elide-proven-guards` permits an eligible discharged guard to be replaced by
+a proof comment.
 
 ---
 
@@ -250,13 +253,13 @@ The obligation engine:
 1. Creates `Boundary` obligations for `balance` and `amount` (public function)
 2. Creates a `ProofObligation` for `p1`
 3. Z3 proves `p1`: given `balance >= 0`, `amount > 0`, and `balance >= amount`, then `balance - amount >= 0`
-4. Emitted C#: runtime guards for the public boundary parameters, proven comment for `p1`
+4. Emitted C# by default: runtime guards for the public boundary parameters and `p1`; with `--elide-proven-guards`, the eligible `p1` guard becomes a proven comment
 
 ---
 
 ## See Also
 
-- [Dependent Types Tutorial](/guides/dependent-types-tutorial/) — Progressive walkthrough with MCP agent guidance
-- [Contracts](/syntax-reference/contracts/) — Preconditions and postconditions
-- [Static Verification](/philosophy/static-verification/) — Z3-based contract verification
-- [MCP Tools](/cli/mcp/) — Agent guidance tools for refinement types
+- [Dependent Types Tutorial](/docs/guides/dependent-types-tutorial/) — Progressive walkthrough with MCP agent guidance
+- [Contracts](/docs/syntax-reference/contracts/) — Preconditions and postconditions
+- [Static Verification](/docs/philosophy/static-verification/) — Z3-based contract verification
+- [MCP Tools](/docs/cli/mcp/) — Agent guidance tools for refinement types
