@@ -400,7 +400,7 @@ public sealed class Binder
             [typeof(ArrayCreationNode)] = (b, e) =>
                 {
                     var n = (ArrayCreationNode)e;
-                    return new BoundArrayCreation(n.Span, n.Name, n.ElementType,
+                    return new BoundArrayCreation(n.Span, n.Id, n.Name, n.ElementType,
                         n.Size is null ? null : b.BindExpression(n.Size),
                         n.Initializer.Select(b.BindExpression).ToList());
                 },
@@ -411,9 +411,10 @@ public sealed class Binder
             [typeof(MultiDimArrayCreationNode)] = (b, e) =>
                 {
                     var n = (MultiDimArrayCreationNode)e;
-                    return new BoundMultiDimArrayCreation(n.Span, n.Name, n.ElementType, n.Rank,
+                    return new BoundMultiDimArrayCreation(n.Span, n.Id, n.Name, n.ElementType, n.Rank,
                         n.DimensionSizes.Select(b.BindExpression).ToList(),
-                        n.Initializer.SelectMany(row => row).Select(b.BindExpression).ToList());
+                        n.Initializer.Select(row =>
+                            (IReadOnlyList<BoundExpression>)row.Select(b.BindExpression).ToList()).ToList());
                 },
             [typeof(MultiDimArrayAccessNode)] = (b, e) =>
                 {
@@ -433,24 +434,24 @@ public sealed class Binder
             [typeof(ListCreationNode)] = (b, e) =>
                 {
                     var n = (ListCreationNode)e;
-                    return new BoundListCreation(n.Span, n.Name, n.ElementType,
+                    return new BoundListCreation(n.Span, n.Id, n.Name, n.ElementType,
                         n.Elements.Select(b.BindExpression).ToList());
                 },
             [typeof(SetCreationNode)] = (b, e) =>
                 {
                     var n = (SetCreationNode)e;
-                    return new BoundSetCreation(n.Span, n.Name, n.ElementType,
+                    return new BoundSetCreation(n.Span, n.Id, n.Name, n.ElementType,
                         n.Elements.Select(b.BindExpression).ToList());
                 },
             [typeof(DictionaryCreationNode)] = (b, e) =>
                 {
                     var n = (DictionaryCreationNode)e;
-                    return new BoundDictionaryCreation(n.Span, n.Name, n.KeyType, n.ValueType,
+                    return new BoundDictionaryCreation(n.Span, n.Id, n.Name, n.KeyType, n.ValueType,
                         n.Entries.Select(kv => new BoundPair(
                             b.BindExpression(kv.Key), b.BindExpression(kv.Value), kv.Span)).ToList());
                 },
             [typeof(CollectionContainsNode)] = (b, e) =>
-                { var n = (CollectionContainsNode)e; return new BoundCollectionContains(n.Span, n.CollectionName, b.BindExpression(n.KeyOrValue)); },
+                { var n = (CollectionContainsNode)e; return new BoundCollectionContains(n.Span, n.CollectionName, b.BindExpression(n.KeyOrValue), n.Mode); },
             [typeof(CollectionCountNode)] = (b, e) =>
                 { var n = (CollectionCountNode)e; return new BoundCollectionCount(n.Span, b.BindExpression(n.Collection)); },
             [typeof(TupleLiteralNode)] = (b, e) =>
