@@ -577,12 +577,18 @@ public class McpServerTests
         output.Position = 0;
         var response = Encoding.UTF8.GetString(output.ToArray());
 
-        Assert.Contains("success", response);
+        AssertResponseContains(response, "success");
         Assert.Contains("dimensions", response);
         Assert.Contains("ContractPotential", response);
         Assert.Contains("AsyncPotential", response);
         Assert.Contains("LinqPotential", response);
     }
+
+    /// <summary>#897 observability: on failure, carry the FULL response so the next CI
+    /// hit shows the server's actual error instead of a truncated prefix.</summary>
+    private static void AssertResponseContains(string response, string expected) =>
+        Assert.True(response.Contains(expected),
+            $"Expected substring '{expected}' not found. FULL RESPONSE:\n{response}");
 
     #region Diagnose Tool Integration Tests with Suggestions and Fixes
 
