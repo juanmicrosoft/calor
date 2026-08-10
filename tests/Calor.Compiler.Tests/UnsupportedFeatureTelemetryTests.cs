@@ -227,7 +227,7 @@ public class UnsupportedFeatureTelemetryTests
     }
 
     [Fact]
-    public void TrackUnsupportedFeatures_UnknownFeatureNamesFailClosed()
+    public void TrackUnsupportedFeatures_UnknownFeatureNamesDropLabelsOnly()
     {
         var (telemetry, channel) = CreateTestTelemetry();
         var features = new Dictionary<string, int>();
@@ -238,7 +238,13 @@ public class UnsupportedFeatureTelemetryTests
 
         telemetry.TrackUnsupportedFeatures(features, features.Values.Sum());
 
-        Assert.Empty(channel.Items);
+        var aggregate = Assert.Single(channel.Items.OfType<EventTelemetry>());
+        Assert.Equal("UnsupportedFeatures", aggregate.Name);
+        Assert.Equal(features.Values.Sum(), aggregate.Metrics["totalUnsupportedCount"]);
+        Assert.DoesNotContain(
+            channel.Items.OfType<EventTelemetry>(),
+            item => item.Name == "UnsupportedFeature");
+        Assert.True(telemetry.IsEnabled);
     }
 
     [Fact]
@@ -461,7 +467,15 @@ public class UnsupportedFeatureTelemetryTests
             explanation.GetFeatureCounts(),
             explanation.TotalUnsupportedCount);
 
-        Assert.Empty(channel.Items);
+        var aggregate = Assert.Single(channel.Items.OfType<EventTelemetry>());
+        Assert.Equal("UnsupportedFeatures", aggregate.Name);
+        Assert.Equal(
+            explanation.TotalUnsupportedCount,
+            aggregate.Metrics["totalUnsupportedCount"]);
+        Assert.DoesNotContain(
+            channel.Items.OfType<EventTelemetry>(),
+            item => item.Name == "UnsupportedFeature");
+        Assert.True(telemetry.IsEnabled);
     }
 
     #endregion

@@ -101,7 +101,7 @@ public class W1Slice2TrustSurfaceTests
     {
         var (telemetry, channel) = CreateTestTelemetry();
 
-        telemetry.TrackDiagnosticEvent("Calor0410", "Error", "Effects");
+        telemetry.TrackDiagnosticEvent("Calor0410", "Error", "Effect");
 
         var evt = Assert.IsType<EventTelemetry>(Assert.Single(channel.Items));
         Assert.Equal("DiagnosticOccurrence", evt.Name);

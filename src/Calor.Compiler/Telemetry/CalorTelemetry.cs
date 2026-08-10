@@ -244,10 +244,8 @@ public sealed class CalorTelemetry : IDisposable
         {
             return;
         }
-        if (featureCounts.Any(kv =>
-                !TelemetrySchema.IsKnownFeature(kv.Key) || kv.Value < 0))
+        if (featureCounts.Any(kv => kv.Value < 0))
         {
-            _failed = true;
             return;
         }
 
@@ -258,6 +256,7 @@ public sealed class CalorTelemetry : IDisposable
         });
 
         foreach (var (feature, count) in featureCounts
+                     .Where(kv => TelemetrySchema.IsKnownFeature(kv.Key))
                      .OrderByDescending(kv => kv.Value)
                      .Take(50))
         {

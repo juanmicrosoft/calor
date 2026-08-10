@@ -131,6 +131,38 @@ public sealed class TelemetryPrivacyTests
     }
 
     [Fact]
+    public void UnknownConversionFeaturesDropOnlyPerFeatureEvent()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+        telemetry.SetCommand("convert");
+
+        telemetry.TrackUnsupportedFeatures(
+            new Dictionary<string, int>
+            {
+                ["namespace-collision"] = 1,
+                ["goto"] = 2
+            },
+            totalCount: 3);
+        telemetry.TrackCommand("convert", 0);
+
+        Assert.True(telemetry.IsEnabled);
+        Assert.Contains(
+            channel.Items.OfType<EventTelemetry>(),
+            item => item.Name == "UnsupportedFeatures");
+        Assert.Contains(
+            channel.Items.OfType<EventTelemetry>(),
+            item => item.Name == "UnsupportedFeature"
+                    && item.Properties["feature"] == "goto");
+        Assert.DoesNotContain(
+            channel.Items.OfType<EventTelemetry>(),
+            item => item.Properties.TryGetValue("feature", out var feature)
+                    && feature == "namespace-collision");
+        Assert.Contains(
+            channel.Items.OfType<EventTelemetry>(),
+            item => item.Name == "CommandSucceeded");
+    }
+
+    [Fact]
     public void SerializedPayloadsContainNoSourceIdentifiersPathsArgumentsDiagnosticsOrExceptions()
     {
         var (telemetry, channel) = CreateTestTelemetry(anonymize: true);
