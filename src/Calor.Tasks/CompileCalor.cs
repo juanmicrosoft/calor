@@ -413,12 +413,30 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 if (assemblyPaths.Count > 0)
                 {
                     var ilOptions = CreateILAnalysisOptions();
+                    var resolvedImplementationPaths =
+                        Compiler.Effects.IL.AssemblyIndex.ResolveImplementationAssemblyPaths(
+                            assemblyPaths,
+                            ilOptions);
+                    var unresolvedReferenceCount = resolvedImplementationPaths.Count(
+                        path => path == null);
+                    if (unresolvedReferenceCount != 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"{unresolvedReferenceCount} managed reference assembly input(s) "
+                            + "could not be resolved to implementation assemblies");
+                    }
 
                     var resolver = new Compiler.Effects.EffectResolver();
                     resolver.Initialize(ProjectDirectory);
 
                     ilAnalyzer = new Compiler.Effects.IL.ILEffectAnalyzer(
                         assemblyPaths, resolver, ilOptions);
+                    if (ilAnalyzer.LoadedAssemblyCount != assemblyPaths.Count)
+                    {
+                        throw new InvalidOperationException(
+                            $"IL analysis loaded {ilAnalyzer.LoadedAssemblyCount} of "
+                            + $"{assemblyPaths.Count} referenced assembly input(s)");
+                    }
 
                     var sharedResolver = new Compiler.Effects.EffectResolver(ilAnalyzer: ilAnalyzer);
                     sharedResolver.Initialize(ProjectDirectory);
@@ -903,7 +921,12 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             typeof(Calor.Runtime.Option<int>).Assembly.Location,
             Path.Combine(compilerDirectory, "Microsoft.Z3.dll"),
             Path.Combine(compilerDirectory, nativeZ3Name)
-        };
+        }
+        .Concat(Compiler.Verification.Z3.Z3ContextFactory.GetNativeLibraryProbePaths())
+        .Distinct(OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal)
+        .ToList();
     }
 
     private static string DecodeSource(byte[] bytes)

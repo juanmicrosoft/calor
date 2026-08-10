@@ -76,6 +76,17 @@ public static class Z3ContextFactory
                         "AppContext.BaseDirectory is the primary probe root.")]
     private static IntPtr TryLoadZ3Native()
     {
+        foreach (var path in GetNativeLibraryProbePaths())
+        {
+            if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
+                return handle;
+        }
+
+        return IntPtr.Zero;
+    }
+
+    internal static IReadOnlyList<string> GetNativeLibraryProbePaths()
+    {
         // Probe roots, in order:
         //  1. AppContext.BaseDirectory — the CLI / test-host case (libz3 copied
         //     to the output root, or under runtimes/<rid>/native).
@@ -116,13 +127,7 @@ public static class Z3ContextFactory
             }
         }
 
-        foreach (var path in libPaths)
-        {
-            if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
-                return handle;
-        }
-
-        return IntPtr.Zero;
+        return libPaths;
     }
 
     /// <summary>

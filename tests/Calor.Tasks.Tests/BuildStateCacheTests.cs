@@ -601,17 +601,27 @@ public class BuildStateCacheTests : IDisposable
         Assert.Contains(typeof(Calor.Compiler.Program).Assembly.Location, resolved);
         Assert.Contains(typeof(Calor.Runtime.Option<int>).Assembly.Location, resolved);
 
-        var copied = resolved.Select(path =>
+        Assert.Contains(resolved, path =>
+            path.Contains(
+                $"{Path.DirectorySeparatorChar}runtimes{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal)
+            && path.EndsWith(
+                OperatingSystem.IsWindows() ? "libz3.dll"
+                    : OperatingSystem.IsMacOS() ? "libz3.dylib" : "libz3.so",
+                StringComparison.Ordinal));
+
+        var copied = resolved.Select((path, index) =>
         {
-            var destination = Path.Combine(dir, Path.GetFileName(path));
+            var destination = Path.Combine(dir, $"{index:D2}-{Path.GetFileName(path)}");
             if (File.Exists(path))
                 File.Copy(path, destination);
             return destination;
         }).ToList();
         var compiler = copied.Single(path =>
-            Path.GetFileName(path).Equals("calor.dll", StringComparison.OrdinalIgnoreCase));
+            Path.GetFileName(path).EndsWith("-calor.dll", StringComparison.OrdinalIgnoreCase));
         var runtime = copied.Single(path =>
-            Path.GetFileName(path).Equals("Calor.Runtime.dll", StringComparison.OrdinalIgnoreCase));
+            Path.GetFileName(path).EndsWith(
+                "-Calor.Runtime.dll", StringComparison.OrdinalIgnoreCase));
 
         var baseline = BuildStateCache.ComputeCompilerHash(copied);
         File.AppendAllText(compiler, "compiler-change");

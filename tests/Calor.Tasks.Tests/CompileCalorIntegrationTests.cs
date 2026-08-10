@@ -1048,6 +1048,30 @@ public class CompileCalorIntegrationTests : IDisposable
     }
 
     [Fact]
+    public void ILAnalysis_UnresolvableManagedReference_FailsClosed()
+    {
+        var runtimeDirectory = new DirectoryInfo(
+            Path.GetDirectoryName(typeof(object).Assembly.Location)!);
+        var dotnetRoot = runtimeDirectory.Parent?.Parent?.Parent
+            ?? throw new DirectoryNotFoundException("Could not locate the dotnet root.");
+        var referenceAssembly = Directory.GetDirectories(Path.Combine(
+                dotnetRoot.FullName, "packs", "Microsoft.NETCore.App.Ref"))
+            .OrderByDescending(path => path, StringComparer.Ordinal)
+            .Select(path => Path.Combine(path, "ref", "net10.0", "System.Runtime.dll"))
+            .First(File.Exists);
+
+        var src = CreateSourceFile("UnresolvedIl.calr", ValidCalorSource);
+        var task = CreateTask(src);
+        task.EnableILAnalysis = true;
+        task.ReferencedAssemblies = [new TaskItem(referenceAssembly)];
+
+        Assert.False(task.Execute());
+        Assert.Contains(
+            ((TestBuildEngine)task.BuildEngine).Errors,
+            error => error.Contains("could not be resolved to implementation assemblies"));
+    }
+
+    [Fact]
     public void CrossModuleEnforcementException_FailsClosed()
     {
         var src1 = CreateSourceFile("StrictCrossA.calr", ValidCalorSource);
@@ -1067,14 +1091,6 @@ public class CompileCalorIntegrationTests : IDisposable
             error => error.Contains("fails rather than silently skipping")
                      && error.Contains("injected cross-module failure"));
     }
-
-    // #788 fail-closed note: the IL-analysis init and cross-module enforcement
-    // catch blocks in CompileCalor now FAIL the build instead of warning and
-    // continuing. Neither failure is cheaply reachable with real components
-    // (AssemblyIndex and ManifestLoader are internally defensive and skip
-    // malformed inputs), so the fail-closed branches are covered by review,
-    // not by a fixture — a garbage referenced assembly is deliberately
-    // tolerated (skipped) by design and does not trip them.
 
     [Fact]
     public void CrossModuleCall_TasksPath_EmitsQualifiedTarget()
