@@ -64,7 +64,7 @@ public sealed class MethodLocation
 /// </summary>
 public sealed class AssemblyIndex : IDisposable
 {
-    private readonly ILAnalysisOptions _options;
+    private readonly AssemblyPathResolver _pathResolver;
     private readonly List<LoadedAssembly> _assemblies = [];
 
     // Phase 1: type name → assembly (eager, built on construction)
@@ -81,17 +81,175 @@ public sealed class AssemblyIndex : IDisposable
     // Type → direct subtypes (for abstract class resolution)
     private readonly Dictionary<string, List<string>> _subtypeIndex = new(StringComparer.Ordinal);
 
-    // Deps.json runtime mappings: assembly simple name → implementation path
-    private readonly Dictionary<string, string> _depsRuntimePaths = new(StringComparer.OrdinalIgnoreCase);
-
     private bool _disposed;
 
     public AssemblyIndex(IReadOnlyList<string> assemblyPaths, ILAnalysisOptions? options = null)
     {
-        _options = options ?? new ILAnalysisOptions();
-        LoadDepsJson();
+        _pathResolver = new AssemblyPathResolver(options ?? new ILAnalysisOptions());
         LoadAssemblies(assemblyPaths);
         BuildImplementationIndex();
+    }
+
+    internal sealed class AssemblyPathResolver
+    {
+        private readonly ILAnalysisOptions _options;
+        private readonly Dictionary<string, string> _depsRuntimePaths =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        internal AssemblyPathResolver(ILAnalysisOptions options)
+        {
+            _options = options;
+            LoadDepsJson();
+        }
+
+        internal string? Resolve(string path)
+        {
+            if (!File.Exists(path))
+                return null;
+            if (!IsReferenceAssembly(path))
+                return path;
+
+            var implPath = TryRefToLibSwap(path);
+            if (implPath != null)
+                return implPath;
+
+            var assemblyName = Path.GetFileNameWithoutExtension(path);
+            if (_depsRuntimePaths.TryGetValue(assemblyName, out var depsPath)
+                && File.Exists(depsPath))
+            {
+                return depsPath;
+            }
+
+            if (!string.IsNullOrEmpty(_options.RuntimeDirectory))
+            {
+                var runtimePath = Path.Combine(_options.RuntimeDirectory, Path.GetFileName(path));
+                if (File.Exists(runtimePath))
+                    return runtimePath;
+            }
+
+            return null;
+        }
+
+        private static bool IsReferenceAssembly(string path)
+        {
+            try
+            {
+                using var stream = File.OpenRead(path);
+                using var peReader = new PEReader(stream);
+                if (!peReader.HasMetadata)
+                    return false;
+
+                var reader = peReader.GetMetadataReader();
+                foreach (var attrHandle in reader.GetAssemblyDefinition().GetCustomAttributes())
+                {
+                    var attr = reader.GetCustomAttribute(attrHandle);
+                    var attributeName = attr.Constructor.Kind switch
+                    {
+                        HandleKind.MemberReference => GetMemberReferenceTypeName(
+                            reader,
+                            reader.GetMemberReference((MemberReferenceHandle)attr.Constructor)),
+                        HandleKind.MethodDefinition => GetTypeDefinitionName(
+                            reader,
+                            reader.GetMethodDefinition(
+                                (MethodDefinitionHandle)attr.Constructor).GetDeclaringType()),
+                        _ => null
+                    };
+                    if (attributeName == "ReferenceAssemblyAttribute")
+                        return true;
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string? GetMemberReferenceTypeName(
+            MetadataReader reader,
+            MemberReference constructor)
+            => constructor.Parent.Kind switch
+            {
+                HandleKind.TypeReference => reader.GetString(
+                    reader.GetTypeReference((TypeReferenceHandle)constructor.Parent).Name),
+                HandleKind.TypeDefinition => GetTypeDefinitionName(
+                    reader,
+                    (TypeDefinitionHandle)constructor.Parent),
+                _ => null
+            };
+
+        private static string GetTypeDefinitionName(
+            MetadataReader reader,
+            TypeDefinitionHandle handle)
+            => reader.GetString(reader.GetTypeDefinition(handle).Name);
+
+        private static string? TryRefToLibSwap(string refPath)
+        {
+            var normalized = refPath.Replace('\\', '/');
+            var refIndex = normalized.LastIndexOf("/ref/", StringComparison.OrdinalIgnoreCase);
+            if (refIndex < 0)
+                return null;
+
+            var libPath = normalized[..refIndex] + "/lib/" + normalized[(refIndex + 5)..];
+            libPath = libPath.Replace('/', Path.DirectorySeparatorChar);
+            return File.Exists(libPath) ? libPath : null;
+        }
+
+        private void LoadDepsJson()
+        {
+            if (string.IsNullOrEmpty(_options.DepsFilePath) || !File.Exists(_options.DepsFilePath))
+                return;
+
+            try
+            {
+                var json = File.ReadAllText(_options.DepsFilePath);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("targets", out var targets))
+                    return;
+
+                foreach (var target in targets.EnumerateObject())
+                {
+                    foreach (var package in target.Value.EnumerateObject())
+                    {
+                        if (!package.Value.TryGetProperty("runtime", out var runtime))
+                            continue;
+
+                        foreach (var asset in runtime.EnumerateObject())
+                        {
+                            var assemblyFileName = Path.GetFileNameWithoutExtension(asset.Name);
+                            var packageName = package.Name;
+                            if (root.TryGetProperty("libraries", out var libraries)
+                                && libraries.TryGetProperty(packageName, out var lib)
+                                && lib.TryGetProperty("path", out var pathProp))
+                            {
+                                var packagePath = pathProp.GetString();
+                                if (packagePath != null
+                                    && !string.IsNullOrEmpty(_options.NuGetPackageRoot))
+                                {
+                                    var fullPath = Path.GetFullPath(Path.Combine(
+                                        _options.NuGetPackageRoot, packagePath, asset.Name));
+                                    _depsRuntimePaths.TryAdd(assemblyFileName, fullPath);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            catch
+            {
+                // Invalid dependency metadata is ignored consistently with IL analysis.
+            }
+        }
+    }
+
+    internal static IReadOnlyList<string?> ResolveImplementationAssemblyPaths(
+        IReadOnlyList<string> assemblyPaths,
+        ILAnalysisOptions? options = null)
+    {
+        var resolver = new AssemblyPathResolver(options ?? new ILAnalysisOptions());
+        return assemblyPaths.Select(resolver.Resolve).ToList();
     }
 
     /// <summary>
@@ -189,7 +347,7 @@ public sealed class AssemblyIndex : IDisposable
         {
             try
             {
-                var resolvedPath = ResolveAssemblyPath(path);
+                var resolvedPath = _pathResolver.Resolve(path);
                 if (resolvedPath == null)
                     continue;
 
@@ -212,135 +370,6 @@ public sealed class AssemblyIndex : IDisposable
             catch (IOException) { /* file access error — skip */ }
             catch (InvalidOperationException) { /* no metadata — skip */ }
         }
-    }
-
-    /// <summary>
-    /// Resolves a reference assembly path to its implementation assembly.
-    /// Returns the original path if it's already an implementation assembly,
-    /// the resolved impl path if found, or null if unresolvable.
-    /// </summary>
-    private string? ResolveAssemblyPath(string path)
-    {
-        if (!File.Exists(path))
-            return null;
-
-        // Quick check: is this a reference assembly?
-        if (!IsReferenceAssembly(path))
-            return path; // Already an implementation assembly
-
-        // Strategy 1: NuGet ref→lib path swap
-        var implPath = TryRefToLibSwap(path);
-        if (implPath != null)
-            return implPath;
-
-        // Strategy 2: deps.json runtime mapping
-        var assemblyName = Path.GetFileNameWithoutExtension(path);
-        if (_depsRuntimePaths.TryGetValue(assemblyName, out var depsPath) && File.Exists(depsPath))
-            return depsPath;
-
-        // Strategy 3: Runtime directory for BCL assemblies
-        if (!string.IsNullOrEmpty(_options.RuntimeDirectory))
-        {
-            var runtimePath = Path.Combine(_options.RuntimeDirectory, Path.GetFileName(path));
-            if (File.Exists(runtimePath))
-                return runtimePath;
-        }
-
-        // Unresolvable — will be skipped
-        return null;
-    }
-
-    private static bool IsReferenceAssembly(string path)
-    {
-        try
-        {
-            using var stream = File.OpenRead(path);
-            using var peReader = new PEReader(stream);
-            if (!peReader.HasMetadata) return false;
-
-            var reader = peReader.GetMetadataReader();
-            foreach (var attrHandle in reader.GetAssemblyDefinition().GetCustomAttributes())
-            {
-                var attr = reader.GetCustomAttribute(attrHandle);
-                if (attr.Constructor.Kind == HandleKind.MemberReference)
-                {
-                    var ctor = reader.GetMemberReference((MemberReferenceHandle)attr.Constructor);
-                    if (ctor.Parent.Kind == HandleKind.TypeReference)
-                    {
-                        var typeRef = reader.GetTypeReference((TypeReferenceHandle)ctor.Parent);
-                        var name = reader.GetString(typeRef.Name);
-                        if (name == "ReferenceAssemblyAttribute")
-                            return true;
-                    }
-                }
-            }
-            return false;
-        }
-        catch { return false; }
-    }
-
-    private static string? TryRefToLibSwap(string refPath)
-    {
-        // NuGet layout: packages/{id}/{version}/ref/{tfm}/Assembly.dll
-        // Implementation: packages/{id}/{version}/lib/{tfm}/Assembly.dll
-        var normalized = refPath.Replace('\\', '/');
-        var refIndex = normalized.LastIndexOf("/ref/", StringComparison.OrdinalIgnoreCase);
-        if (refIndex < 0) return null;
-
-        var libPath = normalized[..refIndex] + "/lib/" + normalized[(refIndex + 5)..];
-        libPath = libPath.Replace('/', Path.DirectorySeparatorChar);
-        return File.Exists(libPath) ? libPath : null;
-    }
-
-    private void LoadDepsJson()
-    {
-        if (string.IsNullOrEmpty(_options.DepsFilePath) || !File.Exists(_options.DepsFilePath))
-            return;
-
-        try
-        {
-            var json = File.ReadAllText(_options.DepsFilePath);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            if (!root.TryGetProperty("targets", out var targets))
-                return;
-
-            // Get the first target (e.g., ".NETCoreApp,Version=v10.0")
-            foreach (var target in targets.EnumerateObject())
-            {
-                foreach (var package in target.Value.EnumerateObject())
-                {
-                    if (!package.Value.TryGetProperty("runtime", out var runtime))
-                        continue;
-
-                    foreach (var asset in runtime.EnumerateObject())
-                    {
-                        // asset.Name is like "lib/net10.0/Assembly.dll"
-                        var assemblyFileName = Path.GetFileNameWithoutExtension(asset.Name);
-
-                        // Find the package path in libraries
-                        var packageName = package.Name; // e.g., "Newtonsoft.Json/13.0.3"
-                        if (root.TryGetProperty("libraries", out var libraries)
-                            && libraries.TryGetProperty(packageName, out var lib)
-                            && lib.TryGetProperty("path", out var pathProp))
-                        {
-                            var packagePath = pathProp.GetString();
-                            if (packagePath != null && !string.IsNullOrEmpty(_options.NuGetPackageRoot))
-                            {
-                                var fullPath = Path.Combine(
-                                    _options.NuGetPackageRoot, packagePath, asset.Name);
-                                fullPath = Path.GetFullPath(fullPath);
-                                if (!_depsRuntimePaths.ContainsKey(assemblyFileName))
-                                    _depsRuntimePaths[assemblyFileName] = fullPath;
-                            }
-                        }
-                    }
-                }
-                break; // Only process the first target
-            }
-        }
-        catch { /* deps.json parsing failure — non-fatal */ }
     }
 
     private void IndexTypes(LoadedAssembly assembly)

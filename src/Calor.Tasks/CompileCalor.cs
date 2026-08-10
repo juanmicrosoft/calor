@@ -27,6 +27,7 @@ internal sealed record CompileCalorCacheInputs(
     string ExperimentalFlags,
     string ProjectDirectory,
     IReadOnlyList<string> ReferencedAssemblies,
+    IReadOnlyList<string> ResolvedImplementationAssemblies,
     string RuntimeDirectory,
     string NuGetPackageRoot,
     string DepsFile)
@@ -46,6 +47,8 @@ internal sealed record CompileCalorCacheInputs(
         Append(builder, "projectDirectory", ProjectDirectory);
         foreach (var reference in ReferencedAssemblies)
             Append(builder, "referencedAssembly", reference);
+        foreach (var implementation in ResolvedImplementationAssemblies)
+            Append(builder, "resolvedImplementationAssembly", implementation);
         Append(builder, "runtimeDirectory", RuntimeDirectory);
         Append(builder, "nuGetPackageRoot", NuGetPackageRoot);
         Append(builder, "depsFile", DepsFile);
@@ -168,6 +171,12 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 .Select(flag => flag.ToLowerInvariant())
                 .OrderBy(flag => flag, StringComparer.Ordinal));
 
+        var resolvedImplementations = EnableILAnalysis
+            ? Compiler.Effects.IL.AssemblyIndex.ResolveImplementationAssemblyPaths(
+                referencedAssemblies.Select(reference => reference.Path).ToList(),
+                CreateILAnalysisOptions())
+            : [];
+
         return new CompileCalorCacheInputs(
             BuildStateCache.CurrentOptionsSerializerVersion,
             BuildStateCache.CurrentFormatVersion,
@@ -182,6 +191,10 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             EnableILAnalysis
                 ? referencedAssemblies.Select(reference => reference.Descriptor).ToList()
                 : [],
+            resolvedImplementations.Select((path, index) =>
+                path == null
+                    ? $"unresolved:{referencedAssemblies[index].Descriptor}"
+                    : DescribeAssembly(path, File.Exists(path))).ToList(),
             EnableILAnalysis
                 ? DescribePath(RuntimeDirectory, includeContent: false)
                 : "unused",
@@ -192,6 +205,14 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 ? DescribePath(DepsFilePath, includeContent: true)
                 : "unused");
     }
+
+    private Compiler.Effects.IL.ILAnalysisOptions CreateILAnalysisOptions()
+        => new()
+        {
+            RuntimeDirectory = !string.IsNullOrEmpty(RuntimeDirectory) ? RuntimeDirectory : null,
+            NuGetPackageRoot = !string.IsNullOrEmpty(NuGetPackageRoot) ? NuGetPackageRoot : null,
+            DepsFilePath = !string.IsNullOrEmpty(DepsFilePath) ? DepsFilePath : null
+        };
 
     private IReadOnlyList<ResolvedReference> ResolveReferencedAssemblies()
     {
@@ -391,12 +412,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
 
                 if (assemblyPaths.Count > 0)
                 {
-                    var ilOptions = new Compiler.Effects.IL.ILAnalysisOptions
-                    {
-                        RuntimeDirectory = !string.IsNullOrEmpty(RuntimeDirectory) ? RuntimeDirectory : null,
-                        NuGetPackageRoot = !string.IsNullOrEmpty(NuGetPackageRoot) ? NuGetPackageRoot : null,
-                        DepsFilePath = !string.IsNullOrEmpty(DepsFilePath) ? DepsFilePath : null
-                    };
+                    var ilOptions = CreateILAnalysisOptions();
 
                     var resolver = new Compiler.Effects.EffectResolver();
                     resolver.Initialize(ProjectDirectory);
@@ -415,6 +431,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                             "Calor: IL analysis enabled with {0} referenced assemblies ({1} loaded).",
                             assemblyPaths.Count, ilAnalyzer.LoadedAssemblyCount);
                     }
+
                 }
             }
             catch (Exception ex)

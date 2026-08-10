@@ -877,4 +877,77 @@ public class BuildStateCacheTests : IDisposable
         Assert.NotEqual(userChanged, projectChanged);
     }
 
+    [Fact]
+    public void ManifestLoader_LoadsSamePriorityManifestsInCanonicalPathOrder()
+    {
+        var directory = Path.Combine(_tempDir, "ordered-manifests");
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(
+            Path.Combine(directory, "z.calor-effects.json"),
+            """{"version":"1.0","mappings":[]}""");
+        File.WriteAllText(
+            Path.Combine(directory, "a.calor-effects.json"),
+            """{"version":"1.0","mappings":[]}""");
+
+        var loader = new Calor.Compiler.Effects.Manifests.ManifestLoader();
+        loader.LoadManifestsFromDirectory(
+            directory,
+            Calor.Compiler.Effects.Manifests.ManifestPriority.UserLevel);
+
+        Assert.Equal(
+            ["a.calor-effects.json", "z.calor-effects.json"],
+            loader.LoadedManifests.Select(item => Path.GetFileName(item.Source.FilePath)));
+    }
+
+    [Fact]
+    public void CanonicalInputs_HashResolvedRuntimeImplementationContent()
+    {
+        var runtimeSourceDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        var runtimeAssembly = Path.Combine(runtimeSourceDirectory, "System.Runtime.dll");
+        var referenceAssembly = FindFrameworkReferenceAssembly("System.Runtime.dll");
+        Assert.True(File.Exists(runtimeAssembly));
+
+        var runtimeDirectory = Path.Combine(_tempDir, "runtime-implementations");
+        Directory.CreateDirectory(runtimeDirectory);
+        var copiedRuntimeAssembly = Path.Combine(runtimeDirectory, "System.Runtime.dll");
+        File.Copy(runtimeAssembly, copiedRuntimeAssembly);
+        var resolved = Calor.Compiler.Effects.IL.AssemblyIndex
+            .ResolveImplementationAssemblyPaths(
+                [referenceAssembly],
+                new Calor.Compiler.Effects.IL.ILAnalysisOptions
+                {
+                    RuntimeDirectory = runtimeDirectory
+                });
+        Assert.Equal(copiedRuntimeAssembly, Assert.Single(resolved));
+
+        var task = new Calor.Tasks.CompileCalor
+        {
+            ProjectDirectory = _tempDir,
+            EnableILAnalysis = true,
+            RuntimeDirectory = runtimeDirectory,
+            ReferencedAssemblies = [new TaskItem(referenceAssembly)]
+        };
+        var baseline = task.ComputeCacheInputs().Serialize();
+
+        File.AppendAllText(copiedRuntimeAssembly, "runtime-implementation-change");
+
+        Assert.NotEqual(baseline, task.ComputeCacheInputs().Serialize());
+    }
+
+    private static string FindFrameworkReferenceAssembly(string fileName)
+    {
+        var runtimeDirectory = new DirectoryInfo(
+            Path.GetDirectoryName(typeof(object).Assembly.Location)!);
+        var dotnetRoot = runtimeDirectory.Parent?.Parent?.Parent
+            ?? throw new DirectoryNotFoundException("Could not locate the dotnet root.");
+        var referencePackRoot = Path.Combine(
+            dotnetRoot.FullName, "packs", "Microsoft.NETCore.App.Ref");
+        var referenceAssembly = Directory.GetDirectories(referencePackRoot)
+            .OrderByDescending(path => path, StringComparer.Ordinal)
+            .Select(path => Path.Combine(path, "ref", "net10.0", fileName))
+            .FirstOrDefault(File.Exists);
+        return referenceAssembly
+            ?? throw new FileNotFoundException($"Could not locate framework reference {fileName}.");
+    }
+
 }

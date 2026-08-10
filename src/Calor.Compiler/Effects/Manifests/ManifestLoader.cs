@@ -65,7 +65,8 @@ public sealed class ManifestLoader
     {
         var assembly = Assembly.GetExecutingAssembly();
         var resourceNames = assembly.GetManifestResourceNames()
-            .Where(name => name.EndsWith(".calor-effects.json", StringComparison.OrdinalIgnoreCase));
+            .Where(name => name.EndsWith(".calor-effects.json", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(name => name, StringComparer.Ordinal);
 
         foreach (var resourceName in resourceNames)
         {
@@ -134,11 +135,16 @@ public sealed class ManifestLoader
     /// <summary>
     /// Loads all .calor-effects.json files from a directory.
     /// </summary>
-    private void LoadManifestsFromDirectory(string directory, ManifestPriority priority)
+    internal void LoadManifestsFromDirectory(string directory, ManifestPriority priority)
     {
         try
         {
             var files = Directory.GetFiles(directory, "*.calor-effects.json", SearchOption.TopDirectoryOnly);
+            Array.Sort(
+                files,
+                OperatingSystem.IsWindows()
+                    ? StringComparer.OrdinalIgnoreCase
+                    : StringComparer.Ordinal);
             foreach (var file in files)
             {
                 LoadManifestFromFile(file, priority);

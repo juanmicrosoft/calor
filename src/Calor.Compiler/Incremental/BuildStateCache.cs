@@ -120,7 +120,7 @@ internal static class BuildStateCache
     // fingerprinting. Older state is intentionally rebuilt and overwritten.
     public const string CurrentFormatVersion = "3.0";
     public const string CurrentCompilerSemanticsVersion = "calor-compile-semantics-v1";
-    public const string CurrentOptionsSerializerVersion = "compile-inputs-v2";
+    public const string CurrentOptionsSerializerVersion = "compile-inputs-v3";
     private const string CacheFileName = ".calor-build-state.json";
     private const int MaxRetries = 3;
     private const int BaseRetryDelayMs = 50;
