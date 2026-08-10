@@ -1,11 +1,11 @@
-§DOC{Security Benchmark: SQL Injection Detection}
-§DOC{Tests taint analysis for SQL injection vulnerabilities}
+// Security Benchmark: SQL Injection Detection
+// Tests taint analysis for SQL injection vulnerabilities
 
 §M{m001:SqlInjectionBenchmark}
 
   §F{f001:VulnerableQuery:pub}
-    §DOC{BUG: Direct SQL concatenation with user input}
-    §DOC{EXPECTED: Calor0981 SQL Injection}
+    // BUG: Direct SQL concatenation with user input
+    // EXPECTED: Calor0981 SQL Injection
     §I{string:user_input}
     §O{string}
     §E{db:w}
@@ -15,8 +15,8 @@
     §R query
 
   §F{f002:SafeParameterizedQuery:pub}
-    §DOC{SAFE: Parameterized query with placeholders}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Parameterized query with placeholders
+    // EXPECTED: No warnings
     §I{string:user_input}
     §O{string}
     §E{db:w}
@@ -25,8 +25,8 @@
     §R query
 
   §F{f003:VulnerableMultipleConcatenation:pub}
-    §DOC{BUG: Multiple concatenations with user input}
-    §DOC{EXPECTED: Calor0981 SQL Injection}
+    // BUG: Multiple concatenations with user input
+    // EXPECTED: Calor0981 SQL Injection
     §I{string:name}
     §I{string:email}
     §O{string}
@@ -40,8 +40,8 @@
     §R query
 
   §F{f004:SafeEscapedInput:pub}
-    §DOC{SAFE: Input properly escaped before concatenation}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Input properly escaped before concatenation
+    // EXPECTED: No warnings
     §I{string:user_input}
     §O{string}
     §E{db:w}
@@ -52,8 +52,8 @@
     §R query
 
   §F{f005:VulnerableIndirectTaint:pub}
-    §DOC{BUG: Taint propagates through intermediate variable}
-    §DOC{EXPECTED: Calor0981 SQL Injection}
+    // BUG: Taint propagates through intermediate variable
+    // EXPECTED: Calor0981 SQL Injection
     §I{string:request_param}
     §O{string}
     §E{db:w}
@@ -65,8 +65,8 @@
     §R query
 
   §F{f006:SafeConstantQuery:pub}
-    §DOC{SAFE: Query uses only constants}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Query uses only constants
+    // EXPECTED: No warnings
     §O{string}
     §E{db:w}
     §B{tableName:string} STR:"users"

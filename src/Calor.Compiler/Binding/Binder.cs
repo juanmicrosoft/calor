@@ -339,8 +339,12 @@ public sealed class Binder
             [typeof(ConditionalExpressionNode)] = (b, e) => b.BindConditionalExpression((ConditionalExpressionNode)e),
             [typeof(NameOfExpressionNode)] = (b, e) => { var n = (NameOfExpressionNode)e; return new BoundStringLiteral(n.Span, n.Name); },
             [typeof(NoneExpressionNode)] = (b, e) => { var n = (NoneExpressionNode)e; return new BoundNoneLiteral(n.Span, n.TypeName); },
+            // static-context 'this' is a CONTEXT error on a BOUND construct, not binder
+            // incompleteness — it must not pollute the Calor0259 instrument, and the old
+            // path was silent (review of B1, Major 2). Quiet until it gets a proper
+            // semantic diagnostic in B2+.
             [typeof(ThisExpressionNode)] = (b, e) => b._isStaticContext
-                ? b.BindIncomplete(e, "'this' is not valid in a static context")
+                ? b.BindIncompleteQuiet(e, "'this' is not valid in a static context")
                 : new BoundThisExpression(e.Span, b._currentClassName ?? "UNKNOWN"),
             [typeof(BaseExpressionNode)] = (b, e) => new BoundBaseExpression(e.Span),
             [typeof(FieldAccessNode)] = (b, e) => b.BindFieldAccess((FieldAccessNode)e),
@@ -363,8 +367,15 @@ public sealed class Binder
         return table;
     }
 
+    /// <summary>
+    /// Total expressions dispatched — the incomplete-fraction's denominator (scoping doc
+    /// §5: "incomplete diagnostics ÷ bound expressions"). Read by the ratchet instrument.
+    /// </summary>
+    public int ExpressionsBound { get; private set; }
+
     private BoundExpression BindExpression(ExpressionNode expr)
     {
+        ExpressionsBound++;
         return ExpressionDispatch.TryGetValue(expr.GetType(), out var bind)
             ? bind(this, expr)
             // Unreachable for assembly-local node classes (the table is reflection-complete);
@@ -579,6 +590,14 @@ public sealed class Binder
             "are not yet visible to them.");
         return new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason);
     }
+
+    /// <summary>
+    /// The opaque-node path WITHOUT the Calor0259 instrument diagnostic — for context
+    /// errors on constructs that HAVE a binder (e.g. static 'this'). Counting those as
+    /// "incomplete" would pollute the instrument, and the pre-B1 behavior was silent.
+    /// </summary>
+    private BoundExpression BindIncompleteQuiet(ExpressionNode expr, string reason)
+        => new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason);
 
     /// <summary>
     /// Generates a unique name by appending a number suffix.

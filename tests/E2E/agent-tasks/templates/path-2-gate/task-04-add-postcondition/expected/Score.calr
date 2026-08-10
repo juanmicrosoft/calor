@@ -8,7 +8,6 @@
   §S (<= result max)
   §IF{i1} (> score max) → §R max
   §R score
-§/F{f001}
 
 §F{f002:ClampLowerBound:pub}
   §I{i32:val}
@@ -16,6 +15,3 @@
   §S (>= result 0)
   §IF{i2} (< val 0) → §R 0
   §R val
-§/F{f002}
-
-§/M{m001}

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- **The binder dispatches every expression class** (#762 B1): a single authoritative dispatch
+  table replaces the partial switch; expressions without a structural binder yet produce an
+  explicit Info-severity `Calor0259` (analysis incomplete) instead of a silent opaque fallback,
+  counted by a ratcheted corpus instrument. `BoundCallExpression` is no longer `sealed` (the
+  incomplete node subclasses it to preserve analysis behavior exactly) — an API-surface note
+  for SDK consumers pattern-matching bound trees. MCP `analyze` no longer counts Info-severity
+  diagnostics as issues.
 - **Proof-based guard elision is now opt-in** (`--elide-proven-guards` on the CLI,
   `ElideProvenGuards` on `CompilationOptions` and the MSBuild task). By default a `Proven`
   postcondition or `Discharged` `§PROOF` obligation keeps its runtime check — verification
