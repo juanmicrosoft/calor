@@ -2,7 +2,7 @@
 title: "Verification Guarantees and Limits"
 section: "guides"
 order: 2
-description: "How to interpret v0.12 verification results and the current opt-in guard-elision policy"
+description: "How to interpret v0.12.1 verification results and guard elision safely"
 ---
 
 Calor verifies individual contract obligations under a positive, enumerated
@@ -24,10 +24,9 @@ number of soundness gaps that have not yet been found is not knowable.
 Preconditions are never elided from satisfiability results. A vacuous proof is
 reported with a flag and also keeps its runtime check.
 
-As of the v0.13 work on current `main`, verification is diagnostic by default:
-even an eligible `proven` result keeps its runtime guard. Pass
-`--verify --elide-proven-guards` to opt in to removing eligible guards. This
-replaces the v0.12 behavior in which verification enabled eligible elision.
+In released v0.12.1, compiling with `--verify` automatically removes an
+eligible runtime guard after a clean, non-vacuous, assumption-free proof.
+`assumed` and all inconclusive outcomes keep their guards.
 
 ## What Changed in v0.12
 
@@ -89,8 +88,8 @@ calls are pure and therefore voids the guarantee.
 
 ## Review Checklist
 
-1. Keep default diagnostic-only verification unless the project explicitly accepts `--elide-proven-guards`.
-2. Treat only a non-vacuous, assumption-free `proven` as eligible for opt-in elision.
+1. In v0.12.1, remember that `--verify` automatically elides eligible guards.
+2. Treat only a non-vacuous, assumption-free `proven` as eligible for elision.
 3. Read every named assumption on `assumed` results.
 4. Keep `unsupported`, `unknown`, `timeout`, and `unavailable` distinct; their
    remedies differ.

@@ -13,9 +13,15 @@ order: 11
 
 ## Overview
 
-Calor's compiler enforces that declared effects match actual effects through interprocedural analysis. A function marked `§E{}` (pure) cannot contain I/O operations, and a function calling code with effects must declare those effects.
+Calor's compiler checks declared effects against direct recognized operations
+and the resolved Calor call graph. A function marked `§E{}` cannot contain a
+known I/O operation or call a resolved effectful function without a matching
+declaration.
 
-This catches hidden side effects at compile time—something impossible with constrained decoding or traditional type systems.
+Unknown external calls, unresolved delegates, and raw interop are explicit
+soundness boundaries: the compiler surfaces diagnostics or assumptions rather
+than proving their behavior. `--permissive-effects` waives those boundaries and
+voids the effect guarantee.
 
 ---
 
@@ -29,15 +35,19 @@ Hidden side effects cause real bugs:
 - **Security issues** - Code assumed side-effect-free modifies databases
 
 Effect soundness means:
-- You can trust effect declarations
-- Refactoring is safe (move "pure" code anywhere)
+- You can rely on declarations for the resolved graph when there are no
+  unresolved-call, interop-assumption, or waiver diagnostics
+- Refactoring across that checked surface exposes newly introduced known effects
 - Testing strategy follows directly from effects
+
+It does not by itself prove thread safety, determinism, or freedom from effects
+hidden behind an unresolved boundary.
 
 ---
 
 ## How It's Measured
 
-The compiler traces effect violations through the entire call graph:
+The compiler traces effect violations through the resolved call graph:
 
 1. **Direct effects** - Does the function body contain effectful operations?
 2. **Transitive effects** - Do called functions have effects?
@@ -189,9 +199,9 @@ error Calor0411: Unknown effects for call to 'ThirdParty.DoSomething'
 | Aspect | C# (Implicit) | Calor (Explicit) |
 |:-------|:--------------|:-----------------|
 | Side effects visible? | No - must read implementation | Yes - in function signature |
-| Compiler enforcement | None | Full interprocedural analysis |
-| "Pure" guarantee | Convention only | Compiler-verified |
-| Refactoring safety | Must manually verify | Compiler catches violations |
+| Compiler enforcement | None | Resolved-call graph analysis with explicit unknowns |
+| "Pure" guarantee | Convention only | Enforced when calls resolve; assumptions are surfaced |
+| Refactoring safety | Must manually verify | Known-effect violations are caught within the checked surface |
 | Testing strategy | Guesswork | Follows from effects |
 
 ### C# Example
@@ -235,9 +245,10 @@ Find all functions that access the database:
 
 ### 2. Refactoring Safety
 
-Move pure functions anywhere without side-effect concerns:
+Use `§E{}` as a checked pure surface only when compilation has no unresolved or
+waived effect assumptions:
 ```
-// If §E{} is declared, the function is provably safe to parallelize
+// §E{} does not alone prove that a function is safe to parallelize
 ```
 
 ### 3. Test Planning

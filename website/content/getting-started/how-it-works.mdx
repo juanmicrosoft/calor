@@ -103,7 +103,8 @@ We've tested this approach extensively:
 The repository includes deterministic generation and structure calculators, but
 they are not a substitute for a blinded, live-agent success study. In practice,
 agents should use the compiler feedback loop: generate a small change, run
-`calor check`, and repair any syntax, type, contract, or effect diagnostics.
+`calor -i change.calr -o change.g.cs`, and repair any syntax, type, contract,
+or effect diagnostics. MCP clients can use the equivalent `calor_check` tool.
 
 The combination of instructions + skills + hooks creates a reliable system, not a hopeful one.
 

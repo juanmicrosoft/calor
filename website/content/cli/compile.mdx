@@ -17,6 +17,11 @@ calor --input <file.calr> --output <file.cs>
 
 The default `calor` command (when no subcommand is specified) compiles Calor source files to C#. This is the core functionality of the Calor compiler.
 
+> **Version note:** The released v0.12.1 compiler automatically removes an
+> eligible, clean proof guard when `--verify` succeeds. Current `main` (the
+> v0.13 development line) keeps guards by default and adds
+> `--elide-proven-guards`; v0.12.1 does not recognize that switch.
+
 ---
 
 ## Quick Start
@@ -42,7 +47,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--output` | `-o` | No | Output path for a single input; otherwise each `.g.cs` is written beside its input |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 | `--verify` | | No | Enable Z3 static contract verification |
-| `--elide-proven-guards` | | No | With `--verify`, opt in to removing eligible proven runtime guards; off by default as of v0.13 |
+| `--elide-proven-guards` | | No | **Current main/nightly only (v0.13 development):** opt in to removing eligible proven guards. Released v0.12.1 rejects this option. |
 | `--analyze` | | No | Enable [static analysis](/docs/cli/static-analysis/) (dataflow, bug patterns, taint tracking) |
 | `--all-findings` | | No | Report all analysis findings including inconclusive results (requires `--analyze`) |
 | `--no-enforce-effects` | | No | Opt out of default-on effect enforcement |
@@ -117,7 +122,10 @@ Use `--verify` to enable Z3 static contract verification:
 calor -i MyModule.calr -o MyModule.g.cs --verify
 ```
 
-When enabled, the compiler uses the Z3 SMT solver to attempt proving contracts at compile time. Verdicts are diagnostic by default: proven contracts keep their runtime checks unless you also pass `--elide-proven-guards` (elision is opt-in as of v0.13).
+When enabled in released v0.12.1, the compiler uses Z3 to attempt proving
+contracts at compile time and automatically removes an eligible runtime guard
+only for a clean, non-vacuous, assumption-free proof. Current `main` reports
+the same verdicts but keeps guards unless `--elide-proven-guards` is also set.
 
 Example output:
 
@@ -129,9 +137,9 @@ Generated MyModule.g.cs
 ```
 
 The seven statuses are `proven`, `refuted`, `assumed`, `unknown`, `timeout`,
-`unsupported`, and `unavailable`. Only a clean, non-vacuous `proven`
-postcondition is eligible to lose its runtime guard, and only when
-`--elide-proven-guards` is explicitly enabled. See
+`unsupported`, and `unavailable`. In v0.12.1, only a clean, non-vacuous,
+assumption-free `proven` postcondition is eligible to lose its runtime guard.
+All other verdicts retain their guard. See
 [Verification Guarantees](/docs/guides/verification-guarantees/).
 
 ---

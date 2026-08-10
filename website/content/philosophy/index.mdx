@@ -206,7 +206,7 @@ The Calor CLI includes a language server for IDE integration. VS Code extension 
 
 ### "Is this production-ready?"
 
-Calor is a pre-1.0 research project exploring AI-native language design. It emits strongly typed C# for .NET, but its verifier supports only a documented subset and reports unsupported obligations as `Assumed` instead of claiming a proof. Conversion and tooling also retain known limitations. Start with a narrow pilot, keep generated C# and tests in review, and follow the [adoption playbook](/docs/guides/adoption-playbook/) and [verification guarantees](/docs/guides/verification-guarantees/) before expanding its role.
+Calor is a pre-1.0 research project exploring AI-native language design. It emits strongly typed C# for .NET, but its verifier supports only a documented subset. Forms outside that subset report `unsupported`; modeled proofs that depend on named assumptions report `assumed`. Neither is presented as a clean proof. Conversion and tooling also retain known limitations. Start with a narrow pilot, keep generated C# and tests in review, and follow the [adoption playbook](/docs/guides/adoption-playbook/) and [verification guarantees](/docs/guides/verification-guarantees/) before expanding its role.
 
 ---
 

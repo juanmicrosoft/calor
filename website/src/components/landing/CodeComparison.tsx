@@ -25,7 +25,7 @@ const csharpCode = `public static int Square(int x)
 const calorAnnotations = [
   { line: 1, text: 'Stable ID gives agents a durable target across renames and moves' },
   { line: 3, text: 'The precondition is explicit and checked according to contract mode' },
-  { line: 4, text: 'Verification keeps this guard by default; eligible proof-based elision is opt-in' },
+  { line: 4, text: 'v0.12.1 can discharge this guard only with a clean, assumption-free proof' },
   { line: 2, text: 'The pure effect declaration is checked against known and manifested calls' },
 ];
 

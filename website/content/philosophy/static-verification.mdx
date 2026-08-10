@@ -6,9 +6,9 @@ order: 4
 
 
 Calor uses Z3 to verify contracts inside an explicitly modeled subset. The
-result is one of seven statuses. Verification is diagnostic by default as of
-v0.13; only an explicit `--elide-proven-guards` opt-in allows a clean,
-non-vacuous `proven` postcondition to lose its runtime guard.
+result is one of seven statuses. In released v0.12.1, `--verify` automatically
+removes an eligible runtime guard only for a clean, non-vacuous,
+assumption-free `proven` result. Every other result keeps its guard.
 
 ---
 
@@ -38,12 +38,7 @@ Use the `--verify` flag when compiling:
 calor -i MyModule.calr -o MyModule.g.cs --verify
 ```
 
-This keeps runtime guards while reporting verdicts. Guard removal requires an
-explicit second switch:
-
-```bash
-calor -i MyModule.calr -o MyModule.g.cs --verify --elide-proven-guards
-```
+In v0.12.1 this also enables automatic removal of eligible proven guards.
 
 ---
 
@@ -51,7 +46,7 @@ calor -i MyModule.calr -o MyModule.g.cs --verify --elide-proven-guards
 
 | Status | Meaning | Runtime postcondition check |
 |:-------|:--------|:----------------------------|
-| `proven` | The obligation holds under the modeled semantics | Kept by default; eligible for removal with `--elide-proven-guards` only when non-vacuous and free of assumptions |
+| `proven` | The obligation holds under the modeled semantics | In v0.12.1, automatically removed only when non-vacuous and free of assumptions |
 | `refuted` | Z3 found a violation; a counterexample is included when available | Kept; `calor verify` exits 1 |
 | `assumed` | The proof depends on a named modeling assumption | Always kept |
 | `unknown` | Z3 could not decide | Kept |
@@ -201,7 +196,7 @@ allowed to remove a runtime check.
 | Aspect | Runtime Only | Static + Runtime |
 |:-------|:-------------|:-----------------|
 | Verification cost | 0 | Compile time |
-| Runtime cost | Always | Guards remain by default; eligible proven guards can be removed only with explicit opt-in |
+| Runtime cost | Always | In v0.12.1, eligible proven guards are removed; all others remain |
 | Bug detection | At runtime | At compile time |
 | Coverage | All contracts | Supported constructs |
 
@@ -218,7 +213,7 @@ Calor is **not** a proof assistant like LEAN, Isabelle, or Rocq. The distinction
 | Aspect | Proof Assistants | Calor |
 |:-------|:-----------------|:------|
 | You write | Proofs (tactics, lemmas) | Contracts (§Q, §S) |
-| Verification | Must complete to compile | Reports verdicts while keeping guards by default; eligible guard removal is opt-in |
+| Verification | Must complete to compile | Reports seven verdicts; v0.12.1 removes only eligible clean proven guards |
 | Scope | Arbitrary mathematical properties | Practical software contracts |
 | Expertise | Type theory, proof tactics | Software engineering |
 

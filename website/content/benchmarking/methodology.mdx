@@ -38,21 +38,30 @@ dotnet run --project tests/Calor.Evaluation -- --statistical --runs 30
 
 ### Current Scale
 
-- **40 programs** across multiple categories
+- **217 programs** across 14 manifest categories
 - Each program has paired Calor (.calr) and C# (.cs) implementations
-- Complexity levels 1-5 (simple to advanced)
+- Complexity levels 1-4 in the published corpus: 14 level-1, 112 level-2,
+  84 level-3, and 7 level-4 programs
 
 ### Categories
 
-| Category | Count | Examples |
-|:---------|:------|:---------|
-| Basic Functions | 10 | HelloWorld, Calculator, FizzBuzz |
-| Data Structures | 4 | Stack, Queue, LinkedList, BinaryTree |
-| Design Patterns | 4 | Singleton, Factory, ShoppingCart |
-| Algorithms | 3 | BinarySearch, QuickSort, Fibonacci |
-| Contract Verification | 7 | ProvableContracts, OverflowSafe, StringContracts |
-| Effect Soundness | 3 | CorrectEffects, MissingEffects, HiddenNetworkEffect |
-| Interop Effects | 2 | BclCoverage, PureFunctions |
+| Manifest category | Count |
+|:------------------|------:|
+| TokenEconomics | 52 |
+| DataStructures | 15 |
+| DesignPatterns | 17 |
+| DomainProblems | 20 |
+| ComplexAlgorithms | 15 |
+| AsyncConcurrency | 10 |
+| CollectionsLINQ | 11 |
+| CompactSyntax | 5 |
+| ContractVerification | 15 |
+| ErrorHandling | 10 |
+| EffectSoundness | 10 |
+| InteropEffectCoverage | 5 |
+| OOPGenerics | 21 |
+| PatternMatching | 11 |
+| **Total** | **217** |
 
 ### Requirements
 
@@ -476,7 +485,7 @@ The CI pipeline checks for:
 
 ## Limitations
 
-1. **Corpus size**: 40 programs may not cover all patterns
+1. **Corpus size**: 217 paired programs still may not cover all patterns
 2. **C# baseline**: Other languages might perform differently
 3. **Static analysis**: Some metrics don't capture runtime behavior
 4. **LLM variance**: Model updates can affect evaluation scores

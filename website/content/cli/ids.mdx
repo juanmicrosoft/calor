@@ -120,7 +120,7 @@ calor fix src/ --compact-ids --log compact-ids.json
 
 ```bash
 # Compact authoring form is valid
-calor compile -i src/app.calr -o generated/app.g.cs
+calor -i src/app.calr -o generated/app.g.cs
 
 # Materialize persistent IDs when external tools need them
 calor ids assign src/ --dry-run

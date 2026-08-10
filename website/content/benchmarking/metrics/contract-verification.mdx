@@ -43,7 +43,7 @@ Contracts use the schema 2.0 seven-status vocabulary:
 
 | Result | Meaning | Runtime Check |
 |:-------|:--------|:--------------|
-| `proven` | The obligation holds under the modeled semantics | Kept by default; may be elided with `--elide-proven-guards` only when non-vacuous and assumption-free |
+| `proven` | The obligation holds under the modeled semantics | v0.12.1 removes an eligible guard only when non-vacuous and assumption-free |
 | `refuted` | A violation exists | Preserved + counterexample when available |
 | `assumed` | The proof depends on named assumptions | Preserved |
 | `unknown` | Z3 could not decide | Preserved |
@@ -57,37 +57,30 @@ The metric tracks the distribution across these categories.
 
 ## Example
 
-Consider a division function with a precondition:
+The repository includes a deliberately refutable postcondition fixture:
 
 ```calor
-§F{f001:Divide:pub} (i32:a, i32:b) -> i32
-  §E{}
-  §Q (!= b 0)              // Precondition: b must not be zero
-  §R (/ a b)
+§M{m1:OutcomeRefuted}
+  §F{f1:Dec:pub} (i32:x) -> i32
+    §Q (> x 0)
+    §S (> result 10)
+    §R (- x 1)
 ```
 
-When compiled with `--verify`, Z3 checks the modeled obligations in the
-function. Preconditions remain runtime-checked even when the solver proves a
-related fact:
+When compiled with `--verify`, Z3 binds `result` to the body expression and
+checks whether the postcondition can fail:
 
 ```bash
 calor -i math.calr -o math.g.cs --verify
 ```
 
-If the verifier can model a zero-divisor obligation, it may report a refutation
-with a counterexample. Exact diagnostics depend on the obligation and context;
-the following illustrates that shape:
+The fixture produces `Calor0712` (`PostconditionMayBeViolated`) with status
+`refuted`. Its regression test requires a non-empty structured counterexample
+with a `result` binding. The renderer begins that model with `Counterexample:`;
+the exact bindings and formatting are solver-dependent.
 
-```calor
-§B{result:i32} §C{Divide} x (- y y) §/C    // (y - y) = 0!
-```
-
-Z3 detects this at compile time:
-
-```
-warning Calor0712: Contract may be violated in function 'Divide'.
-  Counterexample: y=5 (b = y - y = 0)
-```
+This is an implementation-postcondition check. It should not be read as a
+claim that v0.12.1 proves arbitrary preconditions at every call site.
 
 ---
 
@@ -159,7 +152,7 @@ whitelist report `unsupported`.
 |:-------|:-------------|:-----------------|
 | When bugs found | At runtime | At compile time |
 | Verification cost | None | Compile time (cached) |
-| Runtime overhead | Always | Guards remain by default; reduced only for eligible proofs under explicit elision opt-in |
+| Runtime overhead | Always | v0.12.1 removes eligible clean proven guards; all other guards remain |
 | Coverage | All contracts | Supported constructs |
 
 Static verification complements runtime checking; it does not replace it. All

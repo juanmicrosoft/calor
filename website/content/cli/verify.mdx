@@ -44,7 +44,7 @@ produces a model. Vacuity is a separate flag.
 | `2` | Invalid weakening-check invocation |
 
 `calor verify` reports verdicts; it does not opt compilation into guard
-elision. A clean, non-vacuous `proven` postcondition is merely eligible, and
-the compile path keeps its runtime guard unless `--elide-proven-guards` is set.
-See [Verification Guarantees](/docs/guides/verification-guarantees/) before
-using proof results as a gate.
+elision. In released v0.12.1, compiling separately with `--verify`
+automatically elides an eligible clean, non-vacuous, assumption-free guard. See
+[Verification Guarantees](/docs/guides/verification-guarantees/) before using
+proof results as a gate.

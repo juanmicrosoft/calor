@@ -6,13 +6,15 @@ order: 8
 
 **Category:** Safety Benchmark
 **Status:** 1.59x structural estimate; not part of the v0.12 dashboard
-**What it measures:** Contract enforcement effectiveness and error quality
+**What it estimates:** Signals rewarded by the safety scoring rubric
 
 ---
 
 ## Overview
 
-The Safety Benchmark measures how well Calor contracts catch bugs compared to C# guard clauses. Unlike the Task Completion benchmark (which answers "can correct code be written?"), this benchmark answers: **"Does the code catch more bugs?"**
+The checked-in 1.59x Safety figure is a structural estimate of signals such as
+contract presence and potential error metadata. It does not execute generated
+programs, observe defects, or establish that Calor catches more bugs than C#.
 
 The 1.59x figure on this page comes from estimation mode. It compares the
 signals the calculator rewards; it is not an observed defect-reduction rate.
@@ -23,15 +25,16 @@ whether a static obligation is cleanly proven.
 
 ## What This Benchmark Answers
 
-**Primary Question:** Does Calor code catch more bugs with better error messages?
+**Primary Question:** Which language surface receives more credit under the
+current safety-scoring heuristic?
 
-**Key Differences Measured:**
+**Signals rewarded by the rubric:**
 
 | Scenario | Calor | C# |
 |:---------|:------|:---|
-| Invalid input | `ContractViolationException` with location | Generic `ArgumentException` (maybe) |
-| Bug in output | Postcondition fails | Silent incorrect result |
-| Missing validation | Compile warning (Z3) | No warning |
+| Invalid-input declaration | First-class precondition syntax and potential contract metadata | Explicit guard clauses can express the same check |
+| Output constraint | First-class postcondition syntax | Must be written as an explicit output check |
+| Static verification | Seven-status result for supported obligations | No built-in C# equivalent |
 
 ---
 
@@ -67,16 +70,17 @@ Each task has two types of test cases:
 
 ### Error Quality Scoring
 
-| Level | Score | Criteria |
-|:------|:------|:---------|
-| Excellent | 1.0 | Specific exception type + precise location + condition shown |
-| Good | 0.7 | Specific exception type + meaningful message |
-| Adequate | 0.4 | Any exception thrown with some message |
-| Poor | 0.1 | Exception thrown but generic/unhelpful |
-| Fail | 0.0 | No exception (silent failure or wrong result) |
+| Level | Implemented score range | Typical signal |
+|:------|:------------------------|:---------------|
+| Excellent | `>= 0.9` | Full contract diagnostics, including location and condition |
+| Good | `>= 0.6` and `< 0.9` | Specific contract-like exception or partial diagnostics |
+| Adequate | `>= 0.3` and `< 0.6` | Meaningful exception or parameter information |
+| Poor | `>= 0.1` and `< 0.3` | Generic or runtime exception with limited context |
+| Fail | `< 0.1` | Expected violation was not detected |
 
-**Calor advantage**: `ContractViolationException` includes FunctionId, Line, Column, Condition
-**C# typical**: `ArgumentException("b cannot be zero")` - no location info
+The rubric rewards Calor's structured contract metadata. C# can provide equally
+specific information when an implementation deliberately includes it; the
+comparison is not a universal property of C# exceptions.
 
 ---
 
@@ -127,7 +131,8 @@ ArgumentException: Division by zero not allowed
   Parameter name: b
 ```
 
-**Quality Score: 0.4** - Has parameter name but no location
+**Quality Score: 0.5** - The scorer awards a base 0.3, plus 0.1 each for
+parameter name and a descriptive message
 
 ### C# DivideByZeroException (Runtime)
 
@@ -139,16 +144,15 @@ DivideByZeroException: Attempted to divide by zero.
 
 ---
 
-## Benchmark Results
+## Published Figure
 
-Actual benchmark results:
+| Figure | Evidence | Interpretation |
+|:-------|:---------|:---------------|
+| **1.59x** | Static estimation mode | Calor receives 1.59 times the heuristic score in this configuration; this is not an observed bug-detection rate or LLM win rate |
 
-| Metric | Calor | C# | Insight |
-|:-------|:------|:---|:--------|
-| Tasks Won | 22 | 0 | Calor won 73% of safety tasks |
-| Tasks Tied | 8 | 8 | Both languages handled simple cases |
-| Error Quality | 0.73 | 0.36 | 2x better error messages |
-| **Overall Safety Ratio** | **1.59x** | **1.00x** | **Calor catches more bugs** |
+No successful provider-backed safety run is committed for the 1.59x claim, so
+task wins, violation-detection rates, and comparative error-quality results are
+not reported here.
 
 ---
 
@@ -226,11 +230,14 @@ public static int SafeDivide(int a, int b)
 }
 ```
 
-When `SafeDivide(10, 0)` is called:
+If these examples are compiled with runtime contracts enabled and called as
+`SafeDivide(10, 0)`:
 - **Calor**: `ContractViolationException` with line 5, condition `(!= b 0)`
 - **C#**: `ArgumentException` with message and parameter name
 
-Both catch the error, but Calor provides more debugging context.
+Both are written to catch the error. The exact Calor runtime behavior depends
+on contract mode and guard placement; this illustrative comparison is not a
+benchmark result.
 
 ---
 
@@ -238,16 +245,20 @@ Both catch the error, but Calor provides more debugging context.
 
 ### Reproducibility
 
-All benchmark data is available:
+The benchmark definitions and scorer are available:
 - Task definitions: `tests/Calor.Evaluation/Tasks/task-manifest-safety.json`
 - Safety scorer: `tests/Calor.Evaluation/LlmTasks/SafetyScorer.cs`
-- Results: `safety-results.json`
+
+The checked-in `website/public/data/safety-results.json` is an unsuccessful
+provider run: both languages have empty generated code and zero successful
+compilations. It is not evidence for the 1.59x estimate.
 
 ### Limitations
 
-- Results depend on LLM-generated code quality
+- A fresh provider-backed run would depend on model, prompt, and generated-code quality
 - 30 tasks is a limited sample size
 - Error quality scoring is somewhat subjective
+- The published 1.59x value is an estimate and does not execute an agent
 
 ---
 

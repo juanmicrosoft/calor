@@ -53,6 +53,9 @@ calor migrate ./src --direction calor-to-cs
 | `--parallel` | `-p` | `true` | Run conversions in parallel |
 | `--report` | `-r` | None | Save migration report to file (`.md` or `.json`) |
 | `--verbose` | `-v` | `false` | Enable verbose output |
+| `--skip-analyze` | — | `false` | Skip the migration analysis phase |
+| `--skip-verify` | — | `false` | Skip the Z3 contract verification phase |
+| `--verification-timeout` | — | `5000` | Z3 verification timeout per contract, in milliseconds |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). |
 
 ---
@@ -115,9 +118,8 @@ calor migrate ./src --report migration-report.json
 
 | Code | Meaning |
 |:-----|:--------|
-| `0` | All files migrated successfully |
-| `1` | Some files failed or had warnings |
-| `2` | Error - invalid arguments, directory not found, etc. |
+| `0` | No files failed; warnings alone do not fail the command |
+| `1` | The path was missing, one or more files failed, or migration raised a handled error |
 
 ---
 
