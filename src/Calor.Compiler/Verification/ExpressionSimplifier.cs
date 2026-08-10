@@ -760,10 +760,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         var newArgs = new List<ExpressionNode>();
         foreach (var arg in node.Arguments)
         {
-            // Nodes with no-op Accept implementations return null; injecting that null
-            // into the rebuilt argument list crashes every downstream visitor with an
-            // unlocatable NRE (#874). Keep the original node instead.
-            var simplified = arg.Accept(this) ?? arg;
+            var simplified = arg.Accept(this);
             newArgs.Add(simplified);
             if (!ReferenceEquals(simplified, arg))
                 argsChanged = true;
@@ -779,10 +776,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         var newArgs = new List<ExpressionNode>();
         foreach (var arg in node.Arguments)
         {
-            // Nodes with no-op Accept implementations return null; injecting that null
-            // into the rebuilt argument list crashes every downstream visitor with an
-            // unlocatable NRE (#874). Keep the original node instead.
-            var simplified = arg.Accept(this) ?? arg;
+            var simplified = arg.Accept(this);
             newArgs.Add(simplified);
             if (!ReferenceEquals(simplified, arg))
                 argsChanged = true;
@@ -1419,10 +1413,7 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         var newArgs = new List<ExpressionNode>();
         foreach (var arg in node.Arguments)
         {
-            // Nodes with no-op Accept implementations return null; injecting that null
-            // into the rebuilt argument list crashes every downstream visitor with an
-            // unlocatable NRE (#874). Keep the original node instead.
-            var simplified = arg.Accept(this) ?? arg;
+            var simplified = arg.Accept(this);
             newArgs.Add(simplified);
             if (!ReferenceEquals(simplified, arg))
                 argsChanged = true;

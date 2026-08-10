@@ -84,11 +84,12 @@ public sealed class KeywordArgNode : ExpressionNode
     }
 
     // KeywordArgNode is internal to parsing - it should be consumed by the parser
-    // and not appear in the final AST. The parser enforces this: string operations
-    // consume comparison-mode keywords, and the generic call recovery paths reject
-    // any that remain with a diagnostic (Parser.RejectKeywordArgs, #874). These
-    // methods should therefore never be called; default! here means any escape
-    // becomes a null child in a visitor rebuild, so the invariant must hold.
+    // and not appear in the final AST. The parser enforces this at a single choke
+    // point (Parser.FilterKeywordArgs, #874): a trailing keyword on a recognized
+    // string operation is consumed as the comparison mode; every other occurrence
+    // is rejected with a diagnostic and dropped. These methods should therefore
+    // never be called; default! here means any escape becomes a null child in a
+    // visitor rebuild, so the choke point is load-bearing.
     public override void Accept(IAstVisitor visitor) { }
     public override T Accept<T>(IAstVisitor<T> visitor) => default!;
 }
