@@ -40,14 +40,14 @@ Your `.csproj` is updated with MSBuild targets that compile `.calr` files automa
 
 ## Step 2: Analyze Your Codebase
 
-Use `calor analyze` to find C# files that would benefit most from Calor:
+Use `calor assess` to find C# files that would benefit most from Calor:
 
 ```bash
 # Analyze your source directory
-calor analyze ./src
+calor assess ./src
 
 # Show top 10 candidates with detailed scores
-calor analyze ./src --top 10 --verbose
+calor assess ./src --top 10 --verbose
 ```
 
 ### Understanding the Output
@@ -161,7 +161,7 @@ Write a function that validates email addresses with:
 
 ### What to Convert First
 
-1. **High-scoring files** from `calor analyze`
+1. **High-scoring files** from `calor assess`
 2. **Files with complex validation** - benefit from contracts
 3. **Files with error handling** - benefit from `Result\<T,E\>`
 4. **Files with side effects** - benefit from effect declarations
@@ -176,7 +176,7 @@ Write a function that validates email addresses with:
 
 ## Next Steps
 
-- [Syntax Reference](/syntax-reference/) - Complete Calor language reference
-- [Contracts](/syntax-reference/contracts/) - Writing preconditions and postconditions
-- [Effects](/syntax-reference/effects/) - Declaring side effects
-- [calor analyze](/cli/analyze/) - Understanding migration scores
+- [Syntax Reference](/docs/syntax-reference/) - Complete Calor language reference
+- [Contracts](/docs/syntax-reference/contracts/) - Writing preconditions and postconditions
+- [Effects](/docs/syntax-reference/effects/) - Declaring side effects
+- [calor assess](/docs/cli/analyze/) - Understanding migration scores

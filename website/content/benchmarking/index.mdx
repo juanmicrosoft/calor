@@ -6,34 +6,33 @@ hasChildren: true
 ---
 
 
-Calor is evaluated against C# across 11 metrics designed to measure what matters for AI coding agents.
+The published v0.12 dashboard compares **217 paired programs across eight
+deterministic metrics**. It reports a 1.32x overall Calor/C# composite, with
+Calor ahead in seven metrics and C# ahead in information density.
 
 ---
 
 ## The Metrics
 
-### Static Analysis Metrics
+### Published v0.12 Metrics
 
 | Category | What It Measures | Why It Matters |
 |:---------|:-----------------|:---------------|
-| [**Comprehension**](/benchmarking/metrics/comprehension/) | Structural clarity, semantic extractability | Can agents understand code without deep analysis? |
-| [**Error Detection**](/benchmarking/metrics/error-detection/) | Bug identification, contract violation detection | Can agents find issues using explicit semantics? |
-| [**Edit Precision**](/benchmarking/metrics/edit-precision/) | Targeting accuracy, change isolation | Can agents make precise edits using unique IDs? |
-| [**Generation Accuracy**](/benchmarking/metrics/generation-accuracy/) | Compilation success, structural correctness | Can agents produce valid code? |
-| [**Token Economics**](/benchmarking/metrics/token-economics/) | Tokens required to represent logic | How much context window does code consume? |
-| [**Information Density**](/benchmarking/metrics/information-density/) | Semantic elements per token | How much meaning per token? |
-| [**Refactoring Stability**](/benchmarking/metrics/refactoring-stability/) | ID-based reference preservation | Do unique IDs survive code transformations? |
+| [**Comprehension**](/docs/benchmarking/metrics/comprehension/) | Structural clarity, semantic extractability | Can agents understand code without deep analysis? |
+| [**Error Detection**](/docs/benchmarking/metrics/error-detection/) | Bug identification, contract violation detection | Can agents find issues using explicit semantics? |
+| [**Edit Precision**](/docs/benchmarking/metrics/edit-precision/) | Heuristic targetability and change isolation | Do explicit IDs and markers provide stronger source targets? |
+| [**Generation Accuracy**](/docs/benchmarking/metrics/generation-accuracy/) | Compilation success, structural correctness | Can agents produce valid code? |
+| [**Token Economics**](/docs/benchmarking/metrics/token-economics/) | Tokens required to represent logic | How much context window does code consume? |
+| [**Information Density**](/docs/benchmarking/metrics/information-density/) | Semantic elements per token | How much meaning per token? |
+| [**Refactoring Stability**](/docs/benchmarking/metrics/refactoring-stability/) | ID-based reference preservation | Are explicit IDs preserved by modeled transformations? |
+| [**Correctness**](/docs/benchmarking/metrics/correctness/) | Edge case handling, bug prevention | Does code produce correct results for edge cases? |
 
-### LLM-Based Metrics
-
-These metrics use actual LLM code generation to measure real-world effectiveness:
-
-| Category | What It Measures | Why It Matters |
-|:---------|:-----------------|:---------------|
-| [**Task Completion**](/benchmarking/metrics/task-completion/) | LLM code generation success | Can AI complete tasks with Calor vs C#? |
-| [**Safety**](/benchmarking/metrics/safety/) | Contract enforcement effectiveness | Does code catch bugs with informative errors? |
-| [**Effect Discipline**](/benchmarking/metrics/effect-discipline/) | Side effect management, bug prevention | Does code prevent flaky tests, security violations? |
-| [**Correctness**](/benchmarking/metrics/correctness/) | Edge case handling, bug prevention | Does code produce correct results for edge cases? |
+The repository also contains separate LLM and estimation-mode suites for
+[task completion](/docs/benchmarking/metrics/task-completion/),
+[safety](/docs/benchmarking/metrics/safety/), and
+[effect discipline](/docs/benchmarking/metrics/effect-discipline/). Their
+results are not included in the v0.12 eight-metric headline or the 1.32x
+composite.
 
 ---
 
@@ -41,43 +40,37 @@ These metrics use actual LLM code generation to measure real-world effectiveness
 
 <BenchmarkSummaryTable />
 
-**Pattern:** Calor wins on comprehension and precision metrics. C# wins on efficiency metrics.
+**Current pattern:** Calor leads seven categories. C# leads information density
+at 0.98x Calor/C#.
 
 ---
 
 ## Key Insight
 
-Calor excels where explicitness matters:
-- **Comprehension (1.51x)** - Explicit structure aids understanding
-- **Error Detection (1.22x)** - Contracts surface invariant violations
-- **Edit Precision (1.37x)** - Unique IDs enable targeted changes
-- **Refactoring Stability (1.36x)** - ID-based references survive transformations
-- **Safety (1.59x)** - Contracts catch more bugs with better error messages
-- **Task Completion (1.22x)** - LLMs complete tasks better with Calor's explicit contracts
+The strongest current advantages are comprehension (1.84x), error detection
+(1.49x), token economics (1.42x composite), and refactoring stability (1.38x).
+Generation accuracy is close at 1.02x. Information density is 0.98x, the only
+current C# win.
 
-Calor and C# are equivalent on:
-- **Correctness (1.0x)** - Both languages achieve 100% on edge case handling when benchmarked fairly
-- **Effect Discipline (1.0x)** - Both languages can write deterministic, side-effect-free code when benchmarked fairly
-
-C# wins on efficiency:
-- **Token Economics (0.83x)** - Calor's explicit syntax uses more tokens
-- **Generation Accuracy (0.97x)** - C# has broader training data
-
-This reflects a fundamental tradeoff: **explicit semantics require more tokens but enable better agent reasoning, safer code, and higher task completion rates**.
+Token economics is a composite of token, character, and line ratios. Calor
+still uses more raw tokens on small programs, so the 1.42x composite must not be
+read as a raw-token advantage.
 
 ---
 
 ## Agent Task Benchmark
 
-The [Agent Task Benchmark](/benchmarking/agent-tasks/) tests Claude's ability to generate correct Calor code from natural language prompts. It validates skill documentation quality by measuring how well Claude can learn Calor syntax.
+The [Agent Task Benchmark](/docs/benchmarking/agent-tasks/) tests Claude's ability to generate correct Calor code from natural language prompts. It validates skill documentation quality by measuring how well Claude can learn Calor syntax.
 
-**Current Pass Rate: 86%** across 89 tasks in 17 categories.
+The latest committed agent-task artifact is dated **2026-02-16** and reports an
+**86.5% pass rate** (77 of 89 tasks across 17 categories). It is a separate,
+single-run benchmark and is not part of the v0.12 dashboard composite.
 
 ---
 
 ## Learn More
 
-- [Methodology](/benchmarking/methodology/) - How benchmarks work
-- [Results](/benchmarking/results/) - Detailed results table
-- [Agent Tasks](/benchmarking/agent-tasks/) - Claude code generation benchmark
-- [Individual Metrics](/benchmarking/metrics/comprehension/) - Deep dive into each metric
+- [Methodology](/docs/benchmarking/methodology/) - How benchmarks work
+- [Results](/docs/benchmarking/results/) - Detailed results table
+- [Agent Tasks](/docs/benchmarking/agent-tasks/) - Claude code generation benchmark
+- [Individual Metrics](/docs/benchmarking/metrics/comprehension/) - Deep dive into each metric

@@ -1,0 +1,17 @@
+---
+title: "calor coverage"
+section: "cli"
+order: 24
+---
+
+Estimate Calor conversion coverage and identify blockers in one C# file.
+
+```bash
+calor coverage src/OrderService.cs
+calor coverage src/OrderService.cs --verbose
+```
+
+`--verbose` includes dimension scores and examples. Coverage is planning
+evidence, not proof that conversion is lossless. Follow it with
+[`calor convert`](/docs/cli/convert/) and inspect the loss report and any
+`CSharpInteropBlockNode` output.

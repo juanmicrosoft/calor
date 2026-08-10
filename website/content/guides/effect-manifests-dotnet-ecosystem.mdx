@@ -26,9 +26,10 @@ But how does the compiler know that `DbContext.SaveChanges` has effect `db:w` an
 
 ## What's Covered
 
-Calor ships with **14 embedded manifest files** covering **~170 types** across three tiers:
+Calor ships with **15 embedded manifest files** covering BCL, Calor Runtime,
+framework, and ecosystem types across three tiers:
 
-### BCL Types (10 manifests)
+### BCL and Runtime Types (11 manifests)
 
 Core .NET types the compiler has always known about, plus recent additions:
 
@@ -44,6 +45,7 @@ Core .NET types the compiler has always known about, plus recent additions:
 | `bcl-concurrent` | ConcurrentDictionary, Channel, BlockingCollection | `ConcurrentDictionary.TryAdd → mut` |
 | `bcl-crypto` | SHA256, RSA, Aes, RandomNumberGenerator | `SHA256.HashData → pure`, `RandomNumberGenerator.GetBytes → rand` |
 | `bcl-framework-interfaces` | ILogger, DbContext, IConfiguration, IHost, ControllerBase | See below |
+| `calor-runtime` | Option and Result combinators | Pure modulo callback arguments |
 
 ### Framework Interfaces (Tier B)
 
@@ -94,7 +96,7 @@ Manifests are loaded in priority order (higher overrides lower):
 
 | Priority | Source | Example |
 |----------|--------|---------|
-| 0 | **Built-in** (embedded in compiler) | All 14 shipped manifests |
+| 0 | **Built-in** (embedded in compiler) | All 15 shipped manifests |
 | 100 | **User-level** (`~/.calor/manifests/`) | Personal overrides |
 | 200 | **Solution-level** (`{solution}/.calor-effects/`) | Team-shared manifests |
 | 300 | **Project-local** (`.calor-effects.json`) | Project-specific types |
@@ -136,6 +138,24 @@ Each manifest supports:
 - **`constructors`** — Constructor effects (keyed by parameter signature)
 - **`defaultEffects`** — Fallback for any method not explicitly listed
 - **`namespaceDefaults`** — Default effects for entire namespaces
+
+## Generate a Starting Manifest in v0.12
+
+For a restored NuGet package or an assembly, `calor import` analyzes the public
+surface instead of requiring a blank manifest by hand:
+
+```bash
+calor import Serilog --project .
+calor import path/to/My.Library.dll --references path/to/dependencies
+```
+
+Fully resolved concrete IL chains are emitted with `inferred` provenance.
+Existing curated coverage is reported but not duplicated. Unresolved members
+are listed as `Calor1351` and excluded—they are never represented by an empty
+effect list, because that would incorrectly mean pure. Nothing emitted by
+import is labeled `verified`.
+
+See [calor import](/docs/cli/import/) for options and contract-sidecar rules.
 
 ## Effect Code Reference
 
@@ -185,7 +205,7 @@ calor effects list --type ILogger
 
 ## Reducing Manifest Burden with IL Analysis
 
-For methods in **your own assemblies** (repositories, services, handlers), you can enable [cross-assembly IL analysis](/guides/il-analysis/) instead of writing manifests. The compiler traces through the IL of your referenced DLLs and discovers effects automatically.
+For methods in **your own assemblies** (repositories, services, handlers), you can enable [cross-assembly IL analysis](/docs/guides/il-analysis/) instead of writing manifests. The compiler traces through the IL of your referenced DLLs and discovers effects automatically.
 
 ```xml
 <PropertyGroup>
@@ -199,11 +219,11 @@ With IL analysis enabled, the compiler can trace `UserRepository.Save()` → `Db
 
 | Approach | Best for | Coverage |
 |----------|----------|----------|
-| **Built-in manifests** | .NET framework types (DbCommand, HttpClient, ILogger) | ~170 types |
+| **Built-in manifests** | .NET and Calor Runtime types (DbCommand, HttpClient, ILogger, Option/Result) | Curated embedded coverage |
 | **Custom manifests** | Ecosystem libraries, interface-heavy patterns | Precise, reviewed |
 | **IL analysis** | Your own assemblies with concrete call chains | Automatic, best-effort |
 
-See the [IL analysis guide](/guides/il-analysis/) for details.
+See the [IL analysis guide](/docs/guides/il-analysis/) for details.
 
 ## Architecture: Why Manifests?
 

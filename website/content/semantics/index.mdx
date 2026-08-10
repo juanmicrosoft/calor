@@ -49,7 +49,7 @@ Calor defines its semantics **independently of any backend**. The C# emitter mus
 | **Scoping** | Lexical with explicit shadowing | No surprises from dynamic lookup |
 | **Integer Overflow** | TRAP by default | Safety-first; silent bugs are unacceptable |
 | **Type Conversions** | Explicit for narrowing | Prevents accidental data loss |
-| **Nullability** | `Option\<T\>` for optional values | No null pointer exceptions |
+| **Nullability** | `Option\<T\>` for explicit optional values | Reduces implicit nulls; raw .NET references and unsafe unwraps still require analysis |
 | **Exceptions** | Typed, with semantic meaning | `ContractViolationException` carries context |
 
 ### Why This Matters for Agents

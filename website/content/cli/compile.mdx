@@ -17,6 +17,11 @@ calor --input <file.calr> --output <file.cs>
 
 The default `calor` command (when no subcommand is specified) compiles Calor source files to C#. This is the core functionality of the Calor compiler.
 
+> **Version note:** The released v0.12.1 compiler automatically removes an
+> eligible, clean proof guard when `--verify` succeeds. Current `main` (the
+> v0.13 development line) keeps guards by default and adds
+> `--elide-proven-guards`; v0.12.1 does not recognize that switch.
+
 ---
 
 ## Quick Start
@@ -38,16 +43,28 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 
 | Option | Short | Required | Description |
 |:-------|:------|:---------|:------------|
-| `--input` | `-i` | Yes | Input Calor source file |
-| `--output` | `-o` | Yes | Output C# file path |
+| `--input` | `-i` | For compilation | One or more Calor source files; multiple files enable cross-module effect checks |
+| `--output` | `-o` | No | Output path for a single input; otherwise each `.g.cs` is written beside its input |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 | `--verify` | | No | Enable Z3 static contract verification |
-| `--analyze` | | No | Enable [static analysis](/cli/static-analysis/) (dataflow, bug patterns, taint tracking) |
+| `--elide-proven-guards` | | No | **Current main/nightly only (v0.13 development):** opt in to removing eligible proven guards. Released v0.12.1 rejects this option. |
+| `--analyze` | | No | Enable [static analysis](/docs/cli/static-analysis/) (dataflow, bug patterns, taint tracking) |
 | `--all-findings` | | No | Report all analysis findings including inconclusive results (requires `--analyze`) |
-| `--permissive-effects` | | No | Suppresses unknown-effect warnings (recommended for converted code) |
-| `--no-cache` | | No | Disable verification result caching |
-| `--clear-cache` | | No | Clear verification cache before compiling |
-| `--contract-mode` | | No | Contract enforcement mode: `full`, `preconditions`, or `none` |
+| `--no-enforce-effects` | | No | Opt out of default-on effect enforcement |
+| `--strict-effects` | | No | Promote unknown external-call diagnostics (`Calor0411`) to errors |
+| `--permissive-effects` | | No | Assume unknown calls pure and demote effect violations; this voids the effect guarantee |
+| `--no-type-check` | | No | Opt out of the v0.12 default-on type checker for this command |
+| `--cache` | | No | Opt into the incremental build cache for the default output layout |
+| `--no-cache` | | No | Disable verification and incremental-build caches |
+| `--clear-cache` | | No | Clear verification and incremental-build cache state first |
+| `--contract-mode` | | No | Runtime contract mode: `off`, `debug`, or `release` (default `debug`) |
+| `--verification-timeout` | | No | Z3 budget per contract in milliseconds; default 5000 |
+| `--strict-api` | | No | Require breaking-change markers for public API changes |
+| `--require-docs` | | No | Require documentation on public functions and types |
+| `--no-strict-bind-inference` | | No | Opt out of default-on `Calor0251`–`Calor0253` inference checks |
+| `--experimental` | | No | Enable a named experimental feature; repeatable |
+| `--format` | `-f` | No | Diagnostics: `text`, `json`, or `sarif` |
+| `--no-telemetry` | | No | Force-disable telemetry; telemetry is opt-in and already off by default |
 
 ---
 
@@ -77,13 +94,14 @@ Error in Calculator.calr:12:5
 Compilation failed with 1 error
 ```
 
-For machine-readable diagnostics, use the `calor_check` MCP tool (`action: "diagnose"`).
+For machine-readable diagnostics, use `--format json|sarif` or the
+`calor_check` MCP tool. See [Structured Output](/docs/cli/structured-output/).
 
 ---
 
 ## Integration with MSBuild
 
-For automatic compilation during `dotnet build`, use [`calor init`](/cli/init/) to set up MSBuild integration.
+For automatic compilation during `dotnet build`, use [`calor init`](/docs/cli/init/) to set up MSBuild integration.
 
 ---
 
@@ -92,8 +110,7 @@ For automatic compilation during `dotnet build`, use [`calor init`](/cli/init/) 
 | Code | Meaning |
 |:-----|:--------|
 | `0` | Compilation successful |
-| `1` | Compilation failed (syntax errors, validation errors) |
-| `2` | Error (file not found, invalid arguments) |
+| `1` | Missing input, invalid option combination, missing file, or compilation failure |
 
 ---
 
@@ -105,24 +122,35 @@ Use `--verify` to enable Z3 static contract verification:
 calor -i MyModule.calr -o MyModule.g.cs --verify
 ```
 
-When enabled, the compiler uses the Z3 SMT solver to attempt proving contracts at compile time. Verdicts are diagnostic by default: proven contracts keep their runtime checks unless you also pass `--elide-proven-guards` (elision is opt-in as of v0.13).
+When enabled in released v0.12.1, the compiler uses Z3 to attempt proving
+contracts at compile time and automatically removes an eligible runtime guard
+only for a clean, non-vacuous, assumption-free proof. Current `main` reports
+the same verdicts but keeps guards unless `--elide-proven-guards` is also set.
 
 Example output:
 
 ```
 Compiling MyModule.calr...
   Function Square: PROVEN - Postcondition (result >= 0)
-  Function Divide: UNPROVEN - Postcondition (result >= 0)
+  Function Divide: ASSUMED - Postcondition (result >= 0)
 Generated MyModule.g.cs
 ```
 
-For details on verification categories (Proven, Unproven, Disproven, Unsupported), see [Static Contract Verification](/philosophy/static-verification/).
+The seven statuses are `proven`, `refuted`, `assumed`, `unknown`, `timeout`,
+`unsupported`, and `unavailable`. In v0.12.1, only a clean, non-vacuous,
+assumption-free `proven` postcondition is eligible to lose its runtime guard.
+All other verdicts retain their guard. See
+[Verification Guarantees](/docs/guides/verification-guarantees/).
 
 ---
 
 ## Verification Caching
 
-When using `--verify`, the compiler caches Z3 verification results to avoid redundant SMT solver invocations on subsequent compilations. This can dramatically improve compile times for projects with stable contracts.
+When using `--verify`, the compiler caches Z3 verification results to avoid
+redundant solver work. The separate incremental-build cache is opt-in for a
+plain compile with `--cache`; `calor watch` enables it by design. Incremental
+caching is available only for the default output layout, not a redirected
+single `--output`.
 
 ### Cache Options
 
@@ -135,12 +163,15 @@ calor -i MyModule.calr -o MyModule.g.cs --verify --no-cache
 
 # Clear cache before verification
 calor -i MyModule.calr -o MyModule.g.cs --verify --clear-cache
+
+# Opt into whole-file incremental build caching (default output path)
+calor -i MyModule.calr --cache
 ```
 
 ---
 
 ## See Also
 
-- [calor init](/cli/init/) - Set up automatic compilation with MSBuild
-- [calor format](/cli/format/) - Format Calor source files
-- [Static Contract Verification](/philosophy/static-verification/) - Z3 verification details
+- [calor init](/docs/cli/init/) - Set up automatic compilation with MSBuild
+- [calor format](/docs/cli/format/) - Format Calor source files
+- [Static Contract Verification](/docs/philosophy/static-verification/) - Z3 verification details

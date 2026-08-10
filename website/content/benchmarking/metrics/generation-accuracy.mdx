@@ -6,7 +6,7 @@ order: 6
 
 
 **Category:** Generation Accuracy
-**Result:** C# wins (0.94x)
+**v0.12 result:** Calor narrowly wins (1.02x across 217 programs)
 **What it measures:** Compilation success and structural correctness
 
 ---
@@ -67,7 +67,12 @@ Score = (CompilationSuccess × 0.5) + (StructureScore × 0.3) + (NoErrors × 0.2
 
 ---
 
-## Why C# Wins
+## Why the Result Is Close
+
+The current static compilation-and-structure calculator gives Calor a small
+1.02x lead. That is close enough that the following C# familiarity advantages
+still matter when interpreting actual LLM generation, which this metric does
+not directly measure.
 
 ### 1. Training Data Advantage
 
@@ -217,17 +222,17 @@ results.Add(MetricResult.CreateHigherIsBetter(
 
 ## Interpretation
 
-The 0.94x ratio indicates C# has a small advantage in generation accuracy.
-
-This is expected because:
+The v0.12 ratio is 1.02x, a small Calor lead in the deterministic calculator.
+Actual model-generated code may behave differently because:
 - C# has more training data exposure
 - C# patterns are more familiar to LLMs
 - C# tooling provides better error feedback
 
-The gap is relatively small, suggesting Calor's explicit structure helps offset the novelty disadvantage.
+Treat the result as near parity on the measured compilation and structural
+signals, not as proof that an LLM generates either language more reliably.
 
 ---
 
 ## Next
 
-- [Task Completion](/benchmarking/metrics/task-completion/) - End-to-end success rates
+- [Task Completion](/docs/benchmarking/metrics/task-completion/) - End-to-end success rates

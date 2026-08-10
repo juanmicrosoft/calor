@@ -43,8 +43,9 @@ calor init --project MyApp.csproj
 
 | Option | Short | Required | Description |
 |:-------|:------|:---------|:------------|
-| `--ai` | `-a` | No | AI agent to configure: `claude`, `codex`, `gemini`, `github` |
+| `--ai` | `-a` | No | Agent to configure; repeat for `claude`, `codex`, `gemini`, and/or `github` |
 | `--project` | `-p` | No | Target .csproj file (auto-detects if single .csproj exists) |
+| `--solution` | `-s` | No | Initialize all projects in a `.sln` or `.slnx` solution |
 | `--force` | `-f` | No | Overwrite existing files without prompting |
 
 ---
@@ -97,14 +98,15 @@ Creates the following files:
 
 | File | Purpose |
 |:-----|:--------|
-| `.codex/skills/calor/SKILL.md` | Calor code writing skill with YAML frontmatter |
-| `.codex/skills/calor-convert/SKILL.md` | C# to Calor conversion skill |
 | `.codex/config.toml` | MCP server configuration for Calor tools |
+| `.codex/hooks.json` | Codex-native pre-write validation and post-write lint hooks |
 | `AGENTS.md` | Project documentation with Calor-first guidelines |
 
 #### MCP Server Integration
 
-The `.codex/config.toml` file configures an MCP server that gives Codex direct access to Calor compiler tools (`calor_typecheck`, `calor_verify_contracts`, `calor_analyze`, `calor_convert`, and more):
+The `.codex/config.toml` file configures an MCP server that gives Codex direct
+access to the consolidated v0.12 tools such as `calor_check`, `calor_verify`,
+`calor_analyze`, and `calor_convert`:
 
 ```toml
 # BEGIN CalorC MCP SECTION - DO NOT EDIT
@@ -114,24 +116,16 @@ args = ["mcp", "--stdio"]
 # END CalorC MCP SECTION
 ```
 
-See [calor mcp](/cli/mcp/) for the complete list of available tools.
+See [calor mcp](/docs/cli/mcp/) for the complete list of available tools.
 
 #### Enforcement
 
-Codex CLI does not support hooks like Claude Code. MCP tools provide direct access to Calor compiler features, and Calor-first development is **guidance-based**, relying on `AGENTS.md` and the skill files.
-
-This means:
-- Codex *should* create `.calr` files based on the instructions
-- MCP tools give Codex native access to compile, verify, and convert
-- Hooks are not supported, so enforcement is not automatic
-- Use `calor analyze` to find any unconverted `.cs` files
-
-After initialization, use these Codex commands:
-
-| Command | Description |
-|:--------|:------------|
-| `$calor` | Write new Calor code with Codex's assistance |
-| `$calor-convert` | Convert existing C# code to Calor syntax |
+Codex project lifecycle hooks cover supported `apply_patch`, Edit, and Write
+operations and lint changed `.calr` files afterward. The user must review and
+trust them with `/hooks`. Specialized file-change paths and shell commands can
+bypass hooks, so run the generated smoke test and retain CI checks. Calor writes
+current project guidance into `AGENTS.md`; it does not create project-local
+Codex skills.
 
 ### Gemini (`--ai gemini`)
 
@@ -178,10 +172,10 @@ Creates the following files:
 GitHub Copilot does not support hooks like Claude Code or Gemini CLI. Calor-first development is **guidance-based with MCP tool support**.
 
 MCP tools give Copilot programmatic access to the Calor compiler:
-- `calor_compile`, `calor_verify`, `calor_analyze`, `calor_convert`, `calor_typecheck`
-- `calor_diagnose` and `calor_validate_snippet` for validation
+- `calor_compile`, `calor_verify`, `calor_analyze`, and `calor_convert`
+- `calor_check` actions for diagnostics, type checking, lint, and snippet validation
 - Enforcement is not automatic - review file extensions after generation
-- Use `calor analyze` to find any unconverted `.cs` files
+- Use `calor assess` to find any unconverted `.cs` files
 
 After initialization, reference skills by name in your prompts:
 
@@ -221,7 +215,7 @@ This keeps generated files out of your source tree.
 calor init
 
 # Analyze codebase for migration candidates
-calor analyze ./src --top 10
+calor assess ./src --top 10
 ```
 
 ### With Claude Code
@@ -251,11 +245,11 @@ calor init --ai claude  # Optional
 
 ## See Also
 
-- [Adding Calor to Existing Projects](/guides/adding-calor-to-existing-projects/) - Complete migration guide
-- [calor convert](/cli/convert/) - Convert individual files
-- [calor analyze](/cli/analyze/) - Find migration candidates
-- [calor mcp](/cli/mcp/) - MCP server for AI agent integration
-- [Claude Integration](/getting-started/claude-integration/) - Using Calor with Claude Code
-- [Codex Integration](/getting-started/codex-integration/) - Using Calor with OpenAI Codex CLI
-- [Gemini Integration](/getting-started/gemini-integration/) - Using Calor with Google Gemini CLI
-- [GitHub Copilot Integration](/getting-started/github-integration/) - Using Calor with GitHub Copilot
+- [Adding Calor to Existing Projects](/docs/guides/adding-calor-to-existing-projects/) - Complete migration guide
+- [calor convert](/docs/cli/convert/) - Convert individual files
+- [calor assess](/docs/cli/analyze/) - Find migration candidates
+- [calor mcp](/docs/cli/mcp/) - MCP server for AI agent integration
+- [Claude Integration](/docs/getting-started/claude-integration/) - Using Calor with Claude Code
+- [Codex Integration](/docs/getting-started/codex-integration/) - Using Calor with OpenAI Codex CLI
+- [Gemini Integration](/docs/getting-started/gemini-integration/) - Using Calor with Google Gemini CLI
+- [GitHub Copilot Integration](/docs/getting-started/github-integration/) - Using Calor with GitHub Copilot

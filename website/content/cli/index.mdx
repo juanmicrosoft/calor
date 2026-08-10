@@ -30,18 +30,37 @@ dotnet tool update -g calor
 
 | Command | Description |
 |:--------|:------------|
-| `calor` (default) | Compile Calor source files to C# |
-| `calor --analyze` | [Static analysis](/cli/static-analysis/): find bugs via dataflow, Z3 verification, and taint tracking |
-| [`calor analyze`](/cli/analyze/) | Score C# files for Calor migration potential |
-| [`calor init`](/cli/init/) | Initialize Calor with AI agent support and .csproj integration |
-| [`calor convert`](/cli/convert/) | Convert single files between C# and Calor |
-| [`calor migrate`](/cli/migrate/) | Migrate entire projects between C# and Calor |
-| [`calor ids`](/cli/ids/) | Manage unique identifiers (check, assign, index) |
-| [`calor benchmark`](/cli/benchmark/) | Compare Calor vs C# across evaluation metrics |
-| [`calor format`](/cli/format/) | Format Calor source files to canonical style |
-| [`calor lint`](/cli/lint/) | Check and auto-fix agent-optimized format issues |
-| [`calor mcp`](/cli/mcp/) | Start MCP server for AI agent integration |
-| [`calor hook`](/cli/hook/) | Claude Code hook commands (internal) |
+| [`calor` (default)](/docs/cli/compile/) | Compile one or more Calor files to C#; type and effect checking are on by default |
+| [`calor run`](/docs/cli/run/) | Compile and execute Calor without a project file |
+| [`calor test`](/docs/cli/test/) | Compile Calor and run xUnit tests without a project file |
+| [`calor watch`](/docs/cli/watch/) | Incrementally recompile changed Calor sources |
+| [`calor verify`](/docs/cli/verify/) | Verify contracts with the seven-status proof vocabulary |
+| `calor --analyze` | [Static analysis](/docs/cli/static-analysis/): find bugs via dataflow, Z3 verification, and taint tracking |
+| [`calor assess`](/docs/cli/analyze/) | Score C# files for migration potential (`analyze` remains an alias) |
+| [`calor analyze-convertibility`](/docs/cli/analyze-convertibility/) | Estimate whether C# source can convert successfully |
+| [`calor coverage`](/docs/cli/coverage/) | Explain conversion coverage and blockers for one C# file |
+| [`calor feature-check`](/docs/cli/feature-check/) | Query the C# feature-support registry |
+| [`calor convert`](/docs/cli/convert/) | Convert a file between C# and Calor with explicit loss reporting |
+| [`calor migrate`](/docs/cli/migrate/) | Migrate projects between C# and Calor |
+| [`calor import`](/docs/cli/import/) | Generate inferred effect manifests and assumed-provenance contract annotations |
+| [`calor review-packet`](/docs/cli/review-packet/) | Report the unproven remainder, waivers, interop, and caller impact |
+| [`calor init`](/docs/cli/init/) | Add the SDK and AI-agent integration to a project |
+| [`calor ids`](/docs/cli/ids/) | Check, assign, and index declaration IDs |
+| [`calor format`](/docs/cli/format/) | Render canonical formatting; writes require experimental acknowledgment |
+| [`calor lint`](/docs/cli/lint/) | Check agent-oriented formatting; fixes require experimental acknowledgment |
+| [`calor fix`](/docs/cli/fix/) | Apply reversible mechanical source migrations |
+| [`calor effects`](/docs/cli/effects/) | Resolve, validate, list, or suggest effect manifest entries |
+| [`calor benchmark`](/docs/cli/benchmark/) | Compare Calor and C# across evaluation metrics |
+| [`calor mcp`](/docs/cli/mcp/) | Start the MCP server for coding agents |
+| [`calor self-check docs`](/docs/cli/self-check/) | Detect agent-documentation drift |
+| [`calor lsp`](/docs/cli/lsp/) | Start the language server over stdio |
+| [`calor hook`](/docs/cli/hook/) | Run AI-agent hook checks |
+| [`calor self-test`](/docs/cli/self-test/) | Check the compiler distribution against embedded golden files |
+| [`calor evaluation`](/docs/cli/evaluation/) | Run experimental type-system evaluation workflows |
+
+Machine-readable commands use the shared
+[envelope schema](/docs/cli/envelope-schema/). Root compile and lint also
+support SARIF; watch emits one JSON envelope per rebuild as NDJSON.
 
 ---
 
@@ -57,9 +76,14 @@ calor --input file.calr --output file.g.cs
 
 | Option | Description |
 |:-------|:------------|
-| `--input`, `-i` | Input Calor file path (required) |
-| `--output`, `-o` | Output C# file path (required) |
+| `--input`, `-i` | One or more Calor inputs; omitting it displays help |
+| `--output`, `-o` | Optional output path for a single input; otherwise writes beside each input |
 | `--verbose`, `-v` | Show detailed compilation output |
+| `--no-enforce-effects` | Opt out of default-on effect enforcement |
+| `--no-type-check` | Opt out of default-on type checking for this command |
+| `--verify` | Run Z3 contract verification |
+| `--contract-mode` | Runtime contract mode: `off`, `debug`, or `release` |
+| `--format`, `-f` | Diagnostics: `text`, `json`, or `sarif` |
 
 ### Example
 
@@ -75,5 +99,5 @@ calor -v -i src/MyModule.calr -o src/MyModule.g.cs
 
 ## See Also
 
-- [Getting Started](/getting-started/) - Installation and first program
-- [Syntax Reference](/syntax-reference/) - Complete language reference
+- [Getting Started](/docs/getting-started/) - Installation and first program
+- [Syntax Reference](/docs/syntax-reference/) - Complete language reference

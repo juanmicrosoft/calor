@@ -1,10 +1,12 @@
 ---
-title: hook
-description: Claude Code hook commands for Calor-first enforcement
+title: "calor hook"
+description: Host-specific hook commands for Calor-first enforcement
 ---
 
 
-Internal commands for Claude Code hook integration. These commands are called automatically by Claude Code hooks and are not typically invoked directly.
+Internal hook commands used by Claude Code, Gemini CLI, and Codex project
+integrations. They are normally invoked by generated configuration rather than
+typed by a user.
 
 ```bash
 calor hook <subcommand> [args]
@@ -14,7 +16,16 @@ calor hook <subcommand> [args]
 
 ## Overview
 
-The `hook` command provides subcommands that integrate with Claude Code's hook system to enforce Calor-first development. When you run `calor init --ai claude`, it configures these hooks automatically.
+`calor init --ai <agent>` writes the host-specific hook configuration.
+
+| Subcommand | Purpose |
+|:-----------|:--------|
+| `validate-write <tool-input>` | Validate a Claude-style Write request |
+| `validate-edit <tool-input>` | Validate a Claude-style Edit request |
+| `validate-calr-content <tool-input>` | Check Calor content for its semantics declaration |
+| `post-write-lint <tool-input>` | Lint a `.calr` file after a write |
+| `validate-ids <tool-input>` | Validate declaration IDs in Calor content |
+| `codex-write` | Consume Codex's hook JSON from stdin and validate all destinations |
 
 ---
 
@@ -95,6 +106,12 @@ When Claude tries to create a `.cs` file in an Calor-initialized project:
 
 This enforcement happens automatically - no user intervention required.
 
+For Codex, the input schema and trust model differ. `codex-write` reads the
+Codex hook envelope from stdin; it does not use Claude's `$TOOL_INPUT`
+environment variable. Review and trust `.codex/hooks.json` with `/hooks`, run
+the generated smoke test, and retain CI checks because specialized tool and
+shell paths can fall outside lifecycle-hook coverage.
+
 ---
 
 ## Troubleshooting
@@ -126,5 +143,5 @@ calor init --ai claude --force
 
 ## See Also
 
-- [calor init](/cli/init/) - Initialize Calor with hook configuration
-- [Claude Integration](/getting-started/claude-integration/) - Using Calor with Claude
+- [calor init](/docs/cli/init/) - Initialize Calor with hook configuration
+- [Claude Integration](/docs/getting-started/claude-integration/) - Using Calor with Claude

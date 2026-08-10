@@ -126,8 +126,8 @@ export function BenchmarkDashboard() {
         <SummaryCard
           icon={<BarChart3 className="h-4 w-4" />}
           label="Overall Advantage"
-          value={`${(data.summary.overallAdvantage * 100).toFixed(0)}%`}
-          subtext="Calor vs C# (100% = equal)"
+          value={`${data.summary.overallAdvantage.toFixed(2)}x`}
+          subtext="Calor/C# composite"
           highlight={data.summary.overallAdvantage >= 1 ? 'calor' : 'csharp'}
         />
         <SummaryCard
@@ -150,6 +150,13 @@ export function BenchmarkDashboard() {
           subtext={`of ${data.summary.metricCount} metrics`}
           highlight="csharp"
         />
+      </div>
+
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-5 text-sm text-muted-foreground">
+        <strong className="text-foreground">How to read this run:</strong>{' '}
+        these are deterministic static-analysis micro-benchmarks. Repeating them 30 times produced
+        identical values, so the zero-width confidence intervals and reported p-values do not measure
+        uncertainty in the 217-program sample. These results are also separate from the v0.12 release gates.
       </div>
 
       {/* Agent Refactoring Benchmark */}

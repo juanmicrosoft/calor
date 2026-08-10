@@ -1,0 +1,20 @@
+---
+title: "calor feature-check"
+section: "cli"
+order: 23
+---
+
+Check whether the C#-to-Calor converter supports a C# feature.
+
+```bash
+calor feature-check async-await
+calor feature-check --list
+calor feature-check --list --level partial
+```
+
+`--level` filters the registry to `full`, `partial`, `notsupported`, or
+`manualrequired`. A support level describes the converter's expected handling;
+conversion can still preserve an unsupported construct as an interop block.
+Use [`calor coverage`](/docs/cli/coverage/) for a source-file-specific report
+and [`calor convert`](/docs/cli/convert/) for the actual conversion and loss
+report.

@@ -5,13 +5,15 @@ const completedMilestones = [
   'Type checking',
   'Rule enforcement',
   'Side effect tracking',
+  'Static verification',
   'VS Code support',
   'Build integration',
+  'Published MSBuild SDK',
   'Performance tests',
   'AI agent guides',
 ];
 
-const currentFocus = 'Faster compilation';
+const currentFocus = 'Verification soundness and ecosystem adoption';
 
 export function ProjectStatus() {
   return (

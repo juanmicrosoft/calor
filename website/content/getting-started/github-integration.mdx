@@ -5,7 +5,7 @@ order: 7
 ---
 
 
-This guide explains how to use Calor with GitHub Copilot. For other AI integrations, see [Claude Integration](/getting-started/claude-integration/), [Gemini Integration](/getting-started/gemini-integration/), or [Codex Integration](/getting-started/codex-integration/).
+This guide explains how to use Calor with GitHub Copilot. For other AI integrations, see [Claude Integration](/docs/getting-started/claude-integration/), [Gemini Integration](/docs/getting-started/gemini-integration/), or [Codex Integration](/docs/getting-started/codex-integration/).
 
 ---
 
@@ -34,8 +34,8 @@ Unlike Claude Code and Gemini CLI which use hooks to enforce Calor-first develop
 
 - Calor-first development is **guidance-based with MCP tool support**
 - Copilot *should* follow the instructions and create `.calr` files
-- MCP tools like `calor_diagnose` and `calor_validate_snippet` enable validation within Copilot
-- Use `calor analyze` to find any unconverted `.cs` files
+- `calor_check` actions enable diagnostics, type checks, lint, and snippet validation within Copilot
+- Use `calor assess` to find any unconverted `.cs` files
 - Review file extensions after generation
 
 ---
@@ -81,10 +81,10 @@ The init command also configures an **MCP (Model Context Protocol) server** that
 When you open the project in VS Code with Agent mode enabled, Copilot reads `.vscode/mcp.json` and starts the MCP server automatically. Copilot can then use tools like:
 
 ```
-calor_typecheck        - Check for type errors
+calor_check            - Diagnose, type check, lint, or validate snippets
 calor_verify           - Verify function contracts
-calor_diagnose         - Get syntax diagnostics
-calor_validate_snippet - Validate code snippets
+calor_navigate         - Definitions, references, symbols, and scope
+calor_structure        - Outlines, call graphs, and impact
 ```
 
 ### Available Tools
@@ -92,14 +92,14 @@ calor_validate_snippet - Validate code snippets
 | Tool | Purpose |
 |:-----|:--------|
 | `calor_compile` | Compile Calor source to C# |
-| `calor_typecheck` | Semantic type checking with error categorization |
+| `calor_check` | Diagnostics, type checking, lint, and snippet validation |
 | `calor_verify` | Verify contracts with Z3 SMT solver |
 | `calor_analyze` | Advanced bug detection and migration analysis |
 | `calor_convert` | Convert between C# and Calor |
-| `calor_diagnose` | Get syntax diagnostics for a file |
-| `calor_validate_snippet` | Validate incremental code snippets |
+| `calor_navigate` | Definition, reference, symbol, type, and scope queries |
+| `calor_structure` | Outline, call graph, and impact analysis |
 
-See [calor mcp](/cli/mcp/) for the complete list of 19 available tools.
+See [calor mcp](/docs/cli/mcp/) for the complete 18-tool surface.
 
 ### Using MCP Tools in Prompts
 
@@ -108,7 +108,7 @@ Use the calor_compile tool to compile src/Models/User.calr
 ```
 
 ```
-Use the calor_diagnose tool to validate this file for syntax errors
+Use calor_check with action diagnose to validate this file for syntax errors
 ```
 
 ### Configuration
@@ -134,11 +134,11 @@ The `.vscode/mcp.json` file is created automatically by `calor init --ai github`
 
 | Feature | Claude Code | Gemini CLI | Codex CLI | GitHub Copilot |
 |:--------|:------------|:-----------|:----------|:---------------|
-| Skills directory | `.claude/skills/` | `.gemini/skills/` | `.codex/skills/` | `.github/copilot/skills/` |
+| Project-local skills | `.claude/skills/` | `.gemini/skills/` | Not generated; managed `AGENTS.md` guidance | `.github/copilot/skills/` |
 | Project instructions | `CLAUDE.md` | `GEMINI.md` | `AGENTS.md` | `copilot-instructions.md` |
-| Skill invocation | `/calor` | `@calor` | `$calor` | Reference skill name |
-| Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Guidance only | Guidance + MCP tools |
-| Hook mechanism | `PreToolUse` | `BeforeTool` | N/A | MCP tools |
+| Skill invocation | `/calor` | `@calor` | Not applicable | Reference skill name |
+| Enforcement | **Hooks (enforced)** | **Hooks (enforced)** | Hooks for covered tools + guidance | Guidance + MCP tools |
+| Hook mechanism | `PreToolUse` | `BeforeTool` | Codex project hooks | None |
 
 ---
 
@@ -147,9 +147,9 @@ The `.vscode/mcp.json` file is created automatically by `calor init --ai github`
 1. **Review generated files** - Check that Copilot created `.calr` files, not `.cs`
 2. **Use explicit instructions** - Be specific about wanting Calor output
 3. **Reference skills clearly** - Mention "using the calor skill" in your prompts
-4. **Run analysis regularly** - Use `calor analyze` to find migration candidates
+4. **Run analysis regularly** - Use `calor assess` to find migration candidates
 5. **Include context** - Copilot works best with clear, detailed prompts about contracts and effects
-6. **Validate with MCP** - Use `calor_diagnose` via MCP to validate code after generation
+6. **Validate with MCP** - Use `calor_check` with `action: "diagnose"` after generation
 7. **Use Agent mode** - Enable Agent mode in VS Code for best MCP tool integration
 
 ---
@@ -175,16 +175,16 @@ After Copilot generates code, verify Calor compliance:
 
 ```bash
 # Find any .cs files that shouldn't exist
-calor analyze ./src --top 10
+calor assess ./src --top 10
 ```
 
 ---
 
 ## See Also
 
-- [Syntax Reference](/syntax-reference/) - Complete language reference
-- [calor init](/cli/init/) - Full init command documentation
-- [calor mcp](/cli/mcp/) - Complete MCP tools reference (19 tools)
-- [Claude Integration](/getting-started/claude-integration/) - Alternative with enforced Calor-first
-- [Gemini Integration](/getting-started/gemini-integration/) - Alternative with enforced Calor-first
-- [Codex Integration](/getting-started/codex-integration/) - Alternative with OpenAI Codex CLI
+- [Syntax Reference](/docs/syntax-reference/) - Complete language reference
+- [calor init](/docs/cli/init/) - Full init command documentation
+- [calor mcp](/docs/cli/mcp/) - Complete MCP tools reference (18 tools)
+- [Claude Integration](/docs/getting-started/claude-integration/) - Alternative with enforced Calor-first
+- [Gemini Integration](/docs/getting-started/gemini-integration/) - Alternative with enforced Calor-first
+- [Codex Integration](/docs/getting-started/codex-integration/) - Alternative with OpenAI Codex CLI

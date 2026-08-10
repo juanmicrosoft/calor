@@ -13,8 +13,8 @@ The `lint` command checks Calor source files for compliance with the agent-optim
 # Check files and report issues
 calor lint <files...>
 
-# Auto-fix all fixable issues
-calor lint <files...> --fix
+# Auto-fix all fixable issues (explicitly acknowledge the experimental writer)
+calor lint <files...> --fix --experimental
 
 # Check without modifying (exit code indicates issues)
 calor lint <files...> --check
@@ -23,17 +23,23 @@ calor lint <files...> --check
 calor lint <files...> --verbose
 
 # Combine options
-calor lint src/*.calr --fix --verbose
+calor lint src/*.calr --fix --experimental --verbose
 ```
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
-| `--fix` | Automatically fix all fixable issues |
+| `--fix`, `-f` | Automatically fix issues through the formatter write path; requires `--experimental` |
 | `--check` | Check mode - exit with error if issues found (CI-friendly) |
 | `--verbose` | Show detailed information about each issue |
-| `--agent` | Output in compact agent-optimized format |
+| `--format` | `text`, schema 2.0 `json`, or `sarif`; no short alias |
+| `--experimental` | Acknowledge known formatter write defects |
+
+> **v0.12 release policy:** `lint --fix` is refused with `Calor1346` unless
+> you pass `--experimental` or set `CALOR_EXPERIMENTAL_FORMAT_WRITE=1`. The
+> shared writer can rewrite identifiers and drop comments. Read-only linting
+> remains available without acknowledgment.
 
 ## Exit Codes
 
@@ -177,7 +183,7 @@ calor lint src/hello.calr
 
 ```bash
 # Fix all issues automatically
-calor lint src/hello.calr --fix
+calor lint src/hello.calr --fix --experimental
 
 # Output:
 # src/hello.calr
@@ -225,7 +231,7 @@ calor lint src/hello.calr --agent
 ## Best Practices
 
 1. **Run lint before commit** - Use pre-commit hooks to ensure all code is properly formatted
-2. **Use `--fix` during development** - Let the linter handle formatting automatically
+2. **Review write-mode changes** - Use `--fix --experimental` only after reading the release-policy warning
 3. **Use `--check` in CI** - Fail builds on lint issues to maintain consistency
 4. **Format after code generation** - If generating Calor from other sources, always lint the output
 
@@ -244,10 +250,10 @@ calor format src/module.calr
 Or use lint with `--fix` for targeted fixes without full reformatting:
 
 ```bash
-calor lint src/module.calr --fix
+calor lint src/module.calr --fix --experimental
 ```
 
 ## Related Commands
 
 - [format](/docs/cli/format) - Reformat entire files to canonical output
-- [parse](/docs/cli/parse) - Parse files and show AST structure
+- [compile](/docs/cli/compile/) - Parse, type-check, and compile Calor source

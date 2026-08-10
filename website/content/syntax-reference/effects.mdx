@@ -224,15 +224,27 @@ Or explicitly:
 
 ## Effect Checking
 
-The compiler warns if:
+Effect enforcement is on by default for compile, build, and watch workflows.
+The compiler reports:
 
-1. **Missing effect**: Function has side effect but doesn't declare it
-2. **Unused effect**: Function declares effect but doesn't use it
-3. **Propagation**: Caller doesn't include callee's effects
+1. **Missing effect**: a function uses an effect it did not declare
+2. **Propagation**: a caller does not include a callee's effects
+3. **Unknown calls**: interop and unmodeled calls become `Assumed` and propagate
+   (`Calor0419`) instead of silently becoming pure
+4. **Delegate calls**: invoking a delegate stored in a parameter, binding, or
+   field is an error (`Calor0418`) unless permissive mode is explicitly chosen
+5. **Variance**: overrides and interface implementations may not declare more
+   effects than their base contracts (`Calor0420` and `Calor0421`)
+
+Collection mutators such as `Add`, `Remove`, `Clear`, `Insert`, `Sort`, and
+`CopyTo` are not on the known-pure list. Use `--no-enforce-effects` only as an
+explicit migration waiver. `--permissive-effects` assumes unknown calls are
+pure and voids the effect guarantee; [review packets](/docs/cli/review-packet/)
+disclose that waiver on their first line.
 
 ---
 
 ## Next
 
-- [Syntax Reference](/syntax-reference/) - Back to overview
-- [Benchmarking](/benchmarking/) - See how effects help comprehension
+- [Effect manifests and package import](/docs/guides/effect-manifests-dotnet-ecosystem/) - External call coverage
+- [Adoption Playbook](/docs/guides/adoption-playbook/) - Applying effects in an existing solution

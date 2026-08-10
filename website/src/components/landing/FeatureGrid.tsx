@@ -9,15 +9,15 @@ const features = [
   {
     name: 'Rules That Enforce Themselves',
     description:
-      'Define what your function should do—like "input must be positive." The compiler proves it, not your tests.',
+      'Define what a function requires and guarantees. Calor proves supported forms and keeps runtime checks when a proof is conditional or unavailable.',
     icon: Shield,
     code: '§Q (>= x 0)\n§S (>= result 0)',
     href: '/docs/philosophy/effects-contracts-enforcement/',
   },
   {
-    name: 'No Hidden Side Effects',
+    name: 'Declared Side Effects',
     description:
-      'Database calls? Network requests? The compiler tells you exactly where they happen—even buried 5 layers deep.',
+      'The compiler checks known and manifested calls against declared effects; interop and unresolved boundaries stay visible as assumptions or diagnostics.',
     icon: FileCode,
     code: '§E{db:rw,net:rw}',
     href: '/docs/philosophy/effects-contracts-enforcement/',
@@ -25,9 +25,9 @@ const features = [
   {
     name: 'Rename Without Breaking',
     description:
-      'Every function has a permanent ID. Rename files, move code around—AI agents still find exactly what they need.',
+      'Every function has a stable ID. Rename files, move code around—AI agents can still target the same declaration.',
     icon: Fingerprint,
-    code: '§F{f_01J5X7K9M2:Process:pub}',
+    code: '§F{f001:Process:pub}',
     href: '/docs/philosophy/stable-identifiers/',
   },
   {
@@ -35,7 +35,7 @@ const features = [
     description:
       'Every block opens with a §-prefixed tag. AI tools find any function, module, or loop at a glance—indentation defines scope, just like Python.',
     icon: Layers,
-    code: '§M{m_01J5X7K9M2:App}\n  §F{f1:Main:pub} () -> void\n    §P "hello"',
+    code: '§M{m001:App}\n  §F{f001:Main:pub} () -> void\n    §P "hello"',
     href: '/docs/syntax-reference/',
   },
 ];
@@ -56,7 +56,7 @@ export function FeatureGrid() {
             Built for How AI Actually Writes Code
           </h2>
           <p className="mt-4 text-lg text-muted-foreground font-body">
-            Four features that make AI-generated code reliable
+            Four features that make AI-generated code easier to check and review
           </p>
         </div>
 

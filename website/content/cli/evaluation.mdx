@@ -1,0 +1,24 @@
+---
+title: "calor evaluation"
+section: "cli"
+order: 27
+---
+
+Run the experimental type-system research evaluation workflow. This surface is
+for experiment governance, not the published Calor-versus-C# dashboard.
+
+| Command | Purpose |
+|:--------|:--------|
+| `calor evaluation registry` | Query `docs/experiments/registry.json` |
+| `calor evaluation registry-validate` | Enforce the registry's append-only invariant |
+| `calor evaluation ab` | Compare paired baseline and candidate runs and emit a decision memo |
+
+`registry` requires a query mode and may require a hypothesis, tuple, or user.
+`registry-validate` requires base and head registry files. `ab` requires
+baseline and candidate run files, a primary metric, and a promotion threshold;
+it also accepts repeatable no-regression guards, direction, bootstrap resample
+count, and random seed.
+
+Use `calor evaluation <command> --help` for the complete experimental option
+surface. For the public language benchmark, see [`calor benchmark`](/docs/cli/benchmark/)
+and the [methodology](/docs/benchmarking/methodology/).

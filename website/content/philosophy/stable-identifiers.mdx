@@ -4,264 +4,125 @@ section: "philosophy"
 order: 3
 ---
 
+Calor can embed an identifier in a structural declaration so tools can target
+that declaration independently of its name or file location. In current syntax,
+source IDs are **optional**: the parser creates an in-memory `_auto` ID when an
+opener omits one.
 
-One of Calor's most distinctive features is embedding unique identifiers directly into the language syntax. This document explains why this matters, what challenges it creates, and how Calor overcomes them.
+```calor
+// Compact source: the parser supplies an in-memory ID
+§M{Calculator}
+  §F{Calculate:pub} (i32:x) -> i32
+    §E{}
+    §R (* x 2)
+
+// Explicit source identity for durable external references
+§M{m_3hj8x2bw9pkq:Calculator}
+  §F{f_7k9m2npqrstv:Calculate:pub} (i32:x) -> i32
+    §E{}
+    §R (* x 2)
+```
+
+Explicit IDs are useful when an agent, index, generated artifact, or review
+packet needs a durable target. They are not magic history: a rename or file move
+keeps the identity only if the editing tool preserves the ID, and a copied or
+extracted declaration must receive a new one.
 
 ---
 
-## The Problem: Code Identity is Fragile
+## What Explicit IDs Solve
 
-Traditional programming relies on **names and locations** to identify code:
+Names and locations are fragile references:
 
-```csharp
-// How do you reference this function?
-public static int Calculate(int x) => x * 2;  // Line 42 in Calculator.cs
-```
+| Reference | Failure mode |
+|:----------|:-------------|
+| File and line | Earlier edits move the line |
+| Declaration name | Renames and overloads make it stale or ambiguous |
+| Content hash | Any implementation edit changes it |
+| Preserved Calor ID | Remains stable across rename, move, and body edits |
 
-This creates fundamental problems:
-
-| Reference Method | Failure Mode |
-|:-----------------|:-------------|
-| File + line number | Breaks when any line above changes |
-| Function name | Breaks on rename, ambiguous with overloads |
-| File + function name | Breaks on file moves or renames |
-| Hash of content | Changes on any modification |
-
-For AI agents that need to track, reference, and modify code across development workflows, these fragile identities create real problems:
-
-- **Lost context** - Agent references become stale after refactoring
-- **Merge conflicts** - Parallel branches create identity collisions
-- **Imprecise edits** - "Edit the calculate function" is ambiguous
-- **Broken traceability** - Can't track an entity through its history
+That makes explicit IDs helpful for precise edits, navigation indexes, and
+round-trip metadata. Collision checks make accidental reuse visible, but IDs do
+not eliminate ordinary textual merge conflicts when two branches edit the same
+lines.
 
 ---
 
-## The Solution: Semantic Identity in Syntax
+## Optional and Explicit Forms
 
-Calor assigns every declaration a **unique ID that represents semantic identity**, not name or location:
+Structural openers accept either their compact name-first form or an explicit
+ID-first form. Indentation ends the block; structural closer tags were removed
+and now produce `Calor0830`.
 
-```
-§F{f_01J5X7K9M2NPQRSTABWXYZ12:Calculate:pub}
-  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  This ID survives ANY refactoring
-  §I{i32:x}
-  §O{i32}
-  §R (* x 2)
-```
+| Operation | Explicit ID behavior |
+|:----------|:---------------------|
+| Rename declaration | Preserve the existing ID |
+| Move declaration or file | Preserve the existing ID |
+| Reformat or change the body | Preserve the existing ID |
+| Extract a helper | Give the helper a new ID |
+| Copy or clone a declaration | Give the copy a new ID |
 
-The ID `f_01J5X7K9M2NPQRSTABWXYZ12`:
-- Survives renaming (`Calculate` → `Compute`)
-- Survives moving to a different file
-- Survives reformatting and refactoring
-- Is globally unique across all codebases (ULID)
-- Can be referenced unambiguously forever
-
----
-
-## Benefits of Language-Level IDs
-
-### 1. Agent Instructions Become Precise
-
-Without IDs:
-```
-"Update the validate function in the user module to check email format"
-```
-- Which validate function? There might be multiple
-- What if it was renamed to `validateUser`?
-- What if the file was moved?
-
-With IDs:
-```
-"Update function f_01J5X7K9M2NPQRSTABWXYZ12 to check email format"
-```
-- Unambiguous target
-- Survives any refactoring
-- Machine-verifiable reference
-
-### 2. Merge Safety Across Branches
-
-Traditional code suffers from merge conflicts when parallel branches modify the same entities. With ULIDs:
-
-| Branch A | Branch B | Result |
-|:---------|:---------|:-------|
-| Adds `f_01ABC...` | Adds `f_01DEF...` | Clean merge |
-| Modifies `f_01ABC...` | Renames `f_01ABC...` | Clean merge |
-| Both add unnamed function | Conflict | N/A in Calor |
-
-ULID's 80-bit random component makes collisions statistically impossible (~10^-24 probability per pair).
-
-### 3. Round-Trip Stability
-
-Code generation and conversion preserve identity:
-
-```
-// Original Calor
-§F{f_01ABC:Add:pub}
-  §O{i32}
-  §R (+ a b)
-```
-
-```csharp
-// Generated C# preserves ID
-[CalorId("f_01ABC")]
-public static int Add(int a, int b) => a + b;
-```
-
-```
-// Re-converted: Same ID
-§F{f_01ABC:Add:pub}
-  §O{i32}
-  §R (+ a b)
-```
-
-### 4. Traceable History
-
-IDs enable tracking entities through their entire lifecycle:
-
-```
-f_01J5X7... created in commit a1b2c3 (Juan, 2024-01-15)
-f_01J5X7... renamed Calculate→Compute in commit d4e5f6 (AI Agent, 2024-02-20)
-f_01J5X7... moved to utils.calr in commit g7h8i9 (Maria, 2024-03-10)
-f_01J5X7... implementation updated in commit j0k1l2 (AI Agent, 2024-04-05)
-```
-
-The entity's history is continuous regardless of name or location changes.
-
----
-
-## The Challenges
-
-Embedding IDs in code creates real challenges. Here's how Calor addresses each:
-
-### Challenge 1: ID Generation
-
-**Problem:** Who generates IDs? When? How to ensure uniqueness?
-
-**Solution:** ULID (Universally Unique Lexicographically Sortable Identifier)
-
-- **Timestamp + Random**: 48-bit timestamp + 80-bit random = unique without coordination
-- **No central registry**: Any machine can generate IDs independently
-- **Sortable**: IDs sort chronologically by creation time
-- **CLI tooling**: `calor ids assign` generates IDs automatically
+Omitting IDs is the simplest authoring style. Materialize explicit IDs when the
+repository needs persistent cross-tool identity:
 
 ```bash
-# Generate IDs for new declarations
-calor ids assign .
+# Preview and then assign IDs to compact declarations
+calor ids assign src/ --dry-run
+calor ids assign src/
 
-# Preview what would be assigned
-calor ids assign . --dry-run
+# Validate formats, prefixes, duplicates, and production/test policy
+calor ids check src/
 ```
 
-### Challenge 2: ID Churn
+---
 
-**Problem:** Agents might accidentally change IDs during edits, breaking references.
+## ID Formats
 
-**Solution:** Multi-layer protection
+New IDs use a kind prefix plus a 12-character lowercase Crockford Base32
+payload. Legacy 26-character uppercase ULID payloads remain accepted for
+backward compatibility.
 
-1. **Hook validation**: Pre-write hooks detect ID modifications
-2. **Agent rules**: Skills explicitly forbid ID modification
-3. **CI validation**: `calor ids check` fails builds with ID issues
+| Kind | Compact example | Legacy accepted example |
+|:-----|:----------------|:------------------------|
+| Module | `m_3hj8x2bw9pkq` | `m_01J5X7K9M2NPQRSTABWXYZ12` |
+| Function | `f_7k9m2npqrstv` | `f_01J5X7K9M2NPQRSTABWXYZ12` |
+| Class | `c_z4w7n5q2gxht` | `c_01J5X7K9M2NPQRSTABWXYZ12` |
+| Interface | `i_9p3hxq7m4nbk` | `i_01J5X7K9M2NPQRSTABWXYZ12` |
+| Method | `mt_5v8b3kxq2nhp` | `mt_01J5X7K9M2NPQRSTABWXYZ12` |
 
-### Challenge 3: Duplicate IDs
+Short IDs such as `m001` and `f001` are for `tests/`, `docs/`, and
+`examples/` (or an explicit `--allow-test-ids` workflow), not production
+source.
 
-**Problem:** Copy-paste or extraction might create duplicate IDs.
-
-**Solution:** Detection and automatic resolution
+To migrate legacy ULID payloads without changing their mapped identity:
 
 ```bash
-# Detect duplicates
-calor ids check .
-# Error Calor0803: Duplicate ID 'f_01ABC...'
-
-# Fix duplicates (keep first, reassign others)
-calor ids assign . --fix-duplicates
+calor fix src/ --compact-ids --log compact-ids.json
+calor fix src/ --compact-ids --revert --log compact-ids.json
 ```
 
-### Challenge 4: Visual Noise
-
-**Problem:** IDs add visual clutter to code.
-
-**Solution:** IDs are for machines, not humans
-
-1. **Agents are the primary audience**: Calor optimizes for machine readability
-2. **IDE support (roadmap)**: Future tooling can hide IDs in display
-3. **Test IDs for docs**: Short IDs (`f001`) allowed in tests/docs/examples
-
-```
-// Production code: Full ULID
-§F{f_01J5X7K9M2NPQRSTABWXYZ12:Calculate:pub}
-
-// Documentation: Readable test ID
-§F{f001:Calculate:pub}
-```
-
-### Challenge 5: New Developers
-
-**Problem:** Developers unfamiliar with IDs might create invalid ones.
-
-**Solution:** Omit IDs, let tooling assign them
-
-```
-// Developer writes (no ID):
-§F{:NewFunction:pub}
-  §O{void}
-
-// After `calor ids assign`:
-§F{f_01NEW...:NewFunction:pub}
-  §O{void}
-```
-
-The tooling handles the complexity; developers just write code.
+The migration is reversible only while its log is available.
 
 ---
 
-## Why This Matters for AI-First Development
+## Tooling
 
-Traditional languages assume humans are the primary code authors. When AI agents become primary authors, different tradeoffs make sense.
+```bash
+calor ids check src/                         # text validation
+calor ids check src/ --format json           # schema 2.0 envelope
+calor ids assign src/ --fix-duplicates       # keep first, reassign repeats
+calor ids index src/ --output calor.ids.json # declaration index
+```
 
-| Human-First | AI-First |
-|:------------|:---------|
-| Names are primary identifiers | Names are documentation |
-| Location matters | Identity is intrinsic |
-| Minimize syntax | Maximize precision |
-| Trust implicit conventions | Require explicit contracts |
-
-Calor's stable identifiers are part of a broader shift toward **explicit, machine-verifiable code** that agents can reliably understand, reference, and modify.
-
----
-
-## ID Format
-
-Production IDs use ULID with kind prefix:
-
-| Kind | Prefix | Example |
-|:-----|:-------|:--------|
-| Module | `m_` | `m_01J5X7K9M2NPQRSTABWXYZ12` |
-| Function | `f_` | `f_01J5X7K9M2NPQRSTABWXYZ12` |
-| Class | `c_` | `c_01J5X7K9M2NPQRSTABWXYZ12` |
-| Interface | `i_` | `i_01J5X7K9M2NPQRSTABWXYZ12` |
-| Method | `mt_` | `mt_01J5X7K9M2NPQRSTABWXYZ12` |
-| Property | `p_` | `p_01J5X7K9M2NPQRSTABWXYZ12` |
-| Constructor | `ctor_` | `ctor_01J5X7K9M2NPQRSTABWXYZ12` |
-| Enum | `e_` | `e_01J5X7K9M2NPQRSTABWXYZ12` |
-
----
-
-## Preservation Rules
-
-| Operation | ID Behavior |
-|:----------|:------------|
-| Rename | Preserved |
-| Move file | Preserved |
-| Reformat | Preserved |
-| Change implementation | Preserved |
-| Extract helper | **New ID** for helper |
-| Copy code | **New ID** required |
+Keep ID-preservation rules in agent instructions and run `ids check` in CI.
+The compiler catches malformed, wrongly prefixed, duplicated, and disallowed
+test IDs; repository history or an edit hook is needed to detect that a valid ID
+was deliberately replaced with another valid ID.
 
 ---
 
 ## Next
 
-- [CLI Reference: ids](/cli/ids/) - Command-line tools for ID management
-- [Design Principles](/philosophy/design-principles/) - "Everything has an ID"
-- [Tradeoffs](/philosophy/tradeoffs/) - What Calor gives up for explicitness
+- [CLI Reference: ids](/docs/cli/ids/) - Validate, assign, and index IDs
+- [CLI Reference: fix](/docs/cli/fix/) - Run reversible ID migrations
+- [Tradeoffs](/docs/philosophy/tradeoffs/) - Where explicit identity helps and what it costs
