@@ -49,6 +49,14 @@ one-element runtime arrays and remain explicitly conditional on the nullable-ref
 The string row uses non-negative length with a non-null ASCII witness and remains conditional on
 the documented string model.
 
+The ordinal-comparison row uses the documented zero-width-joiner witness:
+`"abc".StartsWith("\u200dabc")` is `true` under `en-US` current-culture comparison but `false`
+under ordinal comparison. Its provable cell negates that predicate and its refutable cell uses the
+predicate directly, both with explicit `StringComparisonMode.Ordinal`. Generated runtime is
+executed under `en-US` and restores the ambient current and UI cultures after every invocation.
+A direct mutation control inspects the emitted `StringComparison.Ordinal` arguments, removes them
+to select the current-culture overload, and requires both runtime verdicts to reverse.
+
 ## Oracle
 
 The module is verified once through the contract pass and obligation solver, then emitted twice:
@@ -100,4 +108,5 @@ regenerate metrics intentionally, set
 `CALOR_UPDATE_VERIFIER_RUNTIME_DIFFERENTIAL_REPORTS=1` while running the same filtered test.
 Repository discovery accepts both a `.git` directory and a worktree `.git` file. The report paths
 are pinned to LF in `.gitattributes`, and generated assemblies run in collectible load contexts
-that are disposed and unloaded after each main or fail-safe execution.
+that are disposed and unloaded after each main or fail-safe execution. Runtime invocations use the
+controlled `en-US` culture and restore the caller's culture afterward.

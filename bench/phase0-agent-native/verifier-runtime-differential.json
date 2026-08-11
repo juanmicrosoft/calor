@@ -38,7 +38,8 @@
     "scalar-type:u32": "The u32 row combines non-negativity with the wrap boundary of 3 * Int32.MaxValue; this distinguishes 32-bit unsigned arithmetic from u64 without requiring an out-of-model UInt32.MaxValue literal.",
     "scalar-type:u64": "The u64 row combines non-negativity with the non-wrapping result of 3 * Int32.MaxValue; it does not claim direct UInt64.MaxValue literal coverage.",
     "array-element-types": "Integer array rows apply the same per-type boundary predicates to values[0]. Runtime uses a non-null one-element array with the matching deterministic witness; proofs are therefore conditional only on the production nullable-reference-model assumption.",
-    "scalar-type:str": "The string row proves non-negative length using the non-null ASCII runtime witness \u0027ascii\u0027. The solver result remains explicitly conditional on the production string-model assumption; this does not claim nullable or non-ASCII equivalence."
+    "scalar-type:str": "The string row proves non-negative length using the non-null ASCII runtime witness \u0027ascii\u0027. The solver result remains explicitly conditional on the production string-model assumption; this does not claim nullable or non-ASCII equivalence.",
+    "string-comparison-mode:Ordinal": "The ordinal row uses the zero-width-joiner witness \u0027abc\u0027.StartsWith(\u0027\\u200dabc\u0027): false under Ordinal but true under en-US CurrentCulture. Provable and refutable cells use opposite polarities of that same predicate. Generated runtime is executed under en-US with ambient culture restored."
   },
   "forms": [
     {

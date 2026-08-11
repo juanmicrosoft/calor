@@ -19,6 +19,7 @@ internal static class DifferentialGate
         "6dbdc9c0e1ec122ec1110013cb023ac51109ae5452b55ad00a0b782b471ec463";
     internal const string ProbeFieldType = "u8";
     internal const byte ProbeFieldWitness = byte.MaxValue;
+    internal const string RuntimeCultureName = "en-US";
 
     private const int MaximumDepth = 3;
     private static readonly TextSpan Span = TextSpan.Empty;
@@ -669,7 +670,12 @@ internal static class DifferentialGate
                 ["scalar-type:str"] =
                     "The string row proves non-negative length using the non-null ASCII runtime witness " +
                     "'ascii'. The solver result remains explicitly conditional on the production string-" +
-                    "model assumption; this does not claim nullable or non-ASCII equivalence."
+                    "model assumption; this does not claim nullable or non-ASCII equivalence.",
+                ["string-comparison-mode:Ordinal"] =
+                    "The ordinal row uses the zero-width-joiner witness " +
+                    "'abc'.StartsWith('\\u200dabc'): false under Ordinal but true under en-US " +
+                    "CurrentCulture. Provable and refutable cells use opposite polarities of that same " +
+                    "predicate. Generated runtime is executed under en-US with ambient culture restored."
             },
             formCoverage,
             failSafeControls,

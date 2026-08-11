@@ -204,11 +204,20 @@ internal static class DifferentialFormRegistry
             true,
             null,
             [Z3Verifier.StringModelAssumption],
-            polarity => NoParameters(
-                BuildStringOperationCondition(
-                    StringOp.Contains,
-                    polarity == CasePolarity.Provable,
-                    StringComparisonMode.Ordinal)),
+            polarity =>
+            {
+                var cultureDivergentStartsWith = StringOpNode(
+                    StringOp.StartsWith,
+                    [Str("abc"), Str("\u200dabc")],
+                    StringComparisonMode.Ordinal);
+                return NoParameters(
+                    polarity == CasePolarity.Provable
+                        ? new UnaryOperationNode(
+                            Span,
+                            UnaryOperator.Not,
+                            cultureDivergentStartsWith)
+                        : cultureDivergentStartsWith);
+            },
             condition => ContainsStringComparisonMode(condition, StringComparisonMode.Ordinal));
     }
 

@@ -1,6 +1,8 @@
 using System.Text;
 using System.Runtime.CompilerServices;
+using System.Globalization;
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Microsoft.Z3;
@@ -147,6 +149,87 @@ public sealed class VerifierRuntimeDifferentialTests
         Assert.Equal(Status.SATISFIABLE, signedMutation.NegatedBoundStatus);
         Assert.Equal(32u, widthMutation.Width);
         Assert.Equal(Status.SATISFIABLE, widthMutation.NegatedBoundStatus);
+    }
+
+    [Fact]
+    public void OrdinalComparisonProbeDistinguishesEmitterModeMutation()
+    {
+        const string source = "abc";
+        const string zeroWidthJoinerPrefix = "\u200dabc";
+        var previousCulture = CultureInfo.CurrentCulture;
+        var previousUiCulture = CultureInfo.CurrentUICulture;
+        var controlledCulture = CultureInfo.GetCultureInfo(DifferentialGate.RuntimeCultureName);
+
+        try
+        {
+            CultureInfo.CurrentCulture = controlledCulture;
+            CultureInfo.CurrentUICulture = controlledCulture;
+            Assert.StartsWith(
+                zeroWidthJoinerPrefix,
+                source,
+                StringComparison.CurrentCulture);
+            Assert.NotEqual(
+                source.StartsWith(zeroWidthJoinerPrefix, StringComparison.CurrentCulture),
+                source.StartsWith(zeroWidthJoinerPrefix, StringComparison.Ordinal));
+
+            var form = DifferentialFormRegistry.Build().Single(
+                candidate => candidate.Id == "string-comparison-mode:Ordinal");
+            var provable = form.Build(CasePolarity.Provable).Condition;
+            var refutable = form.Build(CasePolarity.Refutable).Condition;
+            var provableNot = Assert.IsType<UnaryOperationNode>(provable);
+            Assert.Equal(UnaryOperator.Not, provableNot.Operator);
+            AssertOrdinalStartsWithWitness(
+                Assert.IsType<StringOperationNode>(provableNot.Operand));
+            AssertOrdinalStartsWithWitness(
+                Assert.IsType<StringOperationNode>(refutable));
+
+            var emitter = new CSharpEmitter();
+            var generatedCode = BuildOrdinalControlCode(
+                provable.Accept(emitter),
+                refutable.Accept(emitter));
+            Assert.Equal(2, CountOccurrences(generatedCode, "StringComparison.Ordinal"));
+            Assert.Equal(2, CountOccurrences(generatedCode, ".StartsWith("));
+
+            const string ordinalArgument = ", StringComparison.Ordinal";
+            var mutatedCode = generatedCode.Replace(
+                ordinalArgument,
+                string.Empty,
+                StringComparison.Ordinal);
+            Assert.NotEqual(generatedCode, mutatedCode);
+            Assert.DoesNotContain("StringComparison.Ordinal", mutatedCode);
+
+            using var registeredRuntime = GeneratedRuntime.Compile(
+                "CalorVerifierDifferentialOrdinalRegistered",
+                generatedCode,
+                "OrdinalEmitterControl");
+            using var mutatedRuntime = GeneratedRuntime.Compile(
+                "CalorVerifierDifferentialOrdinalMutated",
+                mutatedCode,
+                "OrdinalEmitterControl");
+
+            var ambientCulture = CultureInfo.GetCultureInfo("fr-FR");
+            CultureInfo.CurrentCulture = ambientCulture;
+            CultureInfo.CurrentUICulture = ambientCulture;
+            Assert.Equal(
+                RuntimeVerdict.Completed,
+                registeredRuntime.Invoke("Provable", Array.Empty<string>(), out _));
+            Assert.Equal(
+                RuntimeVerdict.GuardFailed,
+                registeredRuntime.Invoke("Refutable", Array.Empty<string>(), out _));
+            Assert.Equal(
+                RuntimeVerdict.GuardFailed,
+                mutatedRuntime.Invoke("Provable", Array.Empty<string>(), out _));
+            Assert.Equal(
+                RuntimeVerdict.Completed,
+                mutatedRuntime.Invoke("Refutable", Array.Empty<string>(), out _));
+            Assert.Equal(ambientCulture, CultureInfo.CurrentCulture);
+            Assert.Equal(ambientCulture, CultureInfo.CurrentUICulture);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+            CultureInfo.CurrentUICulture = previousUiCulture;
+        }
     }
 
     [Fact]
@@ -319,5 +402,60 @@ public sealed class VerifierRuntimeDifferentialTests
                 ?? FindArrayAccessOrNull(implication.Consequent),
             _ => null
         };
+    }
+
+    private static void AssertOrdinalStartsWithWitness(StringOperationNode operation)
+    {
+        Assert.Equal(StringOp.StartsWith, operation.Operation);
+        Assert.Equal(StringComparisonMode.Ordinal, operation.ComparisonMode);
+        Assert.Equal<string>(
+            ["abc", "\u200dabc"],
+            operation.Arguments
+                .Cast<StringLiteralNode>()
+                .Select(argument => argument.Value)
+                .ToArray());
+    }
+
+    private static string BuildOrdinalControlCode(
+        string provableExpression,
+        string refutableExpression) => $$"""
+        namespace OrdinalEmitterControl
+        {
+            internal static class OrdinalEmitterControlModule
+            {
+                internal static void Provable()
+                {
+                    AssertControlledCulture();
+                    if (!({{provableExpression}}))
+                        throw new InvalidOperationException("Proof obligation failed: provable");
+                }
+
+                internal static void Refutable()
+                {
+                    AssertControlledCulture();
+                    if (!({{refutableExpression}}))
+                        throw new InvalidOperationException("Proof obligation failed: refutable");
+                }
+
+                private static void AssertControlledCulture()
+                {
+                    if (global::System.Globalization.CultureInfo.CurrentCulture.Name != "en-US")
+                        throw new InvalidOperationException("Generated runtime culture was not controlled");
+                }
+            }
+        }
+        """;
+
+    private static int CountOccurrences(string value, string needle)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = value.IndexOf(needle, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += needle.Length;
+        }
+
+        return count;
     }
 }

@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Globalization;
 using Calor.Compiler.CodeGen;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -83,25 +84,38 @@ internal sealed class GeneratedRuntime : IDisposable
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException($"Generated method '{methodName}' was not found.");
         var arguments = parameterTypes.Select(CreateArgument).ToArray();
+        var previousCulture = CultureInfo.CurrentCulture;
+        var previousUiCulture = CultureInfo.CurrentUICulture;
+        var controlledCulture = CultureInfo.GetCultureInfo(DifferentialGate.RuntimeCultureName);
 
         try
         {
-            method.Invoke(null, arguments);
-            detail = null;
-            return RuntimeVerdict.Completed;
-        }
-        catch (TargetInvocationException invocation) when (invocation.InnerException != null)
-        {
-            var inner = invocation.InnerException;
-            detail = $"{inner.GetType().FullName}: {inner.Message}";
-            if (inner is Calor.Runtime.ContractViolationException)
-                return RuntimeVerdict.GuardFailed;
-            if (inner is InvalidOperationException
-                && inner.Message.StartsWith("Proof obligation", StringComparison.Ordinal))
+            CultureInfo.CurrentCulture = controlledCulture;
+            CultureInfo.CurrentUICulture = controlledCulture;
+            try
             {
-                return RuntimeVerdict.GuardFailed;
+                method.Invoke(null, arguments);
+                detail = null;
+                return RuntimeVerdict.Completed;
             }
-            return RuntimeVerdict.RuntimeError;
+            catch (TargetInvocationException invocation) when (invocation.InnerException != null)
+            {
+                var inner = invocation.InnerException;
+                detail = $"{inner.GetType().FullName}: {inner.Message}";
+                if (inner is Calor.Runtime.ContractViolationException)
+                    return RuntimeVerdict.GuardFailed;
+                if (inner is InvalidOperationException
+                    && inner.Message.StartsWith("Proof obligation", StringComparison.Ordinal))
+                {
+                    return RuntimeVerdict.GuardFailed;
+                }
+                return RuntimeVerdict.RuntimeError;
+            }
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previousCulture;
+            CultureInfo.CurrentUICulture = previousUiCulture;
         }
     }
 

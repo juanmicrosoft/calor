@@ -39,6 +39,7 @@
 - `scalar-type:u64` — The u64 row combines non-negativity with the non-wrapping result of 3 * Int32.MaxValue; it does not claim direct UInt64.MaxValue literal coverage.
 - `array-element-types` — Integer array rows apply the same per-type boundary predicates to values[0]. Runtime uses a non-null one-element array with the matching deterministic witness; proofs are therefore conditional only on the production nullable-reference-model assumption.
 - `scalar-type:str` — The string row proves non-negative length using the non-null ASCII runtime witness 'ascii'. The solver result remains explicitly conditional on the production string-model assumption; this does not claim nullable or non-ASCII equivalence.
+- `string-comparison-mode:Ordinal` — The ordinal row uses the zero-width-joiner witness 'abc'.StartsWith('\u200dabc'): false under Ordinal but true under en-US CurrentCulture. Provable and refutable cells use opposite polarities of that same predicate. Generated runtime is executed under en-US with ambient culture restored.
 
 ## Explicit Assumed allowances
 
