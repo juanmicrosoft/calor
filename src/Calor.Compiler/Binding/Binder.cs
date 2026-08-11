@@ -845,7 +845,7 @@ public sealed class Binder
     /// </summary>
     private BoundExpression BindIncomplete(ExpressionNode expr, string reason)
     {
-        _diagnostics.ReportInfo(expr.Span, DiagnosticCode.AnalysisIncomplete,
+        _diagnostics.ReportWarning(expr.Span, DiagnosticCode.AnalysisIncomplete,
             $"Analysis incomplete: '{expr.GetType().Name}' has no structural binding yet " +
             $"({reason}). Analyses treat this expression as an opaque value; its sub-expressions " +
             "are not yet visible to them.");
@@ -859,7 +859,7 @@ public sealed class Binder
     private BoundExpression BindIncompleteWithChildren(
         ExpressionNode expr, string reason, IReadOnlyList<BoundExpression> children)
     {
-        _diagnostics.ReportInfo(expr.Span, DiagnosticCode.AnalysisIncomplete,
+        _diagnostics.ReportWarning(expr.Span, DiagnosticCode.AnalysisIncomplete,
             $"Analysis incomplete: '{expr.GetType().Name}' has no structural binding yet " +
             $"({reason}). Analyses treat this expression as an opaque value; its sub-expressions " +
             "are retained and visible to traversals, deferred-marked.");

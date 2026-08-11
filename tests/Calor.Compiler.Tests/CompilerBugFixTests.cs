@@ -345,12 +345,14 @@ public class CompilerBugFixTests
         Assert.IsType<BoundIncompleteExpression>(ret.Expression);
         // The opaque call should NOT be mistaken for a zero literal
         Assert.False(BoundNodeHelpers.IsLiteralZero(ret.Expression));
-        // The fallback must not report ERRORS (the original noise complaint) — but it now
-        // reports exactly one Info-severity Calor0259, which IS the incomplete-fraction
-        // instrument. Both properties pinned.
+        // The fallback must not report ERRORS (the original noise complaint) — but it
+        // reports exactly one Calor0259, which IS the incomplete-fraction instrument.
+        // B1 shipped it at Info; B8 promoted it to Warning (scoping doc §5: Tier A
+        // incomplete is zero, so a warning finally means something). Both properties
+        // pinned.
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
         Assert.Contains(diagnostics,
-            d => d.Code == DiagnosticCode.AnalysisIncomplete && d.Severity == DiagnosticSeverity.Info);
+            d => d.Code == DiagnosticCode.AnalysisIncomplete && d.Severity == DiagnosticSeverity.Warning);
     }
 
     #endregion

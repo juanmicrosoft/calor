@@ -167,7 +167,9 @@ gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
    strictly better instrument); the residual incomplete-fraction outside those classes is
    **published per release, reported-not-adjudicated** (the M-S2/PP-L4 route). The escape
    category is thereby bounded: the gate cannot be passed by marking registered constructs
-   "incomplete".
+   "incomplete". **Status: measured green by the B8 closure PR (2026-08-10)** — zero Tier A
+   `Calor0259` on both F-2 legs; residuals published in the F-1 B8 amendment (in-repo 1
+   `SizeOfNode`, conversion 17 `StackAllocNode`, all Tier B).
 2. **Full-vs-incremental identity**: byte-identical diagnostics, index contents, and review packets
    (after canonical ordering) across a **registered edit-script corpus** that includes the #883
    reproduction — plus an **incrementality witness** (the incremental path demonstrably reuses the

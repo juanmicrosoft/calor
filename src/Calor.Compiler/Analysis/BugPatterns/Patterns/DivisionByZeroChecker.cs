@@ -188,6 +188,15 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
                 CheckExpression(unaryExpr.Operand, function, diagnostics, pathConditions);
                 break;
 
+            // #762 B8: Tier-B residuals are BoundCallExpression-shaped but carry
+            // RetainedChildren — walk those, or the case below erases the subtree.
+            case BoundIncompleteExpression incomplete:
+                foreach (var child in incomplete.RetainedChildren)
+                {
+                    CheckExpression(child, function, diagnostics, pathConditions);
+                }
+                break;
+
             case BoundCallExpression callExpr:
                 foreach (var arg in callExpr.Arguments)
                 {
