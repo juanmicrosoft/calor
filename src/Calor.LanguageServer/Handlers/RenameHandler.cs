@@ -23,30 +23,32 @@ public sealed class RenameHandler : RenameHandlerBase
         _workspace = workspace;
     }
 
-    public override Task<WorkspaceEdit?> Handle(
+    public override async Task<WorkspaceEdit?> Handle(
         RenameParams request,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var state = _workspace.Get(request.TextDocument.Uri);
         var snapshot = state?.Snapshot;
         if (snapshot == null
             || string.IsNullOrWhiteSpace(request.NewName)
             || !IsValidIdentifier(request.NewName))
         {
-            return Task.FromResult<WorkspaceEdit?>(null);
+            return null;
         }
 
         _workspace.RefreshClosedDocuments();
+        cancellationToken.ThrowIfCancellationRequested();
         var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
         var occurrence = _workspace.ResolveOccurrence(request.TextDocument.Uri, offset);
         if (occurrence == null || !_workspace.CanRenameSymbol(occurrence.SymbolId))
-            return Task.FromResult<WorkspaceEdit?>(null);
+            return null;
 
         var oldName = occurrence.Snapshot.Source.Substring(
             occurrence.Span.Start,
             occurrence.Span.Length);
         if (string.Equals(oldName, request.NewName, StringComparison.Ordinal))
-            return Task.FromResult<WorkspaceEdit?>(null);
+            return null;
 
         var occurrences = _workspace.FindSymbolOccurrences(
             occurrence.SymbolId,
@@ -60,11 +62,19 @@ public sealed class RenameHandler : RenameHandlerBase
             || occurrences.Any(item => item.IsSplitDeclaration)
             || occurrences.Any(item =>
                 !IsExactIdentifierSpan(item.Snapshot.Source, item.Span, oldName))
-            || !_workspace.AreOccurrenceSnapshotsCurrent(occurrences)
-            || !_workspace.ValidateRename(occurrences, request.NewName))
+            || !_workspace.AreOccurrenceSnapshotsCurrent(occurrences))
         {
-            return Task.FromResult<WorkspaceEdit?>(null);
+            return null;
         }
+
+        if (!await _workspace.ValidateRenameAsync(
+                occurrences,
+                request.NewName,
+                cancellationToken).ConfigureAwait(false))
+            return null;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_workspace.AreOccurrenceSnapshotsCurrent(occurrences))
+            return null;
 
         var documentChanges = occurrences
             .GroupBy(item => DocumentUri.From(item.Doc.Uri))
@@ -94,12 +104,11 @@ public sealed class RenameHandler : RenameHandlerBase
             })
             .ToArray();
 
-        return Task.FromResult<WorkspaceEdit?>(
-            new WorkspaceEdit
-            {
-                DocumentChanges = new Container<WorkspaceEditDocumentChange>(
-                    documentChanges),
-            });
+        return new WorkspaceEdit
+        {
+            DocumentChanges = new Container<WorkspaceEditDocumentChange>(
+                documentChanges),
+        };
     }
 
     private static bool IsExactIdentifierSpan(
