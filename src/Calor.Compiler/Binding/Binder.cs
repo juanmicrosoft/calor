@@ -456,6 +456,44 @@ public sealed class Binder
                 { var n = (CollectionCountNode)e; return new BoundCollectionCount(n.Span, b.BindExpression(n.Collection)); },
             [typeof(TupleLiteralNode)] = (b, e) =>
                 { var n = (TupleLiteralNode)e; return new BoundTupleLiteral(n.Span, n.Elements.Select(b.BindExpression).ToList()); },
+            // #762 B4 — string family (4 classes), every AST property retained.
+            [typeof(StringOperationNode)] = (b, e) =>
+                {
+                    var n = (StringOperationNode)e;
+                    return new BoundStringOperation(n.Span, n.Operation,
+                        n.Arguments.Select(b.BindExpression).ToList(), n.ComparisonMode);
+                },
+            [typeof(InterpolatedStringNode)] = (b, e) =>
+                {
+                    var n = (InterpolatedStringNode)e;
+                    // Part subclasses have real Accept dispatch, but binding goes through
+                    // properties for the same reason as FieldAssignmentNode: no
+                    // IAstVisitor<BoundExpression> implementation exists.
+                    return new BoundInterpolatedString(n.Span, n.Parts.Select(p => p switch
+                    {
+                        InterpolatedStringTextNode t =>
+                            new BoundInterpolationPart(t.Text, null, null, null, t.Span),
+                        InterpolatedStringExpressionNode ex => new BoundInterpolationPart(
+                            null, b.BindExpression(ex.Expression),
+                            ex.FormatSpecifier, ex.AlignmentClause, ex.Span),
+                        // Fail LOUD if a third part subclass ever appears (B4 review
+                        // minor 3) — a silent empty part would vanish from BoundChildren.
+                        _ => throw new NotSupportedException(
+                            $"Unknown interpolation part: {p.GetType().Name}"),
+                    }).ToList());
+                },
+            [typeof(StringBuilderOperationNode)] = (b, e) =>
+                {
+                    var n = (StringBuilderOperationNode)e;
+                    return new BoundStringBuilderOperation(n.Span, n.Operation,
+                        n.Arguments.Select(b.BindExpression).ToList());
+                },
+            [typeof(CharOperationNode)] = (b, e) =>
+                {
+                    var n = (CharOperationNode)e;
+                    return new BoundCharOperation(n.Span, n.Operation,
+                        n.Arguments.Select(b.BindExpression).ToList());
+                },
         };
 
         // Every remaining concrete ExpressionNode subclass dispatches to BindIncomplete.

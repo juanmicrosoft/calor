@@ -486,6 +486,12 @@ public static class BoundChildren
         BoundCollectionContains cc => [cc.KeyOrValue],
         BoundCollectionCount cn => [cn.Collection],
         BoundTupleLiteral tl => tl.Elements,
+        // #762 B4 — string family.
+        BoundStringOperation so => so.Arguments,
+        BoundInterpolatedString istr => istr.Parts
+            .Where(p => p.Expression is not null).Select(p => p.Expression!),
+        BoundStringBuilderOperation sb => sb.Arguments,
+        BoundCharOperation co => co.Arguments,
         _ => [],
     };
 }
@@ -784,6 +790,93 @@ public sealed class BoundTupleLiteral : BoundExpression
         Elements = elements;
         // Element types composed rather than discarded (review M3).
         TypeName = $"Tuple<{string.Join(",", elements.Select(e => e.TypeName))}>";
+    }
+}
+
+/// <summary>#762 B4: string operation — result type derived PER OPERATION from the
+/// StringOp enum's own semantics (the first family with genuinely typed results rather
+/// than placeholders). ComparisonMode retained (the B3 ContainsMode lesson).</summary>
+public sealed class BoundStringOperation : BoundExpression
+{
+    public StringOp Operation { get; }
+    public IReadOnlyList<BoundExpression> Arguments { get; }
+    public StringComparisonMode? ComparisonMode { get; }
+    public override string TypeName { get; }
+    public BoundStringOperation(TextSpan span, StringOp operation,
+        IReadOnlyList<BoundExpression> arguments, StringComparisonMode? comparisonMode)
+        : base(span)
+    {
+        Operation = operation; Arguments = arguments; ComparisonMode = comparisonMode;
+        TypeName = operation switch
+        {
+            StringOp.Length or StringOp.IndexOf => "INT",
+            StringOp.Contains or StringOp.StartsWith or StringOp.EndsWith
+                or StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace
+                or StringOp.Equals or StringOp.RegexTest => "BOOL",
+            StringOp.Split or StringOp.RegexSplit => "str[]",
+            // Emits Regex.Match (a Match object). Calor has no Match type-string; OBJECT
+            // is the honest placeholder but note it collides with the incomplete-node
+            // spelling (B4 review minor 2) — revisit with the pre-B6 vocabulary
+            // normalization decision (scoping doc §5).
+            StringOp.RegexMatch => "OBJECT",
+            _ => "STRING",
+        };
+    }
+}
+
+/// <summary>One part of a bound interpolated string: either literal text or a bound
+/// expression with its format/alignment clauses retained (B3 retention standard).</summary>
+public sealed record BoundInterpolationPart(
+    string? Text, BoundExpression? Expression,
+    string? FormatSpecifier, string? AlignmentClause, TextSpan Span);
+
+/// <summary>#762 B4: interpolated string — STRING; parts ordered, expressions bound.</summary>
+public sealed class BoundInterpolatedString : BoundExpression
+{
+    public IReadOnlyList<BoundInterpolationPart> Parts { get; }
+    public override string TypeName => "STRING";
+    public BoundInterpolatedString(TextSpan span, IReadOnlyList<BoundInterpolationPart> parts)
+        : base(span) => Parts = parts;
+}
+
+/// <summary>#762 B4: StringBuilder operation — ToString→STRING, Length→INT, everything
+/// else returns the builder ("StringBuilder", the effect-resolution spelling).</summary>
+public sealed class BoundStringBuilderOperation : BoundExpression
+{
+    public StringBuilderOp Operation { get; }
+    public IReadOnlyList<BoundExpression> Arguments { get; }
+    public override string TypeName { get; }
+    public BoundStringBuilderOperation(TextSpan span, StringBuilderOp operation,
+        IReadOnlyList<BoundExpression> arguments) : base(span)
+    {
+        Operation = operation; Arguments = arguments;
+        TypeName = operation switch
+        {
+            StringBuilderOp.ToString => "STRING",
+            StringBuilderOp.Length => "INT",
+            _ => "StringBuilder",
+        };
+    }
+}
+
+/// <summary>#762 B4: char operation — per-op result ("CHAR" is the canonical spelling,
+/// AttributeHelper maps char↔CHAR).</summary>
+public sealed class BoundCharOperation : BoundExpression
+{
+    public CharOp Operation { get; }
+    public IReadOnlyList<BoundExpression> Arguments { get; }
+    public override string TypeName { get; }
+    public BoundCharOperation(TextSpan span, CharOp operation,
+        IReadOnlyList<BoundExpression> arguments) : base(span)
+    {
+        Operation = operation; Arguments = arguments;
+        TypeName = operation switch
+        {
+            CharOp.CharCode => "INT",
+            CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace
+                or CharOp.IsUpper or CharOp.IsLower => "BOOL",
+            _ => "CHAR",
+        };
     }
 }
 

@@ -160,6 +160,13 @@ items 1–3 (B1–B8 families), 4 (B5), 5–6 (B8), 7 (B8), 8 (B1 expression-hal
   close in that PR, not a silent delta. (B1's direct-Binder audit, corrected count: **14**
   pre-existing test files instantiate `Binder` directly — not 22 as round-1 review estimated —
   all green post-B1 with one updated pin, `Binder_FallbackExpression_ReturnsOpaqueExpression`.)
+- **Bound-TypeName normalization decision (B4 review Major 1), due BEFORE B6:** the bound
+  vocabulary is bifurcated — scalars use canonical forms ("STRING") while composed types use
+  surface forms ("str[]", "i32[]"), so array-element derivation yields "str" where scalar
+  string expressions say "STRING". Latent (no consumer equality-compares bound TypeNames —
+  verified), but B5/B6 must not mint more derived types on top of it. Candidate: all bound
+  TypeNames pass through AttributeHelper's canonical expansion at construction. Decide and
+  apply in B5.
 - **CI cost budget (review m2):** the corpus leg must stay under **5 minutes**; B1 measures and
   publishes the actual cost; the conversion leg's migrate outputs are cached per pinned subject
   commit (they are deterministic at a frozen commit).
