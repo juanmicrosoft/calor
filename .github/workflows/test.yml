@@ -22,6 +22,12 @@ jobs:
       - name: Test Calor-first guard behavior
         run: bash scripts/check-calor-first-diff-tests.sh
 
+      # §2.2 dogfood utility: its source must stay Calor-only and its generated
+      # C# must stay untracked. Cheap and dependency-free, so it sits in the
+      # guard job rather than waiting on a build.
+      - name: Check the dogfood utility is Calor-only
+        run: bash scripts/check-dogfood-utility.sh
+
       - name: Reject unapproved C# alongside Calor source
         env:
           CALOR_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -85,6 +91,17 @@ jobs:
           -c Release --no-build
           --filter "FullyQualifiedName~EditScriptIdentityTests"
           --verbosity normal
+
+      # §2.2 dogfood utility: built from .calr through Calor.Sdk and then RUN,
+      # against this repository's own allowlist. Building it proves the SDK path
+      # works; running it is what makes the repo actually depend on a Calor
+      # program — it exits non-zero when the allowlist has drifted.
+      - name: Build and run the dogfood utility (Calor source, Calor.Sdk)
+        run: |
+          set -euo pipefail
+          dotnet build tools/calor-allowlist-audit/CalorAllowlistAudit.csproj \
+            -c Release --no-restore
+          dotnet tools/calor-allowlist-audit/bin/Release/net10.0/calor-allowlist-audit.dll
 
       - name: Run rename gate
         run: >-
