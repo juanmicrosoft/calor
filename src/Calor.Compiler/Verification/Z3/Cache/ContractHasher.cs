@@ -17,6 +17,7 @@ public sealed class ContractHasher
         IReadOnlyList<(string Name, string TypeName)> parameters,
         RequiresNode precondition)
     {
+        ResetUnhashedKindFlag();
         var sb = new StringBuilder();
         sb.Append("PRE:");
         AppendParameters(sb, parameters);
@@ -40,6 +41,7 @@ public sealed class ContractHasher
         EnsuresNode postcondition,
         IReadOnlyList<StatementNode>? body = null)
     {
+        ResetUnhashedKindFlag();
         var sb = new StringBuilder();
         sb.Append("POST:");
         AppendParameters(sb, parameters);
@@ -93,9 +95,9 @@ public sealed class ContractHasher
                     // unencodable (never cached) but must still hash DISTINCTLY from
                     // the immutable spelling.
                     sb.Append(bind.IsMutable ? "B~(" : "B(");
-                    sb.Append(bind.Name);
+                    AppendRaw(sb, bind.Name);
                     sb.Append(':');
-                    sb.Append(bind.TypeName ?? "?");
+                    AppendRaw(sb, bind.TypeName ?? "?");
                     sb.Append('=');
                     if (bind.Initializer != null)
                         AppendExpression(sb, bind.Initializer);
@@ -138,6 +140,7 @@ public sealed class ContractHasher
     /// </summary>
     public string GetCanonicalExpression(ExpressionNode expression)
     {
+        ResetUnhashedKindFlag(); // #914 review F5: no stale flag across calls
         var sb = new StringBuilder();
         AppendExpression(sb, expression);
         return sb.ToString();
@@ -149,10 +152,23 @@ public sealed class ContractHasher
         {
             if (i > 0)
                 sb.Append(',');
-            sb.Append(parameters[i].Name);
+            AppendRaw(sb, parameters[i].Name);
             sb.Append(':');
-            sb.Append(parameters[i].TypeName);
+            AppendRaw(sb, parameters[i].TypeName);
         }
+    }
+
+    /// <summary>#914 review F4: raw caller-supplied text (names, type spellings) is
+    /// length-prefixed so delimiter characters inside it cannot forge serialization
+    /// structure. Parser-produced identifiers cannot contain delimiters (lexer
+    /// restricts them), but the cache is public SDK surface — collision resistance
+    /// must hold by construction, not by lexer accident. Confirmed collision pre-fix:
+    /// parameters [("a","T"),("b","U")] vs [("a","T,b:U")] hashed identically.</summary>
+    private static void AppendRaw(StringBuilder sb, string text)
+    {
+        sb.Append(text.Length);
+        sb.Append('#');
+        sb.Append(text);
     }
 
     private void AppendExpression(StringBuilder sb, ExpressionNode expr)
@@ -182,7 +198,7 @@ public sealed class ContractHasher
 
             case ReferenceNode refNode:
                 sb.Append("REF:");
-                sb.Append(refNode.Name);
+                AppendRaw(sb, refNode.Name);
                 break;
 
             case BinaryOperationNode binOp:
@@ -208,9 +224,9 @@ public sealed class ContractHasher
                 foreach (var bv in forall.BoundVariables)
                 {
                     sb.Append('(');
-                    sb.Append(bv.Name);
+                    AppendRaw(sb, bv.Name);
                     sb.Append(' ');
-                    sb.Append(bv.TypeName);
+                    AppendRaw(sb, bv.TypeName);
                     sb.Append(')');
                 }
                 sb.Append(") ");
@@ -223,9 +239,9 @@ public sealed class ContractHasher
                 foreach (var bv in exists.BoundVariables)
                 {
                     sb.Append('(');
-                    sb.Append(bv.Name);
+                    AppendRaw(sb, bv.Name);
                     sb.Append(' ');
-                    sb.Append(bv.TypeName);
+                    AppendRaw(sb, bv.TypeName);
                     sb.Append(')');
                 }
                 sb.Append(") ");
@@ -291,17 +307,40 @@ public sealed class ContractHasher
                 sb.Append("(FLD ");
                 AppendExpression(sb, fieldAccess.Target);
                 sb.Append(' ');
-                sb.Append(fieldAccess.FieldName);
+                AppendRaw(sb, fieldAccess.FieldName);
                 sb.Append(')');
                 break;
 
+            // #778: SelfRefNode is on the ModeledForms whitelist (refinement `#`), so
+            // it can appear in CACHED contracts — it must not fall to the default arm.
+            // It is contentless, so a fixed token is exact.
+            case SelfRefNode:
+                sb.Append("SELF");
+                break;
+
             default:
-                // For unsupported expressions, use the type name as a fallback
+                // #778: an expression kind with no serializer here CANNOT be given a
+                // collision-safe key (two distinct instances of the same kind would
+                // share a hash). The flag makes the cache refuse to read or write
+                // under such a key — defense in depth behind the ModeledForms
+                // whitelist, which should have refused the contract before any
+                // cacheable verdict existed. The marker stays in the hash text for
+                // debuggability, but no cache round-trip consumes it.
+                SawUnhashedKind = true;
                 sb.Append("UNSUPPORTED:");
                 sb.Append(expr.GetType().Name);
                 break;
         }
     }
+
+    /// <summary>#778: true when the most recent Hash* call encountered an expression
+    /// kind AppendExpression cannot serialize with content. Reset at the start of each
+    /// Hash* call; the cache must skip both lookup and store when set. NOT thread-safe —
+    /// callers serialize access (VerificationCache holds its hasher lock across the
+    /// hash + flag read).</summary>
+    public bool SawUnhashedKind { get; private set; }
+
+    internal void ResetUnhashedKindFlag() => SawUnhashedKind = false;
 
     private static string GetOperatorSymbol(BinaryOperator op)
     {

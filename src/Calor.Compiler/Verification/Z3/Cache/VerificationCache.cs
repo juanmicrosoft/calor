@@ -13,7 +13,13 @@ public sealed class VerificationCache : IDisposable
     private readonly ContractHasher _hasher;
     private readonly string _cacheDirectory;
     private readonly string? _z3Version;
+    // #778: semantics-versioned, solver-config-aware keys.
+    private readonly string _semanticsVersion = Incremental.BuildStateCache.CurrentCompilerSemanticsVersion;
+    private readonly uint? _solverTimeoutMs;
     private readonly object _lock = new();
+    // #778: ContractHasher carries per-call state (SawUnhashedKind); hash + flag read
+    // must be atomic under concurrency.
+    private readonly object _hasherLock = new();
     private bool _disposed;
 
     // Statistics
@@ -29,9 +35,10 @@ public sealed class VerificationCache : IDisposable
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public VerificationCache(VerificationCacheOptions options)
+    public VerificationCache(VerificationCacheOptions options, uint? solverTimeoutMs = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _solverTimeoutMs = solverTimeoutMs;
         _hasher = new ContractHasher();
         _cacheDirectory = options.GetCacheDirectory();
         _z3Version = Z3ContextFactory.GetZ3Version();
@@ -60,7 +67,13 @@ public sealed class VerificationCache : IDisposable
         if (!_options.Enabled)
             return false;
 
-        var hash = _hasher.HashPrecondition(parameters, precondition);
+        string hash;
+        lock (_hasherLock)
+        {
+            hash = _hasher.HashPrecondition(parameters, precondition);
+            if (_hasher.SawUnhashedKind)
+                return false; // #778: key is not collision-safe — never serve under it
+        }
         return TryGetCachedResult(hash, out result);
     }
 
@@ -80,7 +93,13 @@ public sealed class VerificationCache : IDisposable
         if (!_options.Enabled)
             return false;
 
-        var hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition, body);
+        string hash;
+        lock (_hasherLock)
+        {
+            hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition, body);
+            if (_hasher.SawUnhashedKind)
+                return false; // #778: key is not collision-safe — never serve under it
+        }
         return TryGetCachedResult(hash, out result);
     }
 
@@ -100,7 +119,13 @@ public sealed class VerificationCache : IDisposable
             result.Status == ContractVerificationStatus.Skipped)
             return;
 
-        var hash = _hasher.HashPrecondition(parameters, precondition);
+        string hash;
+        lock (_hasherLock)
+        {
+            hash = _hasher.HashPrecondition(parameters, precondition);
+            if (_hasher.SawUnhashedKind)
+                return; // #778: key is not collision-safe — never store under it
+        }
         CacheResult(hash, result);
     }
 
@@ -123,7 +148,13 @@ public sealed class VerificationCache : IDisposable
             result.Status == ContractVerificationStatus.Skipped)
             return;
 
-        var hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition, body);
+        string hash;
+        lock (_hasherLock)
+        {
+            hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition, body);
+            if (_hasher.SawUnhashedKind)
+                return; // #778: key is not collision-safe — never store under it
+        }
         CacheResult(hash, result);
     }
 
@@ -188,7 +219,8 @@ public sealed class VerificationCache : IDisposable
 
             var entry = JsonSerializer.Deserialize<VerificationCacheEntry>(json, JsonOptions);
 
-            if (entry == null || entry.ContractHash != hash || !entry.IsValidFor(_z3Version))
+            if (entry == null || entry.ContractHash != hash
+                || !entry.IsValidFor(_z3Version, _semanticsVersion, _solverTimeoutMs))
             {
                 // Cache entry is invalid, version mismatch, or Z3 version changed
                 Interlocked.Increment(ref _misses);
@@ -234,7 +266,7 @@ public sealed class VerificationCache : IDisposable
                 // Enforce cache size limit before writing
                 EnforceCacheSizeLimit();
 
-                var entry = VerificationCacheEntry.FromResult(result, hash, _z3Version);
+                var entry = VerificationCacheEntry.FromResult(result, hash, _z3Version, _semanticsVersion, _solverTimeoutMs);
                 var json = JsonSerializer.Serialize(entry, JsonOptions);
 
                 // Write to a temp file first, then move for atomicity

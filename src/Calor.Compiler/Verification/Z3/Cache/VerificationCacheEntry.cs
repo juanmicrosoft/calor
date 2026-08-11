@@ -69,7 +69,22 @@ public sealed class VerificationCacheEntry
     // 1.13 (2026-08-05, D14): array and user-type sorts join the string demotion. 1.12 entries
     // hold `Proven` for array-carried proofs — `a.Length >= 0` is a solver tautology and a runtime
     // NullReferenceException — which is precisely the verdict that elides.
-    public const string CurrentFormatVersion = "1.13";
+    // 1.14 (2026-08-11, #778): keys become semantics-versioned and solver-config-aware. New
+    // fields: SemanticsVersion (the compiler semantics ledger constant — a semantics change no
+    // longer relies solely on a manual format bump here) and SolverTimeoutMs (an Unproven verdict
+    // is timeout-DEPENDENT: one cached at 5s must not be reused by a 30s run that might prove).
+    // 1.13 entries lack both fields; the bump evicts them, which is required for the new
+    // validity rules to hold from the first warm read.
+    public const string CurrentFormatVersion = "1.14";
+
+    /// <summary>#778: the compiler-semantics ledger version that produced this entry.
+    /// A verdict computed under different compile semantics must not be served, even
+    /// when the contract text and cache format are unchanged.</summary>
+    public string? SemanticsVersion { get; set; }
+
+    /// <summary>#778: the Z3 timeout (ms) in effect when this verdict was produced.
+    /// Null when the producing surface did not track it (treated as unknown).</summary>
+    public uint? SolverTimeoutMs { get; set; }
 
     /// <summary>
     /// Cache format version for invalidation on format changes.
@@ -159,12 +174,16 @@ public sealed class VerificationCacheEntry
     public static VerificationCacheEntry FromResult(
         ContractVerificationResult result,
         string contractHash,
-        string? z3Version)
+        string? z3Version,
+        string? semanticsVersion = null,
+        uint? solverTimeoutMs = null)
     {
         return new VerificationCacheEntry
         {
             Version = CurrentFormatVersion,
             Z3Version = z3Version,
+            SemanticsVersion = semanticsVersion,
+            SolverTimeoutMs = solverTimeoutMs,
             Status = result.Status,
             CounterexampleDescription = result.CounterexampleDescription,
             ProofStatus = result.Outcome?.StatusName,
@@ -179,9 +198,13 @@ public sealed class VerificationCacheEntry
     }
 
     /// <summary>
-    /// Checks if this cache entry is valid for the given Z3 version.
+    /// Checks if this cache entry is valid for the given Z3 version, compiler
+    /// semantics version, and solver timeout (#778).
     /// </summary>
-    public bool IsValidFor(string? currentZ3Version)
+    public bool IsValidFor(
+        string? currentZ3Version,
+        string? currentSemanticsVersion = null,
+        uint? currentTimeoutMs = null)
     {
         // Format version must match
         if (Version != CurrentFormatVersion)
@@ -190,6 +213,36 @@ public sealed class VerificationCacheEntry
         // Z3 version must match (both null is OK for tests)
         if (Z3Version != currentZ3Version)
             return false;
+
+        // #778: compiler semantics version must match (both null is OK for tests —
+        // production callers always pass the ledger constant).
+        if (SemanticsVersion != currentSemanticsVersion)
+            return false;
+
+        // #778: an Unproven verdict is timeout-dependent — "could not prove within
+        // the budget". Reusable only when the entry's budget was at least the
+        // current one (a bigger current budget might prove what the smaller one
+        // could not). Proven/Disproven are sound regardless of budget (proofs and
+        // models are budget-free). NOTE (#914 review F2): Assumed proofs are stored
+        // with Status == Unproven (the frozen D-G2.2 mapping), so they ARE
+        // budget-gated here — deliberately: an Assumed can be a budget-limited
+        // downgrade of Proven (the divisor-nonzero entailment sub-check yields
+        // Assumed on solver UNKNOWN, including timeout), so a bigger budget might
+        // genuinely upgrade it. Unknown budgets (null on either side) are treated
+        // as not-reusable for Unproven — conservative: a cold re-verify, never a
+        // stale inconclusive.
+        if (Status == ContractVerificationStatus.Unproven)
+        {
+            if (SolverTimeoutMs is null || currentTimeoutMs is null)
+                return false;
+            // #914 review F1: Z3 treats timeout 0 (and uint.MaxValue) as NO timeout —
+            // 0 must rank as the LARGEST budget, not the smallest, or an
+            // infinite-budget run accepts any finite-budget Unproven (the exact
+            // stale-inconclusive vector this rule exists to close).
+            static ulong Effective(uint ms) => ms is 0 or uint.MaxValue ? ulong.MaxValue : ms;
+            if (Effective(SolverTimeoutMs.Value) < Effective(currentTimeoutMs.Value))
+                return false;
+        }
 
         return true;
     }
