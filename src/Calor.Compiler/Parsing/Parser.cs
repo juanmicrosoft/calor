@@ -510,6 +510,7 @@ public sealed class Parser
         var attrs = ParseAttributes();
 
         var (id, moduleName) = AttributeHelper.InterpretModuleAttributes(attrs);
+        var moduleNameKey = "_pos1";
 
         // --- Compact syntax: optional ID (RFC §1 Phase 1) ---
         // §M{Calculator} or §M Calculator (1 positional, name only)
@@ -520,6 +521,7 @@ public sealed class Parser
             // Shift: id was actually name.
             moduleName = id;
             id = GenerateParserAutoId("m");
+            moduleNameKey = "_pos0";
         }
 
         if (string.IsNullOrEmpty(id))
@@ -672,7 +674,8 @@ public sealed class Parser
         return new ModuleNode(span, id, moduleName, usings, interfaces, classes,
             enums, enumExtensions, delegates, functions, attrs,
             issues, assumptions, invariants, decisions, context, interopBlocks, refinementTypes, indexedTypes,
-            typePreprocessorBlocks.Count > 0 ? typePreprocessorBlocks : null);
+            typePreprocessorBlocks.Count > 0 ? typePreprocessorBlocks : null,
+            GetIdentifierSpan(attrs, moduleNameKey, moduleName));
     }
 
     /// <summary>

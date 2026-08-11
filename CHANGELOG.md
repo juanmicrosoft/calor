@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Exact-span LSP refactoring (#765)** now indexes every open and closed
+  workspace `.calr` file by stable `SymbolId`, resolves cursors only through
+  exact identifier-token occurrences, and incrementally reparses changed or
+  deleted closed files. Definition, references, and rename distinguish
+  overloads, shadowed locals and fields, unrelated members, and same-spelled
+  symbols across files. Rename emits versioned `documentChanges` for open
+  documents and validated unversioned edits for unchanged closed files.
+- A CI-visible exact-span refactoring gate applies adversarial multi-file edits,
+  reparses and rebinds the workspace, emits C#, and requires a clean Roslyn
+  compilation.
+
+### Changed
+- LSP rename is advertised by default. The experimental
+  `CALOR_LSP_EXPERIMENTAL` gate and production name-only reference/rename
+  collectors were removed after the exact-span gate passed.
+
 ## [0.13.0] - 2026-08-11
 
 ### Benchmark Results (Statistical: 30 runs)

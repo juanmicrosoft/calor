@@ -962,15 +962,17 @@ public static class TypeReferenceIndex
     public static IReadOnlyList<IndexedTypeReference> Build(
         ModuleNode ast,
         BoundModule boundModule,
-        string source)
+        string source,
+        IReadOnlyList<TypeSymbol>? workspaceTypeSymbols = null)
     {
         ArgumentNullException.ThrowIfNull(ast);
         ArgumentNullException.ThrowIfNull(boundModule);
         ArgumentNullException.ThrowIfNull(source);
 
-        var typeSymbols = boundModule.SymbolsById.Values
-            .OfType<TypeSymbol>()
+        var typeSymbols = (workspaceTypeSymbols
+                ?? boundModule.SymbolsById.Values.OfType<TypeSymbol>().ToArray())
             .Where(symbol => !symbol.Id.IsNone)
+            .DistinctBy(symbol => symbol.Id)
             .ToArray();
         if (typeSymbols.Length == 0)
             return Array.Empty<IndexedTypeReference>();
@@ -980,7 +982,11 @@ public static class TypeReferenceIndex
                      .DescendantsAndSelf(boundModule)
                      .OfType<BoundNewExpression>())
         {
-            AddBoundTypeReference(creation.TypeReference, source, references);
+            AddBoundTypeReference(
+                creation.TypeReference,
+                source,
+                typeSymbols,
+                references);
         }
 
         foreach (var node in DescendantsAndSelf(ast))
@@ -1050,21 +1056,48 @@ public static class TypeReferenceIndex
     private static void AddBoundTypeReference(
         BoundTypeReference reference,
         string source,
+        IReadOnlyList<TypeSymbol> typeSymbols,
         ICollection<IndexedTypeReference> references)
     {
-        if (reference.ResolvedTypeSymbolId is { IsNone: false } symbolId
+        var resolvedType = reference.ResolvedType
+            ?? ResolveTypeSymbol(reference.Name, typeSymbols);
+        if (resolvedType is { Id.IsNone: false }
             && reference.Span.Length > 0
             && reference.Span.Start >= 0
             && reference.Span.End <= source.Length)
         {
             references.Add(new IndexedTypeReference(
-                symbolId,
+                resolvedType.Id,
                 source.Substring(reference.Span.Start, reference.Span.Length),
                 reference.Span));
         }
 
         foreach (var typeArgument in reference.TypeArguments)
-            AddBoundTypeReference(typeArgument, source, references);
+            AddBoundTypeReference(typeArgument, source, typeSymbols, references);
+    }
+
+    private static TypeSymbol? ResolveTypeSymbol(
+        string typeName,
+        IReadOnlyList<TypeSymbol> typeSymbols)
+    {
+        var name = typeName.Trim().TrimStart('?').TrimEnd('?', '*');
+        var generic = name.IndexOf('<');
+        if (generic > 0)
+            name = name[..generic];
+        var array = name.IndexOf('[');
+        if (array > 0)
+            name = name[..array];
+
+        var matches = name.Contains('.', StringComparison.Ordinal)
+            ? typeSymbols.Where(symbol =>
+                string.Equals(symbol.QualifiedName, name, StringComparison.Ordinal)
+                || symbol.QualifiedName.EndsWith(
+                    "." + name,
+                    StringComparison.Ordinal))
+            : typeSymbols.Where(symbol =>
+                string.Equals(symbol.Name, name, StringComparison.Ordinal));
+        var resolved = matches.Take(2).ToArray();
+        return resolved.Length == 1 ? resolved[0] : null;
     }
 
     private static TypeSymbol? ResolveTypeSymbol(

@@ -10,6 +10,7 @@ public sealed class ModuleNode : AstNode
 {
     public string Id { get; }
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public IReadOnlyList<UsingDirectiveNode> Usings { get; }
     public IReadOnlyList<InterfaceDefinitionNode> Interfaces { get; }
     public IReadOnlyList<ClassDefinitionNode> Classes { get; }
@@ -174,11 +175,13 @@ public sealed class ModuleNode : AstNode
         IReadOnlyList<CSharpInteropBlockNode>? interopBlocks = null,
         IReadOnlyList<RefinementTypeNode>? refinementTypes = null,
         IReadOnlyList<IndexedTypeNode>? indexedTypes = null,
-        IReadOnlyList<TypePreprocessorBlockNode>? typePreprocessorBlocks = null)
+        IReadOnlyList<TypePreprocessorBlockNode>? typePreprocessorBlocks = null,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         Usings = usings ?? throw new ArgumentNullException(nameof(usings));
         Interfaces = interfaces ?? throw new ArgumentNullException(nameof(interfaces));
         Classes = classes ?? throw new ArgumentNullException(nameof(classes));

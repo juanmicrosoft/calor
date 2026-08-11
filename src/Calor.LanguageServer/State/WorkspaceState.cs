@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Parsing;
+using Calor.LanguageServer.Utilities;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 
 namespace Calor.LanguageServer.State;
@@ -24,16 +25,41 @@ public sealed record ProjectReferenceLocation(
     DocumentAnalysisSnapshot Snapshot,
     TextSpan Span);
 
+public enum SymbolOccurrenceKind
+{
+    Definition,
+    Reference,
+}
+
+public sealed record ProjectSymbolOccurrence(
+    DocumentState Doc,
+    DocumentAnalysisSnapshot Snapshot,
+    SymbolId SymbolId,
+    TextSpan Span,
+    SymbolOccurrenceKind Kind,
+    bool IsOpen);
+
 /// <summary>
 /// Manages document state for the entire workspace.
 /// </summary>
 public sealed class WorkspaceState
 {
     private sealed record WorkspaceRoot(string Path, string Identity);
+    private sealed record DocumentSymbolIndex(
+        IReadOnlyDictionary<SymbolId, ProjectSymbolOccurrence[]> BySymbol,
+        ProjectSymbolOccurrence[] Occurrences);
+    private sealed record WorkspaceSymbolIndex(
+        long Generation,
+        IReadOnlyDictionary<DocumentUri, DocumentSymbolIndex> ByDocument,
+        IReadOnlyDictionary<SymbolId, ProjectSymbolOccurrence[]> BySymbol);
 
     private readonly ConcurrentDictionary<DocumentUri, DocumentState> _documents = new();
+    private readonly ConcurrentDictionary<DocumentUri, DocumentState> _closedDocuments = new();
     private readonly object _workspaceRootsGate = new();
+    private readonly object _indexGate = new();
     private WorkspaceRoot[] _workspaceRoots = [];
+    private long _workspaceGeneration;
+    private WorkspaceSymbolIndex? _symbolIndex;
 
     public WorkspaceState(string? workspaceRootPath = null)
     {
@@ -61,6 +87,8 @@ public sealed class WorkspaceState
                     .Append(new WorkspaceRoot(normalized, $"root{current.Length}"))
                     .ToArray());
         }
+
+        RefreshWorkspaceIndex();
     }
 
     public void ConfigureWorkspaceRoot(Uri? workspaceRoot)
@@ -83,6 +111,8 @@ public sealed class WorkspaceState
 
         lock (_workspaceRootsGate)
             Volatile.Write(ref _workspaceRoots, normalized);
+
+        RefreshWorkspaceIndex();
     }
 
     /// <summary>
@@ -90,7 +120,19 @@ public sealed class WorkspaceState
     /// </summary>
     public DocumentState GetOrCreate(DocumentUri uri, string source, int version = 0)
     {
-        return _documents.GetOrAdd(uri, _ => CreateAndAnalyze(uri, source, version));
+        _closedDocuments.TryRemove(uri, out _);
+        if (_documents.TryGetValue(uri, out var existing))
+        {
+            var before = existing.Snapshot;
+            existing.Update(source, version);
+            if (!ReferenceEquals(before, existing.Snapshot))
+                InvalidateSymbolIndex();
+            return existing;
+        }
+
+        var state = _documents.GetOrAdd(uri, _ => CreateAndAnalyze(uri, source, version));
+        InvalidateSymbolIndex();
+        return state;
     }
 
     /// <summary>
@@ -107,7 +149,10 @@ public sealed class WorkspaceState
     public DocumentState Update(DocumentUri uri, string source, int version)
     {
         var state = _documents.GetOrAdd(uri, _ => CreateAndAnalyze(uri, source, version));
+        var before = state.Snapshot;
         state.Update(source, version);
+        if (!ReferenceEquals(before, state.Snapshot))
+            InvalidateSymbolIndex();
         return state;
     }
 
@@ -116,7 +161,23 @@ public sealed class WorkspaceState
     /// </summary>
     public bool Remove(DocumentUri uri)
     {
-        return _documents.TryRemove(uri, out _);
+        var removed = _documents.TryRemove(uri, out _);
+        if (removed)
+        {
+            InvalidateSymbolIndex();
+            RefreshWorkspaceIndex();
+        }
+        return removed;
+    }
+
+    public DocumentState? Reanalyze(DocumentUri uri)
+    {
+        if (!_documents.TryGetValue(uri, out var state))
+            return null;
+
+        state.Reanalyze();
+        InvalidateSymbolIndex();
+        return state;
     }
 
     /// <summary>
@@ -133,6 +194,110 @@ public sealed class WorkspaceState
     public bool Contains(DocumentUri uri)
     {
         return _documents.ContainsKey(uri);
+    }
+
+    public ProjectSymbolOccurrence? ResolveOccurrence(DocumentUri uri, int offset)
+    {
+        var index = GetSymbolIndex();
+        if (!index.ByDocument.TryGetValue(uri, out var documentIndex))
+            return null;
+
+        var matches = documentIndex.Occurrences
+            .Where(occurrence => occurrence.Span.Contains(offset))
+            .GroupBy(occurrence => occurrence.SymbolId)
+            .Select(group => group
+                .OrderBy(occurrence => occurrence.Span.Length)
+                .ThenBy(occurrence => occurrence.Kind)
+                .First())
+            .OrderBy(occurrence => occurrence.Span.Length)
+            .ToArray();
+        if (matches.Length == 0)
+            return null;
+
+        var shortestLength = matches[0].Span.Length;
+        var shortest = matches
+            .Where(occurrence => occurrence.Span.Length == shortestLength)
+            .ToArray();
+        return shortest.Length == 1 ? shortest[0] : null;
+    }
+
+    public ProjectSymbolOccurrence? FindSymbolDefinition(SymbolId symbolId)
+    {
+        if (symbolId.IsNone)
+            return null;
+
+        return GetSymbolIndex().BySymbol.TryGetValue(symbolId, out var occurrences)
+            ? occurrences.FirstOrDefault(occurrence =>
+                occurrence.Kind == SymbolOccurrenceKind.Definition)
+            : null;
+    }
+
+    public IReadOnlyList<ProjectSymbolOccurrence> FindSymbolOccurrences(
+        SymbolId symbolId,
+        bool includeDeclaration)
+    {
+        if (symbolId.IsNone
+            || !GetSymbolIndex().BySymbol.TryGetValue(symbolId, out var occurrences))
+        {
+            return Array.Empty<ProjectSymbolOccurrence>();
+        }
+
+        return occurrences
+            .Where(occurrence =>
+                includeDeclaration || occurrence.Kind != SymbolOccurrenceKind.Definition)
+            .OrderBy(occurrence => occurrence.Doc.Uri.ToString(), StringComparer.Ordinal)
+            .ThenBy(occurrence => occurrence.Span.Start)
+            .ToArray();
+    }
+
+    public bool AreOccurrenceSnapshotsCurrent(
+        IEnumerable<ProjectSymbolOccurrence> occurrences)
+    {
+        ArgumentNullException.ThrowIfNull(occurrences);
+        RefreshWorkspaceIndex();
+
+        foreach (var occurrence in occurrences)
+        {
+            var uri = DocumentUri.From(occurrence.Doc.Uri);
+            if (occurrence.IsOpen)
+            {
+                if (!_documents.TryGetValue(uri, out var open)
+                    || !ReferenceEquals(open.Snapshot, occurrence.Snapshot))
+                {
+                    return false;
+                }
+                continue;
+            }
+
+            if (_documents.ContainsKey(uri)
+                || !_closedDocuments.TryGetValue(uri, out var closed)
+                || !ReferenceEquals(closed.Snapshot, occurrence.Snapshot)
+                || !occurrence.Doc.Uri.IsFile)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (!string.Equals(
+                        File.ReadAllText(occurrence.Doc.Uri.LocalPath),
+                        occurrence.Snapshot.Source,
+                        StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public ProjectSymbolLocation FindBoundSymbol(SymbolId symbolId)
@@ -209,6 +374,11 @@ public sealed class WorkspaceState
         var callerContainingType = FindCallerContainingType(callerSnapshot, call);
         var lookupTarget = GetProjectLookupTarget(target, receiver);
         if (callerContainingType != null
+            && !lookupTarget.Contains('.', StringComparison.Ordinal))
+        {
+            lookupTarget = $"{callerContainingType}.{lookupTarget}";
+        }
+        if (callerContainingType != null
             && target.StartsWith("base.", StringComparison.Ordinal))
         {
             var callerClass = FindClass(documents, callerContainingType);
@@ -228,7 +398,10 @@ public sealed class WorkspaceState
                 caller,
                 callerContainingType,
                 documents))
-            .Where(candidate => IsInCallerScope(candidate.Symbol, lookupTarget))
+            .Where(candidate => IsInCallerScope(
+                candidate.Symbol,
+                lookupTarget,
+                callerContainingType))
             .ToArray();
         if (candidates.Length == 0)
             return new ProjectFunctionLocation(null, null, null);
@@ -308,52 +481,13 @@ public sealed class WorkspaceState
         FunctionSymbol target,
         bool includeDeclaration)
     {
-        var documents = CaptureDocuments();
-        var references = new List<ProjectReferenceLocation>();
-        var owner = FindFunctionOwner(documents, target.Id);
-        if (includeDeclaration
-            && owner.Doc != null
-            && owner.Snapshot != null
-            && owner.Symbol?.DeclarationSpan.Length > 0)
-        {
-            references.Add(new ProjectReferenceLocation(
-                owner.Doc,
-                owner.Snapshot,
-                owner.Symbol.DeclarationSpan));
-        }
-
-        foreach (var document in documents)
-        {
-            if (document.Analysis.BoundModule == null)
-                continue;
-
-            foreach (var node in Descendants(document.Analysis.BoundModule))
-            {
-                if (node is not (BoundCallStatement
-                    or BoundCallExpression
-                    or BoundNewExpression
-                    or BoundExpressionCallExpression))
-                {
-                    continue;
-                }
-
-                var resolved = ResolveProjectCall(
-                    documents,
-                    document.Document,
-                    document.Analysis,
-                    node);
-                if (GetResolvedFunctions(node).Any(symbol => symbol.Id == target.Id)
-                    || resolved.Symbol?.Id == target.Id)
-                {
-                    references.Add(new ProjectReferenceLocation(
-                        document.Document,
-                        document.Analysis,
-                        GetCallReferenceSpan(node)));
-                }
-            }
-        }
-
-        return references;
+        ArgumentNullException.ThrowIfNull(target);
+        return FindSymbolOccurrences(target.Id, includeDeclaration)
+            .Select(occurrence => new ProjectReferenceLocation(
+                occurrence.Doc,
+                occurrence.Snapshot,
+                occurrence.Span))
+            .ToArray();
     }
 
     private static ProjectFunctionLocation FindFunctionOwner(
@@ -384,15 +518,6 @@ public sealed class WorkspaceState
             BoundCallExpression expression => expression.ResolvedSymbol,
             BoundNewExpression creation => creation.ResolvedConstructor,
             _ => null,
-        };
-
-    private static IReadOnlyList<FunctionSymbol> GetResolvedFunctions(BoundNode call) =>
-        call switch
-        {
-            BoundCallStatement statement => statement.ResolvedSymbols,
-            BoundCallExpression expression => expression.ResolvedSymbols,
-            BoundNewExpression creation => creation.ResolvedConstructors,
-            _ => Array.Empty<FunctionSymbol>(),
         };
 
     private static TextSpan GetCallReferenceSpan(BoundNode call) =>
@@ -523,10 +648,17 @@ public sealed class WorkspaceState
         };
     }
 
-    private static bool IsInCallerScope(FunctionSymbol function, string lookupTarget)
+    private static bool IsInCallerScope(
+        FunctionSymbol function,
+        string lookupTarget,
+        string? callerContainingType)
     {
         return lookupTarget.Contains('.', StringComparison.Ordinal)
-            || function.ContainingTypeName == null;
+            || function.ContainingTypeName == null
+            || string.Equals(
+                function.ContainingTypeName,
+                callerContainingType,
+                StringComparison.Ordinal);
     }
 
     private static string? FindCallerContainingType(
@@ -611,11 +743,486 @@ public sealed class WorkspaceState
         }
     }
 
+    private WorkspaceSymbolIndex GetSymbolIndex()
+    {
+        lock (_indexGate)
+        {
+            RefreshWorkspaceIndexCore();
+            if (_symbolIndex?.Generation == _workspaceGeneration)
+                return _symbolIndex;
+
+            _symbolIndex = BuildSymbolIndex(
+                CaptureDocumentsCore(),
+                _workspaceGeneration);
+            return _symbolIndex;
+        }
+    }
+
+    private WorkspaceSymbolIndex BuildSymbolIndex(
+        IReadOnlyList<WorkspaceDocumentSnapshot> documents,
+        long generation)
+    {
+        var byDocument = documents.ToDictionary(
+            document => DocumentUri.From(document.Document.Uri),
+            _ => new List<ProjectSymbolOccurrence>());
+        var bySymbol = new Dictionary<SymbolId, List<ProjectSymbolOccurrence>>();
+        var seen = new HashSet<(DocumentUri Uri, SymbolId Id, TextSpan Span, SymbolOccurrenceKind Kind)>();
+        var typeSymbols = documents
+            .SelectMany(document =>
+                document.Analysis.BoundModule?.SymbolsById.Values
+                    .OfType<TypeSymbol>()
+                    .Select(symbol => (Owner: document, Symbol: symbol))
+                ?? Enumerable.Empty<(WorkspaceDocumentSnapshot Owner, TypeSymbol Symbol)>())
+            .ToArray();
+
+        foreach (var document in documents)
+        {
+            var boundModule = document.Analysis.BoundModule;
+            if (boundModule == null)
+                continue;
+
+            var moduleId = SymbolId.Create(
+                "source",
+                GetCanonicalSourceIdentity(document.Document.Uri),
+                "module",
+                document.Analysis.Ast!.Id);
+            AddOccurrence(
+                document,
+                moduleId,
+                document.Analysis.Ast.IdentifierSpan,
+                SymbolOccurrenceKind.Definition);
+
+            foreach (var symbol in boundModule.SymbolsById.Values)
+            {
+                if (!symbol.Id.IsNone
+                    && IsExactSymbolDeclaration(
+                        document.Analysis.Source,
+                        symbol,
+                        symbol.DeclarationSpan))
+                {
+                    AddOccurrence(
+                        document,
+                        symbol.Id,
+                        symbol.DeclarationSpan,
+                        SymbolOccurrenceKind.Definition);
+                }
+            }
+
+            foreach (var node in Descendants(boundModule))
+            {
+                switch (node)
+                {
+                    case BoundVariableExpression variable:
+                        foreach (var symbol in variable.ResolvedSymbols.Where(
+                                     symbol => !symbol.Id.IsNone))
+                        {
+                            AddOccurrence(
+                                document,
+                                symbol.Id,
+                                variable.Span,
+                                SymbolOccurrenceKind.Reference);
+                        }
+                        break;
+
+                    case BoundFieldAccessExpression field:
+                        foreach (var symbol in ResolveProjectFields(
+                                     documents,
+                                     document,
+                                     field))
+                        {
+                            AddOccurrence(
+                                document,
+                                symbol.Id,
+                                field.FieldNameSpan,
+                                SymbolOccurrenceKind.Reference);
+                        }
+                        break;
+
+                    case BoundCallExpression call:
+                        AddCallOccurrences(document, call);
+                        break;
+
+                    case BoundCallStatement call:
+                        AddCallOccurrences(document, call);
+                        break;
+                }
+            }
+
+            var visibleTypeSymbols = typeSymbols
+                .Where(candidate =>
+                    candidate.Owner.Document.Uri == document.Document.Uri
+                    || candidate.Symbol.Visibility
+                        != Calor.Compiler.Ast.Visibility.Private)
+                .Select(candidate => candidate.Symbol)
+                .ToArray();
+            foreach (var reference in TypeReferenceIndex.Build(
+                         document.Analysis.Ast!,
+                         boundModule,
+                         document.Analysis.Source,
+                         visibleTypeSymbols))
+            {
+                AddOccurrence(
+                    document,
+                    reference.SymbolId,
+                    reference.Span,
+                    SymbolOccurrenceKind.Reference);
+            }
+        }
+
+        return new WorkspaceSymbolIndex(
+            generation,
+            byDocument.ToDictionary(
+                pair => pair.Key,
+                pair =>
+                {
+                    var occurrences = pair.Value
+                        .OrderBy(occurrence => occurrence.Span.Start)
+                        .ThenBy(occurrence => occurrence.Span.Length)
+                        .ThenBy(
+                            occurrence => occurrence.SymbolId.Value,
+                            StringComparer.Ordinal)
+                        .ToArray();
+                    return new DocumentSymbolIndex(
+                        occurrences
+                            .GroupBy(occurrence => occurrence.SymbolId)
+                            .ToDictionary(
+                                group => group.Key,
+                                group => group.ToArray()),
+                        occurrences);
+                }),
+            bySymbol.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value
+                    .OrderBy(occurrence => occurrence.Doc.Uri.ToString(), StringComparer.Ordinal)
+                    .ThenBy(occurrence => occurrence.Span.Start)
+                    .ThenBy(occurrence => occurrence.Kind)
+                    .ToArray()));
+
+        void AddCallOccurrences(
+            WorkspaceDocumentSnapshot document,
+            BoundNode call)
+        {
+            switch (call)
+            {
+                case BoundCallExpression expression
+                    when expression.ReceiverSymbol is { Id.IsNone: false } receiver:
+                    AddOccurrence(
+                        document,
+                        receiver.Id,
+                        expression.ReceiverSpan ?? expression.Span,
+                        SymbolOccurrenceKind.Reference);
+                    break;
+                case BoundCallStatement statement
+                    when statement.ReceiverSymbol is { Id.IsNone: false } receiver:
+                    AddOccurrence(
+                        document,
+                        receiver.Id,
+                        statement.ReceiverSpan ?? statement.Span,
+                        SymbolOccurrenceKind.Reference);
+                    break;
+            }
+
+            var resolved = ResolveProjectCall(
+                documents,
+                document.Document,
+                document.Analysis,
+                call);
+            if (resolved.Symbol is { Id.IsNone: false } function)
+            {
+                AddOccurrence(
+                    document,
+                    function.Id,
+                    GetCallReferenceSpan(call),
+                    SymbolOccurrenceKind.Reference);
+            }
+        }
+
+        void AddOccurrence(
+            WorkspaceDocumentSnapshot document,
+            SymbolId symbolId,
+            TextSpan span,
+            SymbolOccurrenceKind kind)
+        {
+            if (symbolId.IsNone
+                || !IsExactIdentifierSpan(document.Analysis.Source, span))
+            {
+                return;
+            }
+
+            var uri = DocumentUri.From(document.Document.Uri);
+            if (!seen.Add((uri, symbolId, span, kind)))
+                return;
+
+            var occurrence = new ProjectSymbolOccurrence(
+                document.Document,
+                document.Analysis,
+                symbolId,
+                span,
+                kind,
+                _documents.ContainsKey(uri));
+            byDocument[uri].Add(occurrence);
+            if (!bySymbol.TryGetValue(symbolId, out var symbolOccurrences))
+            {
+                symbolOccurrences = [];
+                bySymbol.Add(symbolId, symbolOccurrences);
+            }
+            symbolOccurrences.Add(occurrence);
+        }
+    }
+
+    private static IReadOnlyList<VariableSymbol> ResolveProjectFields(
+        IReadOnlyList<WorkspaceDocumentSnapshot> documents,
+        WorkspaceDocumentSnapshot caller,
+        BoundFieldAccessExpression field)
+    {
+        var resolved = field.ResolvedFields
+            .Where(symbol => !symbol.Id.IsNone)
+            .DistinctBy(symbol => symbol.Id)
+            .ToArray();
+        if (resolved.Length > 0)
+            return resolved;
+
+        var callerContainingType = FindCallerContainingType(caller.Analysis, field);
+        var currentType = GetNominalTypeName(field.Target.TypeName);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (currentType.Length > 0 && visited.Add(currentType))
+        {
+            var candidates = documents
+                .SelectMany(document =>
+                    document.Analysis.BoundModule?.SymbolsById.Values
+                        .OfType<VariableSymbol>()
+                        .Select(symbol => (Owner: document, Symbol: symbol))
+                    ?? Enumerable.Empty<(WorkspaceDocumentSnapshot Owner, VariableSymbol Symbol)>())
+                .Where(candidate =>
+                    (candidate.Symbol.IsField || candidate.Symbol.IsProperty)
+                    && string.Equals(
+                        candidate.Symbol.DeclaringTypeName,
+                        currentType,
+                        StringComparison.Ordinal)
+                    && string.Equals(
+                        candidate.Symbol.Name,
+                        field.FieldName,
+                        StringComparison.Ordinal))
+                .Where(candidate => IsVisibleToCaller(
+                    candidate,
+                    caller,
+                    callerContainingType,
+                    documents))
+                .Select(candidate => candidate.Symbol)
+                .DistinctBy(symbol => symbol.Id)
+                .Take(2)
+                .ToArray();
+            if (candidates.Length > 0)
+                return candidates.Length == 1 ? candidates : Array.Empty<VariableSymbol>();
+
+            var declaration = FindClass(documents, currentType);
+            currentType = declaration?.BaseClass is { Length: > 0 } baseClass
+                ? GetNominalTypeName(baseClass)
+                : string.Empty;
+        }
+
+        return Array.Empty<VariableSymbol>();
+    }
+
+    private static bool IsVisibleToCaller(
+        (WorkspaceDocumentSnapshot Owner, VariableSymbol Symbol) candidate,
+        WorkspaceDocumentSnapshot caller,
+        string? callerContainingType,
+        IReadOnlyList<WorkspaceDocumentSnapshot> documents)
+    {
+        var sameDocument = candidate.Owner.Document.Uri == caller.Document.Uri;
+        return candidate.Symbol.Visibility switch
+        {
+            Calor.Compiler.Ast.Visibility.Private =>
+                sameDocument
+                && string.Equals(
+                    candidate.Symbol.DeclaringTypeName,
+                    callerContainingType,
+                    StringComparison.Ordinal),
+            Calor.Compiler.Ast.Visibility.Protected =>
+                callerContainingType != null
+                && candidate.Symbol.DeclaringTypeName != null
+                && IsSameOrDerivedType(
+                    callerContainingType,
+                    candidate.Symbol.DeclaringTypeName,
+                    documents),
+            _ => true,
+        };
+    }
+
+    private static bool IsExactSymbolDeclaration(
+        string source,
+        Symbol symbol,
+        TextSpan span)
+    {
+        if (!IsExactIdentifierSpan(source, span))
+            return false;
+
+        var sourceName = source.Substring(span.Start, span.Length);
+        var symbolName = symbol.Name;
+        if (symbol is FunctionSymbol)
+        {
+            var lastDot = symbolName.LastIndexOf('.');
+            if (lastDot >= 0)
+                symbolName = symbolName[(lastDot + 1)..];
+            var generic = symbolName.IndexOf('<');
+            if (generic > 0)
+                symbolName = symbolName[..generic];
+        }
+
+        return string.Equals(sourceName, symbolName, StringComparison.Ordinal);
+    }
+
+    private static bool IsExactIdentifierSpan(string source, TextSpan span)
+    {
+        if (span.Length <= 0
+            || span.Start < 0
+            || span.End > source.Length
+            || (!char.IsLetter(source[span.Start]) && source[span.Start] != '_'))
+        {
+            return false;
+        }
+
+        for (var offset = span.Start + 1; offset < span.End; offset++)
+        {
+            if (!char.IsLetterOrDigit(source[offset]) && source[offset] != '_')
+                return false;
+        }
+
+        return true;
+    }
+
     private WorkspaceDocumentSnapshot[] CaptureDocuments()
     {
+        lock (_indexGate)
+        {
+            RefreshWorkspaceIndexCore();
+            return CaptureDocumentsCore();
+        }
+    }
+
+    private WorkspaceDocumentSnapshot[] CaptureDocumentsCore()
+    {
         return _documents.Values
+            .Concat(_closedDocuments
+                .Where(pair => !_documents.ContainsKey(pair.Key))
+                .Select(pair => pair.Value))
             .Select(document => new WorkspaceDocumentSnapshot(document, document.Snapshot))
             .ToArray();
+    }
+
+    private void RefreshWorkspaceIndex()
+    {
+        lock (_indexGate)
+            RefreshWorkspaceIndexCore();
+    }
+
+    private void RefreshWorkspaceIndexCore()
+    {
+        var roots = Volatile.Read(ref _workspaceRoots);
+        if (roots.Length == 0)
+            return;
+
+        var seen = new HashSet<DocumentUri>();
+        var changed = false;
+        foreach (var root in roots)
+        {
+            if (!Directory.Exists(root.Path))
+                continue;
+
+            IEnumerable<string> paths;
+            try
+            {
+                paths = Directory.EnumerateFiles(
+                    root.Path,
+                    "*.calr",
+                    new EnumerationOptions
+                    {
+                        RecurseSubdirectories = true,
+                        IgnoreInaccessible = true,
+                        AttributesToSkip = FileAttributes.ReparsePoint,
+                    })
+                    .Where(ShouldIndexPath)
+                    .ToArray();
+            }
+            catch (IOException)
+            {
+                continue;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            foreach (var path in paths)
+            {
+                var fullPath = Path.GetFullPath(path);
+                var uri = DocumentUri.FromFileSystemPath(fullPath);
+                seen.Add(uri);
+                if (_documents.ContainsKey(uri))
+                {
+                    changed |= _closedDocuments.TryRemove(uri, out _);
+                    continue;
+                }
+
+                string source;
+                try
+                {
+                    source = File.ReadAllText(fullPath);
+                }
+                catch (IOException)
+                {
+                    continue;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                if (_closedDocuments.TryGetValue(uri, out var existing)
+                    && string.Equals(existing.Source, source, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                _closedDocuments[uri] = CreateAndAnalyze(uri, source, version: 0);
+                changed = true;
+            }
+        }
+
+        foreach (var uri in _closedDocuments.Keys)
+        {
+            if (!seen.Contains(uri) && _closedDocuments.TryRemove(uri, out _))
+                changed = true;
+        }
+
+        if (changed)
+        {
+            _workspaceGeneration++;
+            _symbolIndex = null;
+        }
+    }
+
+    private static bool ShouldIndexPath(string path)
+    {
+        var segments = path.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        return !segments.Any(segment =>
+            segment.Equals(".git", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals(".vs", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("bin", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("obj", StringComparison.OrdinalIgnoreCase)
+            || segment.Equals("node_modules", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void InvalidateSymbolIndex()
+    {
+        lock (_indexGate)
+        {
+            _workspaceGeneration++;
+            _symbolIndex = null;
+        }
     }
 
     private DocumentState CreateAndAnalyze(DocumentUri uri, string source, int version)

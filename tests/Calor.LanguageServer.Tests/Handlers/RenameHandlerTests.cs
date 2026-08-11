@@ -1,7 +1,10 @@
+using Calor.Compiler.CodeGen;
 using Calor.LanguageServer.Handlers;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
 using Calor.LanguageServer.Utilities;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Xunit;
@@ -11,41 +14,9 @@ namespace Calor.LanguageServer.Tests.Handlers;
 public class RenameHandlerTests
 {
     [Fact]
-    public async Task RenameFunctionDeclaration_EditsOnlyIdentifierTokenAsync()
+    public async Task RenameUsesVersionedDocumentChangesAndExactTokenRangesAsync()
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Compute:pub}
-                §O{i32}
-                §R 42
-            """;
-        var uri = DocumentUri.From("file:///rename.calr");
-        var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("Compute", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new RenameHandler(workspace);
-
-        var edit = await handler.Handle(
-            new RenameParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-                NewName = "Calculate",
-            },
-            CancellationToken.None);
-
-        var textEdit = Assert.Single(Assert.Single(edit!.Changes!).Value);
-        Assert.Equal(new Position(line - 1, column - 1), textEdit.Range.Start);
-        Assert.Equal(
-            new Position(line - 1, column - 1 + "Compute".Length),
-            textEdit.Range.End);
-    }
-
-    [Fact]
-    public async Task RenameFunctionCall_UsesExactCalleeSpanAsync()
-    {
-        var source = """
+        const string source = """
             §M{m001:TestModule}
               §F{f001:Compute:pub} () -> i32
                 §R 42
@@ -54,35 +25,29 @@ public class RenameHandlerTests
             """;
         var uri = DocumentUri.From("file:///rename.calr");
         var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("Compute", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new RenameHandler(workspace);
+        workspace.GetOrCreate(uri, source, version: 7);
+        var edit = await RenameAtAsync(workspace, uri, source, "Compute", "Calculate");
 
-        var edit = await handler.Handle(
-            new RenameParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-                NewName = "Calculate",
-            },
-            CancellationToken.None);
-
-        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.NotNull(edit);
+        Assert.Null(edit.Changes);
+        var change = Assert.Single(Assert.IsType<Container<WorkspaceEditDocumentChange>>(
+            edit.DocumentChanges));
+        var documentEdit = Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit);
+        Assert.Equal(7, documentEdit.TextDocument.Version);
+        Assert.Equal(uri, documentEdit.TextDocument.Uri);
+        var edits = documentEdit.Edits.ToArray();
         Assert.Equal(2, edits.Length);
         Assert.All(edits, textEdit =>
         {
-            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
-            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
-            Assert.Equal("Compute", source[start..end]);
+            Assert.Equal("Compute", TextAt(source, textEdit.Range));
             Assert.Equal("Calculate", textEdit.NewText);
         });
     }
 
     [Fact]
-    public async Task RenameInheritedFieldAccesses_EditsOnlyFieldIdentifiersAsync()
+    public async Task RenameInheritedFieldAccessesEditsOnlyFieldIdentifiersAsync()
     {
-        var source = """
+        const string source = """
             §M{m001:TestModule}
               §CL{c001:Base:pub}
                 §FLD{i32:shared:prot}
@@ -93,82 +58,26 @@ public class RenameHandlerTests
         var uri = DocumentUri.From("file:///rename-field.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("shared:prot", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new RenameHandler(workspace);
+        var edit = await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "shared:prot",
+            "renamed");
 
-        var edit = await handler.Handle(
-            new RenameParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-                NewName = "renamed",
-            },
-            CancellationToken.None);
-
-        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.NotNull(edit);
+        var change = Assert.Single(Assert.IsType<Container<WorkspaceEditDocumentChange>>(
+            edit.DocumentChanges));
+        var documentEdit = Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit);
+        var edits = documentEdit.Edits.ToArray();
         Assert.Equal(3, edits.Length);
-        Assert.All(edits, textEdit =>
-        {
-            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
-            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
-            Assert.Equal("shared", source[start..end]);
-            Assert.Equal("renamed", textEdit.NewText);
-        });
+        Assert.All(edits, textEdit => Assert.Equal("shared", TextAt(source, textEdit.Range)));
     }
 
     [Fact]
-    public async Task RenameConstructorResolvedNewExpression_EditsExactTypeTokensAsync()
+    public async Task RenameTypeDoesNotEditQualifiedExternalTypeAsync()
     {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:Widget:pub}
-                §CTOR{ctor:pub}
-                §/CTOR{ctor}
-              §F{f001:Create:pub} () -> Widget
-                §R §NEW{Widget} §/NEW
-            """;
-        var uri = DocumentUri.From("file:///rename-new-type.calr");
-        var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
-        var offset = source.LastIndexOf("Widget", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new RenameHandler(workspace);
-
-        var edit = await handler.Handle(
-            new RenameParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-                NewName = "Gadget",
-            },
-            CancellationToken.None);
-
-        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
-        Assert.Equal(3, edits.Length);
-        Assert.All(edits, textEdit =>
-        {
-            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
-            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
-            Assert.Equal("Widget", source[start..end]);
-            Assert.Equal("Gadget", textEdit.NewText);
-        });
-        Assert.Equal(
-            new[]
-            {
-                source.IndexOf("Widget:pub", StringComparison.Ordinal),
-                source.IndexOf("-> Widget", StringComparison.Ordinal) + "-> ".Length,
-                source.LastIndexOf("Widget", StringComparison.Ordinal),
-            },
-            edits.Select(textEdit => PositionConverter.ToOffset(textEdit.Range.Start, source))
-                .Order()
-                .ToArray());
-    }
-
-    [Fact]
-    public async Task RenameLocalType_DoesNotEditQualifiedExternalTypeAsync()
-    {
-        var source = """
+        const string source = """
             §M{m001:TestModule}
               §CL{c001:Exception:pub}
               §CL{c002:Holder:pub}
@@ -178,30 +87,20 @@ public class RenameHandlerTests
         var uri = DocumentUri.From("file:///rename-qualified-type.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("Exception:pub", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new RenameHandler(workspace);
+        var edit = await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "Exception:pub",
+            "LocalException");
 
-        var edit = await handler.Handle(
-            new RenameParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-                NewName = "LocalException",
-            },
-            CancellationToken.None);
-
-        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.NotNull(edit);
+        var change = Assert.Single(Assert.IsType<Container<WorkspaceEditDocumentChange>>(
+            edit.DocumentChanges));
+        var documentEdit = Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit);
+        var edits = documentEdit.Edits.ToArray();
         Assert.Equal(2, edits.Length);
-        Assert.Equal(
-            new[]
-            {
-                source.IndexOf("Exception:pub", StringComparison.Ordinal),
-                source.IndexOf("Exception:local", StringComparison.Ordinal),
-            },
-            edits.Select(textEdit => PositionConverter.ToOffset(textEdit.Range.Start, source))
-                .Order()
-                .ToArray());
+        Assert.All(edits, textEdit => Assert.Equal("Exception", TextAt(source, textEdit.Range)));
         Assert.DoesNotContain(
             edits,
             textEdit => PositionConverter.ToOffset(textEdit.Range.Start, source)
@@ -209,340 +108,414 @@ public class RenameHandlerTests
     }
 
     [Fact]
-    public async Task RenameTypeFromNewGenericArgument_EditsExactTypeTokensAsync()
+    public async Task RenameModuleUsesStableModuleSymbolIdAndExactNameSpanAsync()
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Create:pub} () -> object
-                §R §NEW{Box<Widget>} §/NEW
-              §CL{c001:Widget:pub}
-              §CL{c002:Box:pub}
-                §FLD{i32:_dummy:priv}
+        const string source = """
+            §M{m001:OriginalModule}
+              §F{f001:Run:pub} () -> i32
+                §R INT:1
             """;
-        var uri = DocumentUri.From("file:///rename-new-generic-type.calr");
+        var uri = DocumentUri.From("file:///rename-module.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source, version: 3);
+        var edit = await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "OriginalModule",
+            "RenamedModule");
+
+        Assert.NotNull(edit);
+        var change = Assert.Single(Assert.IsType<Container<WorkspaceEditDocumentChange>>(
+            edit.DocumentChanges));
+        var documentEdit = Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit);
+        var textEdit = Assert.Single(documentEdit.Edits);
+        Assert.Equal("OriginalModule", TextAt(source, textEdit.Range));
+        Assert.Equal(3, documentEdit.TextDocument.Version);
+    }
+
+    [Fact]
+    public async Task RenameTypeIncludesClosedDefinitionAndOpenReferencesAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string definition = """
+                §M{m001:Models}
+                  §CL{c001:Widget:pub}
+                """;
+            const string use = """
+                §M{m002:App}
+                  §F{f001:Make:pub} () -> Widget
+                    §R §NEW{Widget} §/NEW
+                """;
+            var definitionPath = Path.Combine(root, "definition.calr");
+            var usePath = Path.Combine(root, "use.calr");
+            File.WriteAllText(definitionPath, definition);
+            File.WriteAllText(usePath, use);
+            var workspace = new WorkspaceState(root);
+            var useUri = DocumentUri.FromFileSystemPath(usePath);
+            workspace.GetOrCreate(useUri, use, version: 5);
+            var edit = await RenameAtAsync(
+                workspace,
+                useUri,
+                use,
+                "Widget} §/NEW",
+                "Gadget");
+
+            Assert.NotNull(edit);
+            var documentEdits = Assert.IsType<Container<WorkspaceEditDocumentChange>>(
+                    edit.DocumentChanges)
+                .Select(change => Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit))
+                .ToArray();
+            Assert.Equal(2, documentEdits.Length);
+            Assert.Equal(3, documentEdits.Sum(documentEdit => documentEdit.Edits.Count()));
+            Assert.Contains(
+                documentEdits,
+                documentEdit => documentEdit.TextDocument.Uri == useUri
+                    && documentEdit.TextDocument.Version == 5);
+            Assert.Contains(
+                documentEdits,
+                documentEdit => documentEdit.TextDocument.Uri.ToUri().LocalPath
+                        == definitionPath
+                    && documentEdit.TextDocument.Version == null);
+            foreach (var documentEdit in documentEdits)
+            {
+                var source = documentEdit.TextDocument.Uri == useUri ? use : definition;
+                Assert.All(
+                    documentEdit.Edits,
+                    textEdit => Assert.Equal("Widget", TextAt(source, textEdit.Range)));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(7)]
+    [InlineData(8)]
+    public async Task RenameDoesNotResolveAdjacentOrWhitespaceCursorsAsync(int relativeOffset)
+    {
+        const string source = """
+            §M{m001:TestModule}
+              §F{f001:Compute:pub} () -> i32
+                §R 42
+            """;
+        var uri = DocumentUri.From("file:///rename-cursor.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("Widget>}", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new RenameHandler(workspace);
-
-        var edit = await handler.Handle(
+        var identifier = source.IndexOf("Compute", StringComparison.Ordinal);
+        var cursor = identifier + relativeOffset;
+        var (line, column) = LspTestHarness.GetLineColumn(source, cursor);
+        var edit = await new RenameHandler(workspace).Handle(
             new RenameParams
             {
                 TextDocument = new TextDocumentIdentifier(uri),
                 Position = new Position(line - 1, column - 1),
-                NewName = "Gadget",
+                NewName = "Calculate",
             },
             CancellationToken.None);
 
-        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
-        Assert.Equal(2, edits.Length);
-        Assert.All(edits, textEdit =>
-        {
-            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
-            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
-            Assert.Equal("Widget", source[start..end]);
-        });
-        Assert.Equal(
-            new[]
+        Assert.Null(edit);
+    }
+
+    private static async Task<WorkspaceEdit?> RenameAtAsync(
+        WorkspaceState workspace,
+        DocumentUri uri,
+        string source,
+        string cursorText,
+        string newName)
+    {
+        var offset = source.IndexOf(cursorText, StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        return await new RenameHandler(workspace).Handle(
+            new RenameParams
             {
-                source.IndexOf("Widget>}", StringComparison.Ordinal),
-                source.IndexOf("Widget:pub", StringComparison.Ordinal),
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = newName,
             },
-            edits.Select(textEdit => PositionConverter.ToOffset(textEdit.Range.Start, source))
-                .Order()
-                .ToArray());
+            CancellationToken.None);
     }
 
-    [Fact]
-    public void ReferenceCollectorForRename_FindsAllOccurrences()
+    private static string TextAt(string source, OmniSharp.Extensions.LanguageServer.Protocol.Models.Range range)
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §B{counter} 0
-                §ASSIGN counter (+ counter 1)
-                §R counter
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("counter");
-        collector.Visit(ast);
-
-        // Should find: declaration in bind, two usages in assignment, and usage in return
-        Assert.True(collector.References.Count >= 1);
+        var start = PositionConverter.ToOffset(range.Start, source);
+        var end = PositionConverter.ToOffset(range.End, source);
+        return source[start..end];
     }
 
-    [Fact]
-    public void ReferenceCollectorForRename_FindsFunctionDeclarationAndCalls()
+    private static string CreateWorkspaceDirectory()
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Helper:pub}
-                §O{i32}
-                §R 42
-              §F{f002:Main:pub}
-                §O{i32}
-                §R §C{Helper} §/C
-            """;
+        var directory = Directory.GetCurrentDirectory();
+        while (!File.Exists(Path.Combine(directory, "Calor.sln")))
+            directory = Directory.GetParent(directory)!.FullName;
 
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
+        var root = Path.Combine(
+            directory,
+            "artifacts",
+            "lsp-refactoring-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        return root;
+    }
+}
 
-        var collector = new ReferenceCollectorForRename("Helper");
-        collector.Visit(ast);
+public sealed class ExactSpanRefactoringGateTests
+{
+    [Fact]
+    public async Task AdversarialWorkspaceRenameAppliesAndCompilesRoslynCleanAsync()
+    {
+        var serverAssembly = typeof(RenameHandler).Assembly;
+        Assert.Null(serverAssembly.GetType(
+            "Calor.LanguageServer.Handlers.ReferenceCollector"));
+        Assert.Null(serverAssembly.GetType(
+            "Calor.LanguageServer.Handlers.ReferenceCollectorForRename"));
+        var programSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Calor.LanguageServer",
+            "Program.cs"));
+        Assert.Contains(".WithHandler<RenameHandler>()", programSource);
+        Assert.DoesNotContain("CALOR_LSP_EXPERIMENTAL", programSource);
+        foreach (var handlerName in new[]
+                 {
+                     "DefinitionHandler.cs",
+                     "ReferencesHandler.cs",
+                     "RenameHandler.cs",
+                 })
+        {
+            var handlerSource = File.ReadAllText(Path.Combine(
+                FindRepositoryRoot(),
+                "src",
+                "Calor.LanguageServer",
+                "Handlers",
+                handlerName));
+            Assert.Contains("ResolveOccurrence", handlerSource);
+            Assert.DoesNotContain("FindSymbolAtPosition", handlerSource);
+            Assert.DoesNotContain("FindBoundReferences", handlerSource);
+            Assert.DoesNotContain("ReferenceCollector", handlerSource);
+        }
 
-        // Should find: function declaration and call
-        Assert.True(collector.References.Count >= 1);
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["definitions.calr"] = """
+                    §M{defs:Collision}
+                      §CL{c001:Worker:pub:partial}
+                        §FLD{i32:value:pub}
+                        §MT{m001:Pick:pub} (i32:value) -> i32
+                          §IF{nested} (== value INT:0)
+                            §B{result:i32} INT:10
+                            §R result
+                          §EL
+                            §B{result:i32} value
+                            §R result
+                        §MT{m002:Pick:pub} (str:value) -> i32
+                          §R INT:2
+                        §MT{m003:Run:pub} () -> i32
+                          §B{value:i32} INT:3
+                          §R (+ value §THIS.value)
+                        §CL{c005:Nested:pub}
+                          §MT{m005:Run:pub} () -> i32
+                            §B{result:i32} INT:4
+                            §R result
+                    """,
+                ["open-use.calr"] = """
+                    §M{openUse:Collision}
+                      §CL{c002:Worker:pub:partial}
+                        §MT{m010:UseOne:pub} () -> i32
+                          §R §C{Pick} §A INT:1 §/C
+                    """,
+                ["closed-use.calr"] = """
+                    §M{closedUse:Collision}
+                      §CL{c003:Worker:pub:partial}
+                        §MT{m011:UseTwo:pub} () -> i32
+                          §R §C{Pick} §A INT:2 §/C
+                    """,
+                ["collisions.calr"] = """
+                    §M{other:Collision}
+                      §CL{c004:OtherType:pub}
+                        §FLD{i32:value:pub}
+                        §MT{m020:Pick:pub} (str:value) -> i32
+                          §R INT:3
+                        §MT{m021:Run:pub} (i32:value) -> i32
+                          §R value
+                    """,
+            };
+            foreach (var (fileName, source) in sources)
+                File.WriteAllText(Path.Combine(root, fileName), source);
+
+            var workspace = new WorkspaceState(root);
+            var openPath = Path.Combine(root, "open-use.calr");
+            var openUri = DocumentUri.FromFileSystemPath(openPath);
+            workspace.GetOrCreate(openUri, sources["open-use.calr"], version: 11);
+            var edit = await RenameAtAsync(
+                workspace,
+                openUri,
+                sources["open-use.calr"],
+                "Pick",
+                "Choose");
+
+            Assert.NotNull(edit);
+            Assert.Null(edit.Changes);
+            var changes = Assert.IsType<Container<WorkspaceEditDocumentChange>>(
+                    edit.DocumentChanges)
+                .Select(change => Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit))
+                .ToArray();
+            Assert.Equal(3, changes.Length);
+            Assert.Contains(
+                changes,
+                documentEdit => documentEdit.TextDocument.Uri == openUri
+                    && documentEdit.TextDocument.Version == 11);
+            Assert.Equal(
+                2,
+                changes.Count(documentEdit =>
+                    documentEdit.TextDocument.Uri != openUri
+                    && documentEdit.TextDocument.Version == null));
+
+            var updated = sources.ToDictionary(
+                pair => Path.Combine(root, pair.Key),
+                pair => pair.Value,
+                StringComparer.Ordinal);
+            foreach (var documentEdit in changes)
+            {
+                var path = documentEdit.TextDocument.Uri.ToUri().LocalPath;
+                var source = updated[path];
+                foreach (var textEdit in documentEdit.Edits)
+                {
+                    Assert.Equal("Pick", TextAt(source, textEdit.Range));
+                    var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+                    var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+                    source = source[..start] + textEdit.NewText + source[end..];
+                }
+                updated[path] = source;
+                if (documentEdit.TextDocument.Version == null)
+                    File.WriteAllText(path, source);
+                else
+                    workspace.Update(documentEdit.TextDocument.Uri, source, version: 12);
+            }
+
+            Assert.Equal(3, updated.Values.Sum(source => Count(source, "Choose")));
+            Assert.Equal(
+                1,
+                Count(updated[Path.Combine(root, "definitions.calr")], ":Pick:pub"));
+            Assert.Equal(
+                1,
+                Count(updated[Path.Combine(root, "collisions.calr")], ":Pick:pub"));
+            Assert.Contains("§MT{m003:Run:pub}", updated[Path.Combine(root, "definitions.calr")]);
+            Assert.Contains("§MT{m021:Run:pub}", updated[Path.Combine(root, "collisions.calr")]);
+
+            var syntaxTrees = new List<SyntaxTree>();
+            foreach (var (path, source) in updated.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                var state = LspTestHarness.CreateDocument(
+                    source,
+                    new Uri(path).AbsoluteUri);
+                Assert.NotNull(state.Ast);
+                Assert.NotNull(state.BoundModule);
+                Assert.False(
+                    state.Diagnostics.HasErrors,
+                    string.Join(
+                        Environment.NewLine,
+                        state.Diagnostics.Select(diagnostic =>
+                            $"{diagnostic.Code}: {diagnostic.Message}")));
+                var generated = new CSharpEmitter().Emit(state.Ast!);
+                var syntaxTree = CSharpSyntaxTree.ParseText(generated, path: path + ".cs");
+                Assert.DoesNotContain(
+                    syntaxTree.GetDiagnostics(),
+                    diagnostic => diagnostic.Severity
+                        == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+                syntaxTrees.Add(syntaxTree);
+            }
+
+            var compilation = CSharpCompilation.Create(
+                "ExactSpanRefactoringGate",
+                syntaxTrees,
+                GetPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            Assert.DoesNotContain(
+                compilation.GetDiagnostics(),
+                diagnostic => diagnostic.Severity
+                    == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
     }
 
-    [Fact]
-    public void ReferenceCollectorForRename_FindsParameterUsages()
+    private static async Task<WorkspaceEdit?> RenameAtAsync(
+        WorkspaceState workspace,
+        DocumentUri uri,
+        string source,
+        string cursorText,
+        string newName)
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Square:pub}
-                §I{i32:num}
-                §O{i32}
-                §R (* num num)
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("num");
-        collector.Visit(ast);
-
-        // Should find: parameter declaration and usages in return
-        Assert.True(collector.References.Count >= 1);
+        var offset = source.IndexOf(cursorText, StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        return await new RenameHandler(workspace).Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = newName,
+            },
+            CancellationToken.None);
     }
 
-    [Fact]
-    public void ReferenceCollectorForRename_FindsClassAndConstructorUsages()
+    private static string TextAt(string source, OmniSharp.Extensions.LanguageServer.Protocol.Models.Range range)
     {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:Widget}
-                §FLD{str:name}
-              §F{f001:Create:pub}
-                §O{Widget}
-                §R §NEW{Widget} §/NEW
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("Widget");
-        collector.Visit(ast);
-
-        // Should find: class declaration and new expression
-        Assert.True(collector.References.Count >= 1);
+        var start = PositionConverter.ToOffset(range.Start, source);
+        var end = PositionConverter.ToOffset(range.End, source);
+        return source[start..end];
     }
 
-    [Fact]
-    public void ReferenceCollectorForRename_FindsFieldUsages()
+    private static int Count(string source, string value)
     {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:Counter}
-                §FLD{i32:value:priv}
-                §MT{m001:Get:pub}
-                  §O{i32}
-                  §R value
-                §MT{m002:Set:pub}
-                  §I{i32:newValue}
-                  §O{void}
-                  §ASSIGN value newValue
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("value");
-        collector.Visit(ast);
-
-        // Should find: field declaration, return usage, and assignment target
-        Assert.True(collector.References.Count >= 1);
+        var count = 0;
+        for (var index = 0;
+             (index = source.IndexOf(value, index, StringComparison.Ordinal)) >= 0;
+             index += value.Length)
+        {
+            count++;
+        }
+        return count;
     }
 
-    [Fact]
-    public void ReferenceCollectorForRename_FindsLoopVariableUsages()
+    private static string CreateWorkspaceDirectory()
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Sum:pub}
-                §O{i32}
-                §B{result} 0
-                §L{for1:index:0:10:1}
-                  §ASSIGN result (+ result index)
-                §R result
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("index");
-        collector.Visit(ast);
-
-        // Should find: for loop variable and usage in loop body
-        Assert.True(collector.References.Count >= 1);
+        var root = Path.Combine(
+            FindRepositoryRoot(),
+            "artifacts",
+            "lsp-refactoring-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        return root;
     }
 
-    [Fact]
-    public void ReferenceCollectorForRename_FindsForeachVariableUsages()
+    private static string FindRepositoryRoot()
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Print:pub}
-                §I{[str]:items}
-                §O{void}
-                §EACH{e1:item:str} items
-                  §P item
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("item");
-        collector.Visit(ast);
-
-        // Should find: foreach variable and usage in print
-        Assert.True(collector.References.Count >= 1);
+        var directory = Directory.GetCurrentDirectory();
+        while (!File.Exists(Path.Combine(directory, "Calor.sln")))
+            directory = Directory.GetParent(directory)!.FullName;
+        return directory;
     }
 
-    [Fact]
-    public void ReferenceCollectorForRename_FindsMethodUsages()
+    private static IEnumerable<MetadataReference> GetPlatformReferences()
     {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:Math}
-                §MT{m001:Add:pub}
-                  §I{i32:a}
-                  §I{i32:b}
-                  §O{i32}
-                  §R (+ a b)
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("Add");
-        collector.Visit(ast);
-
-        // Should find: method declaration
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollectorForRename_FindsEnumMemberUsages()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §EN{e001:Status}
-              Active
-              Inactive
-              §/EN{e001}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("Active");
-        collector.Visit(ast);
-
-        // Should find: enum member
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollectorForRename_FindsInterfaceDeclaration()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §IFACE{i001:IService}
-                §MT{m001:Execute}
-                  §O{void}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("IService");
-        collector.Visit(ast);
-
-        // Should find: interface declaration
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollectorForRename_NoReferences_ForNonexistentSymbol()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §R 0
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("nonexistent");
-        collector.Visit(ast);
-
-        Assert.Empty(collector.References);
-    }
-
-    [Fact]
-    public void ReferenceCollectorForRename_FindsLambdaParameterUsages()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §B{doubler} §LAM
-                §I{i32:val}
-                §R (* val 2)
-                §/LAM
-                §R 0
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("val");
-        collector.Visit(ast);
-
-        // Should find: lambda parameter and usage
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollectorForRename_FindsCatchVariableUsages()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Safe:pub}
-                §O{i32}
-                §TRY{t1}
-                §R (/ 10 0)
-                §CATCH{Exception:ex}
-                §P ex
-                §R 0
-                §/CATCH
-                §/TRY{t1}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollectorForRename("ex");
-        collector.Visit(ast);
-
-        // Should find: catch variable and usage in print
-        Assert.True(collector.References.Count >= 1);
+        var trustedAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
+            ?? throw new InvalidOperationException("Trusted platform assemblies are unavailable.");
+        return trustedAssemblies
+            .Split(Path.PathSeparator)
+            .Select(path => MetadataReference.CreateFromFile(path));
     }
 }
