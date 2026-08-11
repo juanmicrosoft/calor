@@ -672,9 +672,11 @@ public class ClassMemberBindingTests
         // The return expression should be a binary division
         Assert.IsType<BoundBinaryExpression>(ret.Expression);
         var div = (BoundBinaryExpression)ret.Expression!;
-        // The RHS (DEC:100) should NOT be zero
-        Assert.IsType<BoundFloatLiteral>(div.Right);
-        Assert.NotEqual(0.0, ((BoundFloatLiteral)div.Right).Value);
+        // The RHS (DEC:100) should NOT be zero. #762 B5: decimals now bind as
+        // BoundDecimalLiteral at FULL precision (the old BoundFloatLiteral shape this
+        // pin asserted was itself the item-4 downcast defect).
+        Assert.IsType<BoundDecimalLiteral>(div.Right);
+        Assert.NotEqual(0m, ((BoundDecimalLiteral)div.Right).Value);
     }
 
     #endregion
