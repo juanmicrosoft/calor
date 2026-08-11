@@ -1,5 +1,7 @@
 using Calor.Compiler.Formatting;
 using Calor.LanguageServer.State;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -14,17 +16,28 @@ namespace Calor.LanguageServer.Handlers;
 public sealed class FormattingHandler : DocumentFormattingHandlerBase
 {
     private readonly WorkspaceState _workspace;
+    private readonly ILogger<FormattingHandler> _logger;
 
-    public FormattingHandler(WorkspaceState workspace)
+    public FormattingHandler(
+        WorkspaceState workspace,
+        ILogger<FormattingHandler>? logger = null)
     {
         _workspace = workspace;
+        _logger = logger ?? NullLogger<FormattingHandler>.Instance;
     }
 
     public override Task<TextEditContainer?> Handle(DocumentFormattingParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null || state.Diagnostics.HasErrors)
+        if (state == null)
         {
+            return Task.FromResult<TextEditContainer?>(null);
+        }
+        if (state.Ast == null || state.Diagnostics.HasErrors)
+        {
+            _logger.LogWarning(
+                "Formatting returned no edits for {DocumentUri} because the document has compiler errors.",
+                request.TextDocument.Uri);
             return Task.FromResult<TextEditContainer?>(null);
         }
 
@@ -34,8 +47,23 @@ public sealed class FormattingHandler : DocumentFormattingHandlerBase
             var result = formatter.FormatSource(
                 state.Source,
                 state.Uri.IsFile ? state.Uri.LocalPath : state.Uri.ToString());
-            if (!result.Success
-                || string.Equals(result.Original, result.Formatted, StringComparison.Ordinal))
+            if (!result.Success)
+            {
+                _logger.LogError(
+                    "Formatting failed for {DocumentUri}: {Errors}",
+                    request.TextDocument.Uri,
+                    string.Join("; ", result.Errors));
+                return Task.FromResult<TextEditContainer?>(null);
+            }
+            if (result.UsedConservativeFallback)
+            {
+                _logger.LogWarning(
+                    "Formatting returned no edits for {DocumentUri}: {Reason}",
+                    request.TextDocument.Uri,
+                    result.ConservativeFallbackReason);
+                return Task.FromResult<TextEditContainer?>(null);
+            }
+            if (string.Equals(result.Original, result.Formatted, StringComparison.Ordinal))
             {
                 return Task.FromResult<TextEditContainer?>(null);
             }
@@ -53,10 +81,13 @@ public sealed class FormattingHandler : DocumentFormattingHandlerBase
 
             return Task.FromResult<TextEditContainer?>(new TextEditContainer(edit));
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // If formatting fails, return no edits
-            return Task.FromResult<TextEditContainer?>(null);
+            _logger.LogError(
+                ex,
+                "Unexpected formatting failure for {DocumentUri}.",
+                request.TextDocument.Uri);
+            throw;
         }
     }
 

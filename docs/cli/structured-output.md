@@ -154,7 +154,7 @@ pipeline) so they can flow through the structured formats:
 | Code | Meaning |
 |:-----|:--------|
 | `Calor1300` | Lint: line has trailing whitespace |
-| `Calor1301` | Lint: construct ID is not abbreviated (e.g. `f001` → `f1`, `for1` → `l1`) |
+| `Calor1301` | Reserved legacy lint code; not emitted. Formatting never normalizes or abbreviates IDs |
 | `Calor1302` | Lint: input file not found |
 | `Calor1303` | Lint: input file is not a `.calr` file |
 | `Calor1304` | Lint: unexpected error while processing a file |
@@ -180,7 +180,7 @@ pipeline) so they can flow through the structured formats:
 | `Calor1344` | Convert: `--validate` found a parse error in the generated output (warning — the output was still written) |
 | `Calor1345` | Convert: command-level failure — input not found, unknown file type, timeout, or crash |
 | `Calor1346` | Reserved legacy diagnostic from the temporary #760 formatter containment; safe validated writes no longer emit it |
-| `Calor1347` | Format: parseable input was conservatively left byte-identical because semantic or generated-C# validation was not green |
+| `Calor1347` | Format/Lint fix: parseable input was conservatively left byte-identical because semantic or generated-C# validation was not green |
 | `Calor1350` | Import: package or assembly not found (`.dll` path missing, or NuGet package id absent from the global packages folder at the requested version) |
 | `Calor1351` | Import: unresolved public members (Tier C) — their effects are UNKNOWN and are NOT emitted into the manifest (an empty effect list would mean pure); each is listed in the report with a reason |
 | `Calor1352` | Import: command-level failure — unreadable assembly, write failure, or crash |

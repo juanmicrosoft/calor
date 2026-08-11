@@ -360,11 +360,16 @@ public sealed class CheckTool : McpToolBase
 
         try
         {
-            var result = LintSource(source);
+            var result = LintSource(source, fix);
+            var fixHasErrors = result.FixDiagnostics.Any(
+                diagnostic => diagnostic.Severity == "error");
 
             var output = new LintOutput
             {
-                Success = result.ParseSuccess && result.Issues.Count == 0,
+                Success = result.ParseSuccess
+                    && result.Issues.Count == 0
+                    && result.FixSuppressedReason == null
+                    && !fixHasErrors,
                 ParseSuccess = result.ParseSuccess,
                 IssueCount = result.Issues.Count,
                 Issues = result.Issues.Select(i => new LintIssueOutput
@@ -373,10 +378,18 @@ public sealed class CheckTool : McpToolBase
                     Message = i.Message
                 }).ToList(),
                 ParseErrors = result.ParseErrors,
-                FixedCode = fix ? result.FixedContent : null
+                FixedCode = fix ? result.FixedContent : null,
+                FixDiagnostics = result.FixDiagnostics.Count > 0
+                    ? result.FixDiagnostics
+                    : null,
+                FixSuppressedReason = result.FixSuppressedReason
             };
 
-            return Task.FromResult(McpToolResult.Json(output, isError: !result.ParseSuccess));
+            return Task.FromResult(McpToolResult.Json(
+                output,
+                isError: !result.ParseSuccess
+                    || fixHasErrors
+                    || result.FixSuppressedReason != null));
         }
         catch (Exception ex)
         {
@@ -384,7 +397,7 @@ public sealed class CheckTool : McpToolBase
         }
     }
 
-    private static LintResult LintSource(string source)
+    private static LintResult LintSource(string source, bool attemptFix)
     {
         var issues = new List<LintIssue>();
         var trimmableTrailingWhitespace =
@@ -408,7 +421,8 @@ public sealed class CheckTool : McpToolBase
                 ParseErrors = BuildParseErrorEnvelope(diagnostics),
                 Issues = issues,
                 OriginalContent = source,
-                FixedContent = source
+                FixedContent = source,
+                FixDiagnostics = new List<EnvelopeDiagnostic>()
             };
         }
 
@@ -423,36 +437,65 @@ public sealed class CheckTool : McpToolBase
                 ParseErrors = BuildParseErrorEnvelope(diagnostics),
                 Issues = issues,
                 OriginalContent = source,
-                FixedContent = source
+                FixedContent = source,
+                FixDiagnostics = new List<EnvelopeDiagnostic>()
+            };
+        }
+
+        if (!attemptFix)
+        {
+            return new LintResult
+            {
+                ParseSuccess = true,
+                ParseErrors = new List<EnvelopeDiagnostic>(),
+                Issues = issues,
+                OriginalContent = source,
+                FixedContent = source,
+                FixDiagnostics = new List<EnvelopeDiagnostic>()
             };
         }
 
         var formatter = new CalorFormatter();
         var formatResult = formatter.FormatSource(source, "mcp-input.calr");
-        if (!formatResult.Success || formatResult.UsedConservativeFallback)
+        if (!formatResult.Success)
         {
-            var parseErrors = formatResult.Diagnostics
+            var fixDiagnostics = formatResult.Diagnostics
                 .Where(diagnostic => diagnostic.IsError)
                 .Select(diagnostic => DiagnosticEnvelope.Build(diagnostic))
                 .ToList();
-            if (formatResult.UsedConservativeFallback)
+            if (fixDiagnostics.Count == 0)
             {
-                parseErrors.Add(DiagnosticEnvelope.Build(new Diagnostic(
+                fixDiagnostics.Add(DiagnosticEnvelope.Build(new Diagnostic(
                     DiagnosticCode.LintProcessingError,
-                    formatResult.ConservativeFallbackReason
-                        ?? "Source is unsupported by the safe formatting gates.",
+                    formatResult.Errors.FirstOrDefault()
+                        ?? "Safe formatting failed.",
                     TextSpan.Empty,
                     DiagnosticSeverity.Error,
                     "mcp-input.calr")));
             }
             return new LintResult
             {
-                ParseSuccess = false,
-                ParseErrors = parseErrors,
+                ParseSuccess = true,
+                ParseErrors = new List<EnvelopeDiagnostic>(),
                 Issues = issues,
                 OriginalContent = source,
-                FixedContent = source
+                FixedContent = source,
+                FixDiagnostics = fixDiagnostics
             };
+        }
+
+        string? fixSuppressedReason = null;
+        var fallbackDiagnostics = new List<EnvelopeDiagnostic>();
+        if (formatResult.UsedConservativeFallback)
+        {
+            fixSuppressedReason = formatResult.ConservativeFallbackReason
+                ?? "Source is unsupported by the safe formatting gates.";
+            fallbackDiagnostics.Add(DiagnosticEnvelope.Build(new Diagnostic(
+                DiagnosticCode.FormatConservativeFallback,
+                fixSuppressedReason,
+                TextSpan.Empty,
+                DiagnosticSeverity.Warning,
+                "mcp-input.calr")));
         }
 
         return new LintResult
@@ -461,7 +504,9 @@ public sealed class CheckTool : McpToolBase
             ParseErrors = new List<EnvelopeDiagnostic>(),
             Issues = issues,
             OriginalContent = source,
-            FixedContent = formatResult.Formatted
+            FixedContent = formatResult.Formatted,
+            FixDiagnostics = fallbackDiagnostics,
+            FixSuppressedReason = fixSuppressedReason
         };
     }
 
@@ -806,6 +851,8 @@ public sealed class CheckTool : McpToolBase
         public required List<LintIssue> Issues { get; init; }
         public required string OriginalContent { get; init; }
         public required string FixedContent { get; init; }
+        public required List<EnvelopeDiagnostic> FixDiagnostics { get; init; }
+        public string? FixSuppressedReason { get; init; }
     }
 
     private sealed record LintIssue(int Line, string Message);
@@ -832,6 +879,14 @@ public sealed class CheckTool : McpToolBase
         [JsonPropertyName("fixedCode")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? FixedCode { get; init; }
+
+        [JsonPropertyName("fixDiagnostics")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<EnvelopeDiagnostic>? FixDiagnostics { get; init; }
+
+        [JsonPropertyName("fixSuppressedReason")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? FixSuppressedReason { get; init; }
     }
 
     private sealed class LintIssueOutput

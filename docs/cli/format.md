@@ -81,7 +81,7 @@ files). Exit codes are unchanged.
   "data": {
     "files": [
       { "path": "/abs/Good.calr", "changed": true, "status": "formatted",
-        "residualParseErrors": false, "conservativeFallbackReason": null }
+        "residualParseErrors": false }
     ],
     "totals": { "processed": 2, "formatted": 1, "errors": 1,
       "stillFailingAfterHeal": 0, "unsupported": 0 }

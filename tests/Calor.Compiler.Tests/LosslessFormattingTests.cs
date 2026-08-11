@@ -1,5 +1,8 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
@@ -256,6 +259,123 @@ public sealed class LosslessFormattingTests : IDisposable
         Assert.Contains("\n\tConsole.WriteLine(user001);\n", result.Formatted, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [MemberData(nameof(MultilineProtectedTokenSources))]
+    public void MultilineTokenInteriors_AreProtectedByLexerSpans(
+        string name,
+        string source,
+        string protectedText)
+    {
+        var result = new CalorFormatter().FormatSource(source, $"{name}.calr");
+
+        Assert.True(result.Success, $"{name}: {string.Join("\n", result.Errors)}");
+        Assert.False(result.UsedConservativeFallback, result.ConservativeFallbackReason);
+        Assert.NotEqual(source, result.Formatted);
+        Assert.Contains(protectedText, result.Formatted, StringComparison.Ordinal);
+        Assert.Equal(
+            SemanticTokenHash(source, $"{name}.calr"),
+            SemanticTokenHash(result.Formatted, $"{name}.calr"));
+    }
+
+    public static IEnumerable<object[]> MultilineProtectedTokenSources()
+    {
+        yield return
+        [
+            "multiline-string",
+            "§M{m001:MultilineString}   \n" +
+            "  §F{f001:Main:pub} () -> void\n" +
+            "    §E{cw}\n" +
+            "    §P \"\"\"\n" +
+            "      first line   \n" +
+            "        // string content   \n" +
+            "      last line\t\n" +
+            "    \"\"\"\n",
+            "      first line   \n        // string content   \n      last line\t"
+        ];
+        yield return
+        [
+            "multiline-raw-expression",
+            "§M{m001:MultilineExpression}   \n" +
+            "  §F{f001:Get:pub} () -> i32\n" +
+            "    §R §CS{\n" +
+            "      1 +   \n" +
+            "        2\t\n" +
+            "    }\n",
+            "\n      1 +   \n        2\t\n    }"
+        ];
+        yield return
+        [
+            "multiline-raw-block",
+            "§M{m001:MultilineRaw}   \n" +
+                        "  §F{f001:Main:pub} () -> void\n" +
+                        "    §E{cw}\n" +
+                        "    §RAW\n" +
+                        "var rawKeep = \"keep\";   \n" +
+                        "Console.WriteLine(rawKeep);\n" +
+                        "    §/RAW\n",
+                        "var rawKeep = \"keep\";   \nConsole.WriteLine(rawKeep);"
+        ];
+        yield return
+        [
+            "multiline-interop-block",
+            "§M{m001:MultilineInterop}   \n" +
+            "  §CSHARP{\n" +
+            "public static class InteropKeep\n" +
+            "{\n" +
+            "    public static string Value = \"keep\";   \n" +
+            "}\n" +
+            "}§/CSHARP\n",
+            "public static class InteropKeep\n{\n    public static string Value = \"keep\";   \n}"
+        ];
+    }
+
+    [Fact]
+    public void CrOnlyInput_FormatsWithoutLineDesynchronization()
+    {
+        const string source =
+            "§M{m001:CrOnly}\r" +
+            "    §F{f001:Main:pub} () -> void   \r" +
+            "        §E{cw}\r" +
+            "        §P \"ok\"   \r";
+
+        var result = new CalorFormatter().FormatSource(source, "cr-only.calr");
+
+        Assert.True(result.Success, string.Join("\n", result.Errors));
+        Assert.False(result.UsedConservativeFallback, result.ConservativeFallbackReason);
+        Assert.Equal(
+            "§M{m001:CrOnly}\r" +
+            "  §F{f001:Main:pub} () -> void\r" +
+            "    §E{cw}\r" +
+            "    §P \"ok\"\r",
+            result.Formatted);
+    }
+
+    [Fact]
+    public void MixedLoneCrInput_PreservesEveryTerminatorAndRemainsIdempotent()
+    {
+        const string source =
+            "§M{m001:MixedCr}\r\n" +
+            "    §F{f001:Main:pub} () -> void   \r" +
+            "        §E{cw}\n" +
+            "        §P \"ok\"   \r\n";
+        var formatter = new CalorFormatter();
+
+        var once = formatter.FormatSource(source, "mixed-cr.calr");
+        var twice = formatter.FormatSource(once.Formatted, "mixed-cr.calr");
+
+        Assert.True(once.Success, string.Join("\n", once.Errors));
+        Assert.True(twice.Success, string.Join("\n", twice.Errors));
+        Assert.False(once.UsedConservativeFallback, once.ConservativeFallbackReason);
+        Assert.Equal(once.Formatted, twice.Formatted);
+        Assert.True(LosslessSourceDocument.HasEquivalentLineShape(
+            source,
+            once.Formatted,
+            out var error), error);
+        Assert.Contains("\r\n", once.Formatted, StringComparison.Ordinal);
+        Assert.Contains("\r", once.Formatted, StringComparison.Ordinal);
+        Assert.Contains("\n", once.Formatted, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void LintTrailingWhitespaceClassification_MatchesLosslessFormatter()
     {
@@ -338,6 +458,115 @@ public sealed class LosslessFormattingTests : IDisposable
     }
 
     [Fact]
+    public async Task SafeWrite_ResolvesSymlinkTargetWithoutReplacingLink()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var target = Path.Combine(_testDirectory, "symlink-target.calr");
+        var link = Path.Combine(_testDirectory, "symlink.calr");
+        const string source =
+            "§M{m001:Symlink}\n" +
+            "    §F{f001:Main:pub} () -> void   \n";
+        await File.WriteAllTextAsync(target, source);
+        File.CreateSymbolicLink(link, target);
+
+        var snapshot = await SourceFileSnapshot.ReadAsync(link);
+        var formatter = new CalorFormatter();
+        var result = formatter.FormatSource(snapshot.Text, link);
+        Assert.True(result.Success, string.Join("\n", result.Errors));
+
+        await SafeSourceFile.WriteFormattedAsync(snapshot, result.Formatted, formatter);
+
+        Assert.NotNull(File.ResolveLinkTarget(link, returnFinalTarget: false));
+        Assert.Equal(result.Formatted, await File.ReadAllTextAsync(target));
+        Assert.Equal(result.Formatted, await File.ReadAllTextAsync(link));
+    }
+
+    [Fact]
+    public async Task SafeWrite_RejectsMultipleHardLinksWithoutChangingEitherName()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var path = Path.Combine(_testDirectory, "hardlink-source.calr");
+        var alias = Path.Combine(_testDirectory, "hardlink-alias.calr");
+        const string source =
+            "§M{m001:HardLink}\n" +
+            "    §F{f001:Main:pub} () -> void   \n";
+        await File.WriteAllTextAsync(path, source);
+        Assert.Equal(0, CreateHardLink(path, alias));
+        Assert.True(NativeFileLinks.TryGetLinkCount(path) > 1);
+
+        var snapshot = await SourceFileSnapshot.ReadAsync(path);
+        var formatter = new CalorFormatter();
+        var result = formatter.FormatSource(snapshot.Text, path);
+        Assert.True(result.Success, string.Join("\n", result.Errors));
+
+        var error = await Assert.ThrowsAsync<IOException>(
+            () => SafeSourceFile.WriteFormattedAsync(
+                snapshot,
+                result.Formatted,
+                formatter));
+
+        Assert.Contains("multiple hard links", error.Message, StringComparison.Ordinal);
+        Assert.Equal(source, await File.ReadAllTextAsync(path));
+        Assert.Equal(source, await File.ReadAllTextAsync(alias));
+        Assert.Empty(Directory.EnumerateFiles(_testDirectory, "*.format.tmp"));
+    }
+
+    [Fact]
+    public async Task SafeWrite_TemporaryFileIsRestrictiveAndFinalModeIsPreserved()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var path = Path.Combine(_testDirectory, "mode.calr");
+        const string source =
+            "§M{m001:Mode}\n" +
+            "    §F{f001:Main:pub} () -> void   \n";
+        await File.WriteAllTextAsync(path, source);
+        var originalMode = UnixFileMode.UserRead
+            | UnixFileMode.UserWrite
+            | UnixFileMode.GroupRead
+            | UnixFileMode.OtherRead;
+        File.SetUnixFileMode(path, originalMode);
+
+        var snapshot = await SourceFileSnapshot.ReadAsync(path);
+        var formatter = new CalorFormatter();
+        var result = formatter.FormatSource(snapshot.Text, path);
+        Assert.True(result.Success, string.Join("\n", result.Errors));
+
+        UnixFileMode? temporaryMode = null;
+        await SafeSourceFile.WriteFormattedAsync(
+            snapshot,
+            result.Formatted,
+            formatter,
+            _ =>
+            {
+                var temporary = Assert.Single(
+                    Directory.EnumerateFiles(_testDirectory, "*.format.tmp"));
+#pragma warning disable CA1416 // Guarded by the Windows return above.
+                temporaryMode = File.GetUnixFileMode(temporary);
+#pragma warning restore CA1416
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(
+            UnixFileMode.UserRead | UnixFileMode.UserWrite,
+            temporaryMode);
+#pragma warning disable CA1416 // Guarded by the Windows return above.
+        Assert.Equal(originalMode, File.GetUnixFileMode(path));
+#pragma warning restore CA1416
+    }
+
+    [Fact]
     public void SemanticHashGeneratedCSharpAndPublicApi_AreEquivalent()
     {
         const string source = """
@@ -388,36 +617,228 @@ public sealed class LosslessFormattingTests : IDisposable
     }
 
     [Fact]
-    public void CheckedInParseableCalorCorpus_IsIdempotentAndSemanticallyEquivalent()
+    public void CheckedInCalorCorpus_MatchesBaselineAndExercisesSafeTransformations()
     {
         var repoRoot = CliTestHarness.FindRepoRoot();
-        var files = Directory.EnumerateFiles(repoRoot, "*.calr", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}.git{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                && !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                && !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                && !path.Contains($"{Path.DirectorySeparatorChar}.calor-test-artifacts{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToArray();
-        var formatter = new CalorFormatter();
-        var parseable = 0;
+        var files = GetTrackedCalorFiles(repoRoot);
+        using var baselineDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(
+            repoRoot,
+            "tests",
+            "TestData",
+            "Formatting",
+            "formatter-corpus-baseline.json")));
+        var baseline = baselineDocument.RootElement;
+        Assert.Equal(
+            baseline.GetProperty("trackedFileCount").GetInt32(),
+            files.Length);
 
-        foreach (var path in files)
+        var expectedParseFailures = ReadPathSet(
+            baseline.GetProperty("parseFailurePaths"));
+        var fallbacks = baseline.GetProperty("conservativeFallbacks");
+        var expectedSemanticFallbacks = ReadPathSet(
+            fallbacks.GetProperty("semanticErrors"));
+        var expectedGeneratedFallbacks = ReadPathSet(
+            fallbacks.GetProperty("generatedCSharpErrors"));
+
+        var formatter = new CalorFormatter();
+        var actualParseFailures = new HashSet<string>(StringComparer.Ordinal);
+        var actualSemanticFallbacks = new HashSet<string>(StringComparer.Ordinal);
+        var actualGeneratedFallbacks = new HashSet<string>(StringComparer.Ordinal);
+        var successfulTransformations = 0;
+        var commentProbes = 0;
+
+        foreach (var relativePath in files)
         {
+            var path = Path.Combine(repoRoot, relativePath);
             var source = File.ReadAllText(path);
-            if (!Parses(source, path))
+            var classification = formatter.FormatSource(source, path);
+            if (!classification.Success)
+            {
+                actualParseFailures.Add(relativePath);
+                continue;
+            }
+            if (classification.UsedConservativeFallback)
+            {
+                Assert.Equal(source, classification.Formatted);
+                Assert.NotNull(classification.ConservativeFallbackReason);
+                if (classification.ConservativeFallbackReason.StartsWith(
+                        "Source has semantic errors",
+                        StringComparison.Ordinal))
+                {
+                    actualSemanticFallbacks.Add(relativePath);
+                }
+                else if (classification.ConservativeFallbackReason.StartsWith(
+                             "Source does not generate Roslyn-clean C#",
+                             StringComparison.Ordinal))
+                {
+                    actualGeneratedFallbacks.Add(relativePath);
+                }
+                else
+                {
+                    Assert.Fail(
+                        $"{relativePath}: unreviewed conservative fallback reason: " +
+                        classification.ConservativeFallbackReason);
+                }
+                continue;
+            }
+
+            var (probedSource, usedCommentProbe) = InjectFormattingProbe(source, path);
+            if (usedCommentProbe)
+            {
+                commentProbes++;
+            }
+
+            var once = formatter.FormatSource(probedSource, path);
+            Assert.True(once.Success, $"{relativePath}: {string.Join("; ", once.Errors)}");
+            Assert.False(
+                once.UsedConservativeFallback,
+                $"{relativePath}: {once.ConservativeFallbackReason}");
+            Assert.NotEqual(probedSource, once.Formatted);
+
+            var before = Program.Compile(probedSource, path);
+            var after = Program.Compile(once.Formatted, path);
+            Assert.False(
+                before.HasErrors,
+                $"{relativePath} before: {string.Join("; ", before.Diagnostics.Errors)}");
+            Assert.False(
+                after.HasErrors,
+                $"{relativePath} after: {string.Join("; ", after.Diagnostics.Errors)}");
+            Assert.Equal(
+                SemanticTokenHash(probedSource, path),
+                SemanticTokenHash(once.Formatted, path));
+            Assert.Equal(before.GeneratedCode, after.GeneratedCode);
+            Assert.True(
+                GeneratedCSharpCompiler.Validate(after.GeneratedCode).CompilationSuccess,
+                $"{relativePath}: formatted output did not generate Roslyn-clean C#.");
+            Assert.Equal(
+                PublicApi(before.GeneratedCode),
+                PublicApi(after.GeneratedCode));
+
+            var twice = formatter.FormatSource(once.Formatted, path);
+            Assert.True(twice.Success, $"{relativePath}: {string.Join("; ", twice.Errors)}");
+            Assert.False(twice.UsedConservativeFallback, twice.ConservativeFallbackReason);
+            Assert.Equal(once.Formatted, twice.Formatted);
+            successfulTransformations++;
+        }
+
+        Assert.Equal(
+            expectedParseFailures.Order(StringComparer.Ordinal),
+            actualParseFailures.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            expectedSemanticFallbacks.Order(StringComparer.Ordinal),
+            actualSemanticFallbacks.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            expectedGeneratedFallbacks.Order(StringComparer.Ordinal),
+            actualGeneratedFallbacks.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            baseline.GetProperty("successfulTransformationCount").GetInt32(),
+            successfulTransformations);
+        Assert.Equal(successfulTransformations, commentProbes);
+    }
+
+    private static string[] GetTrackedCalorFiles(string repoRoot)
+    {
+        var startInfo = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = repoRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("ls-files");
+        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add("*.calr");
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Could not start git.");
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.True(
+            process.ExitCode == 0,
+            $"git ls-files failed with exit {process.ExitCode}: {error}");
+
+        return output
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static HashSet<string> ReadPathSet(JsonElement array) =>
+        array.EnumerateArray()
+            .Select(element => element.GetString()
+                ?? throw new InvalidDataException("Corpus baseline path is null."))
+            .ToHashSet(StringComparer.Ordinal);
+
+    private static (string Source, bool UsedCommentProbe) InjectFormattingProbe(
+        string source,
+        string path)
+    {
+        var newline = source.Contains("\r\n", StringComparison.Ordinal)
+            ? "\r\n"
+            : source.Contains('\n')
+                ? "\n"
+                : source.Contains('\r')
+                    ? "\r"
+                    : "\n";
+        var commentProbe = "// lossless formatter corpus probe"
+            + newline
+            + source;
+        if (Parses(commentProbe, path)
+            && TryInjectTrailingWhitespace(commentProbe, path, out var probedWithComment))
+        {
+            return (probedWithComment, true);
+        }
+
+        if (TryInjectTrailingWhitespace(source, path, out var probedSource))
+        {
+            return (probedSource, false);
+        }
+
+        throw new InvalidDataException(
+            $"{path}: could not inject a parseable formatting probe.");
+    }
+
+    private static bool TryInjectTrailingWhitespace(
+        string source,
+        string path,
+        out string candidate)
+    {
+        var lineEnds = new List<(int Offset, int Line)>();
+        var line = 1;
+        for (var offset = 0; offset <= source.Length; offset++)
+        {
+            if (offset < source.Length
+                && source[offset] is not '\r' and not '\n')
             {
                 continue;
             }
 
-            parseable++;
-            var once = formatter.FormatSource(source, path);
-            Assert.True(once.Success, $"{path}: {string.Join("; ", once.Errors)}");
-            var twice = formatter.FormatSource(once.Formatted, path);
-            Assert.True(twice.Success, $"{path}: {string.Join("; ", twice.Errors)}");
-            Assert.Equal(once.Formatted, twice.Formatted);
+            lineEnds.Add((offset, line));
+            if (offset < source.Length
+                && source[offset] == '\r'
+                && offset + 1 < source.Length
+                && source[offset + 1] == '\n')
+            {
+                offset++;
+            }
+            line++;
         }
 
-        Assert.True(parseable > 0);
+        foreach (var lineEnd in lineEnds.AsEnumerable().Reverse())
+        {
+            candidate = source.Insert(lineEnd.Offset, " \t");
+            if (LosslessSourceDocument
+                    .GetTrimmableTrailingWhitespaceLines(candidate)
+                    .Contains(lineEnd.Line)
+                && Parses(candidate, path))
+            {
+                return true;
+            }
+        }
+
+        candidate = source;
+        return false;
     }
 
     private static bool Parses(string source, string path)
@@ -473,4 +894,9 @@ public sealed class LosslessFormattingTests : IDisposable
     }
 
     private sealed class InjectedFormatFailure : Exception;
+
+    [DllImport("libc", EntryPoint = "link", SetLastError = true)]
+    private static extern int CreateHardLink(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string existingPath,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string newPath);
 }

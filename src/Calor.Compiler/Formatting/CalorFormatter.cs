@@ -1,4 +1,7 @@
 using System.Text;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
@@ -171,7 +174,7 @@ public sealed class CalorFormatter
 
         var document = LosslessSourceDocument.Parse(source);
         return CoreFormatResult.Successful(
-            document.Format(indentation),
+            document.Format(indentation, document.GetLineProtections(parsed.Tokens)),
             parsed.Diagnostics.ToList());
     }
 
@@ -319,7 +322,7 @@ internal sealed class LosslessSourceDocument
                 var lineBreak = i + 1 < source.Length && source[i + 1] == '\n'
                     ? "\r\n"
                     : "\r";
-                lines.Add(new SourceLine(source[start..i], lineBreak));
+                lines.Add(new SourceLine(start, source[start..i], lineBreak));
                 if (lineBreak.Length == 2)
                 {
                     i++;
@@ -328,75 +331,56 @@ internal sealed class LosslessSourceDocument
             }
             else if (source[i] == '\n')
             {
-                lines.Add(new SourceLine(source[start..i], "\n"));
+                lines.Add(new SourceLine(start, source[start..i], "\n"));
                 start = i + 1;
             }
         }
 
         if (start < source.Length || source.Length == 0)
         {
-            lines.Add(new SourceLine(source[start..], string.Empty));
+            lines.Add(new SourceLine(start, source[start..], string.Empty));
         }
 
         return new LosslessSourceDocument(lines.ToArray());
     }
 
-    public string Format(IReadOnlyDictionary<int, string> indentationByLine)
+    public string Format(
+        IReadOnlyDictionary<int, string> indentationByLine,
+        IReadOnlyDictionary<int, SourceLineProtection>? protections = null)
     {
         var formatted = new FormattedLine[_lines.Length];
-        var rawRegion = false;
 
         for (var i = 0; i < _lines.Length; i++)
         {
             var line = _lines[i];
             var trimmedStart = line.Content.TrimStart(' ', '\t');
-            var startsRawRegion = StartsRawRegion(trimmedStart);
-            var containsInlineRaw = ContainsInlineRawCSharp(trimmedStart);
-
-            if (rawRegion)
-            {
-                formatted[i] = new FormattedLine(
-                    line.Content,
-                    line.LineBreak,
-                    IsBlank: false,
-                    IsComment: false,
-                    IsRaw: true);
-            }
-            else
-            {
-                var leadingLength = line.Content.Length - trimmedStart.Length;
-                var leading = indentationByLine.TryGetValue(i + 1, out var replacement)
+            var protection = protections != null
+                && protections.TryGetValue(i + 1, out var value)
+                    ? value
+                    : SourceLineProtection.None;
+            var leadingLength = line.Content.Length - trimmedStart.Length;
+            var leading = !protection.Leading
+                && indentationByLine.TryGetValue(i + 1, out var replacement)
                     ? replacement
                     : line.Content[..leadingLength];
-                var content = leading + trimmedStart;
+            var content = leading + trimmedStart;
 
-                var isBlank = trimmedStart.Length == 0;
-                var isComment = trimmedStart.StartsWith("//", StringComparison.Ordinal);
-                if (!isBlank
-                    && !isComment
-                    && !startsRawRegion
-                    && !containsInlineRaw
-                    && FindLineCommentStart(trimmedStart) < 0)
-                {
-                    content = content.TrimEnd(' ', '\t');
-                }
-
-                formatted[i] = new FormattedLine(
-                    content,
-                    line.LineBreak,
-                    isBlank,
-                    isComment,
-                    IsRaw: false);
-            }
-
-            if (!rawRegion && startsRawRegion && !EndsRawRegion(trimmedStart))
+            var isBlank = trimmedStart.Length == 0;
+            var isComment = trimmedStart.StartsWith("//", StringComparison.Ordinal);
+            if (!protection.Trailing
+                && !isBlank
+                && !isComment
+                && FindLineCommentStart(trimmedStart) < 0)
             {
-                rawRegion = true;
+                content = content.TrimEnd(' ', '\t');
             }
-            else if (rawRegion && EndsRawRegion(trimmedStart))
-            {
-                rawRegion = false;
-            }
+
+            formatted[i] = new FormattedLine(
+                content,
+                line.LineBreak,
+                isBlank,
+                isComment,
+                protection.Leading);
         }
 
         ReindentAttachedComments(formatted);
@@ -418,37 +402,92 @@ internal sealed class LosslessSourceDocument
     {
         var document = Parse(source);
         var result = new HashSet<int>();
-        var rawRegion = false;
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        var protections = document.GetLineProtections(tokens);
 
         for (var i = 0; i < document._lines.Length; i++)
         {
             var content = document._lines[i].Content;
             var trimmedStart = content.TrimStart(' ', '\t');
-            var startsRawRegion = StartsRawRegion(trimmedStart);
-            var containsInlineRaw = ContainsInlineRawCSharp(trimmedStart);
-            if (!rawRegion
+            var protectedTrailing = protections.TryGetValue(i + 1, out var protection)
+                && protection.Trailing;
+            if (!protectedTrailing
                 && trimmedStart.Length > 0
                 && !trimmedStart.StartsWith("//", StringComparison.Ordinal)
-                && !startsRawRegion
-                && !containsInlineRaw
                 && FindLineCommentStart(trimmedStart) < 0
                 && content.Length > 0
                 && content[^1] is ' ' or '\t')
             {
                 result.Add(i + 1);
             }
-
-            if (!rawRegion && startsRawRegion && !EndsRawRegion(trimmedStart))
-            {
-                rawRegion = true;
-            }
-            else if (rawRegion && EndsRawRegion(trimmedStart))
-            {
-                rawRegion = false;
-            }
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Maps lexer-owned multiline token spans to the exact leading/trailing
+    /// trivia ranges they overlap. Formatting never edits trivia that is part
+    /// of a multiline string or raw/interop token.
+    /// </summary>
+    internal IReadOnlyDictionary<int, SourceLineProtection> GetLineProtections(
+        IReadOnlyList<Token> tokens)
+    {
+        var protections = new Dictionary<int, SourceLineProtection>();
+        foreach (var token in tokens)
+        {
+            if (!IsProtectedToken(token.Kind)
+                || token.Text.IndexOfAny(['\r', '\n']) < 0)
+            {
+                continue;
+            }
+
+            for (var i = 0; i < _lines.Length; i++)
+            {
+                var line = _lines[i];
+                var contentStart = line.Start;
+                var contentEnd = contentStart + line.Content.Length;
+                var lineEnd = contentEnd + line.LineBreak.Length;
+                if (token.Span.End <= contentStart || token.Span.Start >= lineEnd)
+                {
+                    continue;
+                }
+
+                var leadingEnd = contentStart;
+                while (leadingEnd < contentEnd
+                    && line.Content[leadingEnd - contentStart] is ' ' or '\t')
+                {
+                    leadingEnd++;
+                }
+
+                var trailingStart = contentEnd;
+                while (trailingStart > contentStart
+                    && line.Content[trailingStart - contentStart - 1] is ' ' or '\t')
+                {
+                    trailingStart--;
+                }
+
+                var leadingOverlap = token.Span.Start < leadingEnd
+                    && token.Span.End > contentStart;
+                var trailingOverlap = token.Span.Start < contentEnd
+                    && token.Span.End > trailingStart;
+                if (!leadingOverlap && !trailingOverlap)
+                {
+                    continue;
+                }
+
+                var lineNumber = i + 1;
+                var existing = protections.TryGetValue(lineNumber, out var value)
+                    ? value
+                    : SourceLineProtection.None;
+                protections[lineNumber] = new SourceLineProtection(
+                    existing.Leading || leadingOverlap,
+                    existing.Trailing || trailingOverlap);
+            }
+        }
+
+        return protections;
     }
 
     public static bool HasEquivalentLineShape(
@@ -489,7 +528,7 @@ internal sealed class LosslessSourceDocument
     {
         for (var i = 0; i < lines.Length; i++)
         {
-            if (!lines[i].IsComment || lines[i].IsRaw)
+            if (!lines[i].IsComment || lines[i].LeadingProtected)
             {
                 continue;
             }
@@ -503,7 +542,7 @@ internal sealed class LosslessSourceDocument
                     separatedFromNext = true;
                     break;
                 }
-                if (!lines[j].IsComment && !lines[j].IsRaw)
+                if (!lines[j].IsComment && !lines[j].LeadingProtected)
                 {
                     nextCode = j;
                     break;
@@ -528,7 +567,7 @@ internal sealed class LosslessSourceDocument
     {
         for (var i = start - 1; i >= 0; i--)
         {
-            if (!lines[i].IsBlank && !lines[i].IsComment && !lines[i].IsRaw)
+            if (!lines[i].IsBlank && !lines[i].IsComment && !lines[i].LeadingProtected)
             {
                 return i;
             }
@@ -582,28 +621,28 @@ internal sealed class LosslessSourceDocument
         return -1;
     }
 
-    private static bool StartsRawRegion(string content) =>
-        content.StartsWith("§RAW", StringComparison.Ordinal)
-        || content.StartsWith("§CSHARP{", StringComparison.Ordinal);
-
-    private static bool EndsRawRegion(string content) =>
-        content.Contains("§/RAW", StringComparison.Ordinal)
-        || content.Contains("}§/CSHARP", StringComparison.Ordinal);
-
-    private static bool ContainsInlineRawCSharp(string content) =>
-        content.Contains("§CS{", StringComparison.Ordinal);
+    private static bool IsProtectedToken(TokenKind kind) =>
+        kind is TokenKind.StrLiteral
+            or TokenKind.RawCSharp
+            or TokenKind.RawCSharpExpression
+            or TokenKind.CSharpInterop;
 
     private static string NormalizeTrivia(string content) =>
         content.TrimStart(' ', '\t').TrimEnd(' ', '\t');
 
-    private sealed record SourceLine(string Content, string LineBreak);
+    private sealed record SourceLine(int Start, string Content, string LineBreak);
 
     private sealed record FormattedLine(
         string Content,
         string LineBreak,
         bool IsBlank,
         bool IsComment,
-        bool IsRaw);
+        bool LeadingProtected);
+}
+
+internal readonly record struct SourceLineProtection(bool Leading, bool Trailing)
+{
+    public static SourceLineProtection None => new(false, false);
 }
 
 /// <summary>
@@ -636,11 +675,14 @@ internal sealed class SourceFileSnapshot
         string path,
         CancellationToken cancellationToken = default)
     {
-        var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+        var fullPath = System.IO.Path.GetFullPath(path);
+        var resolvedTarget = File.ResolveLinkTarget(fullPath, returnFinalTarget: true);
+        var effectivePath = resolvedTarget?.FullName ?? fullPath;
+        var bytes = await File.ReadAllBytesAsync(effectivePath, cancellationToken);
         var (encoding, preambleLength) = DetectEncoding(bytes);
         var text = encoding.GetString(bytes, preambleLength, bytes.Length - preambleLength);
         var preamble = bytes[..preambleLength];
-        return new SourceFileSnapshot(path, bytes, text, encoding, preamble);
+        return new SourceFileSnapshot(effectivePath, bytes, text, encoding, preamble);
     }
 
     public byte[] Encode(string text)
@@ -744,6 +786,7 @@ internal static class SafeSourceFile
         CancellationToken cancellationToken)
     {
         validate(candidate);
+        EnsureSafeReplacementTarget(original.Path);
         var candidateBytes = original.Encode(candidate);
         var directory = System.IO.Path.GetDirectoryName(original.Path)
             ?? throw new InvalidOperationException("Source file has no parent directory.");
@@ -759,13 +802,21 @@ internal static class SafeSourceFile
 
         try
         {
-            await using (var stream = new FileStream(
-                tempPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                bufferSize: 4096,
-                options: FileOptions.Asynchronous | FileOptions.WriteThrough))
+            var streamOptions = new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                BufferSize = 4096,
+                Options = FileOptions.Asynchronous | FileOptions.WriteThrough
+            };
+            if (!OperatingSystem.IsWindows())
+            {
+                streamOptions.UnixCreateMode =
+                    UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            }
+
+            await using (var stream = new FileStream(tempPath, streamOptions))
             {
                 await stream.WriteAsync(candidateBytes, cancellationToken);
                 await stream.FlushAsync(cancellationToken);
@@ -781,20 +832,21 @@ internal static class SafeSourceFile
             var persistedText = SourceFileSnapshot.DecodeLike(persistedBytes, original);
             validate(persistedText);
 
-            if (!OperatingSystem.IsWindows() && originalMode.HasValue)
-            {
-                File.SetUnixFileMode(tempPath, originalMode.Value);
-            }
-
             if (beforeReplace != null)
             {
                 await beforeReplace(cancellationToken);
             }
 
+            EnsureSafeReplacementTarget(original.Path);
             var currentBytes = await File.ReadAllBytesAsync(original.Path, cancellationToken);
             if (!original.Bytes.AsSpan().SequenceEqual(currentBytes))
             {
                 throw new IOException("Source changed while formatting; refusing to overwrite it.");
+            }
+
+            if (!OperatingSystem.IsWindows() && originalMode.HasValue)
+            {
+                File.SetUnixFileMode(tempPath, originalMode.Value);
             }
 
             File.Move(tempPath, original.Path, overwrite: true);
@@ -806,5 +858,100 @@ internal static class SafeSourceFile
                 File.Delete(tempPath);
             }
         }
+    }
+
+    private static void EnsureSafeReplacementTarget(string path)
+    {
+        if (File.ResolveLinkTarget(path, returnFinalTarget: false) != null)
+        {
+            throw new IOException(
+                "Source replacement target became a symbolic link; refusing to overwrite it.");
+        }
+
+        var linkCount = NativeFileLinks.TryGetLinkCount(path);
+        if (linkCount > 1)
+        {
+            throw new IOException(
+                "Source has multiple hard links; refusing non-atomic replacement.");
+        }
+    }
+}
+
+internal static class NativeFileLinks
+{
+    internal static int? TryGetLinkCount(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            using var handle = File.OpenHandle(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            if (!GetFileInformationByHandle(handle, out var information))
+            {
+                throw new IOException(
+                    $"Could not inspect source hard links: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
+            }
+            return checked((int)information.NumberOfLinks);
+        }
+
+        if (!Environment.Is64BitProcess
+            || (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()))
+        {
+            return null;
+        }
+
+        const int statBufferSize = 256;
+        var buffer = Marshal.AllocHGlobal(statBufferSize);
+        try
+        {
+            if (Stat(path, buffer) != 0)
+            {
+                throw new IOException(
+                    $"Could not inspect source hard links: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
+            }
+
+            return OperatingSystem.IsMacOS()
+                ? unchecked((ushort)Marshal.ReadInt16(buffer, 6))
+                : checked((int)Marshal.ReadInt64(buffer, 16));
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
+    private static extern int Stat(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        IntPtr buffer);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandle(
+        SafeFileHandle file,
+        out ByHandleFileInformation information);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ByHandleFileInformation
+    {
+        public uint FileAttributes;
+        public FileTime CreationTime;
+        public FileTime LastAccessTime;
+        public FileTime LastWriteTime;
+        public uint VolumeSerialNumber;
+        public uint FileSizeHigh;
+        public uint FileSizeLow;
+        public uint NumberOfLinks;
+        public uint FileIndexHigh;
+        public uint FileIndexLow;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileTime
+    {
+        public uint LowDateTime;
+        public uint HighDateTime;
     }
 }

@@ -853,8 +853,8 @@ public static class DiagnosticCode
     public const string LintTrailingWhitespace = "Calor1300";
 
     /// <summary>
-    /// Warning (lint): a construct ID is not in abbreviated form
-    /// (e.g. <c>f001</c> instead of <c>f1</c>, or <c>for1</c> instead of <c>l1</c>).
+    /// Reserved legacy lint diagnostic. Formatting does not normalize IDs, so
+    /// this code is intentionally not emitted.
     /// </summary>
     public const string LintNonAbbreviatedId = "Calor1301";
 
@@ -1028,8 +1028,8 @@ public static class DiagnosticCode
     public const string FormatWriteExperimentalRequired = "Calor1346";
 
     /// <summary>
-    /// Warning (format): a parseable input has semantic or generated-C# errors,
-    /// so the lossless formatter used its documented byte-identical fallback.
+    /// Warning (format/lint fix): a parseable input has semantic or generated-C#
+    /// errors, so the lossless formatter used its documented byte-identical fallback.
     /// </summary>
     public const string FormatConservativeFallback = "Calor1347";
 

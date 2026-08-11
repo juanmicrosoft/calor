@@ -104,6 +104,7 @@ public static class LintCommand
         var filesWithIssues = 0;
         var fixedFiles = 0;
         var errorFiles = 0;
+        var suppressedFixFiles = 0;
         var totalIssues = 0;
 
         foreach (var file in files)
@@ -140,7 +141,7 @@ public static class LintCommand
 
             try
             {
-                var result = await LintFileAsync(file.FullName, verbose);
+                var result = await LintFileAsync(file.FullName, verbose, fix);
                 diagnosticSink?.AddRange(result.Diagnostics);
                 if (declarationIds != null && result.Ast != null)
                 {
@@ -161,6 +162,24 @@ public static class LintCommand
                     continue;
                 }
 
+                if (result.ProcessingError != null)
+                {
+                    if (!structuredOutput)
+                    {
+                        Console.Error.WriteLine(
+                            $"Error formatting {file.Name}: {result.ProcessingError}");
+                    }
+                    errorFiles++;
+                    continue;
+                }
+
+                if (fix && result.FixSuppressedReason != null)
+                {
+                    Console.Error.WriteLine(
+                        $"Warning: fix suppressed for {file.Name}: {result.FixSuppressedReason}");
+                    suppressedFixFiles++;
+                }
+
                 totalIssues += result.Issues.Count;
 
                 if (result.Issues.Count > 0)
@@ -178,12 +197,15 @@ public static class LintCommand
 
                     if (fix)
                     {
-                        await SafeSourceFile.WriteFormattedAsync(
-                            result.Snapshot!,
-                            result.FixedContent,
-                            new CalorFormatter());
-                        statusOut.WriteLine($"Fixed: {file.Name}");
-                        fixedFiles++;
+                        if (result.FixSuppressedReason == null)
+                        {
+                            await SafeSourceFile.WriteFormattedAsync(
+                                result.Snapshot!,
+                                result.FixedContent,
+                                new CalorFormatter());
+                            statusOut.WriteLine($"Fixed: {file.Name}");
+                            fixedFiles++;
+                        }
                     }
                     else if (check && !structuredOutput)
                     {
@@ -227,6 +249,10 @@ public static class LintCommand
             {
                 Console.WriteLine($"  Errors: {errorFiles}");
             }
+            if (suppressedFixFiles > 0)
+            {
+                Console.WriteLine($"  Fixes conservatively suppressed: {suppressedFixFiles}");
+            }
         }
 
         // Exit code: 2 = file/processing errors, 1 = lint issues found
@@ -237,7 +263,8 @@ public static class LintCommand
         {
             exitCode = 2;
         }
-        else if ((check || !fix) && filesWithIssues > 0)
+        else if (suppressedFixFiles > 0
+            || ((check || !fix) && filesWithIssues > 0))
         {
             exitCode = 1;
         }
@@ -257,7 +284,10 @@ public static class LintCommand
         return exitCode;
     }
 
-    private static async Task<LintResult> LintFileAsync(string filePath, bool verbose)
+    private static async Task<LintResult> LintFileAsync(
+        string filePath,
+        bool verbose,
+        bool attemptFix)
     {
         _ = verbose;
         var snapshot = await SourceFileSnapshot.ReadAsync(filePath);
@@ -323,29 +353,53 @@ public static class LintCommand
             };
         }
 
-        var formatter = new CalorFormatter();
-        var formatResult = formatter.FormatSource(source, filePath);
-        if (!formatResult.Success || formatResult.UsedConservativeFallback)
+        if (!attemptFix)
         {
-            var reason = formatResult.UsedConservativeFallback
-                ? formatResult.ConservativeFallbackReason
-                    ?? "Source is unsupported by the safe formatting gates."
-                : formatResult.Errors.FirstOrDefault()
-                    ?? "Safe formatting failed.";
+            return new LintResult
+            {
+                ParseSuccess = true,
+                ParseErrors = new List<string>(),
+                Issues = issues,
+                OriginalContent = source,
+                FixedContent = source,
+                Diagnostics = diagnostics,
+                Ast = ast,
+                Snapshot = snapshot
+            };
+        }
+
+        var formatResult = new CalorFormatter().FormatSource(source, filePath);
+        if (!formatResult.Success)
+        {
+            var reason = formatResult.Errors.FirstOrDefault()
+                ?? "Safe formatting failed.";
             diagnostics.ReportError(
                 TextSpan.Empty,
                 DiagnosticCode.LintProcessingError,
                 reason);
             return new LintResult
             {
-                ParseSuccess = false,
-                ParseErrors = [reason],
+                ParseSuccess = true,
+                ParseErrors = new List<string>(),
                 Issues = issues,
                 OriginalContent = source,
                 FixedContent = source,
                 Diagnostics = diagnostics,
+                Ast = ast,
+                ProcessingError = reason,
                 Snapshot = snapshot
             };
+        }
+
+        string? fixSuppressedReason = null;
+        if (formatResult.UsedConservativeFallback)
+        {
+            fixSuppressedReason = formatResult.ConservativeFallbackReason
+                ?? "Source is unsupported by the safe formatting gates.";
+            diagnostics.ReportWarning(
+                TextSpan.Empty,
+                DiagnosticCode.FormatConservativeFallback,
+                fixSuppressedReason);
         }
 
         return new LintResult
@@ -357,6 +411,7 @@ public static class LintCommand
             FixedContent = formatResult.Formatted,
             Diagnostics = diagnostics,
             Ast = ast,
+            FixSuppressedReason = fixSuppressedReason,
             Snapshot = snapshot
         };
     }
@@ -370,6 +425,8 @@ public static class LintCommand
         public required string FixedContent { get; init; }
         public required DiagnosticBag Diagnostics { get; init; }
         public SourceFileSnapshot? Snapshot { get; init; }
+        public string? ProcessingError { get; init; }
+        public string? FixSuppressedReason { get; init; }
 
         /// <summary>Parsed module when parsing succeeded; feeds declaration-ID resolution.</summary>
         public Ast.ModuleNode? Ast { get; init; }
