@@ -42,6 +42,35 @@ public class DiagnosticSeedReachabilityTests
         yield return new object[] { "deref-operand", "§R §DEREF (/ 10 0)" };
     }
 
+    [Fact]
+    public void UninitializedUseInsideTierBWrapper_ReachesTheDataflowAnalysis()
+    {
+        // #911 review F2: the division seed rows pin the CheckExpression +
+        // ContainsDivision arms only as a PAIR; the GetUsedVariables RetainedChildren
+        // arm needs its own discriminating consumer. An uninitialized local read
+        // inside §ADDR fires Calor0900 only if GetUsedVariables walks the retained
+        // children (revert that arm and this fails).
+        const string source = """
+            §M{m001:Test}
+              §F{f001:Probe:pub} () -> OBJECT
+                §B{~y:i32}
+                §R §ADDR y
+            """;
+
+        var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
+        {
+            EnableVerificationAnalyses = true,
+        });
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.UninitializedVariable && d.Message.Contains("'y'"));
+        // #911 review F1 pin: the B8 severity promotion must reach THIS surface too —
+        // the analyze path re-reports the binder's 0259 with its original severity.
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.AnalysisIncomplete
+                && d.Severity == DiagnosticSeverity.Warning);
+    }
+
     [Theory]
     [MemberData(nameof(Wrappers))]
     public void SeedInsideWrapper_ReachesTheDivisionChecker(string wrapper, string statement)

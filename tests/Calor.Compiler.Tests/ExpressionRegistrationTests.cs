@@ -80,6 +80,28 @@ public class ExpressionRegistrationTests
     }
 
     [Fact]
+    public void CallHeader_DoesNotEatAFollowingBraceInitializerAsAttributes()
+    {
+        // #911 review F6: pre-fix, `§C{Sink} {1, 2} §/C` SILENTLY merged the brace
+        // group into the call header — Target became "Sink" + "1, 2" garbage with zero
+        // diagnostics. With maxGroups: 1 on the §C header, the brace group parses as a
+        // collection-initializer argument. (§B got the same fix with the OpenBrace
+        // unification; §W and §LAM headers are covered by the same one-group rule.)
+        const string source = """
+            §M{m:Test}
+              §F{f:Test:pub}
+                §O{object}
+                §C{Sink} {1, 2} §/C
+            """;
+        var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser().ToList();
+        var module = new Parser(tokens, diagnostics).Parse();
+        var call = Assert.IsType<CallStatementNode>(Assert.Single(Assert.Single(module.Functions).Body));
+        Assert.Equal("Sink", call.Target);
+        Assert.Single(call.Arguments);
+    }
+
+    [Fact]
     public void TestCasesCoverEveryRegisteredExpressionStartToken()
     {
         var property = typeof(Parser).GetProperty(

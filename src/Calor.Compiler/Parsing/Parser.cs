@@ -1662,7 +1662,9 @@ public sealed class Parser
     private CallStatementNode ParseCallStatement()
     {
         var startToken = Expect(TokenKind.Call);
-        var attrs = ParseAttributes();
+        // #911 review F6: exactly one header group — a following brace group is a
+        // collection-initializer expression, not more header attributes.
+        var attrs = ParseAttributes(maxGroups: 1);
 
         // Interpret call attributes
         var (target, fallible) = AttributeHelper.InterpretCallAttributes(attrs);
@@ -3854,7 +3856,9 @@ public sealed class Parser
     private MatchExpressionNode ParseMatchExpression()
     {
         var startToken = Expect(TokenKind.Match);
-        var attrs = ParseAttributes();
+        // #911 review F6: exactly one header group — a following brace group is a
+        // collection-initializer expression, not more header attributes.
+        var attrs = ParseAttributes(maxGroups: 1);
         var id = AttributeHelper.InterpretMatchAttributes(attrs);
         if (string.IsNullOrEmpty(id))
         {
@@ -3881,7 +3885,9 @@ public sealed class Parser
     private StatementNode ParseMatchStatement()
     {
         var startToken = Expect(TokenKind.Match);
-        var attrs = ParseAttributes();
+        // #911 review F6: exactly one header group — a following brace group is a
+        // collection-initializer expression, not more header attributes.
+        var attrs = ParseAttributes(maxGroups: 1);
         var id = AttributeHelper.InterpretMatchAttributes(attrs);
         if (string.IsNullOrEmpty(id))
         {
@@ -8276,7 +8282,9 @@ public sealed class Parser
     private ExpressionNode ParseCallExpression()
     {
         var startToken = Expect(TokenKind.Call);
-        var attrs = ParseAttributes();
+        // #911 review F6: exactly one header group — a following brace group is a
+        // collection-initializer expression, not more header attributes.
+        var attrs = ParseAttributes(maxGroups: 1);
 
         // Positional: [target]
         var target = attrs["_pos0"] ?? "";
@@ -9740,7 +9748,9 @@ public sealed class Parser
     private LambdaExpressionNode ParseLambdaExpression()
     {
         var startToken = Expect(TokenKind.Lambda);
-        var attrs = ParseAttributes();
+        // #911 review F6: exactly one header group — a following brace group is a
+        // collection-initializer expression, not more header attributes.
+        var attrs = ParseAttributes(maxGroups: 1);
 
         // Positional: [id:param1:type1:param2:type2:...] or [id:async:param1:type1:...]
         var id = attrs["_pos0"] ?? "";

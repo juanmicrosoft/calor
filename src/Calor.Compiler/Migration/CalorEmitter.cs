@@ -4193,11 +4193,18 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     // #762 item 8 (B8): real dispatch for the seven former no-op-Accept classes
-    // (bodies ported from PR #900).
+    // (bodies ported from PR #900). REFERENCE PROJECTIONS: the parent nodes'
+    // emission paths still inline-handle these nodes (routing them through Accept is
+    // follow-up work) — keep each body matching its live inline path, or the day
+    // something dispatches Accept the output silently diverges (#911 review F5).
     public string Visit(OutputNode node) => $"§O{{{TypeMapper.CSharpToCalor(node.TypeName)}}}";
 
     public string Visit(EffectsNode node)
     {
+        // Live-path parity (#911 F5): EmitEffects omits the line entirely for an empty
+        // effects map — an emitted `§E{}` would MEAN pure, which is a different claim.
+        if (node.Effects.Count == 0)
+            return "";
         var effectCodes = node.Effects
             .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
             .Distinct();

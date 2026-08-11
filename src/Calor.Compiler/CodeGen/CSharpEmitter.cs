@@ -5782,8 +5782,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     }
 
     // #762 item 8 (B8): real dispatch for the seven former no-op-Accept classes.
-    // Bodies ported from PR #900's implementations (same projections the parent
-    // nodes' inline handling produces).
+    // Bodies ported from PR #900's implementations. REFERENCE PROJECTIONS: the parent
+    // nodes' emission paths still inline-handle these nodes (routing them through
+    // Accept is follow-up work) — keep each body matching its live inline path, or
+    // the day something dispatches Accept the output silently diverges (#911 F5).
     public string Visit(OutputNode node) => MapTypeName(node.TypeName);
 
     public string Visit(EffectsNode node) => "";

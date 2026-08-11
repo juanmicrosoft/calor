@@ -862,7 +862,9 @@ public sealed class Binder
         _diagnostics.ReportWarning(expr.Span, DiagnosticCode.AnalysisIncomplete,
             $"Analysis incomplete: '{expr.GetType().Name}' has no structural binding yet " +
             $"({reason}). Analyses treat this expression as an opaque value; its sub-expressions " +
-            "are retained and visible to traversals, deferred-marked.");
+            "are retained and visible to the shared traversals (BoundChildren and the " +
+            "patched checker walks), deferred-marked — checkers with their own unpatched " +
+            "walks still treat the subtree as opaque (#911 follow-up).");
         return new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason, children);
     }
 
