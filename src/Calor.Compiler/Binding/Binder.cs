@@ -1453,14 +1453,10 @@ public sealed class Binder
 
     private BoundExpression BindGenericType(GenericTypeNode genericType)
     {
-        return Structural(
-            genericType,
-            $"{genericType.TypeName}<{string.Join(",", genericType.TypeArguments)}>",
-            metadata: new Dictionary<string, object?>
-            {
-                ["GenericTypeName"] = genericType.TypeName,
-                ["TypeArguments"] = genericType.TypeArguments.ToArray(),
-            });
+        return new BoundGenericTypeExpression(
+            genericType.Span,
+            genericType.TypeName,
+            genericType.TypeArguments);
     }
 
     private BoundExpression BindSelfReference(SelfRefNode selfReference) =>

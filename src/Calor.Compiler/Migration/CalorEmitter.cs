@@ -949,6 +949,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(EffectsNode node)
     {
+        if (node.Effects.Count == 0)
+            return "";
+
         var effectCodes = node.Effects
             .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
             .Distinct();

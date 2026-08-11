@@ -638,11 +638,42 @@ public sealed class BoundIncompleteExpression : BoundCallExpression
     /// <summary>Why this class is incomplete (F-1 tier reason or "family PR pending").</summary>
     public string Reason { get; }
 
-    public BoundIncompleteExpression(TextSpan span, string nodeTypeName, string reason)
+    /// <summary>#762 B8 (D2 Tier-B extractors): bound children of a residual class,
+    /// retained instead of erased. Deliberately NOT in Arguments — the node's
+    /// checker-visible BoundCallExpression shape stays zero-arg opaque; traversals see
+    /// these via BoundChildren.Of, deferred-marked via DeferredOf (the analysis story
+    /// for the wrapping construct is still out of scope).</summary>
+    public IReadOnlyList<BoundExpression> RetainedChildren { get; }
+    public override IReadOnlyList<BoundExpression> Children => RetainedChildren;
+    public override IReadOnlyList<BoundExpression> DeferredChildren => RetainedChildren;
+
+    public BoundIncompleteExpression(TextSpan span, string nodeTypeName, string reason,
+        IReadOnlyList<BoundExpression>? retainedChildren = null)
         : base(span, $"<unsupported:{nodeTypeName}>", Array.Empty<BoundExpression>(), "OBJECT")
     {
         NodeTypeName = nodeTypeName;
         Reason = reason;
+        RetainedChildren = retainedChildren ?? Array.Empty<BoundExpression>();
+    }
+}
+
+/// <summary>#762 B8 (item-8 disposition): a generic-type reference in expression
+/// position (legacy §G / inline generic syntax), promoted to Tier A. TypeName is the
+/// composed parser-surface form ("List&lt;i32&gt;" — the two-layer vocabulary's second
+/// layer, no-space commas per the B5 decision record). No expression children.</summary>
+public sealed class BoundGenericTypeExpression : BoundExpression
+{
+    public string GenericTypeName { get; }
+    public IReadOnlyList<string> TypeArguments { get; }
+    public override string TypeName { get; }
+    public BoundGenericTypeExpression(TextSpan span, string genericTypeName,
+        IReadOnlyList<string> typeArguments) : base(span)
+    {
+        GenericTypeName = genericTypeName;
+        TypeArguments = typeArguments;
+        TypeName = typeArguments.Count == 0
+            ? genericTypeName
+            : $"{genericTypeName}<{string.Join(",", typeArguments)}>";
     }
 }
 

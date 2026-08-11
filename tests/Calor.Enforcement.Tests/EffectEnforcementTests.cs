@@ -425,7 +425,7 @@ public class EffectEnforcementTests
     }
 
     [Fact]
-    public void UnresolvedInternalOverload_DoesNotFallBackToFirstSameNameFunction()
+    public void UnresolvedInternalOverload_ReportsNoMatchWithoutChargingFirstFunction()
     {
         var source = @"
 §M{m001:Test}
@@ -446,8 +446,9 @@ public class EffectEnforcementTests
         var result = TestHarness.Compile(source);
 
         Assert.Contains(result.Diagnostics.Errors, diagnostic =>
-            diagnostic.Code == DiagnosticCode.ForbiddenEffect
-            && diagnostic.Message.Contains("Unknown:*", StringComparison.Ordinal));
+            diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect);
     }
 
     [Fact]

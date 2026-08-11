@@ -261,12 +261,15 @@ public sealed class AnalyzeTool : McpToolBase
                 var result = Program.Compile(source, Path.GetFileName(filePath), compileOptions);
                 var analysisResult = compileOptions.VerificationAnalysisResult;
 
-                // Info-severity diagnostics (e.g. the Calor0259 incomplete-fraction
-                // instrument, #762 B1) are measurements, not issues — counting them
-                // would flip filesWithIssues on clean files that merely use constructs
-                // the binder has not reached yet.
+                // Info-severity diagnostics are measurements, not issues — counting
+                // them would flip filesWithIssues on clean files. The Calor0259
+                // incomplete-fraction instrument (#762 B1) is additionally excluded BY
+                // CODE: B8 promoted it to Warning (a per-construct "analysis does not
+                // cover this" signal worth showing), but at the aggregate level it
+                // remains an instrument — an unsafe-family file is not an "issue".
                 var issueCount = result.Diagnostics.Count(
-                    d => d.Severity != DiagnosticSeverity.Info);
+                    d => d.Severity != DiagnosticSeverity.Info
+                        && d.Code != DiagnosticCode.AnalysisIncomplete);
                 totalIssues += issueCount;
                 if (issueCount > 0) filesWithIssues++;
 

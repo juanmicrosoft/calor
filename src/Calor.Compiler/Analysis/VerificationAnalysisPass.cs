@@ -172,7 +172,7 @@ public sealed class VerificationAnalysisPass
         // from the correctness diagnostics propagated by BindingDiagnosticPolicy.
         foreach (var d in bindingDiagnostics.Where(d => d.Code == DiagnosticCode.AnalysisIncomplete))
         {
-            _diagnostics.ReportInfo(d.Span, d.Code, d.Message);
+            _diagnostics.Report(d.Span, d.Code, d.Message, d.Severity);
         }
 
         // Run analyses on the bound module with contract info

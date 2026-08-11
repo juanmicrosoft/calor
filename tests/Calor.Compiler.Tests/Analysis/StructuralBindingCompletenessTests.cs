@@ -24,6 +24,17 @@ public sealed class StructuralBindingCompletenessTests
     }
 
     [Fact]
+    public void GenericTypeReference_RetainsExactTypeArguments()
+    {
+        var bound = Assert.IsType<BoundGenericTypeExpression>(
+            Bind(new GenericTypeNode(Span, "Dictionary", ["str", "List<i32>"]), out _));
+
+        Assert.Equal("Dictionary", bound.GenericTypeName);
+        Assert.Equal(["str", "List<i32>"], bound.TypeArguments);
+        Assert.Equal("Dictionary<str,List<i32>>", bound.TypeName);
+    }
+
+    [Fact]
     public void CastAsIsAndPatternTests_RetainOperandAndTargetMetadata()
     {
         var operand = new ReferenceNode(Span, "value");

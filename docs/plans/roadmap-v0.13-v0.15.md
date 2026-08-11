@@ -164,10 +164,11 @@ gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
    A-1.5.3-pinned conversion subjects), **zero analysis-incomplete occurrences (`Calor0259`) for
    the registered construct-class list** (F-1; the marker moved from the silent `<unsupported:>`
    tree string to a counted diagnostic by F-2's 2026-08-10 additive amendment — same denominator,
-   strictly better instrument); the residual incomplete-fraction outside those classes is
-   **published per release, reported-not-adjudicated** (the M-S2/PP-L4 route). The escape
-   category is thereby bounded: the gate cannot be passed by marking registered constructs
-   "incomplete".
+   strictly better instrument). The escape category is thereby bounded: the gate cannot be
+   passed by marking registered constructs "incomplete". **Status: measured green after the
+   PR #900 structural-totality completion (2026-08-11)** — all 60 expression classes are
+   registered Tier A, with zero `Calor0259` occurrences on both recorded F-2 legs
+   (in-repo 0 / 4,612 bound expressions; conversion 0 / 19,348).
 2. **Full-vs-incremental identity**: byte-identical diagnostics, index contents, and review packets
    (after canonical ordering) across a **registered edit-script corpus** that includes the #883
    reproduction — plus an **incrementality witness** (the incremental path demonstrably reuses the
