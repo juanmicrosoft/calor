@@ -59,7 +59,7 @@ public sealed class StructuralBindingCompletenessTests
     [Fact]
     public void IndexAndCollections_RetainAllEvaluatedChildrenAndStableTypes()
     {
-        var index = Assert.IsType<BoundArrayAccessExpression>(
+        var index = Assert.IsType<BoundArrayAccess>(
             Bind(
                 new ArrayAccessNode(
                     Span,
@@ -72,9 +72,9 @@ public sealed class StructuralBindingCompletenessTests
         Assert.Equal(2, index.Children.Count);
         Assert.True(BoundNodeHelpers.ContainsArrayAccess(index, out var array, out var indexExpression));
         Assert.Same(index.Array, array);
-        Assert.Same(index.Indices[0], indexExpression);
+        Assert.Same(index.Index, indexExpression);
 
-        var list = Assert.IsType<BoundStructuralExpression>(
+        var list = Assert.IsType<BoundListCreation>(
             Bind(
                 new ListCreationNode(
                     Span,
@@ -87,7 +87,7 @@ public sealed class StructuralBindingCompletenessTests
         Assert.Equal("List<i32>", list.TypeName);
         Assert.Equal(2, list.Children.Count);
 
-        var dictionary = Assert.IsType<BoundStructuralExpression>(
+        var dictionary = Assert.IsType<BoundDictionaryCreation>(
             Bind(
                 new DictionaryCreationNode(
                     Span,
@@ -109,7 +109,8 @@ public sealed class StructuralBindingCompletenessTests
                 out _));
         Assert.Equal("Dictionary<str,i32>", dictionary.TypeName);
         Assert.Equal(4, dictionary.Children.Count);
-        Assert.Equal(2, dictionary.Metadata["EntryCount"]);
+        Assert.Equal(2, dictionary.Entries.Count);
+        Assert.Empty(dictionary.Attributes.All());
     }
 
     [Fact]
@@ -351,16 +352,13 @@ public sealed class StructuralBindingCompletenessTests
     [Fact]
     public void UnsupportedExpression_EmitsOneExactDiagnosticAndRetainsAllChildren()
     {
-        ExpressionNode MakeCall() => new ExpressionCallNode(
+        ExpressionNode MakeCall() => new UnregisteredExpressionNode(
             Span,
-            new ReferenceNode(Span, "callee"),
-            [
-                new BinaryOperationNode(
-                    Span,
-                    BinaryOperator.Divide,
-                    new IntLiteralNode(Span, 1),
-                    new ReferenceNode(Span, "divisor")),
-            ]);
+            new BinaryOperationNode(
+                Span,
+                BinaryOperator.Divide,
+                new IntLiteralNode(Span, 1),
+                new ReferenceNode(Span, "divisor")));
 
         var tuple = new TupleLiteralNode(Span, [MakeCall(), MakeCall()]);
         var bound = Bind(
@@ -373,17 +371,34 @@ public sealed class StructuralBindingCompletenessTests
             .Where(diagnostic => diagnostic.Code == DiagnosticCode.AnalysisUnsupportedNode)
             .ToArray();
         var diagnostic = Assert.Single(incomplete);
-        Assert.Contains(nameof(ExpressionCallNode), diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(UnregisteredExpressionNode), diagnostic.Message, StringComparison.Ordinal);
 
-        var calls = Assert.IsType<BoundStructuralExpression>(bound).Children
-            .Select(child => Assert.IsType<BoundExpressionCallExpression>(child))
+        var calls = Assert.IsType<BoundTupleLiteral>(bound).Elements
+            .Select(child => Assert.IsType<BoundUnsupportedExpression>(child))
             .ToArray();
         Assert.Equal(2, calls.Length);
-        Assert.All(calls, call => Assert.Equal(2, call.Children.Count));
+        Assert.All(calls, call => Assert.Single(call.Children));
         Assert.All(calls, call => Assert.True(BoundNodeHelpers.ContainsDivision(call, out _)));
         Assert.DoesNotContain(
             BoundNodeHelpers.DescendantsAndSelf(bound).OfType<BoundCallExpression>(),
             call => call.Target.StartsWith("<unsupported:", StringComparison.Ordinal));
+    }
+
+    private sealed class UnregisteredExpressionNode : ExpressionNode
+    {
+        public ExpressionNode Value { get; }
+
+        public UnregisteredExpressionNode(TextSpan span, ExpressionNode value)
+            : base(span)
+        {
+            Value = value;
+        }
+
+        public override void Accept(IAstVisitor visitor) =>
+            throw new NotSupportedException();
+
+        public override T Accept<T>(IAstVisitor<T> visitor) =>
+            throw new NotSupportedException();
     }
 
     [Fact]

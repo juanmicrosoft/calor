@@ -45,6 +45,25 @@ public class DocumentStateTests
         Assert.True(state.Diagnostics.HasErrors);
     }
 
+    [Fact]
+    public void Reanalyze_InteropConstruct_PublishesInfoSeverityUnsupported_NotError()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §F{f001:Pick:pub} () -> object
+                §R §CS{DateTime.Now}
+            """;
+
+        var state = LspTestHarness.CreateDocument(source);
+
+        Assert.False(state.Diagnostics.HasErrors);
+        var unsupported = state.Diagnostics.Where(
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisUnsupportedNode).ToList();
+        Assert.NotEmpty(unsupported);
+        Assert.All(unsupported,
+            d => Assert.Equal(Compiler.Diagnostics.DiagnosticSeverity.Info, d.Severity));
+    }
+
     [Fact(Skip = "Phase 4d: mismatched-ID diagnostic is obsolete under indent-only (no closing tags)")]
     public void Reanalyze_MismatchedId_HasDiagnosticsWithFixes()
     {

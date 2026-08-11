@@ -8,7 +8,7 @@ namespace Calor.Compiler.Binding;
 /// </summary>
 public sealed class Binder
 {
-    private delegate BoundExpression ExpressionBinder(Binder binder, ExpressionNode expression);
+    internal delegate BoundExpression ExpressionBinder(Binder binder, ExpressionNode expression);
 
     private static readonly IReadOnlyDictionary<Type, ExpressionBinder> ExpressionBinders =
         new Dictionary<Type, ExpressionBinder>
@@ -77,6 +77,11 @@ public sealed class Binder
 
     internal static IReadOnlyCollection<Type> RegisteredExpressionNodeTypes =>
         ExpressionBinders.Keys.ToArray();
+
+    internal static IReadOnlyDictionary<Type, ExpressionBinder> ExpressionDispatch =>
+        ExpressionBinders;
+
+    public int ExpressionsBound { get; private set; }
 
     private readonly DiagnosticBag _diagnostics;
     private readonly string _sourceIdentity;
@@ -970,6 +975,7 @@ public sealed class Binder
     private BoundExpression BindExpression(ExpressionNode expr)
     {
         ArgumentNullException.ThrowIfNull(expr);
+        ExpressionsBound++;
         return ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
             ? binder(this, expr)
             : BindUnsupportedExpression(expr);
@@ -1117,192 +1123,148 @@ public sealed class Binder
     {
         var array = BindExpression(arrayAccess.Array);
         var index = BindExpression(arrayAccess.Index);
-        return new BoundArrayAccessExpression(
-            arrayAccess.Span,
-            array,
-            [index],
-            GetIndexedElementType(array.TypeName));
+        return new BoundArrayAccess(arrayAccess.Span, array, index);
     }
 
     private BoundExpression BindMultiDimArrayAccess(MultiDimArrayAccessNode arrayAccess)
     {
         var array = BindExpression(arrayAccess.Array);
         var indices = BindExpressions(arrayAccess.Indices);
-        return new BoundArrayAccessExpression(
-            arrayAccess.Span,
-            array,
-            indices,
-            GetIndexedElementType(array.TypeName));
+        return new BoundMultiDimArrayAccess(arrayAccess.Span, array, indices);
     }
 
     private BoundExpression BindArrayCreation(ArrayCreationNode array)
     {
-        var children = new List<BoundExpression>();
-        if (array.Size != null)
-            children.Add(BindExpression(array.Size));
-        children.AddRange(BindExpressions(array.Initializer));
-
-        return Structural(
-            array,
-            MakeArrayType(array.ElementType, rank: 1),
-            children,
-            new Dictionary<string, object?>
-            {
-                ["Id"] = array.Id,
-                ["Name"] = array.Name,
-                ["ElementType"] = array.ElementType,
-                ["HasSize"] = array.Size != null,
-                ["InitializerCount"] = array.Initializer.Count,
-                ["Attributes"] = array.Attributes,
-            });
+        return new BoundArrayCreation(
+            array.Span,
+            array.Id,
+            array.Name,
+            array.ElementType,
+            array.Size == null ? null : BindExpression(array.Size),
+            BindExpressions(array.Initializer),
+            array.Attributes);
     }
 
     private BoundExpression BindMultiDimArrayCreation(MultiDimArrayCreationNode array)
     {
-        var dimensions = BindExpressions(array.DimensionSizes);
-        var initializer = BindExpressions(array.Initializer.SelectMany(row => row));
-        return Structural(
-            array,
-            MakeArrayType(array.ElementType, array.Rank),
-            [.. dimensions, .. initializer],
-            new Dictionary<string, object?>
-            {
-                ["Id"] = array.Id,
-                ["Name"] = array.Name,
-                ["ElementType"] = array.ElementType,
-                ["Rank"] = array.Rank,
-                ["DimensionCount"] = array.DimensionSizes.Count,
-                ["RowLengths"] = array.Initializer.Select(row => row.Count).ToArray(),
-            });
+        return new BoundMultiDimArrayCreation(
+            array.Span,
+            array.Id,
+            array.Name,
+            array.ElementType,
+            array.Rank,
+            BindExpressions(array.DimensionSizes),
+            array.Initializer
+                .Select(row => (IReadOnlyList<BoundExpression>)BindExpressions(row))
+                .ToArray());
     }
 
     private BoundExpression BindArrayLength(ArrayLengthNode arrayLength)
     {
         var array = BindExpression(arrayLength.Array);
-        return Structural(arrayLength, "INT", [array]);
+        return new BoundArrayLength(arrayLength.Span, array);
     }
 
     private BoundExpression BindListCreation(ListCreationNode list)
     {
-        return Structural(
-            list,
-            $"List<{list.ElementType}>",
+        return new BoundListCreation(
+            list.Span,
+            list.Id,
+            list.Name,
+            list.ElementType,
             BindExpressions(list.Elements),
-            new Dictionary<string, object?>
-            {
-                ["Id"] = list.Id,
-                ["Name"] = list.Name,
-                ["ElementType"] = list.ElementType,
-                ["Attributes"] = list.Attributes,
-            });
+            list.Attributes);
     }
 
     private BoundExpression BindDictionaryCreation(DictionaryCreationNode dictionary)
     {
-        var children = new List<BoundExpression>(dictionary.Entries.Count * 2);
-        foreach (var entry in dictionary.Entries)
-        {
-            children.Add(BindExpression(entry.Key));
-            children.Add(BindExpression(entry.Value));
-        }
-
-        return Structural(
-            dictionary,
-            $"Dictionary<{dictionary.KeyType},{dictionary.ValueType}>",
-            children,
-            new Dictionary<string, object?>
-            {
-                ["Id"] = dictionary.Id,
-                ["Name"] = dictionary.Name,
-                ["KeyType"] = dictionary.KeyType,
-                ["ValueType"] = dictionary.ValueType,
-                ["EntryCount"] = dictionary.Entries.Count,
-                ["Attributes"] = dictionary.Attributes,
-            });
+        return new BoundDictionaryCreation(
+            dictionary.Span,
+            dictionary.Id,
+            dictionary.Name,
+            dictionary.KeyType,
+            dictionary.ValueType,
+            dictionary.Entries
+                .Select(entry => new BoundPair(
+                    BindExpression(entry.Key),
+                    BindExpression(entry.Value),
+                    entry.Span))
+                .ToArray(),
+            dictionary.Attributes);
     }
 
     private BoundExpression BindSetCreation(SetCreationNode set)
     {
-        return Structural(
-            set,
-            $"HashSet<{set.ElementType}>",
+        return new BoundSetCreation(
+            set.Span,
+            set.Id,
+            set.Name,
+            set.ElementType,
             BindExpressions(set.Elements),
-            new Dictionary<string, object?>
-            {
-                ["Id"] = set.Id,
-                ["Name"] = set.Name,
-                ["ElementType"] = set.ElementType,
-                ["Attributes"] = set.Attributes,
-            });
+            set.Attributes);
     }
 
     private BoundExpression BindCollectionContains(CollectionContainsNode contains)
     {
         var collection = BindReferenceExpression(new ReferenceNode(contains.Span, contains.CollectionName));
         var value = BindExpression(contains.KeyOrValue);
-        return Structural(
-            contains,
-            "BOOL",
-            [collection, value],
-            new Dictionary<string, object?>
-            {
-                ["CollectionName"] = contains.CollectionName,
-                ["Mode"] = contains.Mode,
-            });
+        return new BoundCollectionContains(
+            contains.Span,
+            contains.CollectionName,
+            value,
+            contains.Mode,
+            collection);
     }
 
     private BoundExpression BindCollectionCount(CollectionCountNode count)
     {
         var collection = BindExpression(count.Collection);
-        return Structural(count, "INT", [collection]);
+        return new BoundCollectionCount(count.Span, collection);
     }
 
     private BoundExpression BindRecordCreation(RecordCreationNode record)
     {
-        return Structural(
-            record,
+        return new BoundRecordCreation(
+            record.Span,
             record.TypeName,
-            BindExpressions(record.Fields.Select(field => field.Value)),
-            new Dictionary<string, object?>
-            {
-                ["FieldNames"] = record.Fields.Select(field => field.FieldName).ToArray(),
-            });
+            record.Fields
+                .Select(field => new BoundNamedValue(
+                    field.FieldName,
+                    BindExpression(field.Value),
+                    field.Span))
+                .ToArray());
     }
 
     private BoundExpression BindAnonymousObjectCreation(AnonymousObjectCreationNode anonymous)
     {
-        return Structural(
-            anonymous,
-            "ANONYMOUS",
-            BindExpressions(anonymous.Initializers.Select(initializer => initializer.Value)),
-            new Dictionary<string, object?>
-            {
-                ["MemberNames"] = anonymous.Initializers
-                    .Select(initializer => initializer.PropertyName)
-                    .ToArray(),
-            });
+        return new BoundAnonymousObjectCreation(
+            anonymous.Span,
+            anonymous.Initializers
+                .Select(initializer => new BoundNamedValue(
+                    initializer.PropertyName,
+                    BindExpression(initializer.Value),
+                    initializer.Value.Span))
+                .ToArray());
     }
 
     private BoundExpression BindWithExpression(WithExpressionNode withExpression)
     {
         var target = BindExpression(withExpression.Target);
-        var values = BindExpressions(withExpression.Assignments.Select(assignment => assignment.Value));
-        return Structural(
-            withExpression,
-            target.TypeName,
-            [target, .. values],
-            new Dictionary<string, object?>
-            {
-                ["MemberNames"] = withExpression.Assignments
-                    .Select(assignment => assignment.PropertyName)
-                    .ToArray(),
-            });
+        return new BoundWithExpression(
+            withExpression.Span,
+            target,
+            withExpression.Assignments
+                .Select(assignment => new BoundNamedValue(
+                    assignment.PropertyName,
+                    BindExpression(assignment.Value),
+                    assignment.Span))
+                .ToArray());
     }
 
     private BoundExpression BindSomeExpression(SomeExpressionNode some)
     {
         var value = BindExpression(some.Value);
-        return Structural(some, MakeOptionType(value.TypeName), [value]);
+        return new BoundSomeExpression(some.Span, value);
     }
 
     private BoundExpression BindNoneExpression(NoneExpressionNode none)
@@ -1314,13 +1276,13 @@ public sealed class Binder
     private BoundExpression BindOkExpression(OkExpressionNode ok)
     {
         var value = BindExpression(ok.Value);
-        return Structural(ok, MakeResultType(value.TypeName, "OBJECT"), [value]);
+        return new BoundOkExpression(ok.Span, value);
     }
 
     private BoundExpression BindErrExpression(ErrExpressionNode err)
     {
         var error = BindExpression(err.Error);
-        return Structural(err, MakeResultType("OBJECT", error.TypeName), [error]);
+        return new BoundErrExpression(err.Span, error);
     }
 
     private BoundExpression BindAwaitExpression(AwaitExpressionNode awaitExpression)
@@ -1369,30 +1331,22 @@ public sealed class Binder
         if (range.End != null)
             children.Add(BindExpression(range.End));
 
-        return Structural(
-            range,
-            "RANGE",
-            children,
-            new Dictionary<string, object?>
-            {
-                ["HasStart"] = range.Start != null,
-                ["HasEnd"] = range.End != null,
-            });
+        return new BoundRangeExpression(
+            range.Span,
+            range.Start == null ? null : children[0],
+            range.End == null ? null : children[^1]);
     }
 
     private BoundExpression BindIndexFromEnd(IndexFromEndNode index)
     {
         var offset = BindExpression(index.Offset);
-        return Structural(index, "INDEX", [offset]);
+        return new BoundIndexFromEnd(index.Span, offset);
     }
 
     private BoundExpression BindTupleLiteral(TupleLiteralNode tuple)
     {
         var elements = BindExpressions(tuple.Elements);
-        return Structural(
-            tuple,
-            $"({string.Join(",", elements.Select(element => element.TypeName))})",
-            elements);
+        return new BoundTupleLiteral(tuple.Span, elements);
     }
 
     private BoundExpression BindTypeOf(TypeOfExpressionNode typeOf)
@@ -1424,7 +1378,7 @@ public sealed class Binder
     private BoundExpression BindThrowExpression(ThrowExpressionNode throwExpression)
     {
         var exception = BindExpression(throwExpression.Exception);
-        return Structural(throwExpression, "NEVER", [exception]);
+        return new BoundThrowExpression(throwExpression.Span, exception);
     }
 
     private BoundExpression BindInterpolatedString(InterpolatedStringNode interpolated)
@@ -1823,8 +1777,7 @@ public sealed class Binder
     {
         var target = BindExpression(call.TargetExpression);
         var arguments = BindExpressions(call.Arguments);
-        ReportAnalysisIncomplete(call, "Expression-target call resolution is incomplete");
-        return new BoundExpressionCallExpression(call.Span, target, arguments);
+        return new BoundExpressionCall(call.Span, target, arguments);
     }
 
     private BoundExpression BindFallbackInterop(FallbackExpressionNode fallback)

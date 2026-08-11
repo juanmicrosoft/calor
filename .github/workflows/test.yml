@@ -33,6 +33,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # #762 B2 (review Major 2): the F-2 conversion-leg ratchet
+          # (BinderIncompleteRatchetTests.ConversionLeg_*) skips without the corpus
+          # submodules — without this, leg 2's equality ratchet is enforced NOWHERE
+          # in CI and a converter/binder regression moving its counts fails no pipeline.
+          submodules: recursive
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

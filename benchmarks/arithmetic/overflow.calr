@@ -1,19 +1,19 @@
-§DOC{Arithmetic Benchmark: Integer Overflow Detection}
-§DOC{Tests bug pattern analysis for integer overflow vulnerabilities}
+// Arithmetic Benchmark: Integer Overflow Detection
+// Tests bug pattern analysis for integer overflow vulnerabilities
 
 §M{m001:OverflowBenchmark}
 
   §F{f001:VulnerableAddition:pub}
-    §DOC{BUG: Unchecked addition may overflow}
-    §DOC{EXPECTED: Calor0923 Integer Overflow}
+    // BUG: Unchecked addition may overflow
+    // EXPECTED: Calor0923 Integer Overflow
     §I{i32:a}
     §I{i32:b}
     §O{i32}
     §R (+ a b)
 
   §F{f002:SafeCheckedAddition:pub}
-    §DOC{SAFE: Addition with overflow check}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Addition with overflow check
+    // EXPECTED: No warnings
     §I{i32:a}
     §I{i32:b}
     §O{i32}
@@ -21,40 +21,40 @@
     §R result
 
   §F{f003:VulnerableMultiplication:pub}
-    §DOC{BUG: Unchecked multiplication may overflow}
-    §DOC{EXPECTED: Calor0923 Integer Overflow}
+    // BUG: Unchecked multiplication may overflow
+    // EXPECTED: Calor0923 Integer Overflow
     §I{i32:x}
     §I{i32:y}
     §O{i32}
     §R (* x y)
 
   §F{f004:SafeSmallValues:pub}
-    §DOC{SAFE: Values known to be small}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Values known to be small
+    // EXPECTED: No warnings
     §I{i32:x}
     §O{i32}
-    §PRE (< x INT:1000)
-    §PRE (> x INT:0)
+    §Q (< x INT:1000)
+    §Q (> x INT:0)
     §R (* x INT:100)
 
   §F{f005:VulnerableLeftShift:pub}
-    §DOC{BUG: Left shift may overflow}
-    §DOC{EXPECTED: Calor0923 Integer Overflow}
+    // BUG: Left shift may overflow
+    // EXPECTED: Calor0923 Integer Overflow
     §I{i32:x}
     §I{i32:n}
     §O{i32}
     §R (<< x n)
 
   §F{f006:SafeBoundedShift:pub}
-    §DOC{SAFE: Shift amount bounded}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Shift amount bounded
+    // EXPECTED: No warnings
     §I{i32:x}
     §O{i32}
     §R (<< x INT:2)
 
   §F{f007:VulnerableAccumulator:pub}
-    §DOC{BUG: Accumulator in loop may overflow}
-    §DOC{EXPECTED: Calor0923 Integer Overflow}
+    // BUG: Accumulator in loop may overflow
+    // EXPECTED: Calor0923 Integer Overflow
     §I{i32:n}
     §O{i32}
     §B{sum:i32} INT:0
@@ -63,8 +63,8 @@
     §R sum
 
   §F{f008:SafeBoundedAccumulator:pub}
-    §DOC{SAFE: Loop bound prevents overflow}
-    §DOC{EXPECTED: No warnings}
+    // SAFE: Loop bound prevents overflow
+    // EXPECTED: No warnings
     §O{i32}
     §B{sum:i32} INT:0
     §L{l1:i:1:100:1}

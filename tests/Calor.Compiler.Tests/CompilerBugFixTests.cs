@@ -333,11 +333,14 @@ public class CompilerBugFixTests
 
         Assert.NotNull(bound);
         var ret = bound.Functions.First().Body.OfType<BoundReturnStatement>().First();
-        var option = Assert.IsType<BoundStructuralExpression>(ret.Expression);
-        Assert.Equal(nameof(SomeExpressionNode), option.NodeTypeName);
-        Assert.Equal("OPTION[inner=INT]", option.TypeName);
-        Assert.IsType<BoundIntLiteral>(Assert.Single(option.Children));
+        var option = Assert.IsType<BoundSomeExpression>(ret.Expression);
+        Assert.Equal("Option<INT>", option.TypeName);
+        Assert.IsType<BoundIntLiteral>(option.Value);
         Assert.False(BoundNodeHelpers.IsLiteralZero(ret.Expression));
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(diagnostics,
+            d => d.Code is DiagnosticCode.AnalysisIncomplete
+                or DiagnosticCode.AnalysisUnsupportedNode);
     }
 
     #endregion

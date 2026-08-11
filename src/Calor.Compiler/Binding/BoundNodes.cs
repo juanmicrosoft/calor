@@ -522,7 +522,7 @@ public sealed class BoundUnaryExpression : BoundExpression
 /// <summary>
 /// Bound call expression.
 /// </summary>
-public sealed class BoundCallExpression : BoundExpression
+public class BoundCallExpression : BoundExpression
 {
     public string Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
@@ -598,6 +598,411 @@ public sealed class BoundCallExpression : BoundExpression
         CalleeSpan = calleeSpan ?? span;
         ReceiverSpan = receiverSpan;
         IsInaccessibleCall = isInaccessibleCall;
+    }
+}
+
+/// <summary>
+/// #762 B1: an accepted expression the binder cannot yet bind structurally. Subclasses
+/// BoundCallExpression with the historical zero-child "&lt;unsupported:TypeName&gt;" shape so
+/// every existing checker's pattern-match and traversal behavior is BIT-IDENTICAL to the
+/// old fallback (the B1 "zero checker behavior change" exit criterion, by construction) —
+/// the node stays an opaque non-constant value (the div-by-zero lesson). What B1 adds is
+/// the type itself (so later phases can attach children and deferred-evaluation marking
+/// without another checker-visible shape change) and the Calor0259 diagnostic that carries
+/// the incomplete-fraction instrument. Children arrive per family PR; Tier-B residuals get
+/// explicit extractors in B8 (scoping doc D2).
+/// </summary>
+public sealed class BoundIncompleteExpression : BoundCallExpression
+{
+    /// <summary>The concrete ExpressionNode class that lacked a binder.</summary>
+    public string NodeTypeName { get; }
+
+    /// <summary>Why this class is incomplete (F-1 tier reason or "family PR pending").</summary>
+    public string Reason { get; }
+
+    public BoundIncompleteExpression(TextSpan span, string nodeTypeName, string reason)
+        : base(span, $"<unsupported:{nodeTypeName}>", Array.Empty<BoundExpression>(), "OBJECT")
+    {
+        NodeTypeName = nodeTypeName;
+        Reason = reason;
+    }
+}
+
+/// <summary>A bound name→value pair (anonymous-object, record, and with-expression members).
+/// Carries the assignment's own span so checkers can point at the field, not just its value.</summary>
+public sealed record BoundNamedValue(string Name, BoundExpression Value, TextSpan Span);
+
+/// <summary>
+/// Compatibility entry point for B-series analyses. Child enumeration is owned by each
+/// node's universal <see cref="BoundExpression.Children"/> contract.
+/// </summary>
+public static class BoundChildren
+{
+    public static IEnumerable<BoundExpression> Of(BoundExpression expression) =>
+        expression.Children;
+}
+
+/// <summary>#762 B2: Option construction. Type composes from the payload (string types, D3).</summary>
+public sealed class BoundSomeExpression : BoundExpression
+{
+    public BoundExpression Value { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children => [Value];
+
+    public BoundSomeExpression(TextSpan span, BoundExpression value) : base(span)
+    {
+        Value = value;
+        TypeName = $"Option<{value.TypeName}>";
+    }
+}
+
+/// <summary>#762 B2: Result success construction. The error type parameter is unknowable
+/// from the value alone under 0.13's string types — "OBJECT" is the explicit placeholder
+/// (never null, per D3); 0.14's typed representation replaces it.</summary>
+public sealed class BoundOkExpression : BoundExpression
+{
+    public BoundExpression Value { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children => [Value];
+
+    public BoundOkExpression(TextSpan span, BoundExpression value) : base(span)
+    {
+        Value = value;
+        TypeName = $"Result<{value.TypeName}, OBJECT>";
+    }
+}
+
+/// <summary>#762 B2: Result error construction (see BoundOkExpression on the placeholder).</summary>
+public sealed class BoundErrExpression : BoundExpression
+{
+    public BoundExpression Error { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children => [Error];
+
+    public BoundErrExpression(TextSpan span, BoundExpression error) : base(span)
+    {
+        Error = error;
+        TypeName = $"Result<OBJECT, {error.TypeName}>";
+    }
+}
+
+/// <summary>#762 B2: invocation of a function VALUE (computed target). Return type is
+/// unknowable without function types (0.14); "OBJECT" is the explicit placeholder.</summary>
+public sealed class BoundExpressionCall : BoundExpression
+{
+    public BoundExpression Target { get; }
+    public IReadOnlyList<BoundExpression> Arguments { get; }
+    public override string TypeName => "OBJECT";
+    public override IReadOnlyList<BoundExpression> Children => [Target, .. Arguments];
+
+    public BoundExpressionCall(TextSpan span, BoundExpression target,
+        IReadOnlyList<BoundExpression> arguments) : base(span)
+    {
+        Target = target;
+        Arguments = arguments;
+    }
+}
+
+/// <summary>#762 B2: anonymous object creation — member values are bound children.</summary>
+public sealed class BoundAnonymousObjectCreation : BoundExpression
+{
+    public IReadOnlyList<BoundNamedValue> Initializers { get; }
+    public override string TypeName => "OBJECT";
+    public override IReadOnlyList<BoundExpression> Children =>
+        Initializers.Select(initializer => initializer.Value).ToArray();
+
+    public BoundAnonymousObjectCreation(TextSpan span, IReadOnlyList<BoundNamedValue> initializers)
+        : base(span) => Initializers = initializers;
+}
+
+/// <summary>#762 B2: record creation — typed by the record name; field values bound.</summary>
+public sealed class BoundRecordCreation : BoundExpression
+{
+    public IReadOnlyList<BoundNamedValue> Fields { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children =>
+        Fields.Select(item => item.Value).ToArray();
+
+    public BoundRecordCreation(TextSpan span, string typeName, IReadOnlyList<BoundNamedValue> fields)
+        : base(span)
+    {
+        TypeName = typeName;
+        Fields = fields;
+    }
+}
+
+/// <summary>#762 B2: with-expression — same type as its target; assignments bound.</summary>
+public sealed class BoundWithExpression : BoundExpression
+{
+    public BoundExpression Target { get; }
+    public IReadOnlyList<BoundNamedValue> Assignments { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children =>
+        [Target, .. Assignments.Select(assignment => assignment.Value)];
+
+    public BoundWithExpression(TextSpan span, BoundExpression target,
+        IReadOnlyList<BoundNamedValue> assignments) : base(span)
+    {
+        Target = target;
+        Assignments = assignments;
+        TypeName = target.TypeName;
+    }
+}
+
+/// <summary>#762 B2: throw-expression — never produces a value; "NEVER" is the explicit type.</summary>
+public sealed class BoundThrowExpression : BoundExpression
+{
+    public BoundExpression Exception { get; }
+    public override string TypeName => "NEVER";
+    public override IReadOnlyList<BoundExpression> Children => [Exception];
+
+    public BoundThrowExpression(TextSpan span, BoundExpression exception) : base(span)
+        => Exception = exception;
+}
+
+/// <summary>A bound key→value expression pair (dictionary entries).</summary>
+public sealed record BoundPair(BoundExpression Key, BoundExpression Value, TextSpan Span);
+
+/// <summary>#762 B3: array creation — size and initializers are bound children.</summary>
+public sealed class BoundArrayCreation : BoundExpression
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string ElementType { get; }
+    public BoundExpression? Size { get; }
+    public IReadOnlyList<BoundExpression> Initializer { get; }
+    public AttributeCollection Attributes { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children =>
+        Size == null ? Initializer : [Size, .. Initializer];
+
+    public BoundArrayCreation(TextSpan span, string id, string name, string elementType,
+        BoundExpression? size, IReadOnlyList<BoundExpression> initializer,
+        AttributeCollection? attributes = null) : base(span)
+    {
+        Id = id; Name = name; ElementType = elementType; Size = size; Initializer = initializer;
+        Attributes = attributes ?? new AttributeCollection();
+        TypeName = $"{elementType}[]";
+    }
+}
+
+/// <summary>#762 B3: array element access. Element type derives from the array's
+/// composed type string when it has the "T[]" shape; "OBJECT" otherwise (0.13 string
+/// types — 0.14's typed representation replaces the derivation).</summary>
+public sealed class BoundArrayAccess : BoundExpression
+{
+    public BoundExpression Array { get; }
+    public BoundExpression Index { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children => [Array, Index];
+
+    public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index) : base(span)
+    {
+        Array = array; Index = index;
+        TypeName = array.TypeName.EndsWith("[]", StringComparison.Ordinal)
+            ? array.TypeName[..^2]
+            : "OBJECT";
+    }
+}
+
+/// <summary>#762 B3: array length — always INT.</summary>
+public sealed class BoundArrayLength : BoundExpression
+{
+    public BoundExpression Array { get; }
+    public override string TypeName => "INT";
+    public override IReadOnlyList<BoundExpression> Children => [Array];
+
+    public BoundArrayLength(TextSpan span, BoundExpression array) : base(span) => Array = array;
+}
+
+/// <summary>#762 B3: multi-dimensional array creation.</summary>
+public sealed class BoundMultiDimArrayCreation : BoundExpression
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string ElementType { get; }
+    public int Rank { get; }
+    public IReadOnlyList<BoundExpression> DimensionSizes { get; }
+    /// <summary>Row structure RETAINED (B3 review M2): rectangularity/shape-vs-rank
+    /// validation needs it; flattening happens only in BoundChildren.Of.</summary>
+    public IReadOnlyList<IReadOnlyList<BoundExpression>> InitializerRows { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children =>
+        [.. DimensionSizes, .. InitializerRows.SelectMany(row => row)];
+
+    public BoundMultiDimArrayCreation(TextSpan span, string id, string name, string elementType,
+        int rank, IReadOnlyList<BoundExpression> dimensionSizes,
+        IReadOnlyList<IReadOnlyList<BoundExpression>> initializerRows)
+        : base(span)
+    {
+        Id = id; Name = name; ElementType = elementType; Rank = rank;
+        DimensionSizes = dimensionSizes; InitializerRows = initializerRows;
+        TypeName = $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
+    }
+}
+
+/// <summary>#762 B3: multi-dimensional array access.</summary>
+public sealed class BoundMultiDimArrayAccess : BoundExpression
+{
+    public BoundExpression Array { get; }
+    public IReadOnlyList<BoundExpression> Indices { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children => [Array, .. Indices];
+
+    public BoundMultiDimArrayAccess(TextSpan span, BoundExpression array,
+        IReadOnlyList<BoundExpression> indices) : base(span)
+    {
+        Array = array; Indices = indices;
+        // LastIndexOf: on jagged shapes like "i32[][,]" the element type is
+        // everything before the TRAILING bracket group ("i32[]"), not "i32" (B3 review m5).
+        var t = array.TypeName;
+        var open = t.LastIndexOf('[');
+        TypeName = open > 0 ? t[..open] : "OBJECT";
+    }
+}
+
+/// <summary>#762 B3: index-from-end (^n).</summary>
+public sealed class BoundIndexFromEnd : BoundExpression
+{
+    public BoundExpression Offset { get; }
+    public override string TypeName => "INDEX";
+    public override IReadOnlyList<BoundExpression> Children => [Offset];
+
+    public BoundIndexFromEnd(TextSpan span, BoundExpression offset) : base(span) => Offset = offset;
+}
+
+/// <summary>#762 B3: range (a..b) — either bound may be absent.</summary>
+public sealed class BoundRangeExpression : BoundExpression
+{
+    public BoundExpression? Start { get; }
+    public BoundExpression? End { get; }
+    public override string TypeName => "RANGE";
+    public override IReadOnlyList<BoundExpression> Children =>
+        new[] { Start, End }.Where(expression => expression != null).Cast<BoundExpression>().ToArray();
+
+    public BoundRangeExpression(TextSpan span, BoundExpression? start, BoundExpression? end)
+        : base(span)
+    { Start = start; End = end; }
+}
+
+/// <summary>#762 B3: list creation.</summary>
+public sealed class BoundListCreation : BoundExpression
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string ElementType { get; }
+    public IReadOnlyList<BoundExpression> Elements { get; }
+    public AttributeCollection Attributes { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children => Elements;
+
+    public BoundListCreation(TextSpan span, string id, string name, string elementType,
+        IReadOnlyList<BoundExpression> elements, AttributeCollection? attributes = null) : base(span)
+    {
+        Id = id; Name = name; ElementType = elementType; Elements = elements;
+        Attributes = attributes ?? new AttributeCollection();
+        // Spelling matches the PARSER's own vocabulary for the same construct
+        // (B3 review M3: the bind statement types §SET as "HashSet<T>").
+        TypeName = $"List<{elementType}>";
+    }
+}
+
+/// <summary>#762 B3: set creation.</summary>
+public sealed class BoundSetCreation : BoundExpression
+{
+    public string Id { get; }
+    public string Name { get; }
+    public string ElementType { get; }
+    public IReadOnlyList<BoundExpression> Elements { get; }
+    public AttributeCollection Attributes { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children => Elements;
+
+    public BoundSetCreation(TextSpan span, string id, string name, string elementType,
+        IReadOnlyList<BoundExpression> elements, AttributeCollection? attributes = null) : base(span)
+    {
+        Id = id; Name = name; ElementType = elementType; Elements = elements;
+        Attributes = attributes ?? new AttributeCollection();
+        // Spelling matches the PARSER's own vocabulary for the same construct
+        // (B3 review M3: the bind statement types §SET as "HashSet<T>").
+        TypeName = $"HashSet<{elementType}>";
+    }
+}
+
+/// <summary>#762 B3: dictionary creation — entries are bound key/value pairs.</summary>
+public sealed class BoundDictionaryCreation : BoundExpression
+{
+    public string Name { get; }
+    public string KeyType { get; }
+    public string ValueType { get; }
+    public IReadOnlyList<BoundPair> Entries { get; }
+    public AttributeCollection Attributes { get; }
+    public override string TypeName { get; }
+    public string Id { get; }
+    public override IReadOnlyList<BoundExpression> Children =>
+        Entries.SelectMany(entry => new[] { entry.Key, entry.Value }).ToArray();
+
+    public BoundDictionaryCreation(TextSpan span, string id, string name, string keyType,
+        string valueType, IReadOnlyList<BoundPair> entries,
+        AttributeCollection? attributes = null) : base(span)
+    {
+        Id = id; Name = name; KeyType = keyType; ValueType = valueType; Entries = entries;
+        Attributes = attributes ?? new AttributeCollection();
+        // No space: matches Parser.cs/RoslynSyntaxVisitor's "Dictionary<K,V>" (review M3).
+        TypeName = $"Dictionary<{keyType},{valueType}>";
+    }
+}
+
+/// <summary>#762 B3: collection membership test — BOOL; the collection itself is a NAME
+/// (metadata, matching the AST shape), the probed key/value is a bound child.</summary>
+public sealed class BoundCollectionContains : BoundExpression
+{
+    public string CollectionName { get; }
+    public BoundExpression? Collection { get; }
+    public BoundExpression KeyOrValue { get; }
+    /// <summary>Value vs Key vs DictValue — THREE different operations (.Contains /
+    /// .ContainsKey / .ContainsValue); dropping this was B3 review's CRITICAL.</summary>
+    public Ast.ContainsMode Mode { get; }
+    // The source stores the collection as a name. The binder also retains its resolved
+    // expression when available so symbol-based liveness can see the receiver.
+    public override string TypeName => "BOOL";
+    public override IReadOnlyList<BoundExpression> Children =>
+        Collection == null ? [KeyOrValue] : [Collection, KeyOrValue];
+
+    public BoundCollectionContains(TextSpan span, string collectionName,
+        BoundExpression keyOrValue, Ast.ContainsMode mode,
+        BoundExpression? collection = null) : base(span)
+    {
+        CollectionName = collectionName;
+        Collection = collection;
+        KeyOrValue = keyOrValue;
+        Mode = mode;
+    }
+}
+
+/// <summary>#762 B3: collection count — INT.</summary>
+public sealed class BoundCollectionCount : BoundExpression
+{
+    public BoundExpression Collection { get; }
+    public override string TypeName => "INT";
+    public override IReadOnlyList<BoundExpression> Children => [Collection];
+
+    public BoundCollectionCount(TextSpan span, BoundExpression collection) : base(span)
+        => Collection = collection;
+}
+
+/// <summary>#762 B3: tuple literal.</summary>
+public sealed class BoundTupleLiteral : BoundExpression
+{
+    public IReadOnlyList<BoundExpression> Elements { get; }
+    public override string TypeName { get; }
+    public override IReadOnlyList<BoundExpression> Children => Elements;
+
+    public BoundTupleLiteral(TextSpan span, IReadOnlyList<BoundExpression> elements) : base(span)
+    {
+        Elements = elements;
+        // Element types composed rather than discarded (review M3).
+        TypeName = $"Tuple<{string.Join(",", elements.Select(e => e.TypeName))}>";
     }
 }
 

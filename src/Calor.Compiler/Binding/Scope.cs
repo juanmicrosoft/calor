@@ -383,9 +383,17 @@ public static class TypeIdentity
 /// </summary>
 public abstract class Symbol
 {
+    /// <summary>
+    /// Stable, source-qualified identity used by analysis and language-server features.
+    /// </summary>
     public SymbolId Id { get; }
     public string Name { get; }
+
+    /// <summary>
+    /// Exact identifier token span used for definition and rename edits.
+    /// </summary>
     public TextSpan DeclarationSpan { get; }
+    public TextSpan IdentifierSpan => DeclarationSpan;
     public TextSpan DefinitionSpan { get; }
     public string IdentityKey => Id.IsNone ? Name : Id.Value;
 

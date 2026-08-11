@@ -141,7 +141,7 @@ public static class DiagnosticCode
     /// </summary>
     public const string NoMatchingOverload = "Calor0208";
 
-    // Bind inference diagnostics (Calor0250-0259) — RFC v0.6 bind-inference-formalization
+    // Bind inference diagnostics (Calor0250-0260) — RFC v0.6 bind-inference-formalization
 
     /// <summary>
     /// Error: <c>§B{name}</c> requires either a <c>:type</c> annotation or
@@ -232,9 +232,14 @@ public static class DiagnosticCode
     public const string BindDuplicateInScope = "Calor0258";
 
     /// <summary>
+    /// Info: an accepted expression has no structural binder yet and is treated as opaque.
+    /// </summary>
+    public const string AnalysisIncomplete = "Calor0259";
+
+    /// <summary>
     /// Error: a mutable rebind targets a symbol that was not declared mutable.
     /// </summary>
-    public const string BindReassignsImmutable = "Calor0259";
+    public const string BindReassignsImmutable = "Calor0260";
 
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";

@@ -267,7 +267,8 @@ public static class BoundNodeHelpers
     {
         return DescendantsAndSelf(node)
             .Where(descendant =>
-                descendant is BoundUnsupportedExpression
+                descendant is BoundIncompleteExpression
+                    or BoundUnsupportedExpression
                     or BoundInteropExpression
                     or BoundUnsupportedStatement);
     }
@@ -301,6 +302,26 @@ public static class BoundNodeHelpers
     /// Checks if an expression contains array access.
     /// </summary>
     public static bool ContainsArrayAccess(BoundExpression? expression, out BoundExpression? arrayExpr, out BoundExpression? indexExpr)
+    {
+        // #762 B3: the STRUCTURAL array-access nodes this helper was named for finally
+        // exist — match them first (the B3 review found the old "placeholder for when
+        // it's added" comment left false by the family PR that added them).
+        if (expression is BoundArrayAccess structural)
+        {
+            arrayExpr = structural.Array;
+            indexExpr = structural.Index;
+            return true;
+        }
+        if (expression is BoundMultiDimArrayAccess multi)
+        {
+            arrayExpr = multi.Array;
+            indexExpr = multi.Indices.Count > 0 ? multi.Indices[0] : null;
+            return true;
+        }
+        return ContainsArrayAccessLegacy(expression, out arrayExpr, out indexExpr);
+    }
+
+    private static bool ContainsArrayAccessLegacy(BoundExpression? expression, out BoundExpression? arrayExpr, out BoundExpression? indexExpr)
     {
         arrayExpr = null;
         indexExpr = null;

@@ -745,8 +745,16 @@ public class ClassMemberBindingTests
         Assert.NotNull(bound);
         var method = bound.Functions.FirstOrDefault(f => f.Symbol.Name == "Utils.StaticMethod");
         Assert.NotNull(method);
-        // In static context, §THIS should not resolve to BoundThisExpression
-        // It should fall through to BindFallbackExpression (which reports a diagnostic)
+        Assert.DoesNotContain(diagnostics,
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisIncomplete);
+        Assert.Contains(diagnostics,
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisUnsupportedNode);
+        var thisBound = method!.Body.OfType<Compiler.Binding.BoundCallStatement>()
+            .SelectMany(c => c.Arguments)
+            .OfType<Compiler.Binding.BoundUnsupportedExpression>()
+            .FirstOrDefault();
+        Assert.NotNull(thisBound);
+        Assert.Equal("ThisExpressionNode", thisBound!.NodeTypeName);
     }
 
     #endregion
