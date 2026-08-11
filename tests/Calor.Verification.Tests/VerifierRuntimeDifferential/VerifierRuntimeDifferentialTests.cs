@@ -90,7 +90,7 @@ public sealed class VerifierRuntimeDifferentialTests
     }
 
     [Fact]
-    public void FieldAccessProbeUsesU8BoundAndRejectsHistoricalI32Fallback()
+    public void FieldAccessProbeDistinguishesU8FromI8AndI32Mutations()
     {
         Assert.True(
             Z3ContextFactory.IsAvailable,
@@ -98,24 +98,55 @@ public sealed class VerifierRuntimeDifferentialTests
 
         var form = DifferentialFormRegistry.Build().Single(
             candidate => candidate.Id == "expression-kind:FieldAccessNode");
-        var bound = Assert.IsType<BinaryOperationNode>(
+        var predicate = Assert.IsType<BinaryOperationNode>(
             form.Build(CasePolarity.Provable).Condition);
-        Assert.Equal(BinaryOperator.LessOrEqual, bound.Operator);
-        Assert.IsType<FieldAccessNode>(bound.Left);
-        Assert.Equal(byte.MaxValue, Assert.IsType<IntLiteralNode>(bound.Right).Value);
+        Assert.Equal(BinaryOperator.And, predicate.Operator);
+        Assert.Equal(
+            BinaryOperator.GreaterOrEqual,
+            Assert.IsType<BinaryOperationNode>(predicate.Left).Operator);
+        Assert.Equal(
+            BinaryOperator.LessOrEqual,
+            Assert.IsType<BinaryOperationNode>(predicate.Right).Operator);
         Assert.Equal(byte.MaxValue, DifferentialGate.ProbeFieldWitness);
 
         using var context = Z3ContextFactory.Create();
         var registered = TranslateFieldBound(
             context,
-            bound,
+            predicate,
             DifferentialGate.ProbeFieldType);
-        var guessed = TranslateFieldBound(context, bound, "i32");
+        var signedMutation = TranslateFieldBound(context, predicate, "i8");
+        var widthMutation = TranslateFieldBound(context, predicate, "i32");
 
         Assert.Equal(8u, registered.Width);
         Assert.Equal(Status.UNSATISFIABLE, registered.NegatedBoundStatus);
-        Assert.Equal(32u, guessed.Width);
-        Assert.Equal(Status.SATISFIABLE, guessed.NegatedBoundStatus);
+        Assert.Equal(8u, signedMutation.Width);
+        Assert.Equal(Status.SATISFIABLE, signedMutation.NegatedBoundStatus);
+        Assert.Equal(32u, widthMutation.Width);
+        Assert.Equal(Status.SATISFIABLE, widthMutation.NegatedBoundStatus);
+    }
+
+    [Fact]
+    public void ArrayElementProbeDistinguishesU8FromI8AndI32Mutations()
+    {
+        Assert.True(
+            Z3ContextFactory.IsAvailable,
+            "Array-element regression cannot run: Z3 is unavailable.");
+
+        var form = DifferentialFormRegistry.Build().Single(
+            candidate => candidate.Id == "array-element-type:u8");
+        var predicate = form.Build(CasePolarity.Provable).Condition;
+
+        using var context = Z3ContextFactory.Create();
+        var registered = TranslateArrayBound(context, predicate, "u8");
+        var signedMutation = TranslateArrayBound(context, predicate, "i8");
+        var widthMutation = TranslateArrayBound(context, predicate, "i32");
+
+        Assert.Equal(8u, registered.Width);
+        Assert.Equal(Status.UNSATISFIABLE, registered.NegatedBoundStatus);
+        Assert.Equal(8u, signedMutation.Width);
+        Assert.Equal(Status.SATISFIABLE, signedMutation.NegatedBoundStatus);
+        Assert.Equal(32u, widthMutation.Width);
+        Assert.Equal(Status.SATISFIABLE, widthMutation.NegatedBoundStatus);
     }
 
     [Fact]
@@ -226,7 +257,7 @@ public sealed class VerifierRuntimeDifferentialTests
             });
         Assert.True(translator.DeclareVariable("probe", "Probe"));
 
-        var field = Assert.IsType<FieldAccessNode>(bound.Left);
+        var field = FindFieldAccess(bound);
         var translatedField = translator.TranslateBitVecExpr(field);
         Assert.NotNull(translatedField);
 
@@ -236,5 +267,57 @@ public sealed class VerifierRuntimeDifferentialTests
         using var solver = context.MkSolver();
         solver.Assert(context.MkNot(translatedBound));
         return (translatedField.SortSize, solver.Check());
+    }
+
+    private static FieldAccessNode FindFieldAccess(ExpressionNode expression)
+    {
+        return expression switch
+        {
+            FieldAccessNode field => field,
+            BinaryOperationNode binary => FindFieldAccess(binary.Left),
+            UnaryOperationNode unary => FindFieldAccess(unary.Operand),
+            _ => throw new Xunit.Sdk.XunitException(
+                $"No field access found in {expression.GetType().Name}.")
+        };
+    }
+
+    private static (uint Width, Status NegatedBoundStatus) TranslateArrayBound(
+        Context context,
+        ExpressionNode predicate,
+        string elementType)
+    {
+        var translator = new ContractTranslator(context);
+        Assert.True(translator.DeclareVariable("values", $"{elementType}[]"));
+
+        var access = FindArrayAccess(predicate);
+        var translatedAccess = translator.TranslateBitVecExpr(access);
+        Assert.NotNull(translatedAccess);
+        var translatedPredicate = translator.TranslateBoolExpr(predicate);
+        Assert.NotNull(translatedPredicate);
+
+        using var solver = context.MkSolver();
+        solver.Assert(context.MkNot(translatedPredicate));
+        return (translatedAccess.SortSize, solver.Check());
+    }
+
+    private static ArrayAccessNode FindArrayAccess(ExpressionNode expression)
+    {
+        return FindArrayAccessOrNull(expression)
+            ?? throw new Xunit.Sdk.XunitException(
+                $"No array access found in {expression.GetType().Name}.");
+    }
+
+    private static ArrayAccessNode? FindArrayAccessOrNull(ExpressionNode expression)
+    {
+        return expression switch
+        {
+            ArrayAccessNode access => access,
+            BinaryOperationNode binary => FindArrayAccessOrNull(binary.Left)
+                ?? FindArrayAccessOrNull(binary.Right),
+            UnaryOperationNode unary => FindArrayAccessOrNull(unary.Operand),
+            ImplicationExpressionNode implication => FindArrayAccessOrNull(implication.Antecedent)
+                ?? FindArrayAccessOrNull(implication.Consequent),
+            _ => null
+        };
     }
 }

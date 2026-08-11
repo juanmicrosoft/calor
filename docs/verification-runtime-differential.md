@@ -33,10 +33,21 @@ meaning without presenting unbound `#` as ordinary source-valid `§Q`/`§S`/`§P
 
 `FieldAccessNode` runs through the production module-derived type registry. The contract pass and
 obligation solver derive `Probe.Value: u8` from the generated class declaration and translate it as
-an 8-bit unsigned uninterpreted accessor. The generated predicate checks the `255` upper bound and
-executes with the runtime witness at that boundary. The registered `u8` sort makes the bound
-provable (or explicitly assumed under the nullable-reference model); the historical guessed-`i32`
-fallback leaves a counterexample and therefore fails the gate rather than accidentally matching.
+an 8-bit unsigned uninterpreted accessor. The generated predicate checks both bounds `0..255` and
+executes with the runtime witness at `255`. Mapping the field as `i8` violates non-negativity, while
+mapping it as `i32` admits values outside both finite bounds. Production dotted references use the
+same refusing lookup: nested/partial declarations are merged, accessible inherited instance fields
+are registered on derived types, and a missing field type is never guessed.
+
+Integer scalar and array-element rows use sort-discriminating boundary predicates rather than
+self-equality. The 8-bit rows use their complete ranges; 16-bit and `i32` rows add bounded
+existential boundary witnesses so narrowing is observable. The `i64`, `u32`, and `u64` rows use
+signedness plus arithmetic at the `i32` overflow boundary because integer literals above
+`Int32.MaxValue` are deliberately outside the translator's current model. They do not claim direct
+`Int64`/`UInt32`/`UInt64` extrema coverage. Array rows execute the same predicates against non-null
+one-element runtime arrays and remain explicitly conditional on the nullable-reference model.
+The string row uses non-negative length with a non-null ASCII witness and remains conditional on
+the documented string model.
 
 ## Oracle
 

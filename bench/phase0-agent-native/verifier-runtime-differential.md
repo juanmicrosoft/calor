@@ -33,7 +33,12 @@
 ## Encoding notes
 
 - `expression-kind:SelfRefNode` — The harness binds '#' to an i32 parameter named '__self__' before translation; the emitter's existing SelfRef lowering targets the same generated parameter. This exercises the modeled refinement meaning without claiming ordinary source-level §Q/§S/§PROOF acceptance of an unbound '#'.
-- `expression-kind:FieldAccessNode` — The production contract pass and obligation solver derive field types from module class declarations. Probe.Value is a u8 accessor checked against its 255 upper bound and executed at that boundary; the historical guessed-i32 fallback cannot prove the bound. Proofs remain explicitly Assumed under the nullable-reference model.
+- `expression-kind:FieldAccessNode` — The production contract pass and obligation solver derive field types from module class declarations. Probe.Value is a u8 accessor checked against both bounds 0..255 and executed at 255; mapping it as i8 violates the lower bound and mapping it as i32 violates both finite bounds. Proofs remain explicitly Assumed under the nullable-reference model.
+- `scalar-type:i64` — The translator models integer literals only through signed i32. The i64 row therefore uses signedness at -1 plus an i32-overflow boundary witness (2 * Int32.MaxValue) rather than claiming coverage of Int64.MinValue/MaxValue literals.
+- `scalar-type:u32` — The u32 row combines non-negativity with the wrap boundary of 3 * Int32.MaxValue; this distinguishes 32-bit unsigned arithmetic from u64 without requiring an out-of-model UInt32.MaxValue literal.
+- `scalar-type:u64` — The u64 row combines non-negativity with the non-wrapping result of 3 * Int32.MaxValue; it does not claim direct UInt64.MaxValue literal coverage.
+- `array-element-types` — Integer array rows apply the same per-type boundary predicates to values[0]. Runtime uses a non-null one-element array with the matching deterministic witness; proofs are therefore conditional only on the production nullable-reference-model assumption.
+- `scalar-type:str` — The string row proves non-negative length using the non-null ASCII runtime witness 'ascii'. The solver result remains explicitly conditional on the production string-model assumption; this does not claim nullable or non-ASCII equivalence.
 
 ## Explicit Assumed allowances
 

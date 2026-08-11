@@ -50,11 +50,15 @@ internal static class DifferentialFormRegistry
             true,
             null,
             IsStringType(type) ? [Z3Verifier.StringModelAssumption] : Array.Empty<string>(),
-            polarity => new FormExpression(
-                polarity == CasePolarity.Provable
-                    ? Bin(BinaryOperator.Equal, Ref("value"), Ref("value"))
-                    : Bin(BinaryOperator.NotEqual, Ref("value"), Ref("value")),
-                [Parameter("value", type)]),
+            polarity =>
+            {
+                var predicate = BuildScalarTypePredicate(type, Ref("value"));
+                return new FormExpression(
+                    polarity == CasePolarity.Provable
+                        ? predicate
+                        : new UnaryOperationNode(Span, UnaryOperator.Not, predicate),
+                    [Parameter("value", type)]);
+            },
             condition => ContainsReference(condition, "value"));
     }
 
@@ -69,10 +73,11 @@ internal static class DifferentialFormRegistry
             polarity =>
             {
                 var access = new ArrayAccessNode(Span, Ref("values"), Int(0));
+                var predicate = BuildIntegerTypePredicate(type, access);
                 return new FormExpression(
                     polarity == CasePolarity.Provable
-                        ? Bin(BinaryOperator.Equal, access, access)
-                        : Bin(BinaryOperator.NotEqual, access, access),
+                        ? predicate
+                        : new UnaryOperationNode(Span, UnaryOperator.Not, predicate),
                     [Parameter("values", $"{type}[]")]);
             },
             condition => Contains<ArrayAccessNode>(condition));
@@ -358,10 +363,106 @@ internal static class DifferentialFormRegistry
     private static ExpressionNode BuildFieldAccessCondition(bool provable)
     {
         var field = new FieldAccessNode(Span, Ref("probe"), "Value");
-        return Bin(
-            provable ? BinaryOperator.LessOrEqual : BinaryOperator.GreaterThan,
-            field,
-            Int(byte.MaxValue));
+        var predicate = Bin(
+            BinaryOperator.And,
+            Bin(BinaryOperator.GreaterOrEqual, field, Int(byte.MinValue)),
+            Bin(BinaryOperator.LessOrEqual, field, Int(byte.MaxValue)));
+        return provable
+            ? predicate
+            : new UnaryOperationNode(Span, UnaryOperator.Not, predicate);
+    }
+
+    private static ExpressionNode BuildScalarTypePredicate(string type, ExpressionNode value)
+    {
+        return type switch
+        {
+            "bool" => Bin(
+                BinaryOperator.Or,
+                value,
+                new UnaryOperationNode(Span, UnaryOperator.Not, value)),
+            "str" => Bin(
+                BinaryOperator.GreaterOrEqual,
+                new StringOperationNode(Span, StringOp.Length, [value]),
+                Int(0)),
+            _ => BuildIntegerTypePredicate(type, value)
+        };
+    }
+
+    private static ExpressionNode BuildIntegerTypePredicate(string type, ExpressionNode value)
+    {
+        return type switch
+        {
+            "i8" => IntegerRange(value, sbyte.MinValue, sbyte.MaxValue),
+            "i16" => Bin(
+                BinaryOperator.And,
+                IntegerRange(value, short.MinValue, short.MaxValue),
+                ExactBoundaryExists(type, short.MaxValue)),
+            "i32" => Bin(
+                BinaryOperator.And,
+                IntegerRange(value, int.MinValue, int.MaxValue),
+                ExactBoundaryExists(type, short.MaxValue + 1L)),
+            "i64" => Bin(
+                BinaryOperator.And,
+                new ImplicationExpressionNode(
+                    Span,
+                    Eq(value, Int(-1)),
+                    Bin(BinaryOperator.LessThan, value, Int(0))),
+                new ImplicationExpressionNode(
+                    Span,
+                    Eq(value, Int(2)),
+                    Bin(
+                        BinaryOperator.GreaterThan,
+                        Bin(BinaryOperator.Multiply, value, Int(int.MaxValue)),
+                        Int(0)))),
+            "u8" => IntegerRange(value, byte.MinValue, byte.MaxValue),
+            "u16" => Bin(
+                BinaryOperator.And,
+                IntegerRange(value, ushort.MinValue, ushort.MaxValue),
+                ExactBoundaryExists(type, byte.MaxValue + 1L)),
+            "u32" => Bin(
+                BinaryOperator.And,
+                Bin(BinaryOperator.GreaterOrEqual, value, Int(0)),
+                new ImplicationExpressionNode(
+                    Span,
+                    Eq(value, Int(3)),
+                    Bin(
+                        BinaryOperator.LessThan,
+                        Bin(BinaryOperator.Multiply, value, Int(int.MaxValue)),
+                        Int(int.MaxValue)))),
+            "u64" => Bin(
+                BinaryOperator.And,
+                Bin(BinaryOperator.GreaterOrEqual, value, Int(0)),
+                new ImplicationExpressionNode(
+                    Span,
+                    Eq(value, Int(3)),
+                    Bin(
+                        BinaryOperator.GreaterThan,
+                        Bin(BinaryOperator.Multiply, value, Int(int.MaxValue)),
+                        Int(int.MaxValue)))),
+            _ => throw new InvalidOperationException(
+                $"No integer sort discriminator is registered for '{type}'.")
+        };
+    }
+
+    private static ExpressionNode IntegerRange(ExpressionNode value, long minimum, long maximum) =>
+        Bin(
+            BinaryOperator.And,
+            Bin(BinaryOperator.GreaterOrEqual, value, Int(minimum)),
+            Bin(BinaryOperator.LessOrEqual, value, Int(maximum)));
+
+    private static ExpressionNode ExactBoundaryExists(string type, long boundary)
+    {
+        var witness = Ref("sortWitness");
+        return new ExistsExpressionNode(
+            Span,
+            [new QuantifierVariableNode(Span, "sortWitness", type)],
+            Bin(
+                BinaryOperator.And,
+                Bin(
+                    BinaryOperator.And,
+                    Bin(BinaryOperator.GreaterOrEqual, witness, Int(boundary)),
+                    Bin(BinaryOperator.LessThan, witness, Int(boundary + 1))),
+                Eq(witness, Int(boundary))));
     }
 
     private static FormExpression NoParameters(ExpressionNode condition) =>
@@ -386,7 +487,7 @@ internal static class DifferentialFormRegistry
         new(Span, name, type, Attributes);
 
     private static ReferenceNode Ref(string name) => new(Span, name);
-    private static IntLiteralNode Int(int value) => new(Span, value);
+    private static IntLiteralNode Int(long value) => new(Span, value);
     private static BoolLiteralNode Bool(bool value) => new(Span, value);
     private static StringLiteralNode Str(string value) => new(Span, value);
     private static BinaryOperationNode Bin(

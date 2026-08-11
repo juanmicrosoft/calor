@@ -109,14 +109,8 @@ internal sealed class GeneratedRuntime : IDisposable
     {
         return typeName switch
         {
-            "i8" => (sbyte)7,
-            "i16" => (short)7,
-            "i32" => 7,
-            "i64" => 7L,
-            "u8" => (byte)7,
-            "u16" => (ushort)7,
-            "u32" => 7U,
-            "u64" => 7UL,
+            "i8" or "i16" or "i32" or "i64"
+                or "u8" or "u16" or "u32" or "u64" => CreateIntegerWitness(typeName),
             "bool" => true,
             "str" => "ascii",
             "Probe" => CreateProbe(),
@@ -156,9 +150,23 @@ internal sealed class GeneratedRuntime : IDisposable
                 $"No deterministic array witness is registered for '{elementTypeName}[]'.")
         };
         var array = Array.CreateInstance(elementType, 1);
-        array.SetValue(Convert.ChangeType(7, elementType, System.Globalization.CultureInfo.InvariantCulture), 0);
+        array.SetValue(CreateIntegerWitness(elementTypeName), 0);
         return array;
     }
+
+    private static object CreateIntegerWitness(string typeName) => typeName switch
+    {
+        "i8" => sbyte.MaxValue,
+        "i16" => short.MaxValue,
+        "i32" => short.MaxValue + 1,
+        "i64" => 2L,
+        "u8" => byte.MaxValue,
+        "u16" => (ushort)(byte.MaxValue + 1),
+        "u32" => 3U,
+        "u64" => 3UL,
+        _ => throw new InvalidOperationException(
+            $"No deterministic integer witness is registered for '{typeName}'.")
+    };
 
     public void Dispose()
     {

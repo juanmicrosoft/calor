@@ -12,12 +12,14 @@ All notable changes to this project will be documented in this file.
   mislabeled cases, and pins fail-safe handling for unsupported, timeout, solver-error, unavailable,
   and assumed outcomes. CI blocks on zero mismatches and byte-checks published JSON/Markdown
   metrics. Coverage now requires decisive production solver outcomes, with only exact documented
-  assumption sets accepted. The field-access row now derives `Probe.Value: u8`, checks its `255`
-  upper bound, and executes a boundary witness, so the historical guessed-`i32` fallback produces
-  the wrong proof polarity and fails the gate instead of accidentally matching. Generated
-  assemblies are collectible, worktree `.git` files are supported, and report paths are LF-pinned.
-  Current coverage is 65/65 solver-handled forms and 1,170/1,170 solver-handled cells; 40/65 forms
-  currently elide.
+  assumption sets accepted. Field access now checks the full `u8` range `0..255`, with explicit
+  `i8` and `i32` mutation controls. Dotted references never guess missing fields as `i32`; the
+  module registry merges partial/nested declarations and includes accessible inherited instance
+  fields with exact types. Scalar and array-element rows now use width/signedness boundary
+  predicates and aligned runtime witnesses instead of self-equality, including an array-select
+  signedness regression pin. Generated assemblies are collectible, worktree `.git` files are
+  supported, and report paths are LF-pinned. Current coverage is 65/65 solver-handled forms and
+  1,170/1,170 solver-handled cells with zero mismatches; 40/65 forms currently elide.
 
 ### Changed
 - **The binder dispatches every expression class** (#762 B1): a single authoritative dispatch

@@ -155,31 +155,110 @@ public sealed class ContractTranslator
 
     /// <summary>
     /// Builds the field-type registry used by field-access translation from the module's
-    /// class declarations. Partial declarations are merged and nested classes are included.
+    /// class declarations. Partial declarations are merged, nested classes are qualified,
+    /// and derived types include inherited non-private instance fields.
     /// </summary>
     internal static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>
         BuildUserTypeRegistry(ModuleNode module)
     {
         ArgumentNullException.ThrowIfNull(module);
 
-        var fieldMaps = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
-        foreach (var cls in EnumerateClasses(module.Classes))
+        var declarations = EnumerateClasses(module.Classes)
+            .GroupBy(entry => entry.QualifiedName, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(entry => entry.Class).ToList(),
+                StringComparer.Ordinal);
+        var declaredTypeNames = declarations.Keys.ToHashSet(StringComparer.Ordinal);
+        var directFields =
+            new Dictionary<string, Dictionary<string, RegisteredField>>(StringComparer.Ordinal);
+        var baseTypes = new Dictionary<string, string?>(StringComparer.Ordinal);
+
+        foreach (var (typeName, partials) in declarations)
         {
-            var typeName = NormalizeTypeName(cls.Name);
-            if (!fieldMaps.TryGetValue(typeName, out var fields))
+            var fields = new Dictionary<string, RegisteredField>(StringComparer.Ordinal);
+            foreach (var fieldGroup in partials
+                         .SelectMany(cls => cls.Fields)
+                         .GroupBy(field => field.Name, StringComparer.Ordinal))
             {
-                fields = new Dictionary<string, string>(StringComparer.Ordinal);
-                fieldMaps[typeName] = fields;
+                var candidates = fieldGroup
+                    .Select(field => new RegisteredField(
+                        NormalizeTypeName(field.TypeName),
+                        field.Visibility,
+                        field.IsStatic))
+                    .Distinct()
+                    .ToList();
+                if (candidates.Count == 1 && !string.IsNullOrEmpty(candidates[0].TypeName))
+                    fields[fieldGroup.Key] = candidates[0];
             }
 
-            foreach (var field in cls.Fields)
-                fields[field.Name] = field.TypeName;
+            directFields[typeName] = fields;
+
+            var resolvedBases = partials
+                .Select(cls => cls.BaseClass)
+                .Where(baseClass => !string.IsNullOrWhiteSpace(baseClass))
+                .Select(baseClass => ResolveDeclaredTypeName(
+                    baseClass!,
+                    typeName,
+                    declaredTypeNames))
+                .Where(baseClass => baseClass is not null)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            baseTypes[typeName] = resolvedBases.Count == 1 ? resolvedBases[0] : null;
         }
 
-        return fieldMaps.ToDictionary(
-            pair => pair.Key,
-            pair => (IReadOnlyDictionary<string, string>)pair.Value,
-            StringComparer.Ordinal);
+        var resolvedFields =
+            new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
+        var resolving = new HashSet<string>(StringComparer.Ordinal);
+
+        IReadOnlyDictionary<string, string> ResolveFields(string typeName)
+        {
+            if (resolvedFields.TryGetValue(typeName, out var cached))
+                return cached;
+
+            var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (!resolving.Add(typeName))
+                return fields;
+
+            if (baseTypes.TryGetValue(typeName, out var baseType) && baseType is not null)
+            {
+                foreach (var (fieldName, fieldType) in ResolveFields(baseType))
+                {
+                    var baseField = FindRegisteredField(baseType, fieldName, directFields, baseTypes);
+                    if (baseField is not null && baseField.Visibility != Visibility.Private)
+                        fields[fieldName] = fieldType;
+                }
+            }
+
+            foreach (var (fieldName, field) in directFields[typeName])
+            {
+                if (field.IsStatic)
+                    fields.Remove(fieldName);
+                else
+                    fields[fieldName] = field.TypeName;
+            }
+
+            resolving.Remove(typeName);
+            resolvedFields[typeName] = fields;
+            return fields;
+        }
+
+        foreach (var typeName in declarations.Keys.OrderBy(name => name, StringComparer.Ordinal))
+            ResolveFields(typeName);
+
+        // Nested types are canonically registered by qualified name. Preserve exact bare-name
+        // lookup for methods inside an enclosing type only when that spelling is globally unique;
+        // ambiguous nested names are omitted so translation refuses rather than picking a type.
+        foreach (var simpleNameGroup in declarations.Keys
+                     .GroupBy(GetSimpleTypeName, StringComparer.Ordinal)
+                     .Where(group => group.Count() == 1))
+        {
+            var qualifiedName = simpleNameGroup.Single();
+            if (!resolvedFields.ContainsKey(simpleNameGroup.Key))
+                resolvedFields[simpleNameGroup.Key] = resolvedFields[qualifiedName];
+        }
+
+        return resolvedFields;
     }
 
     internal static string BuildUserTypeRegistryCacheScope(
@@ -196,16 +275,77 @@ public sealed class ContractTranslator
                             $"{field.Key.Length}#{field.Key}={field.Value.Length}#{field.Value}"))));
     }
 
-    private static IEnumerable<ClassDefinitionNode> EnumerateClasses(
-        IEnumerable<ClassDefinitionNode> classes)
+    private static RegisteredField? FindRegisteredField(
+        string typeName,
+        string fieldName,
+        IReadOnlyDictionary<string, Dictionary<string, RegisteredField>> directFields,
+        IReadOnlyDictionary<string, string?> baseTypes)
+    {
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var currentType = typeName;
+        while (visited.Add(currentType))
+        {
+            if (directFields.TryGetValue(currentType, out var fields)
+                && fields.TryGetValue(fieldName, out var field))
+            {
+                return field;
+            }
+
+            if (!baseTypes.TryGetValue(currentType, out var baseType) || baseType is null)
+                break;
+            currentType = baseType;
+        }
+
+        return null;
+    }
+
+    private static string? ResolveDeclaredTypeName(
+        string referencedType,
+        string declaringType,
+        IReadOnlySet<string> declaredTypes)
+    {
+        var normalizedReference = NormalizeTypeName(referencedType);
+        if (declaredTypes.Contains(normalizedReference))
+            return normalizedReference;
+
+        var separator = declaringType.LastIndexOf('.');
+        while (separator >= 0)
+        {
+            var candidate = $"{declaringType[..separator]}.{normalizedReference}";
+            if (declaredTypes.Contains(candidate))
+                return candidate;
+            separator = declaringType.LastIndexOf('.', separator - 1);
+        }
+
+        return null;
+    }
+
+    private static string GetSimpleTypeName(string typeName)
+    {
+        var separator = typeName.LastIndexOf('.');
+        return separator < 0 ? typeName : typeName[(separator + 1)..];
+    }
+
+    private static IEnumerable<(ClassDefinitionNode Class, string QualifiedName)> EnumerateClasses(
+        IEnumerable<ClassDefinitionNode> classes,
+        string? enclosingType = null)
     {
         foreach (var cls in classes)
         {
-            yield return cls;
-            foreach (var nested in EnumerateClasses(cls.NestedClasses))
+            var simpleName = NormalizeTypeName(cls.Name);
+            var qualifiedName = enclosingType is null
+                ? simpleName
+                : $"{enclosingType}.{simpleName}";
+            yield return (cls, qualifiedName);
+            foreach (var nested in EnumerateClasses(cls.NestedClasses, qualifiedName))
                 yield return nested;
         }
     }
+
+    private sealed record RegisteredField(
+        string TypeName,
+        Visibility Visibility,
+        bool IsStatic);
 
     /// <summary>
     /// Pushes a self-variable name for refinement predicate translation.
@@ -343,9 +483,8 @@ public sealed class ContractTranslator
     /// Resolves a dot-separated reference name (e.g. "item.Quantity" or "a.b.c") by
     /// walking the path: the first segment is looked up in the variable scope, and each
     /// subsequent segment becomes a field-access on the previous result. Each step uses
-    /// (or creates) an uninterpreted Z3 function for the field. The receiver type comes
-    /// from the variable registry; intermediate types come from the user-type registry
-    /// when known, defaulting to i32 otherwise.
+    /// (or creates) an uninterpreted Z3 function for the field. Receiver and intermediate
+    /// field types must be present in the user-type registry; missing entries are refused.
     /// </summary>
     private Expr? ResolveDotPath(string dottedName)
     {
@@ -366,13 +505,9 @@ public sealed class ContractTranslator
             if (coreType.EndsWith("[]"))
                 return null; // array element access via dot-path is not supported here
 
-            string fieldType = "i32";
-            if (_userTypeRegistry is not null
-                && _userTypeRegistry.TryGetValue(coreType, out var fieldMap)
-                && fieldMap.TryGetValue(fieldName, out var t))
-            {
-                fieldType = NormalizeTypeName(t);
-            }
+            var fieldType = ResolveRegisteredFieldType(coreType, fieldName);
+            if (fieldType is null)
+                return null;
 
             var key = (coreType, fieldName);
             if (!_fieldAccessors.TryGetValue(key, out var accessor))
@@ -383,6 +518,12 @@ public sealed class ContractTranslator
                     _userTypeSorts[coreType] = receiverSort;
                 }
                 var resultSort = ResultSortForType(fieldType);
+                if (resultSort is null)
+                {
+                    return Refuse(
+                        $"field '{coreType}.{fieldName}' has unsupported type '{fieldType}': " +
+                        "modeling it as a guessed sort could produce an unsound proof");
+                }
                 accessor = _ctx.MkFuncDecl($"{coreType}_{fieldName}", new[] { receiverSort }, resultSort);
                 _fieldAccessors[key] = accessor;
             }
@@ -399,6 +540,22 @@ public sealed class ContractTranslator
             }
         }
         return current;
+    }
+
+    private string? ResolveRegisteredFieldType(string receiverType, string fieldName)
+    {
+        if (_userTypeRegistry is null
+            || !_userTypeRegistry.TryGetValue(receiverType, out var fieldMap)
+            || !fieldMap.TryGetValue(fieldName, out var fieldType)
+            || string.IsNullOrWhiteSpace(fieldType))
+        {
+            _ = Refuse(
+                $"field '{receiverType}.{fieldName}' has no registered type: modeling it at a " +
+                "guessed width could reason at the wrong wrap boundary (modeled-forms divergence D7)");
+            return null;
+        }
+
+        return NormalizeTypeName(fieldType);
     }
 
     /// <summary>
@@ -765,7 +922,14 @@ public sealed class ContractTranslator
                 {
                     normalizedIndex = _ctx.MkZeroExt(64 - indexBv.SortSize, indexBv);
                 }
-                return _ctx.MkSelect(arrExpr, normalizedIndex);
+                var selected = (BitVecExpr)_ctx.MkSelect(arrExpr, normalizedIndex);
+                if (_arrayInfo.TryGetValue(arrayName, out var info))
+                {
+                    var (width, isSigned) = GetTypeWidthAndSignedness(info.ElementType);
+                    if (width > 0)
+                        TrackBitVec(selected, width, isSigned);
+                }
+                return selected;
             }
         }
 
@@ -1567,15 +1731,9 @@ public sealed class ContractTranslator
         // W1 Slice 1 (D7): the field's type must come from the user-type registry.
         // The old i32 default guessed a width/signedness; a wrong guess reasons at
         // the wrong wrap boundary and can mint a false Proven that elides a guard.
-        if (_userTypeRegistry is null
-            || !_userTypeRegistry.TryGetValue(coreType, out var fieldMap)
-            || !fieldMap.TryGetValue(node.FieldName, out var t))
-        {
-            return Refuse(
-                $"field '{coreType}.{node.FieldName}' has no registered type: modeling it at a " +
-                "guessed width could reason at the wrong wrap boundary (modeled-forms divergence D7)");
-        }
-        string fieldType = NormalizeTypeName(t);
+        var fieldType = ResolveRegisteredFieldType(coreType, node.FieldName);
+        if (fieldType is null)
+            return null;
 
         // Cache the field accessor function decl per (type, field).
         var key = (coreType, node.FieldName);
@@ -1590,6 +1748,12 @@ public sealed class ContractTranslator
             }
 
             var resultSort = ResultSortForType(fieldType);
+            if (resultSort is null)
+            {
+                return Refuse(
+                    $"field '{coreType}.{node.FieldName}' has unsupported type '{fieldType}': " +
+                    "modeling it as a guessed sort could produce an unsound proof");
+            }
             accessor = _ctx.MkFuncDecl($"{coreType}_{node.FieldName}", new[] { receiverSort }, resultSort);
             _fieldAccessors[key] = accessor;
         }
@@ -1607,9 +1771,9 @@ public sealed class ContractTranslator
 
     /// <summary>
     /// Maps a Calor field type to the corresponding Z3 sort, used as the result sort of
-    /// uninterpreted field accessors. Defaults to 32-bit signed bit-vector for unknown types.
+    /// uninterpreted field accessors. Unsupported or empty types are refused by the caller.
     /// </summary>
-    private Sort ResultSortForType(string typeName)
+    private Sort? ResultSortForType(string typeName)
     {
         var t = NormalizeTypeName(typeName);
         if (t.EndsWith("?")) t = t[..^1];
@@ -1620,17 +1784,14 @@ public sealed class ContractTranslator
             "i32" or "u32" or "int" or "uint" => _ctx.MkBitVecSort(32),
             "i64" or "u64" or "long" or "ulong" => _ctx.MkBitVecSort(64),
             "bool" => _ctx.BoolSort,
-            // Flagged like every other string-sort site (D3/D12): this arm mints a field
-            // accessor's RESULT sort, and `accessor.Apply(target)` does not pass through
-            // TrackString. Unreachable today only because SetUserTypeRegistry has no callers —
-            // but wiring that registry up is the natural fix for D7, which would reopen this
-            // vector on `§S (== (len p.name) INT:2)`. Flagging it here means the invariant
-            // "every string term sets the flag" holds without a caveat.
+            // Like every other string-sort site (D3/D12), this arm mints a field accessor's
+            // result sort and accessor.Apply(target) does not pass through TrackString.
             "string" or "str" => MarkStringSort(),
+            "f32" or "f64" or "float" or "double" => null,
             _ when !string.IsNullOrEmpty(t) => _userTypeSorts.TryGetValue(t, out var s)
                                                ? s
                                                : (_userTypeSorts[t] = MarkUninterpretedSort(t)),
-            _ => _ctx.MkBitVecSort(32),
+            _ => null,
         };
     }
 
