@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Text.RegularExpressions;
 using Calor.Compiler;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
@@ -8,6 +7,7 @@ using Calor.Compiler.Parsing;
 using Calor.LanguageServer.Utilities;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 
 namespace Calor.LanguageServer.State;
@@ -435,11 +435,24 @@ public sealed class WorkspaceState
             if (replacements.TryGetValue(uri, out var edits))
             {
                 replacedDocuments.Add(uri);
+                var originalLength = source.Length;
+                var previousEnd = 0;
+                foreach (var edit in edits)
+                {
+                    if (edit.Span.Start < 0
+                        || edit.Span.Length < 0
+                        || edit.Span.End < edit.Span.Start
+                        || edit.Span.End > originalLength
+                        || edit.Span.Start < previousEnd)
+                    {
+                        return false;
+                    }
+                    previousEnd = edit.Span.End;
+                }
+
                 var delta = 0;
                 foreach (var edit in edits)
                 {
-                    if (edit.Span.Start < 0 || edit.Span.End > source.Length)
-                        return false;
                     var start = edit.Span.Start + delta;
                     var end = edit.Span.End + delta;
                     source = source[..start] + newName + source[end..];
@@ -1742,22 +1755,27 @@ public sealed class WorkspaceState
 
     private static IEnumerable<string> ExtractPreprocessorSymbols(string source)
     {
-        foreach (var line in source.Split('\n'))
+        var root = CSharpSyntaxTree.ParseText(source).GetRoot();
+        foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
         {
-            var trimmed = line.TrimStart();
-            if (!trimmed.StartsWith("#if ", StringComparison.Ordinal)
-                && !trimmed.StartsWith("#elif ", StringComparison.Ordinal))
+            var condition = trivia.GetStructure() switch
+            {
+                IfDirectiveTriviaSyntax directive => directive.Condition,
+                ElifDirectiveTriviaSyntax directive => directive.Condition,
+                _ => null,
+            };
+            if (condition == null)
             {
                 continue;
             }
 
-            foreach (Match match in Regex.Matches(
-                         trimmed,
-                         @"[A-Za-z_][A-Za-z0-9_]*",
-                         RegexOptions.CultureInvariant))
+            foreach (var token in condition.DescendantTokens(descendIntoTrivia: true))
             {
-                if (match.Value is not ("if" or "elif" or "true" or "false" or "defined"))
-                    yield return match.Value;
+                if (token.IsKind(SyntaxKind.IdentifierToken)
+                    && token.ValueText is not ("true" or "false" or "defined"))
+                {
+                    yield return token.ValueText;
+                }
             }
         }
     }
