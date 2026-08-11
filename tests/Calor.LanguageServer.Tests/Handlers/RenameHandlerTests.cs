@@ -865,6 +865,120 @@ public sealed class ExactSpanRefactoringGateTests
         }
     }
 
+    // A module, and a type declared across several files, are one declaration in
+    // the language but one SymbolId per file in the index. Renaming from a
+    // file-local occurrence set edits a single part and splits the declaration —
+    // and Calor reports no error, so the break surfaces only in generated C#
+    // (CS0103 on the other part's members). Rename must refuse instead.
+    [Theory]
+    [InlineData("Collision", "Renamed")]
+    [InlineData("Worker", "Employee")]
+    public async Task RenameRefusesDeclarationsSplitAcrossFilesAsync(
+        string cursorText,
+        string newName)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["definitions.calr"] = """
+                    §M{defs:Collision}
+                      §CL{c001:Worker:pub:partial}
+                        §MT{m001:Pick:pub} (i32:value) -> i32
+                          §R value
+                    """,
+                ["open-use.calr"] = """
+                    §M{openUse:Collision}
+                      §CL{c002:Worker:pub:partial}
+                        §MT{m010:UseOne:pub} () -> i32
+                          §R §C{Pick} §A INT:1 §/C
+                    """,
+            };
+            foreach (var (fileName, source) in sources)
+                File.WriteAllText(Path.Combine(root, fileName), source);
+
+            var workspace = new WorkspaceState(root);
+            var openUri = DocumentUri.FromFileSystemPath(
+                Path.Combine(root, "definitions.calr"));
+            workspace.GetOrCreate(openUri, sources["definitions.calr"], version: 1);
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                openUri,
+                sources["definitions.calr"],
+                cursorText,
+                newName));
+
+            // The refusal must be specific to split declarations: a method declared
+            // in one file still renames across the workspace.
+            Assert.NotNull(await RenameAtAsync(
+                workspace,
+                openUri,
+                sources["definitions.calr"],
+                "Pick",
+                "Choose"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    // A module emits a C# namespace that another file can import. Using directives
+    // are not indexed as occurrences, so renaming an imported module would leave the
+    // importer pointing at a namespace that no longer exists.
+    [Fact]
+    public async Task RenameRefusesModuleImportedByAnotherFileAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["models.calr"] = """
+                    §M{m001:Models}
+                      §CL{c001:Widget:pub}
+                    """,
+                ["app.calr"] = """
+                    §M{m002:App}
+                      §U{Models}
+                      §F{f001:Make:pub} () -> Widget
+                        §R §NEW{Widget} §/NEW
+                    """,
+            };
+            foreach (var (fileName, source) in sources)
+                File.WriteAllText(Path.Combine(root, fileName), source);
+
+            var workspace = new WorkspaceState(root);
+            var openUri = DocumentUri.FromFileSystemPath(Path.Combine(root, "models.calr"));
+            workspace.GetOrCreate(openUri, sources["models.calr"], version: 1);
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                openUri,
+                sources["models.calr"],
+                "Models",
+                "Domain"));
+
+            // The importing module is not imported anywhere, so it still renames.
+            var appUri = DocumentUri.FromFileSystemPath(Path.Combine(root, "app.calr"));
+            workspace.GetOrCreate(appUri, sources["app.calr"], version: 1);
+            Assert.NotNull(await RenameAtAsync(
+                workspace,
+                appUri,
+                sources["app.calr"],
+                "App",
+                "Application"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task<WorkspaceEdit?> RenameAtAsync(
         WorkspaceState workspace,
         DocumentUri uri,
