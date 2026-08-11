@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.12.1</span>
+            <span className="font-semibold text-calor-cerulean">v0.13.0</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The v0.12.0 soundness feature set is now installable from NuGet through v0.12.1. The VS Code Marketplace is still at v0.3.8 after the v0.12.1 publish hit an expired token; current extension packages build successfully but have not been published. Z3 packaging and ARM64 loading were also repaired.</span>
+            <span className="text-foreground">The v0.12.0 soundness feature set is now installable from NuGet through v0.13.0. The VS Code Marketplace is still at v0.3.8 after the v0.13.0 publish hit an expired token; current extension packages build successfully but have not been published. Z3 packaging and ARM64 loading were also repaired.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"

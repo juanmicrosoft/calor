@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ## [0.13.0] - 2026-08-11
 
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads, 32.0%)
+- **Category wins**: Calor 6, C# 0 — Comprehension 1.84x, ErrorDetection 1.49x,
+  TokenEconomics 1.42x, RefactoringStability 1.38x, EditPrecision 1.36x,
+  Correctness 1.29x
+
 The "Trustworthy Project Model" release (roadmap v0.13). Headline: the #762 binder
 rebuild is complete — all 60 accepted expression classes structurally bind (60/60
 Tier A; the unsafe/pointer classes were promoted from residual to structural by the

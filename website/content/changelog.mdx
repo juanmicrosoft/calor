@@ -10,6 +10,34 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-11
+
+The "Trustworthy Project Model" release. Headline: the structural-binding rebuild is complete — all 60 accepted expression classes bind structurally (the analysis-incomplete instrument is retired because nothing is incomplete), with stable symbol identities, full-signature overload resolution, exhaustive checker traversals, a resolved call graph, and LSP rename/references/cross-file resolution on top.
+
+### Release-gate scorecard, stated plainly
+
+- **Green, measured**: binding totality (zero incomplete on both measurement corpora, ratcheted in CI); the verifier-vs-runtime differential gate (65/65 modeled forms, 1,170/1,170 cases, zero mismatches, CI-blocking); the migration fixture registry (enforcing).
+- **Not met, disclosed**: the full-vs-incremental identity harness and the rename harness were registered but never built — they ship unmet and are the top of 0.13.x.
+- **Deferred, named**: the persistent index / `calor query` did not ship — the fourth deferral of an item the plan pre-committed not to defer again. First index work item in 0.13.x.
+
+### Added
+- **Verifier-vs-runtime differential gate**: 1,170 deterministic cases across all 65 frozen modeled forms × contract positions × nesting depths × polarity, with a compile-and-execute oracle. CI blocks on zero mismatches.
+- **Structural binding for every expression class**, with an authoritative dispatch table, reflection completeness tests, and a two-leg corpus ratchet that makes coverage regression a CI failure.
+- **Stable SymbolIds and exact identifier spans** consumed by the LSP (rename, references, cross-file resolution).
+- **Top-level overload sets**: duplicate signatures, ambiguity, and no-match are explicit diagnostics — a second same-name declaration no longer silently vanishes.
+
+### Changed
+- **Proof-based guard elision is now opt-in** (`--elide-proven-guards`): verification verdicts are diagnostic by default; a `Proven` result keeps its runtime guard unless you opt in. The differential gate that would justify flipping the default is now built and green; the flip is a deliberate next-cycle decision.
+- **Verification cache keys are exhaustive and semantics-versioned**: content-hashed over the modeled surface, namespaced by compiler-semantics version and solver budget, with collision-unsafe keys refused outright.
+- **MSBuild incremental builds fingerprint every diagnostics-affecting input**, including referenced assemblies and IL-analysis inputs — flipping any of them against a warm cache forces a recompile.
+
+### Removed
+- **The `osx-x64` Z3 native is no longer shipped.** Upstream ships an arm64 binary under the x64 label, so Intel Macs installed successfully and silently lost verification — no honest asset exists to ship. Intel macOS is unsupported for verification (compilation is unaffected; Z3-dependent features report "Z3 unavailable" loudly). A native arch-vs-RID assertion in the packaging workflow prevents any recurrence.
+
+### Known channel state
+- The VS Code Marketplace remains at v0.3.8 (expired publish token, maintainer-only); this release does not change that.
+
+
 ## [0.12.1] - 2026-08-07
 
 A packaging release. **v0.12.0 was tagged but never installable** — both publish workflows failed, so nuget.org continued to serve `0.10.0` and the VS Code marketplace continued to serve `0.3.8`. Nothing in the language, compiler, or verifier changed here.
