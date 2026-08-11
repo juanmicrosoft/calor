@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Runtime.InteropServices;
@@ -517,6 +518,77 @@ public sealed class LosslessFormattingTests : IDisposable
         Assert.Equal(source, await File.ReadAllTextAsync(path));
         Assert.Equal(source, await File.ReadAllTextAsync(alias));
         Assert.Empty(Directory.EnumerateFiles(_testDirectory, "*.format.tmp"));
+    }
+
+    [Fact]
+    public void LinuxX64LinkCountDecoder_ReadsUnsigned64BitValueAtOffset16()
+    {
+        var buffer = new byte[24];
+        BinaryPrimitives.WriteUInt64LittleEndian(buffer.AsSpan(16), 7);
+
+        Assert.Equal(
+            7,
+            NativeFileLinks.DecodeLinuxLinkCount(buffer, Architecture.X64));
+    }
+
+    [Theory]
+    [InlineData(Architecture.Arm64, false)]
+    [InlineData(Architecture.RiscV64, false)]
+    [InlineData(Architecture.LoongArch64, false)]
+    [InlineData(Architecture.Ppc64le, false)]
+    [InlineData(Architecture.S390x, true)]
+    public void LinuxGeneric64BitLinkCountDecoder_ReadsUnsigned32BitValueAtOffset20(
+        Architecture architecture,
+        bool bigEndian)
+    {
+        var buffer = new byte[24];
+        if (bigEndian)
+        {
+            BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(20), 11);
+        }
+        else
+        {
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(20), 11);
+        }
+
+        Assert.Equal(
+            11,
+            NativeFileLinks.DecodeLinuxLinkCount(buffer, architecture));
+    }
+
+    [Fact]
+    public void LinuxLinkCountDecoder_RejectsUnsupportedArchitectures()
+    {
+        var error = Assert.Throws<IOException>(
+            () => NativeFileLinks.DecodeLinuxLinkCount(
+                new byte[24],
+                Architecture.X86));
+
+        Assert.Contains("unsupported Linux architecture", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LinuxLinkCountDecoder_WrapsOverflowAsIOException()
+    {
+        var buffer = new byte[24];
+        BinaryPrimitives.WriteUInt64LittleEndian(
+            buffer.AsSpan(16),
+            (ulong)int.MaxValue + 1);
+
+        var error = Assert.Throws<IOException>(
+            () => NativeFileLinks.DecodeLinuxLinkCount(buffer, Architecture.X64));
+
+        Assert.IsType<OverflowException>(error.InnerException);
+    }
+
+    [Fact]
+    public void SafeWrite_RejectsUnknownHardLinkCount()
+    {
+        var error = Assert.Throws<IOException>(
+            () => SafeSourceFile.EnsureKnownSingleLinkCount(null));
+
+        Assert.Contains("Could not determine", error.Message, StringComparison.Ordinal);
+        Assert.Contains("refusing replacement", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

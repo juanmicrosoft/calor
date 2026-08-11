@@ -90,6 +90,36 @@ public sealed class FormattingHandlerTests
             message => message.Contains("returned no edits", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void CapturedSnapshot_UsesOriginalSourceAfterWorkspaceUpdate()
+    {
+        const string original =
+            "§M{m001:Original}   \r\n" +
+            "    §F{f001:Main:pub} () -> void   \r\n";
+        const string updated =
+            "§M{m002:Updated}\n" +
+            "    §F{f002:Different:pub} () -> void\n" +
+            "        §B{broken\n";
+        var uri = DocumentUri.From("file:///formatting-snapshot.calr");
+        var workspace = new WorkspaceState();
+        var state = workspace.GetOrCreate(uri, original);
+        var captured = state.Snapshot;
+        workspace.Update(uri, updated, version: 1);
+
+        var edits = FormattingHandler.FormatSnapshot(
+            captured,
+            state.Uri,
+            uri,
+            new RecordingLogger());
+
+        Assert.NotNull(edits);
+        var applied = ApplyEdits(original, edits!);
+        Assert.Contains("§M{m001:Original}", applied, StringComparison.Ordinal);
+        Assert.DoesNotContain("Updated", applied, StringComparison.Ordinal);
+        Assert.Equal(new Position(2, 0), Assert.Single(edits!).Range.End);
+        Assert.Equal(updated, state.Source);
+    }
+
     private static string ApplyEdits(string source, IEnumerable<TextEdit> edits)
     {
         var replacements = edits

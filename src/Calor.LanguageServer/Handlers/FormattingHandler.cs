@@ -2,6 +2,7 @@ using Calor.Compiler.Formatting;
 using Calor.LanguageServer.State;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -33,53 +34,12 @@ public sealed class FormattingHandler : DocumentFormattingHandlerBase
         {
             return Task.FromResult<TextEditContainer?>(null);
         }
-        if (state.Ast == null || state.Diagnostics.HasErrors)
-        {
-            _logger.LogWarning(
-                "Formatting returned no edits for {DocumentUri} because the document has compiler errors.",
-                request.TextDocument.Uri);
-            return Task.FromResult<TextEditContainer?>(null);
-        }
 
+        var snapshot = state.Snapshot;
         try
         {
-            var formatter = new CalorFormatter();
-            var result = formatter.FormatSource(
-                state.Source,
-                state.Uri.IsFile ? state.Uri.LocalPath : state.Uri.ToString());
-            if (!result.Success)
-            {
-                _logger.LogError(
-                    "Formatting failed for {DocumentUri}: {Errors}",
-                    request.TextDocument.Uri,
-                    string.Join("; ", result.Errors));
-                return Task.FromResult<TextEditContainer?>(null);
-            }
-            if (result.UsedConservativeFallback)
-            {
-                _logger.LogWarning(
-                    "Formatting returned no edits for {DocumentUri}: {Reason}",
-                    request.TextDocument.Uri,
-                    result.ConservativeFallbackReason);
-                return Task.FromResult<TextEditContainer?>(null);
-            }
-            if (string.Equals(result.Original, result.Formatted, StringComparison.Ordinal))
-            {
-                return Task.FromResult<TextEditContainer?>(null);
-            }
-
-            var range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-                new Position(0, 0),
-                GetDocumentEnd(state.Source)
-            );
-
-            var edit = new TextEdit
-            {
-                Range = range,
-                NewText = result.Formatted
-            };
-
-            return Task.FromResult<TextEditContainer?>(new TextEditContainer(edit));
+            return Task.FromResult(
+                FormatSnapshot(snapshot, state.Uri, request.TextDocument.Uri, _logger));
         }
         catch (Exception ex)
         {
@@ -89,6 +49,57 @@ public sealed class FormattingHandler : DocumentFormattingHandlerBase
                 request.TextDocument.Uri);
             throw;
         }
+    }
+
+    internal static TextEditContainer? FormatSnapshot(
+        DocumentAnalysisSnapshot snapshot,
+        Uri documentUri,
+        DocumentUri requestedDocumentUri,
+        ILogger<FormattingHandler> logger)
+    {
+        if (snapshot.Ast == null || snapshot.Diagnostics.HasErrors)
+        {
+            logger.LogWarning(
+                "Formatting returned no edits for {DocumentUri} because the document has compiler errors.",
+                requestedDocumentUri);
+            return null;
+        }
+
+        var formatter = new CalorFormatter();
+        var result = formatter.FormatSource(
+            snapshot.Source,
+            documentUri.IsFile ? documentUri.LocalPath : documentUri.ToString());
+        if (!result.Success)
+        {
+            logger.LogError(
+                "Formatting failed for {DocumentUri}: {Errors}",
+                requestedDocumentUri,
+                string.Join("; ", result.Errors));
+            return null;
+        }
+        if (result.UsedConservativeFallback)
+        {
+            logger.LogWarning(
+                "Formatting returned no edits for {DocumentUri}: {Reason}",
+                requestedDocumentUri,
+                result.ConservativeFallbackReason);
+            return null;
+        }
+        if (string.Equals(result.Original, result.Formatted, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+            new Position(0, 0),
+            GetDocumentEnd(snapshot.Source));
+        var edit = new TextEdit
+        {
+            Range = range,
+            NewText = result.Formatted
+        };
+
+        return new TextEditContainer(edit);
     }
 
     private static Position GetDocumentEnd(string source)

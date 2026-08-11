@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
@@ -868,7 +869,17 @@ internal static class SafeSourceFile
                 "Source replacement target became a symbolic link; refusing to overwrite it.");
         }
 
-        var linkCount = NativeFileLinks.TryGetLinkCount(path);
+        EnsureKnownSingleLinkCount(NativeFileLinks.TryGetLinkCount(path));
+    }
+
+    internal static void EnsureKnownSingleLinkCount(int? linkCount)
+    {
+        if (linkCount is null or < 1)
+        {
+            throw new IOException(
+                "Could not determine the source hard-link count; refusing replacement.");
+        }
+
         if (linkCount > 1)
         {
             throw new IOException(
@@ -881,44 +892,114 @@ internal static class NativeFileLinks
 {
     internal static int? TryGetLinkCount(string path)
     {
-        if (OperatingSystem.IsWindows())
-        {
-            using var handle = File.OpenHandle(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete);
-            if (!GetFileInformationByHandle(handle, out var information))
-            {
-                throw new IOException(
-                    $"Could not inspect source hard links: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
-            }
-            return checked((int)information.NumberOfLinks);
-        }
-
-        if (!Environment.Is64BitProcess
-            || (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS()))
-        {
-            return null;
-        }
-
-        const int statBufferSize = 256;
-        var buffer = Marshal.AllocHGlobal(statBufferSize);
         try
         {
-            if (Stat(path, buffer) != 0)
+            if (OperatingSystem.IsWindows())
             {
-                throw new IOException(
-                    $"Could not inspect source hard links: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
+                using var handle = File.OpenHandle(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete);
+                if (!GetFileInformationByHandle(handle, out var information))
+                {
+                    throw new IOException(
+                        $"Could not inspect source hard links: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
+                }
+                return checked((int)information.NumberOfLinks);
             }
 
-            return OperatingSystem.IsMacOS()
-                ? unchecked((ushort)Marshal.ReadInt16(buffer, 6))
-                : checked((int)Marshal.ReadInt64(buffer, 16));
+            if (!Environment.Is64BitProcess)
+            {
+                throw new IOException(
+                    $"Could not inspect source hard links on unsupported 32-bit architecture " +
+                    $"'{RuntimeInformation.ProcessArchitecture}'.");
+            }
+
+            if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
+            {
+                return null;
+            }
+
+            const int statBufferSize = 256;
+            var buffer = Marshal.AllocHGlobal(statBufferSize);
+            try
+            {
+                if (Stat(path, buffer) != 0)
+                {
+                    throw new IOException(
+                        $"Could not inspect source hard links: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
+                }
+
+                if (OperatingSystem.IsMacOS())
+                {
+                    return unchecked((ushort)Marshal.ReadInt16(buffer, 6));
+                }
+
+                var statBytes = new byte[24];
+                Marshal.Copy(buffer, statBytes, 0, statBytes.Length);
+                return DecodeLinuxLinkCount(
+                    statBytes,
+                    RuntimeInformation.ProcessArchitecture);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
         }
-        finally
+        catch (EntryPointNotFoundException ex)
         {
-            Marshal.FreeHGlobal(buffer);
+            throw new IOException(
+                "Could not inspect source hard links because the native stat entry point is unavailable.",
+                ex);
+        }
+        catch (DllNotFoundException ex)
+        {
+            throw new IOException(
+                "Could not inspect source hard links because the native platform library is unavailable.",
+                ex);
+        }
+        catch (OverflowException ex)
+        {
+            throw new IOException(
+                "Could not inspect source hard links because the link count exceeds the supported range.",
+                ex);
+        }
+    }
+
+    internal static int DecodeLinuxLinkCount(
+        ReadOnlySpan<byte> statBuffer,
+        Architecture architecture)
+    {
+        if (statBuffer.Length < 24)
+        {
+            throw new IOException(
+                "Could not inspect source hard links because the Linux stat buffer was too small.");
+        }
+
+        try
+        {
+            return architecture switch
+            {
+                Architecture.X64 => checked((int)BinaryPrimitives.ReadUInt64LittleEndian(
+                    statBuffer.Slice(16, sizeof(ulong)))),
+                Architecture.Arm64
+                    or Architecture.RiscV64
+                    or Architecture.LoongArch64
+                    or Architecture.Ppc64le => checked((int)BinaryPrimitives.ReadUInt32LittleEndian(
+                        statBuffer.Slice(20, sizeof(uint)))),
+                Architecture.S390x => checked((int)BinaryPrimitives.ReadUInt32BigEndian(
+                    statBuffer.Slice(20, sizeof(uint)))),
+                _ => throw new IOException(
+                    $"Could not inspect source hard links on unsupported Linux architecture " +
+                    $"'{architecture}'.")
+            };
+        }
+        catch (OverflowException ex)
+        {
+            throw new IOException(
+                "Could not inspect source hard links because the link count exceeds the supported range.",
+                ex);
         }
     }
 
