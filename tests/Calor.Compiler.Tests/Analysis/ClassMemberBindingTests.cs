@@ -147,6 +147,77 @@ public class ClassMemberBindingTests
         Assert.Empty(errors);
     }
 
+    [Fact]
+    public void InheritedFields_ResolveAcrossHierarchy_WithVisibilityAndIdentity()
+    {
+        var source = """
+            §M{m001:Test}
+              §CL{c001:Base:pub}
+                §FLD{i32:shared:prot}
+                §FLD{i32:publicValue:pub}
+                §FLD{i32:internalValue:int}
+              §CL{c002:Middle:Base:pub}
+                §FLD{i32:secret:priv}
+              §CL{c003:Derived:Middle:pub}
+                §MT{m001:Use:pub} () -> i32
+                  §B{bare:i32} shared
+                  §B{viaThis:i32} §THIS.shared
+                  §B{viaBase:i32} §BASE.shared
+                  §B{viaPublic:i32} §THIS.publicValue
+                  §B{viaInternal:i32} §BASE.internalValue
+                  §B{hidden:object} §BASE.secret
+                  §R (+ bare (+ viaThis viaBase))
+            """;
+
+        var bound = Bind(source, out var diagnostics);
+        var use = bound.Functions.Single(function =>
+            function.Symbol.Name == "Derived.Use");
+        var shared = bound.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.IsField && symbol.Name == "shared");
+        var secret = bound.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.IsField && symbol.Name == "secret");
+        var publicValue = bound.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.IsField && symbol.Name == "publicValue");
+        var internalValue = bound.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.IsField && symbol.Name == "internalValue");
+        var sharedReferences = BoundNodeHelpers.DescendantsAndSelf(use)
+            .OfType<BoundVariableExpression>()
+            .Where(expression => expression.Variable.Name == "shared")
+            .ToArray();
+        var fieldAccesses = BoundNodeHelpers.DescendantsAndSelf(use)
+            .OfType<BoundFieldAccessExpression>()
+            .ToArray();
+
+        Assert.Equal("Base", shared.DeclaringTypeName);
+        Assert.Equal(Visibility.Protected, shared.Visibility);
+        Assert.Equal("Middle", secret.DeclaringTypeName);
+        Assert.Equal(Visibility.Private, secret.Visibility);
+        Assert.Equal(Visibility.Public, publicValue.Visibility);
+        Assert.Equal(Visibility.Internal, internalValue.Visibility);
+        Assert.Same(shared, Assert.Single(sharedReferences).Variable);
+        var sharedAccesses = fieldAccesses
+            .Where(access => access.FieldName == "shared")
+            .ToArray();
+        Assert.Equal(2, sharedAccesses.Length);
+        Assert.All(
+            sharedAccesses,
+            access => Assert.Same(shared, access.ResolvedField));
+        Assert.Same(
+            publicValue,
+            fieldAccesses.Single(access => access.FieldName == "publicValue").ResolvedField);
+        Assert.Same(
+            internalValue,
+            fieldAccesses.Single(access => access.FieldName == "internalValue").ResolvedField);
+        Assert.Null(fieldAccesses.Single(access => access.FieldName == "secret").ResolvedField);
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UndefinedReference
+            && diagnostic.Message.Contains("shared", StringComparison.Ordinal));
+    }
+
     #endregion
 
     #region Property Binding

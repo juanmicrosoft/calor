@@ -1097,7 +1097,7 @@ public sealed class SymbolFinderVisitor
                 var targetType = ResolveExpressionType(fieldAccess.Target);
                 _result = new SymbolLookupResult(
                     fieldAccess.FieldName, "field access", null,
-                    fieldAccess.Span, null, fieldAccess, targetType);
+                    fieldAccess.FieldNameSpan, null, fieldAccess, targetType);
                 break;
 
             case CallExpressionNode callExpr:

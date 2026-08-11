@@ -175,7 +175,7 @@ public static class SymbolFinder
 
         var field = Descendants(boundModule)
             .OfType<BoundFieldAccessExpression>()
-            .Where(expression => expression.Span.Contains(offset))
+            .Where(expression => expression.FieldNameSpan.Contains(offset))
             .Where(expression => string.Equals(
                 expression.FieldName,
                 result.Name,
@@ -270,7 +270,7 @@ public static class SymbolFinder
                     references.Add(variable.Span);
                     break;
                 case BoundFieldAccessExpression field when field.ResolvedSymbolId == symbolId:
-                    references.Add(field.Span);
+                    references.Add(field.FieldNameSpan);
                     break;
                 case BoundCallExpression call
                     when call.ResolvedSymbols.Any(symbol => symbol.Id == symbolId):

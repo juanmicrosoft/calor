@@ -267,7 +267,10 @@ public sealed class Binder
                 isMutable,
                 isParameter: false,
                 ParameterModifier.None,
-                field.IdentifierSpan);
+                field.IdentifierSpan,
+                visibility: field.Visibility,
+                declaringTypeName: qualifiedClassName,
+                isField: true);
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -288,7 +291,9 @@ public sealed class Binder
                 property.Setter != null || property.Initer != null,
                 isParameter: false,
                 ParameterModifier.None,
-                property.IdentifierSpan);
+                property.IdentifierSpan,
+                visibility: property.Visibility,
+                declaringTypeName: qualifiedClassName);
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -466,7 +471,10 @@ public sealed class Binder
         bool isParameter,
         ParameterModifier modifier,
         Parsing.TextSpan declarationSpan,
-        ExpressionNode? defaultValue = null)
+        ExpressionNode? defaultValue = null,
+        Visibility visibility = Visibility.Public,
+        string? declaringTypeName = null,
+        bool isField = false)
     {
         var symbol = new VariableSymbol(
             id,
@@ -476,7 +484,10 @@ public sealed class Binder
             isParameter,
             modifier,
             declarationSpan,
-            defaultValue);
+            defaultValue,
+            visibility,
+            declaringTypeName,
+            isField);
         TrackSymbol(symbol);
         return symbol;
     }
@@ -1044,32 +1055,22 @@ public sealed class Binder
     private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess)
     {
         var target = BindExpression(fieldAccess.Target);
-        VariableSymbol? resolvedField = null;
-
-        // Resolve this.field from the class scope, but retain the field-access
-        // shape and target instead of collapsing it to a bare variable.
-        if (fieldAccess.Target is ThisExpressionNode && _currentClassScope != null)
+        var resolvedField = fieldAccess.Target switch
         {
-            var symbol = _currentClassScope.LookupLocal(fieldAccess.FieldName);
-            if (symbol is VariableSymbol varSymbol)
-                resolvedField = varSymbol;
-        }
-        else if (fieldAccess.Target is BaseExpressionNode)
-        {
-            var baseClass = ResolveBaseClass(_currentClass);
-            if (baseClass != null
-                && _classScopes[baseClass].LookupLocal(fieldAccess.FieldName) is VariableSymbol field)
-            {
-                resolvedField = field;
-            }
-        }
+            ThisExpressionNode => ResolveAccessibleMember(_currentClass, fieldAccess.FieldName),
+            BaseExpressionNode => ResolveAccessibleMember(
+                ResolveBaseClass(_currentClass),
+                fieldAccess.FieldName),
+            _ => null,
+        };
 
         return new BoundFieldAccessExpression(
             fieldAccess.Span,
             target,
             fieldAccess.FieldName,
             resolvedField?.TypeName ?? "OBJECT",
-            resolvedField);
+            resolvedField,
+            fieldAccess.FieldNameSpan);
     }
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
@@ -1812,6 +1813,8 @@ public sealed class Binder
     private BoundExpression BindReferenceExpression(ReferenceNode refNode)
     {
         var symbol = _scope.Lookup(refNode.Name);
+        if (symbol == null)
+            symbol = ResolveAccessibleMember(_currentClass, refNode.Name);
 
         if (symbol == null)
         {
@@ -2052,6 +2055,49 @@ public sealed class Binder
                 _currentClass != null
                 && IsSameOrDerivedClass(_currentClass, function.ContainingTypeName),
             _ => true,
+        };
+    }
+
+    private VariableSymbol? ResolveAccessibleMember(
+        ClassDefinitionNode? start,
+        string memberName)
+    {
+        var current = start;
+        var visited = new HashSet<ClassDefinitionNode>();
+        while (current != null && visited.Add(current))
+        {
+            var declared = _classScopes[current].LookupLocal(memberName);
+            if (declared != null)
+            {
+                return declared is VariableSymbol variable && IsMemberAccessible(variable)
+                    ? variable
+                    : null;
+            }
+
+            current = ResolveBaseClass(current);
+        }
+
+        return null;
+    }
+
+    private bool IsMemberAccessible(VariableSymbol member)
+    {
+        if (member.DeclaringTypeName == null)
+            return true;
+
+        return member.Visibility switch
+        {
+            Visibility.Private =>
+                string.Equals(
+                    member.DeclaringTypeName,
+                    _currentClassName,
+                    StringComparison.Ordinal),
+            Visibility.Protected =>
+                _currentClass != null
+                && IsSameOrDerivedClass(_currentClass, member.DeclaringTypeName),
+            Visibility.Internal or Visibility.ProtectedInternal => true,
+            Visibility.Public => true,
+            _ => false,
         };
     }
 
@@ -2331,13 +2377,9 @@ public sealed class Binder
 
     private static string UnwrapOptionOrNullable(string typeName)
     {
-        const string optionPrefix = "OPTION[inner=";
-        if (typeName.StartsWith(optionPrefix, StringComparison.OrdinalIgnoreCase)
-            && typeName.EndsWith(']'))
-            return typeName[optionPrefix.Length..^1];
-        if (typeName.EndsWith("?", StringComparison.Ordinal))
-            return typeName[..^1];
-        return typeName;
+        return TypeIdentity.TryUnwrapOptionOrNullable(typeName, out var elementType)
+            ? elementType
+            : typeName;
     }
 
     private static string GetIndexedElementType(string typeName)

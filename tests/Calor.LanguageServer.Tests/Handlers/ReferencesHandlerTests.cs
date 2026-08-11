@@ -1,11 +1,53 @@
 using Calor.LanguageServer.Handlers;
+using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
+using Calor.LanguageServer.Utilities;
+using OmniSharp.Extensions.LanguageServer.Protocol;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Xunit;
 
 namespace Calor.LanguageServer.Tests.Handlers;
 
 public class ReferencesHandlerTests
 {
+    [Fact]
+    public async Task InheritedFieldAccesses_ReturnExactIdentifierRangesAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c001:Base:pub}
+                §FLD{i32:shared:prot}
+              §CL{c002:Derived:Base:pub}
+                §MT{m001:Use:pub} () -> i32
+                  §R (+ §THIS.shared §BASE.shared)
+            """;
+        var uri = DocumentUri.From("file:///references-field.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("§THIS.shared", StringComparison.Ordinal)
+            + "§THIS.".Length;
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new ReferencesHandler(workspace);
+
+        var locations = await handler.Handle(
+            new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                Context = new ReferenceContext { IncludeDeclaration = true },
+            },
+            CancellationToken.None);
+
+        var references = locations!.ToArray();
+        Assert.Equal(3, references.Length);
+        Assert.All(references, location =>
+        {
+            var start = PositionConverter.ToOffset(location.Range.Start, source);
+            var end = PositionConverter.ToOffset(location.Range.End, source);
+            Assert.Equal("shared", source[start..end]);
+        });
+    }
+
     [Fact]
     public void ReferenceCollector_FindsVariableReferences()
     {

@@ -80,6 +80,44 @@ public class RenameHandlerTests
     }
 
     [Fact]
+    public async Task RenameInheritedFieldAccesses_EditsOnlyFieldIdentifiersAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c001:Base:pub}
+                §FLD{i32:shared:prot}
+              §CL{c002:Derived:Base:pub}
+                §MT{m001:Use:pub} () -> i32
+                  §R (+ §THIS.shared §BASE.shared)
+            """;
+        var uri = DocumentUri.From("file:///rename-field.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("shared:prot", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "renamed",
+            },
+            CancellationToken.None);
+
+        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.Equal(3, edits.Length);
+        Assert.All(edits, textEdit =>
+        {
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+            Assert.Equal("shared", source[start..end]);
+            Assert.Equal("renamed", textEdit.NewText);
+        });
+    }
+
+    [Fact]
     public void ReferenceCollectorForRename_FindsAllOccurrences()
     {
         var source = """

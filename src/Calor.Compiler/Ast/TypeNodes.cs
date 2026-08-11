@@ -211,12 +211,18 @@ public sealed class FieldAccessNode : ExpressionNode
 {
     public ExpressionNode Target { get; }
     public string FieldName { get; }
+    public TextSpan FieldNameSpan { get; }
 
-    public FieldAccessNode(TextSpan span, ExpressionNode target, string fieldName)
+    public FieldAccessNode(
+        TextSpan span,
+        ExpressionNode target,
+        string fieldName,
+        TextSpan? fieldNameSpan = null)
         : base(span)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
         FieldName = fieldName ?? throw new ArgumentNullException(nameof(fieldName));
+        FieldNameSpan = fieldNameSpan ?? span;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

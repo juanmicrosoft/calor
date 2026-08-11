@@ -1411,6 +1411,7 @@ public sealed class BoundFieldAccessExpression : BoundExpression
 {
     public BoundExpression Target { get; }
     public string FieldName { get; }
+    public TextSpan FieldNameSpan { get; }
     public VariableSymbol? ResolvedField { get; }
     public SymbolId? ResolvedSymbolId => ResolvedField?.Id;
     public override string TypeName { get; }
@@ -1421,11 +1422,13 @@ public sealed class BoundFieldAccessExpression : BoundExpression
         BoundExpression target,
         string fieldName,
         string typeName,
-        VariableSymbol? resolvedField = null)
+        VariableSymbol? resolvedField = null,
+        TextSpan? fieldNameSpan = null)
         : base(span)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
         FieldName = fieldName ?? throw new ArgumentNullException(nameof(fieldName));
+        FieldNameSpan = fieldNameSpan ?? span;
         TypeName = typeName ?? "OBJECT";
         ResolvedField = resolvedField;
         Children = [target];

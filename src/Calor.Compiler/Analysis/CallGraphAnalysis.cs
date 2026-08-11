@@ -92,6 +92,10 @@ public sealed class CallGraphAnalysis
                         target = "<expression-call>";
                         span = expressionCall.Span;
                         break;
+                    case BoundExpressionCall expressionCall:
+                        target = "<expression-call>";
+                        span = expressionCall.Span;
+                        break;
                 }
 
                 if (target == null)
@@ -477,6 +481,10 @@ public sealed class CallGraphAnalysis
                                 : [creation.ResolvedConstructor];
                             break;
                         case BoundExpressionCallExpression:
+                            target = "<expression-call>";
+                            expressionTargetCall = true;
+                            break;
+                        case BoundExpressionCall:
                             target = "<expression-call>";
                             expressionTargetCall = true;
                             break;

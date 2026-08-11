@@ -63,6 +63,32 @@ public sealed class SymbolAndOverloadBindingTests
     }
 
     [Fact]
+    public void SomeNullCoalesce_InfersPayloadType_AndResolvesOverload()
+    {
+        const string source = """
+            §M{m1:Test}
+              §F{f1:Pick:pri} (i32:value) -> i32
+                §R value
+              §F{f2:Pick:pri} (str:value) -> str
+                §R value
+              §F{f3:Use:pub} () -> i32
+                §R §C{Pick} §A (?? §SM INT:1 INT:0) §/C
+            """;
+
+        var bound = ParseAndBind(source, out var diagnostics);
+        var pickInt = bound.Functions.Single(function =>
+            function.Symbol.Name == "Pick"
+            && TypeIdentity.Canonicalize(function.Symbol.ReturnType) == "INT");
+        var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(use.Body)).Expression);
+
+        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
+        Assert.Equal("INT", Assert.Single(call.Arguments).TypeName);
+        Assert.Same(pickInt.Symbol, call.ResolvedSymbol);
+    }
+
+    [Fact]
     public void MemberOverloads_ResolveBareQualifiedAndStatementCalls()
     {
         const string source = """
@@ -590,6 +616,56 @@ public sealed class SymbolAndOverloadBindingTests
     }
 
     [Fact]
+    public void MutuallyExclusivePreprocessorMethods_WithDifferentReturns_UseObject()
+    {
+        var feature = Method(
+            "feature",
+            "Pick",
+            Visibility.Public,
+            [new ReturnStatementNode(Span, new IntLiteralNode(Span, 1))]);
+        var fallback = Method(
+            "fallback",
+            "Pick",
+            Visibility.Public,
+            [new ReturnStatementNode(Span, new StringLiteralNode(Span, "fallback"))],
+            returnType: "str");
+        var runMethod = Method(
+            "run",
+            "Run",
+            Visibility.Public,
+            [new ReturnStatementNode(Span, Call("Pick", []))],
+            returnType: "object");
+        var module = Module(
+        [
+            Class(
+                "c1",
+                "Worker",
+                [runMethod],
+                preprocessorBlocks:
+                [
+                    MemberPreprocessor(
+                        [feature],
+                        MemberPreprocessor([fallback])),
+                ]),
+        ]);
+
+        var bound = Bind(module, out var diagnostics);
+        var alternatives = bound.Functions
+            .Where(function => function.Symbol.Name == "Worker.Pick")
+            .ToArray();
+        var run = bound.Functions.Single(function =>
+            function.Symbol.Name == "Worker.Run");
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(run.Body)).Expression);
+
+        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
+        Assert.Equal("OBJECT", call.TypeName);
+        Assert.Equal(
+            alternatives.Select(function => function.SymbolId).OrderBy(id => id.Value).ToArray(),
+            call.ResolvedSymbols.Select(symbol => symbol.Id).OrderBy(id => id.Value).ToArray());
+    }
+
+    [Fact]
     public void DuplicatePreprocessorMethods_InSameBranchRemainErrors()
     {
         var module = Module(
@@ -785,6 +861,40 @@ public sealed class SymbolAndOverloadBindingTests
         Assert.Equal("External.Log", unresolved.Target);
     }
 
+    [Fact]
+    public void ResolvedCallGraph_BinderExpressionCall_RemainsExplicitlyUnresolved()
+    {
+        const string source = """
+            §M{m1:Test}
+              §F{f1:Use:pub} () -> object
+                §R §C §NEW{object} §/NEW.GetType §/C
+            """;
+
+        var bound = ParseAndBind(source, out var diagnostics);
+        var use = Assert.Single(bound.Functions);
+        var expressionCall = Assert.Single(
+            BoundNodeHelpers.DescendantsAndSelf(use).OfType<BoundExpressionCall>());
+        var graph = CallGraphAnalysis.BuildResolved(bound);
+        var unresolved = Assert.Single(graph.UnresolvedCalls.Where(call =>
+            call.Target == "<expression-call>"));
+
+        Assert.False(diagnostics.HasErrors, string.Join(", ", diagnostics.Select(d => d.Message)));
+        Assert.Empty(graph.ForwardGraph[use.SymbolId]);
+        Assert.Equal(use.SymbolId, unresolved.Caller);
+        Assert.Equal("<expression-call>", unresolved.Target);
+        Assert.Equal(expressionCall.Span, unresolved.Span);
+
+        var astDiagnostics = new DiagnosticBag();
+        var astGraph = CallGraphAnalysis.Build(Parse(source, astDiagnostics));
+        Assert.False(
+            astDiagnostics.HasErrors,
+            string.Join(", ", astDiagnostics.Select(diagnostic => diagnostic.Message)));
+        Assert.Contains(astGraph.UnresolvedCalls, call =>
+            call.CallerId == "f1"
+            && call.Target == "<expression-call>"
+            && call.Span == expressionCall.Span);
+    }
+
     private static bool IsOverloadDiagnostic(Diagnostic diagnostic) =>
         diagnostic.Code is DiagnosticCode.DuplicateFunctionSignature
             or DiagnosticCode.AmbiguousOverload
@@ -878,7 +988,8 @@ public sealed class SymbolAndOverloadBindingTests
         string name,
         Visibility visibility,
         IReadOnlyList<StatementNode> body,
-        EffectsNode? effects = null) =>
+        EffectsNode? effects = null,
+        string returnType = "i32") =>
         new(
             new TextSpan(
                 100 + id.Aggregate(0, (value, character) => value + character),
@@ -891,7 +1002,7 @@ public sealed class SymbolAndOverloadBindingTests
             MethodModifiers.None,
             Array.Empty<TypeParameterNode>(),
             Array.Empty<ParameterNode>(),
-            new OutputNode(Span, "i32"),
+            new OutputNode(Span, returnType),
             effects,
             Array.Empty<RequiresNode>(),
             Array.Empty<EnsuresNode>(),

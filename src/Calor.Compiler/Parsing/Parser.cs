@@ -3097,7 +3097,11 @@ public sealed class Parser
                 }
                 else
                 {
-                    expr = new FieldAccessNode(span, expr, memberToken.Text);
+                    expr = new FieldAccessNode(
+                        span,
+                        expr,
+                        memberToken.Text,
+                        memberToken.Span);
                 }
             }
         }
@@ -3682,7 +3686,11 @@ public sealed class Parser
             }
             else
             {
-                expr = new FieldAccessNode(span, expr, memberName);
+                expr = new FieldAccessNode(
+                    span,
+                    expr,
+                    memberName,
+                    memberToken.Span);
             }
         }
 

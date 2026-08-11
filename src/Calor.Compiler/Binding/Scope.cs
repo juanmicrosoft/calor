@@ -123,6 +123,43 @@ public static class SymbolSourceIdentity
 /// </summary>
 public static class TypeIdentity
 {
+    public static bool TryUnwrapOptionOrNullable(string typeName, out string elementType)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
+        var type = typeName.Trim();
+
+        if (type.StartsWith("?", StringComparison.Ordinal) && type.Length > 1)
+        {
+            elementType = type[1..];
+            return true;
+        }
+
+        if (type.EndsWith("?", StringComparison.Ordinal) && type.Length > 1)
+        {
+            elementType = type[..^1];
+            return true;
+        }
+
+        const string expandedPrefix = "OPTION[inner=";
+        if (type.StartsWith(expandedPrefix, StringComparison.OrdinalIgnoreCase)
+            && type.EndsWith(']'))
+        {
+            elementType = type[expandedPrefix.Length..^1];
+            return true;
+        }
+
+        if (TrySplitGeneric(type, out var genericName, out var arguments)
+            && genericName.Equals("Option", StringComparison.OrdinalIgnoreCase)
+            && arguments.Count == 1)
+        {
+            elementType = arguments[0];
+            return true;
+        }
+
+        elementType = string.Empty;
+        return false;
+    }
+
     public static string Canonicalize(string typeName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
@@ -418,9 +455,12 @@ public sealed class VariableSymbol : Symbol
     public string TypeName { get; }
     public bool IsMutable { get; }
     public bool IsParameter { get; }
+    public bool IsField { get; }
     public ParameterModifier Modifier { get; }
     public ExpressionNode? DefaultValue { get; }
     public bool IsOptional => DefaultValue != null;
+    public Visibility Visibility { get; }
+    public string? DeclaringTypeName { get; }
 
     public VariableSymbol(
         SymbolId id,
@@ -430,14 +470,20 @@ public sealed class VariableSymbol : Symbol
         bool isParameter = false,
         ParameterModifier modifier = ParameterModifier.None,
         TextSpan declarationSpan = default,
-        ExpressionNode? defaultValue = null)
+        ExpressionNode? defaultValue = null,
+        Visibility visibility = Visibility.Public,
+        string? declaringTypeName = null,
+        bool isField = false)
         : base(id, name, declarationSpan)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         IsMutable = isMutable;
         IsParameter = isParameter;
+        IsField = isField;
         Modifier = modifier;
         DefaultValue = defaultValue;
+        Visibility = visibility;
+        DeclaringTypeName = declaringTypeName;
     }
 
     public VariableSymbol(
@@ -766,9 +812,15 @@ public sealed class Scope
                     .Where(other => !ReferenceEquals(other, candidate))
                     .All(other => AreMutuallyExclusiveAlternatives(candidate, other))))
         {
+            var alternativeReturnTypes = best
+                .Select(item => TypeIdentity.Canonicalize(item.ReturnType))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
             return OverloadResolutionResult.ResolvedAlternatives(
                 bestFunctions,
-                best[0].ReturnType);
+                alternativeReturnTypes.Length == 1
+                    ? alternativeReturnTypes[0]
+                    : "OBJECT");
         }
 
         return OverloadResolutionResult.Ambiguous(bestFunctions);
