@@ -46,6 +46,51 @@ public readonly record struct SymbolId
         Uri.EscapeDataString(component ?? throw new ArgumentNullException(nameof(component)));
 }
 
+/// <summary>
+/// Defines which binder diagnostics are part of compilation semantics rather
+/// than optional analysis instrumentation.
+/// </summary>
+public static class BindingDiagnosticPolicy
+{
+    public static bool IsCompilationError(Diagnostics.Diagnostic diagnostic)
+    {
+        ArgumentNullException.ThrowIfNull(diagnostic);
+
+        if (!diagnostic.IsError)
+            return false;
+
+        return diagnostic.Code is
+            Diagnostics.DiagnosticCode.DuplicateDefinition
+            or Diagnostics.DiagnosticCode.DuplicateFunctionSignature
+            or Diagnostics.DiagnosticCode.AmbiguousOverload
+            or Diagnostics.DiagnosticCode.NoMatchingOverload
+            or Diagnostics.DiagnosticCode.BindRequiresTypeOrInitializer
+            or Diagnostics.DiagnosticCode.InstanceMemberInStaticContext;
+    }
+
+    public static void PropagateCompilationErrors(
+        IEnumerable<Diagnostics.Diagnostic> source,
+        Diagnostics.DiagnosticBag destination)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(destination);
+
+        foreach (var diagnostic in source.Where(IsCompilationError))
+        {
+            if (destination.Any(existing =>
+                    existing.Code == diagnostic.Code
+                    && existing.Span == diagnostic.Span
+                    && existing.Message == diagnostic.Message
+                    && existing.Severity == diagnostic.Severity))
+            {
+                continue;
+            }
+
+            destination.Add(diagnostic);
+        }
+    }
+}
+
 public static class SymbolSourceIdentity
 {
     public static string Canonicalize(string? sourceIdentity)
