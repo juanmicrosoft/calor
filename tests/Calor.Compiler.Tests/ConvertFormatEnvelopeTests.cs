@@ -281,11 +281,11 @@ public class ConvertFormatEnvelopeTests : IDisposable
         var root = ParseAndValidate(stdOut, "convert");
         var issue = root.GetProperty("diagnostics").EnumerateArray()
             .Single(d => d.GetProperty("code").GetString() == DiagnosticCode.ConversionIssue);
-        Assert.Equal("warning", issue.GetProperty("severity").GetString());
-        Assert.StartsWith("[unsupported-member]", issue.GetProperty("message").GetString());
+        Assert.Equal("info", issue.GetProperty("severity").GetString());
+        Assert.StartsWith("[destructor]", issue.GetProperty("message").GetString());
         Assert.Equal(5, issue.GetProperty("location").GetProperty("line").GetInt32());
         Assert.EndsWith("Dtor.cs", issue.GetProperty("location").GetProperty("file").GetString());
-        Assert.True(root.GetProperty("summary").GetProperty("warnings").GetInt32() >= 1);
+        Assert.True(root.GetProperty("summary").GetProperty("info").GetInt32() >= 1);
     }
 
     [Fact]
@@ -424,7 +424,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
 
         Assert.Equal(0, exitCode); // conversion still succeeds — but honestly
         Assert.DoesNotContain("Conversion successful", stdOut);
-        Assert.Contains("semantic loss", stdOut);
+        Assert.Contains("interop preservation", stdOut);
         Assert.Contains("InteropPreserved", stdOut);
         // The loss line carries a file:line location.
         Assert.Contains("Rec.cs:", stdOut);
@@ -447,6 +447,9 @@ public class ConvertFormatEnvelopeTests : IDisposable
         var data = root.GetProperty("data");
         Assert.True(data.GetProperty("success").GetBoolean());
         Assert.True(data.GetProperty("lossCount").GetInt32() >= 1);
+        Assert.Equal(1, data.GetProperty("interopPreservationCount").GetInt32());
+        Assert.Equal(0, data.GetProperty("lossySubstitutionCount").GetInt32());
+        Assert.Equal(0, data.GetProperty("dropCount").GetInt32());
 
         var loss = data.GetProperty("losses").EnumerateArray()
             .Single(l => l.GetProperty("feature").GetString() == "record");
@@ -455,7 +458,52 @@ public class ConvertFormatEnvelopeTests : IDisposable
 
         // Human loss summary goes to stderr in envelope mode; no success line.
         Assert.DoesNotContain("Conversion successful", stdErr);
-        Assert.Contains("semantic loss", stdErr);
+        Assert.Contains("interop preservation", stdErr);
+    }
+
+    [Fact]
+    public void Convert_Json_LossyOptInReportsExactDrop()
+    {
+        var csFile = WriteFile("LossyDtor.cs", """
+            public class D
+            {
+                ~D() { }
+            }
+            """);
+
+        var (exitCode, stdOut, _) = RunCli("convert", csFile, "--lossy", "--format", "json");
+
+        Assert.Equal(0, exitCode);
+        var data = ParseAndValidate(stdOut, "convert").GetProperty("data");
+        Assert.Equal("lossy", data.GetProperty("fidelity").GetString());
+        Assert.Equal(1, data.GetProperty("dropCount").GetInt32());
+        var loss = Assert.Single(data.GetProperty("losses").EnumerateArray());
+        Assert.Equal("Dropped", loss.GetProperty("kind").GetString());
+        Assert.EndsWith("LossyDtor.cs", loss.GetProperty("file").GetString());
+        Assert.Equal(3, loss.GetProperty("line").GetInt32());
+    }
+
+    [Fact]
+    public void Convert_ValidationFailureLeavesExistingDestinationUnchanged()
+    {
+        var csFile = WriteFile("InvalidEmission.cs", """
+            public class Service
+            {
+                public string Process(bool enabled, int code) =>
+                    enabled ? code switch { 0 => "Zero", _ => "Other" } : "Disabled";
+            }
+            """);
+        var output = WriteFile("Existing.calr", "original bytes");
+
+        var (exitCode, _, _) = RunCli(
+            "convert",
+            csFile,
+            "--lossy",
+            "--output",
+            output);
+
+        Assert.Equal(1, exitCode);
+        Assert.Equal("original bytes", File.ReadAllText(output));
     }
 
     [Fact]

@@ -207,7 +207,13 @@ public sealed class ProjectMigrator
             if (mergedModules[i] != modules[i].Module)
             {
                 var newSource = emitter.Emit(mergedModules[i]);
-                await File.WriteAllTextAsync(modules[i].File.OutputPath!, newSource);
+                var validation = CalorSourceHelper.Parse(newSource, modules[i].File.OutputPath!);
+                if (!validation.IsSuccess)
+                {
+                    throw new InvalidOperationException(
+                        $"Merged partial-class output failed validation: {modules[i].File.OutputPath}");
+                }
+                await ConversionFileWriter.WriteAtomicAsync(modules[i].File.OutputPath!, newSource);
             }
         }
     }
@@ -264,6 +270,7 @@ public sealed class ProjectMigrator
         var conversionOptions = new ConversionOptions
         {
             IncludeBenchmark = _options.IncludeBenchmark,
+            Fidelity = _options.Fidelity,
             PassthroughOnError = _options.PassthroughOnError,
             UseImplicitCallCloser = _options.UseImplicitCallCloser
         };
@@ -297,7 +304,7 @@ public sealed class ProjectMigrator
         {
             // Use replacement fallback for files with unpairable surrogates (e.g., regex patterns with \uD800)
             var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-            await File.WriteAllTextAsync(entry.OutputPath, result.CalorSource, writeEncoding);
+            await ConversionFileWriter.WriteAtomicAsync(entry.OutputPath, result.CalorSource, writeEncoding);
         }
 
         var status = result.Success
@@ -381,6 +388,7 @@ public sealed class ProjectMigrator
             Status = status,
             Duration = DateTime.UtcNow - startTime,
             Issues = issues,
+            Losses = result.Losses,
             Metrics = metrics,
             Analysis = analysisResult
         };
@@ -399,7 +407,7 @@ public sealed class ProjectMigrator
 
         if (!dryRun && !result.HasErrors)
         {
-            await File.WriteAllTextAsync(entry.OutputPath, result.GeneratedCode);
+            await ConversionFileWriter.WriteAtomicAsync(entry.OutputPath, result.GeneratedCode);
         }
 
         var status = result.HasErrors

@@ -331,7 +331,8 @@ public class MigrationLearningFixTests
             """;
 
         var result = _converter.Convert(csharpSource);
-        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation");
 
         var emitted = Emit(result.Ast!);
         // Keywords should be sanitized with @ prefix in emitted C#

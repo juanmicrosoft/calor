@@ -67,6 +67,10 @@ public static class MigrateCommand
             description: "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision",
             getDefaultValue: () => false);
 
+        var lossyOption = new Option<bool>(
+            aliases: new[] { "--lossy" },
+            description: "Explicitly allow reported semantic substitutions or drops. The default is lossless migration.");
+
         var command = new Command("migrate", "Migrate an entire project between C# and Calor")
         {
             pathArgument,
@@ -79,7 +83,8 @@ public static class MigrateCommand
             skipAnalyzeOption,
             skipVerifyOption,
             verificationTimeoutOption,
-            explicitCallClosersOption
+            explicitCallClosersOption,
+            lossyOption
         };
 
         command.SetHandler(async (InvocationContext ctx) =>
@@ -95,12 +100,13 @@ public static class MigrateCommand
             var skipVerify = ctx.ParseResult.GetValueForOption(skipVerifyOption);
             var verificationTimeout = ctx.ParseResult.GetValueForOption(verificationTimeoutOption);
             var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
+            var lossy = ctx.ParseResult.GetValueForOption(lossyOption);
 
             // Exit code returned through ctx.ExitCode: a code parked only on
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
             ctx.ExitCode = await ExecuteAsync(path, dryRun, benchmark, direction, parallel,
                 reportPath, verbose, skipAnalyze, skipVerify, (uint)verificationTimeout,
-                explicitCallClosers);
+                explicitCallClosers, lossy);
         });
 
         return command;
@@ -117,7 +123,8 @@ public static class MigrateCommand
         bool skipAnalyze,
         bool skipVerify,
         uint verificationTimeout,
-        bool explicitCallClosers)
+        bool explicitCallClosers,
+        bool lossy)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("migrate");
@@ -149,6 +156,7 @@ public static class MigrateCommand
             SkipAnalyze = skipAnalyze,
             SkipVerify = skipVerify,
             VerificationTimeoutMs = verificationTimeout,
+            Fidelity = lossy ? ConversionFidelity.Lossy : ConversionFidelity.Lossless,
             UseImplicitCallCloser = !explicitCallClosers
         };
 

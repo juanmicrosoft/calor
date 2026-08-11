@@ -64,6 +64,11 @@ public sealed class ConvertTool : McpToolBase
                     "enum": ["standard", "interop"],
                     "description": "Conversion mode: 'standard' (default) or 'interop' for §CSHARP blocks"
                 },
+                "fidelity": {
+                    "type": "string",
+                    "enum": ["lossless", "lossy"],
+                    "description": "Fidelity contract. 'lossless' is the default; 'lossy' explicitly permits reported substitutions or drops."
+                },
                 "mode": {
                     "type": "string",
                     "enum": ["convert", "validate", "roundtrip", "assess"],
@@ -167,6 +172,7 @@ public sealed class ConvertTool : McpToolBase
         var passthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false);
         var explicitCallClosers = GetBool(arguments, "explicitCallClosers", defaultValue: false);
         var conversionMode = ResolveConversionMode(arguments);
+        var fidelity = ResolveFidelity(arguments);
 
         try
         {
@@ -177,6 +183,7 @@ public sealed class ConvertTool : McpToolBase
                 AutoGenerateIds = true,
                 GracefulFallback = fallback,
                 Explain = explain,
+                Fidelity = fidelity,
                 Mode = conversionMode,
                 StripPreprocessor = stripPreprocessor,
                 PassthroughOnError = passthroughOnError,
@@ -185,7 +192,7 @@ public sealed class ConvertTool : McpToolBase
 
             var converter = new CSharpToCalorConverter(options);
             cancellationToken.ThrowIfCancellationRequested();
-            var result = converter.Convert(source);
+            var result = converter.Convert(source, inputPath);
 
             // Always compute explanation for unsupported feature summary
             var explanation = result.Context.GetExplanation();
@@ -291,13 +298,14 @@ public sealed class ConvertTool : McpToolBase
                     {
                         Directory.CreateDirectory(outputDir);
                     }
-                    File.WriteAllText(outputPath, calorSourceForOutput);
+                    ConversionFileWriter.WriteAtomic(outputPath, calorSourceForOutput);
                 }
                 catch (Exception ex)
                 {
                     issues.Add(ConversionIssueEnvelope.Message(
-                        DiagnosticCode.ConversionIssue, "warning",
+                        DiagnosticCode.ConversionIssue, "error",
                         $"Failed to write output file: {ex.Message}", inputPath));
+                    success = false;
                 }
             }
 
@@ -313,6 +321,7 @@ public sealed class ConvertTool : McpToolBase
             var output = new ConvertToolOutput
             {
                 Success = success,
+                Fidelity = fidelity.ToString().ToLowerInvariant(),
                 CalorSource = calorSourceForOutput,
                 OutputPath = outputPath,
                 Issues = issues,
@@ -332,6 +341,7 @@ public sealed class ConvertTool : McpToolBase
                 Explanation = explanationOutput,
                 FeatureHints = featureHints.Count > 0 ? featureHints : null,
                 NativeFeaturesUsed = nativeFeaturesUsed.Count > 0 ? nativeFeaturesUsed : null,
+                LossSummary = ConversionLossSummaryOutput.From(result),
                 Tip = "Use calor_help with feature='overview' to see all available Calor syntax before writing or editing .calr files."
             };
 
@@ -381,6 +391,7 @@ public sealed class ConvertTool : McpToolBase
             moduleName = Path.GetFileNameWithoutExtension(inputPath);
         }
         var conversionMode = ResolveConversionMode(arguments);
+        var fidelity = ResolveFidelity(arguments);
         var expectedNamespace = GetString(arguments, "expectedNamespace");
         var expectedPatterns = GetStringArray(arguments, "expectedPatterns");
         var forbiddenPatterns = GetStringArray(arguments, "forbiddenPatterns");
@@ -402,6 +413,7 @@ public sealed class ConvertTool : McpToolBase
                 AutoGenerateIds = true,
                 GracefulFallback = true,
                 Explain = false,
+                Fidelity = fidelity,
                 Mode = conversionMode,
                 StripPreprocessor = GetBool(arguments, "stripPreprocessor", defaultValue: true),
                 PassthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false),
@@ -409,7 +421,7 @@ public sealed class ConvertTool : McpToolBase
             };
 
             var converter = new CSharpToCalorConverter(options);
-            var convResult = converter.Convert(source);
+            var convResult = converter.Convert(source, inputPath);
 
             conversionIssues.AddRange(convResult.Issues
                 .Select(i => ConversionIssueEnvelope.Build(i, inputPath)));
@@ -617,6 +629,7 @@ public sealed class ConvertTool : McpToolBase
                 PreserveComments = true,
                 AutoGenerateIds = true,
                 GracefulFallback = true,
+                Fidelity = ResolveFidelity(arguments),
                 Mode = ConversionMode.Interop,
                 StripPreprocessor = GetBool(arguments, "stripPreprocessor", defaultValue: true),
                 UseImplicitCallCloser = !GetBool(arguments, "explicitCallClosers", defaultValue: false)
@@ -793,6 +806,14 @@ public sealed class ConvertTool : McpToolBase
             ? ConversionMode.Interop : ConversionMode.Standard;
     }
 
+    private static ConversionFidelity ResolveFidelity(JsonElement? arguments)
+    {
+        var fidelity = GetString(arguments, "fidelity") ?? "lossless";
+        return fidelity.Equals("lossy", StringComparison.OrdinalIgnoreCase)
+            ? ConversionFidelity.Lossy
+            : ConversionFidelity.Lossless;
+    }
+
     private static string NormalizeWhitespace(string text)
     {
         return Regex.Replace(text, @"\s+", " ").Trim();
@@ -864,6 +885,9 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("success")]
         public bool Success { get; init; }
 
+        [JsonPropertyName("fidelity")]
+        public required string Fidelity { get; init; }
+
         [JsonPropertyName("calorSource")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? CalorSource { get; init; }
@@ -898,9 +922,66 @@ public sealed class ConvertTool : McpToolBase
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<string>? NativeFeaturesUsed { get; init; }
 
+        [JsonPropertyName("lossSummary")]
+        public required ConversionLossSummaryOutput LossSummary { get; init; }
+
         [JsonPropertyName("tip")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Tip { get; init; }
+    }
+
+    private sealed class ConversionLossSummaryOutput
+    {
+        [JsonPropertyName("nativeConversions")]
+        public int NativeConversions { get; init; }
+
+        [JsonPropertyName("interopPreservations")]
+        public int InteropPreservations { get; init; }
+
+        [JsonPropertyName("lossySubstitutions")]
+        public int LossySubstitutions { get; init; }
+
+        [JsonPropertyName("drops")]
+        public int Drops { get; init; }
+
+        [JsonPropertyName("locations")]
+        public required List<ConversionLossLocationOutput> Locations { get; init; }
+
+        public static ConversionLossSummaryOutput From(ConversionResult result) => new()
+        {
+            NativeConversions = result.NativeConversionCount,
+            InteropPreservations = result.InteropPreservationCount,
+            LossySubstitutions = result.LossySubstitutionCount,
+            Drops = result.DropCount,
+            Locations = result.Losses.Select(loss => new ConversionLossLocationOutput
+            {
+                Kind = loss.Kind.ToString(),
+                Feature = loss.Feature,
+                File = loss.File,
+                Line = loss.Line,
+                Description = loss.Description
+            }).ToList()
+        };
+    }
+
+    private sealed class ConversionLossLocationOutput
+    {
+        [JsonPropertyName("kind")]
+        public required string Kind { get; init; }
+
+        [JsonPropertyName("feature")]
+        public required string Feature { get; init; }
+
+        [JsonPropertyName("file")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? File { get; init; }
+
+        [JsonPropertyName("line")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? Line { get; init; }
+
+        [JsonPropertyName("description")]
+        public required string Description { get; init; }
     }
 
     private sealed class ExplanationOutput

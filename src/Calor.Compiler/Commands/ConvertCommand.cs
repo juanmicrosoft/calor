@@ -47,6 +47,10 @@ public static class ConvertCommand
             aliases: new[] { "--passthrough" },
             description: "Preserve unconvertible members as §CSHARP interop blocks so the output always parses (C# → Calor). If a member's emitted Calor would be invalid, its original C# is kept verbatim instead of writing broken output.");
 
+        var lossyOption = new Option<bool>(
+            aliases: new[] { "--lossy" },
+            description: "Explicitly allow reported semantic substitutions or drops. The default is lossless conversion.");
+
         var timeoutOption = new Option<int>(
             aliases: new[] { "--timeout", "-t" },
             description: "Timeout in seconds for the conversion (0 = no timeout)",
@@ -73,6 +77,7 @@ public static class ConvertCommand
             noFallbackOption,
             validateOption,
             passthroughOption,
+            lossyOption,
             timeoutOption,
             explicitCallClosersOption,
             formatOption
@@ -88,18 +93,19 @@ public static class ConvertCommand
             var noFallback = ctx.ParseResult.GetValueForOption(noFallbackOption);
             var validate = ctx.ParseResult.GetValueForOption(validateOption);
             var passthrough = ctx.ParseResult.GetValueForOption(passthroughOption);
+            var lossy = ctx.ParseResult.GetValueForOption(lossyOption);
             var timeoutSeconds = ctx.ParseResult.GetValueForOption(timeoutOption);
             var explicitCallClosers = ctx.ParseResult.GetValueForOption(explicitCallClosersOption);
             var format = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
             // Exit code returned through ctx.ExitCode: a code parked only on
             // Environment.ExitCode is overwritten by Main's InvokeAsync return.
-            ctx.ExitCode = await ExecuteAsync(input, output, benchmark, verbose, explain, noFallback, validate, passthrough, timeoutSeconds, explicitCallClosers, format);
+            ctx.ExitCode = await ExecuteAsync(input, output, benchmark, verbose, explain, noFallback, validate, passthrough, lossy, timeoutSeconds, explicitCallClosers, format);
         });
 
         return command;
     }
 
-    private static async Task<int> ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, int timeoutSeconds, bool explicitCallClosers, string format)
+    private static async Task<int> ExecuteAsync(FileInfo input, FileInfo? output, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, bool lossy, int timeoutSeconds, bool explicitCallClosers, string format)
     {
         var telemetry = CalorTelemetry.IsInitialized ? CalorTelemetry.Instance : null;
         telemetry?.SetCommand("convert");
@@ -152,7 +158,7 @@ public static class ConvertCommand
             ConversionResult? conversionResult = null;
             if (direction == ConversionDirection.CSharpToCalor)
             {
-                (exitCode, conversionResult) = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, passthrough, timeoutSeconds, explicitCallClosers, envelope);
+                (exitCode, conversionResult) = await ConvertCSharpToCalorAsync(input.FullName, outputPath, benchmark, verbose, explain, noFallback, validate, passthrough, lossy, timeoutSeconds, explicitCallClosers, envelope);
             }
             else
             {
@@ -232,8 +238,10 @@ public static class ConvertCommand
     /// unit-testable without driving the full command handler.
     /// </summary>
     internal static ConversionOptions BuildCSharpToCalorOptions(
-        bool benchmark, bool verbose, bool explain, bool noFallback, bool passthrough, bool explicitCallClosers) => new()
+        bool benchmark, bool verbose, bool explain, bool noFallback, bool passthrough, bool explicitCallClosers,
+        bool lossy = false) => new()
     {
+        Fidelity = lossy ? ConversionFidelity.Lossy : ConversionFidelity.Lossless,
         Verbose = verbose,
         IncludeBenchmark = benchmark,
         Explain = explain,
@@ -245,12 +253,12 @@ public static class ConvertCommand
         UseImplicitCallCloser = !explicitCallClosers
     };
 
-    private static async Task<(int ExitCode, ConversionResult? Result)> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope)
+    private static async Task<(int ExitCode, ConversionResult? Result)> ConvertCSharpToCalorAsync(string inputPath, string outputPath, bool benchmark, bool verbose, bool explain, bool noFallback, bool validate, bool passthrough, bool lossy, int timeoutSeconds, bool explicitCallClosers, ConvertEnvelope? envelope)
     {
         var statusOut = envelope != null ? Console.Error : Console.Out;
 
         var converter = new CSharpToCalorConverter(
-            BuildCSharpToCalorOptions(benchmark, verbose, explain, noFallback, passthrough, explicitCallClosers));
+            BuildCSharpToCalorOptions(benchmark, verbose, explain, noFallback, passthrough, explicitCallClosers, lossy));
 
         ConversionResult result;
         if (timeoutSeconds > 0)
@@ -279,6 +287,7 @@ public static class ConvertCommand
         {
             envelope.AddConversionIssues(result.Issues, inputPath);
             envelope.Data.Success = result.Success;
+            envelope.Data.Fidelity = lossy ? "lossy" : "lossless";
             var explanation = result.Context.GetExplanation();
             envelope.Data.UnsupportedFeatureCount = explanation.TotalUnsupportedCount;
             var featureCounts = explanation.GetFeatureCounts();
@@ -312,44 +321,42 @@ public static class ConvertCommand
             return (1, result);
         }
 
-        // #770: validate BEFORE writing so the success/loss report reflects the
-        // output actually produced. Current --validate semantics are kept (the
-        // file is still written, exit code stays 0 with a warning) — but the
-        // success line below is never printed when validation failed.
+        // Validation is mandatory in every mode. The converter additionally compiles
+        // round-tripped C# in lossless mode; --validate remains accepted for compatibility.
         List<Diagnostic> validationErrors = new();
-        if (validate && result.CalorSource != null)
+        if (result.CalorSource != null)
         {
             validationErrors = ValidateCalorSource(result.CalorSource);
             if (envelope != null)
             {
                 envelope.Data.Validated = true;
                 envelope.Data.ValidationErrorCount = validationErrors.Count;
-                // Warnings, not errors — the output file is still written.
                 foreach (var err in validationErrors)
                 {
                     envelope.Diagnostics.Add(new Diagnostic(
                         DiagnosticCode.ConvertValidationError,
                         $"Generated output failed validation: {err.Message}",
                         err.Span,
-                        DiagnosticSeverity.Warning,
+                        DiagnosticSeverity.Error,
                         outputPath));
                 }
             }
         }
 
-        // Write output (use replacement fallback for files containing unpairable surrogates)
-        var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-        await File.WriteAllTextAsync(outputPath, result.CalorSource, writeEncoding);
-
         if (validationErrors.Count > 0)
         {
-            Console.Error.WriteLine($"⚠ Validation failed ({validationErrors.Count} error{(validationErrors.Count == 1 ? "" : "s")}):");
+            envelope?.Data.Success = false;
+            Console.Error.WriteLine($"Validation failed ({validationErrors.Count} error{(validationErrors.Count == 1 ? "" : "s")}):");
             foreach (var err in validationErrors.Take(5))
                 Console.Error.WriteLine($"  {err}");
             if (validationErrors.Count > 5)
                 Console.Error.WriteLine($"  ... and {validationErrors.Count - 5} more");
-            Console.Error.WriteLine("Output written but may not compile. Use 'calor --input <file>' to compile, or calor_compile MCP tool (autoFix on by default).");
+            Console.Error.WriteLine("Destination was not modified.");
+            return (1, result);
         }
+
+        var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+        await ConversionFileWriter.WriteAtomicAsync(outputPath, result.CalorSource!, writeEncoding);
 
         // #770: structured loss accounting. The unconditional "✓ Conversion
         // successful" line was a false-success vector — it is now printed ONLY
@@ -357,7 +364,7 @@ public static class ConvertCommand
         // requested validation passed. Otherwise a loss summary with file:line
         // locations is printed instead.
         var losses = result.Context.Losses;
-        envelope?.SetLosses(losses);
+        envelope?.SetConversionSummary(result);
         if (losses.Count == 0 && validationErrors.Count == 0)
         {
             statusOut.WriteLine($"✓ Conversion successful");
@@ -365,9 +372,10 @@ public static class ConvertCommand
         else
         {
             statusOut.WriteLine(
-                $"⚠ Conversion completed with {losses.Count} semantic loss(es)" +
+                $"Conversion completed with {result.InteropPreservationCount} interop preservation(s), " +
+                $"{result.LossySubstitutionCount} lossy substitution(s), and {result.DropCount} drop(s)" +
                 (validationErrors.Count > 0 ? $" and {validationErrors.Count} validation error(s)" : "") +
-                " — output is NOT fully native Calor:");
+                " — output is not fully native Calor:");
             foreach (var group in losses.GroupBy(l => l.Kind))
             {
                 statusOut.WriteLine($"  {group.Key}: {group.Count()}");
@@ -463,7 +471,7 @@ public static class ConvertCommand
             return 1;
         }
 
-        await File.WriteAllTextAsync(outputPath, result.GeneratedCode);
+        await ConversionFileWriter.WriteAtomicAsync(outputPath, result.GeneratedCode);
 
         if (envelope != null)
         {
@@ -579,9 +587,14 @@ public static class ConvertCommand
         /// #770: structured loss accounting in the envelope — kind/feature/
         /// line/description per loss, plus the total count.
         /// </summary>
-        public void SetLosses(IReadOnlyList<ConversionLoss> losses)
+        public void SetConversionSummary(ConversionResult result)
         {
+            var losses = result.Losses;
             Data.LossCount = losses.Count;
+            Data.NativeConversionCount = result.NativeConversionCount;
+            Data.InteropPreservationCount = result.InteropPreservationCount;
+            Data.LossySubstitutionCount = result.LossySubstitutionCount;
+            Data.DropCount = result.DropCount;
             Data.Losses = losses.Count > 0
                 ? losses.Select(l => new ConvertLossData
                 {
@@ -633,6 +646,7 @@ public static class ConvertCommand
         public string? InputPath { get; set; }
         public string? OutputPath { get; set; }
         public bool Success { get; set; }
+        public string? Fidelity { get; set; }
 
         /// <summary>C# → Calor only: total unsupported feature instances.</summary>
         public int? UnsupportedFeatureCount { get; set; }
@@ -646,6 +660,10 @@ public static class ConvertCommand
 
         /// <summary>C# → Calor only: total recorded semantic losses (#770). 0 = fully native output.</summary>
         public int? LossCount { get; set; }
+        public int? NativeConversionCount { get; set; }
+        public int? InteropPreservationCount { get; set; }
+        public int? LossySubstitutionCount { get; set; }
+        public int? DropCount { get; set; }
 
         /// <summary>C# → Calor only: per-loss detail (kind, feature, file:line, description); absent when empty.</summary>
         public List<ConvertLossData>? Losses { get; set; }

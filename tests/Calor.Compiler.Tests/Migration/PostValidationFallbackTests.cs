@@ -126,14 +126,18 @@ public class PostValidationFallbackTests
         // Default mode (no passthrough / not Interop): the fallback is gated off, so the
         // output is left as the converter produced it (here real-valid) and no §CSHARP is
         // emitted. Guards that the fallback does not change default-mode behavior.
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = false })
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PassthroughOnError = false
+        })
         {
             ParseValidatorOverride = CondemnOutsideCSharp("Breakme"),
         };
 
         var result = converter.Convert(TwoClasses);
 
-        Assert.True(result.Success);
+        Assert.False(result.Success);
         Assert.NotNull(result.CalorSource);
         Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
         Assert.DoesNotContain("§CSHARP", result.CalorSource!);
