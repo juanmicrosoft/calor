@@ -86,6 +86,13 @@ jobs:
           --filter "FullyQualifiedName~EditScriptIdentityTests"
           --verbosity normal
 
+      - name: Run rename gate
+        run: >-
+          dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+          -c Release --no-build
+          --filter "FullyQualifiedName~RenameHarnessTests"
+          --verbosity normal
+
       - name: Run all tests
         run: |
           set -euo pipefail

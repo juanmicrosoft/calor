@@ -24,7 +24,8 @@ public sealed record SymbolOccurrence(
     SymbolId SymbolId,
     TextSpan Span,
     SymbolOccurrenceKind Kind,
-    bool IsSplitDeclaration);
+    bool IsSplitDeclaration,
+    bool IsTypeDeclaration = false);
 
 /// <summary>
 /// One parsed and bound file in the project.
@@ -185,7 +186,8 @@ public sealed class ProjectSymbolIndex
                         out var declaringDocuments)
                     && declaringDocuments > 1;
                 Add(document, symbol.Id, symbol.DeclarationSpan,
-                    SymbolOccurrenceKind.Definition, split);
+                    SymbolOccurrenceKind.Definition, split,
+                    isTypeDeclaration: symbol is TypeSymbol);
             }
 
             foreach (var node in Descendants(document.BoundModule))
@@ -215,13 +217,21 @@ public sealed class ProjectSymbolIndex
                         break;
 
                     case BoundCallExpression call:
-                        foreach (var symbol in call.ResolvedSymbols)
+                        if (call.ResolvedSymbols.Count > 0)
                         {
-                            if (!symbol.Id.IsNone)
+                            foreach (var symbol in call.ResolvedSymbols)
                             {
-                                Add(document, symbol.Id, call.CalleeSpan,
-                                    SymbolOccurrenceKind.Reference, false);
+                                if (!symbol.Id.IsNone)
+                                {
+                                    Add(document, symbol.Id, call.CalleeSpan,
+                                        SymbolOccurrenceKind.Reference, false);
+                                }
                             }
+                        }
+                        else if (ResolveAcrossDocuments(call) is { } crossModule)
+                        {
+                            Add(document, crossModule.Id, call.CalleeSpan,
+                                SymbolOccurrenceKind.Reference, false);
                         }
                         break;
 
@@ -255,12 +265,40 @@ public sealed class ProjectSymbolIndex
                 SymbolOccurrenceKind.Definition, moduleSplit);
         }
 
+        // Each file is bound on its own, so a call into another module resolves
+        // to nothing locally. Without this, a cross-file call site is invisible
+        // and renaming the callee leaves the caller pointing at a name that no
+        // longer exists. Matching is by bare callee name across the project and
+        // requires exactly one candidate: ambiguity yields no occurrence, which
+        // makes the rename refuse rather than guess.
+        FunctionSymbol? ResolveAcrossDocuments(BoundCallExpression call)
+        {
+            var target = call.Target;
+            if (string.IsNullOrEmpty(target) || target.Contains('.', StringComparison.Ordinal))
+                return null;
+
+            var candidates = Documents
+                .SelectMany(candidate => candidate.BoundModule.SymbolsById.Values
+                    .OfType<FunctionSymbol>())
+                .Where(symbol => !symbol.Id.IsNone
+                    && string.Equals(
+                        BareFunctionName(symbol.Name),
+                        target,
+                        StringComparison.Ordinal))
+                .DistinctBy(symbol => symbol.Id)
+                .Take(2)
+                .ToArray();
+
+            return candidates.Length == 1 ? candidates[0] : null;
+        }
+
         void Add(
             IndexedDocument document,
             SymbolId symbolId,
             TextSpan span,
             SymbolOccurrenceKind kind,
-            bool isSplitDeclaration)
+            bool isSplitDeclaration,
+            bool isTypeDeclaration = false)
         {
             if (!IsExactIdentifier(document.Source, span))
                 return;
@@ -268,7 +306,8 @@ public sealed class ProjectSymbolIndex
                 return;
 
             var occurrence = new SymbolOccurrence(
-                document.FilePath, symbolId, span, kind, isSplitDeclaration);
+                document.FilePath, symbolId, span, kind, isSplitDeclaration,
+                isTypeDeclaration);
             _byFile[document.FilePath].Add(occurrence);
             if (!_bySymbol.TryGetValue(symbolId, out var list))
             {
@@ -277,6 +316,15 @@ public sealed class ProjectSymbolIndex
             }
             list.Add(occurrence);
         }
+    }
+
+    internal static string BareFunctionName(string name)
+    {
+        var lastDot = name.LastIndexOf('.');
+        if (lastDot >= 0)
+            name = name[(lastDot + 1)..];
+        var generic = name.IndexOf('<');
+        return generic > 0 ? name[..generic] : name;
     }
 
     private static bool IsExactDeclaration(string source, Symbol symbol)

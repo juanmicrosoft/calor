@@ -1,0 +1,12 @@
+§M{m001:Overload}
+  §CL{c001:Picker:pub}
+    §MT{m001:Pick:pub} (i32:n) -> i32
+      §E{}
+      §R (+ n INT:1)
+    §MT{m002:Pick:pub} (str:s) -> i32
+      §E{}
+      §R INT:99
+  §F{f001:Run:pub} () -> i32
+    §E{}
+    §B{p:Picker} §NEW{Picker} §/NEW
+    §R §C{p.Pick} §A INT:5 §/C

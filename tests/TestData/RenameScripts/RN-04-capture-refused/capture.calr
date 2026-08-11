@@ -1,0 +1,6 @@
+§M{m001:Capture}
+  §F{f001:Run:pub} () -> i32
+    §E{}
+    §B{source:i32} INT:7
+    §B{target:i32} INT:3
+    §R (- source target)

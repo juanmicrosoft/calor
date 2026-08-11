@@ -1,0 +1,10 @@
+{
+  "id": "RN-01",
+  "title": "A function and its call sites in another file",
+  "pins": "The baseline: renaming a declaration must carry every call site with it, including those in other files. A rename that misses a call site in a file it never opened produces a program that no longer compiles, or worse, one that binds to something else.",
+  "target": { "file": "lib.calr", "marker": "Double", "occurrence": 0 },
+  "newName": "Triple",
+  "expect": "applies",
+  "entry": "Run",
+  "expectedResult": 30
+}

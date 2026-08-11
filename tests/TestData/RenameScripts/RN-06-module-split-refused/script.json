@@ -1,0 +1,9 @@
+{
+  "id": "RN-06",
+  "title": "A module declared in two files",
+  "pins": "One module, two declarations, one identity per file — so the edit set would cover a single part and split the module. Calor reports nothing for the split (each file still binds); the break appears only in generated C#. The engine refuses. Lifting this refusal is #922.",
+  "target": { "file": "part-a.calr", "marker": "Split", "occurrence": 0 },
+  "newName": "Renamed",
+  "expect": "refuses",
+  "expectedRefusal": "SplitDeclaration"
+}

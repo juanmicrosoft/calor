@@ -1,0 +1,21 @@
+{
+  "id": "RN-02",
+  "title": "Two functions declare the same local name; one is renamed",
+  "pins": "The shadowing case the gate names. `value` is declared independently in two functions: same name, different symbols. Renaming one must leave the other alone. Behaviour alone cannot settle this — renaming BOTH consistently also preserves behaviour — so the case additionally pins that Helper still declares and returns its own `value`. That assertion is what fails under a text-directed rename.",
+  "target": {
+    "file": "shadow.calr",
+    "marker": "value",
+    "occurrence": 0
+  },
+  "newName": "total",
+  "expect": "applies",
+  "entry": "Run",
+  "expectedResult": 11,
+  "preserved": [
+    {
+      "file": "shadow.calr",
+      "text": "value",
+      "count": 2
+    }
+  ]
+}

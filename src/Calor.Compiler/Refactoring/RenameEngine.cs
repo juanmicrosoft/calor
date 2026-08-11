@@ -27,6 +27,14 @@ public enum RenameRefusal
     InexactOccurrence,
     /// <summary>The new name already denotes something where the symbol is used.</summary>
     NameCollision,
+    /// <summary>
+    /// A type declaration. Type *references* (§B bindings, §NEW, parameter and
+    /// return types) are not indexed yet, so renaming the declaration alone
+    /// would leave every use pointing at a name that no longer exists. Refusing
+    /// keeps the engine from producing a broken program; indexing them is the
+    /// follow-up.
+    /// </summary>
+    TypeReferencesNotIndexed,
 }
 
 public sealed record RenameResult(
@@ -61,6 +69,9 @@ public static class RenameEngine
 
         if (occurrences.Any(occurrence => occurrence.IsSplitDeclaration))
             return Refuse(RenameRefusal.SplitDeclaration);
+
+        if (occurrences.Any(occurrence => occurrence.IsTypeDeclaration))
+            return Refuse(RenameRefusal.TypeReferencesNotIndexed);
 
         var sources = index.Documents.ToDictionary(
             document => document.FilePath,

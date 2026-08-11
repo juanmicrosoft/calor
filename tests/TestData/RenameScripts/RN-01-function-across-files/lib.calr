@@ -1,0 +1,4 @@
+§M{m001:Lib}
+  §F{f001:Double:pub} (i32:n) -> i32
+    §E{}
+    §R (* n INT:2)
