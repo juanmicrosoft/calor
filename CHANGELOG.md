@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-11
+
+The "Trustworthy Project Model" release (roadmap v0.13). Headline: the #762 binder
+rebuild is complete — every accepted expression class structurally binds (56/56
+Tier A; the 4 Tier B unsafe residuals retain children and emit the Calor0259
+instrument, promoted to Warning), landed twice over: the reviewed B1–B8 incremental
+series plus the #900 consumer migrations (SymbolIds, full-signature overloads,
+exhaustive checker traversals, call graph, LSP rename/references/cross-file).
+Verification cache keys are exhaustive and semantics-versioned (#778), the MSBuild
+incremental cache fingerprints every diagnostics-affecting input (#788/#890 incl.
+the #883 IL-analysis inputs), and the Z3 asset chain is closed end-to-end with a
+registry-verified republish.
+
+**Release-gate scorecard (§2.5), stated plainly rather than claimed:**
+- **Green, measured**: gate 1 (binding totality — zero Tier A incomplete on both
+  corpus legs, ratcheted); gate 5 (verifier-runtime differential program — 65/65
+  forms, 1,170/1,170 cells, zero mismatches, CI-blocking); gate 6 (PP-S4 migration
+  fixture registry, enforcing).
+- **Executes post-publish**: gate 7 (clean-consumer per-RID; the osx-x64 leg's
+  oracle is now the documented loud degradation, per the chain-closure decision).
+- **NOT met — instruments unbuilt, disclosed**: gate 2 (full-vs-incremental
+  identity: the F-3 edit-script corpus and identity harness were registered but
+  never built) and gate 4 (rename harness with apply-recompile-and-test oracle and
+  shadowing corpus). These are unconditional gates in the plan of record; this
+  release ships without them and says so — they are the top of 0.13.x.
+- **Not measurable, deferral now recorded**: gates 3 and 8 depend on the
+  persistent index / `calor query`, which did not ship in 0.13; their SHOULD-tier
+  deferral to 0.13.x is recorded here per §2.5's tier-decision rule.
+
+Known channel state: the VS Code marketplace remains stuck at 0.3.8 (expired
+VSCE_PAT, maintainer-only); this release does not change that.
+
 ### Added
 - **Issue #779's residual verifier-vs-runtime differential gate (F-4)** now generates and executes
   1,170 deterministic cases: all 65 frozen modeled forms × `§Q`/`§S`/explicit `§PROOF` × nesting
@@ -35,7 +67,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - **The binder dispatches every expression class** (#762 B1): a single authoritative dispatch
   table replaces the partial switch; expressions without a structural binder yet produce an
-  explicit Info-severity `Calor0259` (analysis incomplete) instead of a silent opaque fallback,
+  explicit `Calor0259` (analysis incomplete; Info until B8, Warning at release) instead of a silent opaque fallback,
   counted by a ratcheted corpus instrument. `BoundCallExpression` is no longer `sealed` (the
   incomplete node subclasses it to preserve analysis behavior exactly) — an API-surface note
   for SDK consumers pattern-matching bound trees. MCP `analyze` no longer counts Info-severity
