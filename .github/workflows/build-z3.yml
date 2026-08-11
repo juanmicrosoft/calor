@@ -50,6 +50,14 @@ jobs:
   # - The native arch-vs-RID assertion below (held back until both decisions
   #   landed) makes any future mislabeled upstream archive fail this job
   #   instead of shipping.
+  # POST-MERGE PROCEDURE (one repin/republish): dispatch this workflow; then
+  #   `gh release delete-asset z3-binaries-<ver> libz3-osx-x64.dylib` (the
+  #   release action replaces same-named assets but never deletes unlisted
+  #   ones — without this the release claims osx-x64 is absent while the
+  #   mislabeled binary stays attached); then commit the regenerated
+  #   .github/z3-binaries-<ver>.sha256 block from the run's step summary.
+  #   Until that commit, publish-nuget and z3-pin-check fail closed (by
+  #   design) on the changed osx-arm64 asset hash.
   # Download pre-built Z3 for every supported RID. These archives are
   # pinned by src/Calor.Compiler/scripts/z3-upstream-<ver>.sha256, so extraction
   # is deterministic and the resulting release assets are byte-stable across runs.

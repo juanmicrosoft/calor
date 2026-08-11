@@ -53,6 +53,12 @@ verify_archive() {
     echo "  [verified] $name"
 }
 RUNTIMES_DIR="$SCRIPT_DIR/../runtimes"
+
+# Z3 chain closure (#916 review F2): the osx-x64 RID is dropped, but the
+# provenance stamp does not invalidate on a RID-set change — an existing
+# checkout keeps the mislabeled dylib forever and local packs resurrect the
+# dropped RID (the csproj packs runtimes/** by glob). Purge unconditionally.
+rm -rf "$RUNTIMES_DIR/osx-x64"
 Z3_DIR="$SCRIPT_DIR/../z3"
 TEMP_DIR="$SCRIPT_DIR/../.z3-temp"
 

@@ -191,10 +191,14 @@ gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
    the CI job is **demonstrated to fail on a fixture-less `SupportLevel` promotion** (a
    discriminating pin — revert the fixture, watch it fail).
 7. **Clean-consumer install, per-RID**: on a frozen RID × package matrix (win-x64, linux-x64,
-   osx-x64, osx-arm64; CLI + Sdk + VSIX where unblocked), a clean consumer runs `calor verify` on a
+   osx-arm64: CLI + Sdk + VSIX where unblocked), a clean consumer runs `calor verify` on a
    Z3-requiring fixture and gets a **solver verdict** — exit-0 install is not the bar, because the
-   known osx-x64 state is precisely "installs successfully, silently loses verification". The
-   registries are verified **after** publishing (a workflow firing is not a publish).
+   pre-closure osx-x64 state was precisely "installs successfully, silently loses verification".
+   **Gate amended with the Z3 chain closure (2026-08-11, #916 review F3): the osx-x64 RID is
+   dropped, so its leg's oracle changes rather than disappearing** — a clean Intel-mac consumer
+   must get the *documented degradation* (a loud "Z3 unavailable"/Calor0710 signal, no crash, no
+   silent pass), which turns the drop decision itself into a tested claim. The registries are
+   verified **after** publishing (a workflow firing is not a publish).
 8. **Performance envelope (project scale needs a number)**: index build ≤ 30s and warm `calor query`
    ≤ 500ms on the largest pinned conversion subject, measured in CI. Generous by design; the point
    is that "usable at project scale" is adjudicable at all. Frozen here, before the index exists.

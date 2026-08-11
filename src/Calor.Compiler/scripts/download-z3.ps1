@@ -6,6 +6,11 @@ $ErrorActionPreference = "Stop"
 $Z3_VERSION = "4.15.7"
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RUNTIMES_DIR = Join-Path $SCRIPT_DIR "..\runtimes"
+
+# Z3 chain closure (#916 review F2): purge the dropped osx-x64 RID unconditionally —
+# the provenance stamp does not invalidate on RID-set changes, and stale natives
+# would be resurrected into local packs by the runtimes/** glob.
+Remove-Item -Recurse -Force (Join-Path $RUNTIMES_DIR "osx-x64") -ErrorAction SilentlyContinue
 $Z3_DIR = Join-Path $SCRIPT_DIR "..\z3"
 $TEMP_DIR = Join-Path $SCRIPT_DIR "..\.z3-temp"
 
