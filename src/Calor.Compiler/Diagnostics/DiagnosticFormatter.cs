@@ -425,6 +425,7 @@ public sealed class SarifDiagnosticFormatter : IDiagnosticFormatter
         DiagnosticCode.LintFileNotFound => "Lint input file not found",
         DiagnosticCode.LintUnsupportedFileType => "Lint input file is not a .calr file",
         DiagnosticCode.LintProcessingError => "Unexpected error while linting a file",
+        DiagnosticCode.FormatConservativeFallback => "Source left unchanged by safe formatting fallback",
         DiagnosticCode.CliInputNotFound => "Input file not found",
         DiagnosticCode.CliUsageError => "Invalid command-line argument combination",
         DiagnosticCode.CliInternalError => "Unhandled compiler error",

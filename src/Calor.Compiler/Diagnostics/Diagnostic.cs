@@ -1022,12 +1022,16 @@ public static class DiagnosticCode
     public const string ConvertCommandError = "Calor1345";
 
     /// <summary>
-    /// Error: `format --write` invoked without the experimental acknowledgment.
-    /// The formatter write path is release-policy-disabled (#793/#760 — it can
-    /// rewrite identifiers via ID-abbreviation regexes and drops comments);
-    /// pass --experimental or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1 (W1 Slice 2).
+    /// Reserved legacy diagnostic from the temporary #760 write-path
+    /// containment. Lossless validated writes no longer emit this code.
     /// </summary>
     public const string FormatWriteExperimentalRequired = "Calor1346";
+
+    /// <summary>
+    /// Warning (format): a parseable input has semantic or generated-C# errors,
+    /// so the lossless formatter used its documented byte-identical fallback.
+    /// </summary>
+    public const string FormatConservativeFallback = "Calor1347";
 
     // `calor import` command diagnostics (Calor1350-1354) — package ingestion
     // (wedge plan v0.11 D-W3.1/D-W3.2). Tier C honesty rides Calor1351: an

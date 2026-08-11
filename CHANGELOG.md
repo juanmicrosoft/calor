@@ -66,6 +66,19 @@ All notable changes to this project will be documented in this file.
   The v0.12.1 entry has been amended in place.
 
 ### Fixed
+- **Formatting is lossless and write paths are re-enabled (#760).** The formatter
+  now edits the original source representation instead of re-emitting a
+  trivia-free AST; comments/doc comments, blank lines, strings, raw C#, user
+  identifiers/types/member targets, structural IDs, newline sequences, encoding,
+  and BOM are preserved. The broad tag/identifier abbreviation regex is gone.
+  `format --write`, `lint --fix`, MCP formatting, and LSP formatting share
+  semantic-token, idempotence, generated-C# Roslyn compilation, and public-API
+  equivalence gates. File writes use a same-directory flushed temporary file and
+  atomic replacement, with byte-identical rollback on any validation, concurrent
+  edit, or injected failure. Inputs with pre-existing semantic/generated-C#
+  failures are explicitly reported as unsupported and conservatively left
+  unchanged; structural ID migration remains the dedicated, structurally
+  classified `fix --compact-ids` operation.
 - **ARM64 macOS no longer builds Z3 from source**, cutting `download-z3.sh` from roughly 20
   minutes to under 15 seconds there. The workaround it replaces was justified as "pre-built Z3
   binaries have compatibility issues" on that platform; whatever the original failure was, it is

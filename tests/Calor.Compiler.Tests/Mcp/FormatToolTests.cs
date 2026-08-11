@@ -42,6 +42,22 @@ public class FormatToolTests
     }
 
     [Fact]
+    public async Task Format_SemanticallyUnsupportedSource_ReportsConservativeFallback()
+    {
+        var source = "§M{m001:Test}\n  §F{f001:Foo:pub} () -> void\n    §P \"missing effect\"\n";
+
+        var result = await _tool.ExecuteAsync(CreateArgs(source));
+
+        Assert.False(result.IsError);
+        var output = ParseOutput(result);
+        Assert.True(output.GetProperty("success").GetBoolean());
+        Assert.False(output.GetProperty("isChanged").GetBoolean());
+        Assert.Equal(source, output.GetProperty("formattedCode").GetString());
+        Assert.True(output.TryGetProperty("conservativeFallbackReason", out var reason));
+        Assert.False(string.IsNullOrWhiteSpace(reason.GetString()));
+    }
+
+    [Fact]
     public async Task Format_ParseError_ReturnsEnvelopeDiagnostics()
     {
         // Structural closer tags are a hard parser error (Calor0830)
@@ -120,4 +136,3 @@ public class FormatToolTests
         Assert.Equal(issues.Count, output.GetProperty("issueCount").GetInt32());
     }
 }
-

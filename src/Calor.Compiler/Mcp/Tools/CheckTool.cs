@@ -1,7 +1,6 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
 using Calor.Compiler.Ids;
@@ -388,56 +387,11 @@ public sealed class CheckTool : McpToolBase
     private static LintResult LintSource(string source)
     {
         var issues = new List<LintIssue>();
-
-        var lines = source.Split('\n');
-        for (var i = 0; i < lines.Length; i++)
+        var trimmableTrailingWhitespace =
+            LosslessSourceDocument.GetTrimmableTrailingWhitespaceLines(source);
+        foreach (var lineNum in trimmableTrailingWhitespace.Order())
         {
-            var line = lines[i];
-            var lineNum = i + 1;
-
-            // Indentation is now semantically meaningful (Phase 1+ indent form);
-            // do not flag leading whitespace.
-
-            if (line.Length > 0 && line.TrimEnd('\r') != line.TrimEnd('\r').TrimEnd())
-            {
-                issues.Add(new LintIssue(lineNum, "Line has trailing whitespace"));
-            }
-
-            var paddedIdMatch = Regex.Match(line, @"§[A-Z/]+\{([a-zA-Z]+)(0+)(\d+)");
-            if (paddedIdMatch.Success)
-            {
-                var prefix = paddedIdMatch.Groups[1].Value;
-                var zeros = paddedIdMatch.Groups[2].Value;
-                var number = paddedIdMatch.Groups[3].Value;
-                var oldId = prefix + zeros + number;
-                var newId = prefix + number;
-                issues.Add(new LintIssue(lineNum, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
-            }
-
-            var verboseIdPatterns = new[]
-            {
-                (@"§L\{(for)(\d+)", "l"),
-                (@"§/L\{(for)(\d+)", "l"),
-                (@"§IF\{(if)(\d+)", "i"),
-                (@"§/I\{(if)(\d+)", "i"),
-                (@"§WHILE\{(while)(\d+)", "w"),
-                (@"§/WHILE\{(while)(\d+)", "w"),
-                (@"§DO\{(do)(\d+)", "d"),
-                (@"§/DO\{(do)(\d+)", "d")
-            };
-
-            foreach (var (pattern, replacement) in verboseIdPatterns)
-            {
-                var match = Regex.Match(line, pattern);
-                if (match.Success)
-                {
-                    var oldId = match.Groups[1].Value + match.Groups[2].Value;
-                    var newId = replacement + match.Groups[2].Value;
-                    issues.Add(new LintIssue(lineNum, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
-                }
-            }
-
-            // Blank lines are now allowed as readability separators (Phase 4 indent form).
+            issues.Add(new LintIssue(lineNum, "Line has trailing whitespace"));
         }
 
         var diagnostics = new DiagnosticBag();
@@ -474,7 +428,32 @@ public sealed class CheckTool : McpToolBase
         }
 
         var formatter = new CalorFormatter();
-        var fixedContent = formatter.Format(ast);
+        var formatResult = formatter.FormatSource(source, "mcp-input.calr");
+        if (!formatResult.Success || formatResult.UsedConservativeFallback)
+        {
+            var parseErrors = formatResult.Diagnostics
+                .Where(diagnostic => diagnostic.IsError)
+                .Select(diagnostic => DiagnosticEnvelope.Build(diagnostic))
+                .ToList();
+            if (formatResult.UsedConservativeFallback)
+            {
+                parseErrors.Add(DiagnosticEnvelope.Build(new Diagnostic(
+                    DiagnosticCode.LintProcessingError,
+                    formatResult.ConservativeFallbackReason
+                        ?? "Source is unsupported by the safe formatting gates.",
+                    TextSpan.Empty,
+                    DiagnosticSeverity.Error,
+                    "mcp-input.calr")));
+            }
+            return new LintResult
+            {
+                ParseSuccess = false,
+                ParseErrors = parseErrors,
+                Issues = issues,
+                OriginalContent = source,
+                FixedContent = source
+            };
+        }
 
         return new LintResult
         {
@@ -482,7 +461,7 @@ public sealed class CheckTool : McpToolBase
             ParseErrors = new List<EnvelopeDiagnostic>(),
             Issues = issues,
             OriginalContent = source,
-            FixedContent = fixedContent
+            FixedContent = formatResult.Formatted
         };
     }
 

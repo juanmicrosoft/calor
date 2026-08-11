@@ -12,12 +12,10 @@ public static class Program
     {
         var workspace = new WorkspaceState();
 
-        // W1 Slice 2 (T3, kickoff §1.4): the #793 release policy holds LSP
-        // formatting and rename disabled — formatting applies the CalorFormatter's
-        // id-rewriting machinery as whole-document edits (#760), and rename lacks
-        // exact-span indexing (#765). Both register only under an explicit
-        // experimental opt-in; every read-only handler stays available.
-        var experimentalWriteHandlers =
+        // Rename remains experimental (#765). Formatting is registered
+        // unconditionally because its whole-document edit now passes the same
+        // lossless semantic and generated-C# gates as CLI writes (#760).
+        var experimentalRename =
             Environment.GetEnvironmentVariable("CALOR_LSP_EXPERIMENTAL") is "1" or "true";
 
         var server = await OmniSharp.Extensions.LanguageServer.Server.LanguageServer.From(options =>
@@ -38,6 +36,7 @@ public static class Program
                 .WithHandler<HoverHandler>()
                 .WithHandler<CompletionHandler>()
                 .WithHandler<CodeActionHandler>()
+                .WithHandler<FormattingHandler>()
                 .WithHandler<SignatureHelpHandler>()
                 .WithHandler<ReferencesHandler>()
                 .WithHandler<WorkspaceSymbolHandler>()
@@ -64,11 +63,9 @@ public static class Program
                     return Task.CompletedTask;
                 });
 
-            if (experimentalWriteHandlers)
+            if (experimentalRename)
             {
-                options
-                    .WithHandler<FormattingHandler>()
-                    .WithHandler<RenameHandler>();
+                options.WithHandler<RenameHandler>();
             }
         }).ConfigureAwait(false);
 

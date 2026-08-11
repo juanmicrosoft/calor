@@ -23,31 +23,32 @@ public sealed class FormattingHandler : DocumentFormattingHandlerBase
     public override Task<TextEditContainer?> Handle(DocumentFormattingParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null)
+        if (state?.Ast == null || state.Diagnostics.HasErrors)
         {
             return Task.FromResult<TextEditContainer?>(null);
         }
 
         try
         {
-            // Use the existing CalorFormatter to format the AST
             var formatter = new CalorFormatter();
-            var formattedText = formatter.Format(state.Ast);
-
-            // Calculate the range of the entire document
-            var lines = state.Source.Split('\n');
-            var lastLine = lines.Length - 1;
-            var lastLineLength = lines[lastLine].Length;
+            var result = formatter.FormatSource(
+                state.Source,
+                state.Uri.IsFile ? state.Uri.LocalPath : state.Uri.ToString());
+            if (!result.Success
+                || string.Equals(result.Original, result.Formatted, StringComparison.Ordinal))
+            {
+                return Task.FromResult<TextEditContainer?>(null);
+            }
 
             var range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                 new Position(0, 0),
-                new Position(lastLine, lastLineLength)
+                GetDocumentEnd(state.Source)
             );
 
             var edit = new TextEdit
             {
                 Range = range,
-                NewText = formattedText
+                NewText = result.Formatted
             };
 
             return Task.FromResult<TextEditContainer?>(new TextEditContainer(edit));
@@ -57,6 +58,34 @@ public sealed class FormattingHandler : DocumentFormattingHandlerBase
             // If formatting fails, return no edits
             return Task.FromResult<TextEditContainer?>(null);
         }
+    }
+
+    private static Position GetDocumentEnd(string source)
+    {
+        var line = 0;
+        var character = 0;
+        for (var i = 0; i < source.Length; i++)
+        {
+            if (source[i] == '\r')
+            {
+                if (i + 1 < source.Length && source[i + 1] == '\n')
+                {
+                    i++;
+                }
+                line++;
+                character = 0;
+            }
+            else if (source[i] == '\n')
+            {
+                line++;
+                character = 0;
+            }
+            else
+            {
+                character++;
+            }
+        }
+        return new Position(line, character);
     }
 
     protected override DocumentFormattingRegistrationOptions CreateRegistrationOptions(

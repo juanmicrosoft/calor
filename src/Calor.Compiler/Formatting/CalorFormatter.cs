@@ -1,115 +1,810 @@
-using System.Text.RegularExpressions;
+using System.Text;
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Formatting;
 
 /// <summary>
-/// Formats a Calor AST back to canonical indent-only Calor source.
-///
-/// Phase 4b: the old hand-written closer-form formatter (1004 lines, ~33
-/// `§/X{…}` emissions, no indentation, no blank lines, abbreviated IDs)
-/// was replaced with a thin adapter over <see cref="CalorEmitter"/> — the
-/// production C#→Calor migration emitter, which has emitted indent form
-/// since Phase 3. Keeping two emitters in lockstep was the primary risk
-/// Phase 4 left on the table: any `calor format` run on a Phase 4 fixture
-/// would re-introduce closers and undo the migration.
-///
-/// What this class still adds on top of <c>CalorEmitter</c>:
-///
-///   1. <see cref="AbbreviateId"/> post-pass on every <c>§X{…}</c> opener,
-///      so production IDs like <c>m001</c> compact to <c>m1</c>, <c>for1</c>
-///      to <c>l1</c>, etc. — the lint rule asserted in
-///      <see cref="LintRegressionTests.Lint_IdAbbreviation_DetectsExpectedIssues"/>
-///      and the corresponding fix path.
-///
-///   2. Final trailing-newline trim, so `calor format`'s "would change"
-///      / "rewrote" diff isn't dominated by a phantom blank tail.
-///
-/// The adapter is intentionally narrow: <see cref="CalorEmitter"/> owns
-/// node-by-node output; this class owns the two opinionated transforms
-/// specific to <c>calor format</c>'s contract with users / agents.
+/// Formats Calor source without reconstructing it from the AST.
 /// </summary>
+/// <remarks>
+/// Source formatting is intentionally limited to transformations that can be
+/// proven trivia-only: canonical indentation, comment attachment indentation,
+/// and trailing whitespace outside comments and raw C# regions. User text,
+/// strings, raw C#, attributes, member targets, types, and every identifier
+/// (including structural IDs) are retained from the original source.
+///
+/// The AST overload remains for C# → Calor conversion tests and emit-only
+/// callers. It performs no identifier post-processing and must not be used for
+/// formatting an existing source document because an AST has no source trivia.
+/// </remarks>
 public sealed class CalorFormatter
 {
-    private static readonly Dictionary<string, string> PrefixMappings = new()
-    {
-        { "for", "l" },
-        { "if", "i" },
-        { "while", "w" },
-        { "do", "d" },
-    };
-
-    private static readonly Regex StripLeadingZeros = new(@"^([a-zA-Z]+)0*(\d+)$", RegexOptions.Compiled);
-
     /// <summary>
-    /// Opener / closer ID block: matches <c>§X{id:…}</c> or <c>§/X{id}</c>
-    /// where the id is the first colon-delimited segment. Captures:
-    ///   1 = full tag prefix up to the opening brace (e.g. <c>§F{</c>)
-    ///   2 = the id token itself
-    ///   3 = remainder of the brace contents (including the leading colon
-    ///       if any, and the closing brace)
-    /// Designed to be safe to apply line-by-line: it deliberately excludes
-    /// <c>{</c> and <c>}</c> from the id and remainder, so nested braces
-    /// (like those in interpolated strings) are not chewed up.
-    /// </summary>
-    private static readonly Regex TagWithId = new(
-        @"(§/?[A-Z]+\{)([A-Za-z][A-Za-z0-9_]*)([:}][^\r\n]*?)",
-        RegexOptions.Compiled);
-
-    /// <summary>
-    /// Format a module AST to canonical Calor source.
+    /// Emits an AST as Calor. This is not a lossless source-formatting API.
     /// </summary>
     public string Format(ModuleNode module)
     {
-        var emitter = new CalorEmitter();
-        var raw = emitter.Emit(module);
-        var abbreviated = AbbreviateIdsInTags(raw);
-        return abbreviated.TrimEnd('\r', '\n');
+        ArgumentNullException.ThrowIfNull(module);
+        return new CalorEmitter().Emit(module).TrimEnd('\r', '\n');
     }
 
     /// <summary>
-    /// Abbreviate IDs by stripping leading zeros from numeric suffix and
-    /// mapping verbose loop / branch prefixes to compact letters.
-    /// Examples: m001→m1, f001→f1, for1→l1, if1→i1, while1→w1, do1→d1.
+    /// Formats source while preserving all non-trivia source text.
     /// </summary>
-    internal static string AbbreviateId(string id)
+    public SourceFormatResult FormatSource(string source, string? filePath = null)
     {
-        foreach (var (oldPrefix, newPrefix) in PrefixMappings)
+        ArgumentNullException.ThrowIfNull(source);
+
+        var core = FormatCore(source, filePath);
+        if (!core.Success)
         {
-            if (id.StartsWith(oldPrefix, StringComparison.Ordinal))
+            return SourceFormatResult.Failure(source, core.Diagnostics, core.Errors);
+        }
+
+        var validation = Validate(source, core.Formatted, filePath);
+        if (validation.IsUnsupported)
+        {
+            var diagnostics = core.Diagnostics.ToList();
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCode.FormatConservativeFallback,
+                validation.Error
+                    ?? "Source is unsupported by the safe formatting gates.",
+                TextSpan.Empty,
+                DiagnosticSeverity.Warning,
+                filePath));
+            return SourceFormatResult.Successful(
+                source,
+                source,
+                diagnostics,
+                usedConservativeFallback: true,
+                validation.Error);
+        }
+        if (!validation.Success)
+        {
+            return SourceFormatResult.Failure(
+                source,
+                core.Diagnostics,
+                [validation.Error ?? "Formatted source failed validation."]);
+        }
+
+        var idempotence = FormatCore(core.Formatted, filePath);
+        if (!idempotence.Success
+            || !string.Equals(core.Formatted, idempotence.Formatted, StringComparison.Ordinal))
+        {
+            return SourceFormatResult.Failure(
+                source,
+                core.Diagnostics,
+                ["Formatter idempotence validation failed."]);
+        }
+
+        return SourceFormatResult.Successful(source, core.Formatted, core.Diagnostics);
+    }
+
+    /// <summary>
+    /// Re-runs all safety gates used before a source write.
+    /// </summary>
+    internal SourceValidationResult Validate(string original, string formatted, string? filePath)
+    {
+        if (!LosslessSourceDocument.HasEquivalentLineShape(original, formatted, out var shapeError))
+        {
+            return SourceValidationResult.Failed(shapeError);
+        }
+
+        var originalParse = Parse(original, filePath);
+        var formattedParse = Parse(formatted, filePath);
+        if (!originalParse.Success || !formattedParse.Success)
+        {
+            return SourceValidationResult.Failed("Original or formatted source no longer parses.");
+        }
+
+        if (!TokensEqual(originalParse.Tokens, formattedParse.Tokens))
+        {
+            return SourceValidationResult.Failed(
+                "Semantic token sequence changed during formatting.");
+        }
+
+        var originalCompilation = Program.Compile(original, filePath);
+        var formattedCompilation = Program.Compile(formatted, filePath);
+        if (originalCompilation.HasErrors != formattedCompilation.HasErrors)
+        {
+            return SourceValidationResult.Failed(
+                "Compilation success changed during formatting.");
+        }
+
+        if (originalCompilation.HasErrors)
+        {
+            var originalErrors = ErrorFingerprint(originalCompilation.Diagnostics);
+            var formattedErrors = ErrorFingerprint(formattedCompilation.Diagnostics);
+            if (!originalErrors.SequenceEqual(formattedErrors, StringComparer.Ordinal))
             {
-                var suffix = id[oldPrefix.Length..];
-                if (suffix.Length > 0 && char.IsDigit(suffix[0]))
-                {
-                    id = newPrefix + suffix;
-                    break;
-                }
+                return SourceValidationResult.Failed(
+                    "Compilation diagnostics changed during formatting.");
+            }
+
+            return SourceValidationResult.Unsupported(
+                "Source has semantic errors; conservative formatting fallback left it unchanged.");
+        }
+
+        if (!string.Equals(
+                originalCompilation.GeneratedCode,
+                formattedCompilation.GeneratedCode,
+                StringComparison.Ordinal))
+        {
+            return SourceValidationResult.Failed(
+                "Generated C# changed during formatting.");
+        }
+
+        var generatedValidation = GeneratedCSharpCompiler.Validate(
+            formattedCompilation.GeneratedCode);
+        if (!generatedValidation.CompilationSuccess)
+        {
+            return SourceValidationResult.Unsupported(
+                "Source does not generate Roslyn-clean C#; conservative formatting fallback left it unchanged.");
+        }
+
+        return SourceValidationResult.Passed();
+    }
+
+    private static CoreFormatResult FormatCore(string source, string? filePath)
+    {
+        var parsed = Parse(source, filePath);
+        if (!parsed.Success)
+        {
+            return CoreFormatResult.Failure(
+                source,
+                parsed.Diagnostics,
+                parsed.Diagnostics.Errors.Select(d => d.Message).ToList());
+        }
+
+        var indentation = parsed.Diagnostics.DiagnosticsWithFixes
+            .Where(d => d.Code is DiagnosticCode.TabIndentation
+                or DiagnosticCode.NonStandardIndentWidth)
+            .SelectMany(d => d.Fix.Edits)
+            .Where(e => e.StartLine == e.EndLine
+                && e.StartColumn == 1)
+            .GroupBy(e => e.StartLine)
+            .ToDictionary(g => g.Key, g => g.Last().NewText);
+
+        var document = LosslessSourceDocument.Parse(source);
+        return CoreFormatResult.Successful(
+            document.Format(indentation),
+            parsed.Diagnostics.ToList());
+    }
+
+    private static ParsedSource Parse(string source, string? filePath)
+    {
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath(filePath);
+        var lexer = new Lexer(source, diagnostics);
+        var tokens = lexer.TokenizeAllForParser();
+        if (!diagnostics.HasErrors)
+        {
+            var parser = new Parser(tokens, diagnostics);
+            parser.Parse();
+        }
+
+        return new ParsedSource(!diagnostics.HasErrors, tokens, diagnostics);
+    }
+
+    private static bool TokensEqual(IReadOnlyList<Token> left, IReadOnlyList<Token> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Count; i++)
+        {
+            if (left[i].Kind != right[i].Kind
+                || !string.Equals(left[i].Text, right[i].Text, StringComparison.Ordinal))
+            {
+                return false;
             }
         }
 
-        var match = StripLeadingZeros.Match(id);
-        if (match.Success)
-            return match.Groups[1].Value + match.Groups[2].Value;
-        return id;
+        return true;
+    }
+
+    private static IEnumerable<string> ErrorFingerprint(DiagnosticBag diagnostics) =>
+        diagnostics.Errors
+            .Select(d => $"{d.Code}\0{d.Message}")
+            .OrderBy(value => value, StringComparer.Ordinal);
+
+    private sealed record ParsedSource(
+        bool Success,
+        IReadOnlyList<Token> Tokens,
+        DiagnosticBag Diagnostics);
+
+    private sealed record CoreFormatResult(
+        bool Success,
+        string Formatted,
+        List<Diagnostic> Diagnostics,
+        List<string> Errors)
+    {
+        public static CoreFormatResult Successful(string formatted, List<Diagnostic> diagnostics) =>
+            new(true, formatted, diagnostics, []);
+
+        public static CoreFormatResult Failure(
+            string source,
+            DiagnosticBag diagnostics,
+            List<string> errors) =>
+            new(false, source, diagnostics.ToList(), errors);
+    }
+}
+
+/// <summary>
+/// Result of lossless source formatting.
+/// </summary>
+public sealed record SourceFormatResult(
+    bool Success,
+    string Original,
+    string Formatted,
+    IReadOnlyList<Diagnostic> Diagnostics,
+    IReadOnlyList<string> Errors,
+    bool UsedConservativeFallback,
+    string? ConservativeFallbackReason)
+{
+    internal static SourceFormatResult Successful(
+        string original,
+        string formatted,
+        IReadOnlyList<Diagnostic> diagnostics,
+        bool usedConservativeFallback = false,
+        string? conservativeFallbackReason = null) =>
+        new(
+            true,
+            original,
+            formatted,
+            diagnostics,
+            [],
+            usedConservativeFallback,
+            conservativeFallbackReason);
+
+    internal static SourceFormatResult Failure(
+        string original,
+        IReadOnlyList<Diagnostic> diagnostics,
+        IReadOnlyList<string> errors)
+    {
+        var effectiveDiagnostics = diagnostics.ToList();
+        if (!effectiveDiagnostics.Any(d => d.IsError) && errors.Count > 0)
+        {
+            effectiveDiagnostics.Add(new Diagnostic(
+                DiagnosticCode.FormatProcessingError,
+                errors[0],
+                TextSpan.Empty,
+                DiagnosticSeverity.Error));
+        }
+        return new(
+            false,
+            original,
+            original,
+            effectiveDiagnostics,
+            errors,
+            false,
+            null);
+    }
+}
+
+internal sealed record SourceValidationResult(bool Success, bool IsUnsupported, string? Error)
+{
+    public static SourceValidationResult Passed() => new(true, false, null);
+    public static SourceValidationResult Failed(string? error) => new(false, false, error);
+    public static SourceValidationResult Unsupported(string error) => new(false, true, error);
+}
+
+/// <summary>
+/// A line-oriented lossless source representation. Every original line
+/// terminator is retained, including mixed LF/CRLF/CR input.
+/// </summary>
+internal sealed class LosslessSourceDocument
+{
+    private readonly SourceLine[] _lines;
+
+    private LosslessSourceDocument(SourceLine[] lines)
+    {
+        _lines = lines;
+    }
+
+    public static LosslessSourceDocument Parse(string source)
+    {
+        var lines = new List<SourceLine>();
+        var start = 0;
+        for (var i = 0; i < source.Length; i++)
+        {
+            if (source[i] == '\r')
+            {
+                var lineBreak = i + 1 < source.Length && source[i + 1] == '\n'
+                    ? "\r\n"
+                    : "\r";
+                lines.Add(new SourceLine(source[start..i], lineBreak));
+                if (lineBreak.Length == 2)
+                {
+                    i++;
+                }
+                start = i + 1;
+            }
+            else if (source[i] == '\n')
+            {
+                lines.Add(new SourceLine(source[start..i], "\n"));
+                start = i + 1;
+            }
+        }
+
+        if (start < source.Length || source.Length == 0)
+        {
+            lines.Add(new SourceLine(source[start..], string.Empty));
+        }
+
+        return new LosslessSourceDocument(lines.ToArray());
+    }
+
+    public string Format(IReadOnlyDictionary<int, string> indentationByLine)
+    {
+        var formatted = new FormattedLine[_lines.Length];
+        var rawRegion = false;
+
+        for (var i = 0; i < _lines.Length; i++)
+        {
+            var line = _lines[i];
+            var trimmedStart = line.Content.TrimStart(' ', '\t');
+            var startsRawRegion = StartsRawRegion(trimmedStart);
+            var containsInlineRaw = ContainsInlineRawCSharp(trimmedStart);
+
+            if (rawRegion)
+            {
+                formatted[i] = new FormattedLine(
+                    line.Content,
+                    line.LineBreak,
+                    IsBlank: false,
+                    IsComment: false,
+                    IsRaw: true);
+            }
+            else
+            {
+                var leadingLength = line.Content.Length - trimmedStart.Length;
+                var leading = indentationByLine.TryGetValue(i + 1, out var replacement)
+                    ? replacement
+                    : line.Content[..leadingLength];
+                var content = leading + trimmedStart;
+
+                var isBlank = trimmedStart.Length == 0;
+                var isComment = trimmedStart.StartsWith("//", StringComparison.Ordinal);
+                if (!isBlank
+                    && !isComment
+                    && !startsRawRegion
+                    && !containsInlineRaw
+                    && FindLineCommentStart(trimmedStart) < 0)
+                {
+                    content = content.TrimEnd(' ', '\t');
+                }
+
+                formatted[i] = new FormattedLine(
+                    content,
+                    line.LineBreak,
+                    isBlank,
+                    isComment,
+                    IsRaw: false);
+            }
+
+            if (!rawRegion && startsRawRegion && !EndsRawRegion(trimmedStart))
+            {
+                rawRegion = true;
+            }
+            else if (rawRegion && EndsRawRegion(trimmedStart))
+            {
+                rawRegion = false;
+            }
+        }
+
+        ReindentAttachedComments(formatted);
+
+        var builder = new StringBuilder();
+        foreach (var line in formatted)
+        {
+            builder.Append(line.Content);
+            builder.Append(line.LineBreak);
+        }
+        return builder.ToString();
     }
 
     /// <summary>
-    /// Walk the emitted source and rewrite the first colon-delimited segment
-    /// of every <c>§X{…}</c> tag's brace contents through <see cref="AbbreviateId"/>.
-    /// Applied line-by-line so each match's capture cannot cross a newline.
+    /// Returns lines whose trailing whitespace is outside comments and raw C#,
+    /// and is therefore removable by <see cref="Format"/>.
     /// </summary>
-    private static string AbbreviateIdsInTags(string source)
+    internal static IReadOnlySet<int> GetTrimmableTrailingWhitespaceLines(string source)
     {
-        if (string.IsNullOrEmpty(source))
-            return source;
+        var document = Parse(source);
+        var result = new HashSet<int>();
+        var rawRegion = false;
 
-        return TagWithId.Replace(source, m =>
+        for (var i = 0; i < document._lines.Length; i++)
         {
-            var prefix = m.Groups[1].Value;
-            var id = m.Groups[2].Value;
-            var tail = m.Groups[3].Value;
-            return prefix + AbbreviateId(id) + tail;
-        });
+            var content = document._lines[i].Content;
+            var trimmedStart = content.TrimStart(' ', '\t');
+            var startsRawRegion = StartsRawRegion(trimmedStart);
+            var containsInlineRaw = ContainsInlineRawCSharp(trimmedStart);
+            if (!rawRegion
+                && trimmedStart.Length > 0
+                && !trimmedStart.StartsWith("//", StringComparison.Ordinal)
+                && !startsRawRegion
+                && !containsInlineRaw
+                && FindLineCommentStart(trimmedStart) < 0
+                && content.Length > 0
+                && content[^1] is ' ' or '\t')
+            {
+                result.Add(i + 1);
+            }
+
+            if (!rawRegion && startsRawRegion && !EndsRawRegion(trimmedStart))
+            {
+                rawRegion = true;
+            }
+            else if (rawRegion && EndsRawRegion(trimmedStart))
+            {
+                rawRegion = false;
+            }
+        }
+
+        return result;
+    }
+
+    public static bool HasEquivalentLineShape(
+        string original,
+        string formatted,
+        out string? error)
+    {
+        var before = Parse(original)._lines;
+        var after = Parse(formatted)._lines;
+        if (before.Length != after.Length)
+        {
+            error = "Formatting changed the number of source lines.";
+            return false;
+        }
+
+        for (var i = 0; i < before.Length; i++)
+        {
+            if (!string.Equals(before[i].LineBreak, after[i].LineBreak, StringComparison.Ordinal))
+            {
+                error = $"Formatting changed the newline sequence on line {i + 1}.";
+                return false;
+            }
+
+            var beforeText = NormalizeTrivia(before[i].Content);
+            var afterText = NormalizeTrivia(after[i].Content);
+            if (!string.Equals(beforeText, afterText, StringComparison.Ordinal))
+            {
+                error = $"Formatting changed non-trivia source text on line {i + 1}.";
+                return false;
+            }
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static void ReindentAttachedComments(FormattedLine[] lines)
+    {
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (!lines[i].IsComment || lines[i].IsRaw)
+            {
+                continue;
+            }
+
+            var nextCode = -1;
+            var separatedFromNext = false;
+            for (var j = i + 1; j < lines.Length; j++)
+            {
+                if (lines[j].IsBlank)
+                {
+                    separatedFromNext = true;
+                    break;
+                }
+                if (!lines[j].IsComment && !lines[j].IsRaw)
+                {
+                    nextCode = j;
+                    break;
+                }
+            }
+
+            var anchor = !separatedFromNext && nextCode >= 0
+                ? nextCode
+                : FindPreviousCodeLine(lines, i);
+            if (anchor < 0)
+            {
+                continue;
+            }
+
+            var indent = GetLeadingWhitespace(lines[anchor].Content);
+            var commentText = lines[i].Content.TrimStart(' ', '\t');
+            lines[i] = lines[i] with { Content = indent + commentText };
+        }
+    }
+
+    private static int FindPreviousCodeLine(FormattedLine[] lines, int start)
+    {
+        for (var i = start - 1; i >= 0; i--)
+        {
+            if (!lines[i].IsBlank && !lines[i].IsComment && !lines[i].IsRaw)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static string GetLeadingWhitespace(string content)
+    {
+        var length = 0;
+        while (length < content.Length && content[length] is ' ' or '\t')
+        {
+            length++;
+        }
+        return content[..length];
+    }
+
+    private static int FindLineCommentStart(string content)
+    {
+        var inString = false;
+        var escaped = false;
+        for (var i = 0; i + 1 < content.Length; i++)
+        {
+            var current = content[i];
+            if (inString)
+            {
+                if (escaped)
+                {
+                    escaped = false;
+                }
+                else if (current == '\\')
+                {
+                    escaped = true;
+                }
+                else if (current == '"')
+                {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (current == '"')
+            {
+                inString = true;
+            }
+            else if (current == '/' && content[i + 1] == '/')
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static bool StartsRawRegion(string content) =>
+        content.StartsWith("§RAW", StringComparison.Ordinal)
+        || content.StartsWith("§CSHARP{", StringComparison.Ordinal);
+
+    private static bool EndsRawRegion(string content) =>
+        content.Contains("§/RAW", StringComparison.Ordinal)
+        || content.Contains("}§/CSHARP", StringComparison.Ordinal);
+
+    private static bool ContainsInlineRawCSharp(string content) =>
+        content.Contains("§CS{", StringComparison.Ordinal);
+
+    private static string NormalizeTrivia(string content) =>
+        content.TrimStart(' ', '\t').TrimEnd(' ', '\t');
+
+    private sealed record SourceLine(string Content, string LineBreak);
+
+    private sealed record FormattedLine(
+        string Content,
+        string LineBreak,
+        bool IsBlank,
+        bool IsComment,
+        bool IsRaw);
+}
+
+/// <summary>
+/// A byte snapshot of a source file with its original encoding policy.
+/// </summary>
+internal sealed class SourceFileSnapshot
+{
+    private readonly Encoding _encoding;
+    private readonly byte[] _preamble;
+
+    private SourceFileSnapshot(
+        string path,
+        byte[] bytes,
+        string text,
+        Encoding encoding,
+        byte[] preamble)
+    {
+        Path = path;
+        Bytes = bytes;
+        Text = text;
+        _encoding = encoding;
+        _preamble = preamble;
+    }
+
+    public string Path { get; }
+    public byte[] Bytes { get; }
+    public string Text { get; }
+
+    public static async Task<SourceFileSnapshot> ReadAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+        var (encoding, preambleLength) = DetectEncoding(bytes);
+        var text = encoding.GetString(bytes, preambleLength, bytes.Length - preambleLength);
+        var preamble = bytes[..preambleLength];
+        return new SourceFileSnapshot(path, bytes, text, encoding, preamble);
+    }
+
+    public byte[] Encode(string text)
+    {
+        var payload = _encoding.GetBytes(text);
+        if (_preamble.Length == 0)
+        {
+            return payload;
+        }
+
+        var bytes = new byte[_preamble.Length + payload.Length];
+        _preamble.CopyTo(bytes, 0);
+        payload.CopyTo(bytes, _preamble.Length);
+        return bytes;
+    }
+
+    internal static string DecodeLike(byte[] bytes, SourceFileSnapshot policy)
+    {
+        var preambleLength = policy._preamble.Length;
+        if (bytes.Length < preambleLength
+            || !bytes.AsSpan(0, preambleLength).SequenceEqual(policy._preamble))
+        {
+            throw new InvalidDataException("Temporary file did not preserve the source BOM.");
+        }
+        return policy._encoding.GetString(bytes, preambleLength, bytes.Length - preambleLength);
+    }
+
+    private static (Encoding Encoding, int PreambleLength) DetectEncoding(byte[] bytes)
+    {
+        if (HasPrefix(bytes, 0x00, 0x00, 0xFE, 0xFF))
+        {
+            return (new UTF32Encoding(bigEndian: true, byteOrderMark: false, throwOnInvalidCharacters: true), 4);
+        }
+        if (HasPrefix(bytes, 0xFF, 0xFE, 0x00, 0x00))
+        {
+            return (new UTF32Encoding(bigEndian: false, byteOrderMark: false, throwOnInvalidCharacters: true), 4);
+        }
+        if (HasPrefix(bytes, 0xEF, 0xBB, 0xBF))
+        {
+            return (new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true), 3);
+        }
+        if (HasPrefix(bytes, 0xFE, 0xFF))
+        {
+            return (new UnicodeEncoding(bigEndian: true, byteOrderMark: false, throwOnInvalidBytes: true), 2);
+        }
+        if (HasPrefix(bytes, 0xFF, 0xFE))
+        {
+            return (new UnicodeEncoding(bigEndian: false, byteOrderMark: false, throwOnInvalidBytes: true), 2);
+        }
+
+        return (new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true), 0);
+    }
+
+    private static bool HasPrefix(byte[] bytes, params byte[] prefix) =>
+        bytes.Length >= prefix.Length
+        && bytes.AsSpan(0, prefix.Length).SequenceEqual(prefix);
+}
+
+/// <summary>
+/// Atomically replaces a source file only after byte and semantic validation.
+/// </summary>
+internal static class SafeSourceFile
+{
+    internal static async Task WriteFormattedAsync(
+        SourceFileSnapshot original,
+        string formatted,
+        CalorFormatter formatter,
+        Func<CancellationToken, Task>? beforeReplace = null,
+        CancellationToken cancellationToken = default)
+    {
+        await WriteAsync(
+            original,
+            formatted,
+            candidate =>
+            {
+                var validation = formatter.Validate(original.Text, candidate, original.Path);
+                if (!validation.Success)
+                {
+                    throw new InvalidDataException(validation.Error);
+                }
+            },
+            beforeReplace,
+            cancellationToken);
+    }
+
+    internal static async Task WriteParsedAsync(
+        SourceFileSnapshot original,
+        string candidate,
+        Action<string> validate,
+        Func<CancellationToken, Task>? beforeReplace = null,
+        CancellationToken cancellationToken = default)
+    {
+        await WriteAsync(original, candidate, validate, beforeReplace, cancellationToken);
+    }
+
+    private static async Task WriteAsync(
+        SourceFileSnapshot original,
+        string candidate,
+        Action<string> validate,
+        Func<CancellationToken, Task>? beforeReplace,
+        CancellationToken cancellationToken)
+    {
+        validate(candidate);
+        var candidateBytes = original.Encode(candidate);
+        var directory = System.IO.Path.GetDirectoryName(original.Path)
+            ?? throw new InvalidOperationException("Source file has no parent directory.");
+        var tempPath = System.IO.Path.Combine(
+            directory,
+            $".{System.IO.Path.GetFileName(original.Path)}.{Guid.NewGuid():N}.format.tmp");
+
+        UnixFileMode? originalMode = null;
+        if (!OperatingSystem.IsWindows())
+        {
+            originalMode = File.GetUnixFileMode(original.Path);
+        }
+
+        try
+        {
+            await using (var stream = new FileStream(
+                tempPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                bufferSize: 4096,
+                options: FileOptions.Asynchronous | FileOptions.WriteThrough))
+            {
+                await stream.WriteAsync(candidateBytes, cancellationToken);
+                await stream.FlushAsync(cancellationToken);
+                stream.Flush(flushToDisk: true);
+            }
+
+            var persistedBytes = await File.ReadAllBytesAsync(tempPath, cancellationToken);
+            if (!candidateBytes.AsSpan().SequenceEqual(persistedBytes))
+            {
+                throw new IOException("Temporary format file did not persist the expected bytes.");
+            }
+
+            var persistedText = SourceFileSnapshot.DecodeLike(persistedBytes, original);
+            validate(persistedText);
+
+            if (!OperatingSystem.IsWindows() && originalMode.HasValue)
+            {
+                File.SetUnixFileMode(tempPath, originalMode.Value);
+            }
+
+            if (beforeReplace != null)
+            {
+                await beforeReplace(cancellationToken);
+            }
+
+            var currentBytes = await File.ReadAllBytesAsync(original.Path, cancellationToken);
+            if (!original.Bytes.AsSpan().SequenceEqual(currentBytes))
+            {
+                throw new IOException("Source changed while formatting; refusing to overwrite it.");
+            }
+
+            File.Move(tempPath, original.Path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 }
