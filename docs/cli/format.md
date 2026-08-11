@@ -28,8 +28,8 @@ The `format` command formats Calor source files according to the canonical Calor
 # Format a single file (output to stdout)
 calor format MyModule.calr
 
-# Format and overwrite the file — GATED, see "Write mode is experimental" below
-calor format MyModule.calr --write --experimental
+# Format and overwrite the file through validated atomic replacement
+calor format MyModule.calr --write
 
 # Check if files are formatted (for CI)
 calor format src/*.calr --check
@@ -53,8 +53,8 @@ calor format MyModule.calr --diff
 | Option | Short | Default | Description |
 |:-------|:------|:--------|:------------|
 | `--check` | `-c` | `false` | Check if files are formatted without modifying (exit 1 if not) |
-| `--write` | `-w` | `false` | Write formatted output back to the file(s). **Refused (`Calor1346`) unless acknowledged** — see [Write mode is experimental](#write-mode-is-experimental) |
-| `--experimental` | — | `false` | Acknowledge that the `--write` path is experimental. Equivalent to `CALOR_EXPERIMENTAL_FORMAT_WRITE=1` |
+| `--write` | `-w` | `false` | Write through a same-directory temporary file, validate it, then atomically replace the original |
+| `--experimental` | — | `false` | Deprecated compatibility flag; no longer required |
 | `--diff` | `-d` | `false` | Show diff of formatting changes |
 | `--verbose` | `-v` | `false` | Enable verbose output |
 | `--heal` | — | `false` | Best-effort source-level repair of files too broken for the AST formatter. **Not semantics-preserving** — see [Heal Mode](#heal-mode) |
@@ -83,22 +83,25 @@ files). Exit codes are unchanged.
       { "path": "/abs/Good.calr", "changed": true, "status": "formatted",
         "residualParseErrors": false }
     ],
-    "totals": { "processed": 2, "formatted": 1, "errors": 1, "stillFailingAfterHeal": 0 }
+    "totals": { "processed": 2, "formatted": 1, "errors": 1,
+      "stillFailingAfterHeal": 0, "unsupported": 0 }
   }
 }
 ```
 
 - `diagnostics[]` — the real parse/format diagnostics, plus CLI-level entries:
   `Calor1340` (file not found), `Calor1341` (non-`.calr` input, warning),
-  `Calor1342` (processing error). Heal-mode residual parse errors appear with
-  their own parser codes.
+  `Calor1342` (processing error), and `Calor1347` (conservative fallback,
+  warning). Heal-mode residual parse errors appear with their own parser codes.
 - `data.files[].status` — `formatted` | `already-formatted` | `would-reformat`
-  (`--check`) | `healed` (`--heal`) | `error` | `skipped` | `not-found`.
+  (`--check`) | `healed` (`--heal`) | `unsupported` | `error` | `skipped` | `not-found`.
 - `data.files[].formatted` — the formatted source; present only in preview
   mode (neither `--write` nor `--check`) for files that changed.
 - `data.files[].ambiguities` — heal mode: `[{ "line", "message" }]`
   control-flow guesses; `residualParseErrors` is true when the healed output
   still fails to parse.
+- `data.files[].conservativeFallbackReason` — the formatter left an unsupported
+  input byte-identical because semantic or generated-C# validation was not green.
 
 ---
 
@@ -114,42 +117,37 @@ This allows you to preview changes before applying them.
 
 ---
 
-## Write mode is experimental
+## Safe write mode
 
-`--write` is **disabled by the release policy** (#793/#760) and refuses with `Calor1346` unless you
-acknowledge it. The refusal is deliberate, not a bug: the formatter write path **can rewrite
-identifiers and drops comments**, so it is not safe to point at a codebase you care about.
+Issue #760 is closed at the architecture boundary: source formatting no longer
+round-trips through the trivia-free AST and no formatter regex rewrites tag
+fields. `--write`, `lint --fix`, and LSP formatting use the same lossless
+formatter and validation gates.
 
-Read-only modes are unaffected and are what most workflows should use: `--check`, `--diff`, and the
-default stdout preview.
+Before replacing a file, Calor requires:
 
-To acknowledge, either pass the flag or set the environment variable:
+1. the original and candidate both parse;
+2. their exact non-trivia token sequences match;
+3. the source transformation changes only leading/trailing trivia and preserves
+   every original line terminator;
+4. semantic compilation succeeds;
+5. generated C# is byte-identical before/after and compiles cleanly through
+   Roslyn, making its public API identical;
+6. formatting the candidate again is byte-identical.
 
-```bash
-# Format single file
-calor format MyModule.calr --write --experimental
+The candidate is encoded with the original encoding and BOM, written to a
+same-directory temporary file, flushed, decoded and validated again, then
+atomically renamed over the original. A concurrent edit or any validation/write
+failure leaves the original bytes untouched.
 
-# Format multiple files
-calor format src/*.calr --write --experimental
+Inputs with semantic errors or pre-existing generated-C# errors use a
+**conservative fallback**: they are left byte-identical, report
+`status: "unsupported"` (and a reason), and exit `1`. This fallback is not the
+normal formatter and is never used for a supported, gate-clean input.
 
-# Or acknowledge once for a whole session / CI job
-export CALOR_EXPERIMENTAL_FORMAT_WRITE=1
-calor format src/*.calr --write
-```
-
-Without the acknowledgement the command exits **1**, writes nothing, and reports:
-
-```
-error Calor1346: 'format --write' is disabled by the release policy (#793/#760): the formatter
-write path can rewrite identifiers and drops comments. Pass --experimental (or set
-CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to acknowledge, or use --check/--diff for read-only formatting.
-```
-
-Under `--format json` the same refusal arrives as a normal envelope document carrying `Calor1346`,
-so an agent parsing stdout gets a policy decision rather than a parse error.
-
-The LSP has a sibling containment: the **formatting** and **rename** handlers register only under
-`CALOR_LSP_EXPERIMENTAL=1`. Every read-only LSP handler is unaffected.
+LSP formatting is registered by default and returns no edit when these gates do
+not pass. LSP rename remains independently gated by
+`CALOR_LSP_EXPERIMENTAL=1` for issue #765.
 
 ---
 
@@ -185,8 +183,8 @@ reject:
 # Preview the healed source on stdout
 calor format Broken.calr --heal
 
-# Repair in place (--write is gated; see "Write mode is experimental")
-calor format Broken.calr --heal --write --experimental
+# Repair in place through atomic replacement
+calor format Broken.calr --heal --write
 
 # CI / agent loop: report only (prints an ambiguousDecisions count per file)
 calor format Broken.calr --heal --check
@@ -251,52 +249,48 @@ Changes are highlighted:
 
 ## Formatting Rules
 
-The Calor formatter applies these rules:
+The lossless Calor formatter applies these rules:
 
 ### Indentation
 
-- 2 spaces per indentation level
-- Consistent indentation for nested structures
+- 2 spaces per parser-established indentation level
+- Attached full-line comments move only with their declaration/statement
 
 ### Spacing
 
-- Single space after structure tags: `§F{f001:Name:pub}`
-- Single space around operators: `(+ a b)` not `(+a b)`
-- No trailing whitespace
+- No semantic token, identifier, type, member target, string, comment text, or
+  raw-C# payload is reconstructed or rewritten
+- Trailing whitespace is removed only outside comments and raw-C# regions
 
 ### Line Breaks
 
-- One blank line between functions
-- No multiple consecutive blank lines
-- Newline at end of file
+- Blank-line count and location are preserved
+- Each original LF, CRLF, or CR sequence is preserved in place
+- Final-newline presence is preserved
 
-### Alignment
+### Encoding and IDs
 
-- Consistent alignment of matching tags
-- Input/output parameters aligned
+- UTF-8, UTF-8 BOM, UTF-16 LE/BE BOM, and UTF-32 LE/BE BOM are retained
+- Structural IDs are never canonicalized by formatting. Use the dedicated
+  `calor fix --compact-ids` migration for ID changes; it classifies explicit
+  structural marker kinds rather than applying a generic identifier regex
 
 ### Before and After
 
 ```calor
 // Before (inconsistent)
 §M{m001:Math}
-  §F{f001:Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
-    §R(+ a b)
+    /// Adds two values.
+    §F{f001:Add:pub} (i32:a, i32:b) -> i32
+        §R (+ a b)
 ```
 
 ```calor
 // After (formatted)
 §M{m001:Math}
-
-  §F{f001:Add:pub}
-    §I{i32:a}
-    §I{i32:b}
-    §O{i32}
+  /// Adds two values.
+  §F{f001:Add:pub} (i32:a, i32:b) -> i32
     §R (+ a b)
-
 ```
 
 ---
@@ -306,7 +300,7 @@ The Calor formatter applies these rules:
 When formatting multiple files, errors in one file don't stop processing of others:
 
 ```bash
-calor format src/*.calr --write --experimental --verbose
+calor format src/*.calr --write --verbose
 ```
 
 Output:
@@ -328,7 +322,7 @@ Summary: 4 formatted, 1 error
 Use `--verbose` to see detailed processing information:
 
 ```bash
-calor format MyModule.calr --write --experimental --verbose
+calor format MyModule.calr --write --verbose
 ```
 
 Output:
@@ -346,7 +340,7 @@ Formatting MyModule.calr...
 | Code | Meaning |
 |:-----|:--------|
 | `0` | Success (or all files formatted in `--check` mode) |
-| `1` | Unformatted files found (`--check` mode), or `--heal` output still fails to parse |
+| `1` | Unformatted files found (`--check`), unsupported conservative fallback, or `--heal` output still fails to parse |
 | `2` | Error processing files |
 
 ---
@@ -357,10 +351,10 @@ Formatting MyModule.calr...
 
 ```bash
 # Find and format all .calr files
-find . -name "*.calr" -exec calor format {} --write --experimental \;
+find . -name "*.calr" -exec calor format {} --write \;
 
 # Or use shell globbing
-calor format **/*.calr --write --experimental
+calor format **/*.calr --write
 ```
 
 ### Pre-Commit Hook
@@ -376,7 +370,7 @@ if [ -n "$Calor_FILES" ]; then
   # Format staged files
   echo "$Calor_FILES" | xargs calor format --check
   if [ $? -ne 0 ]; then
-    echo "Calor files are not formatted. Run 'calor format --write --experimental' to fix."
+    echo "Calor files are not formatted. Run 'calor format --write' to fix."
     exit 1
   fi
 fi
@@ -392,7 +386,7 @@ Most editors can be configured to run formatters on save:
   "[calor]": {
     "editor.formatOnSave": true
   },
-  "calor.formatCommand": "calor format --write --experimental"
+  "calor.formatCommand": "calor format --write"
 }
 ```
 

@@ -10,7 +10,7 @@ namespace Calor.Compiler.Tests;
 /// Tests all lint rules, edge cases, and ensures idempotent, parseable output.
 ///
 /// Bugs covered by these tests:
-/// - ID abbreviation: m001 → m1, f001 → f1
+/// - Structural and user identifiers are never rewritten by formatting
 /// - Loop ID conversion: for1 → l1, if1 → i1, while1 → w1
 /// - Visibility placement: inside braces as third positional parameter
 /// - Type name case: uppercase to lowercase (VOID → void)
@@ -24,66 +24,55 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class LintRegressionTests
 {
-    #region ID Abbreviation Tests
+    #region Identifier Preservation Tests
 
     [Theory]
-    [InlineData("01_id_abbreviation/padded_module_id.calr", 2)]
-    [InlineData("01_id_abbreviation/padded_function_id.calr", 2)]
-    [InlineData("01_id_abbreviation/loop_id_conversion.calr", 2)]
-    [InlineData("01_id_abbreviation/if_id_conversion.calr", 1)]
-    [InlineData("01_id_abbreviation/while_id_conversion.calr", 0)] // while uses WH tag with proper ID
-    [InlineData("01_id_abbreviation/mixed_ids.calr", 4)]
-    [InlineData("01_id_abbreviation/already_abbreviated.calr", 0)]
-    public void Lint_IdAbbreviation_DetectsExpectedIssues(string file, int expectedIssues)
+    [InlineData("01_id_abbreviation/padded_module_id.calr")]
+    [InlineData("01_id_abbreviation/padded_function_id.calr")]
+    [InlineData("01_id_abbreviation/loop_id_conversion.calr")]
+    [InlineData("01_id_abbreviation/if_id_conversion.calr")]
+    [InlineData("01_id_abbreviation/mixed_ids.calr")]
+    public void Lint_DoesNotTreatZeroPaddedTextAsGenericIds(string file)
     {
         var source = LintTestDataLoader.LoadTestFile(file);
         var issues = LintSource(source);
 
-        // Filter to only ID-related issues
         var idIssues = issues.Where(i =>
             i.Message.Contains("ID should be abbreviated") ||
             i.Message.Contains("for1") ||
             i.Message.Contains("if1") ||
             i.Message.Contains("while1")).ToList();
 
-        Assert.Equal(expectedIssues, idIssues.Count);
+        Assert.Empty(idIssues);
     }
 
     [Theory]
     [InlineData("01_id_abbreviation/padded_module_id.calr")]
     [InlineData("01_id_abbreviation/padded_function_id.calr")]
     [InlineData("01_id_abbreviation/loop_id_conversion.calr")]
-    public void LintFix_IdAbbreviation_ProducesAbbreviatedIds(string file)
+    public void Formatter_PreservesZeroPaddedStructuralIds(string file)
     {
         var source = LintTestDataLoader.LoadTestFile(file);
         var (parseSuccess, formatted) = FormatSource(source);
 
         Assert.True(parseSuccess, "Source should parse successfully");
         Assert.NotNull(formatted);
-
-        // The formatted output should not contain padded IDs
-        Assert.DoesNotContain("m001", formatted);
-        Assert.DoesNotContain("f001", formatted);
-        Assert.DoesNotContain("f002", formatted);
-
-        // But should contain abbreviated IDs
-        Assert.Contains("m1", formatted);
-        Assert.Contains("f1", formatted);
+        foreach (var id in new[] { "m001", "f001", "f002" }.Where(source.Contains))
+        {
+            Assert.Contains(id, formatted);
+        }
     }
 
     [Fact]
-    public void LintFix_LoopIds_ConvertedCorrectly()
+    public void Formatter_PreservesLoopIds()
     {
         var source = LintTestDataLoader.LoadTestFile("01_id_abbreviation/loop_id_conversion.calr");
         var (parseSuccess, formatted) = FormatSource(source);
 
         Assert.True(parseSuccess);
 
-        // for1, for2 should become l1, l2
-        Assert.DoesNotContain("for1", formatted);
-        Assert.DoesNotContain("for2", formatted);
-        Assert.Contains("l1", formatted);
-        Assert.Contains("l2", formatted);
+        Assert.Contains("for1", formatted);
+        Assert.Contains("for2", formatted);
     }
 
     #endregion
@@ -536,37 +525,6 @@ public class LintRegressionTests
             if (line.Length > 0 && line.TrimEnd('\r') != line.TrimEnd('\r').TrimEnd())
             {
                 issues.Add(new LintIssue(lineNum, "Line has trailing whitespace"));
-            }
-
-            // Check for padded IDs
-            var paddedIdMatch = System.Text.RegularExpressions.Regex.Match(line, @"§[A-Z/]+\{([a-zA-Z]+)(0+)(\d+)");
-            if (paddedIdMatch.Success)
-            {
-                var prefix = paddedIdMatch.Groups[1].Value;
-                var number = paddedIdMatch.Groups[3].Value;
-                var oldId = prefix + paddedIdMatch.Groups[2].Value + number;
-                var newId = prefix + number;
-                issues.Add(new LintIssue(lineNum, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
-            }
-
-            // Check for verbose loop IDs
-            var verbosePatterns = new[]
-            {
-                (@"§L\{(for)(\d+)", "l"),
-                (@"§/L\{(for)(\d+)", "l"),
-                (@"§IF\{(if)(\d+)", "i"),
-                (@"§/I\{(if)(\d+)", "i"),
-            };
-
-            foreach (var (pattern, replacement) in verbosePatterns)
-            {
-                var match = System.Text.RegularExpressions.Regex.Match(line, pattern);
-                if (match.Success)
-                {
-                    var oldId = match.Groups[1].Value + match.Groups[2].Value;
-                    var newId = replacement + match.Groups[2].Value;
-                    issues.Add(new LintIssue(lineNum, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
-                }
             }
 
             // Blank lines are now allowed as readability separators (Phase 4 indent form).

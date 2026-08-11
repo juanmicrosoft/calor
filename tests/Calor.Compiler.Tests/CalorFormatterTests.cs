@@ -31,8 +31,7 @@ public class CalorFormatterTests
         var formatter = new CalorFormatter();
         var result = formatter.Format(module);
 
-        // Formatter produces abbreviated IDs: m001 → m1
-        Assert.Contains("m1", result);
+        Assert.Contains("m001", result);
         Assert.Contains("Test", result);
     }
 
@@ -383,8 +382,8 @@ public class CalorFormatterTests
         var formatted = formatter.Format(module);
 
         // Verify the formatted output contains key elements
-        // Formatter produces abbreviated IDs: m001 → m1, f001 → f1
-        Assert.Contains("m1", formatted);
+        Assert.Contains("m001", formatted);
+        Assert.Contains("f001", formatted);
         Assert.Contains("Test", formatted);
         Assert.Contains("Add", formatted);
         Assert.Contains("pub", formatted);

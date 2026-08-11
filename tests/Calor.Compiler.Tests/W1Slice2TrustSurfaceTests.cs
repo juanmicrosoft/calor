@@ -140,23 +140,19 @@ public class W1Slice2TrustSurfaceTests
     }
 
     [Fact]
-    public async Task FormatWrite_WithoutExperimentalAcknowledgment_IsRefused()
+    public async Task FormatWrite_WithoutExperimentalAcknowledgment_ProceedsSafely()
     {
-        // T3 containment (kickoff §1.4): the #793 release policy held the
-        // formatter write path "disabled" in prose only — the gate makes it
-        // code. Read-only modes stay available.
         using var env = WithEnv("CALOR_EXPERIMENTAL_FORMAT_WRITE", null);
         var file = Path.Combine(Path.GetTempPath(), $"calor-w1s2-{Guid.NewGuid():N}.calr");
-        await File.WriteAllTextAsync(file, "§M{m001:T}\n");
+        await File.WriteAllTextAsync(file, "§M{m001:T}   \n");
         try
         {
-            var original = await File.ReadAllTextAsync(file);
             var command = Calor.Compiler.Commands.FormatCommand.Create();
 
             var exit = await command.InvokeAsync(["--write", file]);
 
-            Assert.Equal(1, exit);
-            Assert.Equal(original, await File.ReadAllTextAsync(file)); // untouched
+            Assert.Equal(0, exit);
+            Assert.Equal("§M{m001:T}\n", await File.ReadAllTextAsync(file));
         }
         finally
         {
@@ -185,23 +181,19 @@ public class W1Slice2TrustSurfaceTests
     }
 
     [Fact]
-    public async Task LintFix_WithoutExperimentalAcknowledgment_IsRefused()
+    public async Task LintFix_WithoutExperimentalAcknowledgment_ProceedsSafely()
     {
-        // #834 review C1: `lint --fix` writes through the SAME CalorFormatter
-        // machinery `format --write` gates — an ungated --fix was a one-command
-        // bypass of the #793 containment.
         using var env = WithEnv("CALOR_EXPERIMENTAL_FORMAT_WRITE", null);
         var file = Path.Combine(Path.GetTempPath(), $"calor-w1s2-{Guid.NewGuid():N}.calr");
-        await File.WriteAllTextAsync(file, "§M{m001:T}\n");
+        await File.WriteAllTextAsync(file, "§M{m001:T}   \n");
         try
         {
-            var original = await File.ReadAllTextAsync(file);
             var command = Calor.Compiler.Commands.LintCommand.Create();
 
             var exit = await command.InvokeAsync(["--fix", file]);
 
-            Assert.Equal(1, exit);
-            Assert.Equal(original, await File.ReadAllTextAsync(file)); // untouched
+            Assert.Equal(0, exit);
+            Assert.Equal("§M{m001:T}\n", await File.ReadAllTextAsync(file));
         }
         finally
         {

@@ -1,7 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Formatting;
 using Calor.Compiler.Init;
@@ -27,13 +26,11 @@ public static class LintCommand
 
         var fixOption = new Option<bool>(
             aliases: ["--fix", "-f"],
-            description: "Auto-fix lint issues by reformatting (formatter WRITE path — requires --experimental)");
+            description: "Auto-fix lint issues through the lossless validated formatter");
 
         var experimentalOption = new Option<bool>(
             aliases: ["--experimental"],
-            description: "Acknowledge that the formatter WRITE path --fix rides is experimental and " +
-                         "release-policy-disabled (#760: it can rewrite identifiers via its " +
-                         "ID-abbreviation regexes and drops comments). Required for --fix.");
+            description: "Deprecated compatibility flag. Lossless validated fixes are enabled by default.");
 
         var checkOption = new Option<bool>(
             aliases: ["--check", "-c"],
@@ -66,45 +63,7 @@ public static class LintCommand
         // Environment.ExitCode assignment (lint --check must exit nonzero on issues).
         command.SetHandler(async (InvocationContext ctx) =>
         {
-            // W1 Slice 2 (T3, #834 review C1): `lint --fix` writes files through
-            // the SAME CalorFormatter machinery `format --write` gates — an
-            // ungated --fix was a one-command bypass of the #793 containment.
             var wantsFix = ctx.ParseResult.GetValueForOption(fixOption);
-            var experimentalAcknowledged = ctx.ParseResult.GetValueForOption(experimentalOption)
-                || Environment.GetEnvironmentVariable("CALOR_EXPERIMENTAL_FORMAT_WRITE") is "1" or "true";
-            if (wantsFix && !experimentalAcknowledged)
-            {
-                const string refusal =
-                    "'lint --fix' is disabled by the release policy (#793/#760): it rewrites files " +
-                    "through the formatter write path, which can rewrite identifiers and drops " +
-                    "comments. Pass --experimental (or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to " +
-                    "acknowledge, or use --check for read-only linting.";
-
-                // The refusal must honour --format, exactly as `format --write`'s does. This is the
-                // SAME containment (CHANGELOG and docs/cli/structured-output.md name the two
-                // surfaces as one policy), so an agent that asked for a machine-readable document
-                // and got a bare stderr line sees a parse failure rather than a policy decision.
-                // Found by adversarial review: the format side was fixed and this one was not.
-                var refusalFormat = ctx.ParseResult.GetValueForOption(formatOption) ?? "text";
-                if (!refusalFormat.Equals("text", StringComparison.OrdinalIgnoreCase))
-                {
-                    var bag = new DiagnosticBag();
-                    bag.Add(new Diagnostic(
-                        DiagnosticCode.FormatWriteExperimentalRequired,
-                        refusal,
-                        new TextSpan(0, 0, 1, 1),
-                        DiagnosticSeverity.Error));
-                    Console.WriteLine(DiagnosticFormatterFactory.Create(refusalFormat, null).Format(bag));
-                }
-                else
-                {
-                    Console.Error.WriteLine(
-                        $"error {DiagnosticCode.FormatWriteExperimentalRequired}: {refusal}");
-                }
-
-                ctx.ExitCode = 1;
-                return;
-            }
 
             ctx.ExitCode = await ExecuteAsync(
                 ctx.ParseResult.GetValueForArgument(inputArgument),
@@ -145,6 +104,7 @@ public static class LintCommand
         var filesWithIssues = 0;
         var fixedFiles = 0;
         var errorFiles = 0;
+        var suppressedFixFiles = 0;
         var totalIssues = 0;
 
         foreach (var file in files)
@@ -181,7 +141,7 @@ public static class LintCommand
 
             try
             {
-                var result = await LintFileAsync(file.FullName, verbose);
+                var result = await LintFileAsync(file.FullName, verbose, fix);
                 diagnosticSink?.AddRange(result.Diagnostics);
                 if (declarationIds != null && result.Ast != null)
                 {
@@ -202,6 +162,24 @@ public static class LintCommand
                     continue;
                 }
 
+                if (result.ProcessingError != null)
+                {
+                    if (!structuredOutput)
+                    {
+                        Console.Error.WriteLine(
+                            $"Error formatting {file.Name}: {result.ProcessingError}");
+                    }
+                    errorFiles++;
+                    continue;
+                }
+
+                if (fix && result.FixSuppressedReason != null)
+                {
+                    Console.Error.WriteLine(
+                        $"Warning: fix suppressed for {file.Name}: {result.FixSuppressedReason}");
+                    suppressedFixFiles++;
+                }
+
                 totalIssues += result.Issues.Count;
 
                 if (result.Issues.Count > 0)
@@ -219,9 +197,15 @@ public static class LintCommand
 
                     if (fix)
                     {
-                        await File.WriteAllTextAsync(file.FullName, result.FixedContent);
-                        statusOut.WriteLine($"Fixed: {file.Name}");
-                        fixedFiles++;
+                        if (result.FixSuppressedReason == null)
+                        {
+                            await SafeSourceFile.WriteFormattedAsync(
+                                result.Snapshot!,
+                                result.FixedContent,
+                                new CalorFormatter());
+                            statusOut.WriteLine($"Fixed: {file.Name}");
+                            fixedFiles++;
+                        }
                     }
                     else if (check && !structuredOutput)
                     {
@@ -265,6 +249,10 @@ public static class LintCommand
             {
                 Console.WriteLine($"  Errors: {errorFiles}");
             }
+            if (suppressedFixFiles > 0)
+            {
+                Console.WriteLine($"  Fixes conservatively suppressed: {suppressedFixFiles}");
+            }
         }
 
         // Exit code: 2 = file/processing errors, 1 = lint issues found
@@ -275,7 +263,8 @@ public static class LintCommand
         {
             exitCode = 2;
         }
-        else if ((check || !fix) && filesWithIssues > 0)
+        else if (suppressedFixFiles > 0
+            || ((check || !fix) && filesWithIssues > 0))
         {
             exitCode = 1;
         }
@@ -295,64 +284,25 @@ public static class LintCommand
         return exitCode;
     }
 
-    private static async Task<LintResult> LintFileAsync(string filePath, bool verbose)
+    private static async Task<LintResult> LintFileAsync(
+        string filePath,
+        bool verbose,
+        bool attemptFix)
     {
-        var source = await File.ReadAllTextAsync(filePath);
+        _ = verbose;
+        var snapshot = await SourceFileSnapshot.ReadAsync(filePath);
+        var source = snapshot.Text;
         var issues = new List<LintIssue>();
+        var trimmableTrailingWhitespace =
+            LosslessSourceDocument.GetTrimmableTrailingWhitespaceLines(source);
 
-        // Check source-level issues before parsing
-        var lines = source.Split('\n');
-        for (var i = 0; i < lines.Length; i++)
+        // Check source-level issues before parsing.
+        foreach (var lineNum in trimmableTrailingWhitespace.Order())
         {
-            var line = lines[i];
-            var lineNum = i + 1;
-
-            // Indentation is now semantically meaningful (Phase 1+ indent form);
-            // do not flag leading whitespace.
-
-            // Check for trailing whitespace
-            if (line.Length > 0 && line.TrimEnd('\r') != line.TrimEnd('\r').TrimEnd())
-            {
-                issues.Add(new LintIssue(lineNum, DiagnosticCode.LintTrailingWhitespace, "Line has trailing whitespace"));
-            }
-
-            // Check for non-abbreviated IDs: m001, f001, etc.
-            var paddedIdMatch = Regex.Match(line, @"§[A-Z/]+\{([a-zA-Z]+)(0+)(\d+)");
-            if (paddedIdMatch.Success)
-            {
-                var prefix = paddedIdMatch.Groups[1].Value;
-                var zeros = paddedIdMatch.Groups[2].Value;
-                var number = paddedIdMatch.Groups[3].Value;
-                var oldId = prefix + zeros + number;
-                var newId = prefix + number;
-                issues.Add(new LintIssue(lineNum, DiagnosticCode.LintNonAbbreviatedId, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
-            }
-
-            // Check for verbose loop/condition IDs: for1, if1, while1, do1
-            var verboseIdPatterns = new[]
-            {
-                (@"§L\{(for)(\d+)", "l"),
-                (@"§/L\{(for)(\d+)", "l"),
-                (@"§IF\{(if)(\d+)", "i"),
-                (@"§/I\{(if)(\d+)", "i"),
-                (@"§WHILE\{(while)(\d+)", "w"),
-                (@"§/WHILE\{(while)(\d+)", "w"),
-                (@"§DO\{(do)(\d+)", "d"),
-                (@"§/DO\{(do)(\d+)", "d")
-            };
-
-            foreach (var (pattern, replacement) in verboseIdPatterns)
-            {
-                var match = Regex.Match(line, pattern);
-                if (match.Success)
-                {
-                    var oldId = match.Groups[1].Value + match.Groups[2].Value;
-                    var newId = replacement + match.Groups[2].Value;
-                    issues.Add(new LintIssue(lineNum, DiagnosticCode.LintNonAbbreviatedId, $"ID should be abbreviated: use '{newId}' instead of '{oldId}'"));
-                }
-            }
-
-            // Blank lines are now allowed as readability separators (Phase 4 indent form).
+            issues.Add(new LintIssue(
+                lineNum,
+                DiagnosticCode.LintTrailingWhitespace,
+                "Line has trailing whitespace"));
         }
 
         // Parse the file to generate fixed content
@@ -381,7 +331,8 @@ public static class LintCommand
                 Issues = issues,
                 OriginalContent = source,
                 FixedContent = source,
-                Diagnostics = diagnostics
+                Diagnostics = diagnostics,
+                Snapshot = snapshot
             };
         }
 
@@ -397,13 +348,59 @@ public static class LintCommand
                 Issues = issues,
                 OriginalContent = source,
                 FixedContent = source,
-                Diagnostics = diagnostics
+                Diagnostics = diagnostics,
+                Snapshot = snapshot
             };
         }
 
-        // Format the AST to get the canonical (fixed) version
-        var formatter = new CalorFormatter();
-        var fixedContent = formatter.Format(ast);
+        if (!attemptFix)
+        {
+            return new LintResult
+            {
+                ParseSuccess = true,
+                ParseErrors = new List<string>(),
+                Issues = issues,
+                OriginalContent = source,
+                FixedContent = source,
+                Diagnostics = diagnostics,
+                Ast = ast,
+                Snapshot = snapshot
+            };
+        }
+
+        var formatResult = new CalorFormatter().FormatSource(source, filePath);
+        if (!formatResult.Success)
+        {
+            var reason = formatResult.Errors.FirstOrDefault()
+                ?? "Safe formatting failed.";
+            diagnostics.ReportError(
+                TextSpan.Empty,
+                DiagnosticCode.LintProcessingError,
+                reason);
+            return new LintResult
+            {
+                ParseSuccess = true,
+                ParseErrors = new List<string>(),
+                Issues = issues,
+                OriginalContent = source,
+                FixedContent = source,
+                Diagnostics = diagnostics,
+                Ast = ast,
+                ProcessingError = reason,
+                Snapshot = snapshot
+            };
+        }
+
+        string? fixSuppressedReason = null;
+        if (formatResult.UsedConservativeFallback)
+        {
+            fixSuppressedReason = formatResult.ConservativeFallbackReason
+                ?? "Source is unsupported by the safe formatting gates.";
+            diagnostics.ReportWarning(
+                TextSpan.Empty,
+                DiagnosticCode.FormatConservativeFallback,
+                fixSuppressedReason);
+        }
 
         return new LintResult
         {
@@ -411,9 +408,11 @@ public static class LintCommand
             ParseErrors = new List<string>(),
             Issues = issues,
             OriginalContent = source,
-            FixedContent = fixedContent,
+            FixedContent = formatResult.Formatted,
             Diagnostics = diagnostics,
-            Ast = ast
+            Ast = ast,
+            FixSuppressedReason = fixSuppressedReason,
+            Snapshot = snapshot
         };
     }
 
@@ -425,6 +424,9 @@ public static class LintCommand
         public required string OriginalContent { get; init; }
         public required string FixedContent { get; init; }
         public required DiagnosticBag Diagnostics { get; init; }
+        public SourceFileSnapshot? Snapshot { get; init; }
+        public string? ProcessingError { get; init; }
+        public string? FixSuppressedReason { get; init; }
 
         /// <summary>Parsed module when parsing succeeded; feeds declaration-ID resolution.</summary>
         public Ast.ModuleNode? Ast { get; init; }

@@ -98,7 +98,8 @@ public sealed class FormatTool : McpToolBase
             Success = result.Success,
             FormattedCode = result.Formatted,
             IsChanged = result.Original != result.Formatted,
-            Errors = result.Errors.Count > 0 ? result.Errors : null
+            Errors = result.Errors.Count > 0 ? result.Errors : null,
+            ConservativeFallbackReason = result.ConservativeFallbackReason
         };
 
         return Task.FromResult(McpToolResult.Json(output, isError: !result.Success));
@@ -120,49 +121,18 @@ public sealed class FormatTool : McpToolBase
 
     private static FormatResult FormatSource(string source)
     {
-        // Parse the source; errors are surfaced as envelope schema v1.1
-        // entries built from the real lexer/parser diagnostics.
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath("mcp-input.calr");
-
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        if (diagnostics.HasErrors)
-        {
-            return new FormatResult
-            {
-                Success = false,
-                Original = source,
-                Formatted = source,
-                Errors = BuildErrorEnvelope(diagnostics)
-            };
-        }
-
-        var parser = new Parser(tokens, diagnostics);
-        var ast = parser.Parse();
-
-        if (diagnostics.HasErrors)
-        {
-            return new FormatResult
-            {
-                Success = false,
-                Original = source,
-                Formatted = source,
-                Errors = BuildErrorEnvelope(diagnostics)
-            };
-        }
-
-        // Format the AST
         var formatter = new CalorFormatter();
-        var formatted = formatter.Format(ast);
-
+        var formatted = formatter.FormatSource(source, "mcp-input.calr");
         return new FormatResult
         {
-            Success = true,
+            Success = formatted.Success,
             Original = source,
-            Formatted = formatted,
-            Errors = new List<EnvelopeDiagnostic>()
+            Formatted = formatted.Formatted,
+            Errors = formatted.Diagnostics
+                .Where(diagnostic => diagnostic.IsError)
+                .Select(diagnostic => DiagnosticEnvelope.Build(diagnostic))
+                .ToList(),
+            ConservativeFallbackReason = formatted.ConservativeFallbackReason
         };
     }
 
@@ -282,6 +252,7 @@ public sealed class FormatTool : McpToolBase
         public required string Original { get; init; }
         public required string Formatted { get; init; }
         public required List<EnvelopeDiagnostic> Errors { get; init; }
+        public string? ConservativeFallbackReason { get; init; }
     }
 
     private sealed class FormatToolOutput
@@ -299,6 +270,10 @@ public sealed class FormatTool : McpToolBase
         [JsonPropertyName("errors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<EnvelopeDiagnostic>? Errors { get; init; }
+
+        [JsonPropertyName("conservativeFallbackReason")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ConservativeFallbackReason { get; init; }
     }
 
     // IDs check output types

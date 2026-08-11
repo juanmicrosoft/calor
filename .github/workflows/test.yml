@@ -61,6 +61,17 @@ jobs:
       - name: Build
         run: dotnet build -c Release --no-restore
 
+      - name: Run lossless formatter safety gate
+        run: |
+          dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj \
+            -c Release --no-build \
+            --filter "FullyQualifiedName~LosslessFormattingTests|FullyQualifiedName~ConvertFormatEnvelopeTests.Lint|FullyQualifiedName~Mcp.FormatToolTests" \
+            --verbosity normal
+          dotnet test tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj \
+            -c Release --no-build \
+            --filter "FullyQualifiedName~FormattingHandlerTests" \
+            --verbosity normal
+
       - name: Run all tests
         run: |
           set -euo pipefail

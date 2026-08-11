@@ -330,9 +330,17 @@ public sealed class Lexer
     {
         if (!IsAtEnd)
         {
-            if (Current == '\n')
+            if (Current == '\r')
             {
                 _line++;
+                _column = 1;
+            }
+            else if (Current == '\n')
+            {
+                if (_position == 0 || _source[_position - 1] != '\r')
+                {
+                    _line++;
+                }
                 _column = 1;
             }
             else

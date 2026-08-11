@@ -58,9 +58,7 @@ public static class FormatCommand
 
         var experimentalOption = new Option<bool>(
             aliases: ["--experimental"],
-            description: "Acknowledge that the formatter WRITE path is experimental and " +
-                         "release-policy-disabled (#760: it can rewrite identifiers via its " +
-                         "ID-abbreviation regexes and drops comments). Required for --write.");
+            description: "Deprecated compatibility flag. Lossless validated writes are enabled by default.");
 
         var command = new Command("format", "Format Calor source files to canonical style")
         {
@@ -80,49 +78,7 @@ public static class FormatCommand
         // Environment.ExitCode is overwritten by Main's return value.
         command.SetHandler(async (InvocationContext ctx) =>
         {
-            // W1 Slice 2 (T3, kickoff §1.4): the #793 release policy holds the
-            // formatter WRITE path disabled — the containment was policy text
-            // until now; this makes it code. Read-only modes (--check, --diff,
-            // stdout preview) stay available.
             var wantsWrite = ctx.ParseResult.GetValueForOption(writeOption);
-            var experimentalAcknowledged = ctx.ParseResult.GetValueForOption(experimentalOption)
-                || Environment.GetEnvironmentVariable("CALOR_EXPERIMENTAL_FORMAT_WRITE") is "1" or "true";
-            if (wantsWrite && !experimentalAcknowledged)
-            {
-                const string refusal =
-                    "'format --write' is disabled by the release policy (#793/#760): the formatter " +
-                    "write path can rewrite identifiers and drops comments. Pass --experimental " +
-                    "(or set CALOR_EXPERIMENTAL_FORMAT_WRITE=1) to acknowledge, or use " +
-                    "--check/--diff for read-only formatting.";
-
-                // The refusal must honour --format json. Every other exit from this command emits
-                // the envelope (schema v1.1, loop plan D1.3), and an agent that asked for JSON and
-                // got a bare stderr line sees a parse failure, not a policy decision — so the one
-                // message whose whole purpose is to be understood was the one it could not read.
-                if (string.Equals(ctx.ParseResult.GetValueForOption(formatOption) ?? "text", "json",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    var bag = new DiagnosticBag();
-                    bag.Add(new Diagnostic(
-                        DiagnosticCode.FormatWriteExperimentalRequired,
-                        refusal,
-                        new TextSpan(0, 0, 1, 1),
-                        DiagnosticSeverity.Error));
-                    Console.WriteLine(CommandEnvelope.Serialize("format", bag, new FormatData
-                    {
-                        Files = [],
-                        Totals = new FormatTotals { Processed = 0, Formatted = 0, Errors = 1, StillFailingAfterHeal = 0 }
-                    }));
-                }
-                else
-                {
-                    Console.Error.WriteLine(
-                        $"error {DiagnosticCode.FormatWriteExperimentalRequired}: {refusal}");
-                }
-
-                ctx.ExitCode = 1;
-                return;
-            }
 
             ctx.ExitCode = await ExecuteAsync(
                 ctx.ParseResult.GetValueForArgument(inputArgument),
@@ -166,6 +122,7 @@ public static class FormatCommand
         var formattedFiles = 0;
         var errorFiles = 0;
         var unrepairedFiles = 0; // heal ran but the output still fails to parse
+        var unsupportedFiles = 0;
 
         foreach (var file in files)
         {
@@ -239,6 +196,12 @@ public static class FormatCommand
                 {
                     unrepairedFiles++;
                 }
+                if (result.ConservativeFallbackReason != null)
+                {
+                    unsupportedFiles++;
+                    Console.Error.WriteLine(
+                        $"Warning: {file.Name}: {result.ConservativeFallbackReason}");
+                }
 
                 // Healing is NOT semantics-preserving: surface every
                 // control-flow guess with a file:line so the author can
@@ -267,9 +230,30 @@ public static class FormatCommand
                     }
                     else if (write)
                     {
-                        await File.WriteAllTextAsync(file.FullName, result.Formatted);
-                        statusOut.WriteLine($"{(heal ? "Healed" : "Formatted")}: {file.Name}");
-                        formattedFiles++;
+                        if (result.ResidualParseErrors)
+                        {
+                            statusOut.WriteLine(
+                                $"Not written: {file.Name} (candidate still has parse errors)");
+                        }
+                        else
+                        {
+                            if (heal)
+                            {
+                                await SafeSourceFile.WriteParsedAsync(
+                                    result.Snapshot,
+                                    result.Formatted,
+                                    candidate => ValidateParseableCandidate(candidate, file.FullName));
+                            }
+                            else
+                            {
+                                await SafeSourceFile.WriteFormattedAsync(
+                                    result.Snapshot,
+                                    result.Formatted,
+                                    new CalorFormatter());
+                            }
+                            statusOut.WriteLine($"{(heal ? "Healed" : "Formatted")}: {file.Name}");
+                            formattedFiles++;
+                        }
                     }
                     else if (!json)
                     {
@@ -293,7 +277,9 @@ public static class FormatCommand
                     Path = file.FullName,
                     Changed = !isFormatted,
                     Status = isFormatted
-                        ? "already-formatted"
+                        ? result.ConservativeFallbackReason != null
+                            ? "unsupported"
+                            : "already-formatted"
                         : check ? "would-reformat" : heal ? "healed" : "formatted",
                     Formatted = embedFormatted && !isFormatted ? result.Formatted : null,
                     Ambiguities = heal
@@ -301,7 +287,8 @@ public static class FormatCommand
                             .Select(a => new FormatAmbiguityData { Line = a.Line, Message = a.Message })
                             .ToList()
                         : null,
-                    ResidualParseErrors = result.ResidualParseErrors
+                    ResidualParseErrors = result.ResidualParseErrors,
+                    ConservativeFallbackReason = result.ConservativeFallbackReason
                 });
             }
             catch (Exception ex)
@@ -340,6 +327,10 @@ public static class FormatCommand
             {
                 statusOut.WriteLine($"  Still failing to parse after heal: {unrepairedFiles}");
             }
+            if (unsupportedFiles > 0)
+            {
+                statusOut.WriteLine($"  Conservatively unchanged: {unsupportedFiles}");
+            }
         }
 
         // Envelope mode: stdout carries exactly one document, always.
@@ -353,7 +344,8 @@ public static class FormatCommand
                     Processed = totalFiles,
                     Formatted = formattedFiles,
                     Errors = errorFiles,
-                    StillFailingAfterHeal = unrepairedFiles
+                    StillFailingAfterHeal = unrepairedFiles,
+                    Unsupported = unsupportedFiles
                 }
             };
             Console.WriteLine(CommandEnvelope.Serialize("format", diagnosticSink!, data));
@@ -367,7 +359,7 @@ public static class FormatCommand
         {
             exitCode = 2;
         }
-        else if ((check && hasUnformatted) || unrepairedFiles > 0)
+        else if ((check && hasUnformatted) || unrepairedFiles > 0 || unsupportedFiles > 0)
         {
             exitCode = 1;
         }
@@ -397,7 +389,8 @@ public static class FormatCommand
     /// </summary>
     private static async Task<FormatResult> HealFileAsync(string filePath)
     {
-        var source = await File.ReadAllTextAsync(filePath);
+        var snapshot = await SourceFileSnapshot.ReadAsync(filePath);
+        var source = snapshot.Text;
 
         var healer = new SourceHealer();
         var healed = healer.Heal(source);
@@ -428,6 +421,7 @@ public static class FormatCommand
             Original = source,
             Formatted = healed,
             Errors = new List<string>(),
+            Snapshot = snapshot,
             Diagnostics = diagnostics.ToList(),
             Ambiguities = healer.Ambiguities.ToList(),
             ResidualParseErrors = diagnostics.HasErrors
@@ -436,54 +430,39 @@ public static class FormatCommand
 
     private static async Task<FormatResult> FormatFileAsync(string filePath, bool verbose)
     {
-        var source = await File.ReadAllTextAsync(filePath);
-
-        // Parse the file
-        var diagnostics = new DiagnosticBag();
-        diagnostics.SetFilePath(filePath);
-
-        var lexer = new Lexer(source, diagnostics);
-        var tokens = lexer.TokenizeAllForParser();
-
-        if (diagnostics.HasErrors)
-        {
-            return new FormatResult
-            {
-                Success = false,
-                Original = source,
-                Formatted = source,
-                Errors = diagnostics.Errors.Select(e => e.Message).ToList(),
-                Diagnostics = diagnostics.ToList()
-            };
-        }
-
-        var parser = new Parser(tokens, diagnostics);
-        var ast = parser.Parse();
-
-        if (diagnostics.HasErrors)
-        {
-            return new FormatResult
-            {
-                Success = false,
-                Original = source,
-                Formatted = source,
-                Errors = diagnostics.Errors.Select(e => e.Message).ToList(),
-                Diagnostics = diagnostics.ToList()
-            };
-        }
-
-        // Format the AST
+        _ = verbose;
+        var snapshot = await SourceFileSnapshot.ReadAsync(filePath);
         var formatter = new CalorFormatter();
-        var formatted = formatter.Format(ast);
+        var formatted = formatter.FormatSource(snapshot.Text, filePath);
 
         return new FormatResult
         {
-            Success = true,
-            Original = source,
-            Formatted = formatted,
-            Errors = new List<string>(),
-            Diagnostics = diagnostics.ToList()
+            Success = formatted.Success,
+            Original = snapshot.Text,
+            Formatted = formatted.Formatted,
+            Errors = formatted.Errors.ToList(),
+            Snapshot = snapshot,
+            Diagnostics = formatted.Diagnostics.ToList(),
+            ConservativeFallbackReason = formatted.ConservativeFallbackReason
         };
+    }
+
+    private static void ValidateParseableCandidate(string candidate, string filePath)
+    {
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath(filePath);
+        var lexer = new Lexer(candidate, diagnostics);
+        var tokens = lexer.TokenizeAllForParser();
+        if (!diagnostics.HasErrors)
+        {
+            var parser = new Parser(tokens, diagnostics);
+            parser.Parse();
+        }
+        if (diagnostics.HasErrors)
+        {
+            throw new InvalidDataException(
+                $"Candidate source failed validation: {diagnostics.Errors[0].Message}");
+        }
     }
 
     private static void ShowDiff(string original, string formatted, string fileName, TextWriter writer)
@@ -552,6 +531,7 @@ public static class FormatCommand
         public required string Original { get; init; }
         public required string Formatted { get; init; }
         public required List<string> Errors { get; init; }
+        public required SourceFileSnapshot Snapshot { get; init; }
 
         /// <summary>
         /// The real parse/format diagnostics behind <see cref="Errors"/> (plus
@@ -565,6 +545,12 @@ public static class FormatCommand
 
         /// <summary>True when the healed output still fails to parse (heal path only).</summary>
         public bool ResidualParseErrors { get; init; }
+
+        /// <summary>
+        /// Reason the lossless formatter conservatively left a parseable but
+        /// semantically unsupported source unchanged.
+        /// </summary>
+        public string? ConservativeFallbackReason { get; init; }
     }
 
     // ------------------------------------------------------------------
@@ -599,6 +585,7 @@ public static class FormatCommand
         public List<FormatAmbiguityData>? Ambiguities { get; init; }
 
         public bool ResidualParseErrors { get; init; }
+        public string? ConservativeFallbackReason { get; init; }
     }
 
     private sealed class FormatAmbiguityData
@@ -613,5 +600,6 @@ public static class FormatCommand
         public int Formatted { get; init; }
         public int Errors { get; init; }
         public int StillFailingAfterHeal { get; init; }
+        public int Unsupported { get; init; }
     }
 }

@@ -76,6 +76,7 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.Equal("formatted", entry.GetProperty("status").GetString());
         // Preview mode (neither --write nor --check) embeds the formatted source
         Assert.Contains("§M{m1:Demo}", entry.GetProperty("formatted").GetString());
+        Assert.False(entry.TryGetProperty("conservativeFallbackReason", out _));
 
         var totals = root.GetProperty("data").GetProperty("totals");
         Assert.Equal(1, totals.GetProperty("processed").GetInt32());
@@ -167,6 +168,64 @@ public class ConvertFormatEnvelopeTests : IDisposable
         Assert.Equal(0, exitCode);
         Assert.Contains("§M{m1:Demo}", stdOut);
         Assert.DoesNotContain("\"diagnostics\"", stdOut);
+    }
+
+    [Fact]
+    public void Lint_ReadOnlySemanticError_ReportsIssuesWithoutParseFailure()
+    {
+        var source =
+            "§M{m1:LintReadOnly}\n" +
+            "  §F{f1:Main:pub} () -> void\n" +
+            "    §P \"missing effect\"   \n";
+        var file = WriteFile("lint-read-only.calr", source);
+
+        var (exitCode, stdOut, stdErr) =
+            RunCli("lint", file, "--format", "json");
+
+        Assert.Equal(1, exitCode);
+        var root = JsonDocument.Parse(stdOut).RootElement;
+        EnvelopeSchemaValidator.ValidateEnvelopeDocument(root);
+        Assert.Equal(0, root.GetProperty("summary").GetProperty("errors").GetInt32());
+        Assert.Contains(
+            root.GetProperty("diagnostics").EnumerateArray(),
+            diagnostic => diagnostic.GetProperty("code").GetString()
+                == DiagnosticCode.LintTrailingWhitespace);
+        Assert.DoesNotContain(
+            root.GetProperty("diagnostics").EnumerateArray(),
+            diagnostic => diagnostic.GetProperty("code").GetString()
+                == DiagnosticCode.FormatConservativeFallback);
+        Assert.DoesNotContain("Error parsing", stdErr, StringComparison.Ordinal);
+        Assert.Equal(source, File.ReadAllText(file));
+    }
+
+    [Fact]
+    public void LintFix_SemanticError_SuppressesWriteWithWarningAndExitOne()
+    {
+        var source =
+            "§M{m1:LintFix}\n" +
+            "  §F{f1:Main:pub} () -> void\n" +
+            "    §P \"missing effect\"   \n";
+        var file = WriteFile("lint-fix.calr", source);
+
+        var (exitCode, stdOut, stdErr) =
+            RunCli("lint", file, "--fix", "--format", "json");
+
+        Assert.Equal(1, exitCode);
+        var root = JsonDocument.Parse(stdOut).RootElement;
+        EnvelopeSchemaValidator.ValidateEnvelopeDocument(root);
+        Assert.Equal(0, root.GetProperty("summary").GetProperty("errors").GetInt32());
+        var fallback = Assert.Single(
+            root.GetProperty("diagnostics").EnumerateArray().Where(
+                diagnostic => diagnostic.GetProperty("code").GetString()
+                    == DiagnosticCode.FormatConservativeFallback));
+        Assert.Equal("warning", fallback.GetProperty("severity").GetString());
+        Assert.DoesNotContain(
+            root.GetProperty("diagnostics").EnumerateArray(),
+            diagnostic => diagnostic.GetProperty("code").GetString()
+                == DiagnosticCode.LintProcessingError);
+        Assert.Contains("fix suppressed", stdErr, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Error parsing", stdErr, StringComparison.Ordinal);
+        Assert.Equal(source, File.ReadAllText(file));
     }
 
     // ------------------------------------------------------------------
