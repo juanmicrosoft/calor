@@ -83,10 +83,8 @@ public sealed class CallGraphAnalysis
                         break;
                     case BoundNewExpression creation:
                         target = $"{creation.TypeName}..ctor";
-                        span = creation.Span;
-                        callees = creation.ResolvedConstructor == null
-                            ? Array.Empty<FunctionSymbol>()
-                            : [creation.ResolvedConstructor];
+                        span = creation.TypeNameSpan;
+                        callees = creation.ResolvedConstructors;
                         break;
                     case BoundExpressionCallExpression expressionCall:
                         target = "<expression-call>";
@@ -641,7 +639,7 @@ public sealed class CallGraphAnalysis
         return new FunctionNode(
             ctor.Span,
             qualifiedId,
-            $"{className}..ctor",
+            $"{className}.{(ctor.IsStatic ? ".cctor" : ".ctor")}",
             ctor.Visibility,
             ctor.Parameters,
             output: null,

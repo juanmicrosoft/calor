@@ -4690,7 +4690,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         callExpr.Arguments.ToList(),
                         new AttributeCollection(),
                         stmtArgNames,
-                        stmtArgModifiers);
+                        stmtArgModifiers,
+                        typeArguments: callExpr.TypeArguments);
                 }
                 // If ConvertInvocationExpression returns a non-call (e.g., StringOp, native op),
                 // wrap it in a discard bind: §B{_} expr

@@ -2,8 +2,10 @@ using Calor.Compiler.Analysis;
 using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Migration;
 using Calor.Compiler.Parsing;
 using Xunit;
 
@@ -274,6 +276,74 @@ public sealed class SymbolAndOverloadBindingTests
         Assert.Same(bound.Functions[1].Symbol, calls[1].ResolvedSymbol);
         Assert.Same(bound.Functions[2].Symbol, calls[2].ResolvedSymbol);
         Assert.Same(bound.Functions[3].Symbol, calls[3].ResolvedSymbol);
+    }
+
+    [Fact]
+    public void TypeIdentity_NormalizesAllOptionSpellingsRecursivelyForOverloads()
+    {
+        var spellings = new[]
+        {
+            "?i32",
+            "i32?",
+            "Option<i32>",
+            "OPTION[inner=i32]",
+        };
+
+        Assert.All(spellings, spelling =>
+            Assert.Equal("OPTION<INT>", TypeIdentity.Canonicalize(spelling)));
+        Assert.Equal(
+            "OPTION<OPTION<INT>>",
+            TypeIdentity.Canonicalize("OPTION[inner=Option<i32>]"));
+
+        var scope = new Scope();
+        var expected = new FunctionSymbol(
+            "Pick",
+            "i32",
+            [new VariableSymbol("value", "?i32", false, true)]);
+        scope.DeclareOverload(expected);
+
+        foreach (var spelling in spellings)
+        {
+            var resolution = scope.ResolveOverload("Pick", [spelling]);
+            Assert.Same(expected, resolution.Function);
+        }
+    }
+
+    [Fact]
+    public void StatementGenericCalls_RetainTypeArgumentsAndResolveGenericArity()
+    {
+        const string source = """
+            §M{m1:Test}
+              §F{f1:Select<T>:pri} (T:value) -> T
+                §R value
+              §F{f2:Select<T,U>:pri} (T:value) -> T
+                §R value
+              §F{f3:Use:pub} () -> void
+                §C{Select<i32>} §A INT:1 §/C
+                §C{Select<i32,str>} §A INT:1 §/C
+            """;
+
+        var diagnostics = new DiagnosticBag();
+        var module = Parse(source, diagnostics);
+        var astCalls = module.Functions[2].Body.OfType<CallStatementNode>().ToArray();
+        var bound = new Binder(diagnostics).Bind(module);
+        var boundCalls = bound.Functions
+            .Single(function => function.Symbol.Name == "Use")
+            .Body
+            .OfType<BoundCallStatement>()
+            .ToArray();
+
+        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
+        Assert.Equal(["i32"], astCalls[0].TypeArguments);
+        Assert.Equal(["i32", "str"], astCalls[1].TypeArguments);
+        Assert.Equal("Select", astCalls[0].Target);
+        Assert.Equal("Select", astCalls[1].Target);
+        Assert.Equal(["i32"], boundCalls[0].TypeArguments);
+        Assert.Equal(["i32", "str"], boundCalls[1].TypeArguments);
+        Assert.Equal(1, boundCalls[0].ResolvedSymbol!.GenericArity);
+        Assert.Equal(2, boundCalls[1].ResolvedSymbol!.GenericArity);
+        Assert.Equal("Select<int>(1);", new CSharpEmitter().Visit(astCalls[0]));
+        Assert.Contains("§C{Select<i32>}", new CalorEmitter().Emit(module));
     }
 
     [Fact]
@@ -663,6 +733,129 @@ public sealed class SymbolAndOverloadBindingTests
         Assert.Equal(
             alternatives.Select(function => function.SymbolId).OrderBy(id => id.Value).ToArray(),
             call.ResolvedSymbols.Select(symbol => symbol.Id).OrderBy(id => id.Value).ToArray());
+    }
+
+    [Fact]
+    public void MutuallyExclusiveFieldsPropertiesAndConstructors_AreExplicitAlternatives()
+    {
+        static ClassFieldNode Field(string typeName) =>
+            new(
+                Span,
+                "Value",
+                typeName,
+                Visibility.Public,
+                null,
+                new AttributeCollection());
+
+        static PropertyNode Property(string id, string typeName) =>
+            new(
+                Span,
+                id,
+                "Name",
+                typeName,
+                Visibility.Public,
+                getter: null,
+                setter: null,
+                initer: null,
+                defaultValue: null,
+                new AttributeCollection());
+
+        static ConstructorNode Constructor(string id) =>
+            new(
+                Span,
+                id,
+                Visibility.Public,
+                Array.Empty<ParameterNode>(),
+                Array.Empty<RequiresNode>(),
+                initializer: null,
+                Array.Empty<StatementNode>(),
+                new AttributeCollection());
+
+        var feature = new MemberPreprocessorBlockNode(
+            Span,
+            "FEATURE",
+            [Field("i32")],
+            [Property("p1", "str")],
+            [Constructor("c1")],
+            Array.Empty<MethodNode>(),
+            Array.Empty<EventDefinitionNode>(),
+            Array.Empty<OperatorOverloadNode>(),
+            elseBranch: new MemberPreprocessorBlockNode(
+                Span,
+                "ELSE",
+                [Field("str")],
+                [Property("p2", "i32")],
+                [Constructor("c2")],
+                Array.Empty<MethodNode>(),
+                Array.Empty<EventDefinitionNode>(),
+                Array.Empty<OperatorOverloadNode>()));
+        var read = Method(
+            "read",
+            "Read",
+            Visibility.Public,
+            [new ReturnStatementNode(Span, new ReferenceNode(Span, "Value"))],
+            returnType: "object");
+        var create = Method(
+            "create",
+            "Create",
+            Visibility.Public,
+            [
+                new ReturnStatementNode(
+                    Span,
+                    new NewExpressionNode(
+                        Span,
+                        "Worker",
+                        Array.Empty<string>(),
+                        Array.Empty<ExpressionNode>())),
+            ],
+            returnType: "Worker");
+        var cls = new ClassDefinitionNode(
+            Span,
+            "c1",
+            "Worker",
+            isAbstract: false,
+            isSealed: false,
+            isPartial: false,
+            isStatic: false,
+            baseClass: null,
+            Array.Empty<string>(),
+            Array.Empty<TypeParameterNode>(),
+            Array.Empty<ClassFieldNode>(),
+            Array.Empty<PropertyNode>(),
+            Array.Empty<ConstructorNode>(),
+            [read, create],
+            Array.Empty<EventDefinitionNode>(),
+            Array.Empty<OperatorOverloadNode>(),
+            new AttributeCollection(),
+            Array.Empty<CalorAttributeNode>(),
+            visibility: Visibility.Public,
+            preprocessorBlocks: [feature]);
+
+        var bound = Bind(Module([cls]), out var diagnostics);
+        var valueReference = Assert.IsType<BoundVariableExpression>(
+            Assert.IsType<BoundReturnStatement>(
+                Assert.Single(bound.Functions.Single(function =>
+                    function.Symbol.Name == "Worker.Read").Body)).Expression);
+        var creation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(
+                Assert.Single(bound.Functions.Single(function =>
+                    function.Symbol.Name == "Worker.Create").Body)).Expression);
+
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.DuplicateDefinition
+                or DiagnosticCode.DuplicateFunctionSignature);
+        Assert.Equal(2, valueReference.ResolvedSymbols.Count);
+        Assert.Equal("OBJECT", valueReference.TypeName);
+        Assert.Equal(2, creation.ResolvedConstructors.Count);
+        Assert.All(valueReference.ResolvedSymbols, symbol =>
+            Assert.NotNull(symbol.ConditionalAlternative));
+        Assert.All(creation.ResolvedConstructors, symbol =>
+            Assert.NotNull(symbol.ConditionalAlternative));
+        Assert.Equal(
+            2,
+            bound.SymbolsById.Values
+                .OfType<VariableSymbol>()
+                .Count(symbol => symbol.Name == "Name" && symbol.IsProperty));
     }
 
     [Fact]

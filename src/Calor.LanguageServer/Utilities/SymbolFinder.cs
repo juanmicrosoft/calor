@@ -147,7 +147,7 @@ public static class SymbolFinder
                     && (target == null || expression.Target == target),
                 BoundCallStatement statement => statement.Span.Contains(offset)
                     && (target == null || statement.Target == target),
-                BoundNewExpression creation => creation.Span.Contains(offset)
+                BoundNewExpression creation => creation.TypeNameSpan.Contains(offset)
                     && (target == null || creation.TypeName == target),
                 BoundExpressionCallExpression expressionCall => expressionCall.Span.Contains(offset),
                 _ => false,
@@ -182,8 +182,12 @@ public static class SymbolFinder
                 StringComparison.Ordinal))
             .OrderBy(expression => expression.Span.Length)
             .FirstOrDefault();
-        if (field?.ResolvedSymbolId is { IsNone: false } fieldId)
-            return fieldId;
+        if (field?.ResolvedFields.FirstOrDefault(symbol =>
+                string.Equals(symbol.Name, result.Name, StringComparison.Ordinal)
+                && !symbol.Id.IsNone) is { } resolvedField)
+        {
+            return resolvedField.Id;
+        }
 
         var boundCall = FindBoundCallAtOffset(boundModule, offset);
         switch (boundCall)
@@ -218,8 +222,9 @@ public static class SymbolFinder
                 break;
             case BoundNewExpression creation
                 when string.Equals(creation.TypeName, result.Name, StringComparison.Ordinal)
-                     && creation.ResolvedSymbolId is { IsNone: false } targetId:
-                return targetId;
+                     && creation.TypeNameSpan.Contains(offset)
+                     && creation.ResolvedTypeSymbolId is { IsNone: false } typeId:
+                return typeId;
         }
 
         var declarationAtOffset = boundModule.SymbolsById.Values
@@ -266,10 +271,12 @@ public static class SymbolFinder
         {
             switch (node)
             {
-                case BoundVariableExpression variable when variable.SymbolId == symbolId:
+                case BoundVariableExpression variable
+                    when variable.ResolvedSymbols.Any(symbol => symbol.Id == symbolId):
                     references.Add(variable.Span);
                     break;
-                case BoundFieldAccessExpression field when field.ResolvedSymbolId == symbolId:
+                case BoundFieldAccessExpression field
+                    when field.ResolvedFields.Any(symbol => symbol.Id == symbolId):
                     references.Add(field.FieldNameSpan);
                     break;
                 case BoundCallExpression call
@@ -286,8 +293,12 @@ public static class SymbolFinder
                 case BoundCallStatement call when call.ReceiverSymbolId == symbolId:
                     references.Add(call.ReceiverSpan ?? call.Span);
                     break;
-                case BoundNewExpression creation when creation.ResolvedSymbolId == symbolId:
-                    references.Add(creation.Span);
+                case BoundNewExpression creation when creation.ResolvedTypeSymbolId == symbolId:
+                    references.Add(creation.TypeNameSpan);
+                    break;
+                case BoundNewExpression creation
+                    when creation.ResolvedConstructors.Any(symbol => symbol.Id == symbolId):
+                    references.Add(creation.TypeNameSpan);
                     break;
             }
         }

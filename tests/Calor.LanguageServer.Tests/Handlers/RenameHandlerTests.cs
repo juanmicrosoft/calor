@@ -118,6 +118,44 @@ public class RenameHandlerTests
     }
 
     [Fact]
+    public async Task RenameConstructorResolvedNewExpression_EditsExactTypeTokensAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c001:Widget:pub}
+                §CTOR{ctor:pub}
+                §/CTOR{ctor}
+              §F{f001:Create:pub} () -> Widget
+                §R §NEW{Widget} §/NEW
+            """;
+        var uri = DocumentUri.From("file:///rename-new-type.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.LastIndexOf("Widget", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "Gadget",
+            },
+            CancellationToken.None);
+
+        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.Equal(2, edits.Length);
+        Assert.All(edits, textEdit =>
+        {
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+            Assert.Equal("Widget", source[start..end]);
+            Assert.Equal("Gadget", textEdit.NewText);
+        });
+    }
+
+    [Fact]
     public void ReferenceCollectorForRename_FindsAllOccurrences()
     {
         var source = """

@@ -1159,6 +1159,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }).ToList();
 
         var target = ConvertVerbatimStringsInTarget(node.Target.Replace("->", "."));
+        if (node.TypeArguments is { Count: > 0 })
+            target += $"<{string.Join(", ", node.TypeArguments)}>";
 
         // RFC v0.6 call-closer-elision §3.2 / §4 — statement-context elision.
         // Stmt-context calls normally end at a newline (AppendLine adds \n),

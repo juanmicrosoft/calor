@@ -1,3 +1,4 @@
+using System.Numerics;
 using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
@@ -195,12 +196,25 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
         DiagnosticBag diagnostics,
         List<BoundExpression> pathConditions)
     {
-        // #762 B5 review C2: numeric casts are zero-preserving — see THROUGH the
-        // conversion wrapper or a cast divisor loses its Z3-verified warning and the
-        // Calor0926 suggester (the old Cast arm returned the operand bare, so this
-        // worked by accident before B5).
         while (divisor is BoundTypeOperationExpression { Operation: TypeOp.Cast } conversion)
+        {
+            if (TryEvaluateNumericLiteral(conversion, out var literalValue))
+            {
+                if (literalValue.IsZero)
+                {
+                    diagnostics.ReportError(
+                        divisionExpr.Span,
+                        DiagnosticCode.DivisionByZero,
+                        "Division by literal zero");
+                }
+                return;
+            }
+
+            if (!IsZeroPreservingCast(conversion.Operand.TypeName, conversion.TargetType))
+                break;
+
             divisor = conversion.Operand;
+        }
 
         // Quick check: literal zero is always a bug
         if (BoundNodeHelpers.IsLiteralZero(divisor))
@@ -273,6 +287,198 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
                 }
             }
         }
+    }
+
+    private static bool IsZeroPreservingCast(string sourceType, string targetType)
+    {
+        var source = TypeIdentity.Canonicalize(sourceType);
+        var target = TypeIdentity.Canonicalize(targetType);
+        if (string.Equals(source, target, StringComparison.Ordinal))
+            return true;
+
+        if (TryGetIntegerType(source, out var sourceBits, out _)
+            && TryGetIntegerType(target, out var targetBits, out _))
+        {
+            return targetBits >= sourceBits;
+        }
+
+        return source == "FLOAT[bits=32]" && target == "FLOAT";
+    }
+
+    private static bool TryEvaluateNumericLiteral(
+        BoundExpression expression,
+        out NumericLiteralValue value)
+    {
+        switch (expression)
+        {
+            case BoundIntLiteral integer:
+                value = NumericLiteralValue.FromInteger(
+                    integer.IsUnsigned
+                        ? new BigInteger(integer.UnsignedValue)
+                        : new BigInteger(integer.Value));
+                return true;
+            case BoundFloatLiteral floating:
+                value = NumericLiteralValue.FromFloating(floating.Value);
+                return true;
+            case BoundDecimalLiteral decimalLiteral:
+                value = NumericLiteralValue.FromDecimal(decimalLiteral.Value);
+                return true;
+            case BoundTypeOperationExpression { Operation: TypeOp.Cast } conversion
+                when TryEvaluateNumericLiteral(conversion.Operand, out var operand):
+                return TryApplyNumericCast(operand, conversion.TargetType, out value);
+            default:
+                value = default;
+                return false;
+        }
+    }
+
+    private static bool TryApplyNumericCast(
+        NumericLiteralValue operand,
+        string targetType,
+        out NumericLiteralValue value)
+    {
+        var target = TypeIdentity.Canonicalize(targetType);
+        if (TryGetIntegerType(target, out var bits, out var signed))
+        {
+            if (!operand.TryTruncateToInteger(out var integer))
+            {
+                value = default;
+                return false;
+            }
+
+            if (operand.Kind == NumericLiteralKind.Integer)
+            {
+                var modulus = BigInteger.One << bits;
+                integer %= modulus;
+                if (integer.Sign < 0)
+                    integer += modulus;
+            }
+            else
+            {
+                var minimum = signed ? -(BigInteger.One << (bits - 1)) : BigInteger.Zero;
+                var maximum = signed
+                    ? (BigInteger.One << (bits - 1)) - BigInteger.One
+                    : (BigInteger.One << bits) - BigInteger.One;
+                if (integer < minimum || integer > maximum)
+                {
+                    value = default;
+                    return false;
+                }
+            }
+
+            value = NumericLiteralValue.FromInteger(integer);
+            return true;
+        }
+
+        try
+        {
+            switch (target)
+            {
+                case "FLOAT[bits=32]":
+                    value = NumericLiteralValue.FromFloating((float)operand.ToDouble());
+                    return true;
+                case "FLOAT":
+                    value = NumericLiteralValue.FromFloating(operand.ToDouble());
+                    return true;
+                case "DECIMAL":
+                    value = NumericLiteralValue.FromDecimal(operand.ToDecimal());
+                    return true;
+                default:
+                    value = default;
+                    return false;
+            }
+        }
+        catch (OverflowException)
+        {
+            value = default;
+            return false;
+        }
+    }
+
+    private static bool TryGetIntegerType(
+        string canonicalType,
+        out int bits,
+        out bool signed)
+    {
+        (bits, signed) = canonicalType switch
+        {
+            "INT[bits=8][signed=true]" => (8, true),
+            "INT[bits=8][signed=false]" => (8, false),
+            "INT[bits=16][signed=true]" => (16, true),
+            "INT[bits=16][signed=false]" => (16, false),
+            "INT" => (32, true),
+            "UINT" => (32, false),
+            "LONG" => (64, true),
+            "ULONG" => (64, false),
+            _ => (0, false),
+        };
+        return bits != 0;
+    }
+
+    private enum NumericLiteralKind
+    {
+        Integer,
+        Floating,
+        Decimal,
+    }
+
+    private readonly record struct NumericLiteralValue(
+        NumericLiteralKind Kind,
+        BigInteger Integer,
+        double Floating,
+        decimal Decimal)
+    {
+        public bool IsZero => Kind switch
+        {
+            NumericLiteralKind.Integer => Integer.IsZero,
+            NumericLiteralKind.Floating => Floating == 0,
+            NumericLiteralKind.Decimal => Decimal == 0,
+            _ => false,
+        };
+
+        public static NumericLiteralValue FromInteger(BigInteger value) =>
+            new(NumericLiteralKind.Integer, value, default, default);
+
+        public static NumericLiteralValue FromFloating(double value) =>
+            new(NumericLiteralKind.Floating, default, value, default);
+
+        public static NumericLiteralValue FromDecimal(decimal value) =>
+            new(NumericLiteralKind.Decimal, default, default, value);
+
+        public bool TryTruncateToInteger(out BigInteger value)
+        {
+            switch (Kind)
+            {
+                case NumericLiteralKind.Integer:
+                    value = Integer;
+                    return true;
+                case NumericLiteralKind.Floating when double.IsFinite(Floating):
+                    value = new BigInteger(Math.Truncate(Floating));
+                    return true;
+                case NumericLiteralKind.Decimal:
+                    value = new BigInteger(decimal.Truncate(Decimal));
+                    return true;
+                default:
+                    value = default;
+                    return false;
+            }
+        }
+
+        public double ToDouble() => Kind switch
+        {
+            NumericLiteralKind.Integer => (double)Integer,
+            NumericLiteralKind.Floating => Floating,
+            NumericLiteralKind.Decimal => (double)Decimal,
+            _ => 0,
+        };
+
+        public decimal ToDecimal() => Kind switch
+        {
+            NumericLiteralKind.Integer => (decimal)Integer,
+            NumericLiteralKind.Floating => (decimal)Floating,
+            NumericLiteralKind.Decimal => Decimal,
+            _ => 0,
+        };
     }
 
     private bool? CanDivisorBeZero(

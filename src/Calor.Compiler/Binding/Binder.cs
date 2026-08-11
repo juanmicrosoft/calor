@@ -255,10 +255,10 @@ public sealed class Binder
         }
         simpleMatches.Add(cls);
 
-        var fields = EnumerateFields(cls).ToArray();
+        var fields = EnumerateFieldRegistrations(cls).ToArray();
         for (var fieldIndex = 0; fieldIndex < fields.Length; fieldIndex++)
         {
-            var field = fields[fieldIndex];
+            var (field, conditionalAlternative) = fields[fieldIndex];
             var isMutable = !field.Modifiers.HasFlag(MethodModifiers.Readonly);
             var symbol = CreateVariable(
                 CreateDeclarationId(classIdentity, "field", stableAstId: null, field.Name),
@@ -270,7 +270,9 @@ public sealed class Binder
                 field.IdentifierSpan,
                 visibility: field.Visibility,
                 declaringTypeName: qualifiedClassName,
-                isField: true);
+                isField: true,
+                isStatic: field.IsStatic,
+                conditionalAlternative: conditionalAlternative);
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -280,10 +282,10 @@ public sealed class Binder
             }
         }
 
-        var properties = EnumerateProperties(cls).ToArray();
+        var properties = EnumeratePropertyRegistrations(cls).ToArray();
         for (var propertyIndex = 0; propertyIndex < properties.Length; propertyIndex++)
         {
-            var property = properties[propertyIndex];
+            var (property, conditionalAlternative) = properties[propertyIndex];
             var symbol = CreateVariable(
                 CreateDeclarationId(classIdentity, "property", property.Id, property.Name),
                 property.Name,
@@ -293,7 +295,10 @@ public sealed class Binder
                 ParameterModifier.None,
                 property.IdentifierSpan,
                 visibility: property.Visibility,
-                declaringTypeName: qualifiedClassName);
+                declaringTypeName: qualifiedClassName,
+                isProperty: true,
+                isStatic: property.IsStatic,
+                conditionalAlternative: conditionalAlternative);
             if (!classScope.TryDeclare(symbol))
             {
                 _diagnostics.ReportError(
@@ -334,13 +339,14 @@ public sealed class Binder
                 ReportDuplicateSignature(method.Span, qualifiedLookupName, symbol, duplicate);
         }
 
-        var constructors = EnumerateConstructors(cls).ToArray();
+        var constructors = EnumerateConstructorRegistrations(cls).ToArray();
         for (var constructorIndex = 0; constructorIndex < constructors.Length; constructorIndex++)
         {
-            var constructor = constructors[constructorIndex];
-            var qualifiedLookupName = $"{qualifiedClassName}..ctor";
+            var (constructor, conditionalAlternative) = constructors[constructorIndex];
+            var constructorName = constructor.IsStatic ? ".cctor" : ".ctor";
+            var qualifiedLookupName = $"{qualifiedClassName}.{constructorName}";
             var symbol = CreateFunctionSymbol(
-                CreateDeclarationId(classIdentity, "constructor", constructor.Id, ".ctor"),
+                CreateDeclarationId(classIdentity, "constructor", constructor.Id, constructorName),
                 qualifiedLookupName,
                 "VOID",
                 Array.Empty<string>(),
@@ -348,7 +354,8 @@ public sealed class Binder
                 cls.IdentifierSpan,
                 constructor.Visibility,
                 qualifiedClassName,
-                constructor.Span);
+                constructor.Span,
+                conditionalAlternative);
             _functionSymbols.Add(constructor, symbol);
 
             if (!classScope.TryDeclareOverload(qualifiedLookupName, symbol, out var duplicate))
@@ -357,8 +364,11 @@ public sealed class Binder
                 continue;
             }
 
-            if (!classScope.TryDeclareOverload(cls.Name, symbol, out duplicate))
+            if (!constructor.IsStatic
+                && !classScope.TryDeclareOverload(cls.Name, symbol, out duplicate))
+            {
                 ReportDuplicateSignature(constructor.Span, cls.Name, symbol, duplicate);
+            }
             if (!_scope.TryDeclareOverload(qualifiedLookupName, symbol, out duplicate))
                 ReportDuplicateSignature(constructor.Span, qualifiedLookupName, symbol, duplicate);
         }
@@ -385,14 +395,50 @@ public sealed class Binder
     private static IEnumerable<ClassFieldNode> EnumerateFields(ClassDefinitionNode cls) =>
         cls.Fields.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Fields));
 
+    private static IEnumerable<(ClassFieldNode Field, ConditionalAlternative? Alternative)>
+        EnumerateFieldRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var field in cls.Fields)
+            yield return (field, null);
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+        {
+            foreach (var field in branch.Fields)
+                yield return (field, alternative);
+        }
+    }
+
     private static IEnumerable<PropertyNode> EnumerateProperties(ClassDefinitionNode cls) =>
         cls.Properties.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Properties));
+
+    private static IEnumerable<(PropertyNode Property, ConditionalAlternative? Alternative)>
+        EnumeratePropertyRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var property in cls.Properties)
+            yield return (property, null);
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+        {
+            foreach (var property in branch.Properties)
+                yield return (property, alternative);
+        }
+    }
 
     private static IEnumerable<IndexerNode> EnumerateIndexers(ClassDefinitionNode cls) =>
         cls.Indexers.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Indexers));
 
     private static IEnumerable<ConstructorNode> EnumerateConstructors(ClassDefinitionNode cls) =>
         cls.Constructors.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Constructors));
+
+    private static IEnumerable<(ConstructorNode Constructor, ConditionalAlternative? Alternative)>
+        EnumerateConstructorRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var constructor in cls.Constructors)
+            yield return (constructor, null);
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+        {
+            foreach (var constructor in branch.Constructors)
+                yield return (constructor, alternative);
+        }
+    }
 
     private static IEnumerable<MethodNode> EnumerateMethods(ClassDefinitionNode cls) =>
         cls.Methods.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Methods));
@@ -403,6 +449,16 @@ public sealed class Binder
         foreach (var method in cls.Methods)
             yield return (method, null);
 
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+        {
+            foreach (var method in branch.Methods)
+                yield return (method, alternative);
+        }
+    }
+
+    private static IEnumerable<(MemberPreprocessorBlockNode Branch, ConditionalAlternative Alternative)>
+        EnumerateConditionalMemberBranches(ClassDefinitionNode cls)
+    {
         for (var blockIndex = 0; blockIndex < cls.PreprocessorBlocks.Count; blockIndex++)
         {
             var groupId = $"{cls.Id}:member-pp:{blockIndex}";
@@ -411,9 +467,7 @@ public sealed class Binder
                  branch != null;
                  branch = branch.ElseBranch)
             {
-                var alternative = new ConditionalAlternative(groupId, branchIndex++);
-                foreach (var method in branch.Methods)
-                    yield return (method, alternative);
+                yield return (branch, new ConditionalAlternative(groupId, branchIndex++));
             }
         }
     }
@@ -474,7 +528,10 @@ public sealed class Binder
         ExpressionNode? defaultValue = null,
         Visibility visibility = Visibility.Public,
         string? declaringTypeName = null,
-        bool isField = false)
+        bool isField = false,
+        bool isProperty = false,
+        bool isStatic = false,
+        ConditionalAlternative? conditionalAlternative = null)
     {
         var symbol = new VariableSymbol(
             id,
@@ -487,7 +544,10 @@ public sealed class Binder
             defaultValue,
             visibility,
             declaringTypeName,
-            isField);
+            isField,
+            isProperty,
+            isStatic,
+            conditionalAlternative);
         TrackSymbol(symbol);
         return symbol;
     }
@@ -743,14 +803,16 @@ public sealed class Binder
     private BoundCallStatement BindCallStatement(CallStatementNode call)
     {
         var args = BindExpressions(call.Arguments);
-        var receiverSymbol = ResolveCallReceiver(call.Target);
+        var receiverSymbol = ResolveCallReceiver(
+            call.Target,
+            call.ReceiverSpan ?? call.CalleeSpan);
         var resolution = ResolveCall(
             call.Span,
             call.Target,
             args,
             call.ArgumentNames,
             call.ArgumentModifiers,
-            typeArguments: null);
+            call.TypeArguments);
 
         return new BoundCallStatement(
             call.Span,
@@ -763,7 +825,8 @@ public sealed class Binder
             resolution.Functions,
             call.CalleeSpan,
             call.ReceiverSpan,
-            resolution.Kind == OverloadResolutionKind.Inaccessible);
+            resolution.Kind == OverloadResolutionKind.Inaccessible,
+            call.TypeArguments);
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -1055,22 +1118,28 @@ public sealed class Binder
     private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess)
     {
         var target = BindExpression(fieldAccess.Target);
-        var resolvedField = fieldAccess.Target switch
+        var resolvedFields = fieldAccess.Target switch
         {
-            ThisExpressionNode => ResolveAccessibleMember(_currentClass, fieldAccess.FieldName),
-            BaseExpressionNode => ResolveAccessibleMember(
+            ThisExpressionNode => ResolveAccessibleMembers(_currentClass, fieldAccess.FieldName),
+            BaseExpressionNode => ResolveAccessibleMembers(
                 ResolveBaseClass(_currentClass),
                 fieldAccess.FieldName),
-            _ => null,
+            _ => Array.Empty<Symbol>(),
         };
+        var fields = resolvedFields.OfType<VariableSymbol>().ToArray();
+        var fieldTypes = fields
+            .Select(field => TypeIdentity.Canonicalize(field.TypeName))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
         return new BoundFieldAccessExpression(
             fieldAccess.Span,
             target,
             fieldAccess.FieldName,
-            resolvedField?.TypeName ?? "OBJECT",
-            resolvedField,
-            fieldAccess.FieldNameSpan);
+            fieldTypes.Length == 1 ? fields[0].TypeName : "OBJECT",
+            fields.FirstOrDefault(),
+            fieldAccess.FieldNameSpan,
+            fields);
     }
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
@@ -1119,7 +1188,9 @@ public sealed class Binder
             boundArgs,
             initializers,
             resolution.Function,
-            ResolveTypeSymbol(newExpr.TypeName));
+            ResolveTypeSymbol(newExpr.TypeName),
+            newExpr.TypeNameSpan,
+            resolution.Functions);
     }
 
     private BoundExpression BindArrayAccess(ArrayAccessNode arrayAccess)
@@ -1820,11 +1891,11 @@ public sealed class Binder
 
     private BoundExpression BindReferenceExpression(ReferenceNode refNode)
     {
-        var symbol = _scope.Lookup(refNode.Name);
-        if (symbol == null)
-            symbol = ResolveAccessibleMember(_currentClass, refNode.Name);
+        var symbols = _scope.LookupAll(refNode.Name);
+        if (symbols.Count == 0)
+            symbols = ResolveAccessibleMembers(_currentClass, refNode.Name);
 
-        if (symbol == null)
+        if (symbols.Count == 0)
         {
             var similarName = _scope.FindSimilarName(refNode.Name);
             if (similarName != null)
@@ -1854,13 +1925,44 @@ public sealed class Binder
                 CreateUnresolvedVariable(refNode));
         }
 
-        if (symbol is VariableSymbol variable)
+        if (symbols.All(symbol => symbol is VariableSymbol))
         {
-            return new BoundVariableExpression(refNode.Span, variable);
+            var variables = symbols.Cast<VariableSymbol>().ToArray();
+            if (variables.Any(variable =>
+                    variable.DeclaringTypeName != null
+                    && !IsMemberAccessible(variable)))
+            {
+                _diagnostics.ReportError(
+                    refNode.Span,
+                    DiagnosticCode.UndefinedReference,
+                    $"Member '{refNode.Name}' is not accessible in this context");
+                return new BoundVariableExpression(
+                    refNode.Span,
+                    CreateUnresolvedVariable(refNode));
+            }
+
+            if (_isStaticContext
+                && variables.Any(variable =>
+                    variable.DeclaringTypeName != null
+                    && !variable.IsStatic))
+            {
+                _diagnostics.ReportError(
+                    refNode.Span,
+                    DiagnosticCode.InstanceMemberInStaticContext,
+                    $"Instance member '{refNode.Name}' cannot be accessed by a bare reference in a static context");
+                return new BoundVariableExpression(
+                    refNode.Span,
+                    CreateUnresolvedVariable(refNode));
+            }
+
+            return new BoundVariableExpression(refNode.Span, variables[0], variables);
         }
 
         // Symbol exists but is not a variable - provide helpful fix
-        _diagnostics.ReportNotAVariableWithFix(refNode.Span, refNode.Name, symbol is FunctionSymbol);
+        _diagnostics.ReportNotAVariableWithFix(
+            refNode.Span,
+            refNode.Name,
+            symbols.All(symbol => symbol is FunctionSymbol));
         return new BoundVariableExpression(
             refNode.Span,
             CreateUnresolvedVariable(refNode));
@@ -1911,7 +2013,9 @@ public sealed class Binder
     private BoundCallExpression BindCallExpression(CallExpressionNode callExpr)
     {
         var args = BindExpressions(callExpr.Arguments);
-        var receiverSymbol = ResolveCallReceiver(callExpr.Target);
+        var receiverSymbol = ResolveCallReceiver(
+            callExpr.Target,
+            callExpr.ReceiverSpan ?? callExpr.CalleeSpan);
         var resolution = ResolveCall(
             callExpr.Span,
             callExpr.Target,
@@ -1958,14 +2062,31 @@ public sealed class Binder
             isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible);
     }
 
-    private VariableSymbol? ResolveCallReceiver(string target)
+    private VariableSymbol? ResolveCallReceiver(
+        string target,
+        Parsing.TextSpan referenceSpan)
     {
         var firstDot = target.IndexOf('.');
-        if (firstDot <= 0)
-            return _scope.Lookup(target) as VariableSymbol;
+        var receiverName = firstDot <= 0 ? target : target[..firstDot];
+        var variables = _scope.LookupAll(receiverName)
+            .OfType<VariableSymbol>()
+            .ToArray();
+        if (variables.Length == 0)
+            return null;
 
-        var receiverName = target[..firstDot];
-        return _scope.Lookup(receiverName) as VariableSymbol;
+        if (_isStaticContext
+            && variables.Any(variable =>
+                variable.DeclaringTypeName != null
+                && !variable.IsStatic))
+        {
+            _diagnostics.ReportError(
+                referenceSpan,
+                DiagnosticCode.InstanceMemberInStaticContext,
+                $"Instance member '{receiverName}' cannot be accessed by a bare reference in a static context");
+            return null;
+        }
+
+        return variables[0];
     }
 
     private OverloadResolutionResult ResolveCall(
@@ -2068,24 +2189,31 @@ public sealed class Binder
 
     private VariableSymbol? ResolveAccessibleMember(
         ClassDefinitionNode? start,
+        string memberName) =>
+        ResolveAccessibleMembers(start, memberName).FirstOrDefault() as VariableSymbol;
+
+    private IReadOnlyList<Symbol> ResolveAccessibleMembers(
+        ClassDefinitionNode? start,
         string memberName)
     {
         var current = start;
         var visited = new HashSet<ClassDefinitionNode>();
         while (current != null && visited.Add(current))
         {
-            var declared = _classScopes[current].LookupLocal(memberName);
-            if (declared != null)
+            var declared = _classScopes[current].LookupAllLocal(memberName);
+            if (declared.Count > 0)
             {
-                return declared is VariableSymbol variable && IsMemberAccessible(variable)
-                    ? variable
-                    : null;
+                return declared.All(symbol =>
+                        symbol is VariableSymbol variable
+                        && IsMemberAccessible(variable))
+                    ? declared
+                    : Array.Empty<Symbol>();
             }
 
             current = ResolveBaseClass(current);
         }
 
-        return null;
+        return Array.Empty<Symbol>();
     }
 
     private bool IsMemberAccessible(VariableSymbol member)
@@ -2799,7 +2927,12 @@ public sealed class Binder
             {
                 if (ctor.Body.Count == 0 && ctor.Initializer == null)
                     continue;
-                var bound = TryBindMember(() => BindConstructor(ctor, className), ctor.Span, className, ".ctor");
+                var memberName = ctor.IsStatic ? ".cctor" : ".ctor";
+                var bound = TryBindMember(
+                    () => BindConstructor(ctor, className),
+                    ctor.Span,
+                    className,
+                    memberName);
                 if (bound != null) functions.Add(bound);
             }
 
@@ -2817,7 +2950,8 @@ public sealed class Binder
                             prop.Name,
                             prop.TypeName,
                             prop.Id,
-                            prop.IdentifierSpan),
+                            prop.IdentifierSpan,
+                            prop.IsStatic),
                         prop.Getter.Span, className, $"{prop.Name}.get");
                     if (bound != null) functions.Add(bound);
                 }
@@ -2830,7 +2964,8 @@ public sealed class Binder
                             prop.Name,
                             prop.TypeName,
                             prop.Id,
-                            prop.IdentifierSpan),
+                            prop.IdentifierSpan,
+                            prop.IsStatic),
                         prop.Setter.Span, className, $"{prop.Name}.set");
                     if (bound != null) functions.Add(bound);
                 }
@@ -2843,7 +2978,8 @@ public sealed class Binder
                             prop.Name,
                             prop.TypeName,
                             prop.Id,
-                            prop.IdentifierSpan),
+                            prop.IdentifierSpan,
+                            prop.IsStatic),
                         prop.Initer.Span, className, $"{prop.Name}.init");
                     if (bound != null) functions.Add(bound);
                 }
@@ -3033,7 +3169,9 @@ public sealed class Binder
         boundBody.AddRange(BindStatements(ctor.Body));
 
         return new BoundFunction(ctor.Span, functionSymbol, boundBody, functionScope,
-            Array.Empty<string>(), BoundMemberKind.Constructor, className);
+            Array.Empty<string>(),
+            ctor.IsStatic ? BoundMemberKind.StaticConstructor : BoundMemberKind.Constructor,
+            className);
     }
 
     private BoundFunction BindPropertyAccessor(
@@ -3042,10 +3180,12 @@ public sealed class Binder
         string propName,
         string propType,
         string propertyId,
-        Parsing.TextSpan propertyIdentifierSpan)
+        Parsing.TextSpan propertyIdentifierSpan,
+        bool isStatic)
     {
         var functionScope = _scope.CreateChild();
         using var _ = PushScope(functionScope);
+        using var _staticGuard = PushStaticContext(isStatic);
         var propertyIdentity = _currentClassIdentity.Append("property", $"ast:{propertyId}");
         var functionId = propertyIdentity.Append($"accessor:{accessor.Kind}");
         using var _identity = PushDeclarationContext(functionId);

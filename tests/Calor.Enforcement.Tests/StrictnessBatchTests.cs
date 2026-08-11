@@ -153,6 +153,27 @@ public class StrictnessBatchTests
     }
 
     [Fact]
+    public void GenericOverrideWithAlphaEquivalentTypeParameters_IsMatchedForVariance()
+    {
+        var source = """
+            §M{m001:Test}
+              §CL{c001:Base:pub}
+                §MT{mt001:Render<T>:pub:virt} (T:value) -> void
+                  §E{}
+              §CL{c002:Derived:Base:pub}
+                §MT{mt002:Render<U>:pub:over} (U:value) -> void
+                  §E{cw}
+                  §P "laundered"
+            """;
+
+        var result = TestHarness.Compile(source);
+
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.OverrideEffectVariance
+            && diagnostic.Message.Contains("Render", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void OverrideWithSubsetEffects_Compiles()
     {
         var source = @"

@@ -71,6 +71,7 @@ public enum BoundMemberKind
     TopLevelFunction,
     Method,
     Constructor,
+    StaticConstructor,
     PropertyGetter,
     PropertySetter,
     PropertyInit,
@@ -157,12 +158,25 @@ public sealed class BoundVariableExpression : BoundExpression
 {
     public VariableSymbol Variable { get; }
     public SymbolId SymbolId => Variable.Id;
-    public override string TypeName => Variable.TypeName;
+    public IReadOnlyList<VariableSymbol> ResolvedSymbols { get; }
+    public IReadOnlyList<SymbolId> ResolvedSymbolIds =>
+        ResolvedSymbols.Select(symbol => symbol.Id).ToArray();
+    public override string TypeName { get; }
 
-    public BoundVariableExpression(TextSpan span, VariableSymbol variable)
+    public BoundVariableExpression(
+        TextSpan span,
+        VariableSymbol variable,
+        IReadOnlyList<VariableSymbol>? resolvedSymbols = null)
         : base(span)
     {
         Variable = variable;
+        ResolvedSymbols = resolvedSymbols
+            ?? [variable];
+        var resolvedTypes = ResolvedSymbols
+            .Select(symbol => TypeIdentity.Canonicalize(symbol.TypeName))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        TypeName = resolvedTypes.Length == 1 ? variable.TypeName : "OBJECT";
     }
 }
 
@@ -183,6 +197,7 @@ public sealed class BoundCallStatement : BoundStatement
     public bool IsInaccessibleCall { get; }
     public IReadOnlyList<string?>? ArgumentNames { get; }
     public IReadOnlyList<string?>? ArgumentModifiers { get; }
+    public IReadOnlyList<string>? TypeArguments { get; }
     public override IEnumerable<BoundNode> ChildNodes => Arguments;
 
     public BoundCallStatement(
@@ -196,7 +211,8 @@ public sealed class BoundCallStatement : BoundStatement
         IReadOnlyList<FunctionSymbol>? resolvedSymbols = null,
         TextSpan? calleeSpan = null,
         TextSpan? receiverSpan = null,
-        bool isInaccessibleCall = false)
+        bool isInaccessibleCall = false,
+        IReadOnlyList<string>? typeArguments = null)
         : base(span)
     {
         Target = target;
@@ -206,6 +222,7 @@ public sealed class BoundCallStatement : BoundStatement
             ?? (resolvedSymbol == null ? Array.Empty<FunctionSymbol>() : [resolvedSymbol]);
         ArgumentNames = argumentNames;
         ArgumentModifiers = argumentModifiers;
+        TypeArguments = typeArguments;
         ReceiverSymbol = receiverSymbol;
         CalleeSpan = calleeSpan ?? span;
         ReceiverSpan = receiverSpan;
@@ -1417,6 +1434,7 @@ public sealed class BoundFieldAccessExpression : BoundExpression
     public string FieldName { get; }
     public TextSpan FieldNameSpan { get; }
     public VariableSymbol? ResolvedField { get; }
+    public IReadOnlyList<VariableSymbol> ResolvedFields { get; }
     public SymbolId? ResolvedSymbolId => ResolvedField?.Id;
     public override string TypeName { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
@@ -1427,7 +1445,8 @@ public sealed class BoundFieldAccessExpression : BoundExpression
         string fieldName,
         string typeName,
         VariableSymbol? resolvedField = null,
-        TextSpan? fieldNameSpan = null)
+        TextSpan? fieldNameSpan = null,
+        IReadOnlyList<VariableSymbol>? resolvedFields = null)
         : base(span)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
@@ -1435,6 +1454,8 @@ public sealed class BoundFieldAccessExpression : BoundExpression
         FieldNameSpan = fieldNameSpan ?? span;
         TypeName = typeName ?? "OBJECT";
         ResolvedField = resolvedField;
+        ResolvedFields = resolvedFields
+            ?? (resolvedField == null ? Array.Empty<VariableSymbol>() : [resolvedField]);
         Children = [target];
     }
 }
@@ -1459,12 +1480,15 @@ public sealed class BoundObjectInitializer : BoundNode
 public sealed class BoundNewExpression : BoundExpression
 {
     public override string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<BoundObjectInitializer> Initializers { get; }
     public FunctionSymbol? ResolvedConstructor { get; }
+    public IReadOnlyList<FunctionSymbol> ResolvedConstructors { get; }
     public TypeSymbol? ResolvedType { get; }
-    public SymbolId? ResolvedSymbolId => ResolvedConstructor?.Id ?? ResolvedType?.Id;
+    public SymbolId? ResolvedConstructorSymbolId => ResolvedConstructor?.Id;
+    public SymbolId? ResolvedTypeSymbolId => ResolvedType?.Id;
     public override IReadOnlyList<BoundExpression> Children { get; }
     public override IEnumerable<BoundNode> ChildNodes =>
         Arguments.Cast<BoundNode>().Concat(Initializers);
@@ -1475,7 +1499,8 @@ public sealed class BoundNewExpression : BoundExpression
             typeName,
             Array.Empty<string>(),
             arguments,
-            Array.Empty<BoundObjectInitializer>())
+            Array.Empty<BoundObjectInitializer>(),
+            typeNameSpan: span)
     {
     }
 
@@ -1486,14 +1511,19 @@ public sealed class BoundNewExpression : BoundExpression
         IReadOnlyList<BoundExpression> arguments,
         IReadOnlyList<BoundObjectInitializer> initializers,
         FunctionSymbol? resolvedConstructor = null,
-        TypeSymbol? resolvedType = null)
+        TypeSymbol? resolvedType = null,
+        TextSpan? typeNameSpan = null,
+        IReadOnlyList<FunctionSymbol>? resolvedConstructors = null)
         : base(span)
     {
         TypeName = typeName ?? "OBJECT";
+        TypeNameSpan = typeNameSpan ?? span;
         TypeArguments = typeArguments ?? Array.Empty<string>();
         Arguments = arguments ?? Array.Empty<BoundExpression>();
         Initializers = initializers ?? Array.Empty<BoundObjectInitializer>();
         ResolvedConstructor = resolvedConstructor;
+        ResolvedConstructors = resolvedConstructors
+            ?? (resolvedConstructor == null ? Array.Empty<FunctionSymbol>() : [resolvedConstructor]);
         ResolvedType = resolvedType;
         Children = [.. Arguments, .. Initializers.Select(initializer => initializer.Value)];
     }

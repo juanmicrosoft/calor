@@ -22,6 +22,7 @@ public sealed class CallStatementNode : StatementNode
     public AttributeCollection Attributes { get; }
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
+    public IReadOnlyList<string>? TypeArguments { get; }
 
     /// <summary>
     /// Optional named argument labels, parallel to Arguments list.
@@ -64,7 +65,8 @@ public sealed class CallStatementNode : StatementNode
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
         TextSpan? calleeSpan = null,
-        TextSpan? receiverSpan = null)
+        TextSpan? receiverSpan = null,
+        IReadOnlyList<string>? typeArguments = null)
         : base(span)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
@@ -75,6 +77,7 @@ public sealed class CallStatementNode : StatementNode
         ArgumentModifiers = argumentModifiers;
         CalleeSpan = calleeSpan ?? span;
         ReceiverSpan = receiverSpan;
+        TypeArguments = typeArguments;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

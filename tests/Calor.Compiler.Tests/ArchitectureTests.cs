@@ -202,6 +202,9 @@ public class ArchitectureTests
             ["Analysis/BugPatterns/Patterns/DivisionByZeroChecker.cs:TranslateExpr"] =
                 ("Semantic translator returns null, which callers propagate as an explicit inconclusive result.",
                     "_ => null"),
+            ["Analysis/BugPatterns/Patterns/DivisionByZeroChecker.cs:TryEvaluateNumericLiteral"] =
+                ("Constant classifier for numeric literal casts; unsupported expressions explicitly return false.",
+                    "return false"),
             ["Verification/Z3/KInduction/KInductionProver.cs:GetIntValue"] =
                 ("Constant classifier; unsupported expressions explicitly return null.",
                     "_ => null"),

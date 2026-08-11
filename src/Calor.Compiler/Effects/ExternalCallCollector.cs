@@ -120,7 +120,8 @@ public sealed class ExternalCallCollector
             }
             foreach (var ctor in CallGraphAnalysis.EnumerateConstructors(cls))
             {
-                collector._currentCaller = $"{cls.Name}..ctor";
+                collector._currentCaller =
+                    $"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}";
                 collector.CollectFromFunctionBody(ctor.Body);
             }
         }

@@ -518,7 +518,7 @@ public sealed class ReferenceCollector
             case NewExpressionNode newExpr:
                 if (newExpr.TypeName == _symbolName)
                 {
-                    _references.Add(newExpr.Span);
+                    _references.Add(newExpr.TypeNameSpan);
                 }
                 foreach (var arg in newExpr.Arguments)
                 {

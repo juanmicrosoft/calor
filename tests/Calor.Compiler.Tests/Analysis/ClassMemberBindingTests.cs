@@ -802,6 +802,90 @@ public class ClassMemberBindingTests
     #region Static Context Negative Tests
 
     [Fact]
+    public void StaticMethod_BareInstanceFieldsAndProperties_AreRejectedButStaticMembersResolve()
+    {
+        var source = @"
+§M{m001:Test}
+    §CL{c001:Utils:pub}
+        §FLD{i32:instanceField:priv}
+        §FLD{i32:StaticField:priv:stat}
+        §PROP{p001:InstanceProperty:i32:pub}
+          §GET
+        §/PROP{p001}
+        §PROP{p002:StaticProperty:i32:pub:stat}
+          §GET
+        §/PROP{p002}
+        §MT{m002:Use:pub:stat} () -> i32
+            §B{fieldValue:i32} instanceField
+            §B{propertyValue:i32} InstanceProperty
+            §R (+ StaticField StaticProperty)
+";
+
+        var bound = Bind(source, out var diagnostics);
+        var symbols = bound.SymbolsById.Values.OfType<VariableSymbol>().ToArray();
+        var method = bound.Functions.Single(function => function.Symbol.Name == "Utils.Use");
+        var resolvedStatics = BoundNodeHelpers.DescendantsAndSelf(method)
+            .OfType<BoundVariableExpression>()
+            .Where(expression => expression.Variable.Name is "StaticField" or "StaticProperty")
+            .ToArray();
+
+        Assert.Equal(
+            2,
+            diagnostics.Count(diagnostic =>
+                diagnostic.Code == DiagnosticCode.InstanceMemberInStaticContext));
+        Assert.True(symbols.Single(symbol => symbol.Name == "StaticField").IsStatic);
+        Assert.True(symbols.Single(symbol => symbol.Name == "StaticProperty").IsStatic);
+        Assert.False(symbols.Single(symbol => symbol.Name == "instanceField").IsStatic);
+        Assert.False(symbols.Single(symbol => symbol.Name == "InstanceProperty").IsStatic);
+        Assert.Equal(2, resolvedStatics.Length);
+        Assert.All(resolvedStatics, expression => Assert.True(expression.Variable.IsStatic));
+    }
+
+    [Fact]
+    public void StaticAndInstanceParameterlessConstructors_CoexistAndNewUsesInstanceConstructor()
+    {
+        var source = @"
+§M{m001:Test}
+    §CL{c001:Widget:pub}
+        §CTOR{cctor:stat}
+          §P STR:""static""
+        §/CTOR{cctor}
+        §CTOR{ctor:pub}
+          §P STR:""instance""
+        §/CTOR{ctor}
+    §F{f001:Create:pub} () -> Widget
+      §R §NEW{Widget} §/NEW
+";
+
+        var bound = Bind(source, out var diagnostics);
+        var staticConstructor = bound.Functions.Single(function =>
+            function.MemberKind == BoundMemberKind.StaticConstructor);
+        var instanceConstructor = bound.Functions.Single(function =>
+            function.MemberKind == BoundMemberKind.Constructor);
+        var creation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(
+                Assert.Single(bound.Functions.Single(function =>
+                    function.Symbol.Name == "Create").Body)).Expression);
+
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.DuplicateFunctionSignature);
+        Assert.Equal("Widget..cctor", staticConstructor.Symbol.Name);
+        Assert.Equal("Widget..ctor", instanceConstructor.Symbol.Name);
+        Assert.Same(instanceConstructor.Symbol, creation.ResolvedConstructor);
+        Assert.NotNull(creation.ResolvedTypeSymbolId);
+        Assert.NotNull(creation.ResolvedConstructorSymbolId);
+        Assert.NotEqual(
+            creation.ResolvedTypeSymbolId,
+            creation.ResolvedConstructorSymbolId);
+        Assert.Equal(
+            "Widget",
+            source.Substring(creation.TypeNameSpan.Start, creation.TypeNameSpan.Length));
+        Assert.DoesNotContain(
+            creation.ResolvedConstructors,
+            symbol => symbol.Id == staticConstructor.SymbolId);
+    }
+
+    [Fact]
     public void StaticMethod_ThisExpression_DoesNotResolve()
     {
         var source = @"

@@ -1676,6 +1676,7 @@ public sealed class Parser
         // Interpret call attributes
         var (target, fallible) = AttributeHelper.InterpretCallAttributes(attrs);
         var targetSpan = attrs.GetSpan("_pos0") ?? startToken.Span;
+        var typeArguments = ExtractTrailingCallTypeArguments(ref target);
         var (receiverSpan, calleeSpan) = GetCallTargetIdentifierSpans(target, targetSpan);
         if (string.IsNullOrEmpty(target))
         {
@@ -1711,7 +1712,8 @@ public sealed class Parser
                 argumentNames: null,
                 argumentModifiers: null,
                 calleeSpan: calleeSpan,
-                receiverSpan: receiverSpan);
+                receiverSpan: receiverSpan,
+                typeArguments: typeArguments);
         }
 
         // Zero-arg implicit close: §C{target} followed by anything other than
@@ -1740,7 +1742,8 @@ public sealed class Parser
                 argumentNames: null,
                 argumentModifiers: null,
                 calleeSpan: calleeSpan,
-                receiverSpan: receiverSpan);
+                receiverSpan: receiverSpan,
+                typeArguments: typeArguments);
         }
 
         // Standard format with explicit §A and (optionally) §/C
@@ -1804,7 +1807,8 @@ public sealed class Parser
             hasNames ? argumentNames : null,
             argumentModifiers: null,
             calleeSpan: calleeSpan,
-            receiverSpan: receiverSpan);
+            receiverSpan: receiverSpan,
+            typeArguments: typeArguments);
     }
 
     private ExpressionNode ParseArgument()
@@ -8201,7 +8205,19 @@ public sealed class Parser
         var span = endSpan != startToken.Span ? startToken.Span.Union(endSpan)
             : arguments.Count > 0 ? startToken.Span.Union(arguments[^1].Span)
             : startToken.Span;
-        ExpressionNode expr = new NewExpressionNode(span, typeName, typeArgs, arguments, initializers);
+        var rawTypeNameSpan = attrs.GetSpan("_pos0") ?? startToken.Span;
+        var typeNameSpan = new TextSpan(
+            rawTypeNameSpan.Start,
+            Math.Min(typeName.Length, rawTypeNameSpan.Length),
+            rawTypeNameSpan.Line,
+            rawTypeNameSpan.Column);
+        ExpressionNode expr = new NewExpressionNode(
+            span,
+            typeName,
+            typeArgs,
+            arguments,
+            initializers,
+            typeNameSpan);
 
         // Handle trailing member access (e.g., §NEW{Type}§/NEW.Method or §NEW{Type}§/NEW?.Prop)
         return ParseTrailingMemberAccess(expr);
@@ -8483,30 +8499,7 @@ public sealed class Parser
             finalSpan = startToken.Span.Union(endToken.Span);
         }
 
-        // Extract trailing generic type arguments from call target.
-        // e.g., "items.Cast<i32>" → target = "items.Cast", typeArgs = ["i32"]
-        // This preserves generic types in the middle: "EqualityComparer<i32>.GetHashCode" is unchanged.
-        List<string>? typeArguments = null;
-        if (target.EndsWith(">"))
-        {
-            var depth = 0;
-            var openIdx = -1;
-            for (int i = target.Length - 1; i >= 0; i--)
-            {
-                if (target[i] == '>') depth++;
-                else if (target[i] == '<')
-                {
-                    depth--;
-                    if (depth == 0) { openIdx = i; break; }
-                }
-            }
-            if (openIdx > 0)
-            {
-                var typeArgsStr = target.Substring(openIdx + 1, target.Length - openIdx - 2);
-                typeArguments = typeArgsStr.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
-                target = target.Substring(0, openIdx);
-            }
-        }
+        var typeArguments = ExtractTrailingCallTypeArguments(ref target);
 
         // Only pass argument names if any are non-null
         var hasNames = argumentNames.Any(n => n != null);
@@ -8523,6 +8516,69 @@ public sealed class Parser
 
         // Handle trailing member access (e.g., §C[Method]§/C.Property)
         return ParseTrailingMemberAccess(expr);
+    }
+
+    private static IReadOnlyList<string>? ExtractTrailingCallTypeArguments(ref string target)
+    {
+        if (!target.EndsWith('>'))
+            return null;
+
+        var depth = 0;
+        var openIndex = -1;
+        for (var index = target.Length - 1; index >= 0; index--)
+        {
+            if (target[index] == '>')
+            {
+                depth++;
+            }
+            else if (target[index] == '<')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    openIndex = index;
+                    break;
+                }
+            }
+        }
+
+        if (openIndex <= 0)
+            return null;
+
+        var arguments = SplitCallTypeArguments(target[(openIndex + 1)..^1]);
+        if (arguments.Count == 0)
+            return null;
+
+        target = target[..openIndex];
+        return arguments;
+    }
+
+    private static IReadOnlyList<string> SplitCallTypeArguments(string text)
+    {
+        var arguments = new List<string>();
+        var start = 0;
+        var depth = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            switch (text[index])
+            {
+                case '<':
+                case '[':
+                    depth++;
+                    break;
+                case '>':
+                case ']':
+                    depth--;
+                    break;
+                case ',' when depth == 0:
+                    arguments.Add(text[start..index].Trim());
+                    start = index + 1;
+                    break;
+            }
+        }
+
+        arguments.Add(text[start..].Trim());
+        return arguments.Where(argument => argument.Length > 0).ToArray();
     }
 
     // Phase 9: Properties and Constructors

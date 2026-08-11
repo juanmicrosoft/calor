@@ -391,8 +391,7 @@ public sealed class WorkspaceState
         {
             BoundCallStatement statement => statement.ResolvedSymbols,
             BoundCallExpression expression => expression.ResolvedSymbols,
-            BoundNewExpression creation when creation.ResolvedConstructor != null =>
-                [creation.ResolvedConstructor],
+            BoundNewExpression creation => creation.ResolvedConstructors,
             _ => Array.Empty<FunctionSymbol>(),
         };
 
@@ -401,6 +400,7 @@ public sealed class WorkspaceState
         {
             BoundCallStatement statement => statement.CalleeSpan,
             BoundCallExpression expression => expression.CalleeSpan,
+            BoundNewExpression creation => creation.TypeNameSpan,
             _ => call.Span,
         };
 
@@ -420,7 +420,7 @@ public sealed class WorkspaceState
                 arguments = statement.Arguments;
                 argumentNames = statement.ArgumentNames;
                 argumentModifiers = statement.ArgumentModifiers;
-                typeArguments = null;
+                typeArguments = statement.TypeArguments;
                 receiver = statement.ReceiverSymbol;
                 return true;
             case BoundCallExpression expression:

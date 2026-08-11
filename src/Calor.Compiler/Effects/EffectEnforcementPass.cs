@@ -118,7 +118,8 @@ public sealed class EffectEnforcementPass
         // Constructor enforcement requires language-level E support on CTOR first.
         foreach (var function in _callGraphAnalysis.Functions.Values)
         {
-            if (function.Name.EndsWith("..ctor", StringComparison.Ordinal))
+            if (function.Name.EndsWith("..ctor", StringComparison.Ordinal)
+                || function.Name.EndsWith("..cctor", StringComparison.Ordinal))
                 continue;
             CheckEffects(function);
         }
@@ -553,16 +554,26 @@ public sealed class EffectEnforcementPass
     private static bool CallableSignatureMatches(MethodNode method, MethodSignatureNode signature) =>
         method.Name.Equals(signature.Name, StringComparison.Ordinal)
         && method.TypeParameters.Count == signature.TypeParameters.Count
-        && ParametersMatch(method.Parameters, signature.Parameters);
+        && ParametersMatch(
+            method.Parameters,
+            method.TypeParameters,
+            signature.Parameters,
+            signature.TypeParameters);
 
     private static bool CallableSignatureMatches(MethodNode candidate, MethodNode method) =>
         candidate.Name.Equals(method.Name, StringComparison.Ordinal)
         && candidate.TypeParameters.Count == method.TypeParameters.Count
-        && ParametersMatch(candidate.Parameters, method.Parameters);
+        && ParametersMatch(
+            candidate.Parameters,
+            candidate.TypeParameters,
+            method.Parameters,
+            method.TypeParameters);
 
     private static bool ParametersMatch(
         IReadOnlyList<ParameterNode> left,
-        IReadOnlyList<ParameterNode> right)
+        IReadOnlyList<TypeParameterNode> leftTypeParameters,
+        IReadOnlyList<ParameterNode> right,
+        IReadOnlyList<TypeParameterNode> rightTypeParameters)
     {
         if (left.Count != right.Count)
             return false;
@@ -571,8 +582,12 @@ public sealed class EffectEnforcementPass
         {
             if (left[index].Modifier != right[index].Modifier
                 || !string.Equals(
-                    TypeIdentity.Canonicalize(left[index].TypeName),
-                    TypeIdentity.Canonicalize(right[index].TypeName),
+                    TypeIdentity.CanonicalizeSignature(
+                        left[index].TypeName,
+                        leftTypeParameters.Select(parameter => parameter.Name).ToArray()),
+                    TypeIdentity.CanonicalizeSignature(
+                        right[index].TypeName,
+                        rightTypeParameters.Select(parameter => parameter.Name).ToArray()),
                     StringComparison.Ordinal))
             {
                 return false;

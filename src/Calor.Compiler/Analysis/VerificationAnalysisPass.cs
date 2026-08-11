@@ -259,7 +259,7 @@ public sealed class VerificationAnalysisPass
                 foreach (var pre in ctor.Preconditions)
                     CollectReferencedNames(pre.Condition, paramNames, guardedNames);
                 if (guardedNames.Count > 0)
-                    result[$"{cls.Name}..ctor"] = guardedNames;
+                    result[$"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}"] = guardedNames;
             }
 
             foreach (var op in cls.OperatorOverloads)
@@ -316,7 +316,7 @@ public sealed class VerificationAnalysisPass
             foreach (var pre in ctor.Preconditions)
                 CollectReferencedNames(pre.Condition, paramNames, guardedNames);
             if (guardedNames.Count > 0)
-                result[$"{cls.Name}..ctor"] = guardedNames;
+                result[$"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}"] = guardedNames;
         }
 
         foreach (var nested in cls.NestedClasses)

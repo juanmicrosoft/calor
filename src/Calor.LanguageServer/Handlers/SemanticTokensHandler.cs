@@ -480,9 +480,7 @@ public sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                     VisitExpression(unary.Operand);
                     break;
                 case NewExpressionNode newExpr:
-                    var typeSpan = FindNameSpan(newExpr.Span, newExpr.TypeName);
-                    if (typeSpan.HasValue)
-                        PushToken(typeSpan.Value, SemanticTokenType.Class);
+                    PushToken(newExpr.TypeNameSpan, SemanticTokenType.Class);
                     foreach (var arg in newExpr.Arguments)
                         VisitExpression(arg);
                     break;

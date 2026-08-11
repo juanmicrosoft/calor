@@ -49,6 +49,43 @@ public class ReferencesHandlerTests
     }
 
     [Fact]
+    public async Task ConstructorResolvedNewExpression_ReturnsExactTypeReferenceRangeAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c001:Widget:pub}
+                §CTOR{ctor:pub}
+                §/CTOR{ctor}
+              §F{f001:Create:pub} () -> Widget
+                §R §NEW{Widget} §/NEW
+            """;
+        var uri = DocumentUri.From("file:///references-new-type.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Widget:pub", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new ReferencesHandler(workspace);
+
+        var locations = await handler.Handle(
+            new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                Context = new ReferenceContext { IncludeDeclaration = true },
+            },
+            CancellationToken.None);
+
+        var references = locations!.ToArray();
+        Assert.Equal(2, references.Length);
+        Assert.All(references, location =>
+        {
+            var start = PositionConverter.ToOffset(location.Range.Start, source);
+            var end = PositionConverter.ToOffset(location.Range.End, source);
+            Assert.Equal("Widget", source[start..end]);
+        });
+    }
+
+    [Fact]
     public void ReferenceCollector_FindsVariableReferences()
     {
         var source = """

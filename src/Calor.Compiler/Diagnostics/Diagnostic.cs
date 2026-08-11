@@ -241,6 +241,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string BindReassignsImmutable = "Calor0260";
 
+    /// <summary>
+    /// Error: an instance field or property is accessed by a bare reference from a static member.
+    /// </summary>
+    public const string InstanceMemberInStaticContext = "Calor0261";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

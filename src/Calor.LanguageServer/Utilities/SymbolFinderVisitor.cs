@@ -1125,7 +1125,7 @@ public sealed class SymbolFinderVisitor
                 }
                 _result = new SymbolLookupResult(
                     newExpr.TypeName, "constructor call", newExpr.TypeName,
-                    newExpr.Span, null, newExpr);
+                    newExpr.TypeNameSpan, null, newExpr);
                 break;
 
             case ThisExpressionNode:

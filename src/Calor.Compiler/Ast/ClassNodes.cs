@@ -861,6 +861,7 @@ public sealed class OperatorOverloadNode : AstNode
 public sealed class NewExpressionNode : ExpressionNode
 {
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
 
@@ -883,10 +884,12 @@ public sealed class NewExpressionNode : ExpressionNode
         string typeName,
         IReadOnlyList<string> typeArguments,
         IReadOnlyList<ExpressionNode> arguments,
-        IReadOnlyList<ObjectInitializerAssignment> initializers)
+        IReadOnlyList<ObjectInitializerAssignment> initializers,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? span;
         TypeArguments = typeArguments ?? throw new ArgumentNullException(nameof(typeArguments));
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
         Initializers = initializers ?? Array.Empty<ObjectInitializerAssignment>();

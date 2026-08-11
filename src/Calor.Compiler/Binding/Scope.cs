@@ -165,15 +165,18 @@ public static class TypeIdentity
         ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
         var type = typeName.Trim();
 
-        if (type.StartsWith("?", StringComparison.Ordinal))
-            return "?" + Canonicalize(type[1..]);
+        if (TryUnwrapOptionOrNullable(type, out var optionElement))
+            return $"OPTION<{Canonicalize(optionElement)}>";
 
         if (TryStripPostfix(type, out var elementType, out var postfix))
             return Canonicalize(elementType) + postfix;
 
         if (TrySplitGeneric(type, out var genericName, out var arguments))
         {
-            return $"{genericName.Trim()}<{string.Join(",", arguments.Select(Canonicalize))}>";
+            var canonicalName = genericName.Equals("Option", StringComparison.OrdinalIgnoreCase)
+                ? "OPTION"
+                : genericName.Trim();
+            return $"{canonicalName}<{string.Join(",", arguments.Select(Canonicalize))}>";
         }
 
         return type.ToLowerInvariant() switch
@@ -241,16 +244,6 @@ public static class TypeIdentity
 
         if (string.Equals(parameterType, argumentType, StringComparison.Ordinal))
             return true;
-
-        if (parameterType.StartsWith("?", StringComparison.Ordinal)
-            && argumentType.StartsWith("?", StringComparison.Ordinal))
-        {
-            return TryUnifyCanonical(
-                parameterType[1..],
-                argumentType[1..],
-                typeParameters,
-                substitutions);
-        }
 
         if (TryStripPostfix(parameterType, out var parameterElement, out var parameterPostfix)
             && TryStripPostfix(argumentType, out var argumentElement, out var argumentPostfix)
@@ -432,18 +425,21 @@ public abstract class Symbol
     public TextSpan DeclarationSpan { get; }
     public TextSpan IdentifierSpan => DeclarationSpan;
     public TextSpan DefinitionSpan { get; }
+    public ConditionalAlternative? ConditionalAlternative { get; }
     public string IdentityKey => Id.IsNone ? Name : Id.Value;
 
     protected Symbol(
         SymbolId id,
         string name,
         TextSpan declarationSpan,
-        TextSpan? definitionSpan = null)
+        TextSpan? definitionSpan = null,
+        ConditionalAlternative? conditionalAlternative = null)
     {
         Id = id;
         Name = name ?? throw new ArgumentNullException(nameof(name));
         DeclarationSpan = declarationSpan;
         DefinitionSpan = definitionSpan ?? declarationSpan;
+        ConditionalAlternative = conditionalAlternative;
     }
 }
 
@@ -456,6 +452,8 @@ public sealed class VariableSymbol : Symbol
     public bool IsMutable { get; }
     public bool IsParameter { get; }
     public bool IsField { get; }
+    public bool IsProperty { get; }
+    public bool IsStatic { get; }
     public ParameterModifier Modifier { get; }
     public ExpressionNode? DefaultValue { get; }
     public bool IsOptional => DefaultValue != null;
@@ -473,13 +471,18 @@ public sealed class VariableSymbol : Symbol
         ExpressionNode? defaultValue = null,
         Visibility visibility = Visibility.Public,
         string? declaringTypeName = null,
-        bool isField = false)
-        : base(id, name, declarationSpan)
+        bool isField = false,
+        bool isProperty = false,
+        bool isStatic = false,
+        ConditionalAlternative? conditionalAlternative = null)
+        : base(id, name, declarationSpan, conditionalAlternative: conditionalAlternative)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         IsMutable = isMutable;
         IsParameter = isParameter;
         IsField = isField;
+        IsProperty = isProperty;
+        IsStatic = isStatic;
         Modifier = modifier;
         DefaultValue = defaultValue;
         Visibility = visibility;
@@ -507,7 +510,6 @@ public sealed class FunctionSymbol : Symbol
     public IReadOnlyList<string> TypeParameters { get; }
     public Visibility Visibility { get; }
     public string? ContainingTypeName { get; }
-    public ConditionalAlternative? ConditionalAlternative { get; }
     public int GenericArity => TypeParameters.Count;
 
     public string SignatureKey => string.Join(
@@ -544,14 +546,13 @@ public sealed class FunctionSymbol : Symbol
         string? containingTypeName = null,
         TextSpan? definitionSpan = null,
         ConditionalAlternative? conditionalAlternative = null)
-        : base(id, name, declarationSpan, definitionSpan)
+        : base(id, name, declarationSpan, definitionSpan, conditionalAlternative)
     {
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
         Parameters = parameters?.ToArray() ?? throw new ArgumentNullException(nameof(parameters));
         TypeParameters = typeParameters?.ToArray() ?? Array.Empty<string>();
         Visibility = visibility;
         ContainingTypeName = containingTypeName;
-        ConditionalAlternative = conditionalAlternative;
     }
 
     public FunctionSymbol(
@@ -674,6 +675,7 @@ public sealed class OverloadResolutionResult
 public sealed class Scope
 {
     private readonly Dictionary<string, Symbol> _symbols = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<Symbol>> _symbolAlternatives = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<FunctionSymbol>> _overloadSets = new(StringComparer.Ordinal);
     public Scope? Parent { get; }
 
@@ -684,8 +686,22 @@ public sealed class Scope
 
     public bool TryDeclare(Symbol symbol)
     {
-        if (_symbols.ContainsKey(symbol.Name))
+        if (_symbols.TryGetValue(symbol.Name, out var existing))
         {
+            var existingSymbols = _symbolAlternatives.TryGetValue(symbol.Name, out var alternatives)
+                ? alternatives
+                : [existing];
+            if (existingSymbols.All(candidate => AreMutuallyExclusiveAlternatives(candidate, symbol)))
+            {
+                if (alternatives == null)
+                {
+                    alternatives = [existing];
+                    _symbolAlternatives.Add(symbol.Name, alternatives);
+                }
+                alternatives.Add(symbol);
+                return true;
+            }
+
             return false;
         }
 
@@ -738,6 +754,24 @@ public sealed class Scope
         }
 
         return Parent?.Lookup(name);
+    }
+
+    public IReadOnlyList<Symbol> LookupAll(string name)
+    {
+        if (_symbolAlternatives.TryGetValue(name, out var alternatives))
+            return alternatives;
+        if (_symbols.TryGetValue(name, out var symbol))
+            return [symbol];
+        return Parent?.LookupAll(name) ?? Array.Empty<Symbol>();
+    }
+
+    public IReadOnlyList<Symbol> LookupAllLocal(string name)
+    {
+        if (_symbolAlternatives.TryGetValue(name, out var alternatives))
+            return alternatives;
+        return _symbols.TryGetValue(name, out var symbol)
+            ? [symbol]
+            : Array.Empty<Symbol>();
     }
 
     /// <summary>
@@ -848,7 +882,18 @@ public sealed class Scope
 
     public IEnumerable<Symbol> GetDeclaredSymbols()
     {
-        return _symbols.Values;
+        foreach (var (name, symbol) in _symbols)
+        {
+            if (_symbolAlternatives.TryGetValue(name, out var alternatives))
+            {
+                foreach (var alternative in alternatives)
+                    yield return alternative;
+            }
+            else
+            {
+                yield return symbol;
+            }
+        }
     }
 
     public Scope CreateChild()
@@ -857,8 +902,8 @@ public sealed class Scope
     }
 
     private static bool AreMutuallyExclusiveAlternatives(
-        FunctionSymbol left,
-        FunctionSymbol right) =>
+        Symbol left,
+        Symbol right) =>
         left.ConditionalAlternative is { } leftAlternative
         && right.ConditionalAlternative is { } rightAlternative
         && leftAlternative.IsMutuallyExclusiveWith(rightAlternative);
