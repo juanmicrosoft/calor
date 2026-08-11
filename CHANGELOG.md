@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Issue #779's residual verifier-vs-runtime differential gate (F-4)** now generates and executes
+  1,170 deterministic cases: all 65 frozen modeled forms × `§Q`/`§S`/explicit `§PROOF` × nesting
+  depths 1–3 × provable/refutable polarity. The oracle compiles guard-forced generated C#, covers
+  bounded-quantifier emitter lowering and the separate obligation-elision path, rejects vacuous or
+  mislabeled cases, and pins fail-safe handling for unsupported, timeout, solver-error, unavailable,
+  and assumed outcomes. CI blocks on zero mismatches and byte-checks published JSON/Markdown
+  metrics. Current coverage is 65/65 forms and 1,170/1,170 cells; 40/65 forms currently elide.
+
 ### Changed
 - **The binder dispatches every expression class** (#762 B1): a single authoritative dispatch
   table replaces the partial switch; expressions without a structural binder yet produce an
