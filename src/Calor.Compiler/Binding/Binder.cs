@@ -515,9 +515,30 @@ public sealed class Binder
             [typeof(NullConditionalNode)] = (b, e) =>
                 { var n = (NullConditionalNode)e; return new BoundNullConditional(n.Span, b.BindExpression(n.Target), n.MemberName); },
             [typeof(MatchExpressionNode)] = (b, e) => b.BindMatchExpression((MatchExpressionNode)e),
-            [typeof(LambdaExpressionNode)] = (b, e) => b.BindLambda((LambdaExpressionNode)e),
+            [typeof(LambdaExpressionNode)] = (b, e) =>
+                b.BindLambda((LambdaExpressionNode)e),
             [typeof(AwaitExpressionNode)] = (b, e) =>
                 { var n = (AwaitExpressionNode)e; return new BoundAwaitExpression(n.Span, b.BindExpression(n.Awaited), n.ConfigureAwait); },
+            // #762 B7 — quantifier family (spec expressions; Z3 consumes their AST,
+            // not these bound nodes — binding is for value-safety visibility only).
+            [typeof(ForallExpressionNode)] = (b, e) =>
+                {
+                    var n = (ForallExpressionNode)e;
+                    var (vars, body) = b.BindQuantifier(n.BoundVariables, n.Body);
+                    return new BoundForallExpression(n.Span, vars, body);
+                },
+            [typeof(ExistsExpressionNode)] = (b, e) =>
+                {
+                    var n = (ExistsExpressionNode)e;
+                    var (vars, body) = b.BindQuantifier(n.BoundVariables, n.Body);
+                    return new BoundExistsExpression(n.Span, vars, body);
+                },
+            [typeof(ImplicationExpressionNode)] = (b, e) =>
+                {
+                    var n = (ImplicationExpressionNode)e;
+                    return new BoundImplicationExpression(n.Span,
+                        b.BindExpression(n.Antecedent), b.BindExpression(n.Consequent));
+                },
         };
 
         // Every remaining concrete ExpressionNode subclass dispatches to BindIncomplete.
@@ -775,6 +796,30 @@ public sealed class Binder
             cases.Add(new BoundMatchExpressionCase(c.Pattern, guard, body, c.Span));
         }
         return new BoundMatchExpression(match.Span, match.Id, target, cases);
+    }
+
+    /// <summary>#762 B7: quantifier variables are declared in a child scope, marked
+    /// isParameter — they are bound BY the quantifier (never "uninitialized"), exactly
+    /// like a lambda parameter. The scope pops on all paths, so they never leak into
+    /// the enclosing spec or body. Duplicate names report Calor0201 (function-parameter
+    /// parity).</summary>
+    private (IReadOnlyList<VariableSymbol> Vars, BoundExpression Body) BindQuantifier(
+        IReadOnlyList<QuantifierVariableNode> boundVariables, ExpressionNode body)
+    {
+        var quantifierScope = _scope.CreateChild();
+        using var _ = PushScope(quantifierScope);
+        var vars = new List<VariableSymbol>();
+        foreach (var v in boundVariables)
+        {
+            var sym = new VariableSymbol(v.Name, v.TypeName, isMutable: false, isParameter: true);
+            if (!quantifierScope.TryDeclare(sym))
+            {
+                var suggestedName = GenerateUniqueName(v.Name);
+                _diagnostics.ReportDuplicateDefinitionWithFix(v.Span, v.Name, suggestedName);
+            }
+            vars.Add(sym);
+        }
+        return (vars, BindExpression(body));
     }
 
     /// <summary>#762 B6: lambda parameters live in a child scope; both body forms bind
