@@ -6,6 +6,11 @@ $ErrorActionPreference = "Stop"
 $Z3_VERSION = "4.15.7"
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RUNTIMES_DIR = Join-Path $SCRIPT_DIR "..\runtimes"
+
+# Z3 chain closure (#916 review F2): purge the dropped osx-x64 RID unconditionally —
+# the provenance stamp does not invalidate on RID-set changes, and stale natives
+# would be resurrected into local packs by the runtimes/** glob.
+Remove-Item -Recurse -Force (Join-Path $RUNTIMES_DIR "osx-x64") -ErrorAction SilentlyContinue
 $Z3_DIR = Join-Path $SCRIPT_DIR "..\z3"
 $TEMP_DIR = Join-Path $SCRIPT_DIR "..\.z3-temp"
 
@@ -36,7 +41,7 @@ function Test-ArchiveChecksum {
 # Platform mappings
 $PLATFORMS = @(
     @{ rid = "osx-arm64"; archive = "z3-$Z3_VERSION-arm64-osx-15.7.3"; lib = "libz3.dylib" },
-    @{ rid = "osx-x64"; archive = "z3-$Z3_VERSION-x64-osx-15.7.3"; lib = "libz3.dylib" },
+    # osx-x64 removed (Z3 chain closure): upstream x64-osx archive contains an arm64 binary.
     @{ rid = "win-arm64"; archive = "z3-$Z3_VERSION-arm64-win"; lib = "libz3.dll" },
     @{ rid = "win-x64"; archive = "z3-$Z3_VERSION-x64-win"; lib = "libz3.dll" },
     @{ rid = "win-x86"; archive = "z3-$Z3_VERSION-x86-win"; lib = "libz3.dll" },

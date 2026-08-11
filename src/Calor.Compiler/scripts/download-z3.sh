@@ -53,6 +53,12 @@ verify_archive() {
     echo "  [verified] $name"
 }
 RUNTIMES_DIR="$SCRIPT_DIR/../runtimes"
+
+# Z3 chain closure (#916 review F2): the osx-x64 RID is dropped, but the
+# provenance stamp does not invalidate on a RID-set change — an existing
+# checkout keeps the mislabeled dylib forever and local packs resurrect the
+# dropped RID (the csproj packs runtimes/** by glob). Purge unconditionally.
+rm -rf "$RUNTIMES_DIR/osx-x64"
 Z3_DIR="$SCRIPT_DIR/../z3"
 TEMP_DIR="$SCRIPT_DIR/../.z3-temp"
 
@@ -90,7 +96,8 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 # Platform mappings: "rid|archive_name|lib_name_in_archive|lib_name_output"
 PLATFORMS=(
     "osx-arm64|z3-${Z3_VERSION}-arm64-osx-15.7.3|libz3.dylib|libz3.dylib"
-    "osx-x64|z3-${Z3_VERSION}-x64-osx-15.7.3|libz3.dylib|libz3.dylib"
+    # osx-x64 removed (Z3 chain closure): upstream's x64-osx archive contains an
+    # arm64 binary — Intel macOS is unsupported for verification.
     "win-arm64|z3-${Z3_VERSION}-arm64-win|libz3.dll|libz3.dll"
     "win-x64|z3-${Z3_VERSION}-x64-win|libz3.dll|libz3.dll"
     "win-x86|z3-${Z3_VERSION}-x86-win|libz3.dll|libz3.dll"

@@ -89,7 +89,6 @@
          the runtimes flow works at all). -->
     <PropertyGroup>
       <_CalorSdkHasAnyNative Condition="Exists('$(_CalorSdkTasksStageDir)runtimes/osx-arm64/native/libz3.dylib')
-        or Exists('$(_CalorSdkTasksStageDir)runtimes/osx-x64/native/libz3.dylib')
         or Exists('$(_CalorSdkTasksStageDir)runtimes/linux-x64/native/libz3.so')
         or Exists('$(_CalorSdkTasksStageDir)runtimes/linux-arm64/native/libz3.so')
         or Exists('$(_CalorSdkTasksStageDir)runtimes/win-x64/native/libz3.dll')
@@ -100,9 +99,9 @@
 
     <!-- Release publishing must carry every supported RID (set by the publish
          workflow after the checksum-verified Z3 download). -->
+    <!-- osx-x64 deliberately absent (Z3 chain closure): Intel macOS unsupported for verification. -->
     <Error Condition="'$(CalorSdkRequireAllRids)' == 'true' and (!Exists('$(_CalorSdkTasksStageDir)runtimes/linux-x64/native/libz3.so')
         or !Exists('$(_CalorSdkTasksStageDir)runtimes/linux-arm64/native/libz3.so')
-        or !Exists('$(_CalorSdkTasksStageDir)runtimes/osx-x64/native/libz3.dylib')
         or !Exists('$(_CalorSdkTasksStageDir)runtimes/osx-arm64/native/libz3.dylib')
         or !Exists('$(_CalorSdkTasksStageDir)runtimes/win-x64/native/libz3.dll')
         or !Exists('$(_CalorSdkTasksStageDir)runtimes/win-arm64/native/libz3.dll'))"
