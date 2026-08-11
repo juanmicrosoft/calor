@@ -31,6 +31,10 @@ Every row asserts that its registered form actually occurs in the base AST.
 `__self__` lowering and receives the same runtime argument. This tests the modeled refinement
 meaning without presenting unbound `#` as ordinary source-valid `§Q`/`§S`/`§PROOF`.
 
+`FieldAccessNode` runs through the production module-derived type registry. The contract pass and
+obligation solver derive `Probe.Value: i32` from the generated class declaration, translate it as a
+typed uninterpreted accessor, and execute the same access on the generated `Probe` instance.
+
 ## Oracle
 
 The module is verified once through the contract pass and obligation solver, then emitted twice:
@@ -41,11 +45,17 @@ The module is verified once through the contract pass and obligation solver, the
    actual postcondition and `ObligationStatus.Discharged` elision routes. Preconditions must
    always retain their guards.
 
-`Proven`/`Discharged` must complete at runtime; `Refuted`/`Failed` must fire the generated guard.
-`Assumed`, `Unsupported`, `Timeout`, `Unknown`, and `Unavailable` are fail-safe and may never
-elide. Synthetic typed fail-safe controls cover timeout and solver-error classifications
-deterministically at both elision choke points. Vacuous proofs, missing guards, unexpected runtime
-exceptions, stale reports, and whitelist drift fail the gate.
+Provable cells must be `Proven` and refutable cells must be `Refuted`. A provable cell may instead
+be `Assumed` only when the form registers the exact production assumption set; the report publishes
+every such allowance. Unsupported, timeout, unknown, or unavailable matrix outcomes are not
+coverage. Runtime execution independently requires provable cases to complete and refutable cases
+to fire the generated guard.
+
+Fail-safe controls use the same deterministic status/reason/exception classifier as production
+`ProofOutcome.Assign`: timeout and solver-error controls no longer rehydrate injected statuses.
+Unsupported, unavailable, and assumed controls use their production evidence constructors. Every
+non-decisive status must retain and fire its false guard at both emitter choke points. Vacuous
+proofs, missing guards, unexpected runtime exceptions, stale reports, and whitelist drift fail.
 
 Bounded `forall` and `exists` rows execute the emitter's LINQ lowering, including D15's full
 implication predicate. Explicit proof rows execute the separate obligation solver and emitter path.
@@ -57,9 +67,10 @@ Machine-readable and human-readable reports are committed at:
 - `bench/phase0-agent-native/verifier-runtime-differential.json`
 - `bench/phase0-agent-native/verifier-runtime-differential.md`
 
-The report publishes forms covered, forms eliding, forms whitelisted, Cartesian-cell coverage,
-typed outcome counts, fail-safe controls, and mismatches. The current result is **65/65 forms,
-1,170/1,170 cells, 40/65 forms eliding (61.54%), and zero mismatches**.
+The report publishes solver-handled forms and cells, forms eliding, typed outcome counts, explicit
+`Assumed` allowances, fail-safe controls, and mismatches. The current result is **65/65 forms
+solver-handled, 1,170/1,170 cells solver-handled, 40/65 forms eliding (61.54%), and zero
+mismatches**. Outcomes are 435 `Proven`, 585 `Refuted`, and 150 explicitly allowed `Assumed`.
 
 CI runs:
 
@@ -73,3 +84,6 @@ The test reruns the full oracle and byte-compares both committed reports. The st
 uploads the reports as workflow artifacts; unavailable Z3 is a failure rather than a skip. To
 regenerate metrics intentionally, set
 `CALOR_UPDATE_VERIFIER_RUNTIME_DIFFERENTIAL_REPORTS=1` while running the same filtered test.
+Repository discovery accepts both a `.git` directory and a worktree `.git` file. The report paths
+are pinned to LF in `.gitattributes`, and generated assemblies run in collectible load contexts
+that are disposed and unloaded after each main or fail-safe execution.

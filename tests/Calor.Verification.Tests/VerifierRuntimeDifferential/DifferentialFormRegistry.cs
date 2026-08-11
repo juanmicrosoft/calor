@@ -49,6 +49,7 @@ internal static class DifferentialFormRegistry
             "scalar-type",
             true,
             null,
+            IsStringType(type) ? [Z3Verifier.StringModelAssumption] : Array.Empty<string>(),
             polarity => new FormExpression(
                 polarity == CasePolarity.Provable
                     ? Bin(BinaryOperator.Equal, Ref("value"), Ref("value"))
@@ -64,6 +65,7 @@ internal static class DifferentialFormRegistry
             "array-element-type",
             true,
             null,
+            [Z3Verifier.NullableReferenceModelAssumption],
             polarity =>
             {
                 var access = new ArrayAccessNode(Span, Ref("values"), Int(0));
@@ -85,6 +87,7 @@ internal static class DifferentialFormRegistry
                 "expression-kind",
                 true,
                 null,
+                Array.Empty<string>(),
                 polarity => new FormExpression(
                     Bin(
                         polarity == CasePolarity.Provable
@@ -101,6 +104,7 @@ internal static class DifferentialFormRegistry
             "expression-kind",
             true,
             null,
+            GetExpressionKindAssumptions(kind),
             polarity => BuildExpressionKindExpression(kind, polarity),
             condition => ContainsKind(condition, kind));
     }
@@ -157,6 +161,7 @@ internal static class DifferentialFormRegistry
             "binary-operator",
             true,
             null,
+            Array.Empty<string>(),
             polarity => NoParameters(BuildBinaryOperatorCondition(op, polarity == CasePolarity.Provable)),
             condition => ContainsBinaryOperator(condition, op));
     }
@@ -168,6 +173,7 @@ internal static class DifferentialFormRegistry
             "unary-operator",
             true,
             null,
+            Array.Empty<string>(),
             polarity => NoParameters(BuildUnaryOperatorCondition(op, polarity == CasePolarity.Provable)),
             condition => ContainsUnaryOperator(condition, op));
     }
@@ -179,6 +185,7 @@ internal static class DifferentialFormRegistry
             "string-operation",
             true,
             null,
+            [Z3Verifier.StringModelAssumption],
             polarity => NoParameters(
                 BuildStringOperationCondition(op, polarity == CasePolarity.Provable)),
             condition => ContainsStringOperation(condition, op));
@@ -191,6 +198,7 @@ internal static class DifferentialFormRegistry
             "string-comparison-mode",
             true,
             null,
+            [Z3Verifier.StringModelAssumption],
             polarity => NoParameters(
                 BuildStringOperationCondition(
                     StringOp.Contains,
@@ -206,6 +214,7 @@ internal static class DifferentialFormRegistry
             "quantifier-bound-variable-type",
             true,
             null,
+            Array.Empty<string>(),
             polarity => NoParameters(
                 BuildForall(polarity == CasePolarity.Provable, "Int32")),
             condition => ContainsQuantifierType(condition, "Int32"));
@@ -357,6 +366,21 @@ internal static class DifferentialFormRegistry
 
     private static FormExpression NoParameters(ExpressionNode condition) =>
         new(condition, Array.Empty<ParameterNode>());
+
+    private static bool IsStringType(string type) =>
+        type is "str" or "string";
+
+    private static IReadOnlyList<string> GetExpressionKindAssumptions(string kind)
+    {
+        return kind switch
+        {
+            nameof(StringLiteralNode) or nameof(StringOperationNode) =>
+                [Z3Verifier.StringModelAssumption],
+            nameof(ArrayAccessNode) or nameof(ArrayLengthNode) or nameof(FieldAccessNode) =>
+                [Z3Verifier.NullableReferenceModelAssumption],
+            _ => Array.Empty<string>()
+        };
+    }
 
     private static ParameterNode Parameter(string name, string type) =>
         new(Span, name, type, Attributes);

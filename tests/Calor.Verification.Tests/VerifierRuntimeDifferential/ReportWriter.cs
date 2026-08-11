@@ -26,14 +26,16 @@ internal static class ReportWriter
         builder.AppendLine($"- **Whitelist hash:** `{report.WhitelistSha256}`");
         builder.AppendLine($"- **Mismatches:** {coverage.Mismatches}");
         builder.AppendLine(
-            $"- **Forms covered:** {coverage.FormsCovered}/{coverage.FormsWhitelisted} " +
+            $"- **Forms solver-handled:** {coverage.FormsCovered}/{coverage.FormsWhitelisted} " +
             $"({Percent(coverage.FormCoverageFraction)})");
         builder.AppendLine(
             $"- **Forms eliding:** {coverage.FormsEliding}/{coverage.FormsWhitelisted} " +
             $"({Percent(coverage.ElisionCoverageFraction)})");
         builder.AppendLine(
-            $"- **Cartesian cells executed:** {coverage.MatrixCellsCovered}/{coverage.MatrixCellsRegistered} " +
+            $"- **Cartesian cells solver-handled:** {coverage.MatrixCellsCovered}/{coverage.MatrixCellsApplicable} " +
             $"({Percent(coverage.MatrixCoverageFraction)})");
+        builder.AppendLine(
+            $"- **Cartesian cells registered:** {coverage.MatrixCellsRegistered}");
         builder.AppendLine(
             $"- **Generated cases:** {coverage.CasesGenerated} " +
             $"(3 positions × depths 1–{report.MaximumNestingDepth} × 2 polarities per applicable form)");
@@ -49,7 +51,7 @@ internal static class ReportWriter
 
         builder.AppendLine("## Coverage by category");
         builder.AppendLine();
-        builder.AppendLine("| Category | Whitelisted | Applicable | Covered | Eliding | Mismatches |");
+        builder.AppendLine("| Category | Whitelisted | Applicable | Solver-handled | Eliding | Mismatches |");
         builder.AppendLine("|---|---:|---:|---:|---:|---:|");
         foreach (var category in report.Forms.GroupBy(form => form.Category, StringComparer.Ordinal)
                      .OrderBy(group => group.Key, StringComparer.Ordinal))
@@ -57,7 +59,7 @@ internal static class ReportWriter
             builder.AppendLine(
                 $"| `{category.Key}` | {category.Count()} | " +
                 $"{category.Count(form => form.Applicable)} | " +
-                $"{category.Count(form => form.Cases > 0)} | " +
+                $"{category.Count(form => form.SolverHandled)} | " +
                 $"{category.Count(form => form.Elides)} | " +
                 $"{category.Sum(form => form.Mismatches)} |");
         }
@@ -69,14 +71,29 @@ internal static class ReportWriter
             builder.AppendLine($"- `{form}` — {note}");
         builder.AppendLine();
 
+        builder.AppendLine("## Explicit Assumed allowances");
+        builder.AppendLine();
+        builder.AppendLine(
+            "`Assumed` is accepted only for provable cells whose form lists the exact production " +
+            "assumption set below. Refutable cells must always be `Refuted`.");
+        builder.AppendLine();
+        foreach (var form in report.Forms.Where(form => form.AllowedAssumptions.Count > 0))
+        {
+            builder.AppendLine(
+                $"- `{form.Id}` — " +
+                string.Join("; ", form.AllowedAssumptions.Select(ShortAssumption)));
+        }
+        builder.AppendLine();
+
         builder.AppendLine("## Per-form coverage");
         builder.AppendLine();
-        builder.AppendLine("| Form | Cases | Pre | Post | Obligation | Elides | Mismatches |");
-        builder.AppendLine("|---|---:|---:|---:|---:|:---:|---:|");
+        builder.AppendLine("| Form | Solver-handled | Cases | Pre | Post | Obligation | Elides | Mismatches |");
+        builder.AppendLine("|---|:---:|---:|---:|---:|---:|:---:|---:|");
         foreach (var form in report.Forms)
         {
             builder.AppendLine(
-                $"| `{form.Id}` | {form.Cases} | {form.PreconditionCases} | " +
+                $"| `{form.Id}` | {(form.SolverHandled ? "yes" : "no")} | " +
+                $"{form.Cases} | {form.PreconditionCases} | " +
                 $"{form.PostconditionCases} | {form.ObligationCases} | " +
                 $"{(form.Elides ? "yes" : "no")} | {form.Mismatches} |");
         }
@@ -94,12 +111,12 @@ internal static class ReportWriter
 
         builder.AppendLine("## Fail-safe controls");
         builder.AppendLine();
-        builder.AppendLine("| Channel | Typed status | Guard retained | Runtime | Result |");
-        builder.AppendLine("|---|---|:---:|---|:---:|");
+        builder.AppendLine("| Scenario | Channel | Typed status | Guard retained | Runtime | Result |");
+        builder.AppendLine("|---|---|---|:---:|---|:---:|");
         foreach (var control in report.FailSafeControls)
         {
             builder.AppendLine(
-                $"| {control.Channel} | `{control.Status}` | " +
+                $"| {control.Scenario} | {control.Channel} | `{control.Status}` | " +
                 $"{(control.GuardRetained ? "yes" : "no")} | `{control.RuntimeVerdict}` | " +
                 $"{(control.Passed ? "pass" : "fail")} |");
         }
@@ -129,4 +146,10 @@ internal static class ReportWriter
 
     private static string Percent(double fraction) =>
         (fraction * 100).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    private static string ShortAssumption(string assumption)
+    {
+        var separator = assumption.IndexOf(" — ", StringComparison.Ordinal);
+        return separator < 0 ? assumption : assumption[..separator];
+    }
 }

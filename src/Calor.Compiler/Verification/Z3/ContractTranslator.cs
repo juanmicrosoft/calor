@@ -93,8 +93,7 @@ public sealed class ContractTranslator
     /// <summary>
     /// Z3 uninterpreted function declarations for field accessors on user-defined types,
     /// keyed by (type-name, field-name). Created on demand when a FieldAccessNode is
-    /// translated. The result type is the field's declared Calor type when known, or
-    /// signed 32-bit bit-vector as a default fallback.
+    /// translated. The result type is the field's declared Calor type from the module registry.
     /// </summary>
     private readonly Dictionary<(string TypeName, string FieldName), FuncDecl> _fieldAccessors = new();
 
@@ -146,12 +145,66 @@ public sealed class ContractTranslator
 
     /// <summary>
     /// Registers a map of class type-name → (field-name → field-type) so that
-    /// FieldAccess translation can produce correctly-typed Z3 functions. Pass null
-    /// (or omit the call) to fall back to default-typed accessors.
+    /// FieldAccess translation can produce correctly-typed Z3 functions. Missing entries
+    /// are refused rather than modeled at a guessed width.
     /// </summary>
     public void SetUserTypeRegistry(IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? registry)
     {
         _userTypeRegistry = registry;
+    }
+
+    /// <summary>
+    /// Builds the field-type registry used by field-access translation from the module's
+    /// class declarations. Partial declarations are merged and nested classes are included.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>
+        BuildUserTypeRegistry(ModuleNode module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+
+        var fieldMaps = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        foreach (var cls in EnumerateClasses(module.Classes))
+        {
+            var typeName = NormalizeTypeName(cls.Name);
+            if (!fieldMaps.TryGetValue(typeName, out var fields))
+            {
+                fields = new Dictionary<string, string>(StringComparer.Ordinal);
+                fieldMaps[typeName] = fields;
+            }
+
+            foreach (var field in cls.Fields)
+                fields[field.Name] = field.TypeName;
+        }
+
+        return fieldMaps.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyDictionary<string, string>)pair.Value,
+            StringComparer.Ordinal);
+    }
+
+    internal static string BuildUserTypeRegistryCacheScope(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> registry)
+    {
+        return string.Join(
+            "|",
+            registry.OrderBy(type => type.Key, StringComparer.Ordinal).Select(type =>
+                $"{type.Key.Length}#{type.Key}:" +
+                string.Join(
+                    ",",
+                    type.Value.OrderBy(field => field.Key, StringComparer.Ordinal)
+                        .Select(field =>
+                            $"{field.Key.Length}#{field.Key}={field.Value.Length}#{field.Value}"))));
+    }
+
+    private static IEnumerable<ClassDefinitionNode> EnumerateClasses(
+        IEnumerable<ClassDefinitionNode> classes)
+    {
+        foreach (var cls in classes)
+        {
+            yield return cls;
+            foreach (var nested in EnumerateClasses(cls.NestedClasses))
+                yield return nested;
+        }
     }
 
     /// <summary>
@@ -1487,9 +1540,8 @@ public sealed class ContractTranslator
     /// <summary>
     /// Translates a field-access expression on a user-defined-type value: obj.Field.
     /// Models the field as an uninterpreted Z3 function on the object's sort. The
-    /// function's result sort comes from the user-type registry (when supplied) or
-    /// defaults to signed 32-bit bit-vector. One function per (type, field) pair,
-    /// shared across all expressions referencing the same field.
+    /// function's result sort comes from the required user-type registry. One function
+    /// per (type, field) pair is shared across all expressions referencing the same field.
     /// </summary>
     private Expr? TranslateFieldAccess(FieldAccessNode node)
     {

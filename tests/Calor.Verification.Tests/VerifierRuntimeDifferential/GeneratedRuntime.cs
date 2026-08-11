@@ -7,16 +7,27 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Calor.Verification.Tests.VerifierRuntimeDifferential;
 
-internal sealed class GeneratedRuntime
+internal sealed class GeneratedRuntime : IDisposable
 {
-    private readonly Assembly _assembly;
-    private readonly Type _moduleType;
+    private CollectibleGeneratedLoadContext? _loadContext;
+    private Assembly? _assembly;
+    private Type? _moduleType;
+    private bool _disposed;
 
-    private GeneratedRuntime(Assembly assembly, Type moduleType)
+    private GeneratedRuntime(
+        CollectibleGeneratedLoadContext loadContext,
+        Assembly assembly,
+        Type moduleType)
     {
+        _loadContext = loadContext;
         _assembly = assembly;
         _moduleType = moduleType;
+        LoadContextReference = new WeakReference(loadContext);
     }
+
+    internal WeakReference LoadContextReference { get; }
+
+    internal bool IsCollectible => _loadContext?.IsCollectible == true;
 
     public static GeneratedRuntime Compile(string assemblyName, string generatedCode, string moduleName)
     {
@@ -46,16 +57,28 @@ internal sealed class GeneratedRuntime
         }
 
         stream.Position = 0;
-        var assembly = AssemblyLoadContext.Default.LoadFromStream(stream);
-        var moduleType = assembly.GetType($"{moduleName}.{moduleName}Module")
-            ?? throw new InvalidOperationException(
-                $"Generated module type '{moduleName}.{moduleName}Module' was not found.");
-        return new GeneratedRuntime(assembly, moduleType);
+        var loadContext = new CollectibleGeneratedLoadContext(assemblyName);
+        try
+        {
+            var assembly = loadContext.LoadFromStream(stream);
+            var moduleType = assembly.GetType($"{moduleName}.{moduleName}Module")
+                ?? throw new InvalidOperationException(
+                    $"Generated module type '{moduleName}.{moduleName}Module' was not found.");
+            return new GeneratedRuntime(loadContext, assembly, moduleType);
+        }
+        catch
+        {
+            loadContext.Unload();
+            throw;
+        }
     }
 
     public RuntimeVerdict Invoke(string methodName, IReadOnlyList<string> parameterTypes, out string? detail)
     {
-        var method = _moduleType.GetMethod(
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var moduleType = _moduleType
+            ?? throw new ObjectDisposedException(nameof(GeneratedRuntime));
+        var method = moduleType.GetMethod(
                 methodName,
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException($"Generated method '{methodName}' was not found.");
@@ -106,7 +129,9 @@ internal sealed class GeneratedRuntime
 
     private object CreateProbe()
     {
-        var type = _assembly.GetType("VerifierDifferential.Probe")
+        var assembly = _assembly
+            ?? throw new ObjectDisposedException(nameof(GeneratedRuntime));
+        var type = assembly.GetType("VerifierDifferential.Probe")
             ?? throw new InvalidOperationException("Generated Probe type was not found.");
         var value = Activator.CreateInstance(type)
             ?? throw new InvalidOperationException("Generated Probe instance could not be created.");
@@ -132,6 +157,36 @@ internal sealed class GeneratedRuntime
         var array = Array.CreateInstance(elementType, 1);
         array.SetValue(Convert.ChangeType(7, elementType, System.Globalization.CultureInfo.InvariantCulture), 0);
         return array;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        var loadContext = _loadContext;
+        _moduleType = null;
+        _assembly = null;
+        _loadContext = null;
+        loadContext?.Unload();
+        GC.SuppressFinalize(this);
+    }
+
+    private sealed class CollectibleGeneratedLoadContext : AssemblyLoadContext
+    {
+        public CollectibleGeneratedLoadContext(string name)
+            : base(name, isCollectible: true)
+        {
+        }
+
+        protected override Assembly? Load(AssemblyName assemblyName)
+        {
+            return Default.Assemblies.FirstOrDefault(
+                assembly => AssemblyName.ReferenceMatchesDefinition(
+                    assembly.GetName(),
+                    assemblyName));
+        }
     }
 }
 

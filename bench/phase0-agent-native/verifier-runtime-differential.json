@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "registration": "F-4",
   "whitelistSha256": "6dbdc9c0e1ec122ec1110013cb023ac51109ae5452b55ad00a0b782b471ec463",
   "maximumNestingDepth": 3,
@@ -20,25 +20,28 @@
     "formCoverageFraction": 1,
     "elisionCoverageFraction": 0.615385,
     "matrixCellsRegistered": 1170,
+    "matrixCellsApplicable": 1170,
     "matrixCellsCovered": 1170,
     "matrixCoverageFraction": 1,
     "casesGenerated": 1170,
     "mismatches": 0
   },
   "outcomeCounts": {
-    "assumed": 144,
-    "proven": 432,
-    "refuted": 576,
-    "unsupported": 18
+    "assumed": 150,
+    "proven": 435,
+    "refuted": 585
   },
   "encodingNotes": {
-    "expression-kind:SelfRefNode": "The harness binds \u0027#\u0027 to an i32 parameter named \u0027__self__\u0027 before translation; the emitter\u0027s existing SelfRef lowering targets the same generated parameter. This exercises the modeled refinement meaning without claiming ordinary source-level \u00A7Q/\u00A7S/\u00A7PROOF acceptance of an unbound \u0027#\u0027."
+    "expression-kind:SelfRefNode": "The harness binds \u0027#\u0027 to an i32 parameter named \u0027__self__\u0027 before translation; the emitter\u0027s existing SelfRef lowering targets the same generated parameter. This exercises the modeled refinement meaning without claiming ordinary source-level \u00A7Q/\u00A7S/\u00A7PROOF acceptance of an unbound \u0027#\u0027.",
+    "expression-kind:FieldAccessNode": "The production contract pass and obligation solver derive field types from module class declarations. Probe.Value is translated as a typed uninterpreted accessor and executed against a generated Probe instance; proofs remain explicitly Assumed under the nullable-reference model."
   },
   "forms": [
     {
       "id": "scalar-type:i8",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -56,6 +59,8 @@
       "id": "scalar-type:i16",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -73,6 +78,8 @@
       "id": "scalar-type:i32",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -90,6 +97,8 @@
       "id": "scalar-type:i64",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -107,6 +116,8 @@
       "id": "scalar-type:u8",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -124,6 +135,8 @@
       "id": "scalar-type:u16",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -141,6 +154,8 @@
       "id": "scalar-type:u32",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -158,6 +173,8 @@
       "id": "scalar-type:u64",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -175,6 +192,8 @@
       "id": "scalar-type:bool",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -192,6 +211,10 @@
       "id": "scalar-type:str",
       "category": "scalar-type",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -210,6 +233,10 @@
       "id": "array-element-type:i8",
       "category": "array-element-type",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -228,6 +255,10 @@
       "id": "array-element-type:i16",
       "category": "array-element-type",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -246,6 +277,10 @@
       "id": "array-element-type:i32",
       "category": "array-element-type",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -264,6 +299,10 @@
       "id": "array-element-type:i64",
       "category": "array-element-type",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -282,6 +321,10 @@
       "id": "array-element-type:u8",
       "category": "array-element-type",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -300,6 +343,10 @@
       "id": "array-element-type:u16",
       "category": "array-element-type",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -318,6 +365,10 @@
       "id": "array-element-type:u32",
       "category": "array-element-type",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -336,6 +387,10 @@
       "id": "array-element-type:u64",
       "category": "array-element-type",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -354,6 +409,8 @@
       "id": "expression-kind:IntLiteralNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -371,6 +428,8 @@
       "id": "expression-kind:BoolLiteralNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -388,6 +447,10 @@
       "id": "expression-kind:StringLiteralNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -406,6 +469,8 @@
       "id": "expression-kind:ReferenceNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -423,6 +488,8 @@
       "id": "expression-kind:BinaryOperationNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -440,6 +507,8 @@
       "id": "expression-kind:UnaryOperationNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -457,6 +526,8 @@
       "id": "expression-kind:ConditionalExpressionNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -474,6 +545,8 @@
       "id": "expression-kind:ForallExpressionNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -491,6 +564,8 @@
       "id": "expression-kind:ExistsExpressionNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -508,6 +583,8 @@
       "id": "expression-kind:ImplicationExpressionNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -525,6 +602,10 @@
       "id": "expression-kind:ArrayAccessNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -543,6 +624,10 @@
       "id": "expression-kind:ArrayLengthNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -561,6 +646,10 @@
       "id": "expression-kind:FieldAccessNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -570,13 +659,19 @@
       "elides": false,
       "mismatches": 0,
       "statuses": {
-        "unsupported": 18
+        "assumed": 6,
+        "proven": 3,
+        "refuted": 9
       }
     },
     {
       "id": "expression-kind:StringOperationNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -595,6 +690,8 @@
       "id": "expression-kind:SelfRefNode",
       "category": "expression-kind",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -612,6 +709,8 @@
       "id": "binary-operator:Add",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -629,6 +728,8 @@
       "id": "binary-operator:Subtract",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -646,6 +747,8 @@
       "id": "binary-operator:Multiply",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -663,6 +766,8 @@
       "id": "binary-operator:Divide",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -680,6 +785,8 @@
       "id": "binary-operator:Modulo",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -697,6 +804,8 @@
       "id": "binary-operator:Equal",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -714,6 +823,8 @@
       "id": "binary-operator:NotEqual",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -731,6 +842,8 @@
       "id": "binary-operator:LessThan",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -748,6 +861,8 @@
       "id": "binary-operator:LessOrEqual",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -765,6 +880,8 @@
       "id": "binary-operator:GreaterThan",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -782,6 +899,8 @@
       "id": "binary-operator:GreaterOrEqual",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -799,6 +918,8 @@
       "id": "binary-operator:And",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -816,6 +937,8 @@
       "id": "binary-operator:Or",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -833,6 +956,8 @@
       "id": "binary-operator:BitwiseAnd",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -850,6 +975,8 @@
       "id": "binary-operator:BitwiseOr",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -867,6 +994,8 @@
       "id": "binary-operator:BitwiseXor",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -884,6 +1013,8 @@
       "id": "binary-operator:LeftShift",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -901,6 +1032,8 @@
       "id": "binary-operator:RightShift",
       "category": "binary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -918,6 +1051,8 @@
       "id": "unary-operator:Not",
       "category": "unary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -935,6 +1070,8 @@
       "id": "unary-operator:Negate",
       "category": "unary-operator",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -952,6 +1089,10 @@
       "id": "string-operation:Length",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -970,6 +1111,10 @@
       "id": "string-operation:Contains",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -988,6 +1133,10 @@
       "id": "string-operation:StartsWith",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1006,6 +1155,10 @@
       "id": "string-operation:EndsWith",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1024,6 +1177,10 @@
       "id": "string-operation:Equals",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1042,6 +1199,10 @@
       "id": "string-operation:IsNullOrEmpty",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1060,6 +1221,10 @@
       "id": "string-operation:IndexOf",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1078,6 +1243,10 @@
       "id": "string-operation:Substring",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1096,6 +1265,10 @@
       "id": "string-operation:SubstringFrom",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1114,6 +1287,10 @@
       "id": "string-operation:Concat",
       "category": "string-operation",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1132,6 +1309,10 @@
       "id": "string-comparison-mode:Ordinal",
       "category": "string-comparison-mode",
       "applicable": true,
+      "allowedAssumptions": [
+        "string-model \u2014 the solver\u0027s strings are total, non-null and UTF-8-byte-counted, while .NET\u0027s are nullable and UTF-16-code-unit-counted (D3/D12); a proof touching string semantics is conditional on the value being non-null and ASCII"
+      ],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1150,6 +1331,8 @@
       "id": "quantifier-bound-variable-type:declarable-alias",
       "category": "quantifier-bound-variable-type",
       "applicable": true,
+      "allowedAssumptions": [],
+      "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
       "refutableCases": 9,
@@ -1166,6 +1349,7 @@
   ],
   "failSafeControls": [
     {
+      "scenario": "unsupported",
       "channel": "postcondition",
       "status": "unsupported",
       "guardRetained": true,
@@ -1173,6 +1357,7 @@
       "passed": true
     },
     {
+      "scenario": "unsupported",
       "channel": "obligation",
       "status": "unsupported",
       "guardRetained": true,
@@ -1180,6 +1365,7 @@
       "passed": true
     },
     {
+      "scenario": "timeout",
       "channel": "postcondition",
       "status": "timeout",
       "guardRetained": true,
@@ -1187,6 +1373,7 @@
       "passed": true
     },
     {
+      "scenario": "timeout",
       "channel": "obligation",
       "status": "timeout",
       "guardRetained": true,
@@ -1194,6 +1381,7 @@
       "passed": true
     },
     {
+      "scenario": "solver-error",
       "channel": "postcondition",
       "status": "unknown",
       "guardRetained": true,
@@ -1201,6 +1389,7 @@
       "passed": true
     },
     {
+      "scenario": "solver-error",
       "channel": "obligation",
       "status": "unknown",
       "guardRetained": true,
@@ -1208,6 +1397,7 @@
       "passed": true
     },
     {
+      "scenario": "unavailable",
       "channel": "postcondition",
       "status": "unavailable",
       "guardRetained": true,
@@ -1215,6 +1405,7 @@
       "passed": true
     },
     {
+      "scenario": "unavailable",
       "channel": "obligation",
       "status": "unavailable",
       "guardRetained": true,
@@ -1222,6 +1413,7 @@
       "passed": true
     },
     {
+      "scenario": "assumed",
       "channel": "postcondition",
       "status": "assumed",
       "guardRetained": true,
@@ -1229,6 +1421,7 @@
       "passed": true
     },
     {
+      "scenario": "assumed",
       "channel": "obligation",
       "status": "assumed",
       "guardRetained": true,

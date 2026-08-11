@@ -28,6 +28,7 @@ internal sealed record DifferentialForm(
     string Category,
     bool MatrixApplicable,
     string? ExclusionReason,
+    IReadOnlyList<string> AllowedAssumptions,
     Func<CasePolarity, FormExpression> Build,
     Func<ExpressionNode, bool> ContainsTarget);
 
@@ -43,7 +44,8 @@ internal sealed record DifferentialCase(
     int NestingDepth,
     CasePolarity Polarity,
     FunctionNode Function,
-    string? ProofId);
+    string? ProofId,
+    IReadOnlyList<string> AllowedAssumptions);
 
 internal sealed record CaseResult(
     string Id,
@@ -56,6 +58,7 @@ internal sealed record CaseResult(
     string RuntimeVerdict,
     bool GuardForced,
     bool ElidedWhenEnabled,
+    bool SolverHandled,
     bool Mismatch,
     string? Detail);
 
@@ -64,6 +67,8 @@ internal sealed record FormCoverage(
     string Category,
     bool Applicable,
     string? ExclusionReason,
+    IReadOnlyList<string> AllowedAssumptions,
+    bool SolverHandled,
     int Cases,
     int ProvableCases,
     int RefutableCases,
@@ -75,6 +80,7 @@ internal sealed record FormCoverage(
     IReadOnlyDictionary<string, int> Statuses);
 
 internal sealed record FailSafeControl(
+    string Scenario,
     string Channel,
     string Status,
     bool GuardRetained,
@@ -89,6 +95,7 @@ internal sealed record CoverageMetrics(
     double FormCoverageFraction,
     double ElisionCoverageFraction,
     int MatrixCellsRegistered,
+    int MatrixCellsApplicable,
     int MatrixCellsCovered,
     double MatrixCoverageFraction,
     int CasesGenerated,
@@ -112,5 +119,6 @@ internal sealed record DifferentialReport(
     public bool Passed =>
         Coverage.Mismatches == 0
         && Coverage.FormsCovered == Coverage.FormsApplicable
+        && Coverage.MatrixCellsCovered == Coverage.MatrixCellsApplicable
         && FailSafeControls.All(control => control.Passed);
 }

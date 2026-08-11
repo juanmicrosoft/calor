@@ -58,19 +58,21 @@ internal static class DifferentialGate
 
         var forcedMethods = GeneratedMethodInspector.ExtractMethods(forcedCode);
         var elidedMethods = GeneratedMethodInspector.ExtractMethods(elidedCode);
-        var runtime = GeneratedRuntime.Compile(
-            "CalorVerifierDifferentialMain",
-            forcedCode,
-            "VerifierDifferential");
-
-        var results = cases.Select(testCase => EvaluateCase(
-                testCase,
-                verification,
-                obligations,
-                forcedMethods,
-                elidedMethods,
-                runtime))
-            .ToList();
+        List<CaseResult> results;
+        using (var runtime = GeneratedRuntime.Compile(
+                   "CalorVerifierDifferentialMain",
+                   forcedCode,
+                   "VerifierDifferential"))
+        {
+            results = cases.Select(testCase => EvaluateCase(
+                    testCase,
+                    verification,
+                    obligations,
+                    forcedMethods,
+                    elidedMethods,
+                    runtime))
+                .ToList();
+        }
 
         var failSafeControls = RunFailSafeControls();
         return BuildReport(forms, results, failSafeControls);
@@ -121,7 +123,8 @@ internal static class DifferentialGate
                             depth,
                             polarity,
                             function,
-                            proofId));
+                            proofId,
+                            form.AllowedAssumptions));
                     }
                 }
             }
@@ -260,8 +263,20 @@ internal static class DifferentialGate
         var expectedRuntime = testCase.Polarity == CasePolarity.Provable
             ? RuntimeVerdict.Completed
             : RuntimeVerdict.GuardFailed;
+        var solverHandled = IsExpectedSolverOutcome(testCase, outcome)
+            && !outcome.IsVacuous;
 
         var detail = new List<string>();
+        if (!solverHandled)
+        {
+            var expected = testCase.Polarity == CasePolarity.Refutable
+                ? "refuted"
+                : testCase.AllowedAssumptions.Count == 0
+                    ? "proven"
+                    : "proven or explicitly allowed assumed";
+            detail.Add(
+                $"solver expected {expected} but observed {outcome.StatusName}");
+        }
         if (!guardForced)
             detail.Add("forced-guard emission omitted the runtime guard");
         if (elidedWhenEnabled != elisionEligible)
@@ -301,8 +316,26 @@ internal static class DifferentialGate
             runtimeVerdict.ToString().ToLowerInvariant(),
             guardForced,
             elidedWhenEnabled,
+            solverHandled,
             detail.Count > 0,
             detail.Count == 0 ? null : string.Join("; ", detail));
+    }
+
+    private static bool IsExpectedSolverOutcome(
+        DifferentialCase testCase,
+        ProofOutcome outcome)
+    {
+        if (testCase.Polarity == CasePolarity.Refutable)
+            return outcome.Status == ProofStatus.Refuted;
+
+        if (outcome.Status == ProofStatus.Proven)
+            return true;
+
+        return outcome.Status == ProofStatus.Assumed
+            && outcome.Assumptions.SequenceEqual(
+                testCase.AllowedAssumptions.OrderBy(
+                    assumption => assumption,
+                    StringComparer.Ordinal));
     }
 
     private static ProofOutcome GetOutcome(
@@ -415,31 +448,43 @@ internal static class DifferentialGate
 
     private static IReadOnlyList<FailSafeControl> RunFailSafeControls()
     {
-        var statuses = new[]
+        var statuses = new (string Scenario, ProofOutcome Outcome)[]
         {
-            ProofOutcome.Rehydrate("unsupported", null, "synthetic unsupported control"),
-            ProofOutcome.Rehydrate("timeout", null, "synthetic timeout control"),
-            ProofOutcome.Rehydrate("unknown", null, "Z3 solver error: synthetic error control"),
-            ProofOutcome.Rehydrate("unavailable", null, "synthetic unavailable control"),
-            ProofOutcome.Rehydrate(
-                "assumed",
-                null,
-                "synthetic assumed control",
-                assumptions: ["differential-control"])
+            ("unsupported",
+                ProofOutcome.Assign(ProofEvidence.Unsupported("synthetic unsupported control"))),
+            ("timeout",
+                ProofOutcome.ClassifySolverStatus(
+                    Status.UNKNOWN,
+                    SatPolarity.SatIsRefutation,
+                    reasonUnknown: "timeout: synthetic deterministic control")),
+            ("solver-error",
+                ProofOutcome.ClassifySolverException(
+                    new InvalidOperationException("synthetic deterministic control"))),
+            ("unavailable",
+                ProofOutcome.Assign(ProofEvidence.SolverUnavailable("synthetic unavailable control"))),
+            ("assumed",
+                ProofOutcome.Assign(ProofEvidence.AssumedProof(
+                    "synthetic assumed control",
+                    ["differential-control"])))
         };
 
         var functions = new List<FunctionNode>();
         var verificationFunctions = new List<FunctionVerificationResult>();
         var tracker = new ObligationTracker();
-        var controls = new List<(string Channel, ProofOutcome Outcome, FunctionNode Function, string? ProofId)>();
+        var controls = new List<(
+            string Scenario,
+            string Channel,
+            ProofOutcome Outcome,
+            FunctionNode Function,
+            string? ProofId)>();
         var sequence = 0;
 
-        foreach (var outcome in statuses)
+        foreach (var (scenario, outcome) in statuses)
         {
             sequence++;
             var postFunction = BuildFunction(
                 $"fc{sequence:D3}",
-                $"FailSafe_Post_{outcome.StatusName}",
+                $"FailSafe_Post_{scenario.Replace('-', '_')}",
                 Array.Empty<ParameterNode>(),
                 new BoolLiteralNode(Span, false),
                 ContractPosition.Postcondition,
@@ -450,19 +495,19 @@ internal static class DifferentialGate
                 postFunction.Name,
                 Array.Empty<Z3ContractVerificationResult>(),
                 [Z3ContractVerificationResult.FromOutcome(outcome)]));
-            controls.Add(("postcondition", outcome, postFunction, null));
+            controls.Add((scenario, "postcondition", outcome, postFunction, null));
 
             sequence++;
             var proofId = $"pc{sequence:D3}";
             var obligationFunction = BuildFunction(
                 $"fc{sequence:D3}",
-                $"FailSafe_Obligation_{outcome.StatusName}",
+                $"FailSafe_Obligation_{scenario.Replace('-', '_')}",
                 Array.Empty<ParameterNode>(),
                 new BoolLiteralNode(Span, false),
                 ContractPosition.Obligation,
                 proofId);
             functions.Add(obligationFunction);
-            controls.Add(("obligation", outcome, obligationFunction, proofId));
+            controls.Add((scenario, "obligation", outcome, obligationFunction, proofId));
         }
 
         var module = new ModuleNode(
@@ -490,7 +535,7 @@ internal static class DifferentialGate
         }.Emit(module);
         ValidateGeneratedCode(code, "fail-safe-control");
         var methods = GeneratedMethodInspector.ExtractMethods(code);
-        var runtime = GeneratedRuntime.Compile(
+        using var runtime = GeneratedRuntime.Compile(
             "CalorVerifierDifferentialFailSafe",
             code,
             "VerifierFailSafe");
@@ -507,6 +552,7 @@ internal static class DifferentialGate
                 Array.Empty<string>(),
                 out _);
             return new FailSafeControl(
+                control.Scenario,
                 control.Channel,
                 control.Outcome.StatusName,
                 guardRetained,
@@ -537,6 +583,9 @@ internal static class DifferentialGate
                 form.Category,
                 form.MatrixApplicable,
                 form.ExclusionReason,
+                form.AllowedAssumptions,
+                cases.Count == ExpectedCasesPerApplicableForm
+                    && cases.All(testCase => testCase.SolverHandled),
                 cases.Count,
                 cases.Count(testCase => testCase.Polarity == "provable"),
                 cases.Count(testCase => testCase.Polarity == "refutable"),
@@ -552,12 +601,13 @@ internal static class DifferentialGate
 
         var formsWhitelisted = forms.Count;
         var formsApplicable = forms.Count(form => form.MatrixApplicable);
-        var formsCovered = formCoverage.Count(form => form.Applicable && form.Cases > 0);
+        var formsCovered = formCoverage.Count(form => form.Applicable && form.SolverHandled);
         var formsEliding = formCoverage.Count(form => form.Elides);
         var matrixRegistered = formsWhitelisted
             * Enum.GetValues<ContractPosition>().Length
             * MaximumDepth
             * Enum.GetValues<CasePolarity>().Length;
+        var matrixApplicable = formsApplicable * ExpectedCasesPerApplicableForm;
         var mismatches = results.Count(result => result.Mismatch);
         var metrics = new CoverageMetrics(
             formsWhitelisted,
@@ -567,13 +617,14 @@ internal static class DifferentialGate
             Fraction(formsCovered, formsWhitelisted),
             Fraction(formsEliding, formsWhitelisted),
             matrixRegistered,
-            results.Count,
-            Fraction(results.Count, matrixRegistered),
+            matrixApplicable,
+            results.Count(result => result.SolverHandled),
+            Fraction(results.Count(result => result.SolverHandled), matrixApplicable),
             results.Count,
             mismatches);
 
         return new DifferentialReport(
-            "1.0",
+            "1.1",
             "F-4",
             PinnedWhitelistSha256,
             MaximumDepth,
@@ -591,7 +642,12 @@ internal static class DifferentialGate
                     "The harness binds '#' to an i32 parameter named '__self__' before translation; " +
                     "the emitter's existing SelfRef lowering targets the same generated parameter. " +
                     "This exercises the modeled refinement meaning without claiming ordinary source-level " +
-                    "§Q/§S/§PROOF acceptance of an unbound '#'."
+                    "§Q/§S/§PROOF acceptance of an unbound '#'.",
+                ["expression-kind:FieldAccessNode"] =
+                    "The production contract pass and obligation solver derive field types from module " +
+                    "class declarations. Probe.Value is translated as a typed uninterpreted accessor and " +
+                    "executed against a generated Probe instance; proofs remain explicitly Assumed under " +
+                    "the nullable-reference model."
             },
             formCoverage,
             failSafeControls,
@@ -633,4 +689,7 @@ internal static class DifferentialGate
 
     private static double Fraction(int numerator, int denominator) =>
         denominator == 0 ? 0 : Math.Round((double)numerator / denominator, 6);
+
+    private const int ExpectedCasesPerApplicableForm =
+        3 * MaximumDepth * 2;
 }

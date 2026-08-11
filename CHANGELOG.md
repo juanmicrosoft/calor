@@ -11,7 +11,11 @@ All notable changes to this project will be documented in this file.
   bounded-quantifier emitter lowering and the separate obligation-elision path, rejects vacuous or
   mislabeled cases, and pins fail-safe handling for unsupported, timeout, solver-error, unavailable,
   and assumed outcomes. CI blocks on zero mismatches and byte-checks published JSON/Markdown
-  metrics. Current coverage is 65/65 forms and 1,170/1,170 cells; 40/65 forms currently elide.
+  metrics. Coverage now requires decisive production solver outcomes, with only exact documented
+  assumption sets accepted. Module-derived field typing makes `Probe.Value` solver-handled instead
+  of unsupported; generated assemblies are collectible, worktree `.git` files are supported, and
+  report paths are LF-pinned. Current coverage is 65/65 solver-handled forms and 1,170/1,170
+  solver-handled cells; 40/65 forms currently elide.
 
 ### Changed
 - **The binder dispatches every expression class** (#762 B1): a single authoritative dispatch

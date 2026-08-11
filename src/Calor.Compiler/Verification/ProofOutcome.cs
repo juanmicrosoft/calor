@@ -1,6 +1,9 @@
 using Calor.Compiler.Verification.Obligations;
 using Calor.Compiler.Verification.Z3;
 using Microsoft.Z3;
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("Calor.Verification.Tests")]
 
 namespace Calor.Compiler.Verification;
 
@@ -122,6 +125,7 @@ public readonly struct ProofEvidence
     internal string? ReasonUnknown { get; private init; }
     internal string? Detail { get; private init; }
     internal IReadOnlyList<string>? AssumptionList { get; private init; }
+    internal Exception? Exception { get; private init; }
 
     /// <summary>
     /// Captures a completed <c>solver.Check()</c>: the verdict, the model when SATISFIABLE,
@@ -152,7 +156,8 @@ public readonly struct ProofEvidence
     public static ProofEvidence SolverError(Z3Exception ex) => new()
     {
         Kind = EvidenceKind.SolverError,
-        Detail = $"Z3 solver error: {ex.Message}"
+        Detail = $"Z3 solver error: {ex.Message}",
+        Exception = ex
     };
 
     /// <summary>Captures a translation failure or undeclarable type.</summary>
@@ -290,33 +295,61 @@ public sealed class ProofOutcome
                 return new ProofOutcome(ProofStatus.Assumed, null, evidence.Detail, assumptions: evidence.AssumptionList);
 
             case ProofEvidence.EvidenceKind.SolverError:
-                return new ProofOutcome(ProofStatus.Unknown, null, evidence.Detail);
+                return evidence.Exception is not null
+                    ? ClassifySolverException(evidence.Exception)
+                    : new ProofOutcome(ProofStatus.Unknown, null, evidence.Detail);
 
             case ProofEvidence.EvidenceKind.SolverUnavailable:
                 return new ProofOutcome(ProofStatus.Unavailable, null, evidence.Detail);
 
             case ProofEvidence.EvidenceKind.SolverVerdict:
-                switch (evidence.Check)
-                {
-                    case Microsoft.Z3.Status.UNSATISFIABLE:
-                        return evidence.Polarity == SatPolarity.SatIsProof
-                            ? new ProofOutcome(ProofStatus.Refuted, null, evidence.Detail)
-                            : new ProofOutcome(ProofStatus.Proven, null, null);
-
-                    case Microsoft.Z3.Status.SATISFIABLE:
-                        return evidence.Polarity == SatPolarity.SatIsRefutation
-                            ? new ProofOutcome(ProofStatus.Refuted, evidence.Model, evidence.Detail)
-                            : new ProofOutcome(ProofStatus.Proven, null, null);
-
-                    default:
-                        return IsTimeoutReason(evidence.ReasonUnknown)
-                            ? new ProofOutcome(ProofStatus.Timeout, null, evidence.ReasonUnknown)
-                            : new ProofOutcome(ProofStatus.Unknown, null, evidence.ReasonUnknown);
-                }
+                return ClassifySolverStatus(
+                    evidence.Check,
+                    evidence.Polarity,
+                    evidence.Model,
+                    evidence.ReasonUnknown,
+                    evidence.Detail);
 
             default:
                 return new ProofOutcome(ProofStatus.Unknown, null, evidence.Detail);
         }
+    }
+
+    /// <summary>
+    /// Deterministic solver-boundary classification used by production evidence assignment
+    /// and by tests that must exercise timeout/error policy without relying on a flaky timeout.
+    /// </summary>
+    internal static ProofOutcome ClassifySolverStatus(
+        Status status,
+        SatPolarity polarity,
+        Counterexample? counterexample = null,
+        string? reasonUnknown = null,
+        string? unsatNote = null)
+    {
+        return status switch
+        {
+            Microsoft.Z3.Status.UNSATISFIABLE => polarity == SatPolarity.SatIsProof
+                ? new ProofOutcome(ProofStatus.Refuted, null, unsatNote)
+                : new ProofOutcome(ProofStatus.Proven, null, null),
+            Microsoft.Z3.Status.SATISFIABLE => polarity == SatPolarity.SatIsRefutation
+                ? new ProofOutcome(ProofStatus.Refuted, counterexample, null)
+                : new ProofOutcome(ProofStatus.Proven, null, null),
+            _ => IsTimeoutReason(reasonUnknown)
+                ? new ProofOutcome(ProofStatus.Timeout, null, reasonUnknown)
+                : new ProofOutcome(ProofStatus.Unknown, null, reasonUnknown)
+        };
+    }
+
+    /// <summary>
+    /// Deterministic exception classification shared by every production Z3 catch path.
+    /// </summary>
+    internal static ProofOutcome ClassifySolverException(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return new ProofOutcome(
+            ProofStatus.Unknown,
+            null,
+            $"Z3 solver error: {exception.Message}");
     }
 
     private static bool IsTimeoutReason(string? reasonUnknown)
