@@ -31,6 +31,8 @@ public interface IAstVisitor
 {
     void Visit(ModuleNode node);
     void Visit(FunctionNode node);
+    void Visit(OutputNode node);
+    void Visit(EffectsNode node);
     void Visit(ParameterNode node);
     void Visit(CallStatementNode node);
     void Visit(ReturnStatementNode node);
@@ -46,6 +48,7 @@ public interface IAstVisitor
     void Visit(WhileStatementNode node);
     void Visit(DoWhileStatementNode node);
     void Visit(IfStatementNode node);
+    void Visit(ElseIfClauseNode node);
     void Visit(BindStatementNode node);
     void Visit(BinaryOperationNode node);
     void Visit(UnaryOperationNode node);
@@ -57,11 +60,15 @@ public interface IAstVisitor
     void Visit(PrintStatementNode node);
     // Phase 3: Type System
     void Visit(RecordDefinitionNode node);
+    void Visit(FieldDefinitionNode node);
     void Visit(UnionTypeDefinitionNode node);
+    void Visit(VariantDefinitionNode node);
+    void Visit(TypeReferenceNode node);
     void Visit(EnumDefinitionNode node);
     void Visit(EnumMemberNode node);
     void Visit(EnumExtensionNode node);
     void Visit(RecordCreationNode node);
+    void Visit(FieldAssignmentNode node);
     void Visit(FieldAccessNode node);
     void Visit(SomeExpressionNode node);
     void Visit(NoneExpressionNode node);
@@ -256,6 +263,8 @@ public interface IAstVisitor<T>
 {
     T Visit(ModuleNode node);
     T Visit(FunctionNode node);
+    T Visit(OutputNode node);
+    T Visit(EffectsNode node);
     T Visit(ParameterNode node);
     T Visit(CallStatementNode node);
     T Visit(ReturnStatementNode node);
@@ -271,6 +280,7 @@ public interface IAstVisitor<T>
     T Visit(WhileStatementNode node);
     T Visit(DoWhileStatementNode node);
     T Visit(IfStatementNode node);
+    T Visit(ElseIfClauseNode node);
     T Visit(BindStatementNode node);
     T Visit(BinaryOperationNode node);
     T Visit(UnaryOperationNode node);
@@ -282,11 +292,15 @@ public interface IAstVisitor<T>
     T Visit(PrintStatementNode node);
     // Phase 3: Type System
     T Visit(RecordDefinitionNode node);
+    T Visit(FieldDefinitionNode node);
     T Visit(UnionTypeDefinitionNode node);
+    T Visit(VariantDefinitionNode node);
+    T Visit(TypeReferenceNode node);
     T Visit(EnumDefinitionNode node);
     T Visit(EnumMemberNode node);
     T Visit(EnumExtensionNode node);
     T Visit(RecordCreationNode node);
+    T Visit(FieldAssignmentNode node);
     T Visit(FieldAccessNode node);
     T Visit(SomeExpressionNode node);
     T Visit(NoneExpressionNode node);

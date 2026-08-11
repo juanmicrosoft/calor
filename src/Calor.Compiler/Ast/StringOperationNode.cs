@@ -74,24 +74,21 @@ public static class StringComparisonModeExtensions
 /// Only valid as arguments to operations that support them.
 /// This is an internal node type used during parsing and is not visitable.
 /// </summary>
-public sealed class KeywordArgNode : ExpressionNode
+public sealed class KeywordArgNode
 {
+    // #762 item 8 (B8): reclassified OUT of the AST — a keyword argument is a
+    // parser-internal value object (produced by Parser.ParseLispArgumentOrKeyword,
+    // consumed by Parser.FilterKeywordArgs, #874), not an expression. As a plain
+    // class it cannot appear in expression position, so the old no-op-Accept
+    // null-injection hazard is unrepresentable rather than merely guarded.
+    public TextSpan Span { get; }
     public string Name { get; }
 
-    public KeywordArgNode(TextSpan span, string name) : base(span)
+    public KeywordArgNode(TextSpan span, string name)
     {
+        Span = span;
         Name = name ?? throw new ArgumentNullException(nameof(name));
     }
-
-    // KeywordArgNode is internal to parsing - it should be consumed by the parser
-    // and not appear in the final AST. The parser enforces this at a single choke
-    // point (Parser.FilterKeywordArgs, #874): a trailing keyword on a recognized
-    // string operation is consumed as the comparison mode; every other occurrence
-    // is rejected with a diagnostic and dropped. These methods should therefore
-    // never be called; default! here means any escape becomes a null child in a
-    // visitor rebuild, so the choke point is load-bearing.
-    public override void Accept(IAstVisitor visitor) { }
-    public override T Accept<T>(IAstVisitor<T> visitor) => default!;
 }
 
 /// <summary>

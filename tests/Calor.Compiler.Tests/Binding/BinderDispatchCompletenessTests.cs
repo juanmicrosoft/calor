@@ -43,6 +43,10 @@ public class BinderDispatchCompletenessTests
         // F-1 (v0.13-freeze-registrations.md) froze the denominator at 61 classes,
         // exhaustively tiered. A count change here without an F-1 amendment is exactly
         // the silent-denominator-drift the registration's bidirectional rule forbids.
-        Assert.Equal(61, ConcreteExpressionTypes().Count);
+        // B8 amendment (#762 item 8, subtractive-with-supersession recorded in F-1):
+        // KeywordArgNode reclassified out of the AST entirely — it is a parser-internal
+        // value object that can no longer TYPE as an expression, so it leaves the
+        // denominator by becoming unrepresentable, not by being silently skipped.
+        Assert.Equal(60, ConcreteExpressionTypes().Count);
     }
 }

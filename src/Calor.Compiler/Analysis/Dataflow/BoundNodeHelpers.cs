@@ -41,6 +41,14 @@ public static class BoundNodeHelpers
                     yield return v;
                 break;
 
+            // #762 B8: Tier-B residuals carry RetainedChildren on a
+            // BoundCallExpression-shaped node — walk those first.
+            case BoundIncompleteExpression incomplete:
+                foreach (var child in incomplete.RetainedChildren)
+                    foreach (var v in GetUsedVariables(child))
+                        yield return v;
+                break;
+
             case BoundCallExpression callExpr:
                 foreach (var arg in callExpr.Arguments)
                     foreach (var v in GetUsedVariables(arg))
@@ -291,6 +299,12 @@ public static class BoundNodeHelpers
             case BoundUnaryExpression unaryExpr:
                 return ContainsDivision(unaryExpr.Operand, out divisionExpr);
 
+            case BoundIncompleteExpression incomplete:
+                foreach (var child in incomplete.RetainedChildren)
+                    if (ContainsDivision(child, out divisionExpr))
+                        return true;
+                break;
+
             case BoundCallExpression callExpr:
                 foreach (var arg in callExpr.Arguments)
                     if (ContainsDivision(arg, out divisionExpr))
@@ -353,6 +367,12 @@ public static class BoundNodeHelpers
 
             default:
                 foreach (var child in BoundChildren.Of(expression))
+                    if (ContainsArrayAccess(child, out arrayExpr, out indexExpr))
+                        return true;
+                break;
+
+            case BoundIncompleteExpression incomplete:
+                foreach (var child in incomplete.RetainedChildren)
                     if (ContainsArrayAccess(child, out arrayExpr, out indexExpr))
                         return true;
                 break;

@@ -152,8 +152,8 @@ public sealed class ElseIfClauseNode : AstNode
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
 
-    public override void Accept(IAstVisitor visitor) { }
-    public override T Accept<T>(IAstVisitor<T> visitor) => default!;
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
 
 /// <summary>

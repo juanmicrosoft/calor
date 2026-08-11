@@ -4191,4 +4191,60 @@ public sealed class CalorEmitter : IAstVisitor<string>
         AppendLine(sb.ToString());
         return "";
     }
+
+    // #762 item 8 (B8): real dispatch for the seven former no-op-Accept classes
+    // (bodies ported from PR #900). REFERENCE PROJECTIONS: the parent nodes'
+    // emission paths still inline-handle these nodes (routing them through Accept is
+    // follow-up work) — keep each body matching its live inline path, or the day
+    // something dispatches Accept the output silently diverges (#911 review F5).
+    public string Visit(OutputNode node) => $"§O{{{TypeMapper.CSharpToCalor(node.TypeName)}}}";
+
+    public string Visit(EffectsNode node)
+    {
+        // Live-path parity (#911 F5): EmitEffects omits the line entirely for an empty
+        // effects map — an emitted `§E{}` would MEAN pure, which is a different claim.
+        if (node.Effects.Count == 0)
+            return "";
+        var effectCodes = node.Effects
+            .SelectMany(kvp => kvp.Value.Split(',').Select(v => EffectCodes.ToCompact(kvp.Key, v.Trim())))
+            .Distinct();
+        return $"§E{{{string.Join(",", effectCodes)}}}";
+    }
+
+    public string Visit(ElseIfClauseNode node)
+    {
+        AppendLine($"§EI {node.Condition.Accept(this)}");
+        Indent();
+        foreach (var stmt in node.Body)
+        {
+            stmt.Accept(this);
+        }
+        Dedent();
+        return "";
+    }
+
+    public string Visit(FieldDefinitionNode node)
+    {
+        var defaultValue = node.DefaultValue is null ? "" : $" = {node.DefaultValue.Accept(this)}";
+        return $"{TypeMapper.CSharpToCalor(node.TypeName)}:{node.Name}{defaultValue}";
+    }
+
+    public string Visit(VariantDefinitionNode node)
+    {
+        var fields = node.Fields.Count == 0
+            ? ""
+            : $"({string.Join(", ", node.Fields.Select(Visit))})";
+        return $"§V{{{node.Name}}}{fields}";
+    }
+
+    public string Visit(TypeReferenceNode node)
+    {
+        var typeName = TypeMapper.CSharpToCalor(node.Name);
+        return node.TypeArguments.Count == 0
+            ? typeName
+            : $"{typeName}<{string.Join(",", node.TypeArguments.Select(Visit))}>";
+    }
+
+    public string Visit(FieldAssignmentNode node) => node.Value.Accept(this);
+
 }

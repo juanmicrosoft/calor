@@ -160,9 +160,13 @@ public sealed class VerificationAnalysisPass
         // ONLY the analysis-incomplete instrument code into the real bag — wholesale
         // routing would double-report binder diagnostics that AST-based passes (e.g.
         // BindValidationPass) already surface through their own channels.
+        // #911 review F1: propagate the binder's ORIGINAL severity — B8 promoted the
+        // instrument to Warning (scoping doc §5), and a hardcoded ReportInfo here made
+        // the promotion silently inert on the CLI/analyze/MCP surface (the LSP live-bag
+        // path was the only one that saw it).
         foreach (var d in bindingDiagnostics.Where(d => d.Code == DiagnosticCode.AnalysisIncomplete))
         {
-            _diagnostics.ReportInfo(d.Span, d.Code, d.Message);
+            _diagnostics.Report(d.Span, d.Code, d.Message, d.Severity);
         }
 
         // Run analyses on the bound module with contract info

@@ -124,6 +124,28 @@ public static class DiagnosticCode
     /// </summary>
     public const string ReturnValueInVoidOwner = "Calor0205";
 
+    /// <summary>
+    /// Error: two top-level functions declare the same name AND the same ordered
+    /// parameter-type list (#762 items 5–6, B8). Distinct signatures under one name
+    /// are a legal overload set; an identical signature is unresolvable.
+    /// </summary>
+    public const string DuplicateFunctionSignature = "Calor0206";
+
+    /// <summary>
+    /// Warning: an internal call matches more than one overload at its arity and the
+    /// argument types cannot discriminate (bound types are informational strings in
+    /// 0.13 — B5 decision record). Resolution proceeds with the first declaration,
+    /// NON-silently (#762 DoD: no silent incompatible fallback).
+    /// </summary>
+    public const string AmbiguousOverload = "Calor0207";
+
+    /// <summary>
+    /// Warning: an internal call names a declared function but no overload accepts
+    /// the given argument count. Resolution proceeds with the first declaration for
+    /// bound-tree continuity, NON-silently (#762 DoD).
+    /// </summary>
+    public const string NoMatchingOverload = "Calor0208";
+
     // Bind inference diagnostics (Calor0250-0259) — RFC v0.6 bind-inference-formalization
 
     /// <summary>
