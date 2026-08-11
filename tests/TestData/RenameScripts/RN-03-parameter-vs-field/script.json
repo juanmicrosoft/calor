@@ -1,0 +1,14 @@
+{
+  "id": "RN-03",
+  "title": "A parameter that shadows a field of the same name",
+  "pins": "`count` is both a field of Box and the parameter of the method that reads the field through §THIS. Renaming the parameter must move the parameter declaration and the bare reference to it, and must leave `§THIS.count` alone. A textual rename rewrites the field reference too, which compiles and silently changes which storage the method reads — so the behaviour comparison, not the compiler, is what catches it.",
+  "target": {
+    "file": "holder.calr",
+    "marker": "count",
+    "occurrence": 1
+  },
+  "newName": "delta",
+  "expect": "applies",
+  "entry": "Run",
+  "expectedResult": 5
+}

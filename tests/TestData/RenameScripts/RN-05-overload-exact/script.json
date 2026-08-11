@@ -1,0 +1,14 @@
+{
+  "id": "RN-05",
+  "title": "One overload of a method renamed, its sibling untouched",
+  "pins": "Two methods share the name `Pick` and differ only in parameter type. The rename must move the i32 overload and the call that resolves to it, and must leave the str overload named `Pick`. Overload identity is exactly what a text-directed rename cannot see.",
+  "target": {
+    "file": "overload.calr",
+    "marker": "Pick",
+    "occurrence": 0
+  },
+  "newName": "Choose",
+  "expect": "applies",
+  "entry": "Run",
+  "expectedResult": 6
+}

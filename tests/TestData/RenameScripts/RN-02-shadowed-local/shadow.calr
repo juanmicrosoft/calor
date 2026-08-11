@@ -1,0 +1,9 @@
+§M{m001:Shadow}
+  §F{f001:Run:pub} () -> i32
+    §E{}
+    §B{value:i32} INT:10
+    §R (+ value §C{Helper} §/C)
+  §F{f002:Helper:pub} () -> i32
+    §E{}
+    §B{value:i32} INT:1
+    §R value
