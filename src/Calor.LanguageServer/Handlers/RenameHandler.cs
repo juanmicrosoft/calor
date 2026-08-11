@@ -69,6 +69,7 @@ public sealed class RenameHandler : RenameHandlerBase
 
         if (!await _workspace.ValidateRenameAsync(
                 occurrences,
+                oldName,
                 request.NewName,
                 cancellationToken).ConfigureAwait(false))
             return null;
