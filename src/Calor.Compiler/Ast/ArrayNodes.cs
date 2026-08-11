@@ -23,6 +23,7 @@ public sealed class ArrayCreationNode : ExpressionNode
     /// The element type of the array.
     /// </summary>
     public string ElementType { get; }
+    public TextSpan ElementTypeSpan { get; }
 
     /// <summary>
     /// The size of the array (for sized arrays). Null if using initializer.
@@ -43,12 +44,14 @@ public sealed class ArrayCreationNode : ExpressionNode
         string elementType,
         ExpressionNode? size,
         IReadOnlyList<ExpressionNode> initializer,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? elementTypeSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
+        ElementTypeSpan = elementTypeSpan ?? TextSpan.Empty;
         Size = size;
         Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
@@ -129,6 +132,7 @@ public sealed class ForeachStatementNode : StatementNode
     /// The type of the loop variable.
     /// </summary>
     public string VariableType { get; }
+    public TextSpan VariableTypeSpan { get; }
 
     /// <summary>
     /// The collection being iterated.
@@ -158,13 +162,15 @@ public sealed class ForeachStatementNode : StatementNode
         AttributeCollection attributes,
         string? indexVariableName = null,
         TextSpan? variableSpan = null,
-        TextSpan? indexVariableSpan = null)
+        TextSpan? indexVariableSpan = null,
+        TextSpan? variableTypeSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         VariableName = variableName ?? throw new ArgumentNullException(nameof(variableName));
         VariableSpan = variableSpan ?? span;
         VariableType = variableType ?? throw new ArgumentNullException(nameof(variableType));
+        VariableTypeSpan = variableTypeSpan ?? TextSpan.Empty;
         Collection = collection ?? throw new ArgumentNullException(nameof(collection));
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
@@ -186,6 +192,7 @@ public sealed class MultiDimArrayCreationNode : ExpressionNode
     public string Id { get; }
     public string Name { get; }
     public string ElementType { get; }
+    public TextSpan ElementTypeSpan { get; }
 
     /// <summary>
     /// The rank (number of dimensions), e.g., 2 for [,], 3 for [,,].
@@ -210,12 +217,14 @@ public sealed class MultiDimArrayCreationNode : ExpressionNode
         string elementType,
         int rank,
         IReadOnlyList<ExpressionNode> dimensionSizes,
-        IReadOnlyList<IReadOnlyList<ExpressionNode>> initializer)
+        IReadOnlyList<IReadOnlyList<ExpressionNode>> initializer,
+        TextSpan? elementTypeSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
+        ElementTypeSpan = elementTypeSpan ?? TextSpan.Empty;
         Rank = rank;
         DimensionSizes = dimensionSizes ?? Array.Empty<ExpressionNode>();
         Initializer = initializer ?? Array.Empty<IReadOnlyList<ExpressionNode>>();

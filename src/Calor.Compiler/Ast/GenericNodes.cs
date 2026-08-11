@@ -111,16 +111,22 @@ public sealed class GenericTypeNode : ExpressionNode
     /// The name of the generic type (e.g., "List", "Dictionary").
     /// </summary>
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
 
     /// <summary>
     /// The type arguments.
     /// </summary>
     public IReadOnlyList<string> TypeArguments { get; }
 
-    public GenericTypeNode(TextSpan span, string typeName, IReadOnlyList<string> typeArguments)
+    public GenericTypeNode(
+        TextSpan span,
+        string typeName,
+        IReadOnlyList<string> typeArguments,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         TypeArguments = typeArguments ?? throw new ArgumentNullException(nameof(typeArguments));
     }
 

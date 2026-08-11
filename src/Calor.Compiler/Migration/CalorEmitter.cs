@@ -885,6 +885,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
         var typeParams = node.TypeParameters.Count > 0
             ? $"<{string.Join(",", node.TypeParameters.Select(tp => Visit(tp)))}>"
             : "";
+        var functionName = node.Name;
+        var genericStart = functionName.LastIndexOf('<');
+        if (node.TypeParameters.Count > 0
+            && genericStart > 0
+            && functionName.EndsWith('>'))
+        {
+            functionName = functionName[..genericStart];
+        }
 
         var output = node.Output != null ? TypeMapper.CSharpToCalor(node.Output.TypeName) : "void";
 
@@ -895,11 +903,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}" : "";
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}}}{inlineParams}{inlineReturn}");
+            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}:{visibility}}}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(node.Name)}{typeParams}:{visibility}}}");
+            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}:{visibility}}}");
         }
         Indent();
 

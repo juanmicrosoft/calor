@@ -1,7 +1,11 @@
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 using Calor.Compiler.Binding;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Parsing;
 using Calor.LanguageServer.Utilities;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 
 namespace Calor.LanguageServer.State;
@@ -37,7 +41,8 @@ public sealed record ProjectSymbolOccurrence(
     SymbolId SymbolId,
     TextSpan Span,
     SymbolOccurrenceKind Kind,
-    bool IsOpen);
+    bool IsOpen,
+    bool IsAmbiguous);
 
 /// <summary>
 /// Manages document state for the entire workspace.
@@ -45,21 +50,36 @@ public sealed record ProjectSymbolOccurrence(
 public sealed class WorkspaceState
 {
     private sealed record WorkspaceRoot(string Path, string Identity);
+    private readonly record struct WorkspaceFileStamp(
+        long Length,
+        DateTime LastWriteTimeUtc);
+    private readonly record struct CompilationError(
+        string Id,
+        string Path,
+        int Line);
     private sealed record DocumentSymbolIndex(
         IReadOnlyDictionary<SymbolId, ProjectSymbolOccurrence[]> BySymbol,
         ProjectSymbolOccurrence[] Occurrences);
     private sealed record WorkspaceSymbolIndex(
         long Generation,
         IReadOnlyDictionary<DocumentUri, DocumentSymbolIndex> ByDocument,
-        IReadOnlyDictionary<SymbolId, ProjectSymbolOccurrence[]> BySymbol);
+        IReadOnlyDictionary<SymbolId, ProjectSymbolOccurrence[]> BySymbol,
+        IReadOnlySet<SymbolId> AmbiguousSymbols,
+        IReadOnlySet<SymbolId> IncompleteTypeSymbols);
 
     private readonly ConcurrentDictionary<DocumentUri, DocumentState> _documents = new();
     private readonly ConcurrentDictionary<DocumentUri, DocumentState> _closedDocuments = new();
+    private readonly ConcurrentDictionary<DocumentUri, WorkspaceFileStamp> _closedDocumentStamps = new();
     private readonly object _workspaceRootsGate = new();
     private readonly object _indexGate = new();
     private WorkspaceRoot[] _workspaceRoots = [];
     private long _workspaceGeneration;
+    private long _workspaceFileReadCount;
     private WorkspaceSymbolIndex? _symbolIndex;
+    private static readonly Lazy<IReadOnlyList<MetadataReference>> PlatformReferences =
+        new(CreatePlatformReferences);
+
+    internal long WorkspaceFileReadCount => Interlocked.Read(ref _workspaceFileReadCount);
 
     public WorkspaceState(string? workspaceRootPath = null)
     {
@@ -121,6 +141,7 @@ public sealed class WorkspaceState
     public DocumentState GetOrCreate(DocumentUri uri, string source, int version = 0)
     {
         _closedDocuments.TryRemove(uri, out _);
+        _closedDocumentStamps.TryRemove(uri, out _);
         if (_documents.TryGetValue(uri, out var existing))
         {
             var before = existing.Snapshot;
@@ -218,7 +239,9 @@ public sealed class WorkspaceState
         var shortest = matches
             .Where(occurrence => occurrence.Span.Length == shortestLength)
             .ToArray();
-        return shortest.Length == 1 ? shortest[0] : null;
+        return shortest.Length == 1 && !shortest[0].IsAmbiguous
+            ? shortest[0]
+            : null;
     }
 
     public ProjectSymbolOccurrence? FindSymbolDefinition(SymbolId symbolId)
@@ -226,10 +249,28 @@ public sealed class WorkspaceState
         if (symbolId.IsNone)
             return null;
 
-        return GetSymbolIndex().BySymbol.TryGetValue(symbolId, out var occurrences)
+        var index = GetSymbolIndex();
+        if (index.AmbiguousSymbols.Contains(symbolId))
+            return null;
+
+        return index.BySymbol.TryGetValue(symbolId, out var occurrences)
             ? occurrences.FirstOrDefault(occurrence =>
                 occurrence.Kind == SymbolOccurrenceKind.Definition)
             : null;
+    }
+
+    public bool CanRenameSymbol(SymbolId symbolId)
+    {
+        if (symbolId.IsNone)
+            return false;
+
+        var index = GetSymbolIndex();
+        return !index.AmbiguousSymbols.Contains(symbolId)
+            && !index.IncompleteTypeSymbols.Contains(symbolId)
+            && index.BySymbol.TryGetValue(symbolId, out var occurrences)
+            && occurrences.Any(occurrence =>
+                occurrence.Kind == SymbolOccurrenceKind.Definition
+                && !occurrence.IsAmbiguous);
     }
 
     public IReadOnlyList<ProjectSymbolOccurrence> FindSymbolOccurrences(
@@ -254,7 +295,7 @@ public sealed class WorkspaceState
         IEnumerable<ProjectSymbolOccurrence> occurrences)
     {
         ArgumentNullException.ThrowIfNull(occurrences);
-        RefreshWorkspaceIndex();
+        var verifiedClosedDocuments = new HashSet<DocumentUri>();
 
         foreach (var occurrence in occurrences)
         {
@@ -276,25 +317,104 @@ public sealed class WorkspaceState
             {
                 return false;
             }
+            if (!verifiedClosedDocuments.Add(uri))
+                continue;
 
             try
             {
+                Interlocked.Increment(ref _workspaceFileReadCount);
                 if (!string.Equals(
                         File.ReadAllText(occurrence.Doc.Uri.LocalPath),
                         occurrence.Snapshot.Source,
                         StringComparison.Ordinal))
                 {
+                    _closedDocumentStamps.TryRemove(uri, out _);
                     return false;
                 }
             }
             catch (IOException)
             {
+                _closedDocumentStamps.TryRemove(uri, out _);
                 return false;
             }
             catch (UnauthorizedAccessException)
             {
+                _closedDocumentStamps.TryRemove(uri, out _);
                 return false;
             }
+        }
+
+        return true;
+    }
+
+    public bool ValidateRename(
+        IReadOnlyList<ProjectSymbolOccurrence> occurrences,
+        string newName)
+    {
+        ArgumentNullException.ThrowIfNull(occurrences);
+        ArgumentException.ThrowIfNullOrWhiteSpace(newName);
+        if (occurrences.Count == 0)
+            return false;
+
+        var replacements = occurrences
+            .GroupBy(occurrence => DocumentUri.From(occurrence.Doc.Uri))
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(occurrence => occurrence.Span.Start)
+                    .ToArray());
+        var syntaxSources = new List<(string Path, string Source)>();
+        foreach (var document in CaptureDocuments())
+        {
+            var uri = DocumentUri.From(document.Document.Uri);
+            var source = document.Analysis.Source;
+            if (replacements.TryGetValue(uri, out var edits))
+            {
+                foreach (var edit in edits)
+                {
+                    if (edit.Span.Start < 0 || edit.Span.End > source.Length)
+                        return false;
+                    source = source[..edit.Span.Start] + newName + source[edit.Span.End..];
+                }
+            }
+
+            var candidate = new DocumentState(
+                document.Document.Uri,
+                source,
+                document.Analysis.Version,
+                GetCanonicalSourceIdentity(document.Document.Uri));
+            candidate.Reanalyze();
+            if (candidate.Ast == null
+                || candidate.BoundModule == null
+                || candidate.Diagnostics.HasErrors)
+            {
+                return false;
+            }
+
+            string generated;
+            try
+            {
+                generated = new CSharpEmitter().Emit(candidate.Ast);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+            var path = candidate.Uri.IsFile
+                ? candidate.Uri.LocalPath + ".cs"
+                : candidate.Uri + ".cs";
+            syntaxSources.Add((path, generated));
+        }
+
+        var symbols = syntaxSources
+            .SelectMany(source => ExtractPreprocessorSymbols(source.Source))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(symbol => symbol, StringComparer.Ordinal)
+            .ToArray();
+        foreach (var configuration in EnumeratePreprocessorConfigurations(symbols))
+        {
+            if (GetCompilationErrors(syntaxSources, configuration).Count > 0)
+                return false;
         }
 
         return true;
@@ -529,6 +649,44 @@ public sealed class WorkspaceState
             _ => call.Span,
         };
 
+    private static TypeSymbol? ResolveReceiverType(
+        BoundNode call,
+        IReadOnlyList<TypeSymbol> visibleTypes)
+    {
+        var (target, receiver, resolvedType) = call switch
+        {
+            BoundCallExpression expression => (
+                expression.Target,
+                expression.ReceiverSymbol,
+                expression.ReceiverTypeSymbol),
+            BoundCallStatement statement => (
+                statement.Target,
+                statement.ReceiverSymbol,
+                statement.ReceiverTypeSymbol),
+            _ => (string.Empty, null, null),
+        };
+        if (receiver != null)
+            return null;
+        if (resolvedType != null)
+            return resolvedType;
+
+        var firstDot = target.IndexOf('.');
+        if (firstDot <= 0)
+            return null;
+
+        var receiverName = target[..firstDot];
+        var generic = receiverName.IndexOf('<');
+        if (generic > 0)
+            receiverName = receiverName[..generic];
+        var matches = visibleTypes
+            .Where(type =>
+                string.Equals(type.Name, receiverName, StringComparison.Ordinal)
+                || string.Equals(type.QualifiedName, receiverName, StringComparison.Ordinal))
+            .Take(2)
+            .ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
     private static bool TryGetCallShape(
         BoundNode call,
         out string target,
@@ -747,7 +905,6 @@ public sealed class WorkspaceState
     {
         lock (_indexGate)
         {
-            RefreshWorkspaceIndexCore();
             if (_symbolIndex?.Generation == _workspaceGeneration)
                 return _symbolIndex;
 
@@ -766,6 +923,8 @@ public sealed class WorkspaceState
             document => DocumentUri.From(document.Document.Uri),
             _ => new List<ProjectSymbolOccurrence>());
         var bySymbol = new Dictionary<SymbolId, List<ProjectSymbolOccurrence>>();
+        var ambiguousSymbols = new HashSet<SymbolId>();
+        var incompleteTypeSymbols = new HashSet<SymbolId>();
         var seen = new HashSet<(DocumentUri Uri, SymbolId Id, TextSpan Span, SymbolOccurrenceKind Kind)>();
         var typeSymbols = documents
             .SelectMany(document =>
@@ -804,47 +963,8 @@ public sealed class WorkspaceState
                         document,
                         symbol.Id,
                         symbol.DeclarationSpan,
-                        SymbolOccurrenceKind.Definition);
-                }
-            }
-
-            foreach (var node in Descendants(boundModule))
-            {
-                switch (node)
-                {
-                    case BoundVariableExpression variable:
-                        foreach (var symbol in variable.ResolvedSymbols.Where(
-                                     symbol => !symbol.Id.IsNone))
-                        {
-                            AddOccurrence(
-                                document,
-                                symbol.Id,
-                                variable.Span,
-                                SymbolOccurrenceKind.Reference);
-                        }
-                        break;
-
-                    case BoundFieldAccessExpression field:
-                        foreach (var symbol in ResolveProjectFields(
-                                     documents,
-                                     document,
-                                     field))
-                        {
-                            AddOccurrence(
-                                document,
-                                symbol.Id,
-                                field.FieldNameSpan,
-                                SymbolOccurrenceKind.Reference);
-                        }
-                        break;
-
-                    case BoundCallExpression call:
-                        AddCallOccurrences(document, call);
-                        break;
-
-                    case BoundCallStatement call:
-                        AddCallOccurrences(document, call);
-                        break;
+                        SymbolOccurrenceKind.Definition,
+                        symbol.ConditionalAlternative != null);
                 }
             }
 
@@ -855,11 +975,61 @@ public sealed class WorkspaceState
                         != Calor.Compiler.Ast.Visibility.Private)
                 .Select(candidate => candidate.Symbol)
                 .ToArray();
-            foreach (var reference in TypeReferenceIndex.Build(
-                         document.Analysis.Ast!,
-                         boundModule,
-                         document.Analysis.Source,
-                         visibleTypeSymbols))
+            foreach (var node in Descendants(boundModule))
+            {
+                switch (node)
+                {
+                    case BoundVariableExpression variable:
+                        var variables = variable.ResolvedSymbols
+                            .Where(symbol => !symbol.Id.IsNone)
+                            .DistinctBy(symbol => symbol.Id)
+                            .ToArray();
+                        foreach (var symbol in variables)
+                        {
+                            AddOccurrence(
+                                document,
+                                symbol.Id,
+                                variable.Span,
+                                SymbolOccurrenceKind.Reference,
+                                variables.Length > 1);
+                        }
+                        break;
+
+                    case BoundFieldAccessExpression field:
+                        var fields = ResolveProjectFields(
+                                documents,
+                                document,
+                                field)
+                            .DistinctBy(symbol => symbol.Id)
+                            .ToArray();
+                        foreach (var symbol in fields)
+                        {
+                            AddOccurrence(
+                                document,
+                                symbol.Id,
+                                field.FieldNameSpan,
+                                SymbolOccurrenceKind.Reference,
+                                fields.Length > 1);
+                        }
+                        break;
+
+                    case BoundCallExpression call:
+                        AddCallOccurrences(document, call, visibleTypeSymbols);
+                        break;
+
+                    case BoundCallStatement call:
+                        AddCallOccurrences(document, call, visibleTypeSymbols);
+                        break;
+                }
+            }
+
+            var typeIndex = TypeReferenceIndex.BuildDetailed(
+                document.Analysis.Ast!,
+                boundModule,
+                document.Analysis.Source,
+                visibleTypeSymbols);
+            incompleteTypeSymbols.UnionWith(typeIndex.IncompleteSymbolIds);
+            foreach (var reference in typeIndex.References)
             {
                 AddOccurrence(
                     document,
@@ -896,16 +1066,27 @@ public sealed class WorkspaceState
                     .OrderBy(occurrence => occurrence.Doc.Uri.ToString(), StringComparer.Ordinal)
                     .ThenBy(occurrence => occurrence.Span.Start)
                     .ThenBy(occurrence => occurrence.Kind)
-                    .ToArray()));
+                    .ToArray()),
+            ambiguousSymbols,
+            incompleteTypeSymbols);
 
         void AddCallOccurrences(
             WorkspaceDocumentSnapshot document,
-            BoundNode call)
+            BoundNode call,
+            IReadOnlyList<TypeSymbol> visibleTypes)
         {
             switch (call)
             {
                 case BoundCallExpression expression
                     when expression.ReceiverSymbol is { Id.IsNone: false } receiver:
+                    AddOccurrence(
+                        document,
+                        receiver.Id,
+                        expression.ReceiverSpan ?? expression.Span,
+                        SymbolOccurrenceKind.Reference);
+                    break;
+                case BoundCallExpression expression
+                    when ResolveReceiverType(expression, visibleTypes) is { Id.IsNone: false } receiver:
                     AddOccurrence(
                         document,
                         receiver.Id,
@@ -920,20 +1101,46 @@ public sealed class WorkspaceState
                         statement.ReceiverSpan ?? statement.Span,
                         SymbolOccurrenceKind.Reference);
                     break;
+                case BoundCallStatement statement
+                    when ResolveReceiverType(statement, visibleTypes) is { Id.IsNone: false } receiver:
+                    AddOccurrence(
+                        document,
+                        receiver.Id,
+                        statement.ReceiverSpan ?? statement.Span,
+                        SymbolOccurrenceKind.Reference);
+                    break;
             }
 
-            var resolved = ResolveProjectCall(
-                documents,
-                document.Document,
-                document.Analysis,
-                call);
-            if (resolved.Symbol is { Id.IsNone: false } function)
+            var resolvedFunctions = call switch
+            {
+                BoundCallExpression expression => expression.ResolvedSymbols,
+                BoundCallStatement statement => statement.ResolvedSymbols,
+                _ => Array.Empty<FunctionSymbol>(),
+            };
+            var functions = resolvedFunctions
+                .Where(function => !function.Id.IsNone)
+                .DistinctBy(function => function.Id)
+                .ToArray();
+            if (functions.Length == 0)
+            {
+                var resolved = ResolveProjectCall(
+                    documents,
+                    document.Document,
+                    document.Analysis,
+                    call);
+                functions = resolved.Symbol is { Id.IsNone: false } function
+                    ? [function]
+                    : [];
+            }
+
+            foreach (var function in functions)
             {
                 AddOccurrence(
                     document,
                     function.Id,
                     GetCallReferenceSpan(call),
-                    SymbolOccurrenceKind.Reference);
+                    SymbolOccurrenceKind.Reference,
+                    functions.Length > 1);
             }
         }
 
@@ -941,7 +1148,8 @@ public sealed class WorkspaceState
             WorkspaceDocumentSnapshot document,
             SymbolId symbolId,
             TextSpan span,
-            SymbolOccurrenceKind kind)
+            SymbolOccurrenceKind kind,
+            bool isAmbiguous = false)
         {
             if (symbolId.IsNone
                 || !IsExactIdentifierSpan(document.Analysis.Source, span))
@@ -951,7 +1159,11 @@ public sealed class WorkspaceState
 
             var uri = DocumentUri.From(document.Document.Uri);
             if (!seen.Add((uri, symbolId, span, kind)))
+            {
+                if (isAmbiguous)
+                    ambiguousSymbols.Add(symbolId);
                 return;
+            }
 
             var occurrence = new ProjectSymbolOccurrence(
                 document.Document,
@@ -959,7 +1171,10 @@ public sealed class WorkspaceState
                 symbolId,
                 span,
                 kind,
-                _documents.ContainsKey(uri));
+                _documents.ContainsKey(uri),
+                isAmbiguous);
+            if (isAmbiguous)
+                ambiguousSymbols.Add(symbolId);
             byDocument[uri].Add(occurrence);
             if (!bySymbol.TryGetValue(symbolId, out var symbolOccurrences))
             {
@@ -1095,10 +1310,7 @@ public sealed class WorkspaceState
     private WorkspaceDocumentSnapshot[] CaptureDocuments()
     {
         lock (_indexGate)
-        {
-            RefreshWorkspaceIndexCore();
             return CaptureDocumentsCore();
-        }
     }
 
     private WorkspaceDocumentSnapshot[] CaptureDocumentsCore()
@@ -1111,11 +1323,13 @@ public sealed class WorkspaceState
             .ToArray();
     }
 
-    private void RefreshWorkspaceIndex()
+    public void RefreshClosedDocuments()
     {
         lock (_indexGate)
             RefreshWorkspaceIndexCore();
     }
+
+    private void RefreshWorkspaceIndex() => RefreshClosedDocuments();
 
     private void RefreshWorkspaceIndexCore()
     {
@@ -1162,12 +1376,38 @@ public sealed class WorkspaceState
                 if (_documents.ContainsKey(uri))
                 {
                     changed |= _closedDocuments.TryRemove(uri, out _);
+                    _closedDocumentStamps.TryRemove(uri, out _);
+                    continue;
+                }
+
+                WorkspaceFileStamp stamp;
+                try
+                {
+                    var info = new FileInfo(fullPath);
+                    stamp = new WorkspaceFileStamp(
+                        info.Length,
+                        info.LastWriteTimeUtc);
+                }
+                catch (IOException)
+                {
+                    continue;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                if (_closedDocuments.ContainsKey(uri)
+                    && _closedDocumentStamps.TryGetValue(uri, out var existingStamp)
+                    && existingStamp == stamp)
+                {
                     continue;
                 }
 
                 string source;
                 try
                 {
+                    Interlocked.Increment(ref _workspaceFileReadCount);
                     source = File.ReadAllText(fullPath);
                 }
                 catch (IOException)
@@ -1182,10 +1422,12 @@ public sealed class WorkspaceState
                 if (_closedDocuments.TryGetValue(uri, out var existing)
                     && string.Equals(existing.Source, source, StringComparison.Ordinal))
                 {
+                    _closedDocumentStamps[uri] = stamp;
                     continue;
                 }
 
                 _closedDocuments[uri] = CreateAndAnalyze(uri, source, version: 0);
+                _closedDocumentStamps[uri] = stamp;
                 changed = true;
             }
         }
@@ -1193,7 +1435,10 @@ public sealed class WorkspaceState
         foreach (var uri in _closedDocuments.Keys)
         {
             if (!seen.Contains(uri) && _closedDocuments.TryRemove(uri, out _))
+            {
+                _closedDocumentStamps.TryRemove(uri, out _);
                 changed = true;
+            }
         }
 
         if (changed)
@@ -1201,6 +1446,90 @@ public sealed class WorkspaceState
             _workspaceGeneration++;
             _symbolIndex = null;
         }
+    }
+
+    private static IEnumerable<string> ExtractPreprocessorSymbols(string source)
+    {
+        foreach (var line in source.Split('\n'))
+        {
+            var trimmed = line.TrimStart();
+            if (!trimmed.StartsWith("#if ", StringComparison.Ordinal)
+                && !trimmed.StartsWith("#elif ", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            foreach (Match match in Regex.Matches(
+                         trimmed,
+                         @"[A-Za-z_][A-Za-z0-9_]*",
+                         RegexOptions.CultureInvariant))
+            {
+                if (match.Value is not ("if" or "elif" or "true" or "false" or "defined"))
+                    yield return match.Value;
+            }
+        }
+    }
+
+    private static IReadOnlyList<CompilationError> GetCompilationErrors(
+        IReadOnlyList<(string Path, string Source)> sources,
+        IReadOnlyList<string> configuration)
+    {
+        var parseOptions = CSharpParseOptions.Default.WithPreprocessorSymbols(configuration);
+        var trees = sources
+            .Select(source => CSharpSyntaxTree.ParseText(
+                source.Source,
+                parseOptions,
+                source.Path))
+            .ToArray();
+        var compilation = CSharpCompilation.Create(
+            "CalorRenamePreflight",
+            trees,
+            PlatformReferences.Value,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        return compilation.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic =>
+            {
+                var lineSpan = diagnostic.Location.GetLineSpan();
+                return new CompilationError(
+                    diagnostic.Id,
+                    lineSpan.Path ?? string.Empty,
+                    lineSpan.StartLinePosition.Line);
+            })
+            .ToArray();
+    }
+
+    private static IEnumerable<IReadOnlyList<string>> EnumeratePreprocessorConfigurations(
+        IReadOnlyList<string> symbols)
+    {
+        if (symbols.Count <= 8)
+        {
+            var count = 1 << symbols.Count;
+            for (var mask = 0; mask < count; mask++)
+            {
+                yield return symbols
+                    .Where((_, index) => (mask & (1 << index)) != 0)
+                    .ToArray();
+            }
+            yield break;
+        }
+
+        yield return Array.Empty<string>();
+        foreach (var symbol in symbols)
+            yield return [symbol];
+        yield return symbols.ToArray();
+    }
+
+    private static IReadOnlyList<MetadataReference> CreatePlatformReferences()
+    {
+        var trustedAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
+        return string.IsNullOrEmpty(trustedAssemblies)
+            ? Array.Empty<MetadataReference>()
+            : trustedAssemblies
+                .Split(Path.PathSeparator)
+                .Select(path => MetadataReference.CreateFromFile(path))
+                .ToArray();
     }
 
     private static bool ShouldIndexPath(string path)

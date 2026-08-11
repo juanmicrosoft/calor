@@ -671,7 +671,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
-        var methodName = SanitizeIdentifier(node.Name);
+        var callableName = node.Name;
+        var genericStart = callableName.LastIndexOf('<');
+        var embeddedTypeParams = "";
+        if (genericStart > 0 && callableName.EndsWith('>'))
+        {
+            embeddedTypeParams = callableName[genericStart..];
+            callableName = callableName[..genericStart];
+        }
+        var methodName = SanitizeIdentifier(callableName);
 
         // Build type parameters if present
         var typeParams = "";
@@ -694,6 +702,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             {
                 whereClause = " " + string.Join(" ", whereClauses);
             }
+        }
+        else
+        {
+            typeParams = embeddedTypeParams;
         }
 
         // Check if this is the entry point

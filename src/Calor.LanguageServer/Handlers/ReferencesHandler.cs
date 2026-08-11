@@ -29,6 +29,7 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
         if (snapshot == null)
             return Task.FromResult<LocationContainer?>(null);
 
+        _workspace.RefreshClosedDocuments();
         var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
         var occurrence = _workspace.ResolveOccurrence(request.TextDocument.Uri, offset);
         if (occurrence == null)

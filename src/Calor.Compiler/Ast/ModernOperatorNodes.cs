@@ -183,11 +183,16 @@ public sealed class IndexFromEndNode : ExpressionNode
 public sealed class TypeOfExpressionNode : ExpressionNode
 {
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
 
-    public TypeOfExpressionNode(TextSpan span, string typeName)
+    public TypeOfExpressionNode(
+        TextSpan span,
+        string typeName,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

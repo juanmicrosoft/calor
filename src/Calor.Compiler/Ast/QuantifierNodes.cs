@@ -18,17 +18,20 @@ public sealed class QuantifierVariableNode : AstNode
     /// The type name of the variable.
     /// </summary>
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
 
     public QuantifierVariableNode(
         TextSpan span,
         string name,
         string typeName,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

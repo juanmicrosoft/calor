@@ -26,6 +26,7 @@ public sealed class ListCreationNode : ExpressionNode
     /// The element type of the list.
     /// </summary>
     public string ElementType { get; }
+    public TextSpan ElementTypeSpan { get; }
 
     /// <summary>
     /// The initial elements of the list.
@@ -40,12 +41,14 @@ public sealed class ListCreationNode : ExpressionNode
         string name,
         string elementType,
         IReadOnlyList<ExpressionNode> elements,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? elementTypeSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
+        ElementTypeSpan = elementTypeSpan ?? TextSpan.Empty;
         Elements = elements ?? throw new ArgumentNullException(nameof(elements));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
@@ -104,11 +107,13 @@ public sealed class DictionaryCreationNode : ExpressionNode
     /// The key type of the dictionary.
     /// </summary>
     public string KeyType { get; }
+    public TextSpan KeyTypeSpan { get; }
 
     /// <summary>
     /// The value type of the dictionary.
     /// </summary>
     public string ValueType { get; }
+    public TextSpan ValueTypeSpan { get; }
 
     /// <summary>
     /// The initial key-value pairs.
@@ -124,13 +129,17 @@ public sealed class DictionaryCreationNode : ExpressionNode
         string keyType,
         string valueType,
         IReadOnlyList<KeyValuePairNode> entries,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? keyTypeSpan = null,
+        TextSpan? valueTypeSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         KeyType = keyType ?? throw new ArgumentNullException(nameof(keyType));
+        KeyTypeSpan = keyTypeSpan ?? TextSpan.Empty;
         ValueType = valueType ?? throw new ArgumentNullException(nameof(valueType));
+        ValueTypeSpan = valueTypeSpan ?? TextSpan.Empty;
         Entries = entries ?? throw new ArgumentNullException(nameof(entries));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
@@ -162,6 +171,7 @@ public sealed class SetCreationNode : ExpressionNode
     /// The element type of the set.
     /// </summary>
     public string ElementType { get; }
+    public TextSpan ElementTypeSpan { get; }
 
     /// <summary>
     /// The initial elements of the set.
@@ -176,12 +186,14 @@ public sealed class SetCreationNode : ExpressionNode
         string name,
         string elementType,
         IReadOnlyList<ExpressionNode> elements,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? elementTypeSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
+        ElementTypeSpan = elementTypeSpan ?? TextSpan.Empty;
         Elements = elements ?? throw new ArgumentNullException(nameof(elements));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
