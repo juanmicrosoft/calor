@@ -9,11 +9,16 @@ namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// #762 B7: the quantifier family (3 classes). Quantifiers are SPEC expressions — the
-/// Z3 verification pipeline consumes their AST (ExpressionSimplifier), never these
-/// bound nodes ("no verification-pipeline interaction" is the family's checker
-/// contract; the Verification.Tests suite is its baseline). Binding gives value-safety
-/// analyses visibility into bodies, with quantifier variables declared as
-/// parameter-like symbols in a child scope.
+/// CONTRACT verification pipeline (Z3 over §Q/§S/§IV) consumes their AST
+/// (ExpressionSimplifier), never these bound nodes; contracts are never bound at all
+/// (BindFunction binds parameters and body statements only), so a contract quantifier
+/// cannot produce different diagnostics post-B7. The Verification.Tests suite is that
+/// contract's baseline. Scope note (#910 review): the bug-pattern Z3 path DOES consume
+/// bound quantifier bodies — that is the point of binding them (the division pin below
+/// proves it) — and §PROOF is a bound spec position, so quantifiers there now surface
+/// real scope diagnostics on the LSP live bag. Binding gives value-safety analyses
+/// visibility into bodies, with quantifier variables declared as parameter-like
+/// symbols in a child scope.
 /// </summary>
 public class BinderQuantifierFamilyTests
 {
@@ -124,6 +129,9 @@ public class BinderQuantifierFamilyTests
         // Parser-surface e2e: the quantifier variable is a declared, parameter-like
         // symbol — no Calor0200 (undefined), no Calor0900 (uninitialized), and no
         // Calor0259 (the family now binds).
+        // Routing caveat (#910 review): Program.Compile routes ONLY Calor0259 from the
+        // binder's bag, so the 0200 assertion here cannot fail via binder scoping —
+        // the real scope guards are the live-bag unit tests above.
         const string source = """
             §M{m001:Test}
               §F{f001:Probe:pub} () -> bool
@@ -144,8 +152,10 @@ public class BinderQuantifierFamilyTests
     public void DivisionInQuantifierBody_ProducesRealFinding_EndToEnd()
     {
         // A /0 inside a forall body is a bug in the SPEC — Of() exposes it and the
-        // checker fires at the division's span (line 4). Same options discipline as
+        // checker fires at the division's span (line 3). Same options discipline as
         // the B6 pin: ReportOnlyVerified set explicitly (CLI default true, API false).
+        // This is the bug-pattern Z3 path consuming a BOUND quantifier body — the one
+        // Z3-involving verdict B7 deliberately changes (contract Z3 is untouched).
         const string source = """
             §M{m001:Test}
               §F{f001:Trap:pub} (i32:x) -> bool
@@ -166,5 +176,45 @@ public class BinderQuantifierFamilyTests
 
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.DivisionByZero && d.Span.Line == 3);
+    }
+
+    [Fact]
+    public void Exists_ParsedSource_BindsClean_EndToEnd()
+    {
+        // #910 review: parser→binder reachability pinned for all three spellings, not
+        // just forall — `(exists ((v T)) body)` from real source.
+        const string source = """
+            §M{m001:Test}
+              §F{f001:Probe:pub} (i32:x) -> bool
+                §R (exists ((j i32)) (> j x))
+            """;
+
+        var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
+        {
+            EnableVerificationAnalyses = true,
+        });
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.AnalysisIncomplete);
+        Assert.False(result.Diagnostics.HasErrors);
+    }
+
+    [Fact]
+    public void Implication_ParsedSource_BindsClean_EndToEnd()
+    {
+        // `(-> a b)` is the ONLY implication spelling (==>/implies are parse errors);
+        // `->` in Lisp operator position cannot collide with the return arrow.
+        const string source = """
+            §M{m001:Test}
+              §F{f001:Probe:pub} (i32:x) -> bool
+                §R (-> (> x 0) (> x -1))
+            """;
+
+        var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
+        {
+            EnableVerificationAnalyses = true,
+        });
+
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.AnalysisIncomplete);
+        Assert.False(result.Diagnostics.HasErrors);
     }
 }
