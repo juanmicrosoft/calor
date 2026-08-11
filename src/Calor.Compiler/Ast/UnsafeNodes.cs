@@ -13,6 +13,7 @@ public sealed class StackAllocNode : ExpressionNode
     /// The element type being stack-allocated.
     /// </summary>
     public string ElementType { get; }
+    public TextSpan ElementTypeSpan { get; }
 
     /// <summary>
     /// The size expression (for sized stackalloc). Null if using initializer.
@@ -28,10 +29,12 @@ public sealed class StackAllocNode : ExpressionNode
         TextSpan span,
         string elementType,
         ExpressionNode? size,
-        IReadOnlyList<ExpressionNode> initializer)
+        IReadOnlyList<ExpressionNode> initializer,
+        TextSpan? elementTypeSpan = null)
         : base(span)
     {
         ElementType = elementType ?? throw new ArgumentNullException(nameof(elementType));
+        ElementTypeSpan = elementTypeSpan ?? TextSpan.Empty;
         Size = size;
         Initializer = initializer ?? Array.Empty<ExpressionNode>();
     }
@@ -69,6 +72,7 @@ public sealed class FixedStatementNode : StatementNode
     public string Id { get; }
     public string PointerName { get; }
     public string PointerType { get; }
+    public TextSpan PointerTypeSpan { get; }
     public ExpressionNode Initializer { get; }
     public IReadOnlyList<StatementNode> Body { get; }
 
@@ -78,12 +82,14 @@ public sealed class FixedStatementNode : StatementNode
         string pointerName,
         string pointerType,
         ExpressionNode initializer,
-        IReadOnlyList<StatementNode> body)
+        IReadOnlyList<StatementNode> body,
+        TextSpan? pointerTypeSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         PointerName = pointerName ?? throw new ArgumentNullException(nameof(pointerName));
         PointerType = pointerType ?? throw new ArgumentNullException(nameof(pointerType));
+        PointerTypeSpan = pointerTypeSpan ?? TextSpan.Empty;
         Initializer = initializer ?? throw new ArgumentNullException(nameof(initializer));
         Body = body ?? throw new ArgumentNullException(nameof(body));
     }
@@ -135,11 +141,13 @@ public sealed class PointerDereferenceNode : ExpressionNode
 public sealed class SizeOfNode : ExpressionNode
 {
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
 
-    public SizeOfNode(TextSpan span, string typeName)
+    public SizeOfNode(TextSpan span, string typeName, TextSpan? typeNameSpan = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

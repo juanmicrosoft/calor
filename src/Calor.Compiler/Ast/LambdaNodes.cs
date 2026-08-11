@@ -10,17 +10,20 @@ public sealed class LambdaParameterNode : AstNode
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public string? TypeName { get; }
+    public TextSpan? TypeNameSpan { get; }
 
     public LambdaParameterNode(
         TextSpan span,
         string name,
         string? typeName,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName;
+        TypeNameSpan = typeName == null ? null : typeNameSpan ?? TextSpan.Empty;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -96,8 +99,9 @@ public sealed class DelegateDefinitionNode : TypeDefinitionNode
         IReadOnlyList<ParameterNode> parameters,
         OutputNode? output,
         EffectsNode? effects,
-        AttributeCollection attributes)
-        : base(span, id, name, attributes)
+        AttributeCollection attributes,
+        TextSpan? identifierSpan = null)
+        : base(span, id, name, attributes, identifierSpan)
     {
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         Output = output;
@@ -123,6 +127,7 @@ public sealed class EventDefinitionNode : AstNode
     public string Name { get; }
     public Visibility Visibility { get; }
     public string DelegateType { get; }
+    public TextSpan DelegateTypeSpan { get; }
     public AttributeCollection Attributes { get; }
 
     /// <summary>Optional body for the add accessor.</summary>
@@ -140,8 +145,18 @@ public sealed class EventDefinitionNode : AstNode
         string name,
         Visibility visibility,
         string delegateType,
-        AttributeCollection attributes)
-        : this(span, id, name, visibility, delegateType, attributes, null, null)
+        AttributeCollection attributes,
+        TextSpan? delegateTypeSpan = null)
+        : this(
+            span,
+            id,
+            name,
+            visibility,
+            delegateType,
+            attributes,
+            null,
+            null,
+            delegateTypeSpan)
     {
     }
 
@@ -153,13 +168,15 @@ public sealed class EventDefinitionNode : AstNode
         string delegateType,
         AttributeCollection attributes,
         IReadOnlyList<StatementNode>? addBody,
-        IReadOnlyList<StatementNode>? removeBody)
+        IReadOnlyList<StatementNode>? removeBody,
+        TextSpan? delegateTypeSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         Visibility = visibility;
         DelegateType = delegateType ?? throw new ArgumentNullException(nameof(delegateType));
+        DelegateTypeSpan = delegateTypeSpan ?? TextSpan.Empty;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         AddBody = addBody;
         RemoveBody = removeBody;

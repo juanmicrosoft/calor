@@ -184,6 +184,7 @@ public sealed class Binder
         var functions = new List<BoundFunction>();
 
         RegisterTopLevelFunctions(module);
+        RegisterAdditionalTypes(module);
         foreach (var cls in module.Classes)
             RegisterClassTree(cls, _moduleSymbolId, null);
 
@@ -222,6 +223,67 @@ public sealed class Binder
             if (!_scope.TryDeclareOverload(lookupName, symbol, out var duplicate))
                 ReportDuplicateSignature(function.Span, lookupName, symbol, duplicate);
         }
+    }
+
+    private void RegisterAdditionalTypes(ModuleNode module)
+    {
+        foreach (var @interface in module.Interfaces)
+        {
+            RegisterTypeSymbol(
+                _moduleSymbolId,
+                "interface",
+                @interface.Id,
+                @interface.Name,
+                @interface.Name,
+                Visibility.Public,
+                @interface.IdentifierSpan,
+                @interface.Span);
+        }
+
+        foreach (var @enum in module.Enums)
+        {
+            RegisterTypeSymbol(
+                _moduleSymbolId,
+                "enum",
+                @enum.Id,
+                @enum.Name,
+                @enum.Name,
+                @enum.Visibility,
+                @enum.IdentifierSpan,
+                @enum.Span);
+        }
+
+        foreach (var @delegate in module.Delegates)
+        {
+            RegisterTypeSymbol(
+                _moduleSymbolId,
+                "delegate",
+                @delegate.Id,
+                @delegate.Name,
+                @delegate.Name,
+                Visibility.Public,
+                @delegate.IdentifierSpan,
+                @delegate.Span);
+        }
+    }
+
+    private void RegisterTypeSymbol(
+        SymbolId parentIdentity,
+        string kind,
+        string stableAstId,
+        string name,
+        string qualifiedName,
+        Visibility visibility,
+        Parsing.TextSpan declarationSpan,
+        Parsing.TextSpan definitionSpan)
+    {
+        TrackSymbol(new TypeSymbol(
+            CreateDeclarationId(parentIdentity, kind, stableAstId, name),
+            name,
+            qualifiedName,
+            visibility,
+            declarationSpan,
+            definitionSpan));
     }
 
     private void RegisterClassTree(
@@ -379,6 +441,42 @@ public sealed class Binder
                 nested,
                 classIdentity,
                 qualifiedClassName);
+        }
+        foreach (var nested in cls.NestedInterfaces)
+        {
+            RegisterTypeSymbol(
+                classIdentity,
+                "interface",
+                nested.Id,
+                nested.Name,
+                $"{qualifiedClassName}.{nested.Name}",
+                Visibility.Public,
+                nested.IdentifierSpan,
+                nested.Span);
+        }
+        foreach (var nested in cls.NestedEnums)
+        {
+            RegisterTypeSymbol(
+                classIdentity,
+                "enum",
+                nested.Id,
+                nested.Name,
+                $"{qualifiedClassName}.{nested.Name}",
+                nested.Visibility,
+                nested.IdentifierSpan,
+                nested.Span);
+        }
+        foreach (var nested in cls.NestedDelegates)
+        {
+            RegisterTypeSymbol(
+                classIdentity,
+                "delegate",
+                nested.Id,
+                nested.Name,
+                $"{qualifiedClassName}.{nested.Name}",
+                Visibility.Public,
+                nested.IdentifierSpan,
+                nested.Span);
         }
     }
 
@@ -806,6 +904,9 @@ public sealed class Binder
         var receiverSymbol = ResolveCallReceiver(
             call.Target,
             call.ReceiverSpan ?? call.CalleeSpan);
+        var receiverTypeSymbol = receiverSymbol == null
+            ? ResolveCallReceiverType(call.Target)
+            : null;
         var resolution = ResolveCall(
             call.Span,
             call.Target,
@@ -826,7 +927,8 @@ public sealed class Binder
             call.CalleeSpan,
             call.ReceiverSpan,
             resolution.Kind == OverloadResolutionKind.Inaccessible,
-            call.TypeArguments);
+            call.TypeArguments,
+            receiverTypeSymbol);
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -2028,6 +2130,9 @@ public sealed class Binder
         var receiverSymbol = ResolveCallReceiver(
             callExpr.Target,
             callExpr.ReceiverSpan ?? callExpr.CalleeSpan);
+        var receiverTypeSymbol = receiverSymbol == null
+            ? ResolveCallReceiverType(callExpr.Target)
+            : null;
         var resolution = ResolveCall(
             callExpr.Span,
             callExpr.Target,
@@ -2048,6 +2153,8 @@ public sealed class Binder
             resolvedTypeName = receiverSymbol != null
                 ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(
                     GetNominalTypeName(receiverSymbol.TypeName))
+                : receiverTypeSymbol != null
+                    ? receiverTypeSymbol.QualifiedName
                 : !typePart.Contains('.')
                 ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(typePart)
                 : typePart;
@@ -2071,7 +2178,8 @@ public sealed class Binder
             resolvedSymbols: resolution.Functions,
             calleeSpan: callExpr.CalleeSpan,
             receiverSpan: callExpr.ReceiverSpan,
-            isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible);
+            isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible,
+            receiverTypeSymbol: receiverTypeSymbol);
     }
 
     private VariableSymbol? ResolveCallReceiver(
@@ -2099,6 +2207,19 @@ public sealed class Binder
         }
 
         return variables[0];
+    }
+
+    private TypeSymbol? ResolveCallReceiverType(string target)
+    {
+        var firstDot = target.IndexOf('.');
+        if (firstDot <= 0)
+            return null;
+
+        var receiverName = target[..firstDot];
+        var genericStart = receiverName.IndexOf('<');
+        if (genericStart > 0)
+            receiverName = receiverName[..genericStart];
+        return ResolveTypeSymbol(receiverName);
     }
 
     private OverloadResolutionResult ResolveCall(

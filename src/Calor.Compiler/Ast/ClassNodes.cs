@@ -50,6 +50,7 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
     /// Interfaces this interface extends.
     /// </summary>
     public IReadOnlyList<string> BaseInterfaces { get; }
+    public IReadOnlyList<TextSpan> BaseInterfaceSpans { get; }
 
     /// <summary>
     /// Type parameters if this is a generic interface.
@@ -121,10 +122,13 @@ public sealed class InterfaceDefinitionNode : TypeDefinitionNode
         IReadOnlyList<PropertyNode> properties,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
-        IReadOnlyList<IndexerNode>? indexers = null)
-        : base(span, id, name, attributes)
+        IReadOnlyList<IndexerNode>? indexers = null,
+        IReadOnlyList<TextSpan>? baseInterfaceSpans = null,
+        TextSpan? identifierSpan = null)
+        : base(span, id, name, attributes, identifierSpan)
     {
         BaseInterfaces = baseInterfaces ?? throw new ArgumentNullException(nameof(baseInterfaces));
+        BaseInterfaceSpans = baseInterfaceSpans ?? Array.Empty<TextSpan>();
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Methods = methods ?? throw new ArgumentNullException(nameof(methods));
         Properties = properties ?? Array.Empty<PropertyNode>();

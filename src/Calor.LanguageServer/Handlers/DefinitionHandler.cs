@@ -29,6 +29,7 @@ public sealed class DefinitionHandler : DefinitionHandlerBase
         if (snapshot == null)
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
+        _workspace.RefreshClosedDocuments();
         var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
         var occurrence = _workspace.ResolveOccurrence(request.TextDocument.Uri, offset);
         if (occurrence == null)

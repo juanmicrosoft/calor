@@ -253,16 +253,22 @@ public sealed class PositionalPatternNode : PatternNode
     /// The type being matched.
     /// </summary>
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
 
     /// <summary>
     /// The patterns for each position.
     /// </summary>
     public IReadOnlyList<PatternNode> Patterns { get; }
 
-    public PositionalPatternNode(TextSpan span, string typeName, IReadOnlyList<PatternNode> patterns)
+    public PositionalPatternNode(
+        TextSpan span,
+        string typeName,
+        IReadOnlyList<PatternNode> patterns,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         TypeName = typeName ?? "";
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         Patterns = patterns ?? throw new ArgumentNullException(nameof(patterns));
     }
 
@@ -281,16 +287,22 @@ public sealed class PropertyPatternNode : PatternNode
     /// The type being matched (optional).
     /// </summary>
     public string? TypeName { get; }
+    public TextSpan? TypeNameSpan { get; }
 
     /// <summary>
     /// The property matches.
     /// </summary>
     public IReadOnlyList<PropertyMatchNode> Matches { get; }
 
-    public PropertyPatternNode(TextSpan span, string? typeName, IReadOnlyList<PropertyMatchNode> matches)
+    public PropertyPatternNode(
+        TextSpan span,
+        string? typeName,
+        IReadOnlyList<PropertyMatchNode> matches,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         TypeName = typeName;
+        TypeNameSpan = typeName == null ? null : typeNameSpan ?? TextSpan.Empty;
         Matches = matches ?? throw new ArgumentNullException(nameof(matches));
     }
 
@@ -492,6 +504,7 @@ public sealed class TypePatternNode : PatternNode
 {
     /// <summary>The type being tested (raw source type name, e.g. "string", "Point").</summary>
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
 
     /// <summary>The variable bound when the test succeeds, or null for a type-only pattern.</summary>
     public string? BindingName { get; }
@@ -501,10 +514,12 @@ public sealed class TypePatternNode : PatternNode
         TextSpan span,
         string typeName,
         string? bindingName,
-        TextSpan? bindingSpan = null)
+        TextSpan? bindingSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         BindingName = string.IsNullOrEmpty(bindingName) ? null : bindingName;
         BindingSpan = BindingName == null ? null : bindingSpan ?? span;
     }

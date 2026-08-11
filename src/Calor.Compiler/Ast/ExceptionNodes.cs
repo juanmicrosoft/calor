@@ -53,6 +53,7 @@ public sealed class CatchClauseNode : AstNode
     /// The exception type to catch. Null for catch-all.
     /// </summary>
     public string? ExceptionType { get; }
+    public TextSpan? ExceptionTypeSpan { get; }
 
     /// <summary>
     /// The variable name for the exception. Null if not capturing.
@@ -79,10 +80,12 @@ public sealed class CatchClauseNode : AstNode
         ExpressionNode? filter,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes,
-        TextSpan? variableSpan = null)
+        TextSpan? variableSpan = null,
+        TextSpan? exceptionTypeSpan = null)
         : base(span)
     {
         ExceptionType = exceptionType;
+        ExceptionTypeSpan = exceptionType == null ? null : exceptionTypeSpan ?? TextSpan.Empty;
         VariableName = variableName;
         VariableSpan = variableName == null ? null : variableSpan ?? span;
         Filter = filter;

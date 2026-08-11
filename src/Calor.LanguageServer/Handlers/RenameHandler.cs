@@ -1,5 +1,7 @@
+using Calor.Compiler.Parsing;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Utilities;
+using Microsoft.CodeAnalysis.CSharp;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -34,9 +36,10 @@ public sealed class RenameHandler : RenameHandlerBase
             return Task.FromResult<WorkspaceEdit?>(null);
         }
 
+        _workspace.RefreshClosedDocuments();
         var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
         var occurrence = _workspace.ResolveOccurrence(request.TextDocument.Uri, offset);
-        if (occurrence == null)
+        if (occurrence == null || !_workspace.CanRenameSymbol(occurrence.SymbolId))
             return Task.FromResult<WorkspaceEdit?>(null);
 
         var oldName = occurrence.Snapshot.Source.Substring(
@@ -57,7 +60,8 @@ public sealed class RenameHandler : RenameHandlerBase
             || occurrences.Any(item => item.IsSplitDeclaration)
             || occurrences.Any(item =>
                 !IsExactIdentifierSpan(item.Snapshot.Source, item.Span, oldName))
-            || !_workspace.AreOccurrenceSnapshotsCurrent(occurrences))
+            || !_workspace.AreOccurrenceSnapshotsCurrent(occurrences)
+            || !_workspace.ValidateRename(occurrences, request.NewName))
         {
             return Task.FromResult<WorkspaceEdit?>(null);
         }
@@ -117,8 +121,21 @@ public sealed class RenameHandler : RenameHandlerBase
             return false;
         }
 
-        return name.Skip(1).All(character =>
-            char.IsLetterOrDigit(character) || character == '_');
+        if (!name.Skip(1).All(character =>
+                char.IsLetterOrDigit(character) || character == '_')
+            || SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None
+            || SyntaxFacts.GetContextualKeywordKind(name) != SyntaxKind.None)
+        {
+            return false;
+        }
+
+        var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        var tokens = new Lexer(name, diagnostics).TokenizeAll();
+        return !diagnostics.HasErrors
+            && tokens.Count > 0
+            && tokens[0].Kind == TokenKind.Identifier
+            && string.Equals(tokens[0].Text, name, StringComparison.Ordinal)
+            && tokens.Skip(1).All(token => token.Kind == TokenKind.Eof);
     }
 
     protected override RenameRegistrationOptions CreateRegistrationOptions(

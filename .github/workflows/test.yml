@@ -76,7 +76,7 @@ jobs:
         run: >-
           dotnet test tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj
           -c Release --no-build
-          --filter "FullyQualifiedName~ExactSpanRefactoringGateTests"
+          --filter "FullyQualifiedName~ExactSpanRefactoringGateTests|FullyQualifiedName~RenameHandlerTests"
           --verbosity normal
 
       - name: Run full-vs-incremental identity gate
