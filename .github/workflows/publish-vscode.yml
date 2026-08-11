@@ -1,8 +1,10 @@
 name: Publish VS Code Extension
 
+# Decision 2026-08-11: Marketplace publishing is opportunistic, not a release
+# commitment. Release-time VSIX assets are built by build-vsix-release.yml;
+# this workflow runs only when a maintainer deliberately attempts Marketplace
+# publication with a valid token.
 on:
-  release:
-    types: [created]
   workflow_dispatch:
     inputs:
       version:

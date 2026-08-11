@@ -1,6 +1,6 @@
 # Calor Language Support for VS Code
 
-Syntax highlighting for the [Calor programming language](https://github.com/juanmicrosoft/calor-2).
+VS Code client and syntax highlighting for the [Calor programming language](https://github.com/juanmicrosoft/calor).
 
 ## Features
 
@@ -59,10 +59,15 @@ Syntax highlighting for the [Calor programming language](https://github.com/juan
 
 ### From VSIX
 
-1. Download the `.vsix` file from the releases
-2. In VS Code, open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-3. Run "Extensions: Install from VSIX..."
-4. Select the downloaded file
+1. Open the [Calor releases page](https://github.com/juanmicrosoft/calor/releases)
+2. Download the platform-specific `.vsix` attached to the current release
+3. In VS Code, open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+4. Run "Extensions: Install from VSIX..."
+5. Select the downloaded file
+
+This is the supported distribution path. The Marketplace listing is
+deliberately stale at v0.3.8; publishing there is opportunistic and will happen
+only if a token is minted. Marketplace freshness is not a release commitment.
 
 ### From Source
 
@@ -83,4 +88,4 @@ vsce package
 
 ## License
 
-Apache-2.0 - See [LICENSE](https://github.com/juanmicrosoft/calor-2/blob/main/LICENSE)
+Apache-2.0 - See [LICENSE](https://github.com/juanmicrosoft/calor/blob/main/LICENSE)
