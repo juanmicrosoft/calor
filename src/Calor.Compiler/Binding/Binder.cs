@@ -54,7 +54,12 @@ public sealed class Binder
     {
         var functions = new List<BoundFunction>();
 
-        // First pass: register all function symbols in module scope
+        // First pass: register all function symbols in module scope. #762 items 5–6
+        // (B8, scoping doc D5): top-level functions use the same overload-set
+        // machinery as class members — a second declaration with a DIFFERENT
+        // signature is a legal overload (previously its TryDeclare silently failed
+        // and every call resolved to the first declaration); an IDENTICAL ordered
+        // parameter-type list is unresolvable and diagnosed at the declaration.
         foreach (var func in module.Functions)
         {
             var parameters = func.Parameters
@@ -62,7 +67,17 @@ public sealed class Binder
                 .ToList();
             var returnType = func.Output?.TypeName ?? "VOID";
             var funcSymbol = new FunctionSymbol(func.Name, returnType, parameters);
-            _scope.TryDeclare(funcSymbol);
+            var existing = _scope.LookupOverloadSet(func.Name);
+            if (existing.Any(f => f.Parameters.Select(p => p.TypeName)
+                    .SequenceEqual(funcSymbol.Parameters.Select(p => p.TypeName), StringComparer.Ordinal)))
+            {
+                _diagnostics.ReportError(func.Span, DiagnosticCode.DuplicateFunctionSignature,
+                    $"Function '{func.Name}' is already declared with the same parameter types " +
+                    $"({string.Join(", ", parameters.Select(p => p.TypeName))}). Overloads must " +
+                    "differ in their parameter list.");
+                continue;
+            }
+            _scope.DeclareOverload(funcSymbol);
         }
 
         // Second pass: bind function bodies
@@ -753,12 +768,37 @@ public sealed class Binder
             args.Add(BindExpression(arg));
         }
 
-        // Try arity-aware lookup first (resolves overloaded sibling methods)
+        // #762 items 5–6 (B8): resolve against the full overload set, never silently.
+        // Exact-arity single match resolves; an arity tie is Calor0207 (bound types
+        // are informational strings in 0.13 and cannot discriminate — B5 decision);
+        // a declared name with no arity match is Calor0208. Both proceed with the
+        // first declaration for bound-tree continuity — flagged, not silent.
         string returnType;
-        var funcSymbol = _scope.LookupByArity(callExpr.Target, args.Count);
-        if (funcSymbol != null)
+        var overloads = _scope.LookupOverloadSet(callExpr.Target);
+        if (overloads.Count > 0)
         {
-            returnType = funcSymbol.ReturnType;
+            var atArity = overloads.Where(f => f.Parameters.Count == args.Count).ToList();
+            FunctionSymbol resolved;
+            if (atArity.Count == 1)
+            {
+                resolved = atArity[0];
+            }
+            else if (atArity.Count > 1)
+            {
+                _diagnostics.ReportWarning(callExpr.Span, DiagnosticCode.AmbiguousOverload,
+                    $"Call to '{callExpr.Target}' with {args.Count} argument(s) matches " +
+                    $"{atArity.Count} overloads; argument types cannot discriminate between " +
+                    "them. Resolving to the first declaration.");
+                resolved = atArity[0];
+            }
+            else
+            {
+                _diagnostics.ReportWarning(callExpr.Span, DiagnosticCode.NoMatchingOverload,
+                    $"No overload of '{callExpr.Target}' accepts {args.Count} argument(s) " +
+                    $"(declared arities: {string.Join(", ", overloads.Select(f => f.Parameters.Count).Distinct().OrderBy(c => c))}).");
+                resolved = overloads[0];
+            }
+            returnType = resolved.ReturnType;
         }
         else
         {

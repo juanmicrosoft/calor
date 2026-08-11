@@ -134,6 +134,16 @@ public sealed class Scope
         return Parent?.LookupByArity(name, argCount);
     }
 
+    /// <summary>#762 items 5–6 (B8): the full overload set for a name, nearest scope
+    /// wins — the binder resolves against the SET and diagnoses ambiguity/no-match
+    /// itself rather than relying on LookupByArity's silent first-overload fallback.</summary>
+    public IReadOnlyList<FunctionSymbol> LookupOverloadSet(string name)
+    {
+        if (_overloadSets.TryGetValue(name, out var list))
+            return list;
+        return Parent?.LookupOverloadSet(name) ?? Array.Empty<FunctionSymbol>();
+    }
+
     public bool TryLookup(string name, out Symbol? symbol)
     {
         symbol = Lookup(name);
