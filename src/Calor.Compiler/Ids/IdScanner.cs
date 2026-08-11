@@ -343,4 +343,15 @@ public sealed class IdScanner : IAstVisitor
         if (!string.IsNullOrEmpty(node.Id))
             AddEntry(node.Id, IdKind.IndexedType, node.Name, node.Span);
     }
+
+    // #762 item 8 (B8): real dispatch for the former no-op-Accept classes — no IDs
+    // to scan on any of them (IdScanner convention: empty visit).
+    public void Visit(OutputNode node) { }
+    public void Visit(EffectsNode node) { }
+    public void Visit(ElseIfClauseNode node) { }
+    public void Visit(FieldDefinitionNode node) { }
+    public void Visit(VariantDefinitionNode node) { }
+    public void Visit(TypeReferenceNode node) { }
+    public void Visit(FieldAssignmentNode node) { }
+
 }

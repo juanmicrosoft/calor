@@ -263,4 +263,14 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(ProofObligationNode node) => DefaultVisit(node)!;
     // Dependent Types: Indexed Types (size-parameterized)
     public virtual T Visit(IndexedTypeNode node) => DefaultVisit(node)!;
+
+    // #762 item 8 (B8): real dispatch for the former no-op-Accept classes.
+    public virtual T Visit(OutputNode node) => DefaultVisit(node)!;
+    public virtual T Visit(EffectsNode node) => DefaultVisit(node)!;
+    public virtual T Visit(ElseIfClauseNode node) => DefaultVisit(node)!;
+    public virtual T Visit(FieldDefinitionNode node) => DefaultVisit(node)!;
+    public virtual T Visit(VariantDefinitionNode node) => DefaultVisit(node)!;
+    public virtual T Visit(TypeReferenceNode node) => DefaultVisit(node)!;
+    public virtual T Visit(FieldAssignmentNode node) => DefaultVisit(node)!;
+
 }

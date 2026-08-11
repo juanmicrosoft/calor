@@ -1447,4 +1447,15 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     public ExpressionNode Visit(IndexedTypeNode node) => throw new InvalidOperationException();
 
     #endregion
+
+    // #762 item 8 (B8): real dispatch for the former no-op-Accept classes — none is
+    // an expression, so reaching one here is a caller bug (class convention).
+    public ExpressionNode Visit(OutputNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(EffectsNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(ElseIfClauseNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(FieldDefinitionNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(VariantDefinitionNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(TypeReferenceNode node) => throw new InvalidOperationException();
+    public ExpressionNode Visit(FieldAssignmentNode node) => throw new InvalidOperationException();
+
 }

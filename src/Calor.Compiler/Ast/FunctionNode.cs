@@ -26,8 +26,8 @@ public sealed class OutputNode : AstNode
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
     }
 
-    public override void Accept(IAstVisitor visitor) { }
-    public override T Accept<T>(IAstVisitor<T> visitor) => default!;
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
 
 /// <summary>
@@ -42,8 +42,8 @@ public sealed class EffectsNode : AstNode
         Effects = effects ?? throw new ArgumentNullException(nameof(effects));
     }
 
-    public override void Accept(IAstVisitor visitor) { }
-    public override T Accept<T>(IAstVisitor<T> visitor) => default!;
+    public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
+    public override T Accept<T>(IAstVisitor<T> visitor) => visitor.Visit(this);
 }
 
 /// <summary>

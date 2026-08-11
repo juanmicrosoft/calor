@@ -5780,6 +5780,53 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine($"// TODO: proof obligation [{node.Id}{desc}]");
         return "";
     }
+
+    // #762 item 8 (B8): real dispatch for the seven former no-op-Accept classes.
+    // Bodies ported from PR #900's implementations (same projections the parent
+    // nodes' inline handling produces).
+    public string Visit(OutputNode node) => MapTypeName(node.TypeName);
+
+    public string Visit(EffectsNode node) => "";
+
+    public string Visit(ElseIfClauseNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        AppendLine($"else if ({condition})");
+        AppendLine("{");
+        Indent();
+        PushDeclScope();
+        foreach (var stmt in node.Body)
+        {
+            EmitStatement(stmt);
+        }
+        PopDeclScope();
+        Dedent();
+        AppendLine("}");
+        return "";
+    }
+
+    public string Visit(FieldDefinitionNode node)
+    {
+        var defaultValue = node.DefaultValue is null ? "" : $" = {node.DefaultValue.Accept(this)}";
+        return $"{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}{defaultValue}";
+    }
+
+    public string Visit(VariantDefinitionNode node)
+    {
+        var fields = string.Join(", ", node.Fields.Select(Visit));
+        return $"{SanitizeIdentifier(node.Name)}({fields})";
+    }
+
+    public string Visit(TypeReferenceNode node)
+    {
+        var typeName = MapTypeName(node.Name);
+        return node.TypeArguments.Count == 0
+            ? typeName
+            : $"{typeName}<{string.Join(", ", node.TypeArguments.Select(Visit))}>";
+    }
+
+    public string Visit(FieldAssignmentNode node) => node.Value.Accept(this);
+
 }
 
 /// <summary>
@@ -5925,4 +5972,5 @@ public static class GeneratedCSharpCompiler
 
         return new GeneratedCSharpValidation(syntaxErrors, compilationErrors);
     }
+
 }
