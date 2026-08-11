@@ -36,7 +36,7 @@ function Test-ArchiveChecksum {
 # Platform mappings
 $PLATFORMS = @(
     @{ rid = "osx-arm64"; archive = "z3-$Z3_VERSION-arm64-osx-15.7.3"; lib = "libz3.dylib" },
-    @{ rid = "osx-x64"; archive = "z3-$Z3_VERSION-x64-osx-15.7.3"; lib = "libz3.dylib" },
+    # osx-x64 removed (Z3 chain closure): upstream x64-osx archive contains an arm64 binary.
     @{ rid = "win-arm64"; archive = "z3-$Z3_VERSION-arm64-win"; lib = "libz3.dll" },
     @{ rid = "win-x64"; archive = "z3-$Z3_VERSION-x64-win"; lib = "libz3.dll" },
     @{ rid = "win-x86"; archive = "z3-$Z3_VERSION-x86-win"; lib = "libz3.dll" },

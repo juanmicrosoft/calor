@@ -90,7 +90,8 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 # Platform mappings: "rid|archive_name|lib_name_in_archive|lib_name_output"
 PLATFORMS=(
     "osx-arm64|z3-${Z3_VERSION}-arm64-osx-15.7.3|libz3.dylib|libz3.dylib"
-    "osx-x64|z3-${Z3_VERSION}-x64-osx-15.7.3|libz3.dylib|libz3.dylib"
+    # osx-x64 removed (Z3 chain closure): upstream's x64-osx archive contains an
+    # arm64 binary — Intel macOS is unsupported for verification.
     "win-arm64|z3-${Z3_VERSION}-arm64-win|libz3.dll|libz3.dll"
     "win-x64|z3-${Z3_VERSION}-x64-win|libz3.dll|libz3.dll"
     "win-x86|z3-${Z3_VERSION}-x86-win|libz3.dll|libz3.dll"
