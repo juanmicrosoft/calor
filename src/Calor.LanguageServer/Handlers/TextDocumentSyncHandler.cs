@@ -73,10 +73,9 @@ public sealed class TextDocumentSyncHandler :
     public override Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken)
     {
         // Optionally re-analyze on save
-        var state = _workspace.Get(request.TextDocument.Uri);
+        var state = _workspace.Reanalyze(request.TextDocument.Uri);
         if (state != null)
         {
-            state.Reanalyze();
             PublishDiagnostics(request.TextDocument.Uri, state);
         }
 

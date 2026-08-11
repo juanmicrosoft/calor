@@ -1,5 +1,9 @@
+using Calor.LanguageServer.Handlers;
+using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
 using Calor.LanguageServer.Utilities;
+using OmniSharp.Extensions.LanguageServer.Protocol;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Xunit;
 
 namespace Calor.LanguageServer.Tests.Handlers;
@@ -211,5 +215,102 @@ public class DefinitionHandlerTests
 
         Assert.NotNull(def);
         Assert.IsType<Calor.Compiler.Ast.ClassDefinitionNode>(def);
+    }
+
+    [Fact]
+    public async Task DefinitionUsesSymbolIdAcrossClosedWorkspaceFilesAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string definition = """
+                §M{defs:Collision}
+                  §CL{worker1:Worker:pub:partial}
+                    §MT{pickInt:Pick:pub} (i32:value) -> i32
+                      §R value
+                    §MT{pickText:Pick:pub} (str:value) -> i32
+                      §R INT:2
+                """;
+            const string use = """
+                §M{use:Collision}
+                  §CL{worker2:Worker:pub:partial}
+                    §MT{call:Call:pub} () -> i32
+                      §R §C{Pick} §A INT:1 §/C
+                """;
+            var definitionPath = Path.Combine(root, "definition.calr");
+            var usePath = Path.Combine(root, "use.calr");
+            File.WriteAllText(definitionPath, definition);
+            File.WriteAllText(usePath, use);
+            var workspace = new WorkspaceState(root);
+            var useUri = DocumentUri.FromFileSystemPath(usePath);
+            workspace.GetOrCreate(useUri, use, version: 2);
+            var offset = use.IndexOf("Pick", StringComparison.Ordinal);
+            var (line, column) = LspTestHarness.GetLineColumn(use, offset);
+
+            var result = await new DefinitionHandler(workspace).Handle(
+                new DefinitionParams
+                {
+                    TextDocument = new TextDocumentIdentifier(useUri),
+                    Position = new Position(line - 1, column - 1),
+                },
+                CancellationToken.None);
+
+            Assert.NotNull(result);
+            var link = Assert.Single(result);
+            Assert.NotNull(link.Location);
+            var location = link.Location!;
+            Assert.Equal(definitionPath, location.Uri.ToUri().LocalPath);
+            Assert.Equal(
+                definition.IndexOf("Pick:pub", StringComparison.Ordinal),
+                PositionConverter.ToOffset(location.Range.Start, definition));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DefinitionDoesNotResolveWhitespaceOrEndAdjacentCursorAsync()
+    {
+        const string source = """
+            §M{m001:TestModule}
+              §F{f001:Compute:pub} () -> i32
+                §R INT:1
+            """;
+        var uri = DocumentUri.From("file:///definition-cursor.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var identifier = source.IndexOf("Compute", StringComparison.Ordinal);
+        var handler = new DefinitionHandler(workspace);
+
+        foreach (var offset in new[] { identifier - 1, identifier + "Compute".Length })
+        {
+            var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+            var result = await handler.Handle(
+                new DefinitionParams
+                {
+                    TextDocument = new TextDocumentIdentifier(uri),
+                    Position = new Position(line - 1, column - 1),
+                },
+                CancellationToken.None);
+            Assert.Null(result);
+        }
+    }
+
+    private static string CreateWorkspaceDirectory()
+    {
+        var directory = Directory.GetCurrentDirectory();
+        while (!File.Exists(Path.Combine(directory, "Calor.sln")))
+            directory = Directory.GetParent(directory)!.FullName;
+
+        var root = Path.Combine(
+            directory,
+            "artifacts",
+            "lsp-refactoring-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        return root;
     }
 }

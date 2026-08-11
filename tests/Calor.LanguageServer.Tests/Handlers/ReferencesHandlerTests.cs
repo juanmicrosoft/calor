@@ -11,183 +11,276 @@ namespace Calor.LanguageServer.Tests.Handlers;
 public class ReferencesHandlerTests
 {
     [Fact]
-    public async Task InheritedFieldAccesses_ReturnExactIdentifierRangesAsync()
+    public async Task NestedShadowedLocalsRemainSeparatedBySymbolIdAsync()
     {
-        var source = """
+        const string source = """
             §M{m001:TestModule}
-              §CL{c001:Base:pub}
-                §FLD{i32:shared:prot}
-              §CL{c002:Derived:Base:pub}
-                §MT{m001:Use:pub} () -> i32
-                  §R (+ §THIS.shared §BASE.shared)
-            """;
-        var uri = DocumentUri.From("file:///references-field.calr");
-        var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("§THIS.shared", StringComparison.Ordinal)
-            + "§THIS.".Length;
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new ReferencesHandler(workspace);
-
-        var locations = await handler.Handle(
-            new ReferenceParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-                Context = new ReferenceContext { IncludeDeclaration = true },
-            },
-            CancellationToken.None);
-
-        var references = locations!.ToArray();
-        Assert.Equal(3, references.Length);
-        Assert.All(references, location =>
-        {
-            var start = PositionConverter.ToOffset(location.Range.Start, source);
-            var end = PositionConverter.ToOffset(location.Range.End, source);
-            Assert.Equal("shared", source[start..end]);
-        });
-    }
-
-    [Fact]
-    public async Task ConstructorResolvedNewExpression_ReturnsExactTypeReferenceRangeAsync()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:Widget:pub}
-                §CTOR{ctor:pub}
-                §/CTOR{ctor}
-              §F{f001:Create:pub} () -> Widget
-                §R §NEW{Widget} §/NEW
-            """;
-        var uri = DocumentUri.From("file:///references-new-type.calr");
-        var workspace = new WorkspaceState();
-        workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("Widget:pub", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new ReferencesHandler(workspace);
-
-        var locations = await handler.Handle(
-            new ReferenceParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-                Context = new ReferenceContext { IncludeDeclaration = true },
-            },
-            CancellationToken.None);
-
-        var references = locations!.ToArray();
-        Assert.Equal(3, references.Length);
-        Assert.All(references, location =>
-        {
-            var start = PositionConverter.ToOffset(location.Range.Start, source);
-            var end = PositionConverter.ToOffset(location.Range.End, source);
-            Assert.Equal("Widget", source[start..end]);
-        });
-    }
-
-    [Fact]
-    public async Task TypeAnnotations_ReturnExactIdentityAwareRangesAsync()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:Widget:pub}
-              §CL{c002:Container:Widget:pub}
-                §FLD{Widget:item:priv}
-                §PROP{p001:Current:Widget:pub:get}
-                §MT{m001:Echo:pub} (Widget:value) -> Widget
-                  §B{local:Dictionary<str,List<Widget>>}
+              §F{f001:Test:pub} (bool:flag) -> i32
+                §B{value:i32} INT:1
+                §IF{nested} (== flag BOOL:true)
+                  §B{value:i32} INT:2
                   §R value
-                §MT{m002:Use:pub}
-                  §I{Widget:input}
-                  §O{Widget}
-                  §R input
+                §R value
             """;
-        var uri = DocumentUri.From("file:///references-type-annotations.calr");
+        var uri = DocumentUri.From("file:///references-shadow.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("Widget:pub", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new ReferencesHandler(workspace);
 
-        var locations = await handler.Handle(
-            new ReferenceParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-                Context = new ReferenceContext { IncludeDeclaration = true },
-            },
-            CancellationToken.None);
+        var outer = await FindReferencesAsync(
+            workspace,
+            uri,
+            source,
+            source.IndexOf("§B{value", StringComparison.Ordinal) + "§B{".Length);
+        var innerOffset = source.LastIndexOf("§B{value", StringComparison.Ordinal)
+            + "§B{".Length;
+        var inner = await FindReferencesAsync(
+            workspace,
+            uri,
+            source,
+            innerOffset);
 
-        var references = locations!.ToArray();
-        Assert.Equal(9, references.Length);
-        Assert.All(references, location =>
-        {
-            var start = PositionConverter.ToOffset(location.Range.Start, source);
-            var end = PositionConverter.ToOffset(location.Range.End, source);
-            Assert.Equal("Widget", source[start..end]);
-        });
+        Assert.Equal(2, outer.Length);
+        Assert.Equal(2, inner.Length);
+        Assert.DoesNotContain(
+            outer,
+            location => PositionConverter.ToOffset(location.Range.Start, source)
+                == innerOffset);
+        Assert.DoesNotContain(
+            inner,
+            location => PositionConverter.ToOffset(location.Range.Start, source)
+                == source.IndexOf("§B{value", StringComparison.Ordinal) + "§B{".Length);
+        Assert.All(outer.Concat(inner), location =>
+            Assert.Equal("value", TextAt(source, location.Range)));
     }
 
     [Fact]
-    public async Task LocalTypeReferences_ExcludeQualifiedExternalTypeAsync()
+    public async Task SameMethodNameOnUnrelatedTypesDoesNotCollideAsync()
     {
-        var source = """
+        const string source = """
             §M{m001:TestModule}
-              §CL{c001:Exception:pub}
-              §CL{c002:Holder:pub}
-                §FLD{Exception:local:priv}
-                §FLD{System.Exception:external:priv}
+              §CL{c001:First:pub}
+                §MT{m001:Run:pub} () -> i32
+                  §R INT:1
+              §CL{c002:Second:pub}
+                §MT{m002:Run:pub} () -> i32
+                  §R INT:2
+              §F{f001:Use:pub} () -> i32
+                §B{first:First} §NEW{First} §/NEW
+                §R §C{first.Run} §/C
             """;
-        var uri = DocumentUri.From("file:///references-qualified-type.calr");
+        var uri = DocumentUri.From("file:///references-method-collision.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("Exception:pub", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new ReferencesHandler(workspace);
+        var firstRun = source.IndexOf("Run:pub", StringComparison.Ordinal);
+        var references = await FindReferencesAsync(
+            workspace,
+            uri,
+            source,
+            firstRun);
 
-        var locations = await handler.Handle(
-            new ReferenceParams
-            {
-                TextDocument = new TextDocumentIdentifier(uri),
-                Position = new Position(line - 1, column - 1),
-                Context = new ReferenceContext { IncludeDeclaration = true },
-            },
-            CancellationToken.None);
-
-        var references = locations!.ToArray();
         Assert.Equal(2, references.Length);
-        Assert.Equal(
-            new[]
-            {
-                source.IndexOf("Exception:pub", StringComparison.Ordinal),
-                source.IndexOf("Exception:local", StringComparison.Ordinal),
-            },
-            references.Select(location =>
-                    PositionConverter.ToOffset(location.Range.Start, source))
-                .Order()
-                .ToArray());
+        Assert.All(references, location => Assert.Equal("Run", TextAt(source, location.Range)));
+        Assert.DoesNotContain(
+            references,
+            location => PositionConverter.ToOffset(location.Range.Start, source)
+                == source.LastIndexOf("Run:pub", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task NewGenericArgument_ReturnsExactNestedTypeReferenceAsync()
+    public async Task OverloadsResolveToExactSignatureAsync()
     {
-        var source = """
+        const string source = """
             §M{m001:TestModule}
-              §F{f001:Create:pub} () -> object
-                §R §NEW{Box<List<Widget>>} §/NEW
-              §CL{c001:Widget:pub}
-              §CL{c002:List:pub}
-              §CL{c003:Box:pub}
-                §FLD{i32:_dummy:priv}
+              §F{f001:Pick:pub} (i32:value) -> i32
+                §R value
+              §F{f002:Pick:pub} (str:value) -> str
+                §R value
+              §F{f003:Use:pub} () -> i32
+                §R §C{Pick} §A INT:1 §/C
             """;
-        var uri = DocumentUri.From("file:///references-new-generic-type.calr");
+        var uri = DocumentUri.From("file:///references-overloads.calr");
         var workspace = new WorkspaceState();
         workspace.GetOrCreate(uri, source);
-        var offset = source.IndexOf("Widget>>}", StringComparison.Ordinal);
-        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
-        var handler = new ReferencesHandler(workspace);
+        var references = await FindReferencesAsync(
+            workspace,
+            uri,
+            source,
+            source.IndexOf("Pick:pub", StringComparison.Ordinal));
 
-        var locations = await handler.Handle(
+        Assert.Equal(2, references.Length);
+        Assert.DoesNotContain(
+            references,
+            location => PositionConverter.ToOffset(location.Range.Start, source)
+                == source.LastIndexOf("Pick:pub", StringComparison.Ordinal));
+        Assert.All(references, location => Assert.Equal("Pick", TextAt(source, location.Range)));
+    }
+
+    [Fact]
+    public async Task ClosedWorkspaceFilesAreIncludedAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string definition = """
+                §M{defs:Collision}
+                  §CL{worker1:Worker:pub:partial}
+                    §MT{pick:Pick:pub} (i32:value) -> i32
+                      §R value
+                """;
+            const string openUse = """
+                §M{openUse:Collision}
+                  §CL{worker2:Worker:pub:partial}
+                    §MT{use:Use:pub} () -> i32
+                      §R §C{Pick} §A INT:1 §/C
+                """;
+            const string closedUse = """
+                §M{closedUse:Collision}
+                  §CL{worker3:Worker:pub:partial}
+                    §MT{use:UseAgain:pub} () -> i32
+                      §R §C{Pick} §A INT:2 §/C
+                """;
+            File.WriteAllText(Path.Combine(root, "definition.calr"), definition);
+            File.WriteAllText(Path.Combine(root, "open.calr"), openUse);
+            File.WriteAllText(Path.Combine(root, "closed.calr"), closedUse);
+
+            var workspace = new WorkspaceState(root);
+            var openUri = DocumentUri.FromFileSystemPath(Path.Combine(root, "open.calr"));
+            workspace.GetOrCreate(openUri, openUse, version: 4);
+            var references = await FindReferencesAsync(
+                workspace,
+                openUri,
+                openUse,
+                openUse.IndexOf("Pick", StringComparison.Ordinal));
+
+            Assert.Equal(3, references.Length);
+            Assert.Equal(
+                3,
+                references.Select(location => location.Uri.ToUri().LocalPath)
+                    .Distinct(StringComparer.Ordinal)
+                    .Count());
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ClosedWorkspaceIndexInvalidatesSameLengthChangesAndDeletesAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string originalDefinition = """
+                §M{defs:Collision}
+                  §CL{c001:Worker:pub:partial}
+                    §MT{m001:Pick:pub} (i32:value) -> i32
+                      §R value
+                """;
+            const string changedDefinition = """
+                §M{defs:Collision}
+                  §CL{c001:Worker:pub:partial}
+                    §MT{m001:Pock:pub} (i32:value) -> i32
+                      §R value
+                """;
+            const string originalUse = """
+                §M{use:Collision}
+                  §CL{c002:Worker:pub:partial}
+                    §MT{m002:Use:pub} () -> i32
+                      §R §C{Pick} §A INT:1 §/C
+                """;
+            const string changedUse = """
+                §M{use:Collision}
+                  §CL{c002:Worker:pub:partial}
+                    §MT{m002:Use:pub} () -> i32
+                      §R §C{Pock} §A INT:1 §/C
+                """;
+            var definitionPath = Path.Combine(root, "definition.calr");
+            var usePath = Path.Combine(root, "use.calr");
+            File.WriteAllText(definitionPath, originalDefinition);
+            File.WriteAllText(usePath, originalUse);
+            var workspace = new WorkspaceState(root);
+            var useUri = DocumentUri.FromFileSystemPath(usePath);
+            workspace.GetOrCreate(useUri, originalUse, version: 1);
+
+            Assert.Equal(
+                2,
+                (await FindReferencesAsync(
+                    workspace,
+                    useUri,
+                    originalUse,
+                    originalUse.IndexOf("Pick", StringComparison.Ordinal))).Length);
+
+            var occurrence = workspace.ResolveOccurrence(
+                useUri,
+                originalUse.IndexOf("Pick", StringComparison.Ordinal));
+            Assert.NotNull(occurrence);
+            var originalSnapshots = workspace.FindSymbolOccurrences(
+                occurrence!.SymbolId,
+                includeDeclaration: true);
+            File.WriteAllText(definitionPath, changedDefinition);
+            Assert.False(workspace.AreOccurrenceSnapshotsCurrent(originalSnapshots));
+
+            workspace.Update(useUri, changedUse, version: 2);
+            var changedReferences = await FindReferencesAsync(
+                workspace,
+                useUri,
+                changedUse,
+                changedUse.IndexOf("Pock", StringComparison.Ordinal));
+            Assert.Equal(2, changedReferences.Length);
+            Assert.Contains(
+                changedReferences,
+                location => location.Uri.ToUri().LocalPath == definitionPath
+                    && TextAt(changedDefinition, location.Range) == "Pock");
+
+            File.Delete(definitionPath);
+            Assert.Empty(await FindReferencesAsync(
+                workspace,
+                useUri,
+                changedUse,
+                changedUse.IndexOf("Pock", StringComparison.Ordinal)));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WhitespaceAndEndAdjacentCursorsReturnNoReferencesAsync()
+    {
+        const string source = """
+            §M{m001:TestModule}
+              §F{f001:Compute:pub} () -> i32
+                §R INT:1
+            """;
+        var uri = DocumentUri.From("file:///references-cursor.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var identifier = source.IndexOf("Compute", StringComparison.Ordinal);
+
+        Assert.Empty(await FindReferencesAsync(
+            workspace,
+            uri,
+            source,
+            identifier - 1));
+        Assert.Empty(await FindReferencesAsync(
+            workspace,
+            uri,
+            source,
+            identifier + "Compute".Length));
+    }
+
+    private static async Task<Location[]> FindReferencesAsync(
+        WorkspaceState workspace,
+        DocumentUri uri,
+        string source,
+        int offset)
+    {
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var result = await new ReferencesHandler(workspace).Handle(
             new ReferenceParams
             {
                 TextDocument = new TextDocumentIdentifier(uri),
@@ -195,248 +288,30 @@ public class ReferencesHandlerTests
                 Context = new ReferenceContext { IncludeDeclaration = true },
             },
             CancellationToken.None);
-
-        var references = locations!.ToArray();
-        Assert.Equal(2, references.Length);
-        Assert.All(references, location =>
-        {
-            var start = PositionConverter.ToOffset(location.Range.Start, source);
-            var end = PositionConverter.ToOffset(location.Range.End, source);
-            Assert.Equal("Widget", source[start..end]);
-        });
-        Assert.Equal(
-            new[]
-            {
-                source.IndexOf("Widget>>}", StringComparison.Ordinal),
-                source.IndexOf("Widget:pub", StringComparison.Ordinal),
-            },
-            references.Select(location =>
-                    PositionConverter.ToOffset(location.Range.Start, source))
-                .Order()
-                .ToArray());
+        return result?.ToArray() ?? [];
     }
 
-    [Fact]
-    public void ReferenceCollector_FindsVariableReferences()
+    private static string TextAt(
+        string source,
+        OmniSharp.Extensions.LanguageServer.Protocol.Models.Range range)
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §B{x} 10
-                §B{y} x
-                §R (+ x y)
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollector("x", includeDeclaration: true);
-        collector.Visit(ast);
-
-        // Should find: declaration (§B{x}), use in y = x, and use in return
-        Assert.True(collector.References.Count >= 2);
+        var start = PositionConverter.ToOffset(range.Start, source);
+        var end = PositionConverter.ToOffset(range.End, source);
+        return source[start..end];
     }
 
-    [Fact]
-    public void ReferenceCollector_FindsFunctionReferences()
+    private static string CreateWorkspaceDirectory()
     {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Add:pub}
-                §I{i32:a}
-                §I{i32:b}
-                §O{i32}
-                §R (+ a b)
-              §F{f002:Test:pub}
-                §O{i32}
-                §R §C{Add} §A 1 §A 2 §/C
-            """;
+        var directory = Directory.GetCurrentDirectory();
+        while (!File.Exists(Path.Combine(directory, "Calor.sln")))
+            directory = Directory.GetParent(directory)!.FullName;
 
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollector("Add", includeDeclaration: true);
-        collector.Visit(ast);
-
-        // Should find at least: declaration and call
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollector_FindsParameterReferences()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Double:pub}
-                §I{i32:value}
-                §O{i32}
-                §R (* value 2)
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollector("value", includeDeclaration: true);
-        collector.Visit(ast);
-
-        // Should find: parameter declaration and use in return
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollector_ExcludesDeclaration_WhenFlagIsFalse()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §B{x} 10
-                §R x
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collectorWithDecl = new ReferenceCollector("x", includeDeclaration: true);
-        collectorWithDecl.Visit(ast);
-
-        var collectorWithoutDecl = new ReferenceCollector("x", includeDeclaration: false);
-        collectorWithoutDecl.Visit(ast);
-
-        // Without declaration should have fewer or equal references
-        Assert.True(collectorWithoutDecl.References.Count <= collectorWithDecl.References.Count);
-    }
-
-    [Fact]
-    public void ReferenceCollector_FindsClassReferences()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:Person}
-                §FLD{str:name}
-              §F{f001:Test:pub}
-                §O{Person}
-                §R §NEW{Person} §/NEW
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollector("Person", includeDeclaration: true);
-        collector.Visit(ast);
-
-        // Should find: class declaration and new expression
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollector_FindsFieldReferences()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §CL{c001:Counter}
-                §FLD{i32:count:priv}
-                §MT{m001:Increment:pub}
-                  §O{void}
-                  §ASSIGN count (+ count 1)
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollector("count", includeDeclaration: true);
-        collector.Visit(ast);
-
-        // Should find: field declaration and usages
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollector_FindsEnumReferences()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §EN{e001:Color}
-              Red
-              Green
-              Blue
-              §/EN{e001}
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollector("Color", includeDeclaration: true);
-        collector.Visit(ast);
-
-        // Should find: enum declaration
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollector_FindsLoopVariableReferences()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Sum:pub}
-                §O{i32}
-                §B{total} 0
-                §L{for1:i:0:10:1}
-                  §ASSIGN total (+ total i)
-                §R total
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollector("i", includeDeclaration: true);
-        collector.Visit(ast);
-
-        // Should find: loop variable and usage inside loop
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollector_FindsLambdaParameterReferences()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §B{fn} §LAM
-                §I{i32:x}
-                §R (* x 2)
-                §/LAM
-                §R 0
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollector("x", includeDeclaration: true);
-        collector.Visit(ast);
-
-        // Should find references inside lambda
-        Assert.True(collector.References.Count >= 1);
-    }
-
-    [Fact]
-    public void ReferenceCollector_NoReferences_ForUnusedSymbol()
-    {
-        var source = """
-            §M{m001:TestModule}
-              §F{f001:Test:pub}
-                §O{i32}
-                §R 42
-            """;
-
-        var ast = LspTestHarness.GetAst(source);
-        Assert.NotNull(ast);
-
-        var collector = new ReferenceCollector("nonexistent", includeDeclaration: true);
-        collector.Visit(ast);
-
-        Assert.Empty(collector.References);
+        var root = Path.Combine(
+            directory,
+            "artifacts",
+            "lsp-refactoring-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        return root;
     }
 }

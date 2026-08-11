@@ -146,8 +146,8 @@ Inputs with semantic errors or pre-existing generated-C# errors use a
 normal formatter and is never used for a supported, gate-clean input.
 
 LSP formatting is registered by default and returns no edit when these gates do
-not pass. LSP rename remains independently gated by
-`CALOR_LSP_EXPERIMENTAL=1` for issue #765.
+not pass. LSP rename is independently guarded by its exact-span `SymbolId`
+workspace index and returns no edit if any open or closed snapshot is stale.
 
 ---
 

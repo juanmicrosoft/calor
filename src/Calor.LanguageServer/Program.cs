@@ -12,12 +12,6 @@ public static class Program
     {
         var workspace = new WorkspaceState();
 
-        // Rename remains experimental (#765). Formatting is registered
-        // unconditionally because its whole-document edit now passes the same
-        // lossless semantic and generated-C# gates as CLI writes (#760).
-        var experimentalRename =
-            Environment.GetEnvironmentVariable("CALOR_LSP_EXPERIMENTAL") is "1" or "true";
-
         var server = await OmniSharp.Extensions.LanguageServer.Server.LanguageServer.From(options =>
         {
             options
@@ -39,6 +33,7 @@ public static class Program
                 .WithHandler<FormattingHandler>()
                 .WithHandler<SignatureHelpHandler>()
                 .WithHandler<ReferencesHandler>()
+                .WithHandler<RenameHandler>()
                 .WithHandler<WorkspaceSymbolHandler>()
                 .WithHandler<SemanticTokensHandler>()
                 .OnInitialize((server, request, token) =>
@@ -62,11 +57,6 @@ public static class Program
                     });
                     return Task.CompletedTask;
                 });
-
-            if (experimentalRename)
-            {
-                options.WithHandler<RenameHandler>();
-            }
         }).ConfigureAwait(false);
 
         await server.WaitForExit.ConfigureAwait(false);

@@ -169,8 +169,8 @@ The tool scores files based on patterns like null handling, error handling, asyn
 - [x] Refinement types with Z3 verification (M0-M1)
 - [x] Agent guidance tools and obligation policy (M3)
 - [x] Indexed types and bounds checking (M2)
+- [x] IDE language server with SymbolId-based definition, references, and rename
 - [ ] Direct IL emission
-- [ ] IDE language server
 
 ---
 
