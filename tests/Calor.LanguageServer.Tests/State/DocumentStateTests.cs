@@ -51,15 +51,16 @@ public class DocumentStateTests
         // #762 B1: the LSP binds every open document with the LIVE diagnostics bag, so
         // the Calor0259 incomplete-fraction instrument is editor-visible. This pins the
         // severity decision (scoping doc §5): Info until B8 — a document using a
-        // not-yet-bound construct (quantifier, family B7) must gain the instrument
-        // diagnostic WITHOUT errors, or every editor floods while the family PRs land.
+        // not-yet-bound construct must gain the instrument diagnostic WITHOUT errors,
+        // or every editor floods while the family PRs land.
         // (Fixture has moved down the family sequence as each family binds: B6 retired
-        // the null-coalesce version; when B7 lands this must move to a Tier B construct
-        // or, post-B8, be re-pointed at whatever the closure decision leaves incomplete.)
+        // null-coalesce, B7 retired the quantifier. Now a Tier B construct — §SIZEOF,
+        // unsafe/pointer family, out of 0.13 binding scope — so this holds until B8's
+        // closure decision, which owns re-pointing or retiring it.)
         var source = """
             §M{m001:TestModule}
-              §F{f001:Pick:pub} (i32:x) -> bool
-                §R (forall ((i i32)) (> i 0))
+              §F{f001:Pick:pub} (i32:x) -> i32
+                §R §SIZEOF{i32}
             """;
 
         var state = LspTestHarness.CreateDocument(source);

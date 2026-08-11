@@ -507,6 +507,12 @@ public static class BoundChildren
         BoundMatchExpression me => [me.Target, .. me.Cases.Where(c => c.Guard is not null).Select(c => c.Guard!)],
         BoundLambda lam => lam.ExpressionBody is null ? [] : [lam.ExpressionBody],
         BoundAwaitExpression aw => [aw.Awaited],
+        // #762 B7 — quantifiers. Bodies are visible (a /0 inside a forall body is a
+        // bug in the SPEC worth surfacing); quantifier variables are declared symbols,
+        // so body references resolve rather than tripping name-keyed analyses.
+        BoundForallExpression fa => [fa.Body],
+        BoundExistsExpression ex => [ex.Body],
+        BoundImplicationExpression imp => [imp.Antecedent, imp.Consequent],
         // #762 B5 — conversion/pattern family.
         BoundConversionExpression conv => [conv.Operand],
         BoundTypeTest tt => [tt.Operand],
@@ -530,6 +536,11 @@ public static class BoundChildren
     {
         BoundNullCoalesce nc => [nc.Right],
         BoundMatchExpression me => me.Cases.Where(c => c.Guard is not null).Select(c => c.Guard!),
+        // #762 B7: a quantifier body evaluates zero-or-more times (empty domain → not
+        // at all); the implication consequent short-circuits on a false antecedent.
+        BoundForallExpression fa => [fa.Body],
+        BoundExistsExpression ex => [ex.Body],
+        BoundImplicationExpression imp => [imp.Consequent],
         BoundLambda lam => lam.ExpressionBody is null ? [] : [lam.ExpressionBody],
         _ => [],
     };
@@ -1057,6 +1068,45 @@ public sealed class BoundAwaitExpression : BoundExpression
             ? t[5..^1]
             : t is "Task" or "TASK" ? "VOID" : "OBJECT";
     }
+}
+
+/// <summary>#762 B7: universal quantification — the body binds in a child scope where
+/// the quantifier variables are declared (as parameter-like symbols: bound by the
+/// quantifier, never "uninitialized"). Quantifiers are SPEC expressions: the Z3
+/// verification pipeline consumes their AST (ExpressionSimplifier), never these bound
+/// nodes — binding them only gives value-safety analyses visibility into the body.</summary>
+public sealed class BoundForallExpression : BoundExpression
+{
+    public IReadOnlyList<VariableSymbol> BoundVariables { get; }
+    public BoundExpression Body { get; }
+    public override string TypeName => "BOOL";
+    public BoundForallExpression(TextSpan span, IReadOnlyList<VariableSymbol> boundVariables,
+        BoundExpression body) : base(span)
+    { BoundVariables = boundVariables; Body = body; }
+}
+
+/// <summary>#762 B7: existential quantification — see BoundForallExpression.</summary>
+public sealed class BoundExistsExpression : BoundExpression
+{
+    public IReadOnlyList<VariableSymbol> BoundVariables { get; }
+    public BoundExpression Body { get; }
+    public override string TypeName => "BOOL";
+    public BoundExistsExpression(TextSpan span, IReadOnlyList<VariableSymbol> boundVariables,
+        BoundExpression body) : base(span)
+    { BoundVariables = boundVariables; Body = body; }
+}
+
+/// <summary>#762 B7: logical implication (-> a b) ≡ !a || b. The consequent is
+/// DEFERRED: any executable lowering short-circuits it when the antecedent is false
+/// (same shape as BoundNullCoalesce.Right).</summary>
+public sealed class BoundImplicationExpression : BoundExpression
+{
+    public BoundExpression Antecedent { get; }
+    public BoundExpression Consequent { get; }
+    public override string TypeName => "BOOL";
+    public BoundImplicationExpression(TextSpan span, BoundExpression antecedent,
+        BoundExpression consequent) : base(span)
+    { Antecedent = antecedent; Consequent = consequent; }
 }
 
 /// <summary>
