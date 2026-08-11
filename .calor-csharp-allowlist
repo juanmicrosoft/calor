@@ -33,3 +33,14 @@ src/Calor.Compiler/Commands/ReviewPacketCommand.cs
 src/Calor.Compiler/Effects/Manifests/PackageManifestGenerator.cs
 src/Calor.Compiler/Reporting/ReviewPacket.cs
 src/Calor.Compiler/Reporting/ReviewPacketBuilder.cs
+
+# Gate 4 rename harness (roadmap-v0.13-v0.15 §2.5 gate 4) — SymbolId-addressed
+# rename over the parser/binder. Compiler-internal machinery of the same kind
+# as #754: the index reads bound trees and symbol identities, and the engine
+# and command drive them. Calor has no access to its own bound tree, so this
+# cannot be authored in Calor. The gate's plan text places the instrument in
+# the spine deliberately ("shipping with the spine — the deferred LSP later
+# consumes the same identities").
+src/Calor.Compiler/Refactoring/ProjectSymbolIndex.cs
+src/Calor.Compiler/Refactoring/RenameEngine.cs
+src/Calor.Compiler/Commands/RenameCommand.cs

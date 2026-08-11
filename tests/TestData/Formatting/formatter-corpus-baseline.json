@@ -1,6 +1,6 @@
 {
-  "trackedFileCount": 861,
-  "successfulTransformationCount": 630,
+  "trackedFileCount": 870,
+  "successfulTransformationCount": 637,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -170,7 +170,8 @@
       "tests/TestData/LintScenarios/06_statements/throw_statement.calr",
       "tests/TestData/LintScenarios/06_statements/try_catch_when.calr",
       "tests/TestData/LintScenarios/06_statements/try_finally_return.calr",
-      "tests/TestData/LintScenarios/06_statements/try_multi_catch_finally.calr"
+      "tests/TestData/LintScenarios/06_statements/try_multi_catch_finally.calr",
+      "tests/TestData/RenameScripts/RN-01-function-across-files/app.calr"
     ],
     "generatedCSharpErrors": [
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m01.calr",
@@ -237,7 +238,8 @@
       "tests/TestData/Benchmarks/TokenEconomics/CompoundInterest.calr",
       "tests/TestData/Benchmarks/TokenEconomics/Power.calr",
       "tests/TestData/Benchmarks/TokenEconomics/TemperatureConverter.calr",
-      "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.calr"
+      "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.calr",
+      "tests/TestData/RenameScripts/RN-03-parameter-vs-field/reader.calr"
     ]
   }
 }

@@ -190,6 +190,12 @@ public class ArchitectureTests
             ["Effects/ExternalCallCollector.cs:IndexBoundCallReceivers"] =
                 ("Universal ChildNodes traversal; unresolved receivers remain explicit raw calls.",
                     "_boundReceiverTypes"),
+            ["Refactoring/ProjectSymbolIndex.cs:Populate"] =
+                ("Universal ChildNodes traversal; the switch selects which nodes carry a " +
+                    "renameable identifier, and the default arm states that a new " +
+                    "identifier-bearing node would go unindexed. Rename correctness is " +
+                    "established by the apply-recompile-and-run oracle, not by this switch.",
+                    "No occurrence for this node kind"),
             ["Analysis/Dataflow/BoundNodeHelpers.cs:IsLiteralZero"] =
                 ("Literal classifier, not traversal; non-literals explicitly return false.",
                     "_ => false"),

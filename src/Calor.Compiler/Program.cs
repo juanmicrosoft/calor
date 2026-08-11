@@ -267,6 +267,7 @@ public class Program
         rootCommand.AddCommand(BenchmarkCommand.Create());
         rootCommand.AddCommand(InitCommand.Create());
         rootCommand.AddCommand(FormatCommand.Create());
+        rootCommand.AddCommand(RenameCommand.Create());
         rootCommand.AddCommand(LintCommand.Create());
         rootCommand.AddCommand(AssessCommand.Create());
         rootCommand.AddCommand(AnalyzeConvertibilityCommand.Create());

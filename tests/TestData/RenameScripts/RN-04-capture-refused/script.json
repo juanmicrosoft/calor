@@ -1,0 +1,9 @@
+{
+  "id": "RN-04",
+  "title": "Renaming a local onto a name already bound in the same scope",
+  "pins": "The capture the engine can see in advance. Renaming `source` to `target` would produce two bindings of one name in one scope: it compiles, and it silently changes what the expression reads. The engine refuses instead of producing a compiling wrong answer.",
+  "target": { "file": "capture.calr", "marker": "source", "occurrence": 0 },
+  "newName": "target",
+  "expect": "refuses",
+  "expectedRefusal": "NameCollision"
+}

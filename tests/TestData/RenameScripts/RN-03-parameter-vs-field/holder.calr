@@ -1,0 +1,10 @@
+§M{m001:Holder}
+  §CL{c001:Box:pub}
+    §FLD{i32:count:pub}
+    §MT{m001:Add:pub} (i32:count) -> i32
+      §E{}
+      §R (+ §THIS.count count)
+  §F{f001:Run:pub} () -> i32
+    §E{}
+    §B{box:Box} §NEW{Box} §/NEW
+    §R §C{box.Add} §A INT:5 §/C

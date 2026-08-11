@@ -1,0 +1,4 @@
+§M{m002:App}
+  §F{f001:Run:pub} () -> i32
+    §E{}
+    §R (+ §C{Double} §A INT:5 §/C §C{Double} §A INT:10 §/C)
