@@ -76,7 +76,50 @@ public class ReferencesHandlerTests
             CancellationToken.None);
 
         var references = locations!.ToArray();
-        Assert.Equal(2, references.Length);
+        Assert.Equal(3, references.Length);
+        Assert.All(references, location =>
+        {
+            var start = PositionConverter.ToOffset(location.Range.Start, source);
+            var end = PositionConverter.ToOffset(location.Range.End, source);
+            Assert.Equal("Widget", source[start..end]);
+        });
+    }
+
+    [Fact]
+    public async Task TypeAnnotations_ReturnExactIdentityAwareRangesAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c001:Widget:pub}
+              §CL{c002:Container:Widget:pub}
+                §FLD{Widget:item:priv}
+                §PROP{p001:Current:Widget:pub:get}
+                §MT{m001:Echo:pub} (Widget:value) -> Widget
+                  §B{local:Dictionary<str,List<Widget>>}
+                  §R value
+                §MT{m002:Use:pub}
+                  §I{Widget:input}
+                  §O{Widget}
+                  §R input
+            """;
+        var uri = DocumentUri.From("file:///references-type-annotations.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Widget:pub", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new ReferencesHandler(workspace);
+
+        var locations = await handler.Handle(
+            new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                Context = new ReferenceContext { IncludeDeclaration = true },
+            },
+            CancellationToken.None);
+
+        var references = locations!.ToArray();
+        Assert.Equal(9, references.Length);
         Assert.All(references, location =>
         {
             var start = PositionConverter.ToOffset(location.Range.Start, source);

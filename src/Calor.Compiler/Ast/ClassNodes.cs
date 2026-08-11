@@ -272,11 +272,13 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// The base class (if any).
     /// </summary>
     public string? BaseClass { get; }
+    public TextSpan? BaseClassSpan { get; }
 
     /// <summary>
     /// Interfaces implemented by this class.
     /// </summary>
     public IReadOnlyList<string> ImplementedInterfaces { get; }
+    public IReadOnlyList<TextSpan> ImplementedInterfaceSpans { get; }
 
     /// <summary>
     /// Type parameters if this is a generic class.
@@ -493,7 +495,9 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<EnumDefinitionNode>? nestedEnums = null,
         IReadOnlyList<IndexerNode>? indexers = null,
         IReadOnlyList<DelegateDefinitionNode>? nestedDelegates = null,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        TextSpan? baseClassSpan = null,
+        IReadOnlyList<TextSpan>? implementedInterfaceSpans = null)
         : base(span, id, name, attributes, identifierSpan)
     {
         IsAbstract = isAbstract;
@@ -504,7 +508,9 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IsReadOnly = isReadOnly;
         Visibility = visibility;
         BaseClass = baseClass;
+        BaseClassSpan = baseClassSpan;
         ImplementedInterfaces = implementedInterfaces ?? throw new ArgumentNullException(nameof(implementedInterfaces));
+        ImplementedInterfaceSpans = implementedInterfaceSpans ?? Array.Empty<TextSpan>();
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Fields = fields ?? throw new ArgumentNullException(nameof(fields));
         Properties = properties ?? throw new ArgumentNullException(nameof(properties));
@@ -535,6 +541,7 @@ public sealed class ClassFieldNode : AstNode
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
     public bool IsStatic => Modifiers.HasFlag(MethodModifiers.Static);
@@ -580,12 +587,14 @@ public sealed class ClassFieldNode : AstNode
         ExpressionNode? defaultValue,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         Visibility = visibility;
         Modifiers = modifiers;
         DefaultValue = defaultValue;

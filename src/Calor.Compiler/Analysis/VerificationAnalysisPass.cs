@@ -155,6 +155,7 @@ public sealed class VerificationAnalysisPass
         var bindingDiagnostics = new DiagnosticBag();
         var binder = new Binder(bindingDiagnostics);
         var boundModule = binder.Bind(module);
+        BindingDiagnosticPolicy.PropagateCompilationErrors(bindingDiagnostics, _diagnostics);
         foreach (var diagnostic in bindingDiagnostics
                      .Where(diagnostic => diagnostic.Code == DiagnosticCode.AnalysisUnsupportedNode))
         {
@@ -167,11 +168,8 @@ public sealed class VerificationAnalysisPass
             }
         }
 
-        // #762 B1 (scoping doc §5): the binder's bag was historically thrown away here,
-        // which made binder diagnostics invisible on the only CLI path that binds. Route
-        // ONLY the analysis-incomplete instrument code into the real bag — wholesale
-        // routing would double-report binder diagnostics that AST-based passes (e.g.
-        // BindValidationPass) already surface through their own channels.
+        // Analysis instrumentation remains opt-in/noisy and is routed separately
+        // from the correctness diagnostics propagated by BindingDiagnosticPolicy.
         foreach (var d in bindingDiagnostics.Where(d => d.Code == DiagnosticCode.AnalysisIncomplete))
         {
             _diagnostics.ReportInfo(d.Span, d.Code, d.Message);

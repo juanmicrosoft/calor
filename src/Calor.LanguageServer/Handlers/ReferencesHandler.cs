@@ -33,6 +33,9 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
 
         // Convert LSP position to Calor position
         var (line, column) = PositionConverter.ToCalorPosition(request.Position);
+        var typeReferences = snapshot.BoundModule == null
+            ? Array.Empty<IndexedTypeReference>()
+            : TypeReferenceIndex.Build(snapshot.Ast, snapshot.BoundModule, snapshot.Source);
 
         // Find the symbol at the cursor position
         var result = SymbolFinder.FindSymbolAtPosition(
@@ -40,7 +43,8 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
             line,
             column,
             snapshot.Source,
-            snapshot.BoundModule);
+            snapshot.BoundModule,
+            typeReferences);
         if (result == null || string.IsNullOrEmpty(result.Name))
         {
             return Task.FromResult<LocationContainer?>(null);
@@ -69,7 +73,8 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
                 foreach (var span in SymbolFinder.FindBoundReferences(
                              snapshot.BoundModule,
                              symbolId,
-                             request.Context.IncludeDeclaration))
+                             request.Context.IncludeDeclaration,
+                             typeReferences))
                 {
                     locations.Add(new Location
                     {

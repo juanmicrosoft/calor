@@ -1181,7 +1181,8 @@ public sealed class Parser
             csharpAttrs,
             defaultValue,
             inlineRefinement,
-            identifierSpan);
+            identifierSpan,
+            attrs.GetSpan("_pos0"));
     }
 
     private OutputNode ParseOutput()
@@ -1197,7 +1198,7 @@ public sealed class Parser
             typeName = "";
         }
 
-        return new OutputNode(startToken.Span, typeName);
+        return new OutputNode(startToken.Span, typeName, attrs.GetSpan("_pos0"));
     }
 
     private EffectsNode ParseEffects()
@@ -4764,7 +4765,8 @@ public sealed class Parser
             isMutable,
             initializer,
             attrs,
-            identifierSpan);
+            identifierSpan,
+            GetBindTypeSpan(attrs, typeName));
     }
 
     /// <summary>
@@ -4891,6 +4893,33 @@ public sealed class Parser
             length,
             span.Line,
             span.Column + leadingCharacters);
+    }
+
+    private static TextSpan? GetBindTypeSpan(
+        AttributeCollection attrs,
+        string? typeName)
+    {
+        if (string.IsNullOrEmpty(typeName))
+            return null;
+
+        var pos0 = attrs["_pos0"] ?? "";
+        var pos1 = attrs["_pos1"];
+        var pos2 = attrs["_pos2"];
+
+        if (pos2 is "mut" or "const")
+            return attrs.GetSpan("_pos0");
+
+        if (pos0.StartsWith('~'))
+            return attrs.GetSpan("_pos1");
+
+        if (pos1 == "const")
+            return null;
+
+        return !string.IsNullOrEmpty(pos1)
+               && AttributeHelper.IsLikelyType(pos0)
+               && !AttributeHelper.IsLikelyType(pos1)
+            ? attrs.GetSpan("_pos0")
+            : attrs.GetSpan("_pos1");
     }
 
     private static (TextSpan? Receiver, TextSpan Callee) GetCallTargetIdentifierSpans(
@@ -7396,6 +7425,7 @@ public sealed class Parser
         var name = attrs["_pos1"] ?? "";
         var classNameKey = "_pos1";
         var pos2 = attrs["_pos2"] ?? "";
+        var pos2Key = "_pos2";
         var pos3 = attrs["_pos3"];
 
         // --- Compact syntax: optional ID ---
@@ -7405,6 +7435,7 @@ public sealed class Parser
             // Shift all positionals right: id becomes name, name becomes pos2, etc.
             pos3 = pos2;
             pos2 = name;
+            pos2Key = "_pos1";
             name = id;
             id = GenerateParserAutoId("c");
             classNameKey = "_pos0";
@@ -7424,6 +7455,7 @@ public sealed class Parser
         // 3 positionals (pos3 null): if pos2 is all known modifiers/visibility → modifiers; else baseClass
         string modifiers;
         string? baseClass = null;
+        TextSpan? baseClassSpan = null;
         Visibility visibility = Visibility.Internal;
 
         if (pos3 != null)
@@ -7438,6 +7470,7 @@ public sealed class Parser
             else
             {
                 baseClass = pos2;
+                baseClassSpan = attrs.GetSpan(pos2Key);
                 modifiers = pos3;
             }
         }
@@ -7454,6 +7487,7 @@ public sealed class Parser
             {
                 // Not a known modifier -- treat as base class
                 baseClass = string.IsNullOrEmpty(pos2) ? null : pos2;
+                baseClassSpan = baseClass == null ? null : attrs.GetSpan(pos2Key);
                 modifiers = "";
             }
         }
@@ -7479,6 +7513,7 @@ public sealed class Parser
             isAbstract = false;
         }
         var implementedInterfaces = new List<string>();
+        var implementedInterfaceSpans = new List<TextSpan>();
 
         // NEW: Parse optional type parameters §CL{...}<T, U>
         var typeParameters = ParseOptionalTypeParameterList(startToken.Span);
@@ -7547,6 +7582,7 @@ public sealed class Parser
                 Expect(TokenKind.Extends);
                 var extAttrs = ParseAttributes();
                 baseClass = extAttrs["_pos0"] ?? "";
+                baseClassSpan = extAttrs.GetSpan("_pos0");
             }
             else if (Check(TokenKind.Implements))
             {
@@ -7556,6 +7592,8 @@ public sealed class Parser
                 if (!string.IsNullOrEmpty(iface))
                 {
                     implementedInterfaces.Add(iface);
+                    if (implAttrs.GetSpan("_pos0") is { } interfaceSpan)
+                        implementedInterfaceSpans.Add(interfaceSpan);
                 }
             }
             else if (Check(TokenKind.FieldDef))
@@ -7646,7 +7684,9 @@ public sealed class Parser
             nestedEnums: nestedEnums.Count > 0 ? nestedEnums : null,
             indexers: indexers.Count > 0 ? indexers : null,
             nestedDelegates: nestedDelegates.Count > 0 ? nestedDelegates : null,
-            identifierSpan: identifierSpan);
+            identifierSpan: identifierSpan,
+            baseClassSpan: baseClassSpan,
+            implementedInterfaceSpans: implementedInterfaceSpans);
     }
 
     /// <summary>
@@ -7706,7 +7746,8 @@ public sealed class Parser
             defaultValue,
             attrs,
             csharpAttrs,
-            GetIdentifierSpan(attrs, "_pos1", name));
+            GetIdentifierSpan(attrs, "_pos1", name),
+            attrs.GetSpan("_pos0"));
     }
 
     /// <summary>
@@ -8600,6 +8641,7 @@ public sealed class Parser
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
         var propertyNameKey = "_pos1";
+        var propertyTypeKey = "_pos2";
         var typeName = attrs["_pos2"] ?? "object";
         var visStr = attrs["_pos3"] ?? "public";
         var modStr = attrs["_pos4"] ?? "";
@@ -8616,6 +8658,7 @@ public sealed class Parser
             modStr = visStr;
             visStr = typeName;
             typeName = name;
+            propertyTypeKey = "_pos1";
             name = id;
             id = GenerateParserAutoId("p");
             propertyNameKey = "_pos0";
@@ -8670,7 +8713,8 @@ public sealed class Parser
                 defaultValue,
                 attrs,
                 csharpAttrs,
-                GetIdentifierSpan(attrs, propertyNameKey, name));
+                GetIdentifierSpan(attrs, propertyNameKey, name),
+                attrs.GetSpan(propertyTypeKey));
         }
 
         PropertyAccessorNode? getter2 = null;
@@ -8739,7 +8783,8 @@ public sealed class Parser
             defaultValue2,
             attrs,
             csharpAttrs,
-            GetIdentifierSpan(attrs, propertyNameKey, name));
+            GetIdentifierSpan(attrs, propertyNameKey, name),
+            attrs.GetSpan(propertyTypeKey));
     }
 
     /// <summary>
@@ -12013,7 +12058,9 @@ public sealed class Parser
                 // Parse optional parameter modifier (this, ref, out, in, params)
                 var modifier = ParameterModifier.None;
 
+                var typeStartPosition = _position;
                 var paramType = ReadInlineTypeToken();
+                var parameterTypeSpan = GetConsumedSpan(typeStartPosition);
                 var paramName = "";
                 var parameterIdentifierSpan = span;
 
@@ -12072,7 +12119,8 @@ public sealed class Parser
                     paramAttrs,
                     Array.Empty<CalorAttributeNode>(),
                     defaultValue,
-                    identifierSpan: parameterIdentifierSpan));
+                    identifierSpan: parameterIdentifierSpan,
+                    typeNameSpan: parameterTypeSpan));
             }
             while (Match(TokenKind.Comma));
         }
@@ -12096,9 +12144,18 @@ public sealed class Parser
                     Advance();
                 }
             }
+            var typeStartPosition = _position;
             var returnType = prefix + ReadInlineTypeToken();
-            output = new OutputNode(span, returnType);
+            output = new OutputNode(span, returnType, GetConsumedSpan(typeStartPosition));
         }
+    }
+
+    private TextSpan GetConsumedSpan(int startPosition)
+    {
+        if (_position <= startPosition)
+            return TextSpan.Empty;
+
+        return _tokens[startPosition].Span.Union(_tokens[_position - 1].Span);
     }
 
     /// <summary>

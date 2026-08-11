@@ -16,6 +16,7 @@ public sealed class PropertyNode : AstNode
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
     public PropertyAccessorNode? Getter { get; }
@@ -80,13 +81,15 @@ public sealed class PropertyNode : AstNode
         ExpressionNode? defaultValue,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         Visibility = visibility;
         Modifiers = modifiers;
         Getter = getter;

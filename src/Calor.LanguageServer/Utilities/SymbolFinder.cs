@@ -58,13 +58,35 @@ public static class SymbolFinder
         int line,
         int column,
         string source,
-        BoundModule? boundModule = null)
+        BoundModule? boundModule = null,
+        IReadOnlyList<IndexedTypeReference>? typeReferences = null)
     {
+        var offset = GetOffset(source, line, column);
+        if (boundModule != null)
+        {
+            typeReferences ??= TypeReferenceIndex.Build(ast, boundModule, source);
+            var typeReference = typeReferences
+                .Where(reference => reference.Span.Contains(offset))
+                .OrderBy(reference => reference.Span.Length)
+                .FirstOrDefault();
+            if (!typeReference.SymbolId.IsNone
+                && boundModule.SymbolsById.TryGetValue(typeReference.SymbolId, out var symbol)
+                && symbol is TypeSymbol typeSymbol)
+            {
+                return new SymbolLookupResult(
+                    typeSymbol.Name,
+                    "type",
+                    typeSymbol.QualifiedName,
+                    typeReference.Span,
+                    typeSymbol.DeclarationSpan,
+                    symbolId: typeSymbol.Id);
+            }
+        }
+
         var result = FindSymbolAtPositionCore(ast, line, column, source);
         if (result == null || boundModule == null)
             return result;
 
-        var offset = GetOffset(source, line, column);
         var symbolId = FindBoundSymbolId(boundModule, result, offset);
         return symbolId == null
             ? result
@@ -253,7 +275,8 @@ public static class SymbolFinder
     public static IReadOnlyList<TextSpan> FindBoundReferences(
         BoundModule boundModule,
         SymbolId symbolId,
-        bool includeDeclaration)
+        bool includeDeclaration,
+        IReadOnlyList<IndexedTypeReference>? typeReferences = null)
     {
         ArgumentNullException.ThrowIfNull(boundModule);
         if (symbolId.IsNone)
@@ -301,6 +324,13 @@ public static class SymbolFinder
                     references.Add(creation.TypeNameSpan);
                     break;
             }
+        }
+
+        if (typeReferences != null)
+        {
+            references.AddRange(typeReferences
+                .Where(reference => reference.SymbolId == symbolId)
+                .Select(reference => reference.Span));
         }
 
         return references

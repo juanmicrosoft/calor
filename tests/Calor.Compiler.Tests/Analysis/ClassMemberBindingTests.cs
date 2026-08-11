@@ -842,6 +842,29 @@ public class ClassMemberBindingTests
     }
 
     [Fact]
+    public void ProgramCompile_StaticMethodBareInstanceMembers_FailsWithoutOptionalAnalysis()
+    {
+        var source = """
+            §M{m001:Test}
+              §CL{c001:Utils:pub}
+                §FLD{i32:instanceField:priv}
+                §PROP{p001:InstanceProperty:i32:pub:get}
+                §MT{m002:Use:pub:stat} () -> i32
+                  §B{fieldValue:i32} instanceField
+                  §R InstanceProperty
+            """;
+
+        var result = Calor.Compiler.Program.Compile(source);
+
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Equal(
+            2,
+            result.Diagnostics.Count(diagnostic =>
+                diagnostic.Code == DiagnosticCode.InstanceMemberInStaticContext));
+    }
+
+    [Fact]
     public void StaticAndInstanceParameterlessConstructors_CoexistAndNewUsesInstanceConstructor()
     {
         var source = @"

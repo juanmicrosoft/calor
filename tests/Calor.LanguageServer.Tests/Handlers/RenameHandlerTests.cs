@@ -145,7 +145,7 @@ public class RenameHandlerTests
             CancellationToken.None);
 
         var edits = Assert.Single(edit!.Changes!).Value.ToArray();
-        Assert.Equal(2, edits.Length);
+        Assert.Equal(3, edits.Length);
         Assert.All(edits, textEdit =>
         {
             var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
@@ -153,6 +153,16 @@ public class RenameHandlerTests
             Assert.Equal("Widget", source[start..end]);
             Assert.Equal("Gadget", textEdit.NewText);
         });
+        Assert.Equal(
+            new[]
+            {
+                source.IndexOf("Widget:pub", StringComparison.Ordinal),
+                source.IndexOf("-> Widget", StringComparison.Ordinal) + "-> ".Length,
+                source.LastIndexOf("Widget", StringComparison.Ordinal),
+            },
+            edits.Select(textEdit => PositionConverter.ToOffset(textEdit.Range.Start, source))
+                .Order()
+                .ToArray());
     }
 
     [Fact]

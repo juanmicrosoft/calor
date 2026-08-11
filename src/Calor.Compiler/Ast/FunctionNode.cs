@@ -20,10 +20,12 @@ public enum Visibility
 public sealed class OutputNode : AstNode
 {
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
 
-    public OutputNode(TextSpan span, string typeName) : base(span)
+    public OutputNode(TextSpan span, string typeName, TextSpan? typeNameSpan = null) : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -254,6 +256,7 @@ public sealed class ParameterNode : AstNode
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public ParameterModifier Modifier { get; }
     public AttributeCollection Attributes { get; }
 
@@ -312,12 +315,14 @@ public sealed class ParameterNode : AstNode
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
         ExpressionNode? defaultValue,
         InlineRefinementInfo? inlineRefinement = null,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         Modifier = modifier;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();

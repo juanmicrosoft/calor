@@ -34,6 +34,9 @@ public sealed class RenameHandler : RenameHandlerBase
 
         // Convert LSP position to Calor position
         var (line, column) = PositionConverter.ToCalorPosition(request.Position);
+        var typeReferences = snapshot.BoundModule == null
+            ? Array.Empty<IndexedTypeReference>()
+            : TypeReferenceIndex.Build(snapshot.Ast, snapshot.BoundModule, snapshot.Source);
 
         // Find the symbol at the cursor position
         var result = SymbolFinder.FindSymbolAtPosition(
@@ -41,7 +44,8 @@ public sealed class RenameHandler : RenameHandlerBase
             line,
             column,
             snapshot.Source,
-            snapshot.BoundModule);
+            snapshot.BoundModule,
+            typeReferences);
         if (result == null || string.IsNullOrEmpty(result.Name))
         {
             return Task.FromResult<WorkspaceEdit?>(null);
@@ -90,7 +94,8 @@ public sealed class RenameHandler : RenameHandlerBase
                 var references = SymbolFinder.FindBoundReferences(
                         snapshot.BoundModule,
                         symbolId,
-                        includeDeclaration: true);
+                        includeDeclaration: true,
+                        typeReferences);
                 if (references.Any(span =>
                         !IsExactIdentifierSpan(snapshot.Source, span, oldName)))
                 {

@@ -168,6 +168,7 @@ public sealed class BindStatementNode : StatementNode
     public string Name { get; }
     public TextSpan IdentifierSpan { get; }
     public string? TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public bool IsMutable { get; }
     public ExpressionNode? Initializer { get; }
     public AttributeCollection Attributes { get; }
@@ -179,12 +180,14 @@ public sealed class BindStatementNode : StatementNode
         bool isMutable,
         ExpressionNode? initializer,
         AttributeCollection attributes,
-        TextSpan? identifierSpan = null)
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName;
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         IsMutable = isMutable;
         Initializer = initializer;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
