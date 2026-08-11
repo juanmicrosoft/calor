@@ -1,0 +1,99 @@
+// Audits .calor-csharp-allowlist against the rules the file states in prose.
+// The Calor-first guard reads the allowlist but never validates it, so a
+// deleted or renamed C# file leaves a permanent silent permission behind.
+// Run from the repository root.
+//
+// The module prose belongs in §CT, not a comment; §CT currently breaks the
+// dedent that closes a later §IF (#929), which this program is full of.
+§M{m001:AllowlistAudit}
+  §F{f001:StartsWith:pri} (str:text, str:prefix) -> bool
+    §E{}
+    §B{n:i32} (len prefix)
+    §IF{if1} (> n (len text))
+      §R BOOL:false
+    §R (== (substr text 0 n) prefix)
+
+  §F{f002:EndsWith:pri} (str:text, str:suffix) -> bool
+    §E{}
+    §B{n:i32} (len suffix)
+    §B{m:i32} (len text)
+    §IF{if2} (> n m)
+      §R BOOL:false
+    §R (== (substr text (- m n) n) suffix)
+
+  §F{f003:IsSkippable:pri} (str:line) -> bool
+    §E{}
+    §B{t:str} (trim line)
+    §IF{if3} (== (len t) 0)
+      §R BOOL:true
+    §R §C{StartsWith} §A t §A "#" §/C
+
+  §F{f004:IsStructurallyExempt:pri} (str:path) -> bool
+    §E{}
+    §IF{if4} §C{StartsWith} §A path §A "tests/" §/C
+      §R BOOL:true
+    §IF{if5} §C{StartsWith} §A path §A "bench/" §/C
+      §R BOOL:true
+    §IF{if6} §C{StartsWith} §A path §A "tools/Calor.RoundTrip.Harness/" §/C
+      §R BOOL:true
+    §R BOOL:false
+
+  §F{f005:Report:pri} (str:entry, str:problem) -> void
+    §E{cw}
+    §P (+ "  " (+ entry (+ " — " problem)))
+
+  §F{f006:Main:pub} () -> i32
+    §E{fs:r,cw,mut}
+    §B{file:str} ".calor-csharp-allowlist"
+    §B{present:bool} §C{File.Exists} §A file §/C
+    §IF{if7} (! present)
+      §P "allowlist-audit: .calor-csharp-allowlist not found (run from the repository root)."
+      §R INT:2
+
+    §B{lines:[str]} §C{File.ReadAllLines} §A file §/C
+    §LIST{seen:str}
+    §/LIST{seen}
+    §B{~findings:i32} INT:0
+    §B{~entries:i32} INT:0
+
+    §P "allowlist-audit: checking .calor-csharp-allowlist"
+    §EACH{e1:raw} lines
+      §B{skip:bool} §C{IsSkippable} §A raw §/C
+      §IF{if8} (! skip)
+        §B{entry:str} (trim raw)
+        §ASSIGN entries (+ entries INT:1)
+
+        §B{wild:bool} (contains entry "*")
+        §IF{if9} wild
+          §C{Report} §A entry §A "contains a wildcard; the allowlist requires specific paths" §/C
+          §ASSIGN findings (+ findings INT:1)
+
+        §B{isCs:bool} §C{EndsWith} §A entry §A ".cs" §/C
+        §IF{if10} (! isCs)
+          §C{Report} §A entry §A "is not a .cs path, so the guard can never match it" §/C
+          §ASSIGN findings (+ findings INT:1)
+
+        §IF{if11} §HAS{seen} entry
+          §C{Report} §A entry §A "is listed more than once" §/C
+          §ASSIGN findings (+ findings INT:1)
+        §PUSH{seen} entry
+
+        §B{exempt:bool} §C{IsStructurallyExempt} §A entry §/C
+        §IF{if12} exempt
+          §C{Report} §A entry §A "is under a structurally exempt tree, so the entry grants nothing and misleads" §/C
+          §ASSIGN findings (+ findings INT:1)
+
+        // Existence is only meaningful for a well-formed path: reporting it for
+        // a wildcard or a non-.cs entry would be a second finding about the same
+        // defect, and noise is how an auditor gets ignored.
+        §IF{if13} (! wild)
+          §IF{if14} isCs
+            §B{onDisk:bool} §C{File.Exists} §A entry §/C
+            §IF{if15} (! onDisk)
+              §C{Report} §A entry §A "does not exist; a stale entry keeps permission alive for a path nothing occupies" §/C
+              §ASSIGN findings (+ findings INT:1)
+
+    §P (+ (+ (+ (+ "allowlist-audit: " entries) " entries, ") findings) " finding(s)")
+    §IF{if16} (> findings INT:0)
+      §R INT:1
+    §R INT:0
