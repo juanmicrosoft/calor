@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Calor.Compiler.Ast;
 
@@ -13,6 +15,7 @@ public sealed class VerificationCache : IDisposable
     private readonly ContractHasher _hasher;
     private readonly string _cacheDirectory;
     private readonly string? _z3Version;
+    private readonly string? _keyScope;
     // #778: semantics-versioned, solver-config-aware keys.
     private readonly string _semanticsVersion = Incremental.BuildStateCache.CurrentCompilerSemanticsVersion;
     private readonly uint? _solverTimeoutMs;
@@ -35,10 +38,14 @@ public sealed class VerificationCache : IDisposable
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public VerificationCache(VerificationCacheOptions options, uint? solverTimeoutMs = null)
+    public VerificationCache(
+        VerificationCacheOptions options,
+        uint? solverTimeoutMs = null,
+        string? keyScope = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _solverTimeoutMs = solverTimeoutMs;
+        _keyScope = keyScope;
         _hasher = new ContractHasher();
         _cacheDirectory = options.GetCacheDirectory();
         _z3Version = Z3ContextFactory.GetZ3Version();
@@ -73,6 +80,7 @@ public sealed class VerificationCache : IDisposable
             hash = _hasher.HashPrecondition(parameters, precondition);
             if (_hasher.SawUnhashedKind)
                 return false; // #778: key is not collision-safe — never serve under it
+            hash = ApplyKeyScope(hash);
         }
         return TryGetCachedResult(hash, out result);
     }
@@ -99,6 +107,7 @@ public sealed class VerificationCache : IDisposable
             hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition, body);
             if (_hasher.SawUnhashedKind)
                 return false; // #778: key is not collision-safe — never serve under it
+            hash = ApplyKeyScope(hash);
         }
         return TryGetCachedResult(hash, out result);
     }
@@ -125,6 +134,7 @@ public sealed class VerificationCache : IDisposable
             hash = _hasher.HashPrecondition(parameters, precondition);
             if (_hasher.SawUnhashedKind)
                 return; // #778: key is not collision-safe — never store under it
+            hash = ApplyKeyScope(hash);
         }
         CacheResult(hash, result);
     }
@@ -154,6 +164,7 @@ public sealed class VerificationCache : IDisposable
             hash = _hasher.HashPostcondition(parameters, outputType, preconditions, postcondition, body);
             if (_hasher.SawUnhashedKind)
                 return; // #778: key is not collision-safe — never store under it
+            hash = ApplyKeyScope(hash);
         }
         CacheResult(hash, result);
     }
@@ -289,6 +300,16 @@ public sealed class VerificationCache : IDisposable
         {
             Interlocked.Increment(ref _errors);
         }
+    }
+
+    private string ApplyKeyScope(string hash)
+    {
+        if (string.IsNullOrEmpty(_keyScope))
+            return hash;
+
+        return Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes($"{_keyScope}\n{hash}")))
+            .ToLowerInvariant();
     }
 
     /// <summary>

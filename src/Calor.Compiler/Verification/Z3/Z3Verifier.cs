@@ -66,12 +66,18 @@ public sealed class Z3Verifier : IDisposable
 
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
+    private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
 
-    public Z3Verifier(Context ctx, uint timeoutMs = VerificationOptions.DefaultTimeoutMs)
+    public Z3Verifier(
+        Context ctx,
+        uint timeoutMs = VerificationOptions.DefaultTimeoutMs,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? userTypeRegistry = null)
     {
         _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
         _timeoutMs = timeoutMs;
+        _userTypeRegistry = userTypeRegistry
+            ?? new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -85,7 +91,7 @@ public sealed class Z3Verifier : IDisposable
     {
         var sw = Stopwatch.StartNew();
 
-        var translator = new ContractTranslator(_ctx);
+        var translator = CreateTranslator();
 
         // Declare all parameters
         foreach (var (name, type) in parameters)
@@ -177,7 +183,7 @@ public sealed class Z3Verifier : IDisposable
     {
         var sw = Stopwatch.StartNew();
 
-        var translator = new ContractTranslator(_ctx);
+        var translator = CreateTranslator();
 
         // A parameter named `result` collides with the postcondition result variable:
         // DeclareVariable("result") would silently overwrite it, aliasing the two into one
@@ -594,6 +600,13 @@ public sealed class Z3Verifier : IDisposable
                     ? $"Contract form is in the modeled whitelist but its operand typing is not modeled: {detail}. Runtime check kept."
                     : $"whitelist drift — whitelist-accepted form failed to translate with no diagnosis (in {where}). Runtime check kept.")),
             Duration: sw.Elapsed);
+    }
+
+    private ContractTranslator CreateTranslator()
+    {
+        var translator = new ContractTranslator(_ctx);
+        translator.SetUserTypeRegistry(_userTypeRegistry);
+        return translator;
     }
 
     public void Dispose()

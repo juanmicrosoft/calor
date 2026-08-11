@@ -30,6 +30,7 @@ public sealed class ObligationSolver : IDisposable
     {
         // Build a lookup of function info for parameter declarations
         var functionInfo = BuildFunctionInfo(module);
+        var userTypeRegistry = ContractTranslator.BuildUserTypeRegistry(module);
 
         foreach (var obligation in tracker.Obligations)
         {
@@ -38,7 +39,7 @@ public sealed class ObligationSolver : IDisposable
 
             if (functionInfo.TryGetValue(obligation.FunctionId, out var info))
             {
-                SolveObligation(obligation, info);
+                SolveObligation(obligation, info, userTypeRegistry);
             }
             else
             {
@@ -48,11 +49,15 @@ public sealed class ObligationSolver : IDisposable
         }
     }
 
-    private void SolveObligation(Obligation obligation, FunctionInfo info)
+    private void SolveObligation(
+        Obligation obligation,
+        FunctionInfo info,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> userTypeRegistry)
     {
         var sw = Stopwatch.StartNew();
 
         var translator = new ContractTranslator(_ctx);
+        translator.SetUserTypeRegistry(userTypeRegistry);
 
         // Declare all function parameters
         foreach (var (name, type) in info.Parameters)

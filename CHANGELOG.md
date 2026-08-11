@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Issue #779's residual verifier-vs-runtime differential gate (F-4)** now generates and executes
+  1,170 deterministic cases: all 65 frozen modeled forms × `§Q`/`§S`/explicit `§PROOF` × nesting
+  depths 1–3 × provable/refutable polarity. The oracle compiles guard-forced generated C#, covers
+  bounded-quantifier emitter lowering and the separate obligation-elision path, rejects vacuous or
+  mislabeled cases, and pins fail-safe handling for unsupported, timeout, solver-error, unavailable,
+  and assumed outcomes. CI blocks on zero mismatches and byte-checks published JSON/Markdown
+  metrics. Coverage now requires decisive production solver outcomes, with only exact documented
+  assumption sets accepted. Field access now checks the full `u8` range `0..255`, with explicit
+  `i8` and `i32` mutation controls. Dotted references never guess missing fields as `i32`; the
+  module registry merges partial/nested declarations and includes accessible inherited instance
+  fields with exact types. Scalar and array-element rows now use width/signedness boundary
+  predicates and aligned runtime witnesses instead of self-equality, including an array-select
+  signedness regression pin. Generated assemblies are collectible, worktree `.git` files are
+  supported, and report paths are LF-pinned. Current coverage is 65/65 solver-handled forms and
+  1,170/1,170 solver-handled cells with zero mismatches; 40/65 forms currently elide.
+
 ### Removed
 - **The `osx-x64` Z3 native is no longer shipped** (Z3 chain closure). Upstream's
   x64-osx archive contains an arm64 binary under the x64 label, so Intel Macs
