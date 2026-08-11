@@ -32,6 +32,7 @@ public abstract class BoundExpression : BoundNode
 {
     public abstract string TypeName { get; }
     public virtual IReadOnlyList<BoundExpression> Children => Array.Empty<BoundExpression>();
+    public virtual IReadOnlyList<BoundExpression> DeferredChildren => Array.Empty<BoundExpression>();
     public override IEnumerable<BoundNode> ChildNodes => Children;
 
     protected BoundExpression(TextSpan span) : base(span) { }
@@ -640,6 +641,9 @@ public static class BoundChildren
 {
     public static IEnumerable<BoundExpression> Of(BoundExpression expression) =>
         expression.Children;
+
+    public static IEnumerable<BoundExpression> DeferredOf(BoundExpression expression) =>
+        expression.DeferredChildren;
 }
 
 /// <summary>#762 B2: Option construction. Type composes from the payload (string types, D3).</summary>
@@ -1548,19 +1552,22 @@ public class BoundStructuralExpression : BoundExpression
     public override string TypeName { get; }
     public IReadOnlyDictionary<string, object?> Metadata { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
+    public override IReadOnlyList<BoundExpression> DeferredChildren { get; }
 
     public BoundStructuralExpression(
         TextSpan span,
         string nodeTypeName,
         string typeName,
         IReadOnlyList<BoundExpression>? children = null,
-        IReadOnlyDictionary<string, object?>? metadata = null)
+        IReadOnlyDictionary<string, object?>? metadata = null,
+        IReadOnlyList<BoundExpression>? deferredChildren = null)
         : base(span)
     {
         NodeTypeName = nodeTypeName ?? throw new ArgumentNullException(nameof(nodeTypeName));
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         Children = children ?? Array.Empty<BoundExpression>();
         Metadata = metadata ?? new Dictionary<string, object?>();
+        DeferredChildren = deferredChildren ?? Array.Empty<BoundExpression>();
     }
 }
 
@@ -1755,6 +1762,7 @@ public sealed class BoundLambdaExpression : BoundExpression
 {
     public string Id { get; }
     public IReadOnlyList<VariableSymbol> Parameters { get; }
+    public EffectsNode? Effects { get; }
     public IReadOnlyList<string> DeclaredEffects { get; }
     public AttributeCollection Attributes { get; }
     public bool IsAsync { get; }
@@ -1764,6 +1772,7 @@ public sealed class BoundLambdaExpression : BoundExpression
     public string ReturnTypeName { get; }
     public override string TypeName { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
+    public override IReadOnlyList<BoundExpression> DeferredChildren => Children;
     public override IEnumerable<BoundNode> ChildNodes
     {
         get
@@ -1782,6 +1791,7 @@ public sealed class BoundLambdaExpression : BoundExpression
         TextSpan span,
         string id,
         IReadOnlyList<VariableSymbol> parameters,
+        EffectsNode? effects,
         IReadOnlyList<string> declaredEffects,
         AttributeCollection attributes,
         bool isAsync,
@@ -1793,6 +1803,7 @@ public sealed class BoundLambdaExpression : BoundExpression
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
+        Effects = effects;
         DeclaredEffects = declaredEffects ?? Array.Empty<string>();
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         IsAsync = isAsync;
@@ -1813,6 +1824,7 @@ public sealed class BoundQuantifierExpression : BoundExpression
     public BoundExpression Body { get; }
     public override string TypeName => "BOOL";
     public override IReadOnlyList<BoundExpression> Children { get; }
+    public override IReadOnlyList<BoundExpression> DeferredChildren => Children;
 
     public BoundQuantifierExpression(
         TextSpan span,
@@ -1836,6 +1848,7 @@ public sealed class BoundMatchExpression : BoundExpression
     public AttributeCollection Attributes { get; }
     public override string TypeName { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
+    public override IReadOnlyList<BoundExpression> DeferredChildren { get; }
     public override IEnumerable<BoundNode> ChildNodes => [Target, .. Cases];
 
     public BoundMatchExpression(
@@ -1855,6 +1868,11 @@ public sealed class BoundMatchExpression : BoundExpression
         Children =
         [
             target,
+            .. cases.Where(matchCase => matchCase.Guard != null).Select(matchCase => matchCase.Guard!),
+            .. cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!)
+        ];
+        DeferredChildren =
+        [
             .. cases.Where(matchCase => matchCase.Guard != null).Select(matchCase => matchCase.Guard!),
             .. cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!)
         ];

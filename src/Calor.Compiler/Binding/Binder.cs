@@ -1086,6 +1086,8 @@ public sealed class Binder
     private BoundExpression BindIsPattern(IsPatternNode isPattern)
     {
         var operand = BindExpression(isPattern.Operand);
+        if (isPattern.VariableName != null)
+            DeclarePatternVariable(isPattern.Span, isPattern.VariableName, isPattern.TargetType);
         return new BoundIsPatternExpression(
             isPattern.Span,
             operand,
@@ -1307,7 +1309,8 @@ public sealed class Binder
         return Structural(
             coalesce,
             GetCommonType(leftValueType, right.TypeName),
-            [left, right]);
+            [left, right],
+            deferredChildren: [right]);
     }
 
     private BoundExpression BindNullConditional(NullConditionalNode conditional)
@@ -1460,6 +1463,7 @@ public sealed class Binder
             lambda.Span,
             lambda.Id,
             parameters,
+            lambda.Effects,
             effects,
             lambda.Attributes,
             lambda.IsAsync,
@@ -1651,7 +1655,7 @@ public sealed class Binder
                 variable.Name,
                 variable.TypeName,
                 isMutable: false,
-                isParameter: false,
+                isParameter: true,
                 ParameterModifier.None,
                 variable.IdentifierSpan,
                 "quantifier");
@@ -1676,7 +1680,11 @@ public sealed class Binder
     {
         var antecedent = BindExpression(implication.Antecedent);
         var consequent = BindExpression(implication.Consequent);
-        return Structural(implication, "BOOL", [antecedent, consequent]);
+        return Structural(
+            implication,
+            "BOOL",
+            [antecedent, consequent],
+            deferredChildren: [consequent]);
     }
 
     private BoundExpression BindStringOperation(StringOperationNode operation)
@@ -1687,8 +1695,8 @@ public sealed class Binder
             StringOp.Contains or StringOp.StartsWith or StringOp.EndsWith
                 or StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace
                 or StringOp.Equals or StringOp.RegexTest => "BOOL",
-            StringOp.Split or StringOp.RegexSplit => "STRING[]",
-            StringOp.RegexMatch => "REGEX_MATCH",
+            StringOp.Split or StringOp.RegexSplit => "str[]",
+            StringOp.RegexMatch => "OBJECT",
             _ => "STRING",
         };
         return Structural(
@@ -1724,7 +1732,7 @@ public sealed class Binder
         {
             StringBuilderOp.ToString => "STRING",
             StringBuilderOp.Length => "INT",
-            _ => "STRING_BUILDER",
+            _ => "StringBuilder",
         };
         return Structural(
             operation,
@@ -2287,14 +2295,16 @@ public sealed class Binder
         ExpressionNode expression,
         string typeName,
         IReadOnlyList<BoundExpression>? children = null,
-        IReadOnlyDictionary<string, object?>? metadata = null)
+        IReadOnlyDictionary<string, object?>? metadata = null,
+        IReadOnlyList<BoundExpression>? deferredChildren = null)
     {
         return new BoundStructuralExpression(
             expression.Span,
             expression.GetType().Name,
             typeName,
             children,
-            metadata);
+            metadata,
+            deferredChildren);
     }
 
     private BoundUnsupportedExpression BindUnsupportedExpression(

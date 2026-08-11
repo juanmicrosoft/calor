@@ -125,6 +125,8 @@ public sealed class UninitializedVariablesAnalysis
             {
                 foreach (var v in BoundNodeHelpers.GetUsedVariables(block.BranchCondition))
                 {
+                    if (v.IsParameter)
+                        continue;
                     var state = currentFacts.GetState(v.Id);
                     if (state != InitializationState.Initialized)
                     {
@@ -139,6 +141,8 @@ public sealed class UninitializedVariablesAnalysis
                 // Check uses first
                 foreach (var v in BoundNodeHelpers.GetUsedVariables(stmt))
                 {
+                    if (v.IsParameter)
+                        continue;
                     var state = currentFacts.GetState(v.Id);
                     if (state != InitializationState.Initialized)
                     {
