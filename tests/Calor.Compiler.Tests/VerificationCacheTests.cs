@@ -1169,4 +1169,132 @@ public class VerificationCacheTests : IDisposable
     }
 
     #endregion
+
+    // ---- #778: exhaustive, semantics-versioned, solver-config-aware keys ----
+
+    [Fact]
+    public void EveryModeledExpressionKind_HashesWithContent()
+    {
+        // The cacheable surface is EXACTLY ModeledForms.ExpressionKinds (unsupported
+        // verdicts are never cached). Every kind on that list must serialize with
+        // CONTENT — two distinct instances of the same kind must never share a key
+        // (the #824-review collision class, closed exhaustively). SelfRefNode is the
+        // one contentless kind: pinned to a fixed non-UNSUPPORTED token instead.
+        var hasher = new ContractHasher();
+        var s = EmptySpan;
+        var pairs = new Dictionary<string, (ExpressionNode A, ExpressionNode B)>
+        {
+            [nameof(IntLiteralNode)] = (new IntLiteralNode(s, 1), new IntLiteralNode(s, 2)),
+            [nameof(BoolLiteralNode)] = (new BoolLiteralNode(s, true), new BoolLiteralNode(s, false)),
+            [nameof(StringLiteralNode)] = (new StringLiteralNode(s, "a"), new StringLiteralNode(s, "b")),
+            [nameof(ReferenceNode)] = (new ReferenceNode(s, "x"), new ReferenceNode(s, "y")),
+            [nameof(BinaryOperationNode)] = (
+                new BinaryOperationNode(s, BinaryOperator.Add, new ReferenceNode(s, "x"), new IntLiteralNode(s, 1)),
+                new BinaryOperationNode(s, BinaryOperator.Subtract, new ReferenceNode(s, "x"), new IntLiteralNode(s, 1))),
+            [nameof(UnaryOperationNode)] = (
+                new UnaryOperationNode(s, UnaryOperator.Negate, new ReferenceNode(s, "x")),
+                new UnaryOperationNode(s, UnaryOperator.Not, new ReferenceNode(s, "x"))),
+            [nameof(ConditionalExpressionNode)] = (
+                new ConditionalExpressionNode(s, new BoolLiteralNode(s, true), new IntLiteralNode(s, 1), new IntLiteralNode(s, 2)),
+                new ConditionalExpressionNode(s, new BoolLiteralNode(s, true), new IntLiteralNode(s, 3), new IntLiteralNode(s, 2))),
+            [nameof(ForallExpressionNode)] = (
+                new ForallExpressionNode(s, [new QuantifierVariableNode(s, "i", "i32")], new BoolLiteralNode(s, true)),
+                new ForallExpressionNode(s, [new QuantifierVariableNode(s, "i", "i64")], new BoolLiteralNode(s, true))),
+            [nameof(ExistsExpressionNode)] = (
+                new ExistsExpressionNode(s, [new QuantifierVariableNode(s, "i", "i32")], new BoolLiteralNode(s, true)),
+                new ExistsExpressionNode(s, [new QuantifierVariableNode(s, "j", "i32")], new BoolLiteralNode(s, true))),
+            [nameof(ImplicationExpressionNode)] = (
+                new ImplicationExpressionNode(s, new BoolLiteralNode(s, true), new BoolLiteralNode(s, false)),
+                new ImplicationExpressionNode(s, new BoolLiteralNode(s, false), new BoolLiteralNode(s, false))),
+            [nameof(ArrayAccessNode)] = (
+                new ArrayAccessNode(s, new ReferenceNode(s, "a"), new IntLiteralNode(s, 0)),
+                new ArrayAccessNode(s, new ReferenceNode(s, "a"), new IntLiteralNode(s, 1))),
+            [nameof(ArrayLengthNode)] = (
+                new ArrayLengthNode(s, new ReferenceNode(s, "a")),
+                new ArrayLengthNode(s, new ReferenceNode(s, "b"))),
+            [nameof(FieldAccessNode)] = (
+                new FieldAccessNode(s, new ReferenceNode(s, "o"), "F"),
+                new FieldAccessNode(s, new ReferenceNode(s, "o"), "G")),
+            [nameof(StringOperationNode)] = (
+                new StringOperationNode(s, StringOp.Length, [new ReferenceNode(s, "s")], null),
+                new StringOperationNode(s, StringOp.IsNullOrEmpty, [new ReferenceNode(s, "s")], null)),
+        };
+
+        // Bidirectional completeness: the case table above must cover ExpressionKinds
+        // exactly (SelfRefNode asserted separately below).
+        Assert.Equal(
+            Calor.Compiler.Verification.Z3.ModeledForms.ExpressionKinds
+                .Where(k => k != nameof(SelfRefNode)).OrderBy(k => k),
+            pairs.Keys.OrderBy(k => k));
+
+        foreach (var (kind, (a, b)) in pairs)
+        {
+            var ca = hasher.GetCanonicalExpression(a);
+            Assert.False(hasher.SawUnhashedKind, $"{kind} fell to the default arm");
+            var cb = hasher.GetCanonicalExpression(b);
+            Assert.NotEqual(ca, cb);
+            Assert.DoesNotContain("UNSUPPORTED", ca);
+        }
+
+        var self = hasher.GetCanonicalExpression(new SelfRefNode(s));
+        Assert.Equal("SELF", self);
+        Assert.False(hasher.SawUnhashedKind);
+    }
+
+    [Fact]
+    public void UnhashableKind_RefusesCacheRoundTrip()
+    {
+        // Defense in depth behind the ModeledForms whitelist: an expression kind the
+        // hasher cannot serialize with content gets NO cache round-trip — neither
+        // store nor lookup — because its key is not collision-safe.
+        var options = new VerificationCacheOptions { Enabled = true, CacheDirectory = _testCacheDir };
+        var parameters = new List<(string Name, string TypeName)> { ("x", "i32") };
+        var pre = new RequiresNode(
+            EmptySpan,
+            new AwaitExpressionNode(EmptySpan, new ReferenceNode(EmptySpan, "x"), null),
+            null,
+            new AttributeCollection());
+        var result = new ContractVerificationResult(ContractVerificationStatus.Proven);
+
+        using var cache = new VerificationCache(options);
+        cache.CachePreconditionResult(parameters, pre, result);
+        Assert.False(cache.TryGetPreconditionResult(parameters, pre, out _));
+        Assert.Equal(0, cache.GetStatistics().Writes);
+    }
+
+    [Fact]
+    public void CacheEntry_SemanticsVersionMismatch_Invalid()
+    {
+        var result = new ContractVerificationResult(ContractVerificationStatus.Proven);
+        var entry = VerificationCacheEntry.FromResult(result, "h", "z3-4.15",
+            semanticsVersion: "calor-compile-semantics-v1", solverTimeoutMs: 5000);
+
+        Assert.True(entry.IsValidFor("z3-4.15", "calor-compile-semantics-v1", 5000));
+        Assert.False(entry.IsValidFor("z3-4.15", "calor-compile-semantics-v2", 5000));
+        Assert.False(entry.IsValidFor("z3-4.15", null, 5000));
+    }
+
+    [Fact]
+    public void CacheEntry_UnprovenIsTimeoutDependent_DefinitiveIsNot()
+    {
+        // Unproven means "could not prove within the budget": reusable only when the
+        // cached budget covers the current one. Definitive verdicts are sound at any
+        // budget. Unknown budgets are conservative (cold re-verify).
+        const string sem = "calor-compile-semantics-v1";
+        var unproven = VerificationCacheEntry.FromResult(
+            new ContractVerificationResult(ContractVerificationStatus.Unproven), "h", "z", sem, 5000);
+        Assert.True(unproven.IsValidFor("z", sem, 5000));
+        Assert.True(unproven.IsValidFor("z", sem, 1000));   // smaller budget: still unprovable
+        Assert.False(unproven.IsValidFor("z", sem, 30000)); // bigger budget: might prove
+        Assert.False(unproven.IsValidFor("z", sem, null));  // unknown: conservative
+
+        var unknownBudget = VerificationCacheEntry.FromResult(
+            new ContractVerificationResult(ContractVerificationStatus.Unproven), "h", "z", sem, null);
+        Assert.False(unknownBudget.IsValidFor("z", sem, 5000));
+
+        var proven = VerificationCacheEntry.FromResult(
+            new ContractVerificationResult(ContractVerificationStatus.Proven), "h", "z", sem, 5000);
+        Assert.True(proven.IsValidFor("z", sem, 30000)); // budget-independent
+    }
+
 }

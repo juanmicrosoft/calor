@@ -17,6 +17,7 @@ public sealed class ContractHasher
         IReadOnlyList<(string Name, string TypeName)> parameters,
         RequiresNode precondition)
     {
+        ResetUnhashedKindFlag();
         var sb = new StringBuilder();
         sb.Append("PRE:");
         AppendParameters(sb, parameters);
@@ -40,6 +41,7 @@ public sealed class ContractHasher
         EnsuresNode postcondition,
         IReadOnlyList<StatementNode>? body = null)
     {
+        ResetUnhashedKindFlag();
         var sb = new StringBuilder();
         sb.Append("POST:");
         AppendParameters(sb, parameters);
@@ -295,13 +297,36 @@ public sealed class ContractHasher
                 sb.Append(')');
                 break;
 
+            // #778: SelfRefNode is on the ModeledForms whitelist (refinement `#`), so
+            // it can appear in CACHED contracts — it must not fall to the default arm.
+            // It is contentless, so a fixed token is exact.
+            case SelfRefNode:
+                sb.Append("SELF");
+                break;
+
             default:
-                // For unsupported expressions, use the type name as a fallback
+                // #778: an expression kind with no serializer here CANNOT be given a
+                // collision-safe key (two distinct instances of the same kind would
+                // share a hash). The flag makes the cache refuse to read or write
+                // under such a key — defense in depth behind the ModeledForms
+                // whitelist, which should have refused the contract before any
+                // cacheable verdict existed. The marker stays in the hash text for
+                // debuggability, but no cache round-trip consumes it.
+                SawUnhashedKind = true;
                 sb.Append("UNSUPPORTED:");
                 sb.Append(expr.GetType().Name);
                 break;
         }
     }
+
+    /// <summary>#778: true when the most recent Hash* call encountered an expression
+    /// kind AppendExpression cannot serialize with content. Reset at the start of each
+    /// Hash* call; the cache must skip both lookup and store when set. NOT thread-safe —
+    /// callers serialize access (VerificationCache holds its hasher lock across the
+    /// hash + flag read).</summary>
+    public bool SawUnhashedKind { get; private set; }
+
+    internal void ResetUnhashedKindFlag() => SawUnhashedKind = false;
 
     private static string GetOperatorSymbol(BinaryOperator op)
     {
