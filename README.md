@@ -116,6 +116,19 @@ calor init --ai github
 calor --input program.calr --output program.g.cs
 ```
 
+### VS Code Extension
+
+The supported installation path is a platform-specific VSIX attached to the
+[current GitHub release](https://github.com/juanmicrosoft/calor/releases). Download
+the package for your platform, then run **Extensions: Install from VSIX...** in
+VS Code. The extension is a thin client for Calor's first-class language server
+and also includes the `.calr` grammar.
+
+The Marketplace listing deliberately remains at v0.3.8. Marketplace updates
+are opportunistic and happen only if a publishing token is minted; they are not
+a release commitment or gate. The extension, its language server bundle, and
+the release VSIX artifacts remain supported.
+
 ### AI Integration Comparison
 
 | Feature | Claude Code | Gemini CLI | Codex CLI | GitHub Copilot |

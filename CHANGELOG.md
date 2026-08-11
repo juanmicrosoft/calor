@@ -21,6 +21,14 @@ All notable changes to this project will be documented in this file.
   `CALOR_LSP_EXPERIMENTAL` gate and production name-only reference/rename
   collectors were removed after the exact-span gate passed.
 
+- **VS Code Marketplace publishing is no longer a release commitment.** The extension and
+  bundled LSP remain supported as six platform-specific VSIX artifacts attached to each GitHub
+  release, and the PR-only single-file publish check remains a required guard. The Marketplace
+  listing deliberately stays at v0.3.8 unless a publisher token is minted and a maintainer chooses
+  to update it. The channel has been broken since v0.4.0, five months of staleness produced zero
+  complaints, and recurring token/publish-chain maintenance is not justified by demonstrated
+  demand.
+
 ## [0.13.0] - 2026-08-11
 
 ### Benchmark Results (Statistical: 30 runs)

@@ -30,7 +30,8 @@ audit epic and successors — dispositioned exhaustively in §5.2).
   repaired supply story and an arm that actually invokes the Calor compiler.
 - **v0.12.1** — language-equivalent to v0.12.0; packaging remediation. NuGet is live and verified,
   including the **first `Calor.Sdk` publish** (a v0.12.1 event — v0.12.0 was never installable). The
-  VS Code channel is built but blocked on an expired publisher PAT (maintainer action; see §2.4).
+  VS Code extension remains a supported built artifact; the Marketplace listing is historical and
+  updates only opportunistically (decision amendment in §2.4).
 
 The published 1.32× benchmark number remains a **regression indicator, not a roadmap driver** — its
 30 runs are deterministic repetitions and the real-scale comparison never produced a valid Calor arm.
@@ -135,16 +136,19 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
 - **MCP query surface** → ships with or after the LSP re-platform, same reasoning.
 - **`cli/import.mdx`, `cli/review-packet.mdx`, adoption-playbook mirror** → 0.13.x docs tranche 2.
 
-### 2.4 Delivery chain (with the external dependency named as one)
+### 2.4 Delivery chain
 
-- **VS Code channel — external dependency, not an engineering item.** The one blocker is the
-  expired publisher PAT, a maintainer-only action, for a channel that has failed on **every release
-  since v0.4.0 — 27 releases by the release list; marketplace stuck at 0.3.8**. (The CHANGELOG's
-  corrected entry says "roughly nineteen", itself a ~30% undercount — an erratum to file with this
-  plan.) Per that corrected record (PR #887), the expired token was a second, older blocker masked
-  behind the IL3000 build failure. Escalation rule: if the PAT is not
-  minted by 0.13 freeze, the 0.13 release notes state the channel is down and why — the
-  registry-verification discipline applied to our one unfixable-by-code channel.
+- **Decision amendment — 2026-08-11 (supersedes this section's original VSCE_PAT escalation
+  rule).** Marketplace publishing is demoted from a release commitment to an opportunistic
+  channel. The extension and
+  LSP remain first-class investments: every release builds six platform VSIX packages, attaches
+  them to the GitHub release, and keeps the PR `vsix-single-file-publish` guard. The Marketplace
+  listing deliberately remains at v0.3.8 unless a publisher token is minted and a maintainer
+  chooses to publish. Revisit only on a demand signal: a user issue requesting Marketplace
+  installation or download counts that justify the recurring token and publish-chain maintenance.
+  Rationale recorded rather than inferred: publishing has failed since v0.4.0, five months of a
+  stale listing produced zero complaints, and Calor's premise needs the LSP for agents and human
+  reviewers but does not require Marketplace freshness.
 - **Z3 asset chain finished**: resolve the mislabeled `osx-x64` dylib (upstream ships an arm64
   binary under the x64 label — Intel Macs install successfully and *silently lose verification*),
   switch `build-z3.yml`'s `osx-arm64` leg off the source build, then land the native arch-vs-RID
@@ -189,15 +193,15 @@ gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
 6. **PP-S4 registry**: exists at its A-1.5.7-registered location, schema, and CI entry point, and
    the CI job is **demonstrated to fail on a fixture-less `SupportLevel` promotion** (a
    discriminating pin — revert the fixture, watch it fail).
-7. **Clean-consumer install, per-RID**: on a frozen RID × package matrix (win-x64, linux-x64,
-   osx-arm64: CLI + Sdk + VSIX where unblocked), a clean consumer runs `calor verify` on a
+7. **Clean-consumer install, per-RID**: on a frozen RID × artifact matrix (win-x64, linux-x64,
+   osx-arm64: CLI + Sdk + release VSIX), a clean consumer runs `calor verify` on a
    Z3-requiring fixture and gets a **solver verdict** — exit-0 install is not the bar, because the
    pre-closure osx-x64 state was precisely "installs successfully, silently loses verification".
    **Gate amended with the Z3 chain closure (2026-08-11, #916 review F3): the osx-x64 RID is
    dropped, so its leg's oracle changes rather than disappearing** — a clean Intel-mac consumer
    must get the *documented degradation* (a loud "Z3 unavailable"/Calor0710 signal, no crash, no
-   silent pass), which turns the drop decision itself into a tested claim. The registries are
-   verified **after** publishing (a workflow firing is not a publish).
+   silent pass), which turns the drop decision itself into a tested claim. NuGet registries and
+   GitHub release assets are verified **after** publishing (a workflow firing is not a publish).
 8. **Performance envelope (project scale needs a number)**: index build ≤ 30s and warm `calor query`
    ≤ 500ms on the largest pinned conversion subject, measured in CI. Generous by design; the point
    is that "usable at project scale" is adjudicable at all. Frozen here, before the index exists.
@@ -450,7 +454,8 @@ first-order ceiling for the common case. The 0.14 flow checker got exactly this 
 - **Freeze before measurement** — thresholds registered before values are visible; ordering
   controls over concealment controls; freeze *events* named, not implied.
 - **Pins must discriminate** — revert the fix and watch the test fail, or it pins nothing.
-- **Verify registries after every publish** — a workflow firing is not evidence it succeeded.
+- **Verify NuGet registries and GitHub release assets after every publish** — a workflow firing is
+  not evidence it succeeded; Marketplace freshness is not a release criterion.
 - **Claim only what is closed by construction** — "one class closed", never "surface exhausted".
 - **Denominators are pinned artifacts, not implementation-defined sets** — the modeled-forms
   whitelist, the call-site corpus, the RID matrix.

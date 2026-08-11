@@ -51,7 +51,7 @@ export function trackFeatureLearnMore(feature: string) {
   sendEvent({ action: 'feature_learn_more', category: 'engagement', label: feature });
 }
 
-export function trackVSCodeExtensionClick(action: 'marketplace' | 'copy_command') {
+export function trackVSCodeExtensionClick(action: 'release' | 'marketplace') {
   sendEvent({ action: 'vscode_extension_click', category: 'conversion', label: action });
 }
 

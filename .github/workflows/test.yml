@@ -666,11 +666,11 @@ jobs:
         run: python3 scripts/smoke_phase_2_gate_dryrun.py
 
   vsix-single-file-publish:
-    # publish-vscode.yml packs the language server with PublishSingleFile=true.
-    # That is the ONLY place the repo builds single-file, and single-file promotes
+    # The VSIX workflows pack the language server with PublishSingleFile=true.
+    # They are the only release paths that build single-file, and single-file promotes
     # Assembly.Location uses to IL3000 errors under TreatWarningsAsErrors — so
     # v0.12.0's VS Code publish died on a compile error that no PR could have
-    # caught. (That channel had in fact been failing since v0.9.0, unnoticed,
+    # caught. (That channel had in fact been failing since v0.4.0, unnoticed,
     # because nothing between releases ever ran this build.) One target is
     # enough; the analyzer verdict is RID-independent.
     runs-on: ubuntu-latest

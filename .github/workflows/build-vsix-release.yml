@@ -1,0 +1,125 @@
+name: Build VS Code Release Assets
+
+# The extension and LSP remain supported release artifacts. Marketplace
+# publication is a separate, opportunistic manual workflow; this workflow owns
+# the dependable path by attaching all platform VSIX packages to each release.
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build and attach (for example v0.13.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: win32-x64
+          - os: windows-latest
+            target: win32-arm64
+          - os: macos-latest
+            target: darwin-x64
+          - os: macos-latest
+            target: darwin-arm64
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: ubuntu-latest
+            target: linux-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Language Server
+        run: |
+          cd editors/vscode
+          chmod +x scripts/build-server.sh
+          ./scripts/build-server.sh ${{ matrix.target }}
+        shell: bash
+
+      - name: Ensure server is executable (Unix)
+        if: runner.os != 'Windows'
+        run: chmod +x editors/vscode/server/calor-lsp
+        shell: bash
+
+      - name: Install dependencies
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 15
+          shell: bash
+          command: cd editors/vscode && npm ci
+
+      - name: Compile TypeScript
+        run: |
+          cd editors/vscode
+          npm run compile
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package extension
+        run: |
+          cd editors/vscode
+          vsce package --target ${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: calor-${{ matrix.target }}
+          path: editors/vscode/*.vsix
+
+  attach:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: vsix-packages
+
+      - name: Upload consolidated Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension-all-platforms
+          path: vsix-packages/**/*.vsix
+
+      - name: Attach VSIX packages to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          vsixes=(vsix-packages/**/*.vsix)
+          if [ ${#vsixes[@]} -ne 6 ]; then
+            echo "::error::expected 6 platform VSIX packages, found ${#vsixes[@]}"
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${vsixes[@]}" --clobber
