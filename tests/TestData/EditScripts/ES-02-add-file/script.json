@@ -1,0 +1,21 @@
+{
+  "id": "ES-02",
+  "title": "Files added to a warm workspace",
+  "pins": "A new file must be compiled and its diagnostics must appear, while the pre-existing files stay cached. Adding a clean file first, then a violating one, separates 'new file compiles' from 'new file's diagnostics reach the report'.",
+  "expectsReuse": false,
+  "reuseNote": "Adding a file changes the cross-module function map, whose hash is compared unconditionally (#823 review m1): every cached output may carry stale qualification, so the build invalidates globally. Zero reuse here is the compiler's designed behaviour, pinned so a change to it is visible.",
+  "steps": [
+    {
+      "dir": "step-00-baseline",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-01-add-clean",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-02-add-violating",
+      "options": "effects-on"
+    }
+  ]
+}

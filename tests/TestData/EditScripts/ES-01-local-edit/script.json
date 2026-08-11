@@ -1,0 +1,21 @@
+{
+  "id": "ES-01",
+  "title": "Local edits to one file, its neighbour untouched",
+  "pins": "The baseline shape. An edit confined to one file must not change any other file's diagnostics, and the untouched neighbour must be served from cache (the witness) rather than silently rebuilt.",
+  "expectsReuse": true,
+  "reuseNote": "Only file contents change, so the untouched neighbour stays a cache hit.",
+  "steps": [
+    {
+      "dir": "step-00-baseline",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-01-edit-body",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-02-introduce-violation",
+      "options": "effects-on"
+    }
+  ]
+}

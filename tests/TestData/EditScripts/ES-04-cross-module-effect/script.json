@@ -1,0 +1,21 @@
+{
+  "id": "ES-04",
+  "title": "A callee's effects change; the unedited caller's diagnostics change with them",
+  "pins": "The hard case for any per-file cache: the file whose diagnostics change is not the file that was edited. Cross-module effect enforcement (Calor0410) runs over cached effect summaries, so a stale summary would let the caller's violation vanish on a warm build. Step 2 reverses the edit, pinning the direction a cache is most likely to get wrong (appearing findings are noticed; disappearing ones are not).",
+  "expectsReuse": true,
+  "reuseNote": "The file set and options are constant, so the unedited caller stays a cache hit — which is the point: its cross-module violation has to surface from the cached effect summary.",
+  "steps": [
+    {
+      "dir": "step-00-clean",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-01-callee-gains-effect",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-02-callee-loses-effect",
+      "options": "effects-on"
+    }
+  ]
+}

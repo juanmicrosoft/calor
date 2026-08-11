@@ -79,6 +79,13 @@ jobs:
           --filter "FullyQualifiedName~ExactSpanRefactoringGateTests"
           --verbosity normal
 
+      - name: Run full-vs-incremental identity gate
+        run: >-
+          dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+          -c Release --no-build
+          --filter "FullyQualifiedName~EditScriptIdentityTests"
+          --verbosity normal
+
       - name: Run all tests
         run: |
           set -euo pipefail

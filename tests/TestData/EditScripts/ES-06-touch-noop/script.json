@@ -1,0 +1,21 @@
+{
+  "id": "ES-06",
+  "title": "Files rewritten with identical content",
+  "pins": "Rewriting a file changes its timestamp and size-independent stat data without changing its content. Diagnostics must not move. This is the script that would catch identity being bought by never being incremental: nothing changed, so nothing may be recompiled.",
+  "expectsReuse": true,
+  "reuseNote": "Nothing changed, so everything must be reused.",
+  "steps": [
+    {
+      "dir": "step-00-baseline",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-01-touch-identical",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-02-touch-identical-again",
+      "options": "effects-on"
+    }
+  ]
+}

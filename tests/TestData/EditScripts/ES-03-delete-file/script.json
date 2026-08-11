@@ -1,0 +1,21 @@
+{
+  "id": "ES-03",
+  "title": "Files deleted from a warm workspace",
+  "pins": "A deleted file's diagnostics must disappear. The failure this pins is a stale cache entry keeping a removed file's findings alive, which a full build would never report.",
+  "expectsReuse": false,
+  "reuseNote": "Same as ES-02 in reverse: removing a module changes the cross-module map hash and invalidates globally.",
+  "steps": [
+    {
+      "dir": "step-00-baseline",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-01-delete-violating",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-02-delete-clean",
+      "options": "effects-on"
+    }
+  ]
+}
