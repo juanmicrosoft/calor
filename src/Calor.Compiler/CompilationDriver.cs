@@ -329,7 +329,7 @@ internal static class CompilationDriver
     internal static IReadOnlyDictionary<string, string> BuildCrossModuleFunctionMap(
         IReadOnlyList<FileInfo> sources)
     {
-        var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        var modules = new List<ModuleNode>();
         foreach (var file in sources)
         {
             try
@@ -343,38 +343,54 @@ internal static class CompilationDriver
                 {
                     continue;
                 }
-                foreach (var fn in module.Functions)
-                {
-                    // Match CrossModuleEffectRegistry's surface exactly (public AND
-                    // internal — #823 review M1): enforcement resolves internal
-                    // cross-module calls, so emission must qualify them too, or the
-                    // front-end passes and csc fails (the exact #809 shape).
-                    if (fn.Visibility is not (Ast.Visibility.Public or Ast.Visibility.Internal))
-                    {
-                        continue;
-                    }
-                    if (!byName.TryGetValue(fn.Name, out var modules))
-                    {
-                        byName[fn.Name] = modules = new List<string>();
-                    }
-                    if (!modules.Contains(module.Name))
-                    {
-                        modules.Add(module.Name);
-                    }
-                }
+                modules.Add(module);
             }
             catch (IOException)
             {
             }
         }
 
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (name, modules) in byName)
+        return BuildCrossModuleFunctionMap(modules);
+    }
+
+    /// <summary>
+    /// Builds the production cross-module call-qualification map from already
+    /// parsed modules. Editor validation uses this overload so it shares the
+    /// driver's exact visibility and ambiguity rules without reparsing snapshots.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> BuildCrossModuleFunctionMap(
+        IReadOnlyList<ModuleNode> modules)
+    {
+        var byName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var module in modules)
         {
-            if (modules.Count == 1)
+            if (string.IsNullOrEmpty(module.Name) || module.Name == "_global")
+                continue;
+
+            foreach (var fn in module.Functions)
             {
-                map[name] = modules[0];
+                // Match CrossModuleEffectRegistry's surface exactly (public AND
+                // internal — #823 review M1): enforcement resolves internal
+                // cross-module calls, so emission must qualify them too, or the
+                // front-end passes and csc fails (the exact #809 shape).
+                if (fn.Visibility is not (Ast.Visibility.Public or Ast.Visibility.Internal))
+                    continue;
+
+                if (!byName.TryGetValue(fn.Name, out var definingModules))
+                {
+                    definingModules = [];
+                    byName[fn.Name] = definingModules;
+                }
+                if (!definingModules.Contains(module.Name))
+                    definingModules.Add(module.Name);
             }
+        }
+
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (name, definingModules) in byName)
+        {
+            if (definingModules.Count == 1)
+                map[name] = definingModules[0];
         }
         return map;
     }

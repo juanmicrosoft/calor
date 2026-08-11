@@ -4,6 +4,8 @@
     <InternalsVisibleTo Include="Calor.Compiler.Tests" />
     <InternalsVisibleTo Include="Calor.Enforcement.Tests" />
     <InternalsVisibleTo Include="Calor.ILAnalysis.Tests" />
+    <InternalsVisibleTo Include="Calor.LanguageServer.Tests" />
+    <InternalsVisibleTo Include="calor-lsp" />
     <InternalsVisibleTo Include="McpBenchHarness" />
     <InternalsVisibleTo Include="Calor.Tasks" />
     <InternalsVisibleTo Include="Calor.Tasks.Tests" />

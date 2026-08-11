@@ -192,6 +192,8 @@ public sealed class BoundCallStatement : BoundStatement
     public IReadOnlyList<FunctionSymbol> ResolvedSymbols { get; }
     public VariableSymbol? ReceiverSymbol { get; }
     public SymbolId? ReceiverSymbolId => ReceiverSymbol?.Id;
+    public TypeSymbol? ReceiverTypeSymbol { get; }
+    public SymbolId? ReceiverTypeSymbolId => ReceiverTypeSymbol?.Id;
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
@@ -212,7 +214,8 @@ public sealed class BoundCallStatement : BoundStatement
         TextSpan? calleeSpan = null,
         TextSpan? receiverSpan = null,
         bool isInaccessibleCall = false,
-        IReadOnlyList<string>? typeArguments = null)
+        IReadOnlyList<string>? typeArguments = null,
+        TypeSymbol? receiverTypeSymbol = null)
         : base(span)
     {
         Target = target;
@@ -224,6 +227,7 @@ public sealed class BoundCallStatement : BoundStatement
         ArgumentModifiers = argumentModifiers;
         TypeArguments = typeArguments;
         ReceiverSymbol = receiverSymbol;
+        ReceiverTypeSymbol = receiverTypeSymbol;
         CalleeSpan = calleeSpan ?? span;
         ReceiverSpan = receiverSpan;
         IsInaccessibleCall = isInaccessibleCall;
@@ -549,6 +553,8 @@ public class BoundCallExpression : BoundExpression
     public IReadOnlyList<FunctionSymbol> ResolvedSymbols { get; }
     public VariableSymbol? ReceiverSymbol { get; }
     public SymbolId? ReceiverSymbolId => ReceiverSymbol?.Id;
+    public TypeSymbol? ReceiverTypeSymbol { get; }
+    public SymbolId? ReceiverTypeSymbolId => ReceiverTypeSymbol?.Id;
     public TextSpan CalleeSpan { get; }
     public TextSpan? ReceiverSpan { get; }
     public bool IsInaccessibleCall { get; }
@@ -597,7 +603,8 @@ public class BoundCallExpression : BoundExpression
         IReadOnlyList<FunctionSymbol>? resolvedSymbols = null,
         TextSpan? calleeSpan = null,
         TextSpan? receiverSpan = null,
-        bool isInaccessibleCall = false)
+        bool isInaccessibleCall = false,
+        TypeSymbol? receiverTypeSymbol = null)
         : base(span)
     {
         Target = target;
@@ -613,6 +620,7 @@ public class BoundCallExpression : BoundExpression
         ArgumentModifiers = argumentModifiers;
         TypeArguments = typeArguments;
         ReceiverSymbol = receiverSymbol;
+        ReceiverTypeSymbol = receiverTypeSymbol;
         CalleeSpan = calleeSpan ?? span;
         ReceiverSpan = receiverSpan;
         IsInaccessibleCall = isInaccessibleCall;

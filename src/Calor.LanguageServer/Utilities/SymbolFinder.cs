@@ -954,12 +954,23 @@ public readonly record struct IndexedTypeReference(
     string Name,
     TextSpan Span);
 
+public sealed record TypeReferenceIndexResult(
+    IReadOnlyList<IndexedTypeReference> References,
+    IReadOnlySet<SymbolId> IncompleteSymbolIds);
+
 /// <summary>
 /// Builds an identity-aware index from parser-recorded type annotation spans.
 /// </summary>
 public static class TypeReferenceIndex
 {
     public static IReadOnlyList<IndexedTypeReference> Build(
+        ModuleNode ast,
+        BoundModule boundModule,
+        string source,
+        IReadOnlyList<TypeSymbol>? workspaceTypeSymbols = null) =>
+        BuildDetailed(ast, boundModule, source, workspaceTypeSymbols).References;
+
+    public static TypeReferenceIndexResult BuildDetailed(
         ModuleNode ast,
         BoundModule boundModule,
         string source,
@@ -975,9 +986,14 @@ public static class TypeReferenceIndex
             .DistinctBy(symbol => symbol.Id)
             .ToArray();
         if (typeSymbols.Length == 0)
-            return Array.Empty<IndexedTypeReference>();
+        {
+            return new TypeReferenceIndexResult(
+                Array.Empty<IndexedTypeReference>(),
+                new HashSet<SymbolId>());
+        }
 
         var references = new List<IndexedTypeReference>();
+        var incompleteSymbolIds = new HashSet<SymbolId>();
         foreach (var creation in Calor.Compiler.Analysis.Dataflow.BoundNodeHelpers
                      .DescendantsAndSelf(boundModule)
                      .OfType<BoundNewExpression>())
@@ -986,7 +1002,8 @@ public static class TypeReferenceIndex
                 creation.TypeReference,
                 source,
                 typeSymbols,
-                references);
+                references,
+                incompleteSymbolIds);
         }
 
         foreach (var node in DescendantsAndSelf(ast))
@@ -994,34 +1011,184 @@ public static class TypeReferenceIndex
             switch (node)
             {
                 case OutputNode output:
-                    AddAnnotation(output.TypeNameSpan, source, typeSymbols, references);
+                    AddTypePosition(output.TypeName, output.TypeNameSpan);
                     break;
                 case ParameterNode parameter:
-                    AddAnnotation(parameter.TypeNameSpan, source, typeSymbols, references);
+                    AddTypePosition(parameter.TypeName, parameter.TypeNameSpan);
                     break;
                 case ClassFieldNode field:
-                    AddAnnotation(field.TypeNameSpan, source, typeSymbols, references);
+                    AddTypePosition(field.TypeName, field.TypeNameSpan);
                     break;
                 case PropertyNode property:
-                    AddAnnotation(property.TypeNameSpan, source, typeSymbols, references);
+                    AddTypePosition(property.TypeName, property.TypeNameSpan);
+                    break;
+                case BindStatementNode bind
+                    when bind.TypeName != null
+                         && bind.TypeNameSpan.Length == 0
+                         && bind.Initializer is ArrayCreationNode
+                             or MultiDimArrayCreationNode
+                             or ListCreationNode
+                             or DictionaryCreationNode
+                             or SetCreationNode:
                     break;
                 case BindStatementNode bind when bind.TypeName != null:
-                    AddAnnotation(bind.TypeNameSpan, source, typeSymbols, references);
+                    AddTypePosition(bind.TypeName, bind.TypeNameSpan);
                     break;
                 case ClassDefinitionNode cls:
                     if (cls.BaseClassSpan is { } baseSpan)
-                        AddAnnotation(baseSpan, source, typeSymbols, references);
+                        AddTypePosition(cls.BaseClass, baseSpan);
+                    else
+                        MarkIncompleteAnnotation(cls.BaseClass);
                     foreach (var interfaceSpan in cls.ImplementedInterfaceSpans)
                         AddAnnotation(interfaceSpan, source, typeSymbols, references);
+                    if (cls.ImplementedInterfaces.Count > 0
+                        && cls.ImplementedInterfaceSpans.Count == 0)
+                    {
+                        foreach (var interfaceName in cls.ImplementedInterfaces)
+                            MarkIncompleteAnnotation(interfaceName);
+                    }
+                    break;
+                case InterfaceDefinitionNode @interface:
+                    foreach (var interfaceBaseSpan in @interface.BaseInterfaceSpans)
+                        AddAnnotation(interfaceBaseSpan, source, typeSymbols, references);
+                    if (@interface.BaseInterfaces.Count > 0
+                        && @interface.BaseInterfaceSpans.Count == 0)
+                    {
+                        foreach (var baseInterface in @interface.BaseInterfaces)
+                            MarkIncompleteAnnotation(baseInterface);
+                    }
+                    break;
+                case CatchClauseNode @catch:
+                    AddTypePosition(@catch.ExceptionType, @catch.ExceptionTypeSpan);
+                    break;
+                case ArrayCreationNode array:
+                    AddTypePosition(array.ElementType, array.ElementTypeSpan);
+                    break;
+                case MultiDimArrayCreationNode array:
+                    AddTypePosition(array.ElementType, array.ElementTypeSpan);
+                    break;
+                case ForeachStatementNode @foreach:
+                    AddTypePosition(@foreach.VariableType, @foreach.VariableTypeSpan);
+                    break;
+                case ListCreationNode list:
+                    AddTypePosition(list.ElementType, list.ElementTypeSpan);
+                    break;
+                case DictionaryCreationNode dictionary:
+                    AddTypePosition(dictionary.KeyType, dictionary.KeyTypeSpan);
+                    AddTypePosition(dictionary.ValueType, dictionary.ValueTypeSpan);
+                    break;
+                case SetCreationNode set:
+                    AddTypePosition(set.ElementType, set.ElementTypeSpan);
+                    break;
+                case TypeOperationNode operation:
+                    AddTypePosition(operation.TargetType, operation.TargetTypeSpan);
+                    break;
+                case IsPatternNode pattern:
+                    AddTypePosition(pattern.TargetType, pattern.TargetTypeSpan);
+                    break;
+                case TypeOfExpressionNode typeOf:
+                    AddTypePosition(typeOf.TypeName, typeOf.TypeNameSpan);
+                    break;
+                case SizeOfNode sizeOf:
+                    AddTypePosition(sizeOf.TypeName, sizeOf.TypeNameSpan);
+                    break;
+                case StackAllocNode stackAlloc:
+                    AddTypePosition(stackAlloc.ElementType, stackAlloc.ElementTypeSpan);
+                    break;
+                case FixedStatementNode fixedStatement:
+                    AddTypePosition(fixedStatement.PointerType, fixedStatement.PointerTypeSpan);
+                    break;
+                case EventDefinitionNode @event:
+                    AddTypePosition(@event.DelegateType, @event.DelegateTypeSpan);
+                    break;
+                case LambdaParameterNode lambdaParameter:
+                    AddTypePosition(lambdaParameter.TypeName, lambdaParameter.TypeNameSpan);
+                    break;
+                case QuantifierVariableNode quantifier:
+                    AddTypePosition(quantifier.TypeName, quantifier.TypeNameSpan);
+                    break;
+                case PositionalPatternNode positionalPattern:
+                    AddTypePosition(
+                        positionalPattern.TypeName,
+                        positionalPattern.TypeNameSpan);
+                    break;
+                case PropertyPatternNode propertyPattern:
+                    AddTypePosition(
+                        propertyPattern.TypeName,
+                        propertyPattern.TypeNameSpan);
+                    break;
+                case TypePatternNode typePattern:
+                    AddTypePosition(typePattern.TypeName, typePattern.TypeNameSpan);
+                    break;
+                case NoneExpressionNode none:
+                    AddTypePosition(none.TypeName, none.TypeNameSpan);
+                    break;
+                case RecordCreationNode recordCreation:
+                    AddTypePosition(
+                        recordCreation.TypeName,
+                        recordCreation.TypeNameSpan);
+                    break;
+                case FieldDefinitionNode fieldDefinition:
+                    AddTypePosition(
+                        fieldDefinition.TypeName,
+                        fieldDefinition.TypeNameSpan);
+                    break;
+                case TypeConstraintNode constraint:
+                    MarkIncompleteAnnotation(constraint.TypeName);
+                    break;
+                case GenericTypeNode genericType:
+                    AddTypePosition(genericType.TypeName, genericType.TypeNameSpan);
+                    foreach (var typeArgument in genericType.TypeArguments)
+                        MarkIncompleteAnnotation(typeArgument);
+                    break;
+                case RefinementTypeNode refinement:
+                    AddTypePosition(
+                        refinement.BaseTypeName,
+                        refinement.BaseTypeNameSpan);
+                    break;
+                case IndexedTypeNode indexed:
+                    AddTypePosition(indexed.BaseTypeName, indexed.BaseTypeNameSpan);
                     break;
             }
         }
 
-        return references
-            .Distinct()
-            .OrderBy(reference => reference.Span.Start)
-            .ThenBy(reference => reference.Span.End)
-            .ToArray();
+        return new TypeReferenceIndexResult(
+            references
+                .Distinct()
+                .OrderBy(reference => reference.Span.Start)
+                .ThenBy(reference => reference.Span.End)
+                .ToArray(),
+            incompleteSymbolIds);
+
+        void AddTypePosition(string? typeName, TextSpan? span)
+        {
+            if (string.IsNullOrWhiteSpace(typeName))
+                return;
+
+            if (span is { Length: > 0 })
+                AddAnnotation(span.Value, source, typeSymbols, references);
+            else
+                MarkIncompleteAnnotation(typeName);
+        }
+
+        void MarkIncompleteAnnotation(string? annotation)
+        {
+            if (string.IsNullOrWhiteSpace(annotation))
+                return;
+
+            var annotationSpan = annotation.AsSpan();
+            var identifiers = ScanIdentifiers(annotationSpan);
+            for (var index = 0; index < identifiers.Count; index++)
+            {
+                var symbol = ResolveTypeSymbol(
+                    annotationSpan,
+                    identifiers,
+                    index,
+                    typeSymbols);
+                if (symbol is { Id.IsNone: false })
+                    incompleteSymbolIds.Add(symbol.Id);
+            }
+        }
     }
 
     private static void AddAnnotation(
@@ -1057,7 +1224,8 @@ public static class TypeReferenceIndex
         BoundTypeReference reference,
         string source,
         IReadOnlyList<TypeSymbol> typeSymbols,
-        ICollection<IndexedTypeReference> references)
+        ICollection<IndexedTypeReference> references,
+        ISet<SymbolId> incompleteSymbolIds)
     {
         var resolvedType = reference.ResolvedType
             ?? ResolveTypeSymbol(reference.Name, typeSymbols);
@@ -1071,9 +1239,20 @@ public static class TypeReferenceIndex
                 source.Substring(reference.Span.Start, reference.Span.Length),
                 reference.Span));
         }
+        else if (resolvedType is { Id.IsNone: false })
+        {
+            incompleteSymbolIds.Add(resolvedType.Id);
+        }
 
         foreach (var typeArgument in reference.TypeArguments)
-            AddBoundTypeReference(typeArgument, source, typeSymbols, references);
+        {
+            AddBoundTypeReference(
+                typeArgument,
+                source,
+                typeSymbols,
+                references,
+                incompleteSymbolIds);
+        }
     }
 
     private static TypeSymbol? ResolveTypeSymbol(

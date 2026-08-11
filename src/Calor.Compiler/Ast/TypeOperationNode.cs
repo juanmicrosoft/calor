@@ -21,17 +21,20 @@ public sealed class TypeOperationNode : ExpressionNode
     public TypeOp Operation { get; }
     public ExpressionNode Operand { get; }
     public string TargetType { get; }
+    public TextSpan TargetTypeSpan { get; }
 
     public TypeOperationNode(
         TextSpan span,
         TypeOp operation,
         ExpressionNode operand,
-        string targetType)
+        string targetType,
+        TextSpan? targetTypeSpan = null)
         : base(span)
     {
         Operation = operation;
         Operand = operand ?? throw new ArgumentNullException(nameof(operand));
         TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
+        TargetTypeSpan = targetTypeSpan ?? TextSpan.Empty;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -46,17 +49,20 @@ public sealed class IsPatternNode : ExpressionNode
 {
     public ExpressionNode Operand { get; }
     public string TargetType { get; }
+    public TextSpan TargetTypeSpan { get; }
     public string? VariableName { get; }
 
     public IsPatternNode(
         TextSpan span,
         ExpressionNode operand,
         string targetType,
-        string? variableName = null)
+        string? variableName = null,
+        TextSpan? targetTypeSpan = null)
         : base(span)
     {
         Operand = operand ?? throw new ArgumentNullException(nameof(operand));
         TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
+        TargetTypeSpan = targetTypeSpan ?? TextSpan.Empty;
         VariableName = variableName;
     }
 

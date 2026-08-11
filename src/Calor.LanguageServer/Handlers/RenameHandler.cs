@@ -1,5 +1,7 @@
+using Calor.Compiler.Parsing;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Utilities;
+using Microsoft.CodeAnalysis.CSharp;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -21,29 +23,32 @@ public sealed class RenameHandler : RenameHandlerBase
         _workspace = workspace;
     }
 
-    public override Task<WorkspaceEdit?> Handle(
+    public override async Task<WorkspaceEdit?> Handle(
         RenameParams request,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var state = _workspace.Get(request.TextDocument.Uri);
         var snapshot = state?.Snapshot;
         if (snapshot == null
             || string.IsNullOrWhiteSpace(request.NewName)
             || !IsValidIdentifier(request.NewName))
         {
-            return Task.FromResult<WorkspaceEdit?>(null);
+            return null;
         }
 
+        _workspace.RefreshClosedDocuments();
+        cancellationToken.ThrowIfCancellationRequested();
         var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
         var occurrence = _workspace.ResolveOccurrence(request.TextDocument.Uri, offset);
-        if (occurrence == null)
-            return Task.FromResult<WorkspaceEdit?>(null);
+        if (occurrence == null || !_workspace.CanRenameSymbol(occurrence.SymbolId))
+            return null;
 
         var oldName = occurrence.Snapshot.Source.Substring(
             occurrence.Span.Start,
             occurrence.Span.Length);
         if (string.Equals(oldName, request.NewName, StringComparison.Ordinal))
-            return Task.FromResult<WorkspaceEdit?>(null);
+            return null;
 
         var occurrences = _workspace.FindSymbolOccurrences(
             occurrence.SymbolId,
@@ -59,8 +64,18 @@ public sealed class RenameHandler : RenameHandlerBase
                 !IsExactIdentifierSpan(item.Snapshot.Source, item.Span, oldName))
             || !_workspace.AreOccurrenceSnapshotsCurrent(occurrences))
         {
-            return Task.FromResult<WorkspaceEdit?>(null);
+            return null;
         }
+
+        if (!await _workspace.ValidateRenameAsync(
+                occurrences,
+                oldName,
+                request.NewName,
+                cancellationToken).ConfigureAwait(false))
+            return null;
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!_workspace.AreOccurrenceSnapshotsCurrent(occurrences))
+            return null;
 
         var documentChanges = occurrences
             .GroupBy(item => DocumentUri.From(item.Doc.Uri))
@@ -90,12 +105,11 @@ public sealed class RenameHandler : RenameHandlerBase
             })
             .ToArray();
 
-        return Task.FromResult<WorkspaceEdit?>(
-            new WorkspaceEdit
-            {
-                DocumentChanges = new Container<WorkspaceEditDocumentChange>(
-                    documentChanges),
-            });
+        return new WorkspaceEdit
+        {
+            DocumentChanges = new Container<WorkspaceEditDocumentChange>(
+                documentChanges),
+        };
     }
 
     private static bool IsExactIdentifierSpan(
@@ -117,8 +131,21 @@ public sealed class RenameHandler : RenameHandlerBase
             return false;
         }
 
-        return name.Skip(1).All(character =>
-            char.IsLetterOrDigit(character) || character == '_');
+        if (!name.Skip(1).All(character =>
+                char.IsLetterOrDigit(character) || character == '_')
+            || SyntaxFacts.GetKeywordKind(name) != SyntaxKind.None
+            || SyntaxFacts.GetContextualKeywordKind(name) != SyntaxKind.None)
+        {
+            return false;
+        }
+
+        var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
+        var tokens = new Lexer(name, diagnostics).TokenizeAll();
+        return !diagnostics.HasErrors
+            && tokens.Count > 0
+            && tokens[0].Kind == TokenKind.Identifier
+            && string.Equals(tokens[0].Text, name, StringComparison.Ordinal)
+            && tokens.Skip(1).All(token => token.Kind == TokenKind.Eof);
     }
 
     protected override RenameRegistrationOptions CreateRegistrationOptions(

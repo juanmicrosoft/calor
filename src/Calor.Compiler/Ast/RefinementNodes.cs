@@ -11,6 +11,7 @@ public sealed class RefinementTypeNode : AstNode
     public string Id { get; }
     public string Name { get; }
     public string BaseTypeName { get; }
+    public TextSpan BaseTypeNameSpan { get; }
     public ExpressionNode Predicate { get; }
     public AttributeCollection Attributes { get; }
 
@@ -20,12 +21,14 @@ public sealed class RefinementTypeNode : AstNode
         string name,
         string baseTypeName,
         ExpressionNode predicate,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? baseTypeNameSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         BaseTypeName = baseTypeName ?? throw new ArgumentNullException(nameof(baseTypeName));
+        BaseTypeNameSpan = baseTypeNameSpan ?? TextSpan.Empty;
         Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
@@ -85,6 +88,7 @@ public sealed class IndexedTypeNode : AstNode
     public string Id { get; }
     public string Name { get; }
     public string BaseTypeName { get; }
+    public TextSpan BaseTypeNameSpan { get; }
     public string SizeParam { get; }
     public ExpressionNode? Constraint { get; }
     public AttributeCollection Attributes { get; }
@@ -96,12 +100,14 @@ public sealed class IndexedTypeNode : AstNode
         string baseTypeName,
         string sizeParam,
         ExpressionNode? constraint,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? baseTypeNameSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
         BaseTypeName = baseTypeName ?? throw new ArgumentNullException(nameof(baseTypeName));
+        BaseTypeNameSpan = baseTypeNameSpan ?? TextSpan.Empty;
         SizeParam = sizeParam ?? throw new ArgumentNullException(nameof(sizeParam));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         Constraint = constraint;

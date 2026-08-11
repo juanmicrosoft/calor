@@ -61,6 +61,7 @@ public sealed class FieldDefinitionNode : AstNode
 {
     public string Name { get; }
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public ExpressionNode? DefaultValue { get; }
     public AttributeCollection Attributes { get; }
 
@@ -69,11 +70,13 @@ public sealed class FieldDefinitionNode : AstNode
         string name,
         string typeName,
         ExpressionNode? defaultValue,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         DefaultValue = defaultValue;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
@@ -168,15 +171,18 @@ public sealed class TypeReferenceNode : AstNode
 public sealed class RecordCreationNode : ExpressionNode
 {
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public IReadOnlyList<FieldAssignmentNode> Fields { get; }
 
     public RecordCreationNode(
         TextSpan span,
         string typeName,
-        IReadOnlyList<FieldAssignmentNode> fields)
+        IReadOnlyList<FieldAssignmentNode> fields,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         Fields = fields ?? throw new ArgumentNullException(nameof(fields));
     }
 
@@ -254,11 +260,16 @@ public sealed class SomeExpressionNode : ExpressionNode
 public sealed class NoneExpressionNode : ExpressionNode
 {
     public string? TypeName { get; }
+    public TextSpan? TypeNameSpan { get; }
 
-    public NoneExpressionNode(TextSpan span, string? typeName)
+    public NoneExpressionNode(
+        TextSpan span,
+        string? typeName,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         TypeName = typeName;
+        TypeNameSpan = typeName == null ? null : typeNameSpan ?? TextSpan.Empty;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -378,8 +389,9 @@ public sealed class EnumDefinitionNode : TypeDefinitionNode
         IReadOnlyList<EnumMemberNode> members,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
-        Visibility visibility = Visibility.Public)
-        : base(span, id, name, attributes)
+        Visibility visibility = Visibility.Public,
+        TextSpan? identifierSpan = null)
+        : base(span, id, name, attributes, identifierSpan)
     {
         UnderlyingType = underlyingType;
         Members = members ?? throw new ArgumentNullException(nameof(members));

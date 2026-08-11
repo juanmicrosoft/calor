@@ -1274,7 +1274,14 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(predicate.Span);
-        return new RefinementTypeNode(span, id, name, baseTypeName, predicate, attrs);
+        return new RefinementTypeNode(
+            span,
+            id,
+            name,
+            baseTypeName,
+            predicate,
+            attrs,
+            attrs.GetSpan("_pos2"));
     }
 
     /// <summary>
@@ -1321,7 +1328,15 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(lastSpan);
-        return new IndexedTypeNode(span, id, name, baseTypeName, sizeParam, constraint, attrs);
+        return new IndexedTypeNode(
+            span,
+            id,
+            name,
+            baseTypeName,
+            sizeParam,
+            constraint,
+            attrs,
+            attrs.GetSpan("_pos2"));
     }
 
     /// <summary>
@@ -2081,7 +2096,8 @@ public sealed class Parser
                         firstToken.Span,
                         paramName,
                         paramType,
-                        parameterSpan);
+                        parameterSpan,
+                        paramType == null ? null : firstToken.Span);
                     return new LambdaExpressionNode(
                         span,
                         "inline",
@@ -2277,9 +2293,12 @@ public sealed class Parser
         // Handle typeof: (typeof TypeName)
         if (opText == "typeof")
         {
-            var typeName = ParseLispTypeName();
+            var typeName = ParseLispTypeName(out var typeNameSpan);
             var typeofEnd = Expect(TokenKind.CloseParen);
-            return new TypeOfExpressionNode(startToken.Span.Union(typeofEnd.Span), typeName);
+            return new TypeOfExpressionNode(
+                startToken.Span.Union(typeofEnd.Span),
+                typeName,
+                typeNameSpan);
         }
 
         // Handle nameof: (nameof name) or (nameof obj.Property)
@@ -2638,7 +2657,12 @@ public sealed class Parser
                 return operandArg;
             }
 
-            return new TypeOperationNode(span, typeOp.Value, operandArg, typeRef.Name);
+            return new TypeOperationNode(
+                span,
+                typeOp.Value,
+                operandArg,
+                typeRef.Name,
+                typeRef.Span);
         }
 
         // Handle function calls: (CALL target arg1 arg2 ...)
@@ -2671,8 +2695,12 @@ public sealed class Parser
                     }
                     var exprName = string.Join(".", exprParts);
                     var typeName = args[i + 1] switch { ReferenceNode r2 => r2.Name, _ => args[i + 1].ToString() ?? "" };
-                    return new TypeOperationNode(span, TypeOp.As,
-                        new ReferenceNode(span, exprName), typeName);
+                    return new TypeOperationNode(
+                        span,
+                        TypeOp.As,
+                        new ReferenceNode(span, exprName),
+                        typeName,
+                        args[i + 1].Span);
                 }
             }
         }
@@ -2943,7 +2971,8 @@ public sealed class Parser
                 bindingSpan,
                 nameToken.Text,
                 typeToken.Text,
-                nameToken.Span));
+                nameToken.Span,
+                typeToken.Span));
         }
 
         Expect(TokenKind.CloseParen);
@@ -3139,7 +3168,20 @@ public sealed class Parser
     /// Examples: int, string, List&lt;string&gt;, Dictionary&lt;string, int&gt;, System.Collections.Generic.List&lt;int&gt;
     /// Used by typeof, is, and as expressions.
     /// </summary>
-    private string ParseLispTypeName()
+    private string ParseLispTypeName() => ParseLispTypeName(out _);
+
+    private string ParseLispTypeName(out TextSpan typeSpan)
+    {
+        var startPosition = _position;
+        var startSpan = Current.Span;
+        var typeName = ParseLispTypeNameCore();
+        typeSpan = _position > startPosition
+            ? startSpan.Union(Peek(-1).Span)
+            : TextSpan.Empty;
+        return typeName;
+    }
+
+    private string ParseLispTypeNameCore()
     {
         // Handle Calor nullable prefix syntax: ?Type → Type?
         bool isNullablePrefix = false;
@@ -3385,7 +3427,7 @@ public sealed class Parser
         var operand = ParseLispArgument();
 
         // Parse the type name using the shared helper
-        var typeName = ParseLispTypeName();
+        var typeName = ParseLispTypeName(out var typeNameSpan);
 
         // Optionally parse a variable name for pattern matching: (is x MyType varName)
         string? variableName = null;
@@ -3398,7 +3440,12 @@ public sealed class Parser
         var endToken = Expect(TokenKind.CloseParen);
         var span = startToken.Span.Union(endToken.Span);
 
-        return new IsPatternNode(span, operand, typeName, variableName);
+        return new IsPatternNode(
+            span,
+            operand,
+            typeName,
+            variableName,
+            typeNameSpan);
     }
 
     /// <summary>
@@ -3411,12 +3458,17 @@ public sealed class Parser
         var operand = ParseLispArgument();
 
         // Parse the type name using the shared helper
-        var typeName = ParseLispTypeName();
+        var typeName = ParseLispTypeName(out var typeNameSpan);
 
         var endToken = Expect(TokenKind.CloseParen);
         var span = startToken.Span.Union(endToken.Span);
 
-        return new TypeOperationNode(span, TypeOp.As, operand, typeName);
+        return new TypeOperationNode(
+            span,
+            TypeOp.As,
+            operand,
+            typeName,
+            typeNameSpan);
     }
 
     /// <summary>
@@ -3426,13 +3478,18 @@ public sealed class Parser
     private ExpressionNode ParseLispCastExpression(Token startToken)
     {
         // cast: type comes first, then expression
-        var typeName = ParseLispTypeName();
+        var typeName = ParseLispTypeName(out var typeNameSpan);
         var operand = ParseLispArgument();
 
         var endToken = Expect(TokenKind.CloseParen);
         var span = startToken.Span.Union(endToken.Span);
 
-        return new TypeOperationNode(span, TypeOp.Cast, operand, typeName);
+        return new TypeOperationNode(
+            span,
+            TypeOp.Cast,
+            operand,
+            typeName,
+            typeNameSpan);
     }
 
     /// <summary>
@@ -3444,7 +3501,7 @@ public sealed class Parser
         var startSpan = left.Span;
         Advance(); // consume 'is'
 
-        var typeName = ParseLispTypeName();
+        var typeName = ParseLispTypeName(out var typeNameSpan);
         string? variableName = null;
 
         // Check for optional variable declaration: is Type variableName
@@ -3456,7 +3513,12 @@ public sealed class Parser
         }
 
         var endSpan = Peek(-1).Span;
-        return new IsPatternNode(startSpan.Union(endSpan), left, typeName, variableName);
+        return new IsPatternNode(
+            startSpan.Union(endSpan),
+            left,
+            typeName,
+            variableName,
+            typeNameSpan);
     }
 
     /// <summary>
@@ -3729,7 +3791,10 @@ public sealed class Parser
         {
             typeName = AttributeHelper.ExpandType(typeName);
         }
-        return new NoneExpressionNode(startToken.Span, typeName);
+        return new NoneExpressionNode(
+            startToken.Span,
+            typeName,
+            typeName == null ? null : attrs.GetSpan("_pos0"));
     }
 
     private OkExpressionNode ParseOkExpression()
@@ -3765,7 +3830,11 @@ public sealed class Parser
         }
 
         var lastSpan = fields.Count > 0 ? fields[^1].Span : startToken.Span;
-        return new RecordCreationNode(startToken.Span.Union(lastSpan), typeName, fields);
+        return new RecordCreationNode(
+            startToken.Span.Union(lastSpan),
+            typeName,
+            fields,
+            attrs.GetSpan("type"));
     }
 
     private MatchExpressionNode ParseMatchExpression()
@@ -4897,7 +4966,9 @@ public sealed class Parser
         if (!attrs.TryGetSpan(key, out var span))
             return TextSpan.Empty;
 
-        var length = Math.Min(identifier.Length, Math.Max(0, span.Length - leadingCharacters));
+        var genericStart = identifier.IndexOf('<');
+        var identifierLength = genericStart > 0 ? genericStart : identifier.Length;
+        var length = Math.Min(identifierLength, Math.Max(0, span.Length - leadingCharacters));
         return new TextSpan(
             span.Start + leadingCharacters,
             length,
@@ -4940,14 +5011,20 @@ public sealed class Parser
             return (null, targetSpan);
 
         var firstDot = target.IndexOf('.');
-        TextSpan? receiver = firstDot > 0
-            ? new TextSpan(targetSpan.Start, firstDot, targetSpan.Line, targetSpan.Column)
+        var receiverGeneric = target.IndexOf('<');
+        var receiverLength = receiverGeneric > 0 && receiverGeneric < firstDot
+            ? receiverGeneric
+            : firstDot;
+        TextSpan? receiver = receiverLength > 0
+            ? new TextSpan(targetSpan.Start, receiverLength, targetSpan.Line, targetSpan.Column)
             : null;
 
         var lastDot = target.LastIndexOf('.');
         var calleeOffset = lastDot >= 0 ? lastDot + 1 : 0;
+        var genericOffset = target.IndexOf('<', calleeOffset);
+        var calleeEnd = genericOffset >= 0 ? genericOffset : target.Length;
         var calleeLength = Math.Min(
-            target.Length - calleeOffset,
+            calleeEnd - calleeOffset,
             Math.Max(0, targetSpan.Length - calleeOffset));
         var callee = new TextSpan(
             targetSpan.Start + calleeOffset,
@@ -6200,7 +6277,18 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endSpan);
-        return new ArrayCreationNode(span, id, id, elementType, size, initializer, attrs);
+        var elementTypeKey = string.Equals(elementType, rawPos0, StringComparison.Ordinal)
+            ? "_pos0"
+            : "_pos1";
+        return new ArrayCreationNode(
+            span,
+            id,
+            id,
+            elementType,
+            size,
+            initializer,
+            attrs,
+            attrs.GetSpan(elementTypeKey));
     }
 
     /// <summary>
@@ -6342,7 +6430,8 @@ public sealed class Parser
             GetIdentifierSpan(attrs, "_pos1", variableName),
             indexVariableName == null
                 ? null
-                : GetIdentifierSpan(attrs, "_pos3", indexVariableName));
+                : GetIdentifierSpan(attrs, "_pos3", indexVariableName),
+            attrs.GetSpan("_pos2"));
     }
 
     // Phase 6 Extended: Collections (List, Dictionary, HashSet)
@@ -6386,7 +6475,14 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new ListCreationNode(span, id, id, elementType, elements, attrs);
+        return new ListCreationNode(
+            span,
+            id,
+            id,
+            elementType,
+            elements,
+            attrs,
+            attrs.GetSpan("_pos1"));
     }
 
     /// <summary>
@@ -6461,7 +6557,16 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new DictionaryCreationNode(span, id, id, keyType, valueType, entries, attrs);
+        return new DictionaryCreationNode(
+            span,
+            id,
+            id,
+            keyType,
+            valueType,
+            entries,
+            attrs,
+            attrs.GetSpan("_pos1"),
+            attrs.GetSpan("_pos2"));
     }
 
     /// <summary>
@@ -6539,7 +6644,14 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new SetCreationNode(span, id, id, elementType, elements, attrs);
+        return new SetCreationNode(
+            span,
+            id,
+            id,
+            elementType,
+            elements,
+            attrs,
+            attrs.GetSpan("_pos1"));
     }
 
     /// <summary>
@@ -7169,7 +7281,11 @@ public sealed class Parser
             }
         }
 
-        return new GenericTypeNode(startToken.Span, typeName, typeArgs);
+        return new GenericTypeNode(
+            startToken.Span,
+            typeName,
+            typeArgs,
+            attrs.GetSpan("_pos0"));
     }
 
     // Phase 8: Classes, Interfaces, Inheritance
@@ -7189,6 +7305,7 @@ public sealed class Parser
         // Positional: [id:name:baseInterface?]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
+        var interfaceNameKey = "_pos1";
         var pos2 = attrs["_pos2"] ?? "";
 
         // --- Compact syntax: optional ID ---
@@ -7199,6 +7316,7 @@ public sealed class Parser
             pos2 = name;
             name = id;
             id = GenerateParserAutoId("i");
+            interfaceNameKey = "_pos0";
         }
 
         if (string.IsNullOrEmpty(id))
@@ -7249,6 +7367,7 @@ public sealed class Parser
         }
 
         var baseInterfaces = new List<string>();
+        var baseInterfaceSpans = new List<TextSpan>();
         if (!string.IsNullOrEmpty(pos2))
         {
             foreach (var baseIface in pos2.Split(','))
@@ -7259,6 +7378,8 @@ public sealed class Parser
                     baseInterfaces.Add(trimmed);
                 }
             }
+            if (attrs.GetSpan("_pos2") is { } baseInterfaceSpan)
+                baseInterfaceSpans.Add(baseInterfaceSpan);
         }
         var methods = new List<MethodSignatureNode>();
         var properties = new List<PropertyNode>();
@@ -7282,6 +7403,8 @@ public sealed class Parser
                 if (!string.IsNullOrEmpty(baseIface))
                 {
                     baseInterfaces.Add(baseIface);
+                    if (extAttrs.GetSpan("_pos0") is { } baseInterfaceSpan)
+                        baseInterfaceSpans.Add(baseInterfaceSpan);
                 }
             }
             else if (Check(TokenKind.Method))
@@ -7314,7 +7437,9 @@ public sealed class Parser
 
         var span = startToken.Span.Union(endToken.Span);
         return new InterfaceDefinitionNode(span, id, name, baseInterfaces, typeParameters, methods, properties, attrs, csharpAttrs,
-            indexers: indexers.Count > 0 ? indexers : null);
+            indexers: indexers.Count > 0 ? indexers : null,
+            baseInterfaceSpans: baseInterfaceSpans,
+            identifierSpan: GetIdentifierSpan(attrs, interfaceNameKey, name));
     }
 
     /// <summary>
@@ -9752,7 +9877,8 @@ public sealed class Parser
             attrs,
             variableName == null
                 ? null
-                : GetIdentifierSpan(attrs, "_pos1", variableName));
+                : GetIdentifierSpan(attrs, "_pos1", variableName),
+            exceptionType == null ? null : attrs.GetSpan("_pos0"));
     }
 
     private ThrowExpressionNode ParseThrowExpression()
@@ -10191,7 +10317,8 @@ public sealed class Parser
                         startToken.Span,
                         paramName,
                         paramType,
-                        GetIdentifierSpan(attrs, $"_pos{i}", paramName)));
+                        GetIdentifierSpan(attrs, $"_pos{i}", paramName),
+                        paramType == null ? null : attrs.GetSpan($"_pos{i + 1}")));
                 }
                 i += 2;
             }
@@ -10400,7 +10527,15 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new DelegateDefinitionNode(span, id, name, parameters, output, effects, attrs);
+        return new DelegateDefinitionNode(
+            span,
+            id,
+            name,
+            parameters,
+            output,
+            effects,
+            attrs,
+            GetIdentifierSpan(attrs, "_pos1", name));
     }
 
     /// <summary>
@@ -10436,7 +10571,14 @@ public sealed class Parser
         // Check for accessor bodies (§EADD / §EREM ... §/EVT)
         if (!Check(TokenKind.EventAdd) && !Check(TokenKind.EventRemove))
         {
-            return new EventDefinitionNode(startToken.Span, id, name, visibility, delegateType, attrs);
+            return new EventDefinitionNode(
+                startToken.Span,
+                id,
+                name,
+                visibility,
+                delegateType,
+                attrs,
+                attrs.GetSpan("_pos3"));
         }
 
         List<StatementNode>? addBody = null;
@@ -10474,7 +10616,16 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new EventDefinitionNode(span, id, name, visibility, delegateType, attrs, addBody, removeBody);
+        return new EventDefinitionNode(
+            span,
+            id,
+            name,
+            visibility,
+            delegateType,
+            attrs,
+            addBody,
+            removeBody,
+            attrs.GetSpan("_pos3"));
     }
 
     private List<StatementNode> ParseEventAccessorBody(TokenKind startKind, TokenKind endKind)
@@ -10728,7 +10879,11 @@ public sealed class Parser
         var span = patterns.Count > 0
             ? startToken.Span.Union(patterns[^1].Span)
             : startToken.Span;
-        return new PositionalPatternNode(span, typeName, patterns);
+        return new PositionalPatternNode(
+            span,
+            typeName,
+            patterns,
+            attrs.GetSpan("_pos0"));
     }
 
     /// <summary>
@@ -10755,7 +10910,11 @@ public sealed class Parser
         var span = matches.Count > 0
             ? startToken.Span.Union(matches[^1].Span)
             : startToken.Span;
-        return new PropertyPatternNode(span, typeName, matches);
+        return new PropertyPatternNode(
+            span,
+            typeName,
+            matches,
+            typeName == null ? null : attrs.GetSpan("_pos0"));
     }
 
     /// <summary>
@@ -10773,7 +10932,8 @@ public sealed class Parser
             startToken.Span,
             typeName,
             binding,
-            binding == null ? null : GetIdentifierSpan(attrs, "_pos1", binding));
+            binding == null ? null : GetIdentifierSpan(attrs, "_pos1", binding),
+            attrs.GetSpan("_pos0"));
     }
 
     /// <summary>
@@ -11578,6 +11738,7 @@ public sealed class Parser
         // Positional: [id:name] or [id:name:vis] or [id:name:underlyingType] or [id:name:vis:underlyingType]
         var id = attrs["_pos0"] ?? "";
         var name = attrs["_pos1"] ?? "";
+        var enumNameKey = "_pos1";
         var pos2 = attrs["_pos2"];
         var pos3 = attrs["_pos3"];
 
@@ -11587,6 +11748,7 @@ public sealed class Parser
         {
             name = id;
             id = GenerateParserAutoId("e");
+            enumNameKey = "_pos0";
         }
 
         // Disambiguate pos2: visibility keyword vs underlying type
@@ -11670,7 +11832,16 @@ public sealed class Parser
         }
 
         var span = startToken.Span.Union(endToken.Span);
-        return new EnumDefinitionNode(span, id, name, underlyingType, members, attrs, csharpAttrs, visibility);
+        return new EnumDefinitionNode(
+            span,
+            id,
+            name,
+            underlyingType,
+            members,
+            attrs,
+            csharpAttrs,
+            visibility,
+            GetIdentifierSpan(attrs, enumNameKey, name));
     }
 
     /// <summary>
@@ -12733,7 +12904,12 @@ public sealed class Parser
                 ExpectBlockEnd(TokenKind.EndStackAlloc);
         }
 
-        return new StackAllocNode(startToken.Span, elementType, size, initializer);
+        return new StackAllocNode(
+            startToken.Span,
+            elementType,
+            size,
+            initializer,
+            attrs.GetSpan("_pos0"));
     }
 
     /// <summary>
@@ -12764,7 +12940,7 @@ public sealed class Parser
         var startToken = Expect(TokenKind.SizeOf);
         var attrs = ParseAttributes();
         var typeName = attrs["_pos0"] ?? "i32";
-        return new SizeOfNode(startToken.Span, typeName);
+        return new SizeOfNode(startToken.Span, typeName, attrs.GetSpan("_pos0"));
     }
 
     /// <summary>
@@ -12827,7 +13003,15 @@ public sealed class Parser
             rank = initializer.Count > 0 ? 2 : rank;
         }
 
-        return new MultiDimArrayCreationNode(startToken.Span, id, name, elementType, rank, dimensionSizes, initializer);
+        return new MultiDimArrayCreationNode(
+            startToken.Span,
+            id,
+            name,
+            elementType,
+            rank,
+            dimensionSizes,
+            initializer,
+            attrs.GetSpan("_pos2"));
     }
 
     /// <summary>
@@ -12939,7 +13123,14 @@ public sealed class Parser
             ParseAttributes(); // consume optional {id} on closing tag
         }
 
-        return new FixedStatementNode(startToken.Span, id, pointerName, pointerType, initializer, body);
+        return new FixedStatementNode(
+            startToken.Span,
+            id,
+            pointerName,
+            pointerType,
+            initializer,
+            body,
+            attrs.GetSpan("_pos2"));
     }
 
     #endregion

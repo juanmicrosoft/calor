@@ -145,7 +145,7 @@ public class RenameHandlerTests
                   §CL{c001:Widget:pub}
                 """;
             const string use = """
-                §M{m002:App}
+                §M{m002:Models}
                   §F{f001:Make:pub} () -> Widget
                     §R §NEW{Widget} §/NEW
                 """;
@@ -223,12 +223,1221 @@ public class RenameHandlerTests
         Assert.Null(edit);
     }
 
+    [Fact]
+    public async Task GenericModuleFunctionRefactoringUsesBaseIdentifierAndCompilesAsync()
+    {
+        const string source = """
+            §M{m001:GenericModule}
+              §F{f001:Identity<T>:pub} (T:value) -> T
+                §R value
+              §F{f002:Use:pub} () -> i32
+                §R §C{Identity<i32>} §A INT:1 §/C
+            """;
+        var uri = DocumentUri.From("file:///generic-refactor.calr");
+        var workspace = new WorkspaceState();
+        var state = workspace.GetOrCreate(uri, source, version: 4);
+        var function = Assert.Single(state.Ast!.Functions, function =>
+            function.Name == "Identity<T>");
+        Assert.Equal("Identity", source[function.IdentifierSpan.Start..function.IdentifierSpan.End]);
+
+        var callOffset = source.IndexOf("Identity<i32>", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, callOffset);
+        var definition = await new DefinitionHandler(workspace).Handle(
+            new DefinitionParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+            },
+            CancellationToken.None);
+        var definitionLocation = Assert.Single(definition!).Location!;
+        Assert.Equal("Identity", TextAt(source, definitionLocation.Range));
+
+        var references = await new ReferencesHandler(workspace).Handle(
+            new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                Context = new ReferenceContext { IncludeDeclaration = true },
+            },
+            CancellationToken.None);
+        Assert.Equal(2, references!.Count());
+        Assert.All(references!, location => Assert.Equal("Identity", TextAt(source, location.Range)));
+
+        var edit = await RenameAtAsync(workspace, uri, source, "Identity<i32>", "Transform");
+        Assert.NotNull(edit);
+        var updated = ApplySingleDocumentEdit(source, edit!);
+        Assert.Contains("§F{f001:Transform<T>:pub}", updated);
+        Assert.Contains("§C{Transform<i32>}", updated);
+        AssertRoslynClean(updated);
+    }
+
+    [Fact]
+    public async Task TypeRenamesCoverStaticCallsAndTypeBearingPositionsAsync()
+    {
+        const string source = """
+            §M{m001:TypeRefactor}
+              §IFACE{i001:IWidget}
+                §MT{m000:Marker} () -> void
+              §CL{c001:WidgetException:pub}
+                §EXT{System.Exception}
+                §IMPL{IWidget}
+                §MT{m001:Create:pub:static} () -> WidgetException
+                  §R §NEW{WidgetException} §/NEW
+                §MT{m002:Marker:pub} () -> void
+                  §P STR:"marker"
+              §CL{c002:DerivedException:pub}
+                §EXT{WidgetException}
+                §FLD{i32:Code:pub}
+              §F{f001:Use:pub} (object:value) -> WidgetException
+                §ARR{items:WidgetException:1}
+                §LIST{values:WidgetException}
+                  §NEW{WidgetException} §/NEW
+                §/LIST{values}
+                §TR{t001}
+                  §R (cast WidgetException value)
+                §CA{WidgetException:ex}
+                  §R §C{WidgetException.Create} §/C
+                §/TR{t001}
+            """;
+        var uri = DocumentUri.From("file:///type-refactor.calr");
+        var workspace = new WorkspaceState();
+        var state = workspace.GetOrCreate(uri, source, version: 1);
+        Assert.False(
+            state.Diagnostics.HasErrors,
+            string.Join(Environment.NewLine, state.Diagnostics.Select(diagnostic =>
+                $"{diagnostic.Code}: {diagnostic.Message}")));
+        var classOffset = source.IndexOf(
+            "WidgetException:pub",
+            StringComparison.Ordinal);
+        var classOccurrence = workspace.ResolveOccurrence(uri, classOffset);
+        Assert.NotNull(classOccurrence);
+        Assert.NotNull(workspace.FindSymbolDefinition(classOccurrence!.SymbolId));
+        Assert.Contains(
+            workspace.FindSymbolOccurrences(classOccurrence.SymbolId, includeDeclaration: true),
+            occurrence => occurrence.Kind == SymbolOccurrenceKind.Definition);
+        var typeIndex = TypeReferenceIndex.BuildDetailed(
+            state.Ast!,
+            state.BoundModule!,
+            source,
+            state.BoundModule!.SymbolsById.Values.OfType<Calor.Compiler.Binding.TypeSymbol>().ToArray());
+        var spanless = DescendantsAndSelf(state.Ast!)
+            .Select(node => node switch
+            {
+                Calor.Compiler.Ast.EventDefinitionNode value => value.DelegateType,
+                Calor.Compiler.Ast.LambdaParameterNode value => value.TypeName,
+                Calor.Compiler.Ast.QuantifierVariableNode value => value.TypeName,
+                Calor.Compiler.Ast.PositionalPatternNode value => value.TypeName,
+                Calor.Compiler.Ast.PropertyPatternNode value => value.TypeName,
+                Calor.Compiler.Ast.TypePatternNode value => value.TypeName,
+                Calor.Compiler.Ast.NoneExpressionNode value => value.TypeName,
+                Calor.Compiler.Ast.RecordCreationNode value => value.TypeName,
+                Calor.Compiler.Ast.FieldDefinitionNode value => value.TypeName,
+                Calor.Compiler.Ast.TypeConstraintNode value => value.TypeName,
+                Calor.Compiler.Ast.GenericTypeNode value => value.TypeName,
+                Calor.Compiler.Ast.RefinementTypeNode value => value.BaseTypeName,
+                Calor.Compiler.Ast.IndexedTypeNode value => value.BaseTypeName,
+                _ => null,
+            })
+            .Where(typeName => typeName == "WidgetException")
+            .ToArray();
+        Assert.Empty(spanless);
+        var spanlessNewTypes = Calor.Compiler.Analysis.Dataflow.BoundNodeHelpers
+            .DescendantsAndSelf(state.BoundModule!)
+            .OfType<Calor.Compiler.Binding.BoundNewExpression>()
+            .SelectMany(creation => DescendantTypeReferences(creation.TypeReference))
+            .Where(reference => reference.ResolvedTypeSymbolId == classOccurrence.SymbolId)
+            .Where(reference => reference.Span.Length == 0
+                || reference.Span.Start < 0
+                || reference.Span.End > source.Length)
+            .ToArray();
+        Assert.Empty(spanlessNewTypes);
+        var incompleteSpannedPositions = DescendantsAndSelf(state.Ast!)
+            .Select(node => node switch
+            {
+                Calor.Compiler.Ast.OutputNode value when value.TypeName == "WidgetException"
+                    => (Node: node.GetType().Name, Span: value.TypeNameSpan),
+                Calor.Compiler.Ast.ClassDefinitionNode value when value.BaseClass == "WidgetException"
+                    => (Node: node.GetType().Name, Span: value.BaseClassSpan ?? default),
+                Calor.Compiler.Ast.ArrayCreationNode value when value.ElementType == "WidgetException"
+                    => (Node: node.GetType().Name, Span: value.ElementTypeSpan),
+                Calor.Compiler.Ast.ListCreationNode value when value.ElementType == "WidgetException"
+                    => (Node: node.GetType().Name, Span: value.ElementTypeSpan),
+                Calor.Compiler.Ast.TypeOperationNode value when value.TargetType == "WidgetException"
+                    => (Node: node.GetType().Name, Span: value.TargetTypeSpan),
+                Calor.Compiler.Ast.CatchClauseNode value when value.ExceptionType == "WidgetException"
+                    => (Node: node.GetType().Name, Span: value.ExceptionTypeSpan ?? default),
+                _ => default,
+            })
+            .Where(position => position.Node != null && position.Span.Length == 0)
+            .ToArray();
+        Assert.Empty(incompleteSpannedPositions);
+        Assert.DoesNotContain(classOccurrence.SymbolId, typeIndex.IncompleteSymbolIds);
+        Assert.True(workspace.CanRenameSymbol(classOccurrence!.SymbolId));
+        var staticCall = Assert.IsType<Calor.Compiler.Binding.BoundCallExpression>(
+            SymbolFinder.FindBoundCallAtOffset(
+                state.BoundModule,
+                source.IndexOf("WidgetException.Create", StringComparison.Ordinal)));
+        Assert.Equal(classOccurrence.SymbolId, staticCall.ReceiverTypeSymbolId);
+
+        var classEdit = await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "WidgetException:pub",
+            "RenamedException");
+        Assert.NotNull(classEdit);
+        var renamedClass = ApplySingleDocumentEdit(source, classEdit!);
+        Assert.DoesNotContain("WidgetException", renamedClass);
+        Assert.Contains("§C{RenamedException.Create}", renamedClass);
+        Assert.Contains("§CA{RenamedException:ex}", renamedClass);
+        Assert.Contains("§ARR{items:RenamedException:1}", renamedClass);
+        Assert.Contains("§LIST{values:RenamedException}", renamedClass);
+        Assert.Contains("(cast RenamedException value)", renamedClass);
+        AssertRoslynClean(renamedClass);
+
+        workspace.Update(uri, renamedClass, version: 2);
+        var interfaceEdit = await RenameAtAsync(
+            workspace,
+            uri,
+            renamedClass,
+            "IWidget}",
+            "IRenamedWidget");
+        Assert.NotNull(interfaceEdit);
+        var renamedInterface = ApplySingleDocumentEdit(
+            renamedClass,
+            interfaceEdit!);
+        Assert.Contains("§IFACE{i001:IRenamedWidget}", renamedInterface);
+        Assert.Contains("§IMPL{IRenamedWidget}", renamedInterface);
+        AssertRoslynClean(renamedInterface);
+    }
+
+    [Fact]
+    public async Task ConditionalAlternativeReferencesRefuseDefinitionReferencesAndRenameAsync()
+    {
+        const string source = """
+            §M{m001:Conditional}
+              §CL{c001:Worker:pub}
+                §PP{FEATURE}
+                  §MT{m001:Pick:pub} () -> i32
+                    §R INT:1
+                §PPE
+                  §MT{m002:Pick:pub} () -> i32
+                    §R INT:2
+                §/PP{FEATURE}
+                §PP{FEATURE}
+                  §FLD{i32:value:pub}
+                §PPE
+                  §FLD{i32:value:pub}
+                §/PP{FEATURE}
+                §MT{m003:Run:pub} () -> i32
+                  §R (+ §C{Pick} §/C §THIS.value)
+            """;
+        var uri = DocumentUri.From("file:///conditional-refactor.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var callOffset = source.LastIndexOf("Pick", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, callOffset);
+
+        var definition = await new DefinitionHandler(workspace).Handle(
+            new DefinitionParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+            },
+            CancellationToken.None);
+        Assert.Null(definition);
+
+        var references = await new ReferencesHandler(workspace).Handle(
+            new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                Context = new ReferenceContext { IncludeDeclaration = true },
+            },
+            CancellationToken.None);
+        Assert.Null(references);
+
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "§C{Pick}", "Choose"));
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "Pick:pub", "Choose"));
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "§THIS.value", "renamed"));
+    }
+
+    [Theory]
+    [InlineData("if")]
+    [InlineData("class")]
+    [InlineData("return")]
+    [InlineData("async")]
+    public async Task RenameRejectsCalorAndCSharpReservedWordsAsync(string newName)
+    {
+        const string source = """
+            §M{m001:Keywords}
+              §F{f001:Compute:pub} () -> i32
+                §R INT:1
+            """;
+        var uri = DocumentUri.From("file:///rename-keyword.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "Compute", newName));
+    }
+
+    [Fact]
+    public async Task RenameRejectsDeclarationCollisionWithoutPartialEditsAsync()
+    {
+        const string source = """
+            §M{m001:Collisions}
+              §F{f001:First:pub} () -> i32
+                §R INT:1
+              §F{f002:Second:pub} () -> i32
+                §R INT:2
+              §F{f003:Use:pub} () -> i32
+                §R §C{First} §/C
+            """;
+        var uri = DocumentUri.From("file:///rename-collision.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "First:pub", "Second"));
+    }
+
+    [Fact]
+    public async Task RenameAcrossDistinctModulesUsesProductionCrossModuleEmissionAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["models.calr"] = """
+                    §M{m001:Models}
+                      §CL{c001:Widget:pub}
+                        §FLD{i32:Value:pub}
+                    """,
+                ["services.calr"] = """
+                    §M{m002:Services}
+                      §U{Models}
+                      §F{f001:Make:pub} () -> Widget
+                        §R §NEW{Widget} §/NEW
+                    """,
+                ["app.calr"] = """
+                    §M{m003:App}
+                      §U{Models}
+                      §F{f002:Run:pub} () -> Widget
+                        §R §C{Make} §/C
+                    """,
+            };
+            foreach (var (fileName, source) in sources)
+                File.WriteAllText(Path.Combine(root, fileName), source);
+
+            var workspace = new WorkspaceState(root);
+            var servicesPath = Path.Combine(root, "services.calr");
+            var servicesUri = DocumentUri.FromFileSystemPath(servicesPath);
+            workspace.GetOrCreate(
+                servicesUri,
+                sources["services.calr"],
+                version: 3);
+
+            var edit = await RenameAtAsync(
+                workspace,
+                servicesUri,
+                sources["services.calr"],
+                "Make:pub",
+                "Create");
+
+            Assert.NotNull(edit);
+            var documentEdits = Assert.IsType<Container<WorkspaceEditDocumentChange>>(
+                    edit.DocumentChanges)
+                .Select(change => Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit))
+                .ToArray();
+            Assert.Equal(2, documentEdits.Length);
+            Assert.Equal(2, documentEdits.Sum(documentEdit => documentEdit.Edits.Count()));
+            Assert.Contains(
+                documentEdits,
+                documentEdit => documentEdit.TextDocument.Uri == servicesUri
+                    && documentEdit.TextDocument.Version == 3);
+            Assert.Contains(
+                documentEdits,
+                documentEdit => documentEdit.TextDocument.Uri.ToUri().LocalPath
+                    == Path.Combine(root, "app.calr"));
+
+            var updated = sources.ToDictionary(
+                pair => Path.Combine(root, pair.Key),
+                pair => pair.Value,
+                StringComparer.Ordinal);
+            ApplyDocumentEdits(updated, documentEdits);
+            var generated = AssertWorkspaceRoslynCleanWithProductionMap(updated);
+            Assert.Contains(
+                "global::Services.ServicesModule.Create",
+                generated[Path.Combine(root, "app.calr")]);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameAllowsSplitModuleLocalCallableWithUnrelatedBaselineErrorAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["definition.calr"] = """
+                    §M{m001:Split}
+                      §CL{c001:Worker:pub:partial}
+                        §MT{m001:Pick:pub} (i32:value) -> i32
+                          §R value
+                    """,
+                ["use.calr"] = """
+                    §M{m002:Split}
+                      §CL{c002:Worker:pub:partial}
+                        §MT{m002:Run:pub} () -> i32
+                          §R §C{Pick} §A INT:1 §/C
+                    """,
+                ["broken.calr"] = """
+                    §M{m003:Broken}
+                      §CSHARP{public static class BrokenProbe
+                    {
+                        public static int Value => MissingValue;
+                    }}§/CSHARP
+                    """,
+            };
+            foreach (var (fileName, source) in sources)
+                File.WriteAllText(Path.Combine(root, fileName), source);
+
+            Assert.Single(GetRoslynErrors(sources["broken.calr"]));
+            AssertWorkspaceRoslynCleanWithProductionMap(
+                sources
+                    .Where(pair => pair.Key != "broken.calr")
+                    .ToDictionary(
+                        pair => Path.Combine(root, pair.Key),
+                        pair => pair.Value,
+                        StringComparer.Ordinal));
+            var workspace = new WorkspaceState(root);
+            var definitionPath = Path.Combine(root, "definition.calr");
+            var definitionUri = DocumentUri.FromFileSystemPath(definitionPath);
+            workspace.GetOrCreate(
+                definitionUri,
+                sources["definition.calr"],
+                version: 1);
+
+            var edit = await RenameAtAsync(
+                workspace,
+                definitionUri,
+                sources["definition.calr"],
+                "Pick:pub",
+                "Choose");
+
+            Assert.NotNull(edit);
+            var documentEdits = Assert.IsType<Container<WorkspaceEditDocumentChange>>(
+                    edit.DocumentChanges)
+                .Select(change => Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit))
+                .ToArray();
+            Assert.Equal(2, documentEdits.Length);
+            Assert.DoesNotContain(
+                documentEdits,
+                documentEdit => documentEdit.TextDocument.Uri.ToUri().LocalPath
+                    == Path.Combine(root, "broken.calr"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameRejectsNewCompilationErrorWhenAbsoluteCountIsUnchangedAsync()
+    {
+        const string source = """
+            §M{m001:SwapErrors}
+              §F{f001:Old:pub} () -> i32
+                §R INT:1
+              §CSHARP{public static class Probe
+            {
+                public static int Existing() => SwapErrorsModule.Old();
+                public static int Missing() => SwapErrorsModule.NewName();
+            }}§/CSHARP
+            """;
+        var candidate = source.Replace(
+            "§F{f001:Old:pub}",
+            "§F{f001:NewName:pub}",
+            StringComparison.Ordinal);
+        var baselineErrors = GetRoslynErrors(source);
+        var candidateErrors = GetRoslynErrors(candidate);
+        var baselineError = Assert.Single(baselineErrors);
+        var candidateError = Assert.Single(candidateErrors);
+        Assert.Equal(baselineError.Id, candidateError.Id);
+        Assert.NotEqual(
+            baselineError.Location.GetLineSpan().StartLinePosition.Line,
+            candidateError.Location.GetLineSpan().StartLinePosition.Line);
+
+        var uri = DocumentUri.From("file:///rename-error-identity.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+
+        Assert.Null(await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "Old:pub",
+            "NewName"));
+    }
+
+    [Fact]
+    public async Task RenameRejectsFieldToParameterCaptureThatStillCompilesAsync()
+    {
+        const string source = """
+            §M{m001:Capture}
+              §CL{c001:Box:pub}
+                §FLD{i32:stored:priv}
+                §MT{m001:Read:pub} (i32:value) -> i32
+                  §R stored
+            """;
+        var candidate = source
+            .Replace("stored:priv", "value:priv", StringComparison.Ordinal)
+            .Replace("§R stored", "§R value", StringComparison.Ordinal);
+        AssertRoslynClean(candidate);
+        var uri = DocumentUri.From("file:///field-to-parameter-capture.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+
+        Assert.Null(await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "stored:priv",
+            "value"));
+    }
+
+    [Fact]
+    public async Task RenameRejectsParameterToFieldCaptureThatStillCompilesAsync()
+    {
+        const string source = """
+            §M{m001:Capture}
+              §CL{c001:Box:pub}
+                §FLD{i32:value:priv}
+                §MT{m001:Read:pub} (i32:input) -> i32
+                  §R (+ input value)
+            """;
+        var candidate = source
+            .Replace("i32:input", "i32:value", StringComparison.Ordinal)
+            .Replace("(+ input value)", "(+ value value)", StringComparison.Ordinal);
+        AssertRoslynClean(candidate);
+        var uri = DocumentUri.From("file:///parameter-to-field-capture.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+
+        Assert.Null(await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "input)",
+            "value"));
+    }
+
+    [Fact]
+    public async Task RenameRejectsFieldLocalCaptureInBothDirectionsAsync()
+    {
+        const string fieldToLocal = """
+            §M{m001:Capture}
+              §CL{c001:Box:pub}
+                §FLD{i32:stored:priv}
+                §MT{m001:Read:pub} () -> i32
+                  §B{value:i32} INT:2
+                  §R (+ stored value)
+            """;
+        var fieldToLocalCandidate = fieldToLocal
+            .Replace("stored:priv", "value:priv", StringComparison.Ordinal)
+            .Replace("(+ stored value)", "(+ value value)", StringComparison.Ordinal);
+        AssertRoslynClean(fieldToLocalCandidate);
+        var fieldUri = DocumentUri.From("file:///field-to-local-capture.calr");
+        var fieldWorkspace = new WorkspaceState();
+        fieldWorkspace.GetOrCreate(fieldUri, fieldToLocal);
+        Assert.Null(await RenameAtAsync(
+            fieldWorkspace,
+            fieldUri,
+            fieldToLocal,
+            "stored:priv",
+            "value"));
+
+        const string localToField = """
+            §M{m001:Capture}
+              §CL{c001:Box:pub}
+                §FLD{i32:value:priv}
+                §MT{m001:Read:pub} () -> i32
+                  §B{input:i32} INT:2
+                  §R (+ input value)
+            """;
+        var localToFieldCandidate = localToField
+            .Replace("input:i32", "value:i32", StringComparison.Ordinal)
+            .Replace("(+ input value)", "(+ value value)", StringComparison.Ordinal);
+        AssertRoslynClean(localToFieldCandidate);
+        var localUri = DocumentUri.From("file:///local-to-field-capture.calr");
+        var localWorkspace = new WorkspaceState();
+        localWorkspace.GetOrCreate(localUri, localToField);
+        Assert.Null(await RenameAtAsync(
+            localWorkspace,
+            localUri,
+            localToField,
+            "input:i32",
+            "value"));
+    }
+
+    [Fact]
+    public async Task RenameAllowsExplicitFieldAccessToShadowParameterSafelyAsync()
+    {
+        const string source = """
+            §M{m001:Capture}
+              §CL{c001:Box:pub}
+                §FLD{i32:stored:priv}
+                §MT{m001:Read:pub} (i32:value) -> i32
+                  §R (+ §THIS.stored value)
+            """;
+        var uri = DocumentUri.From("file:///shadow-safe-field-rename.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+
+        var edit = await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "stored:priv",
+            "value");
+
+        Assert.NotNull(edit);
+        var candidate = ApplySingleDocumentEdit(source, edit!);
+        Assert.Contains("§FLD{i32:value:priv}", candidate);
+        Assert.Contains("§THIS.value", candidate);
+        AssertRoslynClean(candidate);
+    }
+
+    [Fact]
+    public async Task UnrelatedPreprocessorSymbolsDoNotExpandRenameValidationAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var source = CreatePreprocessorRenameSource(
+                "RenameTarget",
+                preprocessorSymbolCount: 0);
+            var unrelated = CreatePreprocessorRenameSource(
+                "UnrelatedFlags",
+                preprocessorSymbolCount: 8,
+                includeRenameTarget: false);
+            unrelated += """
+
+                  §CSHARP{public static class IdentifierTextOnly
+                {
+                    public const string Value = "Compute Calculate";
+                    // Compute Calculate
+                }}§/CSHARP
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, source);
+            File.WriteAllText(Path.Combine(root, "unrelated.calr"), unrelated);
+            var unrelatedState = LspTestHarness.CreateDocument(unrelated);
+            Assert.Equal(
+                8,
+                new CSharpEmitter().Emit(unrelatedState.Ast!)
+                    .Split("#if FLAG_", StringSplitOptions.None)
+                    .Length - 1);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, source, version: 1);
+            var targetOffset = source.IndexOf("Compute:pub", StringComparison.Ordinal);
+            Assert.NotNull(workspace.ResolveOccurrence(uri, targetOffset));
+            workspace.RefreshClosedDocuments();
+            var target = workspace.ResolveOccurrence(uri, targetOffset);
+            Assert.NotNull(target);
+            Assert.True(workspace.CanRenameSymbol(target!.SymbolId));
+            var targetOccurrences = workspace.FindSymbolOccurrences(
+                target.SymbolId,
+                includeDeclaration: true);
+            Assert.Equal(2, targetOccurrences.Count);
+            Assert.DoesNotContain(
+                targetOccurrences,
+                occurrence => occurrence.IsSplitDeclaration);
+            Assert.True(workspace.AreOccurrenceSnapshotsCurrent(targetOccurrences));
+            var before = workspace.RenameValidationCompilationCount;
+
+            var edit = await RenameAtAsync(
+                workspace,
+                uri,
+                source,
+                "Compute:pub",
+                "Calculate");
+
+            Assert.NotNull(edit);
+            Assert.Equal(
+                2,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameRejectsMethodCollisionInUnchangedPreprocessorFileAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:ConditionalCollision}
+                  §CL{c001:Worker:pub:partial}
+                    §MT{m001:Compute:pub} () -> i32
+                      §R INT:1
+                """;
+            const string conditional = """
+                §M{m002:ConditionalCollision}
+                  §CL{c002:Worker:pub:partial}
+                    §PP{COLLIDING_METHOD}
+                      §MT{m002:Calculate:pub} () -> i32
+                        §R INT:2
+                    §/PP{COLLIDING_METHOD}
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "conditional.calr"), conditional);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                4,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameRejectsFieldCollisionInUnchangedPreprocessorFileAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:ConditionalCollision}
+                  §CL{c001:Worker:pub:partial}
+                    §FLD{i32:stored:pub}
+                """;
+            const string conditional = """
+                §M{m002:ConditionalCollision}
+                  §CL{c002:Worker:pub:partial}
+                    §PP{COLLIDING_FIELD}
+                      §FLD{i32:value:pub}
+                    §/PP{COLLIDING_FIELD}
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "conditional.calr"), conditional);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "stored:pub",
+                "value"));
+            Assert.Equal(
+                4,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameRejectsGuardedRawCSharpStaleReferenceInUnchangedFileAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:RawGuard}
+                  §F{f001:Compute:pub} () -> i32
+                    §R INT:1
+                """;
+            const string guardedReference = """
+                §M{m002:RawGuard}
+                  §CSHARP{public static class RawProbe
+                {
+                #if PRIMARY_RAW
+                    public static int ReadPrimary() => 0;
+                #elif RAW_REFERENCE
+                    public static int Read() => RawGuardModule.Compute();
+                #endif
+                }}§/CSHARP
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "guarded-reference.calr"), guardedReference);
+            var guardedState = LspTestHarness.CreateDocument(guardedReference);
+            Assert.Contains(
+                "#elif RAW_REFERENCE",
+                new CSharpEmitter().Emit(guardedState.Ast!));
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                6,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("#if(PARENTHESIZED_RAW)")]
+    [InlineData("#if\tTAB_RAW")]
+    public async Task RenameRejectsRawCSharpStaleReferenceWithFlexibleDirectiveSpacingAsync(
+        string directive)
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:RawSpacing}
+                  §F{f001:Compute:pub} () -> i32
+                    §R INT:1
+                """;
+            var guardedReference = $$$"""
+                §M{m002:RawSpacing}
+                  §CSHARP{public static class RawProbe
+                {
+                {{{directive}}}
+                    public static int Read() => RawSpacingModule.Compute();
+                #endif
+                }}§/CSHARP
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "guarded-reference.calr"), guardedReference);
+            var emitted = new CSharpEmitter().Emit(
+                LspTestHarness.CreateDocument(guardedReference).Ast!);
+            Assert.Contains(directive, emitted);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                4,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameRejectsRawCSharpStaleReferenceInNestedDisabledCompoundConditionAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:RawCompound}
+                  §F{f001:Compute:pub} () -> i32
+                    §R INT:1
+                """;
+            const string guardedReference = """
+                §M{m002:RawCompound}
+                  §CSHARP{public static class RawProbe
+                {
+                #if OUTER_RAW
+                #if PRIMARY_RAW
+                    public static int ReadPrimary() => 0;
+                #elif INNER_RAW && SECONDARY_RAW
+                    public static int Read() => RawCompoundModule.Compute();
+                #endif
+                #endif
+                }}§/CSHARP
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "guarded-reference.calr"), guardedReference);
+            var emitted = new CSharpEmitter().Emit(
+                LspTestHarness.CreateDocument(guardedReference).Ast!);
+            Assert.Contains("#if OUTER_RAW", emitted);
+            Assert.Contains("#elif INNER_RAW && SECONDARY_RAW", emitted);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                24,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ShorteningRenameNearEndOfFileIsIndependentOfTrailingContextAsync(
+        bool includeTrailingContext)
+    {
+        var source = """
+            §M{m001:ListOps}
+              §F{f001:Sum:pub} (i32:a, i32:b) -> i32
+                §R (+ a b)
+              §F{f002:Count:pub} (i32:n) -> i32
+                §R n
+              §F{f003:FirstOrDefault:pub} (i32:value, i32:defaultVal, bool:hasElements) -> i32
+                §IF{if1} hasElements
+                  §R value
+                §EL
+                  §R defaultVal
+              §F{f004:Use:pub} () -> i32
+                §R §C{FirstOrDefault} §A INT:1 §A INT:0 §A BOOL:true §/C
+            """;
+        if (includeTrailingContext)
+        {
+            source += """
+
+                  §F{f005:TrailingContext:pub} () -> i32
+                    §R INT:0
+                """;
+        }
+
+        var uri = DocumentUri.From("file:///list-ops-shortening-rename.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+
+        var edit = await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "FirstOrDefault:pub",
+            "First");
+
+        Assert.NotNull(edit);
+        var candidate = ApplySingleDocumentEdit(source, edit!);
+        Assert.DoesNotContain("FirstOrDefault", candidate);
+        Assert.Equal(2, candidate.Split("First", StringSplitOptions.None).Length - 1);
+        AssertRoslynClean(candidate);
+    }
+
+    [Fact]
+    public async Task RenameAllowsNonCollidingMembersInUnchangedPreprocessorFileAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:ConditionalControl}
+                  §CL{c001:Worker:pub:partial}
+                    §MT{m001:Compute:pub} () -> i32
+                      §R INT:1
+                    §FLD{i32:stored:pub}
+                """;
+            const string conditional = """
+                §M{m002:ConditionalControl}
+                  §CL{c002:Worker:pub:partial}
+                    §PP{UNRELATED_MEMBERS}
+                      §MT{m002:OtherMethod:pub} () -> i32
+                        §R INT:2
+                      §FLD{i32:otherField:pub}
+                    §/PP{UNRELATED_MEMBERS}
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "conditional.calr"), conditional);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.NotNull(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                2,
+                workspace.RenameValidationCompilationCount - before);
+
+            before = workspace.RenameValidationCompilationCount;
+            Assert.NotNull(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "stored:pub",
+                "value"));
+            Assert.Equal(
+                2,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameFailsClosedWhenRelevantConfigurationBudgetIsExceededAsync()
+    {
+        var source = CreatePreprocessorRenameSource(
+            "TooManyFlags",
+            preprocessorSymbolCount: 6);
+        var uri = DocumentUri.From("file:///rename-too-many-flags.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var before = workspace.RenameValidationCompilationCount;
+
+        Assert.Null(await RenameAtAsync(
+            workspace,
+            uri,
+            source,
+            "Compute:pub",
+            "Calculate"));
+        Assert.Equal(
+            before,
+            workspace.RenameValidationCompilationCount);
+    }
+
+    [Fact]
+    public async Task RenameFailsClosedWhenAffectedUnchangedFileExceedsCombinedBudgetAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var target = CreatePreprocessorRenameSource(
+                "CombinedBudget",
+                preprocessorSymbolCount: 3);
+            const string conditional = """
+                §M{m002:CombinedBudget}
+                  §CL{c002:OtherFlags:pub}
+                    §PP{OTHER_FLAG_0}
+                      §FLD{i32:Calculate:pub}
+                    §/PP{OTHER_FLAG_0}
+                    §PP{OTHER_FLAG_1}
+                      §FLD{i32:Field1:pub}
+                    §/PP{OTHER_FLAG_1}
+                    §PP{OTHER_FLAG_2}
+                      §FLD{i32:Field2:pub}
+                    §/PP{OTHER_FLAG_2}
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "conditional.calr"), conditional);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                before,
+                workspace.RenameValidationCompilationCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameValidationHonorsCancellationDuringCompilationAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var source = CreatePreprocessorRenameSource(
+                "Cancellation",
+                preprocessorSymbolCount: 5);
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, source);
+            for (var index = 0; index < 20; index++)
+            {
+                File.WriteAllText(
+                    Path.Combine(root, $"unrelated-{index}.calr"),
+                    $$"""
+                    §M{m100:Unrelated{{index}}}
+                      §CL{c100:Type{{index}}:pub}
+                        §FLD{i32:Value:pub}
+                    """);
+            }
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, source);
+            var before = workspace.RenameValidationCompilationCount;
+            using var cancellation = new CancellationTokenSource();
+
+            var rename = RenameAtAsync(
+                workspace,
+                uri,
+                source,
+                "Compute:pub",
+                "Calculate",
+                cancellation.Token);
+            Assert.True(SpinWait.SpinUntil(
+                () => workspace.RenameValidationCompilationCount > before
+                    || rename.IsCompleted,
+                TimeSpan.FromSeconds(5)));
+            Assert.False(rename.IsCompleted);
+            await cancellation.CancelAsync();
+
+            try
+            {
+                await rename;
+                Assert.Fail("Rename validation should have observed cancellation.");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            Assert.True(workspace.RenameValidationCompilationCount > before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task TypeRenameRefusesWhenSemanticCompletenessSignalFindsSpanlessConstraintAsync()
+    {
+        const string source = """
+            §M{m001:IncompleteTypeSpan}
+              §CL{c001:Widget:pub}
+                §FLD{i32:Value:pub}
+              §F{f001:Use:pub}<T> (T:value) -> T
+                §WHERE T : Widget
+                §R value
+            """;
+        var uri = DocumentUri.From("file:///rename-incomplete-type.calr");
+        var workspace = new WorkspaceState();
+        var state = workspace.GetOrCreate(uri, source);
+        Assert.False(state.Diagnostics.HasErrors);
+
+        var offset = source.IndexOf("Widget:pub", StringComparison.Ordinal);
+        var occurrence = workspace.ResolveOccurrence(uri, offset);
+        Assert.NotNull(occurrence);
+        Assert.False(workspace.CanRenameSymbol(occurrence!.SymbolId));
+        Assert.Null(await RenameAtAsync(workspace, uri, source, "Widget:pub", "RenamedWidget"));
+    }
+
+    [Fact]
+    public void CachedProjectCallResolutionDoesNotRereadWorkspaceFiles()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string definitions = """
+                §M{m001:Definitions}
+                  §F{f001:Pick:pub} (i32:value) -> i32
+                    §R value
+                """;
+            const string use = """
+                §M{m002:Use}
+                  §F{f002:Run:pub} () -> i32
+                    §R §C{Pick} §A INT:1 §/C
+                """;
+            File.WriteAllText(Path.Combine(root, "definitions.calr"), definitions);
+            var usePath = Path.Combine(root, "use.calr");
+            File.WriteAllText(usePath, use);
+            var workspace = new WorkspaceState(root);
+            var state = workspace.GetOrCreate(
+                DocumentUri.FromFileSystemPath(usePath),
+                use,
+                version: 1);
+            var call = SymbolFinder.FindBoundCallAtOffset(
+                state.BoundModule,
+                use.IndexOf("Pick", StringComparison.Ordinal));
+            var reads = workspace.WorkspaceFileReadCount;
+
+            for (var iteration = 0; iteration < 10; iteration++)
+                Assert.NotNull(workspace.ResolveProjectCall(state, state.Snapshot, call).Symbol);
+
+            Assert.Equal(reads, workspace.WorkspaceFileReadCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static async Task<WorkspaceEdit?> RenameAtAsync(
         WorkspaceState workspace,
         DocumentUri uri,
         string source,
         string cursorText,
-        string newName)
+        string newName,
+        CancellationToken cancellationToken = default)
     {
         var offset = source.IndexOf(cursorText, StringComparison.Ordinal);
         var (line, column) = LspTestHarness.GetLineColumn(source, offset);
@@ -239,7 +1448,7 @@ public class RenameHandlerTests
                 Position = new Position(line - 1, column - 1),
                 NewName = newName,
             },
-            CancellationToken.None);
+            cancellationToken);
     }
 
     private static string TextAt(string source, OmniSharp.Extensions.LanguageServer.Protocol.Models.Range range)
@@ -247,6 +1456,197 @@ public class RenameHandlerTests
         var start = PositionConverter.ToOffset(range.Start, source);
         var end = PositionConverter.ToOffset(range.End, source);
         return source[start..end];
+    }
+
+    private static string ApplySingleDocumentEdit(string source, WorkspaceEdit edit)
+    {
+        var change = Assert.Single(Assert.IsType<Container<WorkspaceEditDocumentChange>>(
+            edit.DocumentChanges));
+        var documentEdit = Assert.IsType<TextDocumentEdit>(change.TextDocumentEdit);
+        foreach (var textEdit in documentEdit.Edits.OrderByDescending(textEdit =>
+                     PositionConverter.ToOffset(textEdit.Range.Start, source)))
+        {
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+            source = source[..start] + textEdit.NewText + source[end..];
+        }
+        return source;
+    }
+
+    private static void AssertRoslynClean(string source)
+    {
+        var state = LspTestHarness.CreateDocument(source);
+        Assert.NotNull(state.Ast);
+        Assert.NotNull(state.BoundModule);
+        Assert.False(
+            state.Diagnostics.HasErrors,
+            string.Join(Environment.NewLine, state.Diagnostics.Select(diagnostic =>
+                $"{diagnostic.Code}: {diagnostic.Message}")));
+        var syntaxTree = CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(state.Ast!));
+        Assert.DoesNotContain(
+            syntaxTree.GetDiagnostics(),
+            diagnostic => diagnostic.Severity
+                == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        var compilation = CSharpCompilation.Create(
+            "RenameAppliedCompile",
+            [syntaxTree],
+            GetPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(
+            compilation.GetDiagnostics(),
+            diagnostic => diagnostic.Severity
+                == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+    }
+
+    private static Microsoft.CodeAnalysis.Diagnostic[] GetRoslynErrors(string source)
+    {
+        var state = LspTestHarness.CreateDocument(source);
+        Assert.NotNull(state.Ast);
+        Assert.False(
+            state.Diagnostics.HasErrors,
+            string.Join(Environment.NewLine, state.Diagnostics.Select(diagnostic =>
+                $"{diagnostic.Code}: {diagnostic.Message}")));
+        var tree = CSharpSyntaxTree.ParseText(new CSharpEmitter().Emit(state.Ast!));
+        var compilation = CSharpCompilation.Create(
+            "RenameBaselineErrors",
+            [tree],
+            GetPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        return compilation.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity
+                == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+            .ToArray();
+    }
+
+    private static Dictionary<string, string> AssertWorkspaceRoslynCleanWithProductionMap(
+        IReadOnlyDictionary<string, string> sources)
+    {
+        var modules = sources
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair =>
+            {
+                var state = LspTestHarness.CreateDocument(
+                    pair.Value,
+                    new Uri(pair.Key).AbsoluteUri);
+                Assert.NotNull(state.Ast);
+                Assert.NotNull(state.BoundModule);
+                Assert.False(
+                    state.Diagnostics.HasErrors,
+                    string.Join(Environment.NewLine, state.Diagnostics.Select(diagnostic =>
+                        $"{diagnostic.Code}: {diagnostic.Message}")));
+                return (pair.Key, Module: state.Ast!);
+            })
+            .ToArray();
+        var crossModuleMap = modules.Length > 1
+            ? Calor.Compiler.CompilationDriver.BuildCrossModuleFunctionMap(
+                modules.Select(module => module.Module).ToArray())
+            : null;
+        var generated = new Dictionary<string, string>(StringComparer.Ordinal);
+        var trees = modules
+            .Select(module =>
+            {
+                var emitter = new CSharpEmitter
+                {
+                    CrossModuleFunctionModules = crossModuleMap,
+                    LineDirectiveFilePath = module.Key,
+                };
+                var source = emitter.Emit(module.Module);
+                generated[module.Key] = source;
+                return CSharpSyntaxTree.ParseText(
+                    source,
+                    path: module.Key + ".g.cs");
+            })
+            .ToArray();
+        var compilation = CSharpCompilation.Create(
+            "RenameWorkspaceCompile",
+            trees,
+            GetPlatformReferences(),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.DoesNotContain(
+            compilation.GetDiagnostics(),
+            diagnostic => diagnostic.Severity
+                == Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+        return generated;
+    }
+
+    private static void ApplyDocumentEdits(
+        IDictionary<string, string> sources,
+        IEnumerable<TextDocumentEdit> documentEdits)
+    {
+        foreach (var documentEdit in documentEdits)
+        {
+            var path = documentEdit.TextDocument.Uri.ToUri().LocalPath;
+            var source = sources[path];
+            foreach (var textEdit in documentEdit.Edits.OrderByDescending(textEdit =>
+                         PositionConverter.ToOffset(textEdit.Range.Start, source)))
+            {
+                var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+                var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+                source = source[..start] + textEdit.NewText + source[end..];
+            }
+            sources[path] = source;
+        }
+    }
+
+    private static string CreatePreprocessorRenameSource(
+        string moduleName,
+        int preprocessorSymbolCount,
+        bool includeRenameTarget = true)
+    {
+        var lines = new List<string>
+        {
+            $"§M{{m001:{moduleName}}}",
+        };
+        if (preprocessorSymbolCount > 0)
+        {
+            lines.Add("  §CL{c001:Flags:pub}");
+            for (var index = 0; index < preprocessorSymbolCount; index++)
+            {
+                lines.Add($"    §PP{{FLAG_{index}}}");
+                lines.Add($"      §FLD{{i32:Field{index}:pub}}");
+                lines.Add($"    §/PP{{FLAG_{index}}}");
+            }
+        }
+        if (includeRenameTarget)
+        {
+            lines.Add("  §F{f001:Compute:pub} () -> i32");
+            lines.Add("    §R INT:1");
+            lines.Add("  §F{f002:Use:pub} () -> i32");
+            lines.Add("    §R §C{Compute} §/C");
+        }
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static IEnumerable<MetadataReference> GetPlatformReferences()
+    {
+        var trustedAssemblies =
+            (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")
+            ?? throw new InvalidOperationException("Trusted platform assemblies are unavailable.");
+        return trustedAssemblies
+            .Split(Path.PathSeparator)
+            .Select(path => MetadataReference.CreateFromFile(path));
+    }
+
+    private static IEnumerable<Calor.Compiler.Ast.AstNode> DescendantsAndSelf(
+        Calor.Compiler.Ast.AstNode node)
+    {
+        yield return node;
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
+        }
+    }
+
+    private static IEnumerable<Calor.Compiler.Binding.BoundTypeReference> DescendantTypeReferences(
+        Calor.Compiler.Binding.BoundTypeReference reference)
+    {
+        yield return reference;
+        foreach (var argument in reference.TypeArguments)
+        {
+            foreach (var descendant in DescendantTypeReferences(argument))
+                yield return descendant;
+        }
     }
 
     private static string CreateWorkspaceDirectory()
