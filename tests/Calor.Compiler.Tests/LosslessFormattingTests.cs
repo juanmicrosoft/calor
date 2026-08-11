@@ -532,28 +532,119 @@ public sealed class LosslessFormattingTests : IDisposable
     }
 
     [Theory]
-    [InlineData(Architecture.Arm64, false)]
-    [InlineData(Architecture.RiscV64, false)]
-    [InlineData(Architecture.LoongArch64, false)]
-    [InlineData(Architecture.Ppc64le, false)]
-    [InlineData(Architecture.S390x, true)]
+    [InlineData(Architecture.Arm64)]
+    [InlineData(Architecture.RiscV64)]
+    [InlineData(Architecture.LoongArch64)]
     public void LinuxGeneric64BitLinkCountDecoder_ReadsUnsigned32BitValueAtOffset20(
-        Architecture architecture,
-        bool bigEndian)
+        Architecture architecture)
     {
         var buffer = new byte[24];
-        if (bigEndian)
-        {
-            BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(20), 11);
-        }
-        else
-        {
-            BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(20), 11);
-        }
+        BinaryPrimitives.WriteUInt32LittleEndian(buffer.AsSpan(20), 11);
 
         Assert.Equal(
             11,
             NativeFileLinks.DecodeLinuxLinkCount(buffer, architecture));
+    }
+
+    [Fact]
+    public void LinuxPpc64leLinkCountDecoder_ReadsUnsigned64BitValueAtOffset16()
+    {
+        var buffer = new byte[24];
+        BinaryPrimitives.WriteUInt64LittleEndian(buffer.AsSpan(16), 13);
+
+        Assert.Equal(
+            13,
+            NativeFileLinks.DecodeLinuxLinkCount(buffer, Architecture.Ppc64le));
+    }
+
+    [Fact]
+    public void LinuxS390xLinkCountDecoder_ReadsUnsigned64BitValueAtOffset16()
+    {
+        var buffer = new byte[24];
+        BinaryPrimitives.WriteUInt64BigEndian(buffer.AsSpan(16), 17);
+
+        Assert.Equal(
+            17,
+            NativeFileLinks.DecodeLinuxLinkCount(buffer, Architecture.S390x));
+    }
+
+    [Fact]
+    public void LinuxS390xLinkCountDecoder_UsesTheFullUnsigned64BitField()
+    {
+        var buffer = new byte[24];
+        BinaryPrimitives.WriteUInt64BigEndian(
+            buffer.AsSpan(16),
+            (ulong)uint.MaxValue + 1);
+
+        var error = Assert.Throws<IOException>(
+            () => NativeFileLinks.DecodeLinuxLinkCount(buffer, Architecture.S390x));
+
+        Assert.IsType<OverflowException>(error.InnerException);
+    }
+
+    [Theory]
+    [InlineData(Architecture.Arm64, 0)]
+    [InlineData(Architecture.RiscV64, 0)]
+    [InlineData(Architecture.LoongArch64, 0)]
+    [InlineData(Architecture.X64, 1)]
+    [InlineData(Architecture.Ppc64le, 1)]
+    [InlineData(Architecture.S390x, 1)]
+    public void LinuxXStatVersion_MatchesGlibcAbi(
+        Architecture architecture,
+        int expectedVersion)
+    {
+        Assert.Equal(
+            expectedVersion,
+            NativeFileLinks.GetLinuxXStatVersion(architecture));
+    }
+
+    [Theory]
+    [InlineData(Architecture.Arm64, "stat")]
+    [InlineData(Architecture.X64, "stat$INODE64")]
+    public void DarwinStatEntryPoint_IsArchitectureSpecific(
+        Architecture architecture,
+        string expectedEntryPoint)
+    {
+        Assert.Equal(
+            expectedEntryPoint,
+            NativeFileLinks.GetDarwinStatEntryPoint(architecture));
+    }
+
+    [Theory]
+    [InlineData("StatDarwinArm64", "stat")]
+    [InlineData("StatDarwin64", "stat$INODE64")]
+    public void DarwinStatImports_BindExpectedNativeSymbols(
+        string methodName,
+        string expectedEntryPoint)
+    {
+        var method = typeof(NativeFileLinks).GetMethod(
+            methodName,
+            System.Reflection.BindingFlags.NonPublic
+                | System.Reflection.BindingFlags.Static);
+        var attribute = Assert.IsType<DllImportAttribute>(
+            Assert.Single(method!.GetCustomAttributes(
+                typeof(DllImportAttribute),
+                inherit: false)));
+
+        Assert.Equal(expectedEntryPoint, attribute.EntryPoint);
+    }
+
+    [Fact]
+    public void Darwin64LinkCountDecoder_ReadsUnsigned16BitValueAtOffset6()
+    {
+        var buffer = new byte[8];
+        BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(6), 19);
+
+        Assert.Equal(19, NativeFileLinks.DecodeDarwin64LinkCount(buffer));
+    }
+
+    [Fact]
+    public void DarwinStatEntryPoint_RejectsUnsupportedArchitectures()
+    {
+        var error = Assert.Throws<IOException>(
+            () => NativeFileLinks.GetDarwinStatEntryPoint(Architecture.X86));
+
+        Assert.Contains("unsupported macOS architecture", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

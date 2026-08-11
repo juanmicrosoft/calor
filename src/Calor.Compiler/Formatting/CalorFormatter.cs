@@ -890,6 +890,8 @@ internal static class SafeSourceFile
 
 internal static class NativeFileLinks
 {
+    private const int StatBufferSize = 256;
+
     internal static int? TryGetLinkCount(string path)
     {
         try
@@ -921,37 +923,9 @@ internal static class NativeFileLinks
                 return null;
             }
 
-            const int statBufferSize = 256;
-            var buffer = Marshal.AllocHGlobal(statBufferSize);
-            try
-            {
-                if (Stat(path, buffer) != 0)
-                {
-                    throw new IOException(
-                        $"Could not inspect source hard links: {new Win32Exception(Marshal.GetLastWin32Error()).Message}");
-                }
-
-                if (OperatingSystem.IsMacOS())
-                {
-                    return unchecked((ushort)Marshal.ReadInt16(buffer, 6));
-                }
-
-                var statBytes = new byte[24];
-                Marshal.Copy(buffer, statBytes, 0, statBytes.Length);
-                return DecodeLinuxLinkCount(
-                    statBytes,
-                    RuntimeInformation.ProcessArchitecture);
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(buffer);
-            }
-        }
-        catch (EntryPointNotFoundException ex)
-        {
-            throw new IOException(
-                "Could not inspect source hard links because the native stat entry point is unavailable.",
-                ex);
+            return OperatingSystem.IsMacOS()
+                ? GetDarwinLinkCount(path, RuntimeInformation.ProcessArchitecture)
+                : GetLinuxLinkCount(path, RuntimeInformation.ProcessArchitecture);
         }
         catch (DllNotFoundException ex)
         {
@@ -965,6 +939,113 @@ internal static class NativeFileLinks
                 "Could not inspect source hard links because the link count exceeds the supported range.",
                 ex);
         }
+    }
+
+    private static int GetDarwinLinkCount(string path, Architecture architecture)
+    {
+        var entryPoint = GetDarwinStatEntryPoint(architecture);
+        var buffer = Marshal.AllocHGlobal(StatBufferSize);
+        try
+        {
+            int result;
+            try
+            {
+                result = architecture switch
+                {
+                    Architecture.Arm64 => StatDarwinArm64(path, buffer),
+                    Architecture.X64 => StatDarwin64(path, buffer),
+                    _ => throw UnsupportedDarwinArchitecture(architecture)
+                };
+            }
+            catch (EntryPointNotFoundException ex)
+            {
+                throw new IOException(
+                    $"Could not inspect source hard links on macOS architecture '{architecture}' " +
+                    $"because libc entry point '{entryPoint}' is unavailable.",
+                    ex);
+            }
+
+            if (result != 0)
+            {
+                throw NativeStatFailure("macOS", architecture, entryPoint);
+            }
+
+            var statBytes = new byte[8];
+            Marshal.Copy(buffer, statBytes, 0, statBytes.Length);
+            return DecodeDarwin64LinkCount(statBytes);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static int GetLinuxLinkCount(string path, Architecture architecture)
+    {
+        EnsureSupportedLinuxArchitecture(architecture);
+
+        var buffer = Marshal.AllocHGlobal(StatBufferSize);
+        try
+        {
+            var entryPoint = "stat";
+            int result;
+            try
+            {
+                result = StatLinux(path, buffer);
+            }
+            catch (EntryPointNotFoundException statException)
+            {
+                entryPoint = "__xstat";
+                try
+                {
+                    result = XStatLinux(
+                        GetLinuxXStatVersion(architecture),
+                        path,
+                        buffer);
+                }
+                catch (EntryPointNotFoundException xstatException)
+                {
+                    throw new IOException(
+                        $"Could not inspect source hard links on Linux architecture " +
+                        $"'{architecture}' because libc exposes neither 'stat' nor the " +
+                        $"compatible '__xstat' fallback.",
+                        new AggregateException(statException, xstatException));
+                }
+            }
+
+            if (result != 0)
+            {
+                throw NativeStatFailure("Linux", architecture, entryPoint);
+            }
+
+            var statBytes = new byte[24];
+            Marshal.Copy(buffer, statBytes, 0, statBytes.Length);
+            return DecodeLinuxLinkCount(statBytes, architecture);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    internal static string GetDarwinStatEntryPoint(Architecture architecture) =>
+        architecture switch
+        {
+            Architecture.Arm64 => "stat",
+            Architecture.X64 => "stat$INODE64",
+            _ => throw UnsupportedDarwinArchitecture(architecture)
+        };
+
+    internal static int DecodeDarwin64LinkCount(ReadOnlySpan<byte> statBuffer)
+    {
+        if (statBuffer.Length < 8)
+        {
+            throw new IOException(
+                "Could not inspect source hard links because the Darwin64 stat buffer was too small.");
+        }
+
+        return BinaryPrimitives.ReadUInt16LittleEndian(
+            statBuffer.Slice(6, sizeof(ushort)));
     }
 
     internal static int DecodeLinuxLinkCount(
@@ -985,11 +1066,12 @@ internal static class NativeFileLinks
                     statBuffer.Slice(16, sizeof(ulong)))),
                 Architecture.Arm64
                     or Architecture.RiscV64
-                    or Architecture.LoongArch64
-                    or Architecture.Ppc64le => checked((int)BinaryPrimitives.ReadUInt32LittleEndian(
+                    or Architecture.LoongArch64 => checked((int)BinaryPrimitives.ReadUInt32LittleEndian(
                         statBuffer.Slice(20, sizeof(uint)))),
-                Architecture.S390x => checked((int)BinaryPrimitives.ReadUInt32BigEndian(
-                    statBuffer.Slice(20, sizeof(uint)))),
+                Architecture.Ppc64le => checked((int)BinaryPrimitives.ReadUInt64LittleEndian(
+                    statBuffer.Slice(16, sizeof(ulong)))),
+                Architecture.S390x => checked((int)BinaryPrimitives.ReadUInt64BigEndian(
+                    statBuffer.Slice(16, sizeof(ulong)))),
                 _ => throw new IOException(
                     $"Could not inspect source hard links on unsupported Linux architecture " +
                     $"'{architecture}'.")
@@ -1003,8 +1085,61 @@ internal static class NativeFileLinks
         }
     }
 
+    internal static int GetLinuxXStatVersion(Architecture architecture)
+    {
+        // glibc generic 64-bit ABIs use _STAT_VER_KERNEL (0). The x86-64,
+        // powerpc64, and s390x architecture-specific ABIs use version 1.
+        return architecture switch
+        {
+            Architecture.Arm64
+                or Architecture.RiscV64
+                or Architecture.LoongArch64 => 0,
+            Architecture.X64
+                or Architecture.Ppc64le
+                or Architecture.S390x => 1,
+            _ => throw new IOException(
+                $"Could not inspect source hard links on unsupported Linux architecture " +
+                $"'{architecture}'.")
+        };
+    }
+
+    private static void EnsureSupportedLinuxArchitecture(Architecture architecture)
+    {
+        _ = GetLinuxXStatVersion(architecture);
+    }
+
+    private static IOException UnsupportedDarwinArchitecture(Architecture architecture) =>
+        new(
+            $"Could not inspect source hard links on unsupported macOS architecture " +
+            $"'{architecture}'.");
+
+    private static IOException NativeStatFailure(
+        string operatingSystem,
+        Architecture architecture,
+        string entryPoint) =>
+        new(
+            $"Could not inspect source hard links on {operatingSystem} architecture " +
+            $"'{architecture}' because libc '{entryPoint}' failed: " +
+            $"{new Win32Exception(Marshal.GetLastWin32Error()).Message}");
+
     [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
-    private static extern int Stat(
+    private static extern int StatLinux(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        IntPtr buffer);
+
+    [DllImport("libc", EntryPoint = "__xstat", SetLastError = true)]
+    private static extern int XStatLinux(
+        int version,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        IntPtr buffer);
+
+    [DllImport("libc", EntryPoint = "stat", SetLastError = true)]
+    private static extern int StatDarwinArm64(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        IntPtr buffer);
+
+    [DllImport("libc", EntryPoint = "stat$INODE64", SetLastError = true)]
+    private static extern int StatDarwin64(
         [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
         IntPtr buffer);
 
