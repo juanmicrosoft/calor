@@ -12,16 +12,22 @@ public sealed class QuantifierVariableNode : AstNode
     /// The variable name.
     /// </summary>
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
 
     /// <summary>
     /// The type name of the variable.
     /// </summary>
     public string TypeName { get; }
 
-    public QuantifierVariableNode(TextSpan span, string name, string typeName)
+    public QuantifierVariableNode(
+        TextSpan span,
+        string name,
+        string typeName,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
     }
 

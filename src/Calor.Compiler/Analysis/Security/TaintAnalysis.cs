@@ -182,7 +182,9 @@ public sealed class TaintAnalysis
     private readonly BoundFunction _function;
     private readonly TaintAnalysisOptions _options;
     private readonly List<TaintVulnerability> _vulnerabilities = new();
-    private readonly Dictionary<string, HashSet<TaintLabel>> _taintedVariables = new();
+    private readonly Dictionary<SymbolId, HashSet<TaintLabel>> _taintedVariables = new();
+    public IReadOnlyList<BoundNode> IncompleteNodes { get; }
+    public bool IsComplete => IncompleteNodes.Count == 0;
 
     /// <summary>
     /// Effect declarations for the function (populated from AST).
@@ -200,6 +202,7 @@ public sealed class TaintAnalysis
         _function = function ?? throw new ArgumentNullException(nameof(function));
         _options = options ?? TaintAnalysisOptions.Default;
         _declaredEffects = declaredEffects ?? Array.Empty<string>();
+        IncompleteNodes = BoundNodeHelpers.GetAnalysisIncompleteNodes(function).ToArray();
 
         Analyze();
     }
@@ -245,7 +248,7 @@ public sealed class TaintAnalysis
             if (source != null)
             {
                 var label = new TaintLabel(source.Value, param.Name, _function.Span);
-                AddTaint(param.Name, label);
+                AddTaint(param, label);
             }
         }
     }
@@ -344,7 +347,7 @@ public sealed class TaintAnalysis
                 {
                     var sourceLabels = GetTaintLabelsFromExpression(assign.Value);
                     foreach (var label in sourceLabels)
-                        AddTaint(targetVar.Variable.Name, label with { Hops = label.Hops + 1 });
+                        AddTaint(targetVar.Variable, label with { Hops = label.Hops + 1 });
                 }
                 break;
 
@@ -358,7 +361,7 @@ public sealed class TaintAnalysis
                 // Propagate taint from collection to loop variable (increment hop count)
                 var collectionLabels = GetTaintLabelsFromExpression(forEach.Collection);
                 foreach (var label in collectionLabels)
-                    AddTaint(forEach.LoopVariable.Name, label with { Hops = label.Hops + 1 });
+                    AddTaint(forEach.LoopVariable, label with { Hops = label.Hops + 1 });
                 foreach (var s in forEach.Body)
                     AnalyzeStatement(s);
                 break;
@@ -394,6 +397,13 @@ public sealed class TaintAnalysis
                     foreach (var s in tryStmt.FinallyBody)
                         AnalyzeStatement(s);
                 break;
+
+            default:
+                foreach (var expression in BoundNodeHelpers.GetImmediateExpressions(stmt))
+                    AnalyzeExpression(expression);
+                foreach (var statement in BoundNodeHelpers.GetImmediateStatements(stmt))
+                    AnalyzeStatement(statement);
+                break;
         }
     }
 
@@ -408,20 +418,10 @@ public sealed class TaintAnalysis
         // Check if the initializer is a taint source
         var sourceLabels = GetTaintLabelsFromExpression(bind.Initializer);
 
-        // Check if the initializer is a call that introduces taint
-        if (bind.Initializer is BoundCallExpression callExpr)
-        {
-            var newTaint = CheckForTaintSource(callExpr.Target, callExpr.Span);
-            if (newTaint != null)
-            {
-                sourceLabels = sourceLabels.Append(newTaint.Value);
-            }
-        }
-
         // Propagate taint to the variable being defined
         foreach (var label in sourceLabels)
         {
-            AddTaint(bind.Variable.Name, label);
+            AddTaint(bind.Variable, label);
         }
     }
 
@@ -453,36 +453,17 @@ public sealed class TaintAnalysis
             }
         }
 
-        // Also recursively analyze arguments
-        foreach (var arg in arguments)
-        {
-            AnalyzeExpression(arg);
-        }
     }
 
     private void AnalyzeExpression(BoundExpression expr)
     {
-        switch (expr)
+        if (expr is BoundCallExpression callExpr)
         {
-            case BoundCallExpression callExpr:
-                AnalyzeCall(callExpr.Target, callExpr.Arguments, callExpr.Span);
-                break;
-
-            case BoundBinaryExpression binExpr:
-                AnalyzeExpression(binExpr.Left);
-                AnalyzeExpression(binExpr.Right);
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                AnalyzeExpression(unaryExpr.Operand);
-                break;
-
-            case BoundConditionalExpression condExpr:
-                AnalyzeExpression(condExpr.Condition);
-                AnalyzeExpression(condExpr.WhenTrue);
-                AnalyzeExpression(condExpr.WhenFalse);
-                break;
+            AnalyzeCall(callExpr.Target, callExpr.Arguments, callExpr.Span);
         }
+
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            AnalyzeExpression(child);
     }
 
     private TaintLabel? CheckForTaintSource(string target, TextSpan location)
@@ -760,44 +741,29 @@ public sealed class TaintAnalysis
 
     private IEnumerable<TaintLabel> GetTaintLabelsFromExpression(BoundExpression expr)
     {
-        switch (expr)
+        if (expr is BoundVariableExpression varExpr)
         {
-            case BoundVariableExpression varExpr:
-                if (_taintedVariables.TryGetValue(varExpr.Variable.Name, out var labels))
-                {
-                    foreach (var label in labels)
-                        yield return label;
-                }
-                break;
-
-            case BoundBinaryExpression binExpr:
-                // Taint propagates through operations (conservative)
-                foreach (var label in GetTaintLabelsFromExpression(binExpr.Left))
+            if (_taintedVariables.TryGetValue(varExpr.Variable.Id, out var labels))
+            {
+                foreach (var label in labels)
                     yield return label;
-                foreach (var label in GetTaintLabelsFromExpression(binExpr.Right))
-                    yield return label;
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                foreach (var label in GetTaintLabelsFromExpression(unaryExpr.Operand))
-                    yield return label;
-                break;
-
-            case BoundCallExpression callExpr:
-                // Check if call is a sanitizer
-                if (IsSanitizer(callExpr.Target))
-                {
-                    yield break; // Sanitizer removes taint
-                }
-
-                // Otherwise, propagate taint from arguments
-                foreach (var arg in callExpr.Arguments)
-                {
-                    foreach (var label in GetTaintLabelsFromExpression(arg))
-                        yield return label;
-                }
-                break;
+            }
+            yield break;
         }
+
+        if (expr is BoundCallExpression callExpr)
+        {
+            if (IsSanitizer(callExpr.Target))
+                yield break;
+
+            var source = CheckForTaintSource(callExpr.Target, callExpr.Span);
+            if (source != null)
+                yield return source.Value;
+        }
+
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            foreach (var label in GetTaintLabelsFromExpression(child))
+                yield return label;
     }
 
     private static bool IsSanitizer(string target)
@@ -812,12 +778,15 @@ public sealed class TaintAnalysis
                lowerTarget.Contains("parameterize");
     }
 
-    private void AddTaint(string variableName, TaintLabel label)
+    private void AddTaint(VariableSymbol variable, TaintLabel label)
     {
-        if (!_taintedVariables.TryGetValue(variableName, out var labels))
+        if (variable.Id.IsNone)
+            return;
+
+        if (!_taintedVariables.TryGetValue(variable.Id, out var labels))
         {
             labels = new HashSet<TaintLabel>();
-            _taintedVariables[variableName] = labels;
+            _taintedVariables[variable.Id] = labels;
         }
         labels.Add(label);
     }

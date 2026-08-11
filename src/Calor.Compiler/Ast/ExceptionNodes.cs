@@ -58,6 +58,7 @@ public sealed class CatchClauseNode : AstNode
     /// The variable name for the exception. Null if not capturing.
     /// </summary>
     public string? VariableName { get; }
+    public TextSpan? VariableSpan { get; }
 
     /// <summary>
     /// Optional filter expression (when clause).
@@ -77,11 +78,13 @@ public sealed class CatchClauseNode : AstNode
         string? variableName,
         ExpressionNode? filter,
         IReadOnlyList<StatementNode> body,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? variableSpan = null)
         : base(span)
     {
         ExceptionType = exceptionType;
         VariableName = variableName;
+        VariableSpan = variableName == null ? null : variableSpan ?? span;
         Filter = filter;
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));

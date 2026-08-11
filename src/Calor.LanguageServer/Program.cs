@@ -44,6 +44,18 @@ public static class Program
                 .WithHandler<SemanticTokensHandler>()
                 .OnInitialize((server, request, token) =>
                 {
+                    var workspaceFolders = request.WorkspaceFolders?
+                        .Select(folder => folder.Uri.ToUri())
+                        .ToArray();
+                    if (workspaceFolders is { Length: > 0 })
+                    {
+                        workspace.ConfigureWorkspaceRoots(workspaceFolders);
+                    }
+                    else if (request.RootUri is { } rootUri)
+                    {
+                        workspace.ConfigureWorkspaceRoot(rootUri.ToUri());
+                    }
+
                     // Register TextDocumentSyncHandler which needs the server reference
                     server.Register(opts =>
                     {

@@ -23,53 +23,9 @@ public sealed class OffByOneChecker : IBugPatternChecker
 
     public void Check(BoundFunction function, DiagnosticBag diagnostics)
     {
-        foreach (var stmt in function.Body)
-        {
-            CheckStatement(stmt, diagnostics);
-        }
-    }
-
-    private void CheckStatement(BoundStatement stmt, DiagnosticBag diagnostics)
-    {
-        switch (stmt)
-        {
-            case BoundForStatement forStmt:
-                CheckForLoop(forStmt, diagnostics);
-                foreach (var s in forStmt.Body)
-                    CheckStatement(s, diagnostics);
-                break;
-
-            case BoundIfStatement ifStmt:
-                foreach (var s in ifStmt.ThenBody)
-                    CheckStatement(s, diagnostics);
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                    foreach (var s in elseIf.Body)
-                        CheckStatement(s, diagnostics);
-                if (ifStmt.ElseBody != null)
-                    foreach (var s in ifStmt.ElseBody)
-                        CheckStatement(s, diagnostics);
-                break;
-
-            case BoundWhileStatement whileStmt:
-                foreach (var s in whileStmt.Body)
-                    CheckStatement(s, diagnostics);
-                break;
-
-            case BoundForeachStatement forEach:
-                foreach (var s in forEach.Body)
-                    CheckStatement(s, diagnostics);
-                break;
-
-            case BoundDoWhileStatement doWhile:
-                foreach (var s in doWhile.Body)
-                    CheckStatement(s, diagnostics);
-                break;
-
-            case BoundUsingStatement usingStmt:
-                foreach (var s in usingStmt.Body)
-                    CheckStatement(s, diagnostics);
-                break;
-        }
+        foreach (var loop in BoundNodeHelpers.DescendantsAndSelf(function)
+                     .OfType<BoundForStatement>())
+            CheckForLoop(loop, diagnostics);
     }
 
     private void CheckForLoop(BoundForStatement forStmt, DiagnosticBag diagnostics)
@@ -79,14 +35,14 @@ public sealed class OffByOneChecker : IBugPatternChecker
             return;
 
         // Check if loop body contains array access using the loop variable
-        var loopVarName = forStmt.LoopVariable.Name;
-        if (!BodyContainsArrayAccessAtLoopVar(forStmt.Body, loopVarName))
+        var loopVariable = forStmt.LoopVariable;
+        if (!BodyContainsArrayAccessAtLoopVar(forStmt.Body, loopVariable))
             return;
 
         diagnostics.ReportWarning(
             forStmt.Span,
             DiagnosticCode.OffByOne,
-            $"Loop iterates to length/count without subtracting 1; potential off-by-one error with array access at '{loopVarName}'");
+            $"Loop iterates to length/count without subtracting 1; potential off-by-one error with array access at '{loopVariable.Name}'");
     }
 
     /// <summary>
@@ -131,41 +87,50 @@ public sealed class OffByOneChecker : IBugPatternChecker
     /// </summary>
     private static bool BodyContainsArrayAccessAtLoopVar(
         IReadOnlyList<BoundStatement> body,
-        string loopVarName)
+        VariableSymbol loopVariable)
     {
         foreach (var stmt in body)
         {
-            if (StatementReferencesLoopVar(stmt, loopVarName))
-                return true;
+            foreach (var node in BoundNodeHelpers.DescendantsAndSelf(stmt))
+            {
+                if (node is BoundVariableExpression variable
+                    && BoundNodeHelpers.SameSymbol(variable.Variable, loopVariable))
+                {
+                    return true;
+                }
+
+                if (node is BoundArrayAccessExpression access
+                    && access.Indices.Any(index => ExpressionUsesVariable(index, loopVariable)))
+                {
+                    return true;
+                }
+
+                if (node is BoundCallExpression call
+                    && IsArrayAccessCall(call)
+                    && call.Arguments.Any(argument => ExpressionUsesVariable(argument, loopVariable)))
+                {
+                    return true;
+                }
+            }
         }
         return false;
     }
 
-    private static bool StatementReferencesLoopVar(BoundStatement stmt, string loopVarName)
+    private static bool IsArrayAccessCall(BoundCallExpression call)
     {
-        switch (stmt)
-        {
-            case BoundBindStatement bind:
-                return bind.Initializer != null && ExpressionUsesVariable(bind.Initializer, loopVarName);
-            case BoundReturnStatement ret:
-                return ret.Expression != null && ExpressionUsesVariable(ret.Expression, loopVarName);
-            case BoundCallStatement call:
-                return call.Arguments.Any(a => ExpressionUsesVariable(a, loopVarName));
-            case BoundIfStatement ifStmt:
-                return BodyContainsArrayAccessAtLoopVar(ifStmt.ThenBody, loopVarName) ||
-                       ifStmt.ElseIfClauses.Any(c => BodyContainsArrayAccessAtLoopVar(c.Body, loopVarName)) ||
-                       (ifStmt.ElseBody != null && BodyContainsArrayAccessAtLoopVar(ifStmt.ElseBody, loopVarName));
-            case BoundWhileStatement whileStmt:
-                return BodyContainsArrayAccessAtLoopVar(whileStmt.Body, loopVarName);
-            case BoundForStatement forStmt:
-                return BodyContainsArrayAccessAtLoopVar(forStmt.Body, loopVarName);
-            default:
-                return false;
-        }
+        var target = call.Target.ToLowerInvariant();
+        return target.EndsWith(".get")
+               || target.EndsWith(".at")
+               || target.EndsWith("[]")
+               || target.Contains("array_get")
+               || target.Contains("list_get");
     }
 
-    private static bool ExpressionUsesVariable(BoundExpression expr, string varName)
+    private static bool ExpressionUsesVariable(
+        BoundExpression expr,
+        VariableSymbol variable)
     {
-        return BoundNodeHelpers.GetUsedVariables(expr).Any(v => v.Name == varName);
+        return BoundNodeHelpers.GetUsedVariables(expr)
+            .Any(used => BoundNodeHelpers.SameSymbol(used, variable));
     }
 }

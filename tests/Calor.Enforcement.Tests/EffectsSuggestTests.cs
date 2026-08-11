@@ -113,6 +113,33 @@ public class EffectsSuggestTests
     }
 
     [Fact]
+    public void Collector_UsesBoundReceiverIdentityForShadowedNames()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:DoWork:pub}
+      §O{void}
+      §B{r} §NEW{Random} §/NEW
+      §IF{if1} BOOL:true
+          §B{r} §NEW{HttpClient} §/NEW
+          §C{r.GetAsync} §A STR:""/"" §/C
+      §C{r.Next} §/C
+";
+        var module = Parse(source);
+
+        var calls = ExternalCallCollector.Collect(module);
+
+        Assert.Contains(
+            calls,
+            call => call.TypeName == "System.Net.Http.HttpClient"
+                && call.MethodName == "GetAsync");
+        Assert.Contains(
+            calls,
+            call => call.TypeName == "System.Random"
+                && call.MethodName == "Next");
+    }
+
+    [Fact]
     public void Collector_TagsConstructors()
     {
         var source = @"

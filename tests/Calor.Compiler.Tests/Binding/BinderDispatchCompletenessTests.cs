@@ -11,7 +11,8 @@ namespace Calor.Compiler.Tests;
 /// binding surface, and it must cover the concrete ExpressionNode subclass set EXACTLY —
 /// in both directions. A new node class with no dispatch entry, or a stale entry for a
 /// removed class, fails here by construction (the code-side half of F-1's bidirectional
-/// completeness rule). F-1 froze the count at 61; this test tracks the live set rather
+/// completeness rule). The parser-totality work leaves 60 accepted expression classes;
+/// KeywordArgNode is a parser helper rather than a value expression.
 /// than the number so an F-1 amendment and a code change must move together.
 /// </summary>
 public class BinderDispatchCompletenessTests

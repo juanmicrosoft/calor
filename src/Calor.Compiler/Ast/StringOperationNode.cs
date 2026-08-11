@@ -77,10 +77,10 @@ public static class StringComparisonModeExtensions
 public sealed class KeywordArgNode
 {
     // #762 item 8 (B8): reclassified OUT of the AST — a keyword argument is a
-    // parser-internal value object (produced by Parser.ParseLispArgumentOrKeyword,
-    // consumed by Parser.FilterKeywordArgs, #874), not an expression. As a plain
-    // class it cannot appear in expression position, so the old no-op-Accept
-    // null-injection hazard is unrepresentable rather than merely guarded.
+    // parser-internal value object (produced only by ParseLispArgumentCore when
+    // keyword arguments are enabled, then consumed by FilterKeywordArgs, #874),
+    // not an expression. As a plain class it cannot appear in expression position,
+    // so the old no-op-Accept null-injection hazard is unrepresentable.
     public TextSpan Span { get; }
     public string Name { get; }
 

@@ -2,6 +2,7 @@ using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using BinaryOperator = Calor.Compiler.Ast.BinaryOperator;
 
 namespace Calor.Compiler.Analysis.ContractInference;
@@ -30,11 +31,11 @@ public sealed class ContractInferencePass
         var contractsInferred = 0;
 
         // Build set of functions that already have contracts
-        var functionsWithContracts = new HashSet<string>();
+        var functionsWithContracts = new HashSet<TextSpan>();
         foreach (var func in astModule.Functions)
         {
             if (func.HasContracts)
-                functionsWithContracts.Add(func.Name);
+                functionsWithContracts.Add(func.Span);
         }
 
         foreach (var boundFunc in boundModule.Functions)
@@ -43,7 +44,7 @@ public sealed class ContractInferencePass
             if (boundFunc.MemberKind != BoundMemberKind.TopLevelFunction)
                 continue;
 
-            if (functionsWithContracts.Contains(boundFunc.Symbol.Name))
+            if (functionsWithContracts.Contains(boundFunc.Symbol.DefinitionSpan))
                 continue;
 
             contractsInferred += InferForFunction(boundFunc);
@@ -96,10 +97,13 @@ public sealed class ContractInferencePass
             return 0;
 
         var retExpr = returns[0].Expression!;
-        var paramNames = function.Symbol.Parameters.Select(p => p.Name).ToHashSet();
+        var parameterIds = function.Symbol.Parameters
+            .Select(parameter => parameter.Id)
+            .ToHashSet();
 
         // Pattern: function returns a parameter directly → §S (== result paramName)
-        if (retExpr is BoundVariableExpression varExpr && paramNames.Contains(varExpr.Variable.Name))
+        if (retExpr is BoundVariableExpression varExpr
+            && parameterIds.Contains(varExpr.Variable.Id))
         {
             var contractText = $"§S (== result {varExpr.Variable.Name})";
             var fix = new SuggestedFix(
@@ -122,8 +126,8 @@ public sealed class ContractInferencePass
             binExpr.Operator == BinaryOperator.Multiply &&
             binExpr.Left is BoundVariableExpression leftVar &&
             binExpr.Right is BoundVariableExpression rightVar &&
-            leftVar.Variable.Name == rightVar.Variable.Name &&
-            paramNames.Contains(leftVar.Variable.Name))
+            BoundNodeHelpers.SameSymbol(leftVar.Variable, rightVar.Variable) &&
+            parameterIds.Contains(leftVar.Variable.Id))
         {
             // x * x is always non-negative for integers
             var contractText = $"§S (>= result 0)";
@@ -149,123 +153,24 @@ public sealed class ContractInferencePass
     /// </summary>
     private static HashSet<string> FindDivisorParameters(BoundFunction function)
     {
-        var paramNames = function.Symbol.Parameters.Select(p => p.Name).ToHashSet();
+        var parameterIds = function.Symbol.Parameters
+            .Select(parameter => parameter.Id)
+            .ToHashSet();
         var divisorParams = new HashSet<string>();
 
-        foreach (var stmt in function.Body)
+        foreach (var division in BoundNodeHelpers.DescendantsAndSelf(function)
+                     .OfType<BoundBinaryExpression>()
+                     .Where(binary =>
+                         binary.Operator is BinaryOperator.Divide or BinaryOperator.Modulo))
         {
-            FindDivisorParamsInStatement(stmt, paramNames, divisorParams);
-        }
-
-        return divisorParams;
-    }
-
-    private static void FindDivisorParamsInStatement(
-        BoundStatement stmt,
-        HashSet<string> paramNames,
-        HashSet<string> divisorParams)
-    {
-        switch (stmt)
-        {
-            case BoundBindStatement bind:
-                if (bind.Initializer != null)
-                    FindDivisorParamsInExpression(bind.Initializer, paramNames, divisorParams);
-                break;
-            case BoundReturnStatement ret:
-                if (ret.Expression != null)
-                    FindDivisorParamsInExpression(ret.Expression, paramNames, divisorParams);
-                break;
-            case BoundCallStatement call:
-                foreach (var arg in call.Arguments)
-                    FindDivisorParamsInExpression(arg, paramNames, divisorParams);
-                break;
-            case BoundIfStatement ifStmt:
-                FindDivisorParamsInExpression(ifStmt.Condition, paramNames, divisorParams);
-                foreach (var s in ifStmt.ThenBody)
-                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                    foreach (var s in elseIf.Body)
-                        FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                if (ifStmt.ElseBody != null)
-                    foreach (var s in ifStmt.ElseBody)
-                        FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                break;
-            case BoundWhileStatement whileStmt:
-                foreach (var s in whileStmt.Body)
-                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                break;
-            case BoundForStatement forStmt:
-                foreach (var s in forStmt.Body)
-                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                break;
-            case BoundAssignmentStatement assign:
-                FindDivisorParamsInExpression(assign.Value, paramNames, divisorParams);
-                break;
-            case BoundCompoundAssignment compound:
-                FindDivisorParamsInExpression(compound.Value, paramNames, divisorParams);
-                break;
-            case BoundExpressionStatement exprStmt:
-                FindDivisorParamsInExpression(exprStmt.Expression, paramNames, divisorParams);
-                break;
-            case BoundForeachStatement forEach:
-                foreach (var s in forEach.Body)
-                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                break;
-            case BoundDoWhileStatement doWhile:
-                foreach (var s in doWhile.Body)
-                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                break;
-            case BoundUsingStatement usingStmt:
-                foreach (var s in usingStmt.Body)
-                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                break;
-            case BoundTryStatement tryStmt:
-                foreach (var s in tryStmt.TryBody)
-                    FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                foreach (var catchClause in tryStmt.CatchClauses)
-                    foreach (var s in catchClause.Body)
-                        FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                if (tryStmt.FinallyBody != null)
-                    foreach (var s in tryStmt.FinallyBody)
-                        FindDivisorParamsInStatement(s, paramNames, divisorParams);
-                break;
-        }
-    }
-
-    private static void FindDivisorParamsInExpression(
-        BoundExpression expr,
-        HashSet<string> paramNames,
-        HashSet<string> divisorParams)
-    {
-        if (BoundNodeHelpers.ContainsDivision(expr, out var divisionExpr) && divisionExpr != null)
-        {
-            var divisor = BoundNodeHelpers.GetDivisor(divisionExpr);
-            if (divisor is BoundVariableExpression varExpr && paramNames.Contains(varExpr.Variable.Name))
+            var divisor = BoundNodeHelpers.GetDivisor(division);
+            if (divisor is BoundVariableExpression variable
+                && parameterIds.Contains(variable.Variable.Id))
             {
-                divisorParams.Add(varExpr.Variable.Name);
+                divisorParams.Add(variable.Variable.Name);
             }
         }
 
-        // Recurse into subexpressions
-        switch (expr)
-        {
-            case BoundBinaryExpression binExpr:
-                FindDivisorParamsInExpression(binExpr.Left, paramNames, divisorParams);
-                FindDivisorParamsInExpression(binExpr.Right, paramNames, divisorParams);
-                break;
-            case BoundUnaryExpression unaryExpr:
-                FindDivisorParamsInExpression(unaryExpr.Operand, paramNames, divisorParams);
-                break;
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                    FindDivisorParamsInExpression(arg, paramNames, divisorParams);
-                break;
-
-            case BoundConditionalExpression condExpr:
-                FindDivisorParamsInExpression(condExpr.Condition, paramNames, divisorParams);
-                FindDivisorParamsInExpression(condExpr.WhenTrue, paramNames, divisorParams);
-                FindDivisorParamsInExpression(condExpr.WhenFalse, paramNames, divisorParams);
-                break;
-        }
+        return divisorParams;
     }
 }

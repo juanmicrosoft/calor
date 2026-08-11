@@ -52,9 +52,10 @@ public class BinderStringFamilyTests
     {
         var (expr, diags) = BindReturn(new StringOperationNode(S, op,
             new ExpressionNode[] { Str("a"), Str("b") }));
-        var bound = Assert.IsType<BoundStringOperation>(expr);
+        var bound = Assert.IsType<BoundStructuralExpression>(expr);
+        Assert.Equal(nameof(StringOperationNode), bound.NodeTypeName);
         Assert.Equal(expected, bound.TypeName);
-        Assert.Equal(2, bound.Arguments.Count);
+        Assert.Equal(2, bound.Children.Count);
         AssertComplete(diags);
     }
 
@@ -66,7 +67,7 @@ public class BinderStringFamilyTests
         var (expr, _) = BindReturn(new StringOperationNode(S, StringOp.Contains,
             new ExpressionNode[] { Str("a"), Str("b") }, StringComparisonMode.IgnoreCase));
         Assert.Equal(StringComparisonMode.IgnoreCase,
-            Assert.IsType<BoundStringOperation>(expr).ComparisonMode);
+            Assert.IsType<BoundStructuralExpression>(expr).Metadata["ComparisonMode"]);
     }
 
     [Fact]
@@ -78,7 +79,7 @@ public class BinderStringFamilyTests
             new InterpolatedStringExpressionNode(S, new IntLiteralNode(S, 42), "N2", "8"),
         });
         var (expr, diags) = BindReturn(node);
-        var bound = Assert.IsType<BoundInterpolatedString>(expr);
+        var bound = Assert.IsType<BoundInterpolatedStringExpression>(expr);
         Assert.Equal("STRING", bound.TypeName);
         Assert.Equal(2, bound.Parts.Count);
         Assert.Equal("total: ", bound.Parts[0].Text);
@@ -97,7 +98,9 @@ public class BinderStringFamilyTests
     {
         var (expr, diags) = BindReturn(new StringBuilderOperationNode(S, op,
             new ExpressionNode[] { Str("x") }));
-        Assert.Equal(expected, Assert.IsType<BoundStringBuilderOperation>(expr).TypeName);
+        var bound = Assert.IsType<BoundStructuralExpression>(expr);
+        Assert.Equal(nameof(StringBuilderOperationNode), bound.NodeTypeName);
+        Assert.Equal(expected, bound.TypeName);
         AssertComplete(diags);
     }
 
@@ -110,7 +113,9 @@ public class BinderStringFamilyTests
     {
         var (expr, diags) = BindReturn(new CharOperationNode(S, op,
             new ExpressionNode[] { Str("a") }));
-        Assert.Equal(expected, Assert.IsType<BoundCharOperation>(expr).TypeName);
+        var bound = Assert.IsType<BoundStructuralExpression>(expr);
+        Assert.Equal(nameof(CharOperationNode), bound.NodeTypeName);
+        Assert.Equal(expected, bound.TypeName);
         AssertComplete(diags);
     }
 
@@ -120,16 +125,16 @@ public class BinderStringFamilyTests
         var i = new BoundIntLiteral(S, 1);
         var j = new BoundIntLiteral(S, 2);
         Assert.Equal([i, j], BoundChildren.Of(
-            new BoundStringOperation(S, StringOp.Contains, [i, j], null)));
-        Assert.Equal([i], BoundChildren.Of(new BoundInterpolatedString(S,
+            new BoundStructuralExpression(S, nameof(StringOperationNode), "BOOL", [i, j])));
+        Assert.Equal([i], BoundChildren.Of(new BoundInterpolatedStringExpression(S,
         [
-            new BoundInterpolationPart("t", null, null, null, S),
-            new BoundInterpolationPart(null, i, null, null, S),
+            new BoundInterpolatedStringPart(S, "t", null),
+            new BoundInterpolatedStringPart(S, null, i),
         ])));
         Assert.Equal([i], BoundChildren.Of(
-            new BoundStringBuilderOperation(S, StringBuilderOp.Append, [i])));
+            new BoundStructuralExpression(S, nameof(StringBuilderOperationNode), "StringBuilder", [i])));
         Assert.Equal([i], BoundChildren.Of(
-            new BoundCharOperation(S, CharOp.CharAt, [i])));
+            new BoundStructuralExpression(S, nameof(CharOperationNode), "CHAR", [i])));
     }
 
     [Fact]

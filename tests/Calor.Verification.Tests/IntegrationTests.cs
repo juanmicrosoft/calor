@@ -1,5 +1,8 @@
 using Calor.Compiler;
+using Calor.Compiler.Analysis;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.Cache;
 using Xunit;
@@ -11,6 +14,69 @@ namespace Calor.Verification.Tests;
 /// </summary>
 public class IntegrationTests
 {
+    [Fact]
+    public void ShadowedQuantifierName_DoesNotGuardCallableParameter()
+    {
+        var span = new TextSpan(0, 1, 1, 1);
+        var parameter = new ParameterNode(span, "divisor", "i32", new AttributeCollection());
+        var quantifier = new ForallExpressionNode(
+            span,
+            [new QuantifierVariableNode(span, "divisor", "i32")],
+            new BinaryOperationNode(
+                span,
+                BinaryOperator.NotEqual,
+                new ReferenceNode(span, "divisor"),
+                new IntLiteralNode(span, 0)));
+        var function = new FunctionNode(
+            span,
+            "f1",
+            "Divide",
+            Visibility.Public,
+            [parameter],
+            new OutputNode(span, "i32"),
+            effects: null,
+            preconditions:
+            [
+                new RequiresNode(span, quantifier, message: null, new AttributeCollection()),
+            ],
+            postconditions: [],
+            body:
+            [
+                new ReturnStatementNode(
+                    span,
+                    new BinaryOperationNode(
+                        span,
+                        BinaryOperator.Divide,
+                        new IntLiteralNode(span, 1),
+                        new ReferenceNode(span, "divisor"))),
+            ],
+            new AttributeCollection());
+        var module = new ModuleNode(
+            span,
+            "m1",
+            "Test",
+            [],
+            [function],
+            new AttributeCollection());
+        var diagnostics = new DiagnosticBag();
+
+        new VerificationAnalysisPass(
+                diagnostics,
+                new VerificationAnalysisOptions
+                {
+                    EnableDataflow = false,
+                    EnableBugPatterns = true,
+                    EnableTaintAnalysis = false,
+                    EnableContractInference = false,
+                    EnableKInduction = false,
+                    UseZ3Verification = false,
+                })
+            .Analyze(module);
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.MissingPrecondition);
+    }
+
     [SkippableFact]
     public void ProvenContract_EmitsComment_NotRuntimeCheck()
     {

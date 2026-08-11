@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Microsoft.Z3;
@@ -151,6 +152,13 @@ public sealed class OverflowChecker : IBugPatternChecker
                     CheckExpression(throwStmt.Expression, function, diagnostics, pathConditions);
                 }
                 break;
+
+            default:
+                foreach (var expression in BoundNodeHelpers.GetImmediateExpressions(stmt))
+                    CheckExpression(expression, function, diagnostics, pathConditions);
+                foreach (var statement in BoundNodeHelpers.GetImmediateStatements(stmt))
+                    CheckStatement(statement, function, diagnostics, pathConditions);
+                break;
         }
     }
 
@@ -160,42 +168,17 @@ public sealed class OverflowChecker : IBugPatternChecker
         DiagnosticBag diagnostics,
         List<BoundExpression> pathConditions)
     {
-        switch (expr)
+        if (expr is BoundBinaryExpression binExpr && IsOverflowProne(binExpr.Operator))
         {
-            case BoundBinaryExpression binExpr:
-                // Check for overflow-prone operations
-                if (IsOverflowProne(binExpr.Operator))
-                {
-                    CheckOverflow(binExpr, function, diagnostics, pathConditions);
-                }
-
-                // Recursively check subexpressions
-                CheckExpression(binExpr.Left, function, diagnostics, pathConditions);
-                CheckExpression(binExpr.Right, function, diagnostics, pathConditions);
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                // Check for negation overflow (e.g., -INT_MIN)
-                if (unaryExpr.Operator == Ast.UnaryOperator.Negate)
-                {
-                    CheckNegationOverflow(unaryExpr, function, diagnostics, pathConditions);
-                }
-                CheckExpression(unaryExpr.Operand, function, diagnostics, pathConditions);
-                break;
-
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                {
-                    CheckExpression(arg, function, diagnostics, pathConditions);
-                }
-                break;
-
-            case BoundConditionalExpression condExpr:
-                CheckExpression(condExpr.Condition, function, diagnostics, pathConditions);
-                CheckExpression(condExpr.WhenTrue, function, diagnostics, pathConditions);
-                CheckExpression(condExpr.WhenFalse, function, diagnostics, pathConditions);
-                break;
+            CheckOverflow(binExpr, function, diagnostics, pathConditions);
         }
+        else if (expr is BoundUnaryExpression { Operator: Ast.UnaryOperator.Negate } unaryExpr)
+        {
+            CheckNegationOverflow(unaryExpr, function, diagnostics, pathConditions);
+        }
+
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            CheckExpression(child, function, diagnostics, pathConditions);
     }
 
     private static bool IsOverflowProne(BinaryOperator op)
@@ -360,7 +343,7 @@ public sealed class OverflowChecker : IBugPatternChecker
             // Declare parameters
             foreach (var param in function.Symbol.Parameters)
             {
-                translator.DeclareVariable(param.Name, param.TypeName);
+                translator.DeclareVariable(param);
             }
 
             // Translate path conditions
@@ -433,7 +416,7 @@ public sealed class OverflowChecker : IBugPatternChecker
 
             foreach (var param in function.Symbol.Parameters)
             {
-                translator.DeclareVariable(param.Name, param.TypeName);
+                translator.DeclareVariable(param);
             }
 
             var pathConstraints = new List<BoolExpr>();

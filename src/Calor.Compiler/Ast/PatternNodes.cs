@@ -153,10 +153,12 @@ public sealed class WildcardPatternNode : PatternNode
 public sealed class VariablePatternNode : PatternNode
 {
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
 
-    public VariablePatternNode(TextSpan span, string name) : base(span)
+    public VariablePatternNode(TextSpan span, string name, TextSpan? identifierSpan = null) : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -391,11 +393,13 @@ public sealed class VarPatternNode : PatternNode
     /// The variable name to bind.
     /// </summary>
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
 
-    public VarPatternNode(TextSpan span, string name)
+    public VarPatternNode(TextSpan span, string name, TextSpan? identifierSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -491,12 +495,18 @@ public sealed class TypePatternNode : PatternNode
 
     /// <summary>The variable bound when the test succeeds, or null for a type-only pattern.</summary>
     public string? BindingName { get; }
+    public TextSpan? BindingSpan { get; }
 
-    public TypePatternNode(TextSpan span, string typeName, string? bindingName)
+    public TypePatternNode(
+        TextSpan span,
+        string typeName,
+        string? bindingName,
+        TextSpan? bindingSpan = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         BindingName = string.IsNullOrEmpty(bindingName) ? null : bindingName;
+        BindingSpan = BindingName == null ? null : bindingSpan ?? span;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

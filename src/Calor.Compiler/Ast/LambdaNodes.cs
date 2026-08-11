@@ -8,12 +8,18 @@ namespace Calor.Compiler.Ast;
 public sealed class LambdaParameterNode : AstNode
 {
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public string? TypeName { get; }
 
-    public LambdaParameterNode(TextSpan span, string name, string? typeName)
+    public LambdaParameterNode(
+        TextSpan span,
+        string name,
+        string? typeName,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName;
     }
 

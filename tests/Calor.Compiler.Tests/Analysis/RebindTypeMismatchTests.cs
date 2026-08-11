@@ -50,6 +50,16 @@ public class RebindTypeMismatchTests
     }
 
     [Fact]
+    public void RebindOfImmutableLocal_IsRejected()
+    {
+        var diagnostics = Validate(
+            "§M{m:S}\n  §F{f:Do:pub} () -> i32\n    §B{x:i32} 0\n    §B{~x} 1\n    §R x\n");
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.BindReassignsImmutable);
+    }
+
+    [Fact]
     public void UnannotatedRebindWithMismatchedLiteral_IsRejected()
     {
         // #740 common case: no annotation, but the literal's type is statically known.

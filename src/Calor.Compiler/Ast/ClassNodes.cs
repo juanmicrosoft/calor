@@ -272,11 +272,13 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
     /// The base class (if any).
     /// </summary>
     public string? BaseClass { get; }
+    public TextSpan? BaseClassSpan { get; }
 
     /// <summary>
     /// Interfaces implemented by this class.
     /// </summary>
     public IReadOnlyList<string> ImplementedInterfaces { get; }
+    public IReadOnlyList<TextSpan> ImplementedInterfaceSpans { get; }
 
     /// <summary>
     /// Type parameters if this is a generic class.
@@ -492,8 +494,11 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IReadOnlyList<InterfaceDefinitionNode>? nestedInterfaces = null,
         IReadOnlyList<EnumDefinitionNode>? nestedEnums = null,
         IReadOnlyList<IndexerNode>? indexers = null,
-        IReadOnlyList<DelegateDefinitionNode>? nestedDelegates = null)
-        : base(span, id, name, attributes)
+        IReadOnlyList<DelegateDefinitionNode>? nestedDelegates = null,
+        TextSpan? identifierSpan = null,
+        TextSpan? baseClassSpan = null,
+        IReadOnlyList<TextSpan>? implementedInterfaceSpans = null)
+        : base(span, id, name, attributes, identifierSpan)
     {
         IsAbstract = isAbstract;
         IsSealed = isSealed;
@@ -503,7 +508,9 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
         IsReadOnly = isReadOnly;
         Visibility = visibility;
         BaseClass = baseClass;
+        BaseClassSpan = baseClassSpan;
         ImplementedInterfaces = implementedInterfaces ?? throw new ArgumentNullException(nameof(implementedInterfaces));
+        ImplementedInterfaceSpans = implementedInterfaceSpans ?? Array.Empty<TextSpan>();
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Fields = fields ?? throw new ArgumentNullException(nameof(fields));
         Properties = properties ?? throw new ArgumentNullException(nameof(properties));
@@ -532,7 +539,9 @@ public sealed class ClassDefinitionNode : TypeDefinitionNode
 public sealed class ClassFieldNode : AstNode
 {
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
     public bool IsStatic => Modifiers.HasFlag(MethodModifiers.Static);
@@ -577,11 +586,15 @@ public sealed class ClassFieldNode : AstNode
         MethodModifiers modifiers,
         ExpressionNode? defaultValue,
         AttributeCollection attributes,
-        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         Visibility = visibility;
         Modifiers = modifiers;
         DefaultValue = defaultValue;
@@ -604,6 +617,7 @@ public sealed class MethodNode : AstNode
 {
     public string Id { get; }
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
@@ -659,11 +673,13 @@ public sealed class MethodNode : AstNode
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
-        bool isAsync = false)
+        bool isAsync = false,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         Visibility = visibility;
         Modifiers = modifiers;
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
@@ -854,6 +870,8 @@ public sealed class OperatorOverloadNode : AstNode
 public sealed class NewExpressionNode : ExpressionNode
 {
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
+    public TypeReferenceNode TypeReference { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
 
@@ -876,11 +894,20 @@ public sealed class NewExpressionNode : ExpressionNode
         string typeName,
         IReadOnlyList<string> typeArguments,
         IReadOnlyList<ExpressionNode> arguments,
-        IReadOnlyList<ObjectInitializerAssignment> initializers)
+        IReadOnlyList<ObjectInitializerAssignment> initializers,
+        TextSpan? typeNameSpan = null,
+        TypeReferenceNode? typeReference = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? span;
         TypeArguments = typeArguments ?? throw new ArgumentNullException(nameof(typeArguments));
+        TypeReference = typeReference ?? new TypeReferenceNode(
+            TypeNameSpan,
+            TypeName,
+            TypeArguments
+                .Select(argument => new TypeReferenceNode(TextSpan.Empty, argument))
+                .ToArray());
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
         Initializers = initializers ?? Array.Empty<ObjectInitializerAssignment>();
     }
@@ -931,6 +958,8 @@ public sealed class CallExpressionNode : ExpressionNode
 {
     public string Target { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
+    public TextSpan CalleeSpan { get; }
+    public TextSpan? ReceiverSpan { get; }
 
     /// <summary>
     /// Optional named argument labels, parallel to Arguments list.
@@ -952,30 +981,29 @@ public sealed class CallExpressionNode : ExpressionNode
     public IReadOnlyList<string>? TypeArguments { get; }
 
     public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments)
-        : base(span)
+        : this(span, target, arguments, null, null, null)
     {
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
     }
 
     public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames)
-        : base(span)
+        : this(span, target, arguments, argumentNames, null, null)
     {
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
-        ArgumentNames = argumentNames;
     }
 
     public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames, IReadOnlyList<string?>? argumentModifiers)
-        : base(span)
+        : this(span, target, arguments, argumentNames, argumentModifiers, null)
     {
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
-        ArgumentNames = argumentNames;
-        ArgumentModifiers = argumentModifiers;
     }
 
-    public CallExpressionNode(TextSpan span, string target, IReadOnlyList<ExpressionNode> arguments, IReadOnlyList<string?>? argumentNames, IReadOnlyList<string?>? argumentModifiers, IReadOnlyList<string>? typeArguments)
+    public CallExpressionNode(
+        TextSpan span,
+        string target,
+        IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers,
+        IReadOnlyList<string>? typeArguments,
+        TextSpan? calleeSpan = null,
+        TextSpan? receiverSpan = null)
         : base(span)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
@@ -983,6 +1011,8 @@ public sealed class CallExpressionNode : ExpressionNode
         ArgumentNames = argumentNames;
         ArgumentModifiers = argumentModifiers;
         TypeArguments = typeArguments;
+        CalleeSpan = calleeSpan ?? span;
+        ReceiverSpan = receiverSpan;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

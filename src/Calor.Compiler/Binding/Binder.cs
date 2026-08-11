@@ -8,15 +8,105 @@ namespace Calor.Compiler.Binding;
 /// </summary>
 public sealed class Binder
 {
+    internal delegate BoundExpression ExpressionBinder(Binder binder, ExpressionNode expression);
+
+    private static readonly IReadOnlyDictionary<Type, ExpressionBinder> ExpressionBinders =
+        new Dictionary<Type, ExpressionBinder>
+        {
+            [typeof(AddressOfNode)] = static (binder, expression) => binder.BindAddressOf((AddressOfNode)expression),
+            [typeof(AnonymousObjectCreationNode)] = static (binder, expression) => binder.BindAnonymousObjectCreation((AnonymousObjectCreationNode)expression),
+            [typeof(ArrayAccessNode)] = static (binder, expression) => binder.BindArrayAccess((ArrayAccessNode)expression),
+            [typeof(ArrayCreationNode)] = static (binder, expression) => binder.BindArrayCreation((ArrayCreationNode)expression),
+            [typeof(ArrayLengthNode)] = static (binder, expression) => binder.BindArrayLength((ArrayLengthNode)expression),
+            [typeof(AwaitExpressionNode)] = static (binder, expression) => binder.BindAwaitExpression((AwaitExpressionNode)expression),
+            [typeof(BaseExpressionNode)] = static (binder, expression) => binder.BindBaseExpression((BaseExpressionNode)expression),
+            [typeof(BinaryOperationNode)] = static (binder, expression) => binder.BindBinaryOperation((BinaryOperationNode)expression),
+            [typeof(BoolLiteralNode)] = static (_, expression) => new BoundBoolLiteral(expression.Span, ((BoolLiteralNode)expression).Value),
+            [typeof(CallExpressionNode)] = static (binder, expression) => binder.BindCallExpression((CallExpressionNode)expression),
+            [typeof(CharOperationNode)] = static (binder, expression) => binder.BindCharOperation((CharOperationNode)expression),
+            [typeof(CollectionContainsNode)] = static (binder, expression) => binder.BindCollectionContains((CollectionContainsNode)expression),
+            [typeof(CollectionCountNode)] = static (binder, expression) => binder.BindCollectionCount((CollectionCountNode)expression),
+            [typeof(ConditionalExpressionNode)] = static (binder, expression) => binder.BindConditionalExpression((ConditionalExpressionNode)expression),
+            [typeof(DecimalLiteralNode)] = static (_, expression) => new BoundDecimalLiteral(expression.Span, ((DecimalLiteralNode)expression).Value),
+            [typeof(DictionaryCreationNode)] = static (binder, expression) => binder.BindDictionaryCreation((DictionaryCreationNode)expression),
+            [typeof(ErrExpressionNode)] = static (binder, expression) => binder.BindErrExpression((ErrExpressionNode)expression),
+            [typeof(ExistsExpressionNode)] = static (binder, expression) => binder.BindExistsExpression((ExistsExpressionNode)expression),
+            [typeof(ExpressionCallNode)] = static (binder, expression) => binder.BindExpressionCall((ExpressionCallNode)expression),
+            [typeof(FallbackExpressionNode)] = static (binder, expression) => binder.BindFallbackInterop((FallbackExpressionNode)expression),
+            [typeof(FieldAccessNode)] = static (binder, expression) => binder.BindFieldAccess((FieldAccessNode)expression),
+            [typeof(FloatLiteralNode)] = static (binder, expression) => binder.BindFloatLiteral((FloatLiteralNode)expression),
+            [typeof(ForallExpressionNode)] = static (binder, expression) => binder.BindForallExpression((ForallExpressionNode)expression),
+            [typeof(GenericTypeNode)] = static (binder, expression) => binder.BindGenericType((GenericTypeNode)expression),
+            [typeof(ImplicationExpressionNode)] = static (binder, expression) => binder.BindImplicationExpression((ImplicationExpressionNode)expression),
+            [typeof(IndexFromEndNode)] = static (binder, expression) => binder.BindIndexFromEnd((IndexFromEndNode)expression),
+            [typeof(IntLiteralNode)] = static (binder, expression) => binder.BindIntLiteral((IntLiteralNode)expression),
+            [typeof(InterpolatedStringNode)] = static (binder, expression) => binder.BindInterpolatedString((InterpolatedStringNode)expression),
+            [typeof(IsPatternNode)] = static (binder, expression) => binder.BindIsPattern((IsPatternNode)expression),
+            [typeof(LambdaExpressionNode)] = static (binder, expression) => binder.BindLambdaExpression((LambdaExpressionNode)expression),
+            [typeof(ListCreationNode)] = static (binder, expression) => binder.BindListCreation((ListCreationNode)expression),
+            [typeof(MatchExpressionNode)] = static (binder, expression) => binder.BindMatchExpression((MatchExpressionNode)expression),
+            [typeof(MultiDimArrayAccessNode)] = static (binder, expression) => binder.BindMultiDimArrayAccess((MultiDimArrayAccessNode)expression),
+            [typeof(MultiDimArrayCreationNode)] = static (binder, expression) => binder.BindMultiDimArrayCreation((MultiDimArrayCreationNode)expression),
+            [typeof(NameOfExpressionNode)] = static (_, expression) => new BoundStringLiteral(expression.Span, ((NameOfExpressionNode)expression).Name),
+            [typeof(NewExpressionNode)] = static (binder, expression) => binder.BindNewExpression((NewExpressionNode)expression),
+            [typeof(NoneExpressionNode)] = static (binder, expression) => binder.BindNoneExpression((NoneExpressionNode)expression),
+            [typeof(NullCoalesceNode)] = static (binder, expression) => binder.BindNullCoalesce((NullCoalesceNode)expression),
+            [typeof(NullConditionalNode)] = static (binder, expression) => binder.BindNullConditional((NullConditionalNode)expression),
+            [typeof(OkExpressionNode)] = static (binder, expression) => binder.BindOkExpression((OkExpressionNode)expression),
+            [typeof(PointerDereferenceNode)] = static (binder, expression) => binder.BindPointerDereference((PointerDereferenceNode)expression),
+            [typeof(RangeExpressionNode)] = static (binder, expression) => binder.BindRangeExpression((RangeExpressionNode)expression),
+            [typeof(RawCSharpExpressionNode)] = static (binder, expression) => binder.BindRawCSharpInterop((RawCSharpExpressionNode)expression),
+            [typeof(RecordCreationNode)] = static (binder, expression) => binder.BindRecordCreation((RecordCreationNode)expression),
+            [typeof(ReferenceNode)] = static (binder, expression) => binder.BindReferenceExpression((ReferenceNode)expression),
+            [typeof(SelfRefNode)] = static (binder, expression) => binder.BindSelfReference((SelfRefNode)expression),
+            [typeof(SetCreationNode)] = static (binder, expression) => binder.BindSetCreation((SetCreationNode)expression),
+            [typeof(SizeOfNode)] = static (binder, expression) => binder.BindSizeOf((SizeOfNode)expression),
+            [typeof(SomeExpressionNode)] = static (binder, expression) => binder.BindSomeExpression((SomeExpressionNode)expression),
+            [typeof(StackAllocNode)] = static (binder, expression) => binder.BindStackAlloc((StackAllocNode)expression),
+            [typeof(StringBuilderOperationNode)] = static (binder, expression) => binder.BindStringBuilderOperation((StringBuilderOperationNode)expression),
+            [typeof(StringLiteralNode)] = static (binder, expression) => binder.BindStringLiteral((StringLiteralNode)expression),
+            [typeof(StringOperationNode)] = static (binder, expression) => binder.BindStringOperation((StringOperationNode)expression),
+            [typeof(ThisExpressionNode)] = static (binder, expression) => binder.BindThisExpression((ThisExpressionNode)expression),
+            [typeof(ThrowExpressionNode)] = static (binder, expression) => binder.BindThrowExpression((ThrowExpressionNode)expression),
+            [typeof(TupleLiteralNode)] = static (binder, expression) => binder.BindTupleLiteral((TupleLiteralNode)expression),
+            [typeof(TypeOfExpressionNode)] = static (binder, expression) => binder.BindTypeOf((TypeOfExpressionNode)expression),
+            [typeof(TypeOperationNode)] = static (binder, expression) => binder.BindTypeOperation((TypeOperationNode)expression),
+            [typeof(UnaryOperationNode)] = static (binder, expression) => binder.BindUnaryOperation((UnaryOperationNode)expression),
+            [typeof(WithExpressionNode)] = static (binder, expression) => binder.BindWithExpression((WithExpressionNode)expression),
+        };
+
+    internal static IReadOnlyCollection<Type> RegisteredExpressionNodeTypes =>
+        ExpressionBinders.Keys.ToArray();
+
+    internal static IReadOnlyDictionary<Type, ExpressionBinder> ExpressionDispatch =>
+        ExpressionBinders;
+
+    public int ExpressionsBound { get; private set; }
+
     private readonly DiagnosticBag _diagnostics;
+    private readonly string _sourceIdentity;
     private Scope _scope;
+    private readonly Dictionary<AstNode, FunctionSymbol> _functionSymbols = new();
+    private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
+    private readonly Dictionary<ClassDefinitionNode, string> _qualifiedClassNames = new();
+    private readonly Dictionary<ClassDefinitionNode, SymbolId> _classSymbolIds = new();
+    private readonly Dictionary<ClassDefinitionNode, TypeSymbol> _classSymbols = new();
+    private readonly Dictionary<string, ClassDefinitionNode> _classesByQualifiedName = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<ClassDefinitionNode>> _classesBySimpleName = new(StringComparer.Ordinal);
+    private readonly Dictionary<SymbolId, Symbol> _symbolsById = new();
+    private readonly Dictionary<string, int> _declarationIdOccurrences = new(StringComparer.Ordinal);
+    private SymbolId _moduleSymbolId;
+    private SymbolId _declarationContext;
     private string? _currentClassName;
+    private ClassDefinitionNode? _currentClass;
     private Scope? _currentClassScope;
+    private SymbolId _currentClassIdentity;
     private bool _isStaticContext;
 
-    public Binder(DiagnosticBag diagnostics)
+    public Binder(DiagnosticBag diagnostics, string? sourceIdentity = null)
     {
         _diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
+        _sourceIdentity = SymbolSourceIdentity.Canonicalize(sourceIdentity);
         _scope = new Scope();
     }
 
@@ -50,59 +140,547 @@ public sealed class Binder
         public void Dispose() => _binder._isStaticContext = _previous;
     }
 
+    private IDisposable PushDeclarationContext(SymbolId context)
+    {
+        var previousContext = _declarationContext;
+        _declarationContext = context;
+        return new DeclarationContextRestorer(this, previousContext);
+    }
+
+    private sealed class DeclarationContextRestorer : IDisposable
+    {
+        private readonly Binder _binder;
+        private readonly SymbolId _previousContext;
+
+        public DeclarationContextRestorer(
+            Binder binder,
+            SymbolId previousContext)
+        {
+            _binder = binder;
+            _previousContext = previousContext;
+        }
+
+        public void Dispose()
+        {
+            _binder._declarationContext = _previousContext;
+        }
+    }
+
     public BoundModule Bind(ModuleNode module)
     {
+        _scope = new Scope();
+        _functionSymbols.Clear();
+        _classScopes.Clear();
+        _qualifiedClassNames.Clear();
+        _classSymbolIds.Clear();
+        _classSymbols.Clear();
+        _classesByQualifiedName.Clear();
+        _classesBySimpleName.Clear();
+        _symbolsById.Clear();
+        _declarationIdOccurrences.Clear();
+        _moduleSymbolId = SymbolId.Create("source", _sourceIdentity, "module", module.Id);
+        _declarationContext = _moduleSymbolId;
+
         var functions = new List<BoundFunction>();
 
-        // First pass: register all function symbols in module scope. #762 items 5–6
-        // (B8, scoping doc D5): top-level functions use the same overload-set
-        // machinery as class members — a second declaration with a DIFFERENT
-        // signature is a legal overload (previously its TryDeclare silently failed
-        // and every call resolved to the first declaration); an IDENTICAL ordered
-        // parameter-type list is unresolvable and diagnosed at the declaration.
-        foreach (var func in module.Functions)
-        {
-            var parameters = func.Parameters
-                .Select(p => new VariableSymbol(p.Name, p.TypeName, isMutable: false, isParameter: true))
-                .ToList();
-            var returnType = func.Output?.TypeName ?? "VOID";
-            var funcSymbol = new FunctionSymbol(func.Name, returnType, parameters);
-            var existing = _scope.LookupOverloadSet(func.Name);
-            if (existing.Any(f => f.Parameters.Select(p => p.TypeName)
-                    .SequenceEqual(funcSymbol.Parameters.Select(p => p.TypeName), StringComparer.Ordinal)))
-            {
-                _diagnostics.ReportError(func.Span, DiagnosticCode.DuplicateFunctionSignature,
-                    $"Function '{func.Name}' is already declared with the same parameter types " +
-                    $"({string.Join(", ", parameters.Select(p => p.TypeName))}). Overloads must " +
-                    "differ in their parameter list.");
-                continue;
-            }
-            _scope.DeclareOverload(funcSymbol);
-        }
+        RegisterTopLevelFunctions(module);
+        foreach (var cls in module.Classes)
+            RegisterClassTree(cls, _moduleSymbolId, null);
 
-        // Second pass: bind function bodies
         foreach (var func in module.Functions)
-        {
             functions.Add(BindFunction(func));
-        }
 
-        // Third pass: bind class member bodies
         foreach (var cls in module.Classes)
             BindClassMembers(cls, functions);
 
-        return new BoundModule(module.Span, module.Name, functions);
+        return new BoundModule(
+            module.Span,
+            module.Name,
+            functions,
+            new Dictionary<SymbolId, Symbol>(_symbolsById));
+    }
+
+    private void RegisterTopLevelFunctions(ModuleNode module)
+    {
+        foreach (var function in module.Functions)
+        {
+            var symbol = CreateFunctionSymbol(
+                CreateDeclarationId(_moduleSymbolId, "function", function.Id, function.Name),
+                function.Name,
+                function.Output?.TypeName ?? "VOID",
+                GetCallableTypeParameters(
+                    function.Name,
+                    function.TypeParameters.Select(parameter => parameter.Name)),
+                function.Parameters,
+                function.IdentifierSpan,
+                function.Visibility,
+                containingTypeName: null,
+                definitionSpan: function.Span);
+            _functionSymbols.Add(function, symbol);
+
+            var lookupName = GetCallableLookupName(function.Name);
+            if (!_scope.TryDeclareOverload(lookupName, symbol, out var duplicate))
+                ReportDuplicateSignature(function.Span, lookupName, symbol, duplicate);
+        }
+    }
+
+    private void RegisterClassTree(
+        ClassDefinitionNode cls,
+        SymbolId parentIdentity,
+        string? containingTypeName)
+    {
+        var classIdentity = CreateDeclarationId(parentIdentity, "class", cls.Id, cls.Name);
+        var qualifiedClassName = containingTypeName == null
+            ? cls.Name
+            : $"{containingTypeName}.{cls.Name}";
+        var classScope = _scope.CreateChild();
+        var classSymbol = new TypeSymbol(
+            classIdentity,
+            cls.Name,
+            qualifiedClassName,
+            cls.Visibility,
+            cls.IdentifierSpan,
+            cls.Span);
+        TrackSymbol(classSymbol);
+
+        _classScopes.Add(cls, classScope);
+        _qualifiedClassNames.Add(cls, qualifiedClassName);
+        _classSymbolIds.Add(cls, classIdentity);
+        _classSymbols.Add(cls, classSymbol);
+        _classesByQualifiedName[qualifiedClassName] = cls;
+        if (!_classesBySimpleName.TryGetValue(cls.Name, out var simpleMatches))
+        {
+            simpleMatches = new List<ClassDefinitionNode>();
+            _classesBySimpleName.Add(cls.Name, simpleMatches);
+        }
+        simpleMatches.Add(cls);
+
+        var fields = EnumerateFieldRegistrations(cls).ToArray();
+        for (var fieldIndex = 0; fieldIndex < fields.Length; fieldIndex++)
+        {
+            var (field, conditionalAlternative) = fields[fieldIndex];
+            var isMutable = !field.Modifiers.HasFlag(MethodModifiers.Readonly);
+            var symbol = CreateVariable(
+                CreateDeclarationId(classIdentity, "field", stableAstId: null, field.Name),
+                field.Name,
+                field.TypeName,
+                isMutable,
+                isParameter: false,
+                ParameterModifier.None,
+                field.IdentifierSpan,
+                visibility: field.Visibility,
+                declaringTypeName: qualifiedClassName,
+                isField: true,
+                isStatic: field.IsStatic,
+                conditionalAlternative: conditionalAlternative);
+            if (!classScope.TryDeclare(symbol))
+            {
+                _diagnostics.ReportError(
+                    field.Span,
+                    DiagnosticCode.DuplicateDefinition,
+                    $"Field '{field.Name}' is already defined in '{qualifiedClassName}'");
+            }
+        }
+
+        var properties = EnumeratePropertyRegistrations(cls).ToArray();
+        for (var propertyIndex = 0; propertyIndex < properties.Length; propertyIndex++)
+        {
+            var (property, conditionalAlternative) = properties[propertyIndex];
+            var symbol = CreateVariable(
+                CreateDeclarationId(classIdentity, "property", property.Id, property.Name),
+                property.Name,
+                property.TypeName,
+                property.Setter != null || property.Initer != null,
+                isParameter: false,
+                ParameterModifier.None,
+                property.IdentifierSpan,
+                visibility: property.Visibility,
+                declaringTypeName: qualifiedClassName,
+                isProperty: true,
+                isStatic: property.IsStatic,
+                conditionalAlternative: conditionalAlternative);
+            if (!classScope.TryDeclare(symbol))
+            {
+                _diagnostics.ReportError(
+                    property.Span,
+                    DiagnosticCode.DuplicateDefinition,
+                    $"Property '{property.Name}' is already defined in '{qualifiedClassName}'");
+            }
+        }
+
+        var methods = EnumerateMethodRegistrations(cls).ToArray();
+        for (var methodIndex = 0; methodIndex < methods.Length; methodIndex++)
+        {
+            var (method, conditionalAlternative) = methods[methodIndex];
+            var lookupName = GetCallableLookupName(method.Name);
+            var qualifiedLookupName = $"{qualifiedClassName}.{lookupName}";
+            var symbol = CreateFunctionSymbol(
+                CreateDeclarationId(classIdentity, "method", method.Id, method.Name),
+                $"{qualifiedClassName}.{method.Name}",
+                method.Output?.TypeName ?? "VOID",
+                GetCallableTypeParameters(
+                    method.Name,
+                    method.TypeParameters.Select(parameter => parameter.Name)),
+                method.Parameters,
+                method.IdentifierSpan,
+                method.Visibility,
+                qualifiedClassName,
+                method.Span,
+                conditionalAlternative);
+            _functionSymbols.Add(method, symbol);
+
+            if (!classScope.TryDeclareOverload(lookupName, symbol, out var duplicate))
+            {
+                ReportDuplicateSignature(method.Span, qualifiedLookupName, symbol, duplicate);
+                continue;
+            }
+
+            if (!_scope.TryDeclareOverload(qualifiedLookupName, symbol, out duplicate))
+                ReportDuplicateSignature(method.Span, qualifiedLookupName, symbol, duplicate);
+        }
+
+        var constructors = EnumerateConstructorRegistrations(cls).ToArray();
+        for (var constructorIndex = 0; constructorIndex < constructors.Length; constructorIndex++)
+        {
+            var (constructor, conditionalAlternative) = constructors[constructorIndex];
+            var constructorName = constructor.IsStatic ? ".cctor" : ".ctor";
+            var qualifiedLookupName = $"{qualifiedClassName}.{constructorName}";
+            var symbol = CreateFunctionSymbol(
+                CreateDeclarationId(classIdentity, "constructor", constructor.Id, constructorName),
+                qualifiedLookupName,
+                "VOID",
+                Array.Empty<string>(),
+                constructor.Parameters,
+                cls.IdentifierSpan,
+                constructor.Visibility,
+                qualifiedClassName,
+                constructor.Span,
+                conditionalAlternative);
+            _functionSymbols.Add(constructor, symbol);
+
+            if (!classScope.TryDeclareOverload(qualifiedLookupName, symbol, out var duplicate))
+            {
+                ReportDuplicateSignature(constructor.Span, qualifiedLookupName, symbol, duplicate);
+                continue;
+            }
+
+            if (!constructor.IsStatic
+                && !classScope.TryDeclareOverload(cls.Name, symbol, out duplicate))
+            {
+                ReportDuplicateSignature(constructor.Span, cls.Name, symbol, duplicate);
+            }
+            if (!_scope.TryDeclareOverload(qualifiedLookupName, symbol, out duplicate))
+                ReportDuplicateSignature(constructor.Span, qualifiedLookupName, symbol, duplicate);
+        }
+
+        foreach (var nested in cls.NestedClasses)
+        {
+            RegisterClassTree(
+                nested,
+                classIdentity,
+                qualifiedClassName);
+        }
+    }
+
+    private static IEnumerable<MemberPreprocessorBlockNode> EnumeratePreprocessorBranches(
+        ClassDefinitionNode cls)
+    {
+        foreach (var block in cls.PreprocessorBlocks)
+        {
+            for (var branch = block; branch != null; branch = branch.ElseBranch)
+                yield return branch;
+        }
+    }
+
+    private static IEnumerable<ClassFieldNode> EnumerateFields(ClassDefinitionNode cls) =>
+        cls.Fields.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Fields));
+
+    private static IEnumerable<(ClassFieldNode Field, ConditionalAlternative? Alternative)>
+        EnumerateFieldRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var field in cls.Fields)
+            yield return (field, null);
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+        {
+            foreach (var field in branch.Fields)
+                yield return (field, alternative);
+        }
+    }
+
+    private static IEnumerable<PropertyNode> EnumerateProperties(ClassDefinitionNode cls) =>
+        cls.Properties.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Properties));
+
+    private static IEnumerable<(PropertyNode Property, ConditionalAlternative? Alternative)>
+        EnumeratePropertyRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var property in cls.Properties)
+            yield return (property, null);
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+        {
+            foreach (var property in branch.Properties)
+                yield return (property, alternative);
+        }
+    }
+
+    private static IEnumerable<IndexerNode> EnumerateIndexers(ClassDefinitionNode cls) =>
+        cls.Indexers.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Indexers));
+
+    private static IEnumerable<ConstructorNode> EnumerateConstructors(ClassDefinitionNode cls) =>
+        cls.Constructors.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Constructors));
+
+    private static IEnumerable<(ConstructorNode Constructor, ConditionalAlternative? Alternative)>
+        EnumerateConstructorRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var constructor in cls.Constructors)
+            yield return (constructor, null);
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+        {
+            foreach (var constructor in branch.Constructors)
+                yield return (constructor, alternative);
+        }
+    }
+
+    private static IEnumerable<MethodNode> EnumerateMethods(ClassDefinitionNode cls) =>
+        cls.Methods.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Methods));
+
+    private static IEnumerable<(MethodNode Method, ConditionalAlternative? Alternative)>
+        EnumerateMethodRegistrations(ClassDefinitionNode cls)
+    {
+        foreach (var method in cls.Methods)
+            yield return (method, null);
+
+        foreach (var (branch, alternative) in EnumerateConditionalMemberBranches(cls))
+        {
+            foreach (var method in branch.Methods)
+                yield return (method, alternative);
+        }
+    }
+
+    private static IEnumerable<(MemberPreprocessorBlockNode Branch, ConditionalAlternative Alternative)>
+        EnumerateConditionalMemberBranches(ClassDefinitionNode cls)
+    {
+        for (var blockIndex = 0; blockIndex < cls.PreprocessorBlocks.Count; blockIndex++)
+        {
+            var groupId = $"{cls.Id}:member-pp:{blockIndex}";
+            var branchIndex = 0;
+            for (var branch = cls.PreprocessorBlocks[blockIndex];
+                 branch != null;
+                 branch = branch.ElseBranch)
+            {
+                yield return (branch, new ConditionalAlternative(groupId, branchIndex++));
+            }
+        }
+    }
+
+    private static IEnumerable<EventDefinitionNode> EnumerateEvents(ClassDefinitionNode cls) =>
+        cls.Events.Concat(EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.Events));
+
+    private static IEnumerable<OperatorOverloadNode> EnumerateOperators(ClassDefinitionNode cls) =>
+        cls.OperatorOverloads.Concat(
+            EnumeratePreprocessorBranches(cls).SelectMany(branch => branch.OperatorOverloads));
+
+    private FunctionSymbol CreateFunctionSymbol(
+        SymbolId id,
+        string name,
+        string returnType,
+        IReadOnlyList<string> typeParameters,
+        IReadOnlyList<ParameterNode> parameters,
+        Parsing.TextSpan declarationSpan,
+        Visibility visibility,
+        string? containingTypeName,
+        Parsing.TextSpan definitionSpan,
+        ConditionalAlternative? conditionalAlternative = null)
+    {
+        var parameterSymbols = parameters
+            .Select((parameter, index) => CreateVariable(
+                CreateDeclarationId(id, "parameter", stableAstId: null, parameter.Name),
+                parameter.Name,
+                parameter.TypeName,
+                isMutable: false,
+                isParameter: true,
+                parameter.Modifier,
+                parameter.IdentifierSpan,
+                parameter.DefaultValue))
+            .ToArray();
+        var symbol = new FunctionSymbol(
+            id,
+            name,
+            returnType,
+            parameterSymbols,
+            typeParameters,
+            declarationSpan,
+            visibility,
+            containingTypeName,
+            definitionSpan,
+            conditionalAlternative);
+        TrackSymbol(symbol);
+        return symbol;
+    }
+
+    private VariableSymbol CreateVariable(
+        SymbolId id,
+        string name,
+        string typeName,
+        bool isMutable,
+        bool isParameter,
+        ParameterModifier modifier,
+        Parsing.TextSpan declarationSpan,
+        ExpressionNode? defaultValue = null,
+        Visibility visibility = Visibility.Public,
+        string? declaringTypeName = null,
+        bool isField = false,
+        bool isProperty = false,
+        bool isStatic = false,
+        ConditionalAlternative? conditionalAlternative = null)
+    {
+        var symbol = new VariableSymbol(
+            id,
+            name,
+            typeName,
+            isMutable,
+            isParameter,
+            modifier,
+            declarationSpan,
+            defaultValue,
+            visibility,
+            declaringTypeName,
+            isField,
+            isProperty,
+            isStatic,
+            conditionalAlternative);
+        TrackSymbol(symbol);
+        return symbol;
+    }
+
+    private VariableSymbol CreateLocalVariable(
+        string name,
+        string typeName,
+        bool isMutable,
+        bool isParameter,
+        ParameterModifier modifier,
+        Parsing.TextSpan declarationSpan,
+        string kind,
+        ExpressionNode? defaultValue = null)
+    {
+        var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
+        return CreateVariable(
+            CreateDeclarationId(context, kind, stableAstId: null, name),
+            name,
+            typeName,
+            isMutable,
+            isParameter,
+            modifier,
+            declarationSpan,
+            defaultValue);
+    }
+
+    private SymbolId CreateDeclarationId(
+        SymbolId parent,
+        string kind,
+        string? stableAstId,
+        string fallbackName)
+    {
+        var baseId = !string.IsNullOrWhiteSpace(stableAstId)
+            ? parent.Append(kind, $"ast:{stableAstId}")
+            : parent.Append(kind, $"name:{fallbackName}");
+        var key = baseId.Value;
+        if (!_declarationIdOccurrences.TryGetValue(key, out var occurrence))
+        {
+            _declarationIdOccurrences.Add(key, 1);
+            return baseId;
+        }
+
+        _declarationIdOccurrences[key] = occurrence + 1;
+        return baseId.Append($"duplicate:{occurrence}");
+    }
+
+    private VariableSymbol CreateUnresolvedVariable(ReferenceNode reference)
+    {
+        return new VariableSymbol(
+            SymbolId.None,
+            reference.Name,
+            "INT",
+            isMutable: false,
+            isParameter: false,
+            ParameterModifier.None,
+            reference.Span);
+    }
+
+    private void TrackSymbol(Symbol symbol)
+    {
+        if (!symbol.Id.IsNone)
+            _symbolsById.Add(symbol.Id, symbol);
+    }
+
+    private void ReportDuplicateSignature(
+        Parsing.TextSpan span,
+        string lookupName,
+        FunctionSymbol symbol,
+        FunctionSymbol? duplicate)
+    {
+        var conflict = duplicate == null ? string.Empty : $" Conflicts with '{duplicate.Id}'.";
+        _diagnostics.ReportError(
+            span,
+            DiagnosticCode.DuplicateFunctionSignature,
+            $"Duplicate signature '{lookupName}{FormatSignatureSuffix(symbol)}'.{conflict}");
+    }
+
+    private static string FormatSignatureSuffix(FunctionSymbol symbol)
+    {
+        var generic = symbol.GenericArity == 0 ? string.Empty : $"<{symbol.GenericArity}>";
+        var parameters = string.Join(
+            ", ",
+            symbol.Parameters.Select(parameter =>
+                $"{FormatParameterModifier(parameter.Modifier)}{TypeIdentity.CanonicalizeSignature(parameter.TypeName, symbol.TypeParameters)}"));
+        return $"{generic}({parameters})";
+    }
+
+    private static string FormatParameterModifier(ParameterModifier modifier)
+    {
+        var callModifier = modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In);
+        return callModifier switch
+        {
+            ParameterModifier.Ref => "ref ",
+            ParameterModifier.Out => "out ",
+            ParameterModifier.In => "in ",
+            _ when modifier.HasFlag(ParameterModifier.Params) => "params ",
+            _ when modifier.HasFlag(ParameterModifier.This) => "this ",
+            _ => string.Empty,
+        };
+    }
+
+    private static string GetCallableLookupName(string declaredName)
+    {
+        var open = declaredName.LastIndexOf('<');
+        return open > 0 && declaredName.EndsWith('>')
+            ? declaredName[..open]
+            : declaredName;
+    }
+
+    private static IReadOnlyList<string> GetCallableTypeParameters(
+        string declaredName,
+        IEnumerable<string> representedTypeParameters)
+    {
+        var represented = representedTypeParameters.ToArray();
+        if (represented.Length > 0)
+            return represented;
+
+        var open = declaredName.LastIndexOf('<');
+        if (open <= 0 || !declaredName.EndsWith('>'))
+            return Array.Empty<string>();
+
+        return declaredName[(open + 1)..^1]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private BoundFunction BindFunction(FunctionNode func)
     {
         var functionScope = _scope.CreateChild();
         using var _ = PushScope(functionScope);
+        var functionSymbol = _functionSymbols[func];
+        using var _identity = PushDeclarationContext(functionSymbol.Id);
 
-        // Bind parameters
-        var parameters = BindParameters(func.Parameters);
-
-        var returnType = func.Output?.TypeName ?? "VOID";
-        var functionSymbol = new FunctionSymbol(func.Name, returnType, parameters);
+        DeclareParameters(functionSymbol.Parameters, func.Parameters);
 
         // Bind body
         var boundBody = BindStatements(func.Body);
@@ -113,18 +691,47 @@ public sealed class Binder
         return new BoundFunction(func.Span, functionSymbol, boundBody, functionScope, declaredEffects);
     }
 
+    private void DeclareParameters(
+        IReadOnlyList<VariableSymbol> symbols,
+        IReadOnlyList<ParameterNode> parameters)
+    {
+        for (var index = 0; index < symbols.Count; index++)
+        {
+            var symbol = symbols[index];
+            if (!_scope.TryDeclare(symbol))
+            {
+                var suggestedName = GenerateUniqueName(symbol.Name);
+                _diagnostics.ReportDuplicateDefinitionWithFix(
+                    parameters[index].IdentifierSpan,
+                    symbol.Name,
+                    suggestedName);
+            }
+        }
+    }
+
     private List<VariableSymbol> BindParameters(IReadOnlyList<ParameterNode> parameters)
     {
-        var result = new List<VariableSymbol>();
-        foreach (var param in parameters)
+        var result = new List<VariableSymbol>(parameters.Count);
+        foreach (var parameter in parameters)
         {
-            var paramSymbol = new VariableSymbol(param.Name, param.TypeName, isMutable: false, isParameter: true);
-            if (!_scope.TryDeclare(paramSymbol))
+            var symbol = CreateLocalVariable(
+                parameter.Name,
+                parameter.TypeName,
+                isMutable: false,
+                isParameter: true,
+                parameter.Modifier,
+                parameter.IdentifierSpan,
+                "parameter",
+                parameter.DefaultValue);
+            if (!_scope.TryDeclare(symbol))
             {
-                var suggestedName = GenerateUniqueName(param.Name);
-                _diagnostics.ReportDuplicateDefinitionWithFix(param.Span, param.Name, suggestedName);
+                var suggestedName = GenerateUniqueName(parameter.Name);
+                _diagnostics.ReportDuplicateDefinitionWithFix(
+                    parameter.IdentifierSpan,
+                    parameter.Name,
+                    suggestedName);
             }
-            result.Add(paramSymbol);
+            result.Add(symbol);
         }
         return result;
     }
@@ -195,13 +802,31 @@ public sealed class Binder
 
     private BoundCallStatement BindCallStatement(CallStatementNode call)
     {
-        var args = new List<BoundExpression>();
-        foreach (var arg in call.Arguments)
-        {
-            args.Add(BindExpression(arg));
-        }
+        var args = BindExpressions(call.Arguments);
+        var receiverSymbol = ResolveCallReceiver(
+            call.Target,
+            call.ReceiverSpan ?? call.CalleeSpan);
+        var resolution = ResolveCall(
+            call.Span,
+            call.Target,
+            args,
+            call.ArgumentNames,
+            call.ArgumentModifiers,
+            call.TypeArguments);
 
-        return new BoundCallStatement(call.Span, call.Target, args);
+        return new BoundCallStatement(
+            call.Span,
+            call.Target,
+            args,
+            resolution.Function,
+            call.ArgumentNames,
+            call.ArgumentModifiers,
+            receiverSymbol,
+            resolution.Functions,
+            call.CalleeSpan,
+            call.ReceiverSpan,
+            resolution.Kind == OverloadResolutionKind.Inaccessible,
+            call.TypeArguments);
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -215,7 +840,14 @@ public sealed class Binder
         using var _ = PushScope(_scope.CreateChild());
 
         // Declare loop variable
-        var loopVar = new VariableSymbol(forStmt.VariableName, "INT", isMutable: true);
+        var loopVar = CreateLocalVariable(
+            forStmt.VariableName,
+            "INT",
+            isMutable: true,
+            isParameter: false,
+            ParameterModifier.None,
+            forStmt.VariableSpan,
+            "for");
         if (!_scope.TryDeclare(loopVar))
         {
             _diagnostics.ReportError(forStmt.Span, DiagnosticCode.DuplicateDefinition,
@@ -269,7 +901,7 @@ public sealed class Binder
         return new BoundIfStatement(ifStmt.Span, condition, thenBody, elseIfClauses, elseBody);
     }
 
-    private BoundBindStatement BindBindStatement(BindStatementNode bind)
+    private BoundStatement BindBindStatement(BindStatementNode bind)
     {
         BoundExpression? initializer = null;
         string typeName;
@@ -298,7 +930,67 @@ public sealed class Binder
             typeName = "INT";
         }
 
-        var variable = new VariableSymbol(bind.Name, typeName, bind.IsMutable);
+        var rebindTarget = bind.IsMutable ? FindRebindTarget(bind.Name) : null;
+        if (rebindTarget != null)
+        {
+            if (!CanRebind(rebindTarget))
+            {
+                _diagnostics.ReportError(
+                    bind.IdentifierSpan,
+                    DiagnosticCode.BindReassignsImmutable,
+                    $"Binding '{bind.Name}' is immutable and cannot be rebound. " +
+                    "Declare it mutable at its original declaration or use a new name.");
+
+                var recoveryVariable = CreateLocalVariable(
+                    bind.Name,
+                    typeName,
+                    isMutable: true,
+                    isParameter: false,
+                    ParameterModifier.None,
+                    bind.IdentifierSpan,
+                    "invalid-rebind");
+                return new BoundBindStatement(bind.Span, recoveryVariable, initializer);
+            }
+
+            var annotatedType = bind.TypeName == null
+                ? null
+                : TypeIdentity.Canonicalize(bind.TypeName);
+            var valueType = initializer?.TypeName;
+            if ((annotatedType != null
+                    && !AreAssignmentCompatible(rebindTarget.TypeName, annotatedType))
+                || (valueType != null
+                    && !AreAssignmentCompatible(rebindTarget.TypeName, valueType)))
+            {
+                _diagnostics.ReportError(
+                    bind.IdentifierSpan,
+                    DiagnosticCode.BindRebindTypeMismatch,
+                    $"Mutable binding '{bind.Name}' has type '{rebindTarget.TypeName}' and cannot be " +
+                    $"rebound with '{annotatedType ?? valueType}'.");
+            }
+
+            if (initializer != null)
+            {
+                return new BoundAssignmentStatement(
+                    bind.Span,
+                    new BoundVariableExpression(bind.IdentifierSpan, rebindTarget),
+                    initializer);
+            }
+
+            _diagnostics.ReportError(
+                bind.IdentifierSpan,
+                DiagnosticCode.BindRequiresTypeOrInitializer,
+                $"Mutable rebind '{bind.Name}' requires an initializer value.");
+            return new BoundBindStatement(bind.Span, rebindTarget, initializer);
+        }
+
+        var variable = CreateLocalVariable(
+            bind.Name,
+            typeName,
+            bind.IsMutable,
+            isParameter: false,
+            ParameterModifier.None,
+            bind.IdentifierSpan,
+            "local");
 
         if (!_scope.TryDeclare(variable))
         {
@@ -309,374 +1001,913 @@ public sealed class Binder
         return new BoundBindStatement(bind.Span, variable, initializer);
     }
 
-    /// <summary>
-    /// #762 B1 (scoping doc D1): the ONE authoritative expression dispatch table. Built
-    /// once: the class-matched binder arms are registered explicitly, then every other
-    /// concrete ExpressionNode subclass is registered to BindIncomplete by reflection —
-    /// a new node class is dispatched (as incomplete, with a diagnostic) the moment it
-    /// exists, never silently dropped. The reflection completeness test pins that the
-    /// table covers the concrete subclass set exactly. A Type-keyed table rather than a
-    /// new IAstVisitor implementation because the visitor interface carries ~236 methods
-    /// per implementer (#791's change-amplification complaint) and eight AST classes
-    /// have broken no-op Accept dispatch until item 8 lands (B8) — visitor traversal is
-    /// the mechanism that cannot be trusted here yet.
-    /// </summary>
-    /// <summary>Registered incomplete-reason table: F-1 Tier B residuals PLUS F-1 dormant
-    /// Tier A classes (currently SelfRefNode). NOTE for any future mechanized gate: this is
-    /// NOT a pure Tier B list — a zero-Tier-A-incomplete check must exclude only the six
-    /// Tier B classes, never treat membership here as exemption (review of B2, minor 4).
-    /// Scoping doc D7 owns the Tier B disposition in B8.
-    /// Declared BEFORE ExpressionDispatch: static fields initialize in declaration order,
-    /// and the dispatch builder reads this table.</summary>
-    private static readonly IReadOnlyDictionary<string, string> s_tierBReasons = new Dictionary<string, string>
+    private VariableSymbol? FindRebindTarget(string name)
     {
-        // B8: the four unsafe classes keep Tier B residual status (a binding-analysis
-        // story for raw pointers is out of 0.13 scope) but now RETAIN their bound
-        // children on the incomplete node (scoping doc D2's Tier-B extractors) — the
-        // reasons below feed the child-retaining arms, not the default loop.
-        ["AddressOfNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
-        ["PointerDereferenceNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
-        ["StackAllocNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
-        ["SizeOfNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
-        // B2: dormant per F-1 — the parser rejects '#' outside refinement predicates, so no
-        // legal program places a SelfRefNode in a binder-visible position; a binder for it
-        // would be vacuously green. Promoted to live WITH a corpus obligation if a
-        // construction path ever returns (F-1's dormant rule).
-        ["SelfRefNode"] = "F-1 dormant: not constructible in binder-visible positions",
-    };
+        if (_scope.Lookup(name) is not VariableSymbol variable)
+            return null;
 
-    internal static readonly IReadOnlyDictionary<Type, Func<Binder, ExpressionNode, BoundExpression>> ExpressionDispatch =
-        BuildExpressionDispatch();
-
-    private static Dictionary<Type, Func<Binder, ExpressionNode, BoundExpression>> BuildExpressionDispatch()
-    {
-        var table = new Dictionary<Type, Func<Binder, ExpressionNode, BoundExpression>>
-        {
-            [typeof(IntLiteralNode)] = (b, e) => { var n = (IntLiteralNode)e; return new BoundIntLiteral(n.Span, n.Value); },
-            [typeof(StringLiteralNode)] = (b, e) => { var n = (StringLiteralNode)e; return new BoundStringLiteral(n.Span, n.Value); },
-            [typeof(BoolLiteralNode)] = (b, e) => { var n = (BoolLiteralNode)e; return new BoundBoolLiteral(n.Span, n.Value); },
-            [typeof(FloatLiteralNode)] = (b, e) => { var n = (FloatLiteralNode)e; return new BoundFloatLiteral(n.Span, n.Value); },
-            // B5 (#762 item 4): full-precision decimal — the downcast is gone.
-            [typeof(DecimalLiteralNode)] = (b, e) => { var n = (DecimalLiteralNode)e; return new BoundDecimalLiteral(n.Span, n.Value); },
-            [typeof(ReferenceNode)] = (b, e) => b.BindReferenceExpression((ReferenceNode)e),
-            [typeof(BinaryOperationNode)] = (b, e) => b.BindBinaryOperation((BinaryOperationNode)e),
-            [typeof(UnaryOperationNode)] = (b, e) => b.BindUnaryOperation((UnaryOperationNode)e),
-            [typeof(CallExpressionNode)] = (b, e) => b.BindCallExpression((CallExpressionNode)e),
-            [typeof(ConditionalExpressionNode)] = (b, e) => b.BindConditionalExpression((ConditionalExpressionNode)e),
-            [typeof(NameOfExpressionNode)] = (b, e) => { var n = (NameOfExpressionNode)e; return new BoundStringLiteral(n.Span, n.Name); },
-            [typeof(NoneExpressionNode)] = (b, e) => { var n = (NoneExpressionNode)e; return new BoundNoneLiteral(n.Span, n.TypeName); },
-            // static-context 'this' is a CONTEXT error on a BOUND construct, not binder
-            // incompleteness — it must not pollute the Calor0259 instrument, and the old
-            // path was silent (review of B1, Major 2). Quiet until it gets a proper
-            // semantic diagnostic in B2+.
-            [typeof(ThisExpressionNode)] = (b, e) => b._isStaticContext
-                ? b.BindIncompleteQuiet(e, "'this' is not valid in a static context")
-                : new BoundThisExpression(e.Span, b._currentClassName ?? "UNKNOWN"),
-            [typeof(BaseExpressionNode)] = (b, e) => new BoundBaseExpression(e.Span),
-            [typeof(FieldAccessNode)] = (b, e) => b.BindFieldAccess((FieldAccessNode)e),
-            [typeof(NewExpressionNode)] = (b, e) => b.BindNewExpression((NewExpressionNode)e),
-            [typeof(TypeOperationNode)] = (b, e) => b.BindTypeOperation((TypeOperationNode)e),
-            [typeof(IsPatternNode)] = (b, e) =>
-                {
-                    // B5: pattern tests no longer fold to literal true (#762 evidence).
-                    var n = (IsPatternNode)e;
-                    var bound = new BoundTypeTest(n.Span, b.BindExpression(n.Operand),
-                        n.TargetType, n.VariableName);
-                    // Review M3: the pattern VARIABLE (`x is Foo f`) is a declaration —
-                    // without this, `f` was "retained" into a node nothing consumes while
-                    // every later use was a hard Undefined-variable error. Scoped to the
-                    // enclosing bind scope (approximates C#'s definite-assignment scope).
-                    if (n.VariableName is not null)
-                        b._scope.TryDeclare(new VariableSymbol(n.VariableName, n.TargetType, isMutable: false));
-                    return bound;
-                },
-            [typeof(TypeOfExpressionNode)] = (b, e) =>
-                { var n = (TypeOfExpressionNode)e; return new BoundTypeOfExpression(n.Span, n.TypeName); },
-            // #762 B2 — the core-9 family (SelfRefNode excepted: dormant, see s_tierBReasons).
-            [typeof(SomeExpressionNode)] = (b, e) =>
-                { var n = (SomeExpressionNode)e; return new BoundSomeExpression(n.Span, b.BindExpression(n.Value)); },
-            [typeof(OkExpressionNode)] = (b, e) =>
-                { var n = (OkExpressionNode)e; return new BoundOkExpression(n.Span, b.BindExpression(n.Value)); },
-            [typeof(ErrExpressionNode)] = (b, e) =>
-                { var n = (ErrExpressionNode)e; return new BoundErrExpression(n.Span, b.BindExpression(n.Error)); },
-            [typeof(ExpressionCallNode)] = (b, e) =>
-                {
-                    var n = (ExpressionCallNode)e;
-                    return new BoundExpressionCall(n.Span, b.BindExpression(n.TargetExpression),
-                        n.Arguments.Select(b.BindExpression).ToList());
-                },
-            [typeof(AnonymousObjectCreationNode)] = (b, e) =>
-                {
-                    var n = (AnonymousObjectCreationNode)e;
-                    return new BoundAnonymousObjectCreation(n.Span,
-                        n.Initializers.Select(i => new BoundNamedValue(i.PropertyName, b.BindExpression(i.Value), i.Value.Span)).ToList());
-                },
-            [typeof(RecordCreationNode)] = (b, e) =>
-                {
-                    var n = (RecordCreationNode)e;
-                    // FieldAssignmentNode is a broken-Accept helper class (#762 item 8) —
-                    // bound through its properties, never through visitor dispatch.
-                    return new BoundRecordCreation(n.Span, n.TypeName,
-                        n.Fields.Select(f => new BoundNamedValue(f.FieldName, b.BindExpression(f.Value), f.Span)).ToList());
-                },
-            [typeof(WithExpressionNode)] = (b, e) =>
-                {
-                    var n = (WithExpressionNode)e;
-                    return new BoundWithExpression(n.Span, b.BindExpression(n.Target),
-                        n.Assignments.Select(a => new BoundNamedValue(a.PropertyName, b.BindExpression(a.Value), a.Span)).ToList());
-                },
-            [typeof(ThrowExpressionNode)] = (b, e) =>
-                { var n = (ThrowExpressionNode)e; return new BoundThrowExpression(n.Span, b.BindExpression(n.Exception)); },
-            // #762 B3 — arrays/indexes + collections (13 classes). Every AST property is
-            // retained (the B2 review's children-retention standard).
-            [typeof(ArrayCreationNode)] = (b, e) =>
-                {
-                    var n = (ArrayCreationNode)e;
-                    return new BoundArrayCreation(n.Span, n.Id, n.Name, n.ElementType,
-                        n.Size is null ? null : b.BindExpression(n.Size),
-                        n.Initializer.Select(b.BindExpression).ToList());
-                },
-            [typeof(ArrayAccessNode)] = (b, e) =>
-                { var n = (ArrayAccessNode)e; return new BoundArrayAccess(n.Span, b.BindExpression(n.Array), b.BindExpression(n.Index)); },
-            [typeof(ArrayLengthNode)] = (b, e) =>
-                { var n = (ArrayLengthNode)e; return new BoundArrayLength(n.Span, b.BindExpression(n.Array)); },
-            [typeof(MultiDimArrayCreationNode)] = (b, e) =>
-                {
-                    var n = (MultiDimArrayCreationNode)e;
-                    return new BoundMultiDimArrayCreation(n.Span, n.Id, n.Name, n.ElementType, n.Rank,
-                        n.DimensionSizes.Select(b.BindExpression).ToList(),
-                        n.Initializer.Select(row =>
-                            (IReadOnlyList<BoundExpression>)row.Select(b.BindExpression).ToList()).ToList());
-                },
-            [typeof(MultiDimArrayAccessNode)] = (b, e) =>
-                {
-                    var n = (MultiDimArrayAccessNode)e;
-                    return new BoundMultiDimArrayAccess(n.Span, b.BindExpression(n.Array),
-                        n.Indices.Select(b.BindExpression).ToList());
-                },
-            [typeof(IndexFromEndNode)] = (b, e) =>
-                { var n = (IndexFromEndNode)e; return new BoundIndexFromEnd(n.Span, b.BindExpression(n.Offset)); },
-            [typeof(RangeExpressionNode)] = (b, e) =>
-                {
-                    var n = (RangeExpressionNode)e;
-                    return new BoundRangeExpression(n.Span,
-                        n.Start is null ? null : b.BindExpression(n.Start),
-                        n.End is null ? null : b.BindExpression(n.End));
-                },
-            [typeof(ListCreationNode)] = (b, e) =>
-                {
-                    var n = (ListCreationNode)e;
-                    return new BoundListCreation(n.Span, n.Id, n.Name, n.ElementType,
-                        n.Elements.Select(b.BindExpression).ToList());
-                },
-            [typeof(SetCreationNode)] = (b, e) =>
-                {
-                    var n = (SetCreationNode)e;
-                    return new BoundSetCreation(n.Span, n.Id, n.Name, n.ElementType,
-                        n.Elements.Select(b.BindExpression).ToList());
-                },
-            [typeof(DictionaryCreationNode)] = (b, e) =>
-                {
-                    var n = (DictionaryCreationNode)e;
-                    return new BoundDictionaryCreation(n.Span, n.Id, n.Name, n.KeyType, n.ValueType,
-                        n.Entries.Select(kv => new BoundPair(
-                            b.BindExpression(kv.Key), b.BindExpression(kv.Value), kv.Span)).ToList());
-                },
-            [typeof(CollectionContainsNode)] = (b, e) =>
-                { var n = (CollectionContainsNode)e; return new BoundCollectionContains(n.Span, n.CollectionName, b.BindExpression(n.KeyOrValue), n.Mode); },
-            [typeof(CollectionCountNode)] = (b, e) =>
-                { var n = (CollectionCountNode)e; return new BoundCollectionCount(n.Span, b.BindExpression(n.Collection)); },
-            [typeof(TupleLiteralNode)] = (b, e) =>
-                { var n = (TupleLiteralNode)e; return new BoundTupleLiteral(n.Span, n.Elements.Select(b.BindExpression).ToList()); },
-            // #762 B4 — string family (4 classes), every AST property retained.
-            [typeof(StringOperationNode)] = (b, e) =>
-                {
-                    var n = (StringOperationNode)e;
-                    return new BoundStringOperation(n.Span, n.Operation,
-                        n.Arguments.Select(b.BindExpression).ToList(), n.ComparisonMode);
-                },
-            [typeof(InterpolatedStringNode)] = (b, e) =>
-                {
-                    var n = (InterpolatedStringNode)e;
-                    // Part subclasses have real Accept dispatch, but binding goes through
-                    // properties for the same reason as FieldAssignmentNode: no
-                    // IAstVisitor<BoundExpression> implementation exists.
-                    return new BoundInterpolatedString(n.Span, n.Parts.Select(p => p switch
-                    {
-                        InterpolatedStringTextNode t =>
-                            new BoundInterpolationPart(t.Text, null, null, null, t.Span),
-                        InterpolatedStringExpressionNode ex => new BoundInterpolationPart(
-                            null, b.BindExpression(ex.Expression),
-                            ex.FormatSpecifier, ex.AlignmentClause, ex.Span),
-                        // Fail LOUD if a third part subclass ever appears (B4 review
-                        // minor 3) — a silent empty part would vanish from BoundChildren.
-                        _ => throw new NotSupportedException(
-                            $"Unknown interpolation part: {p.GetType().Name}"),
-                    }).ToList());
-                },
-            [typeof(StringBuilderOperationNode)] = (b, e) =>
-                {
-                    var n = (StringBuilderOperationNode)e;
-                    return new BoundStringBuilderOperation(n.Span, n.Operation,
-                        n.Arguments.Select(b.BindExpression).ToList());
-                },
-            [typeof(CharOperationNode)] = (b, e) =>
-                {
-                    var n = (CharOperationNode)e;
-                    return new BoundCharOperation(n.Span, n.Operation,
-                        n.Arguments.Select(b.BindExpression).ToList());
-                },
-            // #762 B6 — control-value family (5 classes; the conversion-leg payload).
-            [typeof(NullCoalesceNode)] = (b, e) =>
-                { var n = (NullCoalesceNode)e; return new BoundNullCoalesce(n.Span, b.BindExpression(n.Left), b.BindExpression(n.Right)); },
-            [typeof(NullConditionalNode)] = (b, e) =>
-                { var n = (NullConditionalNode)e; return new BoundNullConditional(n.Span, b.BindExpression(n.Target), n.MemberName); },
-            [typeof(MatchExpressionNode)] = (b, e) => b.BindMatchExpression((MatchExpressionNode)e),
-            [typeof(LambdaExpressionNode)] = (b, e) =>
-                b.BindLambda((LambdaExpressionNode)e),
-            [typeof(AwaitExpressionNode)] = (b, e) =>
-                { var n = (AwaitExpressionNode)e; return new BoundAwaitExpression(n.Span, b.BindExpression(n.Awaited), n.ConfigureAwait); },
-            // #762 B7 — quantifier family (spec expressions; Z3 consumes their AST,
-            // not these bound nodes — binding is for value-safety visibility only).
-            [typeof(ForallExpressionNode)] = (b, e) =>
-                {
-                    var n = (ForallExpressionNode)e;
-                    var (vars, body) = b.BindQuantifier(n.BoundVariables, n.Body);
-                    return new BoundForallExpression(n.Span, vars, body);
-                },
-            [typeof(ExistsExpressionNode)] = (b, e) =>
-                {
-                    var n = (ExistsExpressionNode)e;
-                    var (vars, body) = b.BindQuantifier(n.BoundVariables, n.Body);
-                    return new BoundExistsExpression(n.Span, vars, body);
-                },
-            [typeof(ImplicationExpressionNode)] = (b, e) =>
-                {
-                    var n = (ImplicationExpressionNode)e;
-                    return new BoundImplicationExpression(n.Span,
-                        b.BindExpression(n.Antecedent), b.BindExpression(n.Consequent));
-                },
-            // #762 B8 — interop closure (F-1 Tier A interop row: verbatim content +
-            // stable type + explicit marker, never a zero-child erasure).
-            [typeof(RawCSharpExpressionNode)] = (b, e) =>
-                { var n = (RawCSharpExpressionNode)e; return new BoundRawCSharpExpression(n.Span, n.CSharpCode); },
-            [typeof(FallbackExpressionNode)] = (b, e) =>
-                { var n = (FallbackExpressionNode)e; return new BoundFallbackExpression(n.Span, n.OriginalCSharp, n.FeatureName, n.Suggestion); },
-            // #762 B8 — item-8 disposition: GenericTypeNode promoted to Tier A (it is a
-            // real expression-position type reference with real Accept dispatch; the
-            // F-1 amendment records the additive promotion).
-            [typeof(GenericTypeNode)] = (b, e) =>
-                { var n = (GenericTypeNode)e; return new BoundGenericTypeExpression(n.Span, n.TypeName, n.TypeArguments); },
-            // #762 B8 — Tier-B child extractors (scoping doc D2): the unsafe family
-            // stays incomplete (Calor0259 still fires; the analysis story is out of
-            // 0.13 scope) but its subtrees are no longer erased — children bind and
-            // ride on the incomplete node, deferred-marked (#762 item 3 end state).
-            [typeof(AddressOfNode)] = (b, e) =>
-                {
-                    var n = (AddressOfNode)e;
-                    return b.BindIncompleteWithChildren(e, s_tierBReasons["AddressOfNode"],
-                        new[] { b.BindExpression(n.Operand) });
-                },
-            [typeof(PointerDereferenceNode)] = (b, e) =>
-                {
-                    var n = (PointerDereferenceNode)e;
-                    return b.BindIncompleteWithChildren(e, s_tierBReasons["PointerDereferenceNode"],
-                        new[] { b.BindExpression(n.Operand) });
-                },
-            [typeof(StackAllocNode)] = (b, e) =>
-                {
-                    var n = (StackAllocNode)e;
-                    var children = new List<BoundExpression>();
-                    if (n.Size is not null) children.Add(b.BindExpression(n.Size));
-                    children.AddRange(n.Initializer.Select(b.BindExpression));
-                    return b.BindIncompleteWithChildren(e, s_tierBReasons["StackAllocNode"], children);
-                },
-            // (SizeOfNode has no expression children — it stays on the default
-            // BindIncomplete path via s_tierBReasons.)
-        };
-
-        // Every remaining concrete ExpressionNode subclass dispatches to BindIncomplete.
-        foreach (var type in typeof(ExpressionNode).Assembly.GetTypes())
-        {
-            if (!type.IsAbstract && typeof(ExpressionNode).IsAssignableFrom(type) && !table.ContainsKey(type))
-            {
-                var reason = s_tierBReasons.TryGetValue(type.Name, out var r)
-                    ? r
-                    : "binding for this construct lands in the #762 family PRs (F-1 Tier A)";
-                table[type] = (b, e) => b.BindIncomplete(e, reason);
-            }
-        }
-        return table;
+        var classMember = _currentClassScope?.LookupLocal(name);
+        return classMember is VariableSymbol member && member.Id == variable.Id
+            ? null
+            : variable;
     }
 
-    /// <summary>
-    /// Total expressions dispatched — the incomplete-fraction's denominator (scoping doc
-    /// §5: "incomplete diagnostics ÷ bound expressions"). Read by the ratchet instrument.
-    /// </summary>
-    public int ExpressionsBound { get; private set; }
+    private static bool CanRebind(VariableSymbol variable) =>
+        variable.IsMutable
+        || (variable.IsParameter
+            && !variable.Modifier.HasFlag(ParameterModifier.In));
+
+    private static bool AreAssignmentCompatible(string targetType, string valueType)
+    {
+        var target = TypeIdentity.Canonicalize(targetType);
+        var value = TypeIdentity.Canonicalize(valueType);
+        if (target == value || target is "OBJECT" || value is "OBJECT" or "<unresolved>")
+            return true;
+
+        return value switch
+        {
+            "INT[bits=8][signed=true]" => target is
+                "INT[bits=16][signed=true]" or "INT" or "LONG"
+                or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "INT[bits=8][signed=false]" => target is
+                "INT[bits=16][signed=true]" or "INT[bits=16][signed=false]"
+                or "INT" or "UINT" or "LONG" or "ULONG"
+                or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "INT[bits=16][signed=true]" => target is
+                "INT" or "LONG" or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "INT[bits=16][signed=false]" => target is
+                "INT" or "UINT" or "LONG" or "ULONG"
+                or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "INT" => target is "LONG" or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "UINT" => target is "LONG" or "ULONG" or "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "LONG" or "ULONG" => target is "FLOAT[bits=32]" or "FLOAT" or "DECIMAL",
+            "FLOAT[bits=32]" => target is "FLOAT",
+            _ => false,
+        };
+    }
 
     private BoundExpression BindExpression(ExpressionNode expr)
     {
+        ArgumentNullException.ThrowIfNull(expr);
         ExpressionsBound++;
-        return ExpressionDispatch.TryGetValue(expr.GetType(), out var bind)
-            ? bind(this, expr)
-            // Unreachable for assembly-local node classes (the table is reflection-complete);
-            // fail loud rather than silently degrade if an external node type ever appears.
-            : BindIncomplete(expr, "expression class missing from the dispatch table");
+        return ExpressionBinders.TryGetValue(expr.GetType(), out var binder)
+            ? binder(this, expr)
+            : BindUnsupportedExpression(expr);
+    }
+
+    private BoundExpression BindIntLiteral(IntLiteralNode literal)
+    {
+        var typeName = literal.IsUnsigned
+            ? literal.IsLong || literal.UnsignedValue > uint.MaxValue ? "ULONG" : "UINT"
+            : literal.IsLong || literal.Value is > int.MaxValue or < int.MinValue ? "LONG" : "INT";
+        return new BoundIntLiteral(
+            literal.Span,
+            literal.Value,
+            literal.UnsignedValue,
+            literal.IsUnsigned,
+            typeName);
+    }
+
+    private BoundExpression BindFloatLiteral(FloatLiteralNode literal)
+    {
+        if (literal.IsDecimal)
+            return new BoundDecimalLiteral(literal.Span, (decimal)literal.Value);
+
+        var typeName = literal.IsSingle ? "FLOAT[bits=32]" : "FLOAT";
+        var value = literal.IsSingle ? (double)(float)literal.Value : literal.Value;
+        return new BoundFloatLiteral(literal.Span, value, typeName);
+    }
+
+    private BoundExpression BindStringLiteral(StringLiteralNode literal) =>
+        new BoundStringLiteral(
+            literal.Span,
+            literal.Value,
+            literal.IsMultiline,
+            literal.IsUtf8);
+
+    private BoundExpression BindThisExpression(ThisExpressionNode expression)
+    {
+        if (!_isStaticContext && _currentClassName != null)
+            return new BoundThisExpression(expression.Span, _currentClassName);
+
+        return BindUnsupportedExpression(
+            expression,
+            _currentClassName ?? "UNKNOWN",
+            reason: _isStaticContext
+                ? "'this' is unavailable in a static context"
+                : "'this' is unavailable outside an instance member");
+    }
+
+    private BoundExpression BindBaseExpression(BaseExpressionNode expression)
+    {
+        if (!_isStaticContext && _currentClassName != null)
+        {
+            var baseClass = ResolveBaseClass(_currentClass);
+            return new BoundBaseExpression(
+                expression.Span,
+                baseClass == null ? "OBJECT" : _qualifiedClassNames[baseClass]);
+        }
+
+        return BindUnsupportedExpression(
+            expression,
+            reason: _isStaticContext
+                ? "'base' is unavailable in a static context"
+                : "'base' is unavailable outside an instance member");
     }
 
     private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess)
     {
         var target = BindExpression(fieldAccess.Target);
-
-        // If accessing via 'this', resolve the field name from CLASS scope directly
-        // (not _scope which is the method scope — that would let parameters shadow fields)
-        if (fieldAccess.Target is ThisExpressionNode && _currentClassScope != null)
+        var resolvedFields = fieldAccess.Target switch
         {
-            var symbol = _currentClassScope.LookupLocal(fieldAccess.FieldName);
-            if (symbol is VariableSymbol varSymbol)
-                return new BoundVariableExpression(fieldAccess.Span, varSymbol);
-        }
+            ThisExpressionNode => ResolveAccessibleMembers(_currentClass, fieldAccess.FieldName),
+            BaseExpressionNode => ResolveAccessibleMembers(
+                ResolveBaseClass(_currentClass),
+                fieldAccess.FieldName),
+            _ => Array.Empty<Symbol>(),
+        };
+        var fields = resolvedFields.OfType<VariableSymbol>().ToArray();
+        var fieldTypes = fields
+            .Select(field => TypeIdentity.Canonicalize(field.TypeName))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
-        return new BoundFieldAccessExpression(fieldAccess.Span, target, fieldAccess.FieldName, "OBJECT");
+        return new BoundFieldAccessExpression(
+            fieldAccess.Span,
+            target,
+            fieldAccess.FieldName,
+            fieldTypes.Length == 1 ? fields[0].TypeName : "OBJECT",
+            fields.FirstOrDefault(),
+            fieldAccess.FieldNameSpan,
+            fields);
     }
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
     {
-        // B5 (#762 items 1/4): casts and `as` produce a real conversion node carrying
-        // the TARGET type (the old arm returned the operand — a cast's static type was
-        // whatever the operand claimed); `is` produces a real BOOL type test (the old
-        // arm returned LITERAL TRUE, which constant-aware checkers could fold on).
         var operand = BindExpression(typeOp.Operand);
-        return typeOp.Operation switch
-        {
-            TypeOp.Cast or TypeOp.As => new BoundConversionExpression(
-                typeOp.Span, typeOp.Operation, operand, typeOp.TargetType),
-            TypeOp.Is => new BoundTypeTest(typeOp.Span, operand, typeOp.TargetType, null),
-            // TypeOp is enum-complete above; fail loud if a member is ever added.
-            _ => throw new NotSupportedException($"Unknown TypeOp: {typeOp.Operation}"),
-        };
+        return new BoundTypeOperationExpression(
+            typeOp.Span,
+            typeOp.Operation,
+            operand,
+            typeOp.TargetType);
+    }
+
+    private BoundExpression BindIsPattern(IsPatternNode isPattern)
+    {
+        var operand = BindExpression(isPattern.Operand);
+        if (isPattern.VariableName != null)
+            DeclarePatternVariable(isPattern.Span, isPattern.VariableName, isPattern.TargetType);
+        return new BoundIsPatternExpression(
+            isPattern.Span,
+            operand,
+            isPattern.TargetType,
+            isPattern.VariableName);
     }
 
     private BoundExpression BindNewExpression(NewExpressionNode newExpr)
     {
-        var boundArgs = new List<BoundExpression>();
-        foreach (var arg in newExpr.Arguments)
-            boundArgs.Add(BindExpression(arg));
+        var boundArgs = BindExpressions(newExpr.Arguments);
+        var boundTypeReference = BindTypeReference(newExpr.TypeReference);
+        var resolution = ResolveCall(
+            newExpr.Span,
+            $"{newExpr.TypeName}..ctor",
+            boundArgs,
+            argumentNames: null,
+            argumentModifiers: null,
+            typeArguments: null);
+        var initializers = newExpr.Initializers
+            .Select(initializer => new BoundObjectInitializer(
+                initializer.Value.Span,
+                initializer.PropertyName,
+                BindExpression(initializer.Value)))
+            .ToArray();
 
-        // Also bind object initializer value expressions so they're visible to checkers
-        // (e.g., new Foo { P = 1 / x } — the division must be analyzed)
-        foreach (var init in newExpr.Initializers)
-            BindExpression(init.Value);
+        return new BoundNewExpression(
+            newExpr.Span,
+            newExpr.TypeName,
+            newExpr.TypeArguments,
+            boundArgs,
+            initializers,
+            resolution.Function,
+            boundTypeReference.ResolvedType,
+            newExpr.TypeNameSpan,
+            resolution.Functions,
+            boundTypeReference);
+    }
 
-        return new BoundNewExpression(newExpr.Span, newExpr.TypeName, boundArgs);
+    private BoundTypeReference BindTypeReference(TypeReferenceNode typeReference)
+    {
+        var typeArguments = typeReference.TypeArguments
+            .Select(BindTypeReference)
+            .ToArray();
+        return new BoundTypeReference(
+            typeReference.Name,
+            typeReference.Span,
+            string.IsNullOrEmpty(typeReference.Name)
+                ? null
+                : ResolveTypeSymbol(typeReference.Name),
+            typeArguments);
+    }
+
+    private BoundExpression BindArrayAccess(ArrayAccessNode arrayAccess)
+    {
+        var array = BindExpression(arrayAccess.Array);
+        var index = BindExpression(arrayAccess.Index);
+        return new BoundArrayAccess(arrayAccess.Span, array, index);
+    }
+
+    private BoundExpression BindMultiDimArrayAccess(MultiDimArrayAccessNode arrayAccess)
+    {
+        var array = BindExpression(arrayAccess.Array);
+        var indices = BindExpressions(arrayAccess.Indices);
+        return new BoundMultiDimArrayAccess(arrayAccess.Span, array, indices);
+    }
+
+    private BoundExpression BindArrayCreation(ArrayCreationNode array)
+    {
+        return new BoundArrayCreation(
+            array.Span,
+            array.Id,
+            array.Name,
+            array.ElementType,
+            array.Size == null ? null : BindExpression(array.Size),
+            BindExpressions(array.Initializer),
+            array.Attributes);
+    }
+
+    private BoundExpression BindMultiDimArrayCreation(MultiDimArrayCreationNode array)
+    {
+        return new BoundMultiDimArrayCreation(
+            array.Span,
+            array.Id,
+            array.Name,
+            array.ElementType,
+            array.Rank,
+            BindExpressions(array.DimensionSizes),
+            array.Initializer
+                .Select(row => (IReadOnlyList<BoundExpression>)BindExpressions(row))
+                .ToArray());
+    }
+
+    private BoundExpression BindArrayLength(ArrayLengthNode arrayLength)
+    {
+        var array = BindExpression(arrayLength.Array);
+        return new BoundArrayLength(arrayLength.Span, array);
+    }
+
+    private BoundExpression BindListCreation(ListCreationNode list)
+    {
+        return new BoundListCreation(
+            list.Span,
+            list.Id,
+            list.Name,
+            list.ElementType,
+            BindExpressions(list.Elements),
+            list.Attributes);
+    }
+
+    private BoundExpression BindDictionaryCreation(DictionaryCreationNode dictionary)
+    {
+        return new BoundDictionaryCreation(
+            dictionary.Span,
+            dictionary.Id,
+            dictionary.Name,
+            dictionary.KeyType,
+            dictionary.ValueType,
+            dictionary.Entries
+                .Select(entry => new BoundPair(
+                    BindExpression(entry.Key),
+                    BindExpression(entry.Value),
+                    entry.Span))
+                .ToArray(),
+            dictionary.Attributes);
+    }
+
+    private BoundExpression BindSetCreation(SetCreationNode set)
+    {
+        return new BoundSetCreation(
+            set.Span,
+            set.Id,
+            set.Name,
+            set.ElementType,
+            BindExpressions(set.Elements),
+            set.Attributes);
+    }
+
+    private BoundExpression BindCollectionContains(CollectionContainsNode contains)
+    {
+        var collection = BindReferenceExpression(new ReferenceNode(contains.Span, contains.CollectionName));
+        var value = BindExpression(contains.KeyOrValue);
+        return new BoundCollectionContains(
+            contains.Span,
+            contains.CollectionName,
+            value,
+            contains.Mode,
+            collection);
+    }
+
+    private BoundExpression BindCollectionCount(CollectionCountNode count)
+    {
+        var collection = BindExpression(count.Collection);
+        return new BoundCollectionCount(count.Span, collection);
+    }
+
+    private BoundExpression BindRecordCreation(RecordCreationNode record)
+    {
+        return new BoundRecordCreation(
+            record.Span,
+            record.TypeName,
+            record.Fields
+                .Select(field => new BoundNamedValue(
+                    field.FieldName,
+                    BindExpression(field.Value),
+                    field.Span))
+                .ToArray());
+    }
+
+    private BoundExpression BindAnonymousObjectCreation(AnonymousObjectCreationNode anonymous)
+    {
+        return new BoundAnonymousObjectCreation(
+            anonymous.Span,
+            anonymous.Initializers
+                .Select(initializer => new BoundNamedValue(
+                    initializer.PropertyName,
+                    BindExpression(initializer.Value),
+                    initializer.Value.Span))
+                .ToArray());
+    }
+
+    private BoundExpression BindWithExpression(WithExpressionNode withExpression)
+    {
+        var target = BindExpression(withExpression.Target);
+        return new BoundWithExpression(
+            withExpression.Span,
+            target,
+            withExpression.Assignments
+                .Select(assignment => new BoundNamedValue(
+                    assignment.PropertyName,
+                    BindExpression(assignment.Value),
+                    assignment.Span))
+                .ToArray());
+    }
+
+    private BoundExpression BindSomeExpression(SomeExpressionNode some)
+    {
+        var value = BindExpression(some.Value);
+        return new BoundSomeExpression(some.Span, value);
+    }
+
+    private BoundExpression BindNoneExpression(NoneExpressionNode none)
+    {
+        var innerType = string.IsNullOrWhiteSpace(none.TypeName) ? "OBJECT" : none.TypeName!;
+        return new BoundNoneLiteral(none.Span, MakeOptionType(innerType));
+    }
+
+    private BoundExpression BindOkExpression(OkExpressionNode ok)
+    {
+        var value = BindExpression(ok.Value);
+        return new BoundOkExpression(ok.Span, value);
+    }
+
+    private BoundExpression BindErrExpression(ErrExpressionNode err)
+    {
+        var error = BindExpression(err.Error);
+        return new BoundErrExpression(err.Span, error);
+    }
+
+    private BoundExpression BindAwaitExpression(AwaitExpressionNode awaitExpression)
+    {
+        var awaited = BindExpression(awaitExpression.Awaited);
+        return Structural(
+            awaitExpression,
+            UnwrapAwaitedType(awaited.TypeName),
+            [awaited],
+            new Dictionary<string, object?>
+            {
+                ["ConfigureAwait"] = awaitExpression.ConfigureAwait,
+            });
+    }
+
+    private BoundExpression BindNullCoalesce(NullCoalesceNode coalesce)
+    {
+        var left = BindExpression(coalesce.Left);
+        var right = BindExpression(coalesce.Right);
+        var leftValueType = UnwrapOptionOrNullable(left.TypeName);
+        return Structural(
+            coalesce,
+            GetCommonType(leftValueType, right.TypeName),
+            [left, right],
+            deferredChildren: [right]);
+    }
+
+    private BoundExpression BindNullConditional(NullConditionalNode conditional)
+    {
+        var target = BindExpression(conditional.Target);
+        return Structural(
+            conditional,
+            "OBJECT",
+            [target],
+            new Dictionary<string, object?>
+            {
+                ["MemberName"] = conditional.MemberName,
+                ["TargetType"] = target.TypeName,
+            });
+    }
+
+    private BoundExpression BindRangeExpression(RangeExpressionNode range)
+    {
+        var children = new List<BoundExpression>(2);
+        if (range.Start != null)
+            children.Add(BindExpression(range.Start));
+        if (range.End != null)
+            children.Add(BindExpression(range.End));
+
+        return new BoundRangeExpression(
+            range.Span,
+            range.Start == null ? null : children[0],
+            range.End == null ? null : children[^1]);
+    }
+
+    private BoundExpression BindIndexFromEnd(IndexFromEndNode index)
+    {
+        var offset = BindExpression(index.Offset);
+        return new BoundIndexFromEnd(index.Span, offset);
+    }
+
+    private BoundExpression BindTupleLiteral(TupleLiteralNode tuple)
+    {
+        var elements = BindExpressions(tuple.Elements);
+        return new BoundTupleLiteral(tuple.Span, elements);
+    }
+
+    private BoundExpression BindTypeOf(TypeOfExpressionNode typeOf)
+    {
+        return Structural(
+            typeOf,
+            "TYPE",
+            metadata: new Dictionary<string, object?>
+            {
+                ["OperandType"] = typeOf.TypeName,
+            });
+    }
+
+    private BoundExpression BindGenericType(GenericTypeNode genericType)
+    {
+        return new BoundGenericTypeExpression(
+            genericType.Span,
+            genericType.TypeName,
+            genericType.TypeArguments);
+    }
+
+    private BoundExpression BindSelfReference(SelfRefNode selfReference) =>
+        Structural(selfReference, "OBJECT");
+
+    private BoundExpression BindThrowExpression(ThrowExpressionNode throwExpression)
+    {
+        var exception = BindExpression(throwExpression.Exception);
+        return new BoundThrowExpression(throwExpression.Span, exception);
+    }
+
+    private BoundExpression BindInterpolatedString(InterpolatedStringNode interpolated)
+    {
+        var parts = new List<BoundInterpolatedStringPart>(interpolated.Parts.Count);
+        foreach (var part in interpolated.Parts)
+        {
+            switch (part)
+            {
+                case InterpolatedStringTextNode text:
+                    parts.Add(new BoundInterpolatedStringPart(text.Span, text.Text, null));
+                    break;
+                case InterpolatedStringExpressionNode expression:
+                    parts.Add(new BoundInterpolatedStringPart(
+                        expression.Span,
+                        null,
+                        BindExpression(expression.Expression),
+                        expression.FormatSpecifier,
+                        expression.AlignmentClause));
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unknown interpolated string part '{part.GetType().Name}'");
+            }
+        }
+
+        return new BoundInterpolatedStringExpression(interpolated.Span, parts);
+    }
+
+    private BoundExpression BindLambdaExpression(LambdaExpressionNode lambda)
+    {
+        var parentContext = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
+        var lambdaIdentity = CreateDeclarationId(
+            parentContext,
+            "lambda",
+            lambda.Id,
+            "lambda");
+        using var _scopeGuard = PushScope(_scope.CreateChild());
+        using var _staticGuard = PushStaticContext(lambda.IsStatic);
+        using var _identityGuard = PushDeclarationContext(lambdaIdentity);
+
+        var parameters = new List<VariableSymbol>(lambda.Parameters.Count);
+        foreach (var parameter in lambda.Parameters)
+        {
+            var symbol = CreateLocalVariable(
+                parameter.Name,
+                parameter.TypeName ?? "OBJECT",
+                isMutable: false,
+                isParameter: true,
+                ParameterModifier.None,
+                parameter.IdentifierSpan,
+                "parameter");
+            if (!_scope.TryDeclare(symbol))
+            {
+                _diagnostics.ReportError(
+                    parameter.Span,
+                    DiagnosticCode.DuplicateDefinition,
+                    $"Lambda parameter '{parameter.Name}' is already defined");
+            }
+            parameters.Add(symbol);
+        }
+
+        var expressionBody = lambda.ExpressionBody != null
+            ? BindExpression(lambda.ExpressionBody)
+            : null;
+        var statementBody = lambda.StatementBody != null
+            ? BindStatements(lambda.StatementBody)
+            : null;
+        var returnType = expressionBody?.TypeName
+            ?? GetCommonType(CollectReturnTypes(statementBody))
+            ?? "VOID";
+        var effects = lambda.Effects?.Effects
+            .Select(effect => $"{effect.Key}:{effect.Value}")
+            .ToArray()
+            ?? Array.Empty<string>();
+
+        return new BoundLambdaExpression(
+            lambda.Span,
+            lambda.Id,
+            parameters,
+            lambda.Effects,
+            effects,
+            lambda.Attributes,
+            lambda.IsAsync,
+            lambda.IsStatic,
+            expressionBody,
+            statementBody,
+            returnType);
+    }
+
+    private BoundExpression BindMatchExpression(MatchExpressionNode match)
+    {
+        var target = BindExpression(match.Target);
+        var cases = BindMatchCases(match.Cases);
+        var resultType = GetCommonType(
+                cases.Where(matchCase => matchCase.Result != null)
+                    .Select(matchCase => matchCase.Result!.TypeName))
+            ?? "OBJECT";
+        return new BoundMatchExpression(
+            match.Span,
+            match.Id,
+            target,
+            cases,
+            match.Attributes,
+            resultType);
+    }
+
+    private IReadOnlyList<BoundMatchCase> BindMatchCases(IReadOnlyList<MatchCaseNode> cases)
+    {
+        var boundCases = new List<BoundMatchCase>(cases.Count);
+        foreach (var matchCase in cases)
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            var pattern = BindPattern(matchCase.Pattern);
+            var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
+            var body = BindStatements(matchCase.Body);
+            var result = body.LastOrDefault() is BoundReturnStatement { Expression: not null } returnStatement
+                ? returnStatement.Expression
+                : null;
+            boundCases.Add(new BoundMatchCase(
+                matchCase.Span,
+                pattern,
+                matchCase.Pattern is WildcardPatternNode,
+                guard,
+                body,
+                result));
+        }
+        return boundCases;
+    }
+
+    private BoundPattern BindPattern(PatternNode pattern)
+    {
+        switch (pattern)
+        {
+            case WildcardPatternNode:
+                return Pattern(pattern);
+            case VariablePatternNode variable:
+                if (!variable.Name.Contains('.', StringComparison.Ordinal))
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                return Pattern(
+                    variable,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["Name"] = variable.Name,
+                        ["IsConstant"] = variable.Name.Contains('.', StringComparison.Ordinal),
+                    });
+            case VarPatternNode variable:
+                DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                return Pattern(
+                    variable,
+                    metadata: new Dictionary<string, object?> { ["Name"] = variable.Name });
+            case TypePatternNode typePattern:
+                if (typePattern.BindingName != null)
+                    DeclarePatternVariable(
+                        typePattern.BindingSpan ?? typePattern.Span,
+                        typePattern.BindingName,
+                        typePattern.TypeName);
+                return Pattern(
+                    typePattern,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["TypeName"] = typePattern.TypeName,
+                        ["BindingName"] = typePattern.BindingName,
+                    });
+            case LiteralPatternNode literal:
+                return Pattern(literal, expressions: [BindExpression(literal.Literal)]);
+            case ConstantPatternNode constant:
+                return Pattern(constant, expressions: [BindExpression(constant.Value)]);
+            case RelationalPatternNode relational:
+                return Pattern(
+                    relational,
+                    metadata: new Dictionary<string, object?> { ["Operator"] = relational.Operator },
+                    expressions: [BindExpression(relational.Value)]);
+            case SomePatternNode some:
+                return Pattern(some, patterns: [BindPattern(some.InnerPattern)]);
+            case NonePatternNode:
+                return Pattern(pattern);
+            case OkPatternNode ok:
+                return Pattern(ok, patterns: [BindPattern(ok.InnerPattern)]);
+            case ErrPatternNode err:
+                return Pattern(err, patterns: [BindPattern(err.InnerPattern)]);
+            case PositionalPatternNode positional:
+                return Pattern(
+                    positional,
+                    metadata: new Dictionary<string, object?> { ["TypeName"] = positional.TypeName },
+                    patterns: positional.Patterns.Select(BindPattern).ToArray());
+            case PropertyPatternNode property:
+                return Pattern(
+                    property,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["TypeName"] = property.TypeName,
+                        ["PropertyNames"] = property.Matches.Select(match => match.PropertyName).ToArray(),
+                    },
+                    patterns: property.Matches.Select(match => BindPattern(match.Pattern)).ToArray());
+            case ListPatternNode list:
+                var listPatterns = list.Patterns.Select(BindPattern).ToList();
+                if (list.SlicePattern != null)
+                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count), BindPattern(list.SlicePattern));
+                return Pattern(
+                    list,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["SliceIndex"] = list.SliceIndex,
+                        ["HasSlice"] = list.SlicePattern != null,
+                    },
+                    patterns: listPatterns);
+            case NegatedPatternNode negated:
+                return Pattern(negated, patterns: [BindPattern(negated.Inner)]);
+            case OrPatternNode orPattern:
+                return Pattern(orPattern, patterns: [BindPattern(orPattern.Left), BindPattern(orPattern.Right)]);
+            case AndPatternNode andPattern:
+                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left), BindPattern(andPattern.Right)]);
+            default:
+                return Pattern(
+                    pattern,
+                    metadata: new Dictionary<string, object?>
+                    {
+                        ["AnalysisIncomplete"] = true,
+                    });
+        }
+    }
+
+    private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName)
+    {
+        if (_scope.LookupLocal(name) is VariableSymbol existing
+            && string.Equals(existing.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var symbol = CreateLocalVariable(
+            name,
+            typeName,
+            isMutable: false,
+            isParameter: false,
+            ParameterModifier.None,
+            span,
+            "pattern");
+        if (!_scope.TryDeclare(symbol))
+        {
+            _diagnostics.ReportError(
+                span,
+                DiagnosticCode.DuplicateDefinition,
+                $"Pattern variable '{name}' is already defined");
+        }
+    }
+
+    private static BoundPattern Pattern(
+        PatternNode pattern,
+        IReadOnlyDictionary<string, object?>? metadata = null,
+        IReadOnlyList<BoundPattern>? patterns = null,
+        IReadOnlyList<BoundExpression>? expressions = null) =>
+        new(pattern.Span, pattern.GetType().Name, metadata, patterns, expressions);
+
+    private BoundExpression BindForallExpression(ForallExpressionNode forall) =>
+        BindQuantifier(forall, forall.BoundVariables, forall.Body);
+
+    private BoundExpression BindExistsExpression(ExistsExpressionNode exists) =>
+        BindQuantifier(exists, exists.BoundVariables, exists.Body);
+
+    private BoundExpression BindQuantifier(
+        ExpressionNode quantifier,
+        IReadOnlyList<QuantifierVariableNode> variables,
+        ExpressionNode body)
+    {
+        using var _ = PushScope(_scope.CreateChild());
+        var symbols = new List<VariableSymbol>(variables.Count);
+        foreach (var variable in variables)
+        {
+            var symbol = CreateLocalVariable(
+                variable.Name,
+                variable.TypeName,
+                isMutable: false,
+                isParameter: true,
+                ParameterModifier.None,
+                variable.IdentifierSpan,
+                "quantifier");
+            if (!_scope.TryDeclare(symbol))
+            {
+                _diagnostics.ReportError(
+                    variable.Span,
+                    DiagnosticCode.DuplicateDefinition,
+                    $"Quantifier variable '{variable.Name}' is already defined");
+            }
+            symbols.Add(symbol);
+        }
+
+        return new BoundQuantifierExpression(
+            quantifier.Span,
+            quantifier.GetType().Name,
+            symbols,
+            BindExpression(body));
+    }
+
+    private BoundExpression BindImplicationExpression(ImplicationExpressionNode implication)
+    {
+        var antecedent = BindExpression(implication.Antecedent);
+        var consequent = BindExpression(implication.Consequent);
+        return Structural(
+            implication,
+            "BOOL",
+            [antecedent, consequent],
+            deferredChildren: [consequent]);
+    }
+
+    private BoundExpression BindStringOperation(StringOperationNode operation)
+    {
+        var resultType = operation.Operation switch
+        {
+            StringOp.Length or StringOp.IndexOf => "INT",
+            StringOp.Contains or StringOp.StartsWith or StringOp.EndsWith
+                or StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace
+                or StringOp.Equals or StringOp.RegexTest => "BOOL",
+            StringOp.Split or StringOp.RegexSplit => "str[]",
+            StringOp.RegexMatch => "OBJECT",
+            _ => "STRING",
+        };
+        return Structural(
+            operation,
+            resultType,
+            BindExpressions(operation.Arguments),
+            new Dictionary<string, object?>
+            {
+                ["Operation"] = operation.Operation,
+                ["ComparisonMode"] = operation.ComparisonMode,
+            });
+    }
+
+    private BoundExpression BindCharOperation(CharOperationNode operation)
+    {
+        var resultType = operation.Operation switch
+        {
+            CharOp.CharCode => "INT",
+            CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace
+                or CharOp.IsUpper or CharOp.IsLower => "BOOL",
+            _ => "CHAR",
+        };
+        return Structural(
+            operation,
+            resultType,
+            BindExpressions(operation.Arguments),
+            new Dictionary<string, object?> { ["Operation"] = operation.Operation });
+    }
+
+    private BoundExpression BindStringBuilderOperation(StringBuilderOperationNode operation)
+    {
+        var resultType = operation.Operation switch
+        {
+            StringBuilderOp.ToString => "STRING",
+            StringBuilderOp.Length => "INT",
+            _ => "StringBuilder",
+        };
+        return Structural(
+            operation,
+            resultType,
+            BindExpressions(operation.Arguments),
+            new Dictionary<string, object?> { ["Operation"] = operation.Operation });
+    }
+
+    private BoundExpression BindStackAlloc(StackAllocNode stackAlloc)
+    {
+        var children = new List<BoundExpression>();
+        if (stackAlloc.Size != null)
+            children.Add(BindExpression(stackAlloc.Size));
+        children.AddRange(BindExpressions(stackAlloc.Initializer));
+        return Structural(
+            stackAlloc,
+            $"Span<{stackAlloc.ElementType}>",
+            children,
+            new Dictionary<string, object?>
+            {
+                ["ElementType"] = stackAlloc.ElementType,
+                ["HasSize"] = stackAlloc.Size != null,
+                ["InitializerCount"] = stackAlloc.Initializer.Count,
+            });
+    }
+
+    private BoundExpression BindAddressOf(AddressOfNode addressOf)
+    {
+        var operand = BindExpression(addressOf.Operand);
+        return Structural(addressOf, $"{operand.TypeName}*", [operand]);
+    }
+
+    private BoundExpression BindPointerDereference(PointerDereferenceNode dereference)
+    {
+        var operand = BindExpression(dereference.Operand);
+        var resultType = operand.TypeName.EndsWith('*')
+            ? operand.TypeName[..^1]
+            : "OBJECT";
+        return Structural(dereference, resultType, [operand]);
+    }
+
+    private BoundExpression BindSizeOf(SizeOfNode sizeOf)
+    {
+        return Structural(
+            sizeOf,
+            "INT",
+            metadata: new Dictionary<string, object?> { ["OperandType"] = sizeOf.TypeName });
+    }
+
+    private BoundExpression BindExpressionCall(ExpressionCallNode call)
+    {
+        var target = BindExpression(call.TargetExpression);
+        var arguments = BindExpressions(call.Arguments);
+        return new BoundExpressionCall(call.Span, target, arguments);
+    }
+
+    private BoundExpression BindFallbackInterop(FallbackExpressionNode fallback)
+    {
+        ReportAnalysisIncomplete(fallback, $"Interop fallback feature '{fallback.FeatureName}'");
+        return new BoundInteropExpression(
+            fallback.Span,
+            nameof(FallbackExpressionNode),
+            fallback.OriginalCSharp,
+            "OBJECT",
+            metadata: new Dictionary<string, object?>
+            {
+                ["FeatureName"] = fallback.FeatureName,
+                ["Suggestion"] = fallback.Suggestion,
+            });
+    }
+
+    private BoundExpression BindRawCSharpInterop(RawCSharpExpressionNode raw)
+    {
+        ReportAnalysisIncomplete(raw, "Raw C# expression is opaque to Calor analysis");
+        return new BoundInteropExpression(
+            raw.Span,
+            nameof(RawCSharpExpressionNode),
+            raw.CSharpCode,
+            "OBJECT",
+            metadata: new Dictionary<string, object?>
+            {
+                ["CSharpCode"] = raw.CSharpCode,
+            });
     }
 
     private BoundExpression BindReferenceExpression(ReferenceNode refNode)
     {
-        var symbol = _scope.Lookup(refNode.Name);
+        var symbols = _scope.LookupAll(refNode.Name);
+        if (symbols.Count == 0)
+            symbols = ResolveAccessibleMembers(_currentClass, refNode.Name);
 
-        if (symbol == null)
+        if (symbols.Count == 0)
         {
             var similarName = _scope.FindSimilarName(refNode.Name);
             if (similarName != null)
@@ -701,19 +1932,52 @@ public sealed class Binder
                     $"Undefined variable '{refNode.Name}'");
             }
             // Return a dummy variable to continue analysis
-            return new BoundVariableExpression(refNode.Span,
-                new VariableSymbol(refNode.Name, "INT", false));
+            return new BoundVariableExpression(
+                refNode.Span,
+                CreateUnresolvedVariable(refNode));
         }
 
-        if (symbol is VariableSymbol variable)
+        if (symbols.All(symbol => symbol is VariableSymbol))
         {
-            return new BoundVariableExpression(refNode.Span, variable);
+            var variables = symbols.Cast<VariableSymbol>().ToArray();
+            if (variables.Any(variable =>
+                    variable.DeclaringTypeName != null
+                    && !IsMemberAccessible(variable)))
+            {
+                _diagnostics.ReportError(
+                    refNode.Span,
+                    DiagnosticCode.UndefinedReference,
+                    $"Member '{refNode.Name}' is not accessible in this context");
+                return new BoundVariableExpression(
+                    refNode.Span,
+                    CreateUnresolvedVariable(refNode));
+            }
+
+            if (_isStaticContext
+                && variables.Any(variable =>
+                    variable.DeclaringTypeName != null
+                    && !variable.IsStatic))
+            {
+                _diagnostics.ReportError(
+                    refNode.Span,
+                    DiagnosticCode.InstanceMemberInStaticContext,
+                    $"Instance member '{refNode.Name}' cannot be accessed by a bare reference in a static context");
+                return new BoundVariableExpression(
+                    refNode.Span,
+                    CreateUnresolvedVariable(refNode));
+            }
+
+            return new BoundVariableExpression(refNode.Span, variables[0], variables);
         }
 
         // Symbol exists but is not a variable - provide helpful fix
-        _diagnostics.ReportNotAVariableWithFix(refNode.Span, refNode.Name, symbol is FunctionSymbol);
-        return new BoundVariableExpression(refNode.Span,
-            new VariableSymbol(refNode.Name, "INT", false));
+        _diagnostics.ReportNotAVariableWithFix(
+            refNode.Span,
+            refNode.Name,
+            symbols.All(symbol => symbol is FunctionSymbol));
+        return new BoundVariableExpression(
+            refNode.Span,
+            CreateUnresolvedVariable(refNode));
     }
 
     private BoundBinaryExpression BindBinaryOperation(BinaryOperationNode binOp)
@@ -727,24 +1991,22 @@ public sealed class Binder
         return new BoundBinaryExpression(binOp.Span, binOp.Operator, left, right, resultType);
     }
 
-    private string GetBinaryOperationResultType(BinaryOperator op, string leftType, string rightType)
+    private static string GetBinaryOperationResultType(BinaryOperator op, string leftType, string rightType)
     {
-        // Comparison operators always return BOOL
         if (op is BinaryOperator.Equal or BinaryOperator.NotEqual
             or BinaryOperator.LessThan or BinaryOperator.LessOrEqual
             or BinaryOperator.GreaterThan or BinaryOperator.GreaterOrEqual
             or BinaryOperator.And or BinaryOperator.Or)
-        {
             return "BOOL";
-        }
 
-        // Arithmetic operators return the wider type
-        if (leftType == "FLOAT" || rightType == "FLOAT")
-        {
-            return "FLOAT";
-        }
+        if (op == BinaryOperator.Add
+            && (NormalizeTypeName(leftType) == "STRING" || NormalizeTypeName(rightType) == "STRING"))
+            return "STRING";
 
-        return leftType;
+        if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift)
+            return NormalizeTypeName(leftType);
+
+        return GetCommonType(leftType, rightType);
     }
 
     private BoundUnaryExpression BindUnaryOperation(UnaryOperationNode unaryOp)
@@ -762,49 +2024,18 @@ public sealed class Binder
 
     private BoundCallExpression BindCallExpression(CallExpressionNode callExpr)
     {
-        var args = new List<BoundExpression>();
-        foreach (var arg in callExpr.Arguments)
-        {
-            args.Add(BindExpression(arg));
-        }
-
-        // #762 items 5–6 (B8): resolve against the full overload set, never silently.
-        // Exact-arity single match resolves; an arity tie is Calor0207 (bound types
-        // are informational strings in 0.13 and cannot discriminate — B5 decision);
-        // a declared name with no arity match is Calor0208. Both proceed with the
-        // first declaration for bound-tree continuity — flagged, not silent.
-        string returnType;
-        var overloads = _scope.LookupOverloadSet(callExpr.Target);
-        if (overloads.Count > 0)
-        {
-            var atArity = overloads.Where(f => f.Parameters.Count == args.Count).ToList();
-            FunctionSymbol resolved;
-            if (atArity.Count == 1)
-            {
-                resolved = atArity[0];
-            }
-            else if (atArity.Count > 1)
-            {
-                _diagnostics.ReportWarning(callExpr.Span, DiagnosticCode.AmbiguousOverload,
-                    $"Call to '{callExpr.Target}' with {args.Count} argument(s) matches " +
-                    $"{atArity.Count} overloads; argument types cannot discriminate between " +
-                    "them. Resolving to the first declaration.");
-                resolved = atArity[0];
-            }
-            else
-            {
-                _diagnostics.ReportWarning(callExpr.Span, DiagnosticCode.NoMatchingOverload,
-                    $"No overload of '{callExpr.Target}' accepts {args.Count} argument(s) " +
-                    $"(declared arities: {string.Join(", ", overloads.Select(f => f.Parameters.Count).Distinct().OrderBy(c => c))}).");
-                resolved = overloads[0];
-            }
-            returnType = resolved.ReturnType;
-        }
-        else
-        {
-            var symbol = _scope.Lookup(callExpr.Target);
-            returnType = symbol is FunctionSymbol fs ? fs.ReturnType : "INT";
-        }
+        var args = BindExpressions(callExpr.Arguments);
+        var receiverSymbol = ResolveCallReceiver(
+            callExpr.Target,
+            callExpr.ReceiverSpan ?? callExpr.CalleeSpan);
+        var resolution = ResolveCall(
+            callExpr.Span,
+            callExpr.Target,
+            args,
+            callExpr.ArgumentNames,
+            callExpr.ArgumentModifiers,
+            callExpr.TypeArguments);
+        var returnType = resolution.ResolvedReturnType ?? "OBJECT";
 
         // Populate structured type info for effect resolution
         string? resolvedTypeName = null;
@@ -814,14 +2045,465 @@ public sealed class Binder
         {
             resolvedMethodName = callExpr.Target[(lastDot + 1)..];
             var typePart = callExpr.Target[..lastDot];
-            resolvedTypeName = !typePart.Contains('.')
+            resolvedTypeName = receiverSymbol != null
+                ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(
+                    GetNominalTypeName(receiverSymbol.TypeName))
+                : !typePart.Contains('.')
                 ? Effects.EffectEnforcementPass.MapShortTypeNameToFullName(typePart)
                 : typePart;
         }
 
-        return new BoundCallExpression(callExpr.Span, callExpr.Target, args, returnType,
-            resolvedTypeName, resolvedMethodName);
+        return new BoundCallExpression(
+            callExpr.Span,
+            callExpr.Target,
+            args,
+            returnType,
+            resolvedTypeName,
+            resolvedMethodName,
+            resolvedParameterTypes: resolution.Function?.Parameters
+                .Select(parameter => parameter.TypeName)
+                .ToArray(),
+            argumentNames: callExpr.ArgumentNames,
+            argumentModifiers: callExpr.ArgumentModifiers,
+            typeArguments: callExpr.TypeArguments,
+            resolvedSymbol: resolution.Function,
+            receiverSymbol: receiverSymbol,
+            resolvedSymbols: resolution.Functions,
+            calleeSpan: callExpr.CalleeSpan,
+            receiverSpan: callExpr.ReceiverSpan,
+            isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible);
     }
+
+    private VariableSymbol? ResolveCallReceiver(
+        string target,
+        Parsing.TextSpan referenceSpan)
+    {
+        var firstDot = target.IndexOf('.');
+        var receiverName = firstDot <= 0 ? target : target[..firstDot];
+        var variables = _scope.LookupAll(receiverName)
+            .OfType<VariableSymbol>()
+            .ToArray();
+        if (variables.Length == 0)
+            return null;
+
+        if (_isStaticContext
+            && variables.Any(variable =>
+                variable.DeclaringTypeName != null
+                && !variable.IsStatic))
+        {
+            _diagnostics.ReportError(
+                referenceSpan,
+                DiagnosticCode.InstanceMemberInStaticContext,
+                $"Instance member '{receiverName}' cannot be accessed by a bare reference in a static context");
+            return null;
+        }
+
+        return variables[0];
+    }
+
+    private OverloadResolutionResult ResolveCall(
+        Parsing.TextSpan span,
+        string target,
+        IReadOnlyList<BoundExpression> arguments,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers,
+        IReadOnlyList<string>? typeArguments)
+    {
+        var argumentTypes = arguments
+            .Select(argument =>
+                argument is BoundVariableExpression { Variable.Id.IsNone: true }
+                    ? "<unresolved>"
+                    : argument.TypeName)
+            .ToArray();
+        foreach (var lookupName in GetCallLookupNames(target).Distinct(StringComparer.Ordinal))
+        {
+            var resolution = ResolveAccessibleOverload(
+                lookupName,
+                argumentTypes,
+                argumentNames,
+                argumentModifiers,
+                typeArguments);
+            if (resolution.Kind == OverloadResolutionKind.NotFound)
+                continue;
+
+            var hasUnresolvedArguments = argumentTypes.Any(type =>
+                string.Equals(type, "<unresolved>", StringComparison.Ordinal));
+            if (!hasUnresolvedArguments
+                && resolution.Kind == OverloadResolutionKind.NoMatch)
+            {
+                _diagnostics.ReportError(
+                    span,
+                    DiagnosticCode.NoMatchingOverload,
+                    $"No overload of internal call '{target}' matches " +
+                    $"{FormatCallSignature(argumentTypes, argumentModifiers, typeArguments)}. " +
+                    $"Candidates: {FormatCandidates(resolution.Candidates)}");
+            }
+            else if (!hasUnresolvedArguments
+                     && resolution.Kind == OverloadResolutionKind.Ambiguous)
+            {
+                _diagnostics.ReportError(
+                    span,
+                    DiagnosticCode.AmbiguousOverload,
+                    $"Call '{target}{FormatCallSignature(argumentTypes, argumentModifiers, typeArguments)}' " +
+                    $"is ambiguous between: {FormatCandidates(resolution.Candidates)}");
+            }
+
+            return resolution;
+        }
+
+        return OverloadResolutionResult.NotFound();
+    }
+
+    private OverloadResolutionResult ResolveAccessibleOverload(
+        string lookupName,
+        IReadOnlyList<string> argumentTypes,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers,
+        IReadOnlyList<string>? typeArguments)
+    {
+        var candidates = _scope.GetOverloads(lookupName)
+            .ToArray();
+        if (candidates.Length == 0)
+            return OverloadResolutionResult.NotFound();
+
+        var accessibleCandidates = candidates
+            .Where(IsFunctionAccessible)
+            .ToArray();
+        if (accessibleCandidates.Length == 0)
+            return OverloadResolutionResult.Inaccessible(candidates);
+
+        var accessibleScope = new Scope();
+        foreach (var candidate in accessibleCandidates)
+            accessibleScope.TryDeclareOverload(lookupName, candidate, out _);
+
+        return accessibleScope.ResolveOverload(
+            lookupName,
+            argumentTypes,
+            argumentNames,
+            argumentModifiers,
+            typeArguments,
+            GetImplicitConversionCost);
+    }
+
+    private int? GetImplicitConversionCost(string parameterType, string argumentType)
+    {
+        var parameter = TypeIdentity.Canonicalize(parameterType);
+        var argument = TypeIdentity.Canonicalize(argumentType);
+        if (string.Equals(parameter, argument, StringComparison.Ordinal))
+            return 0;
+        if (string.Equals(argument, "<unresolved>", StringComparison.Ordinal))
+            return null;
+
+        if (parameter == "OBJECT" && argument != "VOID")
+            return 50;
+
+        if (IsImplicitNumericConversion(argument, parameter))
+            return 10;
+
+        var parameterClass = ResolveClass(parameterType);
+        var argumentClass = ResolveClass(argumentType);
+        if (parameterClass == null || argumentClass == null)
+            return null;
+
+        var distance = 0;
+        var current = argumentClass;
+        var visited = new HashSet<ClassDefinitionNode>();
+        while (visited.Add(current))
+        {
+            if (ReferenceEquals(current, parameterClass))
+                return 20 + distance;
+
+            var baseClass = ResolveBaseClass(current);
+            if (baseClass == null)
+                break;
+            current = baseClass;
+            distance++;
+        }
+
+        return null;
+    }
+
+    private static bool IsImplicitNumericConversion(string from, string to) =>
+        (from, to) switch
+        {
+            ("INT[bits=8][signed=true]", "INT[bits=16][signed=true]"
+                or "INT"
+                or "LONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("INT[bits=8][signed=false]", "INT[bits=16][signed=true]"
+                or "INT[bits=16][signed=false]"
+                or "INT"
+                or "UINT"
+                or "LONG"
+                or "ULONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("INT[bits=16][signed=true]", "INT"
+                or "LONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("INT[bits=16][signed=false]", "INT"
+                or "UINT"
+                or "LONG"
+                or "ULONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("INT", "LONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("UINT", "LONG"
+                or "ULONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("LONG", "FLOAT[bits=32]" or "FLOAT" or "DECIMAL") => true,
+            ("ULONG", "FLOAT[bits=32]" or "FLOAT" or "DECIMAL") => true,
+            ("FLOAT[bits=32]", "FLOAT") => true,
+            _ => false,
+        };
+
+    private bool IsFunctionAccessible(FunctionSymbol function)
+    {
+        if (function.ContainingTypeName == null)
+            return true;
+
+        return function.Visibility switch
+        {
+            Visibility.Private =>
+                string.Equals(
+                    function.ContainingTypeName,
+                    _currentClassName,
+                    StringComparison.Ordinal),
+            Visibility.Protected =>
+                _currentClass != null
+                && IsSameOrDerivedClass(_currentClass, function.ContainingTypeName),
+            _ => true,
+        };
+    }
+
+    private VariableSymbol? ResolveAccessibleMember(
+        ClassDefinitionNode? start,
+        string memberName) =>
+        ResolveAccessibleMembers(start, memberName).FirstOrDefault() as VariableSymbol;
+
+    private IReadOnlyList<Symbol> ResolveAccessibleMembers(
+        ClassDefinitionNode? start,
+        string memberName)
+    {
+        var current = start;
+        var visited = new HashSet<ClassDefinitionNode>();
+        while (current != null && visited.Add(current))
+        {
+            var declared = _classScopes[current].LookupAllLocal(memberName);
+            if (declared.Count > 0)
+            {
+                return declared.All(symbol =>
+                        symbol is VariableSymbol variable
+                        && IsMemberAccessible(variable))
+                    ? declared
+                    : Array.Empty<Symbol>();
+            }
+
+            current = ResolveBaseClass(current);
+        }
+
+        return Array.Empty<Symbol>();
+    }
+
+    private bool IsMemberAccessible(VariableSymbol member)
+    {
+        if (member.DeclaringTypeName == null)
+            return true;
+
+        return member.Visibility switch
+        {
+            Visibility.Private =>
+                string.Equals(
+                    member.DeclaringTypeName,
+                    _currentClassName,
+                    StringComparison.Ordinal),
+            Visibility.Protected =>
+                _currentClass != null
+                && IsSameOrDerivedClass(_currentClass, member.DeclaringTypeName),
+            Visibility.Internal or Visibility.ProtectedInternal => true,
+            Visibility.Public => true,
+            _ => false,
+        };
+    }
+
+    private bool IsSameOrDerivedClass(
+        ClassDefinitionNode cls,
+        string expectedBaseName)
+    {
+        var current = cls;
+        var visited = new HashSet<ClassDefinitionNode>();
+        while (visited.Add(current))
+        {
+            if (string.Equals(
+                    _qualifiedClassNames[current],
+                    expectedBaseName,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            var baseClass = ResolveBaseClass(current);
+            if (baseClass == null)
+                return false;
+            current = baseClass;
+        }
+
+        return false;
+    }
+
+    private IEnumerable<string> GetCallLookupNames(string target)
+    {
+        if (target.StartsWith("this.", StringComparison.Ordinal) && _currentClassName != null)
+        {
+            foreach (var lookupName in EnumerateHierarchyLookupNames(
+                         _currentClass,
+                         target["this.".Length..]))
+            {
+                yield return lookupName;
+            }
+            yield break;
+        }
+
+        if (target.StartsWith("base.", StringComparison.Ordinal))
+        {
+            var baseClass = ResolveBaseClass(_currentClass);
+            foreach (var lookupName in EnumerateHierarchyLookupNames(
+                         baseClass,
+                         target["base.".Length..]))
+            {
+                yield return lookupName;
+            }
+            yield break;
+        }
+
+        var firstDot = target.IndexOf('.');
+        if (firstDot <= 0)
+        {
+            if (_currentClass != null)
+            {
+                foreach (var lookupName in EnumerateHierarchyLookupNames(
+                             _currentClass,
+                             target))
+                {
+                    yield return lookupName;
+                }
+            }
+
+            yield return target;
+            yield break;
+        }
+
+        var receiverName = target[..firstDot];
+        if (_scope.Lookup(receiverName) is VariableSymbol receiver)
+        {
+            var receiverType = GetNominalTypeName(receiver.TypeName);
+            var receiverClass = ResolveClass(receiverType);
+            if (receiverClass != null)
+            {
+                foreach (var lookupName in EnumerateHierarchyLookupNames(
+                             receiverClass,
+                             target[(firstDot + 1)..]))
+                {
+                    yield return lookupName;
+                }
+                yield break;
+            }
+        }
+
+        yield return target;
+    }
+
+    private IEnumerable<string> EnumerateHierarchyLookupNames(
+        ClassDefinitionNode? start,
+        string memberName)
+    {
+        var current = start;
+        var visited = new HashSet<ClassDefinitionNode>();
+        while (current != null && visited.Add(current))
+        {
+            yield return $"{_qualifiedClassNames[current]}.{memberName}";
+            current = ResolveBaseClass(current);
+        }
+    }
+
+    private static string GetNominalTypeName(string typeName)
+    {
+        var type = typeName.Trim().TrimStart('?');
+        var generic = type.IndexOf('<');
+        if (generic > 0)
+            type = type[..generic];
+        var array = type.IndexOf('[');
+        if (array > 0)
+            type = type[..array];
+        return type.TrimEnd('?', '*');
+    }
+
+    private TypeSymbol? ResolveTypeSymbol(string typeName)
+    {
+        var cls = ResolveClass(typeName);
+        return cls == null ? null : _classSymbols[cls];
+    }
+
+    private ClassDefinitionNode? ResolveBaseClass(ClassDefinitionNode? cls) =>
+        cls?.BaseClass is { Length: > 0 } baseClass ? ResolveClass(baseClass) : null;
+
+    private ClassDefinitionNode? ResolveClass(string typeName)
+    {
+        var nominal = GetNominalTypeName(typeName);
+        if (_classesByQualifiedName.TryGetValue(nominal, out var qualified))
+            return qualified;
+
+        if (_currentClassName != null)
+        {
+            var containingSeparator = _currentClassName.LastIndexOf('.');
+            if (containingSeparator > 0)
+            {
+                var nestedCandidate = $"{_currentClassName[..containingSeparator]}.{nominal}";
+                if (_classesByQualifiedName.TryGetValue(nestedCandidate, out var nested))
+                    return nested;
+            }
+        }
+
+        return _classesBySimpleName.TryGetValue(nominal, out var matches) && matches.Count == 1
+            ? matches[0]
+            : null;
+    }
+
+    private static string FormatCallSignature(
+        IReadOnlyList<string> argumentTypes,
+        IReadOnlyList<string?>? argumentModifiers,
+        IReadOnlyList<string>? typeArguments)
+    {
+        var generic = typeArguments == null
+            ? string.Empty
+            : $"<{string.Join(",", typeArguments.Select(TypeIdentity.Canonicalize))}>";
+        var arguments = argumentTypes.Select((type, index) =>
+        {
+            var modifier = argumentModifiers != null && index < argumentModifiers.Count
+                ? argumentModifiers[index]
+                : null;
+            return $"{(string.IsNullOrWhiteSpace(modifier) ? string.Empty : modifier + " ")}" +
+                   TypeIdentity.Canonicalize(type);
+        });
+        return $"{generic}({string.Join(", ", arguments)})";
+    }
+
+    private static string FormatCandidates(IReadOnlyList<FunctionSymbol> candidates) =>
+        string.Join(
+            ", ",
+            candidates.Select(candidate =>
+                $"{candidate.DisplaySignature} [{candidate.Id}]"));
 
     private BoundExpression BindConditionalExpression(ConditionalExpressionNode condExpr)
     {
@@ -829,120 +2511,310 @@ public sealed class Binder
         var whenTrue = BindExpression(condExpr.WhenTrue);
         var whenFalse = BindExpression(condExpr.WhenFalse);
 
-        return new BoundConditionalExpression(condExpr.Span, condition, whenTrue, whenFalse);
+        return new BoundConditionalExpression(
+            condExpr.Span,
+            condition,
+            whenTrue,
+            whenFalse,
+            GetCommonType(whenTrue.TypeName, whenFalse.TypeName));
     }
 
-    private BoundExpression BindFallbackExpression(ExpressionNode expr)
-        => BindIncomplete(expr, "no structural binder for this construct yet");
-
-    /// <summary>
-    /// #762 B1 (scoping doc D2, zero-child phase): the explicit successor to the silent
-    /// fallback. The returned node preserves the historical opaque shape exactly (see
-    /// BoundIncompleteExpression — do NOT return a constant; the div-by-zero checker
-    /// false-positives on constant-looking divisors), and the Calor0259 diagnostic is
-    /// the incomplete-fraction instrument. Info severity until B8: the LSP binds every
-    /// open document live, and 37 Tier A classes are incomplete until the family PRs land.
-    /// </summary>
-    private BoundExpression BindIncomplete(ExpressionNode expr, string reason)
+    private static BoundStructuralExpression Structural(
+        ExpressionNode expression,
+        string typeName,
+        IReadOnlyList<BoundExpression>? children = null,
+        IReadOnlyDictionary<string, object?>? metadata = null,
+        IReadOnlyList<BoundExpression>? deferredChildren = null)
     {
-        _diagnostics.ReportWarning(expr.Span, DiagnosticCode.AnalysisIncomplete,
-            $"Analysis incomplete: '{expr.GetType().Name}' has no structural binding yet " +
-            $"({reason}). Analyses treat this expression as an opaque value; its sub-expressions " +
-            "are not yet visible to them.");
-        return new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason);
+        return new BoundStructuralExpression(
+            expression.Span,
+            expression.GetType().Name,
+            typeName,
+            children,
+            metadata,
+            deferredChildren);
     }
 
-    /// <summary>#762 B8 (scoping doc D2): the Tier-B path that RETAINS bound children on
-    /// the incomplete node instead of erasing the subtree. Still incomplete — Calor0259
-    /// still fires (message without the "not visible" clause, which is no longer true) —
-    /// but the children are enumerable via BoundChildren.Of/DeferredOf.</summary>
-    private BoundExpression BindIncompleteWithChildren(
-        ExpressionNode expr, string reason, IReadOnlyList<BoundExpression> children)
+    private BoundUnsupportedExpression BindUnsupportedExpression(
+        ExpressionNode expression,
+        string typeName = "OBJECT",
+        IReadOnlyList<BoundExpression>? children = null,
+        IReadOnlyDictionary<string, object?>? metadata = null,
+        string reason = "Analysis support is incomplete")
     {
-        _diagnostics.ReportWarning(expr.Span, DiagnosticCode.AnalysisIncomplete,
-            $"Analysis incomplete: '{expr.GetType().Name}' has no structural binding yet " +
-            $"({reason}). Analyses treat this expression as an opaque value; its sub-expressions " +
-            "are retained and visible to the shared traversals (BoundChildren and the " +
-            "patched checker walks), deferred-marked — checkers with their own unpatched " +
-            "walks still treat the subtree as opaque (#911 follow-up).");
-        return new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason, children);
+        children ??= BindReflectedExpressionChildren(expression);
+        ReportAnalysisIncomplete(expression, reason);
+        return new BoundUnsupportedExpression(
+            expression.Span,
+            expression.GetType().Name,
+            typeName,
+            children,
+            metadata,
+            reason);
     }
 
-    /// <summary>
-    /// The opaque-node path WITHOUT the Calor0259 instrument diagnostic — for context
-    /// errors on constructs that HAVE a binder (e.g. static 'this'). Counting those as
-    /// "incomplete" would pollute the instrument, and the pre-B1 behavior was silent.
-    /// </summary>
-    /// <summary>#762 B6: each arm gets its own child scope — at most one arm executes,
-    /// so same-named locals across arms are legal and arm locals must not leak outward
-    /// (mirrors BindMatchStatement). A variable pattern declares its capture in the arm
-    /// scope, typed by the scrutinee.</summary>
-    private BoundExpression BindMatchExpression(MatchExpressionNode match)
+    private IReadOnlyList<BoundExpression> BindReflectedExpressionChildren(ExpressionNode expression)
     {
-        var target = BindExpression(match.Target);
-        var cases = new List<BoundMatchExpressionCase>();
-        foreach (var c in match.Cases)
+        var children = new List<BoundExpression>();
+        foreach (var property in expression.GetType().GetProperties())
         {
-            using var _caseScope = PushScope(_scope.CreateChild());
-            if (c.Pattern is VariablePatternNode varPattern)
-                _scope.TryDeclare(new VariableSymbol(varPattern.Name, target.TypeName, isMutable: false));
-            var guard = c.Guard is null ? null : BindExpression(c.Guard);
-            var body = BindStatements(c.Body);
-            cases.Add(new BoundMatchExpressionCase(c.Pattern, guard, body, c.Span));
-        }
-        return new BoundMatchExpression(match.Span, match.Id, target, cases);
-    }
+            if (property.GetIndexParameters().Length != 0 || property.Name == nameof(AstNode.Span))
+                continue;
 
-    /// <summary>#762 B7: quantifier variables are declared in a child scope, marked
-    /// isParameter — they are bound BY the quantifier (never "uninitialized"), exactly
-    /// like a lambda parameter. The scope pops on all paths, so they never leak into
-    /// the enclosing spec or body. Duplicate names report Calor0201 (function-parameter
-    /// parity).</summary>
-    private (IReadOnlyList<VariableSymbol> Vars, BoundExpression Body) BindQuantifier(
-        IReadOnlyList<QuantifierVariableNode> boundVariables, ExpressionNode body)
-    {
-        var quantifierScope = _scope.CreateChild();
-        using var _ = PushScope(quantifierScope);
-        var vars = new List<VariableSymbol>();
-        foreach (var v in boundVariables)
-        {
-            var sym = new VariableSymbol(v.Name, v.TypeName, isMutable: false, isParameter: true);
-            if (!quantifierScope.TryDeclare(sym))
+            var value = property.GetValue(expression);
+            if (value is ExpressionNode child)
             {
-                var suggestedName = GenerateUniqueName(v.Name);
-                _diagnostics.ReportDuplicateDefinitionWithFix(v.Span, v.Name, suggestedName);
+                children.Add(BindExpression(child));
             }
-            vars.Add(sym);
-        }
-        return (vars, BindExpression(body));
-    }
-
-    /// <summary>#762 B6: lambda parameters live in a child scope; both body forms bind
-    /// there. Bodies are DEFERRED (BoundChildren.DeferredOf) — bound for visibility,
-    /// marked conditionally-executed.</summary>
-    private BoundExpression BindLambda(LambdaExpressionNode lambda)
-    {
-        var lambdaScope = _scope.CreateChild();
-        using var _ = PushScope(lambdaScope);
-        var parameters = new List<VariableSymbol>();
-        foreach (var p in lambda.Parameters)
-        {
-            var sym = new VariableSymbol(p.Name, p.TypeName ?? "OBJECT", isMutable: false, isParameter: true);
-            if (!lambdaScope.TryDeclare(sym))
+            else if (value is IEnumerable<ExpressionNode> expressionChildren)
             {
-                var suggestedName = GenerateUniqueName(p.Name);
-                _diagnostics.ReportDuplicateDefinitionWithFix(p.Span, p.Name, suggestedName);
+                children.AddRange(BindExpressions(expressionChildren));
             }
-            parameters.Add(sym);
         }
-        var exprBody = lambda.ExpressionBody is null ? null : BindExpression(lambda.ExpressionBody);
-        var stmtBody = lambda.StatementBody is null ? null : BindStatements(lambda.StatementBody);
-        return new BoundLambda(lambda.Span, lambda.Id, parameters, lambda.Effects,
-            lambda.IsAsync, lambda.IsStatic, exprBody, stmtBody);
+        return children;
     }
 
-    private BoundExpression BindIncompleteQuiet(ExpressionNode expr, string reason)
-        => new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason);
+    private void ReportAnalysisIncomplete(ExpressionNode expression, string detail)
+    {
+        var typeName = expression.GetType().Name;
+        if (_unsupportedNodeTypes.Add(typeName))
+        {
+            _diagnostics.ReportInfo(
+                expression.Span,
+                DiagnosticCode.AnalysisUnsupportedNode,
+                $"Expression type '{typeName}' has incomplete analysis support; {detail}");
+        }
+    }
+
+    private IReadOnlyList<BoundExpression> BindExpressions(IEnumerable<ExpressionNode> expressions) =>
+        expressions.Select(BindExpression).ToArray();
+
+    private static string MakeArrayType(string elementType, int rank) =>
+        $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
+
+    private static string MakeOptionType(string innerType) =>
+        $"OPTION[inner={innerType}]";
+
+    private static string MakeResultType(string okType, string errorType) =>
+        $"RESULT[ok={okType}][err={errorType}]";
+
+    private static string UnwrapAwaitedType(string typeName)
+    {
+        foreach (var prefix in new[] { "Task<", "ValueTask<", "TASK<", "VALUETASK<" })
+        {
+            if (typeName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                && typeName.EndsWith('>'))
+                return typeName[prefix.Length..^1];
+        }
+
+        return typeName.Equals("Task", StringComparison.OrdinalIgnoreCase)
+            || typeName.Equals("ValueTask", StringComparison.OrdinalIgnoreCase)
+            ? "VOID"
+            : "OBJECT";
+    }
+
+    private static string UnwrapOptionOrNullable(string typeName)
+    {
+        return TypeIdentity.TryUnwrapOptionOrNullable(typeName, out var elementType)
+            ? elementType
+            : typeName;
+    }
+
+    private static string GetIndexedElementType(string typeName)
+    {
+        const string arrayPrefix = "ARRAY[element=";
+        if (typeName.StartsWith(arrayPrefix, StringComparison.OrdinalIgnoreCase)
+            && typeName.EndsWith(']'))
+            return typeName[arrayPrefix.Length..^1];
+
+        if (typeName.StartsWith('[') && typeName.EndsWith(']') && typeName.Length > 2)
+            return typeName[1..^1];
+
+        var bracket = typeName.LastIndexOf('[');
+        if (bracket > 0 && typeName.EndsWith(']'))
+            return typeName[..bracket];
+
+        var genericStart = typeName.IndexOf('<');
+        if (genericStart > 0 && typeName.EndsWith('>'))
+        {
+            var genericName = typeName[..genericStart];
+            var arguments = SplitTopLevelTypeArguments(typeName[(genericStart + 1)..^1]);
+            if (genericName.Contains("Dictionary", StringComparison.OrdinalIgnoreCase)
+                || genericName.Equals("Dict", StringComparison.OrdinalIgnoreCase))
+                return arguments.Count > 1 ? arguments[1] : "OBJECT";
+            return arguments.Count > 0 ? arguments[0] : "OBJECT";
+        }
+
+        return "OBJECT";
+    }
+
+    private static IReadOnlyList<string> SplitTopLevelTypeArguments(string text)
+    {
+        var result = new List<string>();
+        var depth = 0;
+        var start = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            switch (text[index])
+            {
+                case '<':
+                case '[':
+                    depth++;
+                    break;
+                case '>':
+                case ']':
+                    depth--;
+                    break;
+                case ',' when depth == 0:
+                    result.Add(text[start..index].Trim());
+                    start = index + 1;
+                    break;
+            }
+        }
+        result.Add(text[start..].Trim());
+        return result;
+    }
+
+    private static string GetCommonType(string leftType, string rightType)
+    {
+        var left = NormalizeTypeName(leftType);
+        var right = NormalizeTypeName(rightType);
+
+        if (left == right)
+            return left;
+        if (left == "NEVER")
+            return right;
+        if (right == "NEVER")
+            return left;
+        if (left == "OBJECT" || right == "OBJECT")
+            return "OBJECT";
+
+        var leftRank = GetNumericRank(left);
+        var rightRank = GetNumericRank(right);
+        if (leftRank >= 0 && rightRank >= 0)
+        {
+            if ((left == "DECIMAL" && right.StartsWith("FLOAT", StringComparison.Ordinal))
+                || (right == "DECIMAL" && left.StartsWith("FLOAT", StringComparison.Ordinal)))
+                return "OBJECT";
+            return leftRank >= rightRank ? left : right;
+        }
+
+        return "OBJECT";
+    }
+
+    private static string? GetCommonType(IEnumerable<string>? types)
+    {
+        if (types == null)
+            return null;
+
+        using var enumerator = types.GetEnumerator();
+        if (!enumerator.MoveNext())
+            return null;
+
+        var result = enumerator.Current;
+        while (enumerator.MoveNext())
+            result = GetCommonType(result, enumerator.Current);
+        return NormalizeTypeName(result);
+    }
+
+    private static int GetNumericRank(string typeName) => typeName switch
+    {
+        "INT[bits=8][signed=true]" or "INT[bits=8][signed=false]" => 0,
+        "INT[bits=16][signed=true]" or "INT[bits=16][signed=false]" => 1,
+        "INT" or "UINT" => 2,
+        "LONG" or "ULONG" or "INT[bits=64][signed=true]" or "INT[bits=64][signed=false]" => 3,
+        "FLOAT[bits=32]" => 4,
+        "FLOAT" => 5,
+        "DECIMAL" => 6,
+        _ => -1,
+    };
+
+    private static string NormalizeTypeName(string typeName)
+    {
+        var trimmed = typeName.Trim();
+        return trimmed.ToLowerInvariant() switch
+        {
+            "i8" or "sbyte" => "INT[bits=8][signed=true]",
+            "int[bits=8][signed=true]" => "INT[bits=8][signed=true]",
+            "u8" or "byte" => "INT[bits=8][signed=false]",
+            "int[bits=8][signed=false]" => "INT[bits=8][signed=false]",
+            "i16" or "short" => "INT[bits=16][signed=true]",
+            "int[bits=16][signed=true]" => "INT[bits=16][signed=true]",
+            "u16" or "ushort" => "INT[bits=16][signed=false]",
+            "int[bits=16][signed=false]" => "INT[bits=16][signed=false]",
+            "i32" or "int" or "int32" => "INT",
+            "int[bits=32][signed=true]" => "INT",
+            "u32" or "uint" or "uint32" => "UINT",
+            "int[bits=32][signed=false]" => "UINT",
+            "i64" or "long" or "int64" => "LONG",
+            "int[bits=64][signed=true]" => "LONG",
+            "u64" or "ulong" or "uint64" => "ULONG",
+            "int[bits=64][signed=false]" => "ULONG",
+            "f32" or "single" => "FLOAT[bits=32]",
+            "float[bits=32]" => "FLOAT[bits=32]",
+            "f64" or "float" or "double" => "FLOAT",
+            "dec" or "decimal" => "DECIMAL",
+            "str" or "string" => "STRING",
+            "bool" or "boolean" => "BOOL",
+            "any" or "object" or "unknown" => "OBJECT",
+            "never" => "NEVER",
+            _ => trimmed,
+        };
+    }
+
+    private static IEnumerable<string> CollectReturnTypes(IReadOnlyList<BoundStatement>? statements)
+    {
+        if (statements == null)
+            yield break;
+
+        foreach (var statement in statements)
+        {
+            switch (statement)
+            {
+                case BoundReturnStatement { Expression: not null } returnStatement:
+                    yield return returnStatement.Expression.TypeName;
+                    break;
+                case BoundIfStatement ifStatement:
+                    foreach (var type in CollectReturnTypes(ifStatement.ThenBody))
+                        yield return type;
+                    foreach (var clause in ifStatement.ElseIfClauses)
+                        foreach (var type in CollectReturnTypes(clause.Body))
+                            yield return type;
+                    foreach (var type in CollectReturnTypes(ifStatement.ElseBody))
+                        yield return type;
+                    break;
+                case BoundWhileStatement whileStatement:
+                    foreach (var type in CollectReturnTypes(whileStatement.Body))
+                        yield return type;
+                    break;
+                case BoundForStatement forStatement:
+                    foreach (var type in CollectReturnTypes(forStatement.Body))
+                        yield return type;
+                    break;
+                case BoundForeachStatement foreachStatement:
+                    foreach (var type in CollectReturnTypes(foreachStatement.Body))
+                        yield return type;
+                    break;
+                case BoundDoWhileStatement doWhileStatement:
+                    foreach (var type in CollectReturnTypes(doWhileStatement.Body))
+                        yield return type;
+                    break;
+                case BoundUsingStatement usingStatement:
+                    foreach (var type in CollectReturnTypes(usingStatement.Body))
+                        yield return type;
+                    break;
+                case BoundTryStatement tryStatement:
+                    foreach (var type in CollectReturnTypes(tryStatement.TryBody))
+                        yield return type;
+                    foreach (var clause in tryStatement.CatchClauses)
+                        foreach (var type in CollectReturnTypes(clause.Body))
+                            yield return type;
+                    foreach (var type in CollectReturnTypes(tryStatement.FinallyBody))
+                        yield return type;
+                    break;
+            }
+        }
+    }
 
     /// <summary>
     /// Generates a unique name by appending a number suffix.
@@ -978,7 +2850,14 @@ public sealed class Binder
             if (catchClause.VariableName != null)
             {
                 var typeName = catchClause.ExceptionType ?? "Exception";
-                exceptionVar = new VariableSymbol(catchClause.VariableName, typeName, isMutable: false);
+                exceptionVar = CreateLocalVariable(
+                    catchClause.VariableName,
+                    typeName,
+                    isMutable: false,
+                    isParameter: false,
+                    ParameterModifier.None,
+                    catchClause.VariableSpan ?? catchClause.Span,
+                    "catch");
                 _scope.TryDeclare(exceptionVar);
             }
 
@@ -1005,54 +2884,7 @@ public sealed class Binder
     private BoundMatchStatement BindMatchStatement(MatchStatementNode matchStmt)
     {
         var target = BindExpression(matchStmt.Target);
-
-        var cases = new List<BoundMatchCase>();
-        foreach (var matchCase in matchStmt.Cases)
-        {
-            using var _caseScope = PushScope(_scope.CreateChild());
-
-            // Bind pattern (if not a wildcard)
-            BoundExpression? pattern = null;
-            var isDefault = false;
-
-            // Check for wildcard pattern
-            if (matchCase.Pattern is WildcardPatternNode)
-            {
-                isDefault = true;
-            }
-            else if (matchCase.Pattern is LiteralPatternNode literalPattern)
-            {
-                pattern = BindExpression(literalPattern.Literal);
-            }
-            else if (matchCase.Pattern is ConstantPatternNode constantPattern)
-            {
-                pattern = BindExpression(constantPattern.Value);
-            }
-            else if (matchCase.Pattern is VariablePatternNode varPattern)
-            {
-                // Variable pattern captures a value - treat as default for now
-                // TODO: Add variable binding to scope
-                isDefault = true;
-            }
-            else
-            {
-                // For other pattern types, mark as default for now
-                isDefault = true;
-            }
-
-            // Bind guard if present
-            BoundExpression? guard = null;
-            if (matchCase.Guard != null)
-            {
-                guard = BindExpression(matchCase.Guard);
-            }
-
-            var body = BindStatements(matchCase.Body);
-
-            cases.Add(new BoundMatchCase(matchCase.Span, pattern, isDefault, guard, body));
-        }
-
-        return new BoundMatchStatement(matchStmt.Span, target, cases);
+        return new BoundMatchStatement(matchStmt.Span, target, BindMatchCases(matchStmt.Cases));
     }
 
     // ===== New statement binders for class member bodies =====
@@ -1077,16 +2909,34 @@ public sealed class Binder
     {
         using var _ = PushScope(_scope.CreateChild());
 
-        var loopVar = new VariableSymbol(forEach.VariableName, forEach.VariableType, isMutable: false);
+        var collection = BindExpression(forEach.Collection);
+        var variableType = string.IsNullOrWhiteSpace(forEach.VariableType)
+                           || forEach.VariableType.Equals("var", StringComparison.OrdinalIgnoreCase)
+            ? GetIndexedElementType(collection.TypeName)
+            : forEach.VariableType;
+        var loopVar = CreateLocalVariable(
+            forEach.VariableName,
+            variableType,
+            isMutable: false,
+            isParameter: false,
+            ParameterModifier.None,
+            forEach.VariableSpan,
+            "foreach");
         _scope.TryDeclare(loopVar);
 
         if (forEach.IndexVariableName != null)
         {
-            var indexVar = new VariableSymbol(forEach.IndexVariableName, "INT", isMutable: true);
+            var indexVar = CreateLocalVariable(
+                forEach.IndexVariableName,
+                "INT",
+                isMutable: true,
+                isParameter: false,
+                ParameterModifier.None,
+                forEach.IndexVariableSpan ?? forEach.Span,
+                "foreach-index");
             _scope.TryDeclare(indexVar);
         }
 
-        var collection = BindExpression(forEach.Collection);
         var body = BindStatements(forEach.Body);
         return new BoundForeachStatement(forEach.Span, loopVar, collection, body);
     }
@@ -1099,7 +2949,14 @@ public sealed class Binder
         if (usingStmt.VariableName != null)
         {
             var typeName = usingStmt.VariableType ?? "IDisposable";
-            resource = new VariableSymbol(usingStmt.VariableName, typeName, isMutable: false);
+            resource = CreateLocalVariable(
+                usingStmt.VariableName,
+                typeName,
+                isMutable: false,
+                isParameter: false,
+                ParameterModifier.None,
+                usingStmt.VariableSpan ?? usingStmt.Span,
+                "using");
             _scope.TryDeclare(resource);
         }
 
@@ -1139,62 +2996,25 @@ public sealed class Binder
 
     // ===== Class member binding =====
 
-    private Scope CreateClassScope(ClassDefinitionNode cls)
-    {
-        var classScope = _scope.CreateChild();
-        foreach (var field in cls.Fields)
-        {
-            var isMutable = !field.Modifiers.HasFlag(MethodModifiers.Readonly);
-            var fieldSymbol = new VariableSymbol(field.Name, field.TypeName, isMutable: isMutable);
-            classScope.TryDeclare(fieldSymbol);
-        }
-        return classScope;
-    }
-
-    private static void RegisterClassMembers(ClassDefinitionNode cls, Scope classScope)
-    {
-        // Register methods (with overload support)
-        foreach (var method in cls.Methods)
-        {
-            var parameters = method.Parameters
-                .Select(p => new VariableSymbol(p.Name, p.TypeName, isMutable: false, isParameter: true))
-                .ToList();
-            var returnType = method.Output?.TypeName ?? "VOID";
-            classScope.DeclareOverload(new FunctionSymbol(method.Name, returnType, parameters));
-        }
-
-        // Register constructors (resolvable as class name)
-        foreach (var ctor in cls.Constructors)
-        {
-            var parameters = ctor.Parameters
-                .Select(p => new VariableSymbol(p.Name, p.TypeName, isMutable: false, isParameter: true))
-                .ToList();
-            classScope.DeclareOverload(new FunctionSymbol(cls.Name, "VOID", parameters));
-        }
-
-        // Register properties as symbols (so property access resolves)
-        foreach (var prop in cls.Properties)
-        {
-            classScope.TryDeclare(new VariableSymbol(prop.Name, prop.TypeName, isMutable: prop.Setter != null || prop.Initer != null));
-        }
-    }
-
     private void BindClassMembers(ClassDefinitionNode cls, List<BoundFunction> functions)
     {
-        var className = cls.Name;
-        var classScope = CreateClassScope(cls);
-        RegisterClassMembers(cls, classScope);
+        var className = _qualifiedClassNames[cls];
+        var classScope = _classScopes[cls];
 
         using var _ = PushScope(classScope);
         var previousClassName = _currentClassName;
+        var previousClass = _currentClass;
         var previousClassScope = _currentClassScope;
+        var previousClassIdentity = _currentClassIdentity;
         _currentClassName = className;
+        _currentClass = cls;
         _currentClassScope = classScope;
+        _currentClassIdentity = _classSymbolIds[cls];
 
         try
         {
             // Methods
-            foreach (var method in cls.Methods)
+            foreach (var method in EnumerateMethods(cls))
             {
                 if (method.IsAbstract || method.IsExtern || method.Body.Count == 0)
                     continue;
@@ -1203,80 +3023,147 @@ public sealed class Binder
             }
 
             // Constructors
-            foreach (var ctor in cls.Constructors)
+            foreach (var ctor in EnumerateConstructors(cls))
             {
-                if (ctor.Body.Count == 0) continue;
-                var bound = TryBindMember(() => BindConstructor(ctor, className), ctor.Span, className, ".ctor");
+                if (ctor.Body.Count == 0 && ctor.Initializer == null)
+                    continue;
+                var memberName = ctor.IsStatic ? ".cctor" : ".ctor";
+                var bound = TryBindMember(
+                    () => BindConstructor(ctor, className),
+                    ctor.Span,
+                    className,
+                    memberName);
                 if (bound != null) functions.Add(bound);
             }
 
             // Property accessors
-            foreach (var prop in cls.Properties)
+            var properties = EnumerateProperties(cls).ToArray();
+            for (var propertyIndex = 0; propertyIndex < properties.Length; propertyIndex++)
             {
+                var prop = properties[propertyIndex];
                 if (prop.Getter is { IsAutoImplemented: false })
                 {
                     var bound = TryBindMember(
-                        () => BindPropertyAccessor(prop.Getter, className, prop.Name, prop.TypeName),
+                        () => BindPropertyAccessor(
+                            prop.Getter,
+                            className,
+                            prop.Name,
+                            prop.TypeName,
+                            prop.Id,
+                            prop.IdentifierSpan,
+                            prop.IsStatic),
                         prop.Getter.Span, className, $"{prop.Name}.get");
                     if (bound != null) functions.Add(bound);
                 }
                 if (prop.Setter is { IsAutoImplemented: false })
                 {
                     var bound = TryBindMember(
-                        () => BindPropertyAccessor(prop.Setter, className, prop.Name, prop.TypeName),
+                        () => BindPropertyAccessor(
+                            prop.Setter,
+                            className,
+                            prop.Name,
+                            prop.TypeName,
+                            prop.Id,
+                            prop.IdentifierSpan,
+                            prop.IsStatic),
                         prop.Setter.Span, className, $"{prop.Name}.set");
                     if (bound != null) functions.Add(bound);
                 }
                 if (prop.Initer is { IsAutoImplemented: false })
                 {
                     var bound = TryBindMember(
-                        () => BindPropertyAccessor(prop.Initer, className, prop.Name, prop.TypeName),
+                        () => BindPropertyAccessor(
+                            prop.Initer,
+                            className,
+                            prop.Name,
+                            prop.TypeName,
+                            prop.Id,
+                            prop.IdentifierSpan,
+                            prop.IsStatic),
                         prop.Initer.Span, className, $"{prop.Name}.init");
                     if (bound != null) functions.Add(bound);
                 }
             }
 
             // Operator overloads
-            foreach (var op in cls.OperatorOverloads)
+            var operators = EnumerateOperators(cls).ToArray();
+            for (var operatorIndex = 0; operatorIndex < operators.Length; operatorIndex++)
             {
+                var op = operators[operatorIndex];
                 if (op.Body.Count == 0) continue;
-                var bound = TryBindMember(() => BindOperator(op, className), op.Span, className, $"op_{op.Kind}");
+                var bound = TryBindMember(
+                    () => BindOperator(op, className, operatorIndex),
+                    op.Span,
+                    className,
+                    $"op_{op.Kind}");
                 if (bound != null) functions.Add(bound);
             }
 
             // Indexer accessors
-            foreach (var ixer in cls.Indexers)
+            var indexers = EnumerateIndexers(cls).ToArray();
+            for (var indexerIndex = 0; indexerIndex < indexers.Length; indexerIndex++)
             {
+                var ixer = indexers[indexerIndex];
                 if (ixer.Getter is { IsAutoImplemented: false })
                 {
                     var bound = TryBindMember(
-                        () => BindIndexerAccessor(ixer.Getter, ixer.Parameters, className, ixer.TypeName),
+                        () => BindIndexerAccessor(
+                            ixer.Getter,
+                            ixer.Parameters,
+                            className,
+                            ixer.TypeName,
+                            ixer.Id,
+                            indexerIndex),
                         ixer.Getter.Span, className, "this[].get");
                     if (bound != null) functions.Add(bound);
                 }
                 if (ixer.Setter is { IsAutoImplemented: false })
                 {
                     var bound = TryBindMember(
-                        () => BindIndexerAccessor(ixer.Setter, ixer.Parameters, className, ixer.TypeName),
+                        () => BindIndexerAccessor(
+                            ixer.Setter,
+                            ixer.Parameters,
+                            className,
+                            ixer.TypeName,
+                            ixer.Id,
+                            indexerIndex),
                         ixer.Setter.Span, className, "this[].set");
                     if (bound != null) functions.Add(bound);
                 }
             }
 
             // Event accessors
-            foreach (var evt in cls.Events)
+            var events = EnumerateEvents(cls).ToArray();
+            for (var eventIndex = 0; eventIndex < events.Length; eventIndex++)
             {
+                var evt = events[eventIndex];
                 if (evt.AddBody != null && evt.AddBody.Count > 0)
                 {
                     var bound = TryBindMember(
-                        () => BindEventAccessor(evt.AddBody, className, evt.Name, "add", evt.DelegateType, evt.Span),
+                        () => BindEventAccessor(
+                            evt.AddBody,
+                            className,
+                            evt.Name,
+                            "add",
+                            evt.DelegateType,
+                            evt.Id,
+                            eventIndex,
+                            evt.Span),
                         evt.Span, className, $"{evt.Name}.add");
                     if (bound != null) functions.Add(bound);
                 }
                 if (evt.RemoveBody != null && evt.RemoveBody.Count > 0)
                 {
                     var bound = TryBindMember(
-                        () => BindEventAccessor(evt.RemoveBody, className, evt.Name, "remove", evt.DelegateType, evt.Span),
+                        () => BindEventAccessor(
+                            evt.RemoveBody,
+                            className,
+                            evt.Name,
+                            "remove",
+                            evt.DelegateType,
+                            evt.Id,
+                            eventIndex,
+                            evt.Span),
                         evt.Span, className, $"{evt.Name}.remove");
                     if (bound != null) functions.Add(bound);
                 }
@@ -1286,18 +3173,14 @@ public sealed class Binder
             // don't inherit outer class fields (C# semantics: nested classes
             // need explicit reference to access outer instance members)
             foreach (var nested in cls.NestedClasses)
-            {
-                // Temporarily restore to module scope (parent of class scope)
-                var outerScope = _scope;
-                _scope = classScope.Parent!;
                 BindClassMembers(nested, functions);
-                _scope = outerScope;
-            }
         }
         finally
         {
             _currentClassName = previousClassName;
+            _currentClass = previousClass;
             _currentClassScope = previousClassScope;
+            _currentClassIdentity = previousClassIdentity;
         }
     }
 
@@ -1337,11 +3220,10 @@ public sealed class Binder
         var functionScope = _scope.CreateChild();
         using var _s = PushScope(functionScope);
         using var _c = PushStaticContext(method.IsStatic);
+        var functionSymbol = _functionSymbols[method];
+        using var _identity = PushDeclarationContext(functionSymbol.Id);
 
-        var parameters = BindParameters(method.Parameters);
-        var returnType = method.Output?.TypeName ?? "VOID";
-        var qualifiedName = $"{className}.{method.Name}";
-        var functionSymbol = new FunctionSymbol(qualifiedName, returnType, parameters);
+        DeclareParameters(functionSymbol.Parameters, method.Parameters);
         var boundBody = BindStatements(method.Body);
         var declaredEffects = ExtractMethodEffects(method.Effects);
         return new BoundFunction(method.Span, functionSymbol, boundBody, functionScope,
@@ -1353,10 +3235,10 @@ public sealed class Binder
         var functionScope = _scope.CreateChild();
         using var _s = PushScope(functionScope);
         using var _c = PushStaticContext(ctor.IsStatic);
+        var functionSymbol = _functionSymbols[ctor];
+        using var _identity = PushDeclarationContext(functionSymbol.Id);
 
-        var parameters = BindParameters(ctor.Parameters);
-        var qualifiedName = $"{className}..ctor";
-        var functionSymbol = new FunctionSymbol(qualifiedName, "VOID", parameters);
+        DeclareParameters(functionSymbol.Parameters, ctor.Parameters);
 
         // Bind constructor initializer (: base(...) / : this(...)) as a call prepended to body.
         // This makes initializer arguments visible to bug pattern checkers (e.g., div-by-zero in base(x / y)).
@@ -1364,23 +3246,49 @@ public sealed class Binder
         var boundBody = new List<BoundStatement>();
         if (ctor.Initializer != null)
         {
-            var initArgs = new List<BoundExpression>();
-            foreach (var arg in ctor.Initializer.Arguments)
-                initArgs.Add(BindExpression(arg));
-            var initTarget = ctor.Initializer.IsBaseCall ? "base..ctor" : $"{className}..ctor";
-            boundBody.Add(new BoundCallStatement(ctor.Initializer.Span, initTarget, initArgs));
+            var initArgs = BindExpressions(ctor.Initializer.Arguments);
+            var baseClass = ResolveBaseClass(_currentClass);
+            var initTarget = ctor.Initializer.IsBaseCall
+                ? baseClass == null
+                    ? "base..ctor"
+                    : $"{_qualifiedClassNames[baseClass]}..ctor"
+                : $"{className}..ctor";
+            var resolution = ResolveCall(
+                ctor.Initializer.Span,
+                initTarget,
+                initArgs,
+                argumentNames: null,
+                argumentModifiers: null,
+                typeArguments: null);
+            boundBody.Add(new BoundCallStatement(
+                ctor.Initializer.Span,
+                initTarget,
+                initArgs,
+                resolution.Function));
         }
         boundBody.AddRange(BindStatements(ctor.Body));
 
         return new BoundFunction(ctor.Span, functionSymbol, boundBody, functionScope,
-            Array.Empty<string>(), BoundMemberKind.Constructor, className);
+            Array.Empty<string>(),
+            ctor.IsStatic ? BoundMemberKind.StaticConstructor : BoundMemberKind.Constructor,
+            className);
     }
 
     private BoundFunction BindPropertyAccessor(
-        PropertyAccessorNode accessor, string className, string propName, string propType)
+        PropertyAccessorNode accessor,
+        string className,
+        string propName,
+        string propType,
+        string propertyId,
+        Parsing.TextSpan propertyIdentifierSpan,
+        bool isStatic)
     {
         var functionScope = _scope.CreateChild();
         using var _ = PushScope(functionScope);
+        using var _staticGuard = PushStaticContext(isStatic);
+        var propertyIdentity = _currentClassIdentity.Append("property", $"ast:{propertyId}");
+        var functionId = propertyIdentity.Append($"accessor:{accessor.Kind}");
+        using var _identity = PushDeclarationContext(functionId);
 
         var parameters = new List<VariableSymbol>();
         var memberKind = BoundMemberKind.PropertyGetter;
@@ -1388,7 +3296,14 @@ public sealed class Binder
         if (accessor.Kind is PropertyAccessorNode.AccessorKind.Set
             or PropertyAccessorNode.AccessorKind.Init)
         {
-            var valueParam = new VariableSymbol("value", propType, isMutable: false, isParameter: true);
+            var valueParam = CreateLocalVariable(
+                "value",
+                propType,
+                isMutable: false,
+                isParameter: true,
+                ParameterModifier.None,
+                Parsing.TextSpan.Empty,
+                "parameter");
             _scope.TryDeclare(valueParam);
             parameters.Add(valueParam);
             memberKind = accessor.Kind == PropertyAccessorNode.AccessorKind.Set
@@ -1397,22 +3312,49 @@ public sealed class Binder
 
         var returnType = accessor.Kind == PropertyAccessorNode.AccessorKind.Get ? propType : "VOID";
         var qualifiedName = $"{className}.{propName}.{accessor.Kind.ToString().ToLowerInvariant()}";
-        var functionSymbol = new FunctionSymbol(qualifiedName, returnType, parameters);
+        var functionSymbol = new FunctionSymbol(
+            functionId,
+            qualifiedName,
+            returnType,
+            parameters,
+            declarationSpan: propertyIdentifierSpan,
+            visibility: accessor.Visibility ?? Visibility.Public,
+            containingTypeName: className,
+            definitionSpan: accessor.Span);
+        TrackSymbol(functionSymbol);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
             Array.Empty<string>(), memberKind, className);
     }
 
-    private BoundFunction BindOperator(OperatorOverloadNode op, string className)
+    private BoundFunction BindOperator(
+        OperatorOverloadNode op,
+        string className,
+        int operatorIndex)
     {
         var functionScope = _scope.CreateChild();
         using var _s = PushScope(functionScope);
         using var _c = PushStaticContext(true); // operators are always static in C#
+        var functionId = CreateDeclarationId(
+            _currentClassIdentity,
+            "operator",
+            op.Id,
+            $"op_{op.Kind}");
+        using var _identity = PushDeclarationContext(functionId);
 
         var parameters = BindParameters(op.Parameters);
         var returnType = op.Output?.TypeName ?? "VOID";
         var qualifiedName = $"{className}.op_{op.Kind}";
-        var functionSymbol = new FunctionSymbol(qualifiedName, returnType, parameters);
+        var functionSymbol = new FunctionSymbol(
+            functionId,
+            qualifiedName,
+            returnType,
+            parameters,
+            declarationSpan: op.Span,
+            visibility: op.Visibility,
+            containingTypeName: className,
+            definitionSpan: op.Span);
+        TrackSymbol(functionSymbol);
         var boundBody = BindStatements(op.Body);
         // OperatorOverloadNode has no Effects field — mark as unknown
         var declaredEffects = new List<string> { "*:*" };
@@ -1422,10 +3364,16 @@ public sealed class Binder
 
     private BoundFunction BindIndexerAccessor(
         PropertyAccessorNode accessor, IReadOnlyList<ParameterNode> indexerParams,
-        string className, string indexerType)
+        string className,
+        string indexerType,
+        string indexerId,
+        int indexerIndex)
     {
         var functionScope = _scope.CreateChild();
         using var _ = PushScope(functionScope);
+        var indexerIdentity = _currentClassIdentity.Append("indexer", $"ast:{indexerId}");
+        var functionId = indexerIdentity.Append($"accessor:{accessor.Kind}");
+        using var _identity = PushDeclarationContext(functionId);
 
         var parameters = BindParameters(indexerParams);
         var memberKind = BoundMemberKind.IndexerGetter;
@@ -1433,7 +3381,14 @@ public sealed class Binder
         if (accessor.Kind is PropertyAccessorNode.AccessorKind.Set
             or PropertyAccessorNode.AccessorKind.Init)
         {
-            var valueParam = new VariableSymbol("value", indexerType, isMutable: false, isParameter: true);
+            var valueParam = CreateLocalVariable(
+                "value",
+                indexerType,
+                isMutable: false,
+                isParameter: true,
+                ParameterModifier.None,
+                Parsing.TextSpan.Empty,
+                "parameter");
             _scope.TryDeclare(valueParam);
             parameters.Add(valueParam);
             memberKind = BoundMemberKind.IndexerSetter;
@@ -1441,7 +3396,16 @@ public sealed class Binder
 
         var returnType = accessor.Kind == PropertyAccessorNode.AccessorKind.Get ? indexerType : "VOID";
         var qualifiedName = $"{className}.this[].{accessor.Kind.ToString().ToLowerInvariant()}";
-        var functionSymbol = new FunctionSymbol(qualifiedName, returnType, parameters);
+        var functionSymbol = new FunctionSymbol(
+            functionId,
+            qualifiedName,
+            returnType,
+            parameters,
+            declarationSpan: accessor.Span,
+            visibility: accessor.Visibility ?? Visibility.Public,
+            containingTypeName: className,
+            definitionSpan: accessor.Span);
+        TrackSymbol(functionSymbol);
         var boundBody = BindStatements(accessor.Body);
         return new BoundFunction(accessor.Span, functionSymbol, boundBody, functionScope,
             Array.Empty<string>(), memberKind, className);
@@ -1449,18 +3413,41 @@ public sealed class Binder
 
     private BoundFunction BindEventAccessor(
         IReadOnlyList<StatementNode> body, string className, string eventName,
-        string accessorKind, string delegateType, Parsing.TextSpan span)
+        string accessorKind,
+        string delegateType,
+        string eventId,
+        int eventIndex,
+        Parsing.TextSpan span)
     {
         var functionScope = _scope.CreateChild();
         using var _ = PushScope(functionScope);
+        var eventIdentity = _currentClassIdentity.Append("event", $"ast:{eventId}");
+        var functionId = eventIdentity.Append($"accessor:{accessorKind}");
+        using var _identity = PushDeclarationContext(functionId);
 
-        var valueParam = new VariableSymbol("value", delegateType, isMutable: false, isParameter: true);
+        var valueParam = CreateLocalVariable(
+            "value",
+            delegateType,
+            isMutable: false,
+            isParameter: true,
+            ParameterModifier.None,
+            Parsing.TextSpan.Empty,
+            "parameter");
         _scope.TryDeclare(valueParam);
         var parameters = new List<VariableSymbol> { valueParam };
 
         var memberKind = accessorKind == "add" ? BoundMemberKind.EventAdd : BoundMemberKind.EventRemove;
         var qualifiedName = $"{className}.{eventName}.{accessorKind}";
-        var functionSymbol = new FunctionSymbol(qualifiedName, "VOID", parameters);
+        var functionSymbol = new FunctionSymbol(
+            functionId,
+            qualifiedName,
+            "VOID",
+            parameters,
+            declarationSpan: span,
+            visibility: Visibility.Public,
+            containingTypeName: className,
+            definitionSpan: span);
+        TrackSymbol(functionSymbol);
         var boundBody = BindStatements(body);
         return new BoundFunction(span, functionSymbol, boundBody, functionScope,
             Array.Empty<string>(), memberKind, className);

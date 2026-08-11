@@ -790,6 +790,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(OutputNode node) => MapTypeName(node.TypeName);
+
+    public string Visit(EffectsNode node) => "";
+
     public string Visit(ParameterNode node)
     {
         var attrPrefix = "";
@@ -859,6 +863,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(CallStatementNode node)
     {
         var target = QualifyCrossModuleTarget(node.Target);
+        if (node.TypeArguments is { Count: > 0 })
+        {
+            var typeArgs = string.Join(", ", node.TypeArguments.Select(MapTypeName));
+            target += $"<{typeArgs}>";
+        }
         var argStrings = new List<string>();
         for (int i = 0; i < node.Arguments.Count; i++)
         {
@@ -1369,6 +1378,23 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(ElseIfClauseNode node)
+    {
+        var condition = node.Condition.Accept(this);
+        AppendLine($"else if ({condition})");
+        AppendLine("{");
+        Indent();
+        PushDeclScope();
+        foreach (var stmt in node.Body)
+        {
+            EmitStatement(stmt);
+        }
+        PopDeclScope();
+        Dedent();
+        AppendLine("}");
+        return "";
+    }
+
     public string Visit(BindStatementNode node)
     {
         // Discard-await (`§B{_} §AWAIT ...`, produced by the C# converter for a
@@ -1542,6 +1568,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    public string Visit(FieldDefinitionNode node)
+    {
+        var defaultValue = node.DefaultValue is null ? "" : $" = {node.DefaultValue.Accept(this)}";
+        return $"{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}{defaultValue}";
+    }
+
     public string Visit(UnionTypeDefinitionNode node)
     {
         // Generate as abstract base class with derived classes for each variant
@@ -1566,6 +1598,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         return "";
+    }
+
+    public string Visit(VariantDefinitionNode node)
+    {
+        var fields = string.Join(", ", node.Fields.Select(Visit));
+        return $"{SanitizeIdentifier(node.Name)}({fields})";
+    }
+
+    public string Visit(TypeReferenceNode node)
+    {
+        var typeName = MapTypeName(node.Name);
+        return node.TypeArguments.Count == 0
+            ? typeName
+            : $"{typeName}<{string.Join(", ", node.TypeArguments.Select(Visit))}>";
     }
 
     public string Visit(EnumDefinitionNode node)
@@ -1802,6 +1848,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var fields = string.Join(", ", node.Fields.Select(f => f.Value.Accept(this)));
         return $"new {typeName}({fields})";
     }
+
+    public string Visit(FieldAssignmentNode node) => node.Value.Accept(this);
 
     public string Visit(FieldAccessNode node)
     {
@@ -5780,55 +5828,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         AppendLine($"// TODO: proof obligation [{node.Id}{desc}]");
         return "";
     }
-
-    // #762 item 8 (B8): real dispatch for the seven former no-op-Accept classes.
-    // Bodies ported from PR #900's implementations. REFERENCE PROJECTIONS: the parent
-    // nodes' emission paths still inline-handle these nodes (routing them through
-    // Accept is follow-up work) — keep each body matching its live inline path, or
-    // the day something dispatches Accept the output silently diverges (#911 F5).
-    public string Visit(OutputNode node) => MapTypeName(node.TypeName);
-
-    public string Visit(EffectsNode node) => "";
-
-    public string Visit(ElseIfClauseNode node)
-    {
-        var condition = node.Condition.Accept(this);
-        AppendLine($"else if ({condition})");
-        AppendLine("{");
-        Indent();
-        PushDeclScope();
-        foreach (var stmt in node.Body)
-        {
-            EmitStatement(stmt);
-        }
-        PopDeclScope();
-        Dedent();
-        AppendLine("}");
-        return "";
-    }
-
-    public string Visit(FieldDefinitionNode node)
-    {
-        var defaultValue = node.DefaultValue is null ? "" : $" = {node.DefaultValue.Accept(this)}";
-        return $"{MapTypeName(node.TypeName)} {SanitizeIdentifier(node.Name)}{defaultValue}";
-    }
-
-    public string Visit(VariantDefinitionNode node)
-    {
-        var fields = string.Join(", ", node.Fields.Select(Visit));
-        return $"{SanitizeIdentifier(node.Name)}({fields})";
-    }
-
-    public string Visit(TypeReferenceNode node)
-    {
-        var typeName = MapTypeName(node.Name);
-        return node.TypeArguments.Count == 0
-            ? typeName
-            : $"{typeName}<{string.Join(", ", node.TypeArguments.Select(Visit))}>";
-    }
-
-    public string Visit(FieldAssignmentNode node) => node.Value.Accept(this);
-
 }
 
 /// <summary>
@@ -5974,5 +5973,4 @@ public static class GeneratedCSharpCompiler
 
         return new GeneratedCSharpValidation(syntaxErrors, compilationErrors);
     }
-
 }

@@ -125,28 +125,23 @@ public static class DiagnosticCode
     public const string ReturnValueInVoidOwner = "Calor0205";
 
     /// <summary>
-    /// Error: two top-level functions declare the same name AND the same ordered
-    /// parameter-type list (#762 items 5–6, B8). Distinct signatures under one name
-    /// are a legal overload set; an identical signature is unresolvable.
+    /// Error: two internal callables declare the same name, generic arity,
+    /// parameter modifiers, and exact parameter types.
     /// </summary>
     public const string DuplicateFunctionSignature = "Calor0206";
 
     /// <summary>
-    /// Warning: an internal call matches more than one overload at its arity and the
-    /// argument types cannot discriminate (bound types are informational strings in
-    /// 0.13 — B5 decision record). Resolution proceeds with the first declaration,
-    /// NON-silently (#762 DoD: no silent incompatible fallback).
+    /// Error: more than one internal overload is applicable to a call.
     /// </summary>
     public const string AmbiguousOverload = "Calor0207";
 
     /// <summary>
-    /// Warning: an internal call names a declared function but no overload accepts
-    /// the given argument count. Resolution proceeds with the first declaration for
-    /// bound-tree continuity, NON-silently (#762 DoD).
+    /// Error: an internal callable name is known, but none of its overloads
+    /// matches the call's generic arity, argument arity, modifiers, and types.
     /// </summary>
     public const string NoMatchingOverload = "Calor0208";
 
-    // Bind inference diagnostics (Calor0250-0259) — RFC v0.6 bind-inference-formalization
+    // Bind inference diagnostics (Calor0250-0260) — RFC v0.6 bind-inference-formalization
 
     /// <summary>
     /// Error: <c>§B{name}</c> requires either a <c>:type</c> annotation or
@@ -237,14 +232,19 @@ public static class DiagnosticCode
     public const string BindDuplicateInScope = "Calor0258";
 
     /// <summary>
-    /// #762 B1: an accepted expression has no structural binder yet — analysis treats it
-    /// as an opaque value. This code IS the incomplete-fraction instrument (freeze
-    /// registration F-2 as amended): the CI leg counts it over the pinned corpus, and the
-    /// roadmap §2.5 gate 1 bar is zero occurrences for F-1 Tier A classes at release.
-    /// Info severity until B8 (the LSP binds every open document live; Warning would
-    /// flood editors while 37 Tier A classes remain unbound).
+    /// Info: an accepted expression has no structural binder yet and is treated as opaque.
     /// </summary>
     public const string AnalysisIncomplete = "Calor0259";
+
+    /// <summary>
+    /// Error: a mutable rebind targets a symbol that was not declared mutable.
+    /// </summary>
+    public const string BindReassignsImmutable = "Calor0260";
+
+    /// <summary>
+    /// Error: an instance field or property is accessed by a bare reference from a static member.
+    /// </summary>
+    public const string InstanceMemberInStaticContext = "Calor0261";
 
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
@@ -671,7 +671,7 @@ public static class DiagnosticCode
     public const string AnalysisSkipped = "Calor0930";
 
     /// <summary>
-    /// Info: A statement type is not fully supported in analysis and is treated as opaque.
+    /// Info: An AST node type is not fully supported in analysis and is retained structurally.
     /// Deduplicated per NodeTypeName per file.
     /// </summary>
     public const string AnalysisUnsupportedNode = "Calor0931";

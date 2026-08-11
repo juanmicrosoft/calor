@@ -123,6 +123,7 @@ public sealed class ForeachStatementNode : StatementNode
     /// The loop variable name.
     /// </summary>
     public string VariableName { get; }
+    public TextSpan VariableSpan { get; }
 
     /// <summary>
     /// The type of the loop variable.
@@ -145,6 +146,7 @@ public sealed class ForeachStatementNode : StatementNode
     /// Optional index variable name for indexed foreach (e.g., Select with index).
     /// </summary>
     public string? IndexVariableName { get; }
+    public TextSpan? IndexVariableSpan { get; }
 
     public ForeachStatementNode(
         TextSpan span,
@@ -154,16 +156,20 @@ public sealed class ForeachStatementNode : StatementNode
         ExpressionNode collection,
         IReadOnlyList<StatementNode> body,
         AttributeCollection attributes,
-        string? indexVariableName = null)
+        string? indexVariableName = null,
+        TextSpan? variableSpan = null,
+        TextSpan? indexVariableSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         VariableName = variableName ?? throw new ArgumentNullException(nameof(variableName));
+        VariableSpan = variableSpan ?? span;
         VariableType = variableType ?? throw new ArgumentNullException(nameof(variableType));
         Collection = collection ?? throw new ArgumentNullException(nameof(collection));
         Body = body ?? throw new ArgumentNullException(nameof(body));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         IndexVariableName = indexVariableName;
+        IndexVariableSpan = indexVariableName == null ? null : indexVariableSpan ?? span;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

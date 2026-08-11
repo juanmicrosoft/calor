@@ -10,6 +10,7 @@ public sealed class ForStatementNode : StatementNode
 {
     public string Id { get; }
     public string VariableName { get; }
+    public TextSpan VariableSpan { get; }
     public ExpressionNode From { get; }
     public ExpressionNode To { get; }
     public ExpressionNode? Step { get; }
@@ -24,11 +25,13 @@ public sealed class ForStatementNode : StatementNode
         ExpressionNode to,
         ExpressionNode? step,
         IReadOnlyList<StatementNode> body,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? variableSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         VariableName = variableName ?? throw new ArgumentNullException(nameof(variableName));
+        VariableSpan = variableSpan ?? span;
         From = from ?? throw new ArgumentNullException(nameof(from));
         To = to ?? throw new ArgumentNullException(nameof(to));
         Step = step;
@@ -163,7 +166,9 @@ public sealed class ElseIfClauseNode : AstNode
 public sealed class BindStatementNode : StatementNode
 {
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public string? TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public bool IsMutable { get; }
     public ExpressionNode? Initializer { get; }
     public AttributeCollection Attributes { get; }
@@ -174,11 +179,15 @@ public sealed class BindStatementNode : StatementNode
         string? typeName,
         bool isMutable,
         ExpressionNode? initializer,
-        AttributeCollection attributes)
+        AttributeCollection attributes,
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName;
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         IsMutable = isMutable;
         Initializer = initializer;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));

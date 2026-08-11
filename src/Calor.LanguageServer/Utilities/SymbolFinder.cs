@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.Parsing;
 
 namespace Calor.LanguageServer.Utilities;
@@ -14,6 +15,7 @@ public sealed class SymbolLookupResult
     public TextSpan Span { get; }
     public TextSpan? DefinitionSpan { get; }
     public AstNode? Node { get; }
+    public SymbolId? SymbolId { get; }
 
     /// <summary>
     /// For member access (e.g., person.name), this contains the type name of the target (e.g., "Person").
@@ -21,7 +23,15 @@ public sealed class SymbolLookupResult
     /// </summary>
     public string? ContainingTypeName { get; }
 
-    public SymbolLookupResult(string name, string kind, string? type, TextSpan span, TextSpan? definitionSpan = null, AstNode? node = null, string? containingTypeName = null)
+    public SymbolLookupResult(
+        string name,
+        string kind,
+        string? type,
+        TextSpan span,
+        TextSpan? definitionSpan = null,
+        AstNode? node = null,
+        string? containingTypeName = null,
+        SymbolId? symbolId = null)
     {
         Name = name;
         Kind = kind;
@@ -30,6 +40,7 @@ public sealed class SymbolLookupResult
         DefinitionSpan = definitionSpan;
         Node = node;
         ContainingTypeName = containingTypeName;
+        SymbolId = symbolId;
     }
 }
 
@@ -42,7 +53,59 @@ public static class SymbolFinder
     /// Find the symbol at a given position in the AST.
     /// Uses a combination of source text analysis and AST traversal.
     /// </summary>
-    public static SymbolLookupResult? FindSymbolAtPosition(ModuleNode ast, int line, int column, string source)
+    public static SymbolLookupResult? FindSymbolAtPosition(
+        ModuleNode ast,
+        int line,
+        int column,
+        string source,
+        BoundModule? boundModule = null,
+        IReadOnlyList<IndexedTypeReference>? typeReferences = null)
+    {
+        var offset = GetOffset(source, line, column);
+        if (boundModule != null)
+        {
+            typeReferences ??= TypeReferenceIndex.Build(ast, boundModule, source);
+            var typeReference = typeReferences
+                .Where(reference => reference.Span.Contains(offset))
+                .OrderBy(reference => reference.Span.Length)
+                .FirstOrDefault();
+            if (!typeReference.SymbolId.IsNone
+                && boundModule.SymbolsById.TryGetValue(typeReference.SymbolId, out var symbol)
+                && symbol is TypeSymbol typeSymbol)
+            {
+                return new SymbolLookupResult(
+                    typeSymbol.Name,
+                    "type",
+                    typeSymbol.QualifiedName,
+                    typeReference.Span,
+                    typeSymbol.DeclarationSpan,
+                    symbolId: typeSymbol.Id);
+            }
+        }
+
+        var result = FindSymbolAtPositionCore(ast, line, column, source);
+        if (result == null || boundModule == null)
+            return result;
+
+        var symbolId = FindBoundSymbolId(boundModule, result, offset);
+        return symbolId == null
+            ? result
+            : new SymbolLookupResult(
+                result.Name,
+                result.Kind,
+                result.Type,
+                result.Span,
+                result.DefinitionSpan,
+                result.Node,
+                result.ContainingTypeName,
+                symbolId);
+    }
+
+    private static SymbolLookupResult? FindSymbolAtPositionCore(
+        ModuleNode ast,
+        int line,
+        int column,
+        string source)
     {
         var offset = GetOffset(source, line, column);
 
@@ -75,6 +138,226 @@ public static class SymbolFinder
 
         // Search for the identifier in the context
         return FindIdentifierInContext(identifier, context, ast, line, source);
+    }
+
+    public static FunctionSymbol? FindResolvedCall(
+        BoundModule? boundModule,
+        int offset,
+        string? target = null)
+    {
+        return FindBoundCallAtOffset(boundModule, offset, target) switch
+        {
+            BoundCallExpression expression => expression.ResolvedSymbol,
+            BoundCallStatement statement => statement.ResolvedSymbol,
+            BoundNewExpression creation => creation.ResolvedConstructor,
+            _ => null,
+        };
+    }
+
+    public static BoundNode? FindBoundCallAtOffset(
+        BoundModule? boundModule,
+        int offset,
+        string? target = null)
+    {
+        if (boundModule == null)
+            return null;
+
+        return Descendants(boundModule)
+            .Where(node => node switch
+            {
+                BoundCallExpression expression => expression.Span.Contains(offset)
+                    && (target == null || expression.Target == target),
+                BoundCallStatement statement => statement.Span.Contains(offset)
+                    && (target == null || statement.Target == target),
+                BoundNewExpression creation => creation.TypeNameSpan.Contains(offset)
+                    && (target == null || creation.TypeName == target),
+                BoundExpressionCallExpression expressionCall => expressionCall.Span.Contains(offset),
+                _ => false,
+            })
+            .OrderBy(node => node.Span.Length)
+            .FirstOrDefault();
+    }
+
+    private static SymbolId? FindBoundSymbolId(
+        BoundModule boundModule,
+        SymbolLookupResult result,
+        int offset)
+    {
+        var variable = Descendants(boundModule)
+            .OfType<BoundVariableExpression>()
+            .Where(expression => expression.Span.Contains(offset))
+            .Where(expression => string.Equals(
+                expression.Variable.Name,
+                result.Name,
+                StringComparison.Ordinal))
+            .OrderBy(expression => expression.Span.Length)
+            .FirstOrDefault();
+        if (variable != null)
+            return variable.SymbolId.IsNone ? null : variable.SymbolId;
+
+        var field = Descendants(boundModule)
+            .OfType<BoundFieldAccessExpression>()
+            .Where(expression => expression.FieldNameSpan.Contains(offset))
+            .Where(expression => string.Equals(
+                expression.FieldName,
+                result.Name,
+                StringComparison.Ordinal))
+            .OrderBy(expression => expression.Span.Length)
+            .FirstOrDefault();
+        if (field?.ResolvedFields.FirstOrDefault(symbol =>
+                string.Equals(symbol.Name, result.Name, StringComparison.Ordinal)
+                && !symbol.Id.IsNone) is { } resolvedField)
+        {
+            return resolvedField.Id;
+        }
+
+        var boundCall = FindBoundCallAtOffset(boundModule, offset);
+        switch (boundCall)
+        {
+            case BoundCallExpression expression:
+                if (expression.ReceiverSymbol is { } expressionReceiver
+                    && expression.ReceiverSpan?.Contains(offset) == true
+                    && string.Equals(expressionReceiver.Name, result.Name, StringComparison.Ordinal))
+                {
+                    return expressionReceiver.Id.IsNone ? null : expressionReceiver.Id;
+                }
+                if (expression.CalleeSpan.Contains(offset)
+                    && CallTargetMatchesName(expression.Target, result.Name)
+                    && expression.ResolvedSymbolId is { IsNone: false } expressionId)
+                {
+                    return expressionId;
+                }
+                break;
+            case BoundCallStatement statement:
+                if (statement.ReceiverSymbol is { } statementReceiver
+                    && statement.ReceiverSpan?.Contains(offset) == true
+                    && string.Equals(statementReceiver.Name, result.Name, StringComparison.Ordinal))
+                {
+                    return statementReceiver.Id.IsNone ? null : statementReceiver.Id;
+                }
+                if (statement.CalleeSpan.Contains(offset)
+                    && CallTargetMatchesName(statement.Target, result.Name)
+                    && statement.ResolvedSymbolId is { IsNone: false } statementId)
+                {
+                    return statementId;
+                }
+                break;
+            case BoundNewExpression creation
+                when string.Equals(creation.TypeName, result.Name, StringComparison.Ordinal)
+                     && creation.TypeNameSpan.Contains(offset)
+                     && creation.ResolvedTypeSymbolId is { IsNone: false } typeId:
+                return typeId;
+        }
+
+        var declarationAtOffset = boundModule.SymbolsById.Values
+            .Where(symbol => symbol.DeclarationSpan.Contains(offset))
+            .Where(symbol =>
+                string.Equals(symbol.Name, result.Name, StringComparison.Ordinal)
+                || symbol.Name.EndsWith("." + result.Name, StringComparison.Ordinal))
+            .OrderBy(symbol => symbol.DeclarationSpan.Length)
+            .Select(symbol => (SymbolId?)symbol.Id)
+            .FirstOrDefault();
+        if (declarationAtOffset != null)
+            return declarationAtOffset;
+
+        var definitionSpan = result.DefinitionSpan ?? result.Span;
+        return boundModule.SymbolsById.Values
+            .Where(symbol =>
+                symbol.DeclarationSpan == definitionSpan
+                || symbol.DefinitionSpan == definitionSpan)
+            .Where(symbol =>
+                string.Equals(symbol.Name, result.Name, StringComparison.Ordinal)
+                || symbol.Name.EndsWith("." + result.Name, StringComparison.Ordinal))
+            .Select(symbol => (SymbolId?)symbol.Id)
+            .FirstOrDefault();
+    }
+
+    public static IReadOnlyList<TextSpan> FindBoundReferences(
+        BoundModule boundModule,
+        SymbolId symbolId,
+        bool includeDeclaration,
+        IReadOnlyList<IndexedTypeReference>? typeReferences = null)
+    {
+        ArgumentNullException.ThrowIfNull(boundModule);
+        if (symbolId.IsNone)
+            return Array.Empty<TextSpan>();
+
+        var references = new List<TextSpan>();
+        if (includeDeclaration
+            && boundModule.SymbolsById.TryGetValue(symbolId, out var declaration)
+            && declaration.DeclarationSpan.Length > 0)
+        {
+            references.Add(declaration.DeclarationSpan);
+        }
+
+        foreach (var node in Descendants(boundModule))
+        {
+            switch (node)
+            {
+                case BoundVariableExpression variable
+                    when variable.ResolvedSymbols.Any(symbol => symbol.Id == symbolId):
+                    references.Add(variable.Span);
+                    break;
+                case BoundFieldAccessExpression field
+                    when field.ResolvedFields.Any(symbol => symbol.Id == symbolId):
+                    references.Add(field.FieldNameSpan);
+                    break;
+                case BoundCallExpression call
+                    when call.ResolvedSymbols.Any(symbol => symbol.Id == symbolId):
+                    references.Add(call.CalleeSpan);
+                    break;
+                case BoundCallExpression call when call.ReceiverSymbolId == symbolId:
+                    references.Add(call.ReceiverSpan ?? call.Span);
+                    break;
+                case BoundCallStatement call
+                    when call.ResolvedSymbols.Any(symbol => symbol.Id == symbolId):
+                    references.Add(call.CalleeSpan);
+                    break;
+                case BoundCallStatement call when call.ReceiverSymbolId == symbolId:
+                    references.Add(call.ReceiverSpan ?? call.Span);
+                    break;
+                case BoundNewExpression creation when creation.ResolvedTypeSymbolId == symbolId:
+                    references.Add(creation.TypeNameSpan);
+                    break;
+                case BoundNewExpression creation
+                    when creation.ResolvedConstructors.Any(symbol => symbol.Id == symbolId):
+                    references.Add(creation.TypeNameSpan);
+                    break;
+            }
+        }
+
+        if (typeReferences != null)
+        {
+            references.AddRange(typeReferences
+                .Where(reference => reference.SymbolId == symbolId)
+                .Select(reference => reference.Span));
+        }
+
+        return references
+            .Distinct()
+            .OrderBy(span => span.Start)
+            .ThenBy(span => span.End)
+            .ToArray();
+    }
+
+    private static bool CallTargetMatchesName(string target, string name)
+    {
+        if (string.Equals(target, name, StringComparison.Ordinal))
+            return true;
+
+        var lastDot = target.LastIndexOf('.');
+        return lastDot >= 0
+            && string.Equals(target[(lastDot + 1)..], name, StringComparison.Ordinal);
+    }
+
+    private static IEnumerable<BoundNode> Descendants(BoundNode node)
+    {
+        yield return node;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var descendant in Descendants(child))
+                yield return descendant;
+        }
     }
 
     /// <summary>
@@ -664,4 +947,276 @@ internal sealed class SymbolContext
     public ConstructorNode? Constructor { get; set; }
     public InterfaceDefinitionNode? Interface { get; set; }
     public EnumDefinitionNode? Enum { get; set; }
+}
+
+public readonly record struct IndexedTypeReference(
+    SymbolId SymbolId,
+    string Name,
+    TextSpan Span);
+
+/// <summary>
+/// Builds an identity-aware index from parser-recorded type annotation spans.
+/// </summary>
+public static class TypeReferenceIndex
+{
+    public static IReadOnlyList<IndexedTypeReference> Build(
+        ModuleNode ast,
+        BoundModule boundModule,
+        string source)
+    {
+        ArgumentNullException.ThrowIfNull(ast);
+        ArgumentNullException.ThrowIfNull(boundModule);
+        ArgumentNullException.ThrowIfNull(source);
+
+        var typeSymbols = boundModule.SymbolsById.Values
+            .OfType<TypeSymbol>()
+            .Where(symbol => !symbol.Id.IsNone)
+            .ToArray();
+        if (typeSymbols.Length == 0)
+            return Array.Empty<IndexedTypeReference>();
+
+        var references = new List<IndexedTypeReference>();
+        foreach (var creation in Calor.Compiler.Analysis.Dataflow.BoundNodeHelpers
+                     .DescendantsAndSelf(boundModule)
+                     .OfType<BoundNewExpression>())
+        {
+            AddBoundTypeReference(creation.TypeReference, source, references);
+        }
+
+        foreach (var node in DescendantsAndSelf(ast))
+        {
+            switch (node)
+            {
+                case OutputNode output:
+                    AddAnnotation(output.TypeNameSpan, source, typeSymbols, references);
+                    break;
+                case ParameterNode parameter:
+                    AddAnnotation(parameter.TypeNameSpan, source, typeSymbols, references);
+                    break;
+                case ClassFieldNode field:
+                    AddAnnotation(field.TypeNameSpan, source, typeSymbols, references);
+                    break;
+                case PropertyNode property:
+                    AddAnnotation(property.TypeNameSpan, source, typeSymbols, references);
+                    break;
+                case BindStatementNode bind when bind.TypeName != null:
+                    AddAnnotation(bind.TypeNameSpan, source, typeSymbols, references);
+                    break;
+                case ClassDefinitionNode cls:
+                    if (cls.BaseClassSpan is { } baseSpan)
+                        AddAnnotation(baseSpan, source, typeSymbols, references);
+                    foreach (var interfaceSpan in cls.ImplementedInterfaceSpans)
+                        AddAnnotation(interfaceSpan, source, typeSymbols, references);
+                    break;
+            }
+        }
+
+        return references
+            .Distinct()
+            .OrderBy(reference => reference.Span.Start)
+            .ThenBy(reference => reference.Span.End)
+            .ToArray();
+    }
+
+    private static void AddAnnotation(
+        TextSpan annotationSpan,
+        string source,
+        IReadOnlyList<TypeSymbol> typeSymbols,
+        ICollection<IndexedTypeReference> references)
+    {
+        if (annotationSpan.Length <= 0
+            || annotationSpan.Start < 0
+            || annotationSpan.End > source.Length)
+        {
+            return;
+        }
+
+        var annotation = source.AsSpan(annotationSpan.Start, annotationSpan.Length);
+        var identifiers = ScanIdentifiers(annotation);
+        for (var index = 0; index < identifiers.Count; index++)
+        {
+            var identifier = identifiers[index];
+            var symbol = ResolveTypeSymbol(annotation, identifiers, index, typeSymbols);
+            if (symbol == null)
+                continue;
+
+            references.Add(new IndexedTypeReference(
+                symbol.Id,
+                identifier.Text,
+                CreateSubspan(annotationSpan, source, identifier.Start, identifier.Length)));
+        }
+    }
+
+    private static void AddBoundTypeReference(
+        BoundTypeReference reference,
+        string source,
+        ICollection<IndexedTypeReference> references)
+    {
+        if (reference.ResolvedTypeSymbolId is { IsNone: false } symbolId
+            && reference.Span.Length > 0
+            && reference.Span.Start >= 0
+            && reference.Span.End <= source.Length)
+        {
+            references.Add(new IndexedTypeReference(
+                symbolId,
+                source.Substring(reference.Span.Start, reference.Span.Length),
+                reference.Span));
+        }
+
+        foreach (var typeArgument in reference.TypeArguments)
+            AddBoundTypeReference(typeArgument, source, references);
+    }
+
+    private static TypeSymbol? ResolveTypeSymbol(
+        ReadOnlySpan<char> annotation,
+        IReadOnlyList<IdentifierPart> identifiers,
+        int index,
+        IReadOnlyList<TypeSymbol> typeSymbols)
+    {
+        var identifier = identifiers[index];
+        var chainStart = index;
+        while (chainStart > 0
+               && IsQualifiedSeparator(
+                   annotation,
+                   identifiers[chainStart - 1].End,
+                   identifiers[chainStart].Start))
+        {
+            chainStart--;
+        }
+
+        var chainEnd = index;
+        while (chainEnd + 1 < identifiers.Count
+               && IsQualifiedSeparator(
+                   annotation,
+                   identifiers[chainEnd].End,
+                   identifiers[chainEnd + 1].Start))
+        {
+            chainEnd++;
+        }
+
+        if (chainStart != chainEnd)
+        {
+            if (index != chainEnd)
+                return null;
+
+            var qualifiedName = string.Join(
+                ".",
+                identifiers.Skip(chainStart).Take(chainEnd - chainStart + 1)
+                    .Select(part => part.Text));
+            var qualifiedMatches = typeSymbols
+                .Where(symbol =>
+                    string.Equals(symbol.Name, identifier.Text, StringComparison.Ordinal)
+                    && (string.Equals(
+                            symbol.QualifiedName,
+                            qualifiedName,
+                            StringComparison.Ordinal)
+                        || symbol.QualifiedName.EndsWith(
+                            "." + qualifiedName,
+                            StringComparison.Ordinal)))
+                .ToArray();
+            return qualifiedMatches.Length == 1 ? qualifiedMatches[0] : null;
+        }
+
+        var simpleMatches = typeSymbols
+            .Where(symbol => string.Equals(symbol.Name, identifier.Text, StringComparison.Ordinal))
+            .ToArray();
+        return simpleMatches.Length == 1 ? simpleMatches[0] : null;
+    }
+
+    private static bool IsQualifiedSeparator(
+        ReadOnlySpan<char> annotation,
+        int previousEnd,
+        int nextStart)
+    {
+        var sawDot = false;
+        for (var i = previousEnd; i < nextStart; i++)
+        {
+            if (annotation[i] == '.')
+            {
+                if (sawDot)
+                    return false;
+                sawDot = true;
+            }
+            else if (!char.IsWhiteSpace(annotation[i]))
+            {
+                return false;
+            }
+        }
+
+        return sawDot;
+    }
+
+    private static List<IdentifierPart> ScanIdentifiers(ReadOnlySpan<char> annotation)
+    {
+        var result = new List<IdentifierPart>();
+        for (var index = 0; index < annotation.Length;)
+        {
+            if (!IsIdentifierStart(annotation[index]))
+            {
+                index++;
+                continue;
+            }
+
+            var start = index++;
+            while (index < annotation.Length && IsIdentifierPart(annotation[index]))
+                index++;
+
+            result.Add(new IdentifierPart(
+                annotation[start..index].ToString(),
+                start,
+                index - start));
+        }
+
+        return result;
+    }
+
+    private static TextSpan CreateSubspan(
+        TextSpan annotationSpan,
+        string source,
+        int relativeStart,
+        int length)
+    {
+        var line = annotationSpan.Line;
+        var column = annotationSpan.Column;
+        for (var offset = annotationSpan.Start;
+             offset < annotationSpan.Start + relativeStart;
+             offset++)
+        {
+            if (source[offset] == '\n')
+            {
+                line++;
+                column = 1;
+            }
+            else
+            {
+                column++;
+            }
+        }
+
+        return new TextSpan(annotationSpan.Start + relativeStart, length, line, column);
+    }
+
+    private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
+    {
+        yield return node;
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
+        }
+    }
+
+    private static bool IsIdentifierStart(char value) =>
+        char.IsLetter(value) || value == '_';
+
+    private static bool IsIdentifierPart(char value) =>
+        char.IsLetterOrDigit(value) || value == '_';
+
+    private readonly record struct IdentifierPart(
+        string Text,
+        int Start,
+        int Length)
+    {
+        public int End => Start + Length;
+    }
 }

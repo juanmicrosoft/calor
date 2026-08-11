@@ -1,5 +1,6 @@
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects.Manifests;
 using Calor.Compiler.Parsing;
@@ -117,7 +118,8 @@ public sealed class EffectEnforcementPass
         // Constructor enforcement requires language-level E support on CTOR first.
         foreach (var function in _callGraphAnalysis.Functions.Values)
         {
-            if (function.Name.EndsWith("..ctor", StringComparison.Ordinal))
+            if (function.Name.EndsWith("..ctor", StringComparison.Ordinal)
+                || function.Name.EndsWith("..cctor", StringComparison.Ordinal))
                 continue;
             CheckEffects(function);
         }
@@ -220,6 +222,7 @@ public sealed class EffectEnforcementPass
             _callGraphAnalysis.Functions,
             _callGraphAnalysis.FunctionNameToId,
             _callGraphAnalysis.MethodNameToIds,
+            _callGraphAnalysis,
             sccMembers, _policy, _strictEffects, _diagnostics, function.Id,
             _crossModuleFunctionNames,
             _classesByName, _interfacesByName, _delegateTypeNames,
@@ -396,7 +399,7 @@ public sealed class EffectEnforcementPass
                 if (!method.IsOverride)
                     continue;
 
-                var (baseMethod, baseClassName) = FindBaseMethod(cls, method.Name);
+                var (baseMethod, baseClassName) = FindBaseMethod(cls, method);
                 if (baseMethod != null)
                 {
                     var overrideDeclared = GetDeclaredEffects(method.Effects);
@@ -433,7 +436,7 @@ public sealed class EffectEnforcementPass
                     // Interface dispatch through an inherited implementation
                     // launders exactly like a direct one.
                     var (impl, implOwnerName, externalBaseName) =
-                        FindImplementingMethod(cls, sig.Name);
+                        FindImplementingMethod(cls, sig);
 
                     if (impl != null)
                     {
@@ -494,16 +497,20 @@ public sealed class EffectEnforcementPass
     /// match; (null, null, null) when there is no match and no external base.
     /// </summary>
     private (MethodNode? Method, string? OwnerName, string? ExternalBaseName) FindImplementingMethod(
-        ClassDefinitionNode cls, string methodName)
+        ClassDefinitionNode cls, MethodSignatureNode signature)
     {
         var current = cls;
         var visited = new HashSet<string>(StringComparer.Ordinal);
         while (current != null && visited.Add(current.Name))
         {
-            var found = CallGraphAnalysis.EnumerateMethods(current).FirstOrDefault(
-                m => m.Name.Equals(methodName, StringComparison.Ordinal));
-            if (found != null)
-                return (found, current.Name, null);
+            var matches = CallGraphAnalysis.EnumerateMethods(current)
+                .Where(method => CallableSignatureMatches(method, signature))
+                .Take(2)
+                .ToArray();
+            if (matches.Length == 1)
+                return (matches[0], current.Name, null);
+            if (matches.Length > 1)
+                return (null, null, null);
 
             var baseName = StripGenericArguments(current.BaseClass);
             if (baseName == null)
@@ -521,7 +528,9 @@ public sealed class EffectEnforcementPass
     /// when the chain leaves the module (external C# base); (null, null) when there is
     /// no base class at all.
     /// </summary>
-    private (MethodNode? Method, string? BaseClassName) FindBaseMethod(ClassDefinitionNode cls, string methodName)
+    private (MethodNode? Method, string? BaseClassName) FindBaseMethod(
+        ClassDefinitionNode cls,
+        MethodNode method)
     {
         var baseName = StripGenericArguments(cls.BaseClass);
         var visited = new HashSet<string>(StringComparer.Ordinal);
@@ -529,13 +538,63 @@ public sealed class EffectEnforcementPass
         {
             if (!_classesByName.TryGetValue(baseName, out var baseCls))
                 return (null, baseName); // external base class
-            var found = CallGraphAnalysis.EnumerateMethods(baseCls).FirstOrDefault(
-                m => m.Name.Equals(methodName, StringComparison.Ordinal));
-            if (found != null)
-                return (found, baseName);
+            var matches = CallGraphAnalysis.EnumerateMethods(baseCls)
+                .Where(candidate => CallableSignatureMatches(candidate, method))
+                .Take(2)
+                .ToArray();
+            if (matches.Length == 1)
+                return (matches[0], baseName);
+            if (matches.Length > 1)
+                return (null, null);
             baseName = StripGenericArguments(baseCls.BaseClass);
         }
         return (null, null);
+    }
+
+    private static bool CallableSignatureMatches(MethodNode method, MethodSignatureNode signature) =>
+        method.Name.Equals(signature.Name, StringComparison.Ordinal)
+        && method.TypeParameters.Count == signature.TypeParameters.Count
+        && ParametersMatch(
+            method.Parameters,
+            method.TypeParameters,
+            signature.Parameters,
+            signature.TypeParameters);
+
+    private static bool CallableSignatureMatches(MethodNode candidate, MethodNode method) =>
+        candidate.Name.Equals(method.Name, StringComparison.Ordinal)
+        && candidate.TypeParameters.Count == method.TypeParameters.Count
+        && ParametersMatch(
+            candidate.Parameters,
+            candidate.TypeParameters,
+            method.Parameters,
+            method.TypeParameters);
+
+    private static bool ParametersMatch(
+        IReadOnlyList<ParameterNode> left,
+        IReadOnlyList<TypeParameterNode> leftTypeParameters,
+        IReadOnlyList<ParameterNode> right,
+        IReadOnlyList<TypeParameterNode> rightTypeParameters)
+    {
+        if (left.Count != right.Count)
+            return false;
+
+        for (var index = 0; index < left.Count; index++)
+        {
+            if (left[index].Modifier != right[index].Modifier
+                || !string.Equals(
+                    TypeIdentity.CanonicalizeSignature(
+                        left[index].TypeName,
+                        leftTypeParameters.Select(parameter => parameter.Name).ToArray()),
+                    TypeIdentity.CanonicalizeSignature(
+                        right[index].TypeName,
+                        rightTypeParameters.Select(parameter => parameter.Name).ToArray()),
+                    StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -802,10 +861,13 @@ public sealed class EffectEnforcementPass
                 foreach (var (calleeName, span) in calls)
                 {
                     // Resolve callee name to ID for internal calls (handles cross-class method calls)
-                    var calleeId = ResolveToInternalId(calleeName);
+                    var calleeIds = _callGraphAnalysis.ResolveCallSites(
+                        currentId,
+                        calleeName,
+                        span);
 
                     // Check external calls via manifest resolver
-                    if (calleeId == null)
+                    if (calleeIds.Count == 0)
                     {
                         var (typeName, methodName) = ParseCallTargetForChain(calleeName);
                         if (!string.IsNullOrEmpty(typeName) && !string.IsNullOrEmpty(methodName))
@@ -820,11 +882,19 @@ public sealed class EffectEnforcementPass
                         }
                     }
                     // Check internal calls
-                    else if (!visited.Contains(calleeId))
+                    else
                     {
-                        visited.Add(calleeId);
-                        var newPath = new List<string>(path) { _callGraphAnalysis.Functions[calleeId].Name };
-                        queue.Enqueue((calleeId, newPath));
+                        foreach (var calleeId in calleeIds)
+                        {
+                            if (!visited.Add(calleeId))
+                                continue;
+
+                            var newPath = new List<string>(path)
+                            {
+                                _callGraphAnalysis.Functions[calleeId].Name,
+                            };
+                            queue.Enqueue((calleeId, newPath));
+                        }
                     }
                 }
             }
@@ -843,6 +913,7 @@ public sealed class EffectEnforcementPass
         public Dictionary<string, FunctionNode> Functions { get; }
         public Dictionary<string, string> FunctionNameToId { get; }
         public Dictionary<string, List<string>> MethodNameToIds { get; }
+        public CallGraphAnalysis CallGraph { get; }
         public HashSet<string> SccMembers { get; }
         public UnknownCallPolicy Policy { get; }
         public bool StrictEffects { get; }
@@ -866,6 +937,7 @@ public sealed class EffectEnforcementPass
             Dictionary<string, FunctionNode> functions,
             Dictionary<string, string> functionNameToId,
             Dictionary<string, List<string>> methodNameToIds,
+            CallGraphAnalysis callGraph,
             HashSet<string> sccMembers,
             UnknownCallPolicy policy,
             bool strictEffects,
@@ -883,6 +955,7 @@ public sealed class EffectEnforcementPass
             Functions = functions;
             FunctionNameToId = functionNameToId;
             MethodNameToIds = methodNameToIds;
+            CallGraph = callGraph;
             SccMembers = sccMembers;
             Policy = policy;
             StrictEffects = strictEffects;
@@ -1036,12 +1109,17 @@ public sealed class EffectEnforcementPass
                     .Union(pp.ElseBody != null ? InferFromStatements(pp.ElseBody) : EffectSet.Empty),
                 // No-effect control-flow / declaration-only constructs
                 BreakStatementNode or ContinueStatementNode or GotoStatementNode or LabelStatementNode
-                    or YieldBreakStatementNode or ProofObligationNode => EffectSet.Empty,
+                    or YieldBreakStatementNode => EffectSet.Empty,
+                ProofObligationNode => InferFromStructuralChildren(statement),
                 // D-W2.3: interop content — effects are assumed, not silently pure
-                RawCSharpNode => RecordAssumption("contains a raw C# interop statement (§CSHARP)"),
-                FallbackCommentNode => RecordAssumption("contains an unconverted C# fallback statement"),
+                RawCSharpNode => InferFromStructuralChildren(statement)
+                    .Union(RecordAssumption("contains a raw C# interop statement (§CSHARP)")),
+                FallbackCommentNode => InferFromStructuralChildren(statement)
+                    .Union(RecordAssumption("contains an unconverted C# fallback statement")),
                 // D-W2.6: fail-loud catch-all
-                _ => RecordAssumption($"contains an unrecognized statement construct '{statement.GetType().Name}' whose effects cannot be inferred")
+                _ => InferFromStructuralChildren(statement)
+                    .Union(RecordAssumption(
+                        $"contains an unrecognized statement construct '{statement.GetType().Name}' whose effects cannot be inferred"))
             };
         }
 
@@ -1128,6 +1206,36 @@ public sealed class EffectEnforcementPass
 
         private EffectSet InferFromCallTarget(string target, TextSpan span)
         {
+            var exactInternalIds = _context.CallGraph.ResolveCallSites(
+                _context.CurrentFunctionId,
+                target,
+                span);
+            if (exactInternalIds.Count > 0)
+            {
+                var effects = EffectSet.Empty;
+                foreach (var exactInternalId in exactInternalIds)
+                {
+                    if (!_context.Functions.TryGetValue(exactInternalId, out var function))
+                        continue;
+
+                    if (_context.ComputedEffects.TryGetValue(exactInternalId, out var exactEffects))
+                    {
+                        effects = effects.Union(exactEffects);
+                    }
+                    else if (_context.SccMembers.Contains(exactInternalId))
+                    {
+                        effects = effects.Union(_context.ComputedEffects.GetValueOrDefault(
+                            exactInternalId,
+                            EffectSet.Empty));
+                    }
+                    else
+                    {
+                        effects = effects.Union(GetDeclaredEffects(function.Effects));
+                    }
+                }
+
+                return effects;
+            }
             // Bare (no-dot) targets: either a value invocation (delegate — D-W2.1),
             // an internal function/method, or an unresolvable free name.
             // Value resolution runs FIRST, mirroring C# scoping: a parameter,
@@ -1140,14 +1248,6 @@ public sealed class EffectEnforcementPass
                 if (ResolveLocalValueType(target) != null)
                     return InferFromBareNameTarget(target, span);
 
-                var internalByName = FindInternalFunctionByName(target);
-                if (internalByName != null)
-                {
-                    if (_context.ComputedEffects.TryGetValue(internalByName.Id, out var computedBare))
-                        return computedBare;
-                    if (_context.SccMembers.Contains(internalByName.Id))
-                        return _context.ComputedEffects.GetValueOrDefault(internalByName.Id, EffectSet.Empty);
-                }
                 return InferFromBareNameTarget(target, span);
             }
 
@@ -1159,29 +1259,6 @@ public sealed class EffectEnforcementPass
             if (staticCharge != null)
             {
                 return staticCharge;
-            }
-
-            // Check if it's an internal function call by name. The bare-method-name
-            // fallback inside FindInternalFunctionByName is only sound when the
-            // receiver could actually be the declaring in-module type — a receiver
-            // whose static type is KNOWN and not that type must not be captured by
-            // a name collision (W2 review C5: `svc.Refresh` on an external-typed
-            // parameter must hit the unknown chain, not `Helper.Refresh`).
-            if (IsDottedInternalFallbackPermitted(target))
-            {
-                var internalFunc = FindInternalFunctionByName(target);
-                if (internalFunc != null)
-                {
-                    if (_context.ComputedEffects.TryGetValue(internalFunc.Id, out var computed))
-                    {
-                        return computed;
-                    }
-                    // If in same SCC, return current approximation
-                    if (_context.SccMembers.Contains(internalFunc.Id))
-                    {
-                        return _context.ComputedEffects.GetValueOrDefault(internalFunc.Id, EffectSet.Empty);
-                    }
-                }
             }
 
             // Try to resolve using the EffectResolver (manifest-based)
@@ -1401,10 +1478,14 @@ public sealed class EffectEnforcementPass
                 var current = queue.Dequeue();
                 if (!visited.Add(current.Name))
                     continue;
-                var sig = current.Methods.FirstOrDefault(
-                    m => m.Name.Equals(methodName, StringComparison.Ordinal));
-                if (sig != null)
-                    return sig;
+                var signatures = current.Methods
+                    .Where(m => m.Name.Equals(methodName, StringComparison.Ordinal))
+                    .Take(2)
+                    .ToArray();
+                if (signatures.Length == 1)
+                    return signatures[0];
+                if (signatures.Length > 1)
+                    return null;
                 foreach (var baseName in current.BaseInterfaces)
                 {
                     var stripped = StripGenericArguments(baseName);
@@ -1421,10 +1502,14 @@ public sealed class EffectEnforcementPass
             var visited = new HashSet<string>(StringComparer.Ordinal);
             while (current != null && visited.Add(current.Name))
             {
-                var method = CallGraphAnalysis.EnumerateMethods(current).FirstOrDefault(
-                    m => m.Name.Equals(methodName, StringComparison.Ordinal));
-                if (method != null)
-                    return (current.Name, method);
+                var methods = CallGraphAnalysis.EnumerateMethods(current)
+                    .Where(m => m.Name.Equals(methodName, StringComparison.Ordinal))
+                    .Take(2)
+                    .ToArray();
+                if (methods.Length == 1)
+                    return (current.Name, methods[0]);
+                if (methods.Length > 1)
+                    return null;
                 var baseName = StripGenericArguments(current.BaseClass);
                 current = baseName != null && _context.ClassesByName.TryGetValue(baseName, out var baseCls)
                     ? baseCls
@@ -1590,42 +1675,14 @@ public sealed class EffectEnforcementPass
 
         private FunctionNode? FindInternalFunctionByName(string name)
         {
-            // Try exact name match against computed effects
-            foreach (var kvp in _context.ComputedEffects)
-            {
-                if (_context.Functions.TryGetValue(kvp.Key, out var func) &&
-                    func.Name.Equals(name, StringComparison.Ordinal))
-                {
-                    return func;
-                }
-            }
-
-            // For dotted targets (e.g., "_calculator.Add", "Helper.Format"),
-            // extract the bare method name and resolve via function name index.
-            // This handles cross-class method calls within the same module.
-            var lastDot = name.LastIndexOf('.');
-            if (lastDot > 0)
-            {
-                var bareMethodName = name[(lastDot + 1)..];
-
-                // Check for ambiguity: if multiple classes define the same method name,
-                // return null to fall through to external resolution (conservative).
-                if (_context.MethodNameToIds.TryGetValue(bareMethodName, out var candidates) && candidates.Count > 1)
-                    return null;
-
-                if (_context.FunctionNameToId.TryGetValue(bareMethodName, out var resolvedId) &&
-                    _context.Functions.TryGetValue(resolvedId, out var resolved))
-                {
-                    // Verify the resolved function has computed effects or is in current SCC
-                    if (_context.ComputedEffects.ContainsKey(resolvedId) ||
-                        _context.SccMembers.Contains(resolvedId))
-                    {
-                        return resolved;
-                    }
-                }
-            }
-
-            return null;
+            var matches = _context.Functions
+                .Where(pair => pair.Value.Name.Equals(name, StringComparison.Ordinal))
+                .Where(pair => _context.ComputedEffects.ContainsKey(pair.Key)
+                    || _context.SccMembers.Contains(pair.Key))
+                .Select(pair => pair.Value)
+                .Take(2)
+                .ToArray();
+            return matches.Length == 1 ? matches[0] : null;
         }
 
         /// <summary>
@@ -1789,15 +1846,36 @@ public sealed class EffectEnforcementPass
                     or ThisExpressionNode or BaseExpressionNode or SelfRefNode
                     or GenericTypeNode or TypeOfExpressionNode or NameOfExpressionNode
                     or SizeOfNode => EffectSet.Empty,
-                // Contract-form quantifiers evaluate over pure predicates
-                ForallExpressionNode or ExistsExpressionNode or ImplicationExpressionNode => EffectSet.Empty,
+                // Contract-form wrappers are pure themselves, but their retained
+                // predicates still need traversal so nested calls cannot disappear.
+                ForallExpressionNode or ExistsExpressionNode or ImplicationExpressionNode
+                    => InferFromStructuralChildren(expr),
                 // D-W2.3: interop / unconverted content — assumed, not silently pure
-                RawCSharpExpressionNode => RecordAssumption("contains a raw C# interop expression (§CS)"),
-                FallbackExpressionNode fallback => RecordAssumption(
-                    $"contains an unconverted C# fallback expression ('{fallback.FeatureName}')"),
+                RawCSharpExpressionNode => InferFromStructuralChildren(expr)
+                    .Union(RecordAssumption("contains a raw C# interop expression (§CS)")),
+                FallbackExpressionNode fallback => InferFromStructuralChildren(expr)
+                    .Union(RecordAssumption(
+                        $"contains an unconverted C# fallback expression ('{fallback.FeatureName}')")),
                 // D-W2.6: fail-loud catch-all
-                _ => RecordAssumption($"contains an unrecognized expression construct '{expr.GetType().Name}' whose effects cannot be inferred")
+                _ => InferFromStructuralChildren(expr)
+                    .Union(RecordAssumption(
+                        $"contains an unrecognized expression construct '{expr.GetType().Name}' whose effects cannot be inferred"))
             };
+        }
+
+        private EffectSet InferFromStructuralChildren(AstNode node)
+        {
+            var effects = EffectSet.Empty;
+            foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+            {
+                effects = child switch
+                {
+                    ExpressionNode expression => effects.Union(InferFromExpression(expression)),
+                    StatementNode statement => effects.Union(InferFromStatement(statement)),
+                    _ => effects.Union(InferFromStructuralChildren(child)),
+                };
+            }
+            return effects;
         }
 
         private EffectSet InferFromMany(IEnumerable<ExpressionNode> expressions)

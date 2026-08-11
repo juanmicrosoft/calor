@@ -398,6 +398,82 @@ public class EffectEnforcementTests
     // === Cross-class method call effect inference (Issue 313) ===
 
     [Fact]
+    public void OverloadedInternalCall_ChargesOnlyResolvedSymbol()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:Work:pub}
+      §I{i32:value}
+      §O{i32}
+      §R value
+  §F{f002:Work:pub}
+      §I{str:value}
+      §O{void}
+      §E{cw}
+      §P value
+  §F{f003:Caller:pub}
+      §O{i32}
+      §R §C{Work} §A INT:1 §/C
+";
+
+        var result = TestHarness.Compile(source);
+
+        Assert.False(
+            result.HasErrors,
+            $"Exact pure overload should not inherit sibling effects: " +
+            string.Join("; ", result.Diagnostics.Errors.Select(error => error.Message)));
+    }
+
+    [Fact]
+    public void UnresolvedInternalOverload_ReportsNoMatchWithoutChargingFirstFunction()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:Work:pub}
+      §I{i32:value}
+      §O{i32}
+      §R value
+  §F{f002:Work:pub}
+      §I{str:value}
+      §O{void}
+      §E{cw}
+      §P value
+  §F{f003:Caller:pub}
+      §O{void}
+      §C{Work} §A BOOL:true §/C
+";
+
+        var result = TestHarness.Compile(source);
+
+        Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.DoesNotContain(result.Diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.ForbiddenEffect);
+    }
+
+    [Fact]
+    public void PreprocessorWrappedMethod_ParticipatesInBoundCallGraph()
+    {
+        var source = @"
+§M{m001:Test}
+  §CL{c001:Worker:pub}
+      §PP{FEATURE}
+          §MT{mt001:Do:pub} () -> i32
+              §R 1
+      §/PP{FEATURE}
+      §MT{mt002:Run:pub} () -> i32
+          §R §C{Do} §/C
+";
+
+        var result = TestHarness.Compile(source);
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UnknownExternalCall);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
     public void CrossClass_PureMethodCall_DoesNotTriggerCalor0411()
     {
         // Function calls a pure method on another class in the same module.

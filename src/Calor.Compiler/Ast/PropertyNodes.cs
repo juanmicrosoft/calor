@@ -14,7 +14,9 @@ public sealed class PropertyNode : AstNode
 {
     public string Id { get; }
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public Visibility Visibility { get; }
     public MethodModifiers Modifiers { get; }
     public PropertyAccessorNode? Getter { get; }
@@ -78,12 +80,16 @@ public sealed class PropertyNode : AstNode
         PropertyAccessorNode? initer,
         ExpressionNode? defaultValue,
         AttributeCollection attributes,
-        IReadOnlyList<CalorAttributeNode> csharpAttributes)
+        IReadOnlyList<CalorAttributeNode> csharpAttributes,
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         Visibility = visibility;
         Modifiers = modifiers;
         Getter = getter;
@@ -413,6 +419,7 @@ public sealed class UsingStatementNode : StatementNode
 {
     public string? Id { get; }
     public string? VariableName { get; }
+    public TextSpan? VariableSpan { get; }
     public string? VariableType { get; }
     public ExpressionNode Resource { get; }
     public IReadOnlyList<StatementNode> Body { get; }
@@ -422,8 +429,9 @@ public sealed class UsingStatementNode : StatementNode
         string? variableName,
         string? variableType,
         ExpressionNode resource,
-        IReadOnlyList<StatementNode> body)
-        : this(span, null, variableName, variableType, resource, body)
+        IReadOnlyList<StatementNode> body,
+        TextSpan? variableSpan = null)
+        : this(span, null, variableName, variableType, resource, body, variableSpan)
     {
     }
 
@@ -433,11 +441,13 @@ public sealed class UsingStatementNode : StatementNode
         string? variableName,
         string? variableType,
         ExpressionNode resource,
-        IReadOnlyList<StatementNode> body)
+        IReadOnlyList<StatementNode> body,
+        TextSpan? variableSpan = null)
         : base(span)
     {
         Id = id;
         VariableName = variableName;
+        VariableSpan = variableName == null ? null : variableSpan ?? span;
         VariableType = variableType;
         Resource = resource ?? throw new ArgumentNullException(nameof(resource));
         Body = body ?? throw new ArgumentNullException(nameof(body));

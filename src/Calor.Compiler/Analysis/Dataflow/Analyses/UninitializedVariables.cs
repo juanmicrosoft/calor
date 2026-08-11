@@ -25,18 +25,26 @@ public sealed class UninitializedVariablesAnalysis
 {
     private readonly ControlFlowGraph _cfg;
     private readonly Dictionary<BasicBlock, BlockDataflowResult<InitializationFacts>> _results;
-    private readonly HashSet<string> _allVariables;
-    private readonly HashSet<string> _parameters;
+    private readonly IReadOnlyDictionary<SymbolId, VariableSymbol> _allVariables;
+    private readonly HashSet<SymbolId> _parameters;
     private readonly List<UninitializedUse> _uninitializedUses = new();
+    public IReadOnlyList<BoundNode> IncompleteNodes { get; }
+    public bool IsComplete => IncompleteNodes.Count == 0;
 
     public UninitializedVariablesAnalysis(ControlFlowGraph cfg, IEnumerable<string>? parameterNames = null)
     {
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
         _allVariables = CollectAllVariables(cfg);
-        _parameters = parameterNames != null ? new HashSet<string>(parameterNames) : new HashSet<string>();
+        IncompleteNodes = BoundNodeHelpers.GetAnalysisIncompleteNodes(cfg.Function).ToArray();
+        var names = parameterNames?.ToHashSet(StringComparer.Ordinal);
+        _parameters = cfg.Function.Symbol.Parameters
+            .Where(parameter => names == null || names.Contains(parameter.Name))
+            .Where(parameter => !parameter.Id.IsNone)
+            .Select(parameter => parameter.Id)
+            .ToHashSet();
 
-        var lattice = new InitializationLattice(_allVariables, _parameters);
-        var transfer = new UninitializedVariablesTransfer(_allVariables);
+        var lattice = new InitializationLattice(_allVariables.Keys.ToHashSet(), _parameters);
+        var transfer = new UninitializedVariablesTransfer();
         var analysis = new DataflowAnalysis<InitializationFacts>(
             lattice, transfer, DataflowDirection.Forward);
 
@@ -44,6 +52,13 @@ public sealed class UninitializedVariablesAnalysis
 
         // Detect uninitialized uses
         DetectUninitializedUses();
+    }
+
+    public UninitializedVariablesAnalysis(
+        ControlFlowGraph cfg,
+        IEnumerable<VariableSymbol> parameters)
+        : this(cfg, parameters.Select(parameter => parameter.Name))
+    {
     }
 
     /// <summary>
@@ -75,10 +90,26 @@ public sealed class UninitializedVariablesAnalysis
     /// </summary>
     public InitializationState GetStateAtEntry(BasicBlock block, string variableName)
     {
-        if (_results.TryGetValue(block, out var result))
-            return result.In.GetState(variableName);
-        return InitializationState.Uninitialized;
+        if (!_results.TryGetValue(block, out var result))
+            return InitializationState.Uninitialized;
+
+        var states = _allVariables
+            .Where(pair => string.Equals(pair.Value.Name, variableName, StringComparison.Ordinal))
+            .Select(pair => result.In.GetState(pair.Key))
+            .Distinct()
+            .ToArray();
+        return states.Length switch
+        {
+            0 => InitializationState.Uninitialized,
+            1 => states[0],
+            _ => InitializationState.MaybeInitialized,
+        };
     }
+
+    public InitializationState GetStateAtEntry(BasicBlock block, SymbolId variableId) =>
+        _results.TryGetValue(block, out var result)
+            ? result.In.GetState(variableId)
+            : InitializationState.Uninitialized;
 
     private void DetectUninitializedUses()
     {
@@ -94,16 +125,12 @@ public sealed class UninitializedVariablesAnalysis
             {
                 foreach (var v in BoundNodeHelpers.GetUsedVariables(block.BranchCondition))
                 {
-                    // Parameters are initialized by their caller: function parameters
-                    // are seeded Initialized at entry, and a LAMBDA parameter (a scope
-                    // this name-keyed analysis cannot see) is always initialized when
-                    // its body runs — flagging it is wrong on any execution (#908 F2).
                     if (v.IsParameter)
                         continue;
-                    var state = currentFacts.GetState(v.Name);
+                    var state = currentFacts.GetState(v.Id);
                     if (state != InitializationState.Initialized)
                     {
-                        _uninitializedUses.Add(new UninitializedUse(v.Name, block.Span, state));
+                        _uninitializedUses.Add(new UninitializedUse(v.Name, block.Span, state, v.Id));
                     }
                 }
             }
@@ -116,10 +143,10 @@ public sealed class UninitializedVariablesAnalysis
                 {
                     if (v.IsParameter)
                         continue;
-                    var state = currentFacts.GetState(v.Name);
+                    var state = currentFacts.GetState(v.Id);
                     if (state != InitializationState.Initialized)
                     {
-                        _uninitializedUses.Add(new UninitializedUse(v.Name, stmt.Span, state));
+                        _uninitializedUses.Add(new UninitializedUse(v.Name, stmt.Span, state, v.Id));
                     }
                 }
 
@@ -131,33 +158,45 @@ public sealed class UninitializedVariablesAnalysis
                     var hasInitializer = stmt is BoundBindStatement bind && bind.Initializer != null;
                     if (hasInitializer)
                     {
-                        currentFacts = currentFacts.SetInitialized(defined.Name);
+                        currentFacts = currentFacts.SetInitialized(defined.Id);
                     }
                 }
             }
         }
     }
 
-    private static HashSet<string> CollectAllVariables(ControlFlowGraph cfg)
+    private static IReadOnlyDictionary<SymbolId, VariableSymbol> CollectAllVariables(ControlFlowGraph cfg)
     {
-        var variables = new HashSet<string>();
+        var variables = new Dictionary<SymbolId, VariableSymbol>();
+
+        foreach (var parameter in cfg.Function.Symbol.Parameters)
+        {
+            if (!parameter.Id.IsNone)
+                variables.TryAdd(parameter.Id, parameter);
+        }
 
         foreach (var block in cfg.Blocks)
         {
             foreach (var stmt in block.Statements)
             {
                 var defined = BoundNodeHelpers.GetDefinedVariable(stmt);
-                if (defined != null)
-                    variables.Add(defined.Name);
+                if (defined != null && !defined.Id.IsNone)
+                    variables.TryAdd(defined.Id, defined);
 
                 foreach (var used in BoundNodeHelpers.GetUsedVariables(stmt))
-                    variables.Add(used.Name);
+                {
+                    if (!used.Id.IsNone)
+                        variables.TryAdd(used.Id, used);
+                }
             }
 
             if (block.BranchCondition != null)
             {
                 foreach (var used in BoundNodeHelpers.GetUsedVariables(block.BranchCondition))
-                    variables.Add(used.Name);
+                {
+                    if (!used.Id.IsNone)
+                        variables.TryAdd(used.Id, used);
+                }
             }
         }
 
@@ -168,25 +207,31 @@ public sealed class UninitializedVariablesAnalysis
 /// <summary>
 /// Represents a use of a potentially uninitialized variable.
 /// </summary>
-public readonly record struct UninitializedUse(string VariableName, TextSpan Span, InitializationState State);
+public readonly record struct UninitializedUse(
+    string VariableName,
+    TextSpan Span,
+    InitializationState State,
+    SymbolId VariableId = default);
 
 /// <summary>
 /// Tracks initialization state for all variables.
 /// </summary>
 public readonly struct InitializationFacts : IEquatable<InitializationFacts>
 {
-    private readonly Dictionary<string, InitializationState>? _states;
+    private readonly Dictionary<SymbolId, InitializationState>? _states;
 
-    private InitializationFacts(Dictionary<string, InitializationState>? states)
+    private InitializationFacts(Dictionary<SymbolId, InitializationState>? states)
     {
         _states = states;
     }
 
     public static InitializationFacts Empty => new(null);
 
-    public static InitializationFacts Create(IEnumerable<string> variables, HashSet<string> initialized)
+    public static InitializationFacts Create(
+        IEnumerable<SymbolId> variables,
+        HashSet<SymbolId> initialized)
     {
-        var states = new Dictionary<string, InitializationState>();
+        var states = new Dictionary<SymbolId, InitializationState>();
         foreach (var v in variables)
         {
             states[v] = initialized.Contains(v)
@@ -196,29 +241,34 @@ public readonly struct InitializationFacts : IEquatable<InitializationFacts>
         return new InitializationFacts(states);
     }
 
-    public InitializationState GetState(string variableName)
+    public InitializationState GetState(SymbolId variableId)
     {
         if (_states == null)
             return InitializationState.Uninitialized;
 
-        return _states.TryGetValue(variableName, out var state)
+        return _states.TryGetValue(variableId, out var state)
             ? state
             : InitializationState.Uninitialized;
     }
 
-    public InitializationFacts SetInitialized(string variableName)
+    public InitializationFacts SetInitialized(SymbolId variableId)
     {
         var newStates = _states != null
-            ? new Dictionary<string, InitializationState>(_states)
-            : new Dictionary<string, InitializationState>();
+            ? new Dictionary<SymbolId, InitializationState>(_states)
+            : new Dictionary<SymbolId, InitializationState>();
 
-        newStates[variableName] = InitializationState.Initialized;
+        newStates[variableId] = InitializationState.Initialized;
         return new InitializationFacts(newStates);
     }
 
-    public InitializationFacts Join(InitializationFacts other, IEnumerable<string> allVariables)
+    public InitializationFacts Join(InitializationFacts other, IEnumerable<SymbolId> allVariables)
     {
-        var newStates = new Dictionary<string, InitializationState>();
+        if (_states == null)
+            return other;
+        if (other._states == null)
+            return this;
+
+        var newStates = new Dictionary<SymbolId, InitializationState>();
 
         foreach (var v in allVariables)
         {
@@ -271,16 +321,17 @@ public readonly struct InitializationFacts : IEquatable<InitializationFacts>
 
 internal sealed class InitializationLattice : IDataflowLattice<InitializationFacts>
 {
-    private readonly HashSet<string> _allVariables;
-    private readonly HashSet<string> _parameters;
+    private readonly HashSet<SymbolId> _allVariables;
+    private readonly HashSet<SymbolId> _parameters;
 
-    public InitializationLattice(HashSet<string> allVariables, HashSet<string> parameters)
+    public InitializationLattice(HashSet<SymbolId> allVariables, HashSet<SymbolId> parameters)
     {
         _allVariables = allVariables;
         _parameters = parameters;
     }
 
-    // Bottom: nothing is definitely initialized (most optimistic for detecting errors)
+    // Empty is an explicit join identity; InitializationFacts.Join handles it
+    // without interpreting missing entries as uninitialized program variables.
     public InitializationFacts Bottom => InitializationFacts.Empty;
 
     // Top: all variables are initialized (includes parameters)
@@ -307,13 +358,6 @@ internal sealed class InitializationLattice : IDataflowLattice<InitializationFac
 
 internal sealed class UninitializedVariablesTransfer : ITransferFunction<InitializationFacts>
 {
-    private readonly HashSet<string> _allVariables;
-
-    public UninitializedVariablesTransfer(HashSet<string> allVariables)
-    {
-        _allVariables = allVariables;
-    }
-
     public InitializationFacts Transfer(BoundStatement statement, InitializationFacts input)
     {
         var defined = BoundNodeHelpers.GetDefinedVariable(statement);
@@ -324,7 +368,7 @@ internal sealed class UninitializedVariablesTransfer : ITransferFunction<Initial
         var hasInitializer = statement is BoundBindStatement bind && bind.Initializer != null;
         if (hasInitializer)
         {
-            return input.SetInitialized(defined.Name);
+            return input.SetInitialized(defined.Id);
         }
 
         return input;

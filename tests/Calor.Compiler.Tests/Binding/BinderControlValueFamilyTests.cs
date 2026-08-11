@@ -18,10 +18,18 @@ public class BinderControlValueFamilyTests
 {
     private static readonly TextSpan S = new(0, 0, 1, 1);
 
-    private static (BoundExpression Expr, DiagnosticBag Diagnostics) BindReturn(ExpressionNode expr)
+    private static (BoundExpression Expr, DiagnosticBag Diagnostics) BindReturn(
+        ExpressionNode expr,
+        params (string Name, string Type)[] parameters)
     {
         var func = new FunctionNode(S, "f001", "Probe", Visibility.Public,
-            Array.Empty<ParameterNode>(), new OutputNode(S, "OBJECT"), null,
+            parameters.Select(parameter =>
+                new ParameterNode(
+                    S,
+                    parameter.Name,
+                    parameter.Type,
+                    new AttributeCollection())).ToArray(),
+            new OutputNode(S, "OBJECT"), null,
             new StatementNode[] { new ReturnStatementNode(S, expr) },
             new AttributeCollection());
         var module = new ModuleNode(S, "m001", "Test",
@@ -40,10 +48,10 @@ public class BinderControlValueFamilyTests
     {
         var (expr, diags) = BindReturn(new NullCoalesceNode(S,
             new IntLiteralNode(S, 1), new IntLiteralNode(S, 2)));
-        var nc = Assert.IsType<BoundNullCoalesce>(expr);
+        var nc = Assert.IsType<BoundStructuralExpression>(expr);
         Assert.Equal("INT", nc.TypeName);
         Assert.Equal(2, BoundChildren.Of(nc).Count());
-        Assert.Equal([nc.Right], BoundChildren.DeferredOf(nc));
+        Assert.Equal([nc.Children[1]], BoundChildren.DeferredOf(nc));
         AssertComplete(diags);
     }
 
@@ -52,8 +60,8 @@ public class BinderControlValueFamilyTests
     {
         var (expr, diags) = BindReturn(new NullConditionalNode(S,
             new ReferenceNode(S, "obj"), "Length"));
-        var ncond = Assert.IsType<BoundNullConditional>(expr);
-        Assert.Equal("Length", ncond.MemberName);
+        var ncond = Assert.IsType<BoundStructuralExpression>(expr);
+        Assert.Equal("Length", ncond.Metadata["MemberName"]);
         Assert.Empty(BoundChildren.DeferredOf(ncond)); // target itself always evaluates
         AssertComplete(diags);
     }
@@ -76,8 +84,8 @@ public class BinderControlValueFamilyTests
         Assert.Single(match.Cases);
         Assert.NotNull(match.Cases[0].Guard);
         Assert.Single(match.Cases[0].Body);
-        Assert.IsType<ConstantPatternNode>(match.Cases[0].Pattern); // AST-retained
-        Assert.Single(BoundChildren.DeferredOf(match)); // the guard
+        Assert.Equal(nameof(ConstantPatternNode), match.Cases[0].Pattern.Kind);
+        Assert.Equal(2, BoundChildren.DeferredOf(match).Count()); // guard + arm result
         AssertComplete(diags);
     }
 
@@ -104,7 +112,7 @@ public class BinderControlValueFamilyTests
 
         var boundLambda = bound.Functions.Single().Body
             .OfType<BoundExpressionStatement>().Select(s => s.Expression)
-            .OfType<BoundLambda>().Single();
+            .OfType<BoundLambdaExpression>().Single();
         Assert.Single(boundLambda.Parameters);
         Assert.NotNull(boundLambda.ExpressionBody);
         Assert.Equal([boundLambda.ExpressionBody!], BoundChildren.DeferredOf(boundLambda));
@@ -117,20 +125,16 @@ public class BinderControlValueFamilyTests
     public void Await_UnwrapsTaskTypeString_ConfigureAwaitRetained()
     {
         var (expr, diags) = BindReturn(new AwaitExpressionNode(S,
-            new ReferenceNode(S, "t"), configureAwait: false));
-        var aw = Assert.IsType<BoundAwaitExpression>(expr);
-        Assert.False(aw.ConfigureAwait);
+            new ReferenceNode(S, "t"), configureAwait: false), ("t", "Task<i32>"));
+        var aw = Assert.IsType<BoundStructuralExpression>(expr);
+        Assert.Equal("i32", aw.TypeName);
+        Assert.Equal(false, aw.Metadata["ConfigureAwait"]);
         AssertComplete(diags);
 
-        // String-level unwrap pins (constructed directly — variable types are surface).
-        Assert.Equal("i32",
-            new BoundAwaitExpression(S,
-                new BoundVariableExpression(S, new VariableSymbol("t", "Task<i32>", false)),
-                null).TypeName);
-        Assert.Equal("VOID",
-            new BoundAwaitExpression(S,
-                new BoundVariableExpression(S, new VariableSymbol("t", "Task", false)),
-                null).TypeName);
+        var (voidAwait, _) = BindReturn(
+            new AwaitExpressionNode(S, new ReferenceNode(S, "t")),
+            ("t", "Task"));
+        Assert.Equal("VOID", voidAwait.TypeName);
     }
 
     [Fact]
@@ -138,16 +142,41 @@ public class BinderControlValueFamilyTests
     {
         var i = new BoundIntLiteral(S, 1);
         var j = new BoundIntLiteral(S, 2);
-        Assert.Equal([i, j], BoundChildren.Of(new BoundNullCoalesce(S, i, j)));
-        Assert.Equal([i], BoundChildren.Of(new BoundNullConditional(S, i, "M")));
+        Assert.Equal([i, j], BoundChildren.Of(
+            new BoundStructuralExpression(
+                S,
+                nameof(NullCoalesceNode),
+                "INT",
+                [i, j],
+                deferredChildren: [j])));
+        Assert.Equal([i], BoundChildren.Of(
+            new BoundStructuralExpression(S, nameof(NullConditionalNode), "OBJECT", [i])));
         var guard = new BoundBoolLiteral(S, true);
         var match = new BoundMatchExpression(S, "m", i,
-            [new BoundMatchExpressionCase(new ConstantPatternNode(S, new IntLiteralNode(S, 0)),
-                guard, [], S)]);
+            [new BoundMatchCase(
+                S,
+                new BoundPattern(S, nameof(ConstantPatternNode)),
+                isDefault: false,
+                guard,
+                [])],
+            new AttributeCollection(),
+            "OBJECT");
         Assert.Equal(new BoundExpression[] { i, guard }, BoundChildren.Of(match));
-        var lam = new BoundLambda(S, "l", [], null, false, false, j, null);
+        var lam = new BoundLambdaExpression(
+            S,
+            "l",
+            [],
+            null,
+            [],
+            new AttributeCollection(),
+            isAsync: false,
+            isStatic: false,
+            j,
+            null,
+            "INT");
         Assert.Equal([j], BoundChildren.Of(lam));
-        Assert.Equal([i], BoundChildren.Of(new BoundAwaitExpression(S, i, null)));
+        Assert.Equal([i], BoundChildren.Of(
+            new BoundStructuralExpression(S, nameof(AwaitExpressionNode), "INT", [i])));
     }
 
     [Fact]
@@ -259,7 +288,7 @@ public class BinderControlValueFamilyTests
             new[] { new LambdaParameterNode(S, "y", "i32") }, effects,
             isAsync: false, new ReferenceNode(S, "y"), null, new AttributeCollection());
         var (expr, _) = BindReturn(lambda);
-        var bound = Assert.IsType<BoundLambda>(expr);
+        var bound = Assert.IsType<BoundLambdaExpression>(expr);
         Assert.Same(effects, bound.Effects);
     }
 

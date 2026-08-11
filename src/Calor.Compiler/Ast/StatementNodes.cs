@@ -20,6 +20,9 @@ public sealed class CallStatementNode : StatementNode
     public bool Fallible { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
     public AttributeCollection Attributes { get; }
+    public TextSpan CalleeSpan { get; }
+    public TextSpan? ReceiverSpan { get; }
+    public IReadOnlyList<string>? TypeArguments { get; }
 
     /// <summary>
     /// Optional named argument labels, parallel to Arguments list.
@@ -38,12 +41,8 @@ public sealed class CallStatementNode : StatementNode
         bool fallible,
         IReadOnlyList<ExpressionNode> arguments,
         AttributeCollection attributes)
-        : base(span)
+        : this(span, target, fallible, arguments, attributes, null, null)
     {
-        Target = target ?? throw new ArgumentNullException(nameof(target));
-        Fallible = fallible;
-        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
-        Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 
     public CallStatementNode(
@@ -53,9 +52,8 @@ public sealed class CallStatementNode : StatementNode
         IReadOnlyList<ExpressionNode> arguments,
         AttributeCollection attributes,
         IReadOnlyList<string?>? argumentNames)
-        : this(span, target, fallible, arguments, attributes)
+        : this(span, target, fallible, arguments, attributes, argumentNames, null)
     {
-        ArgumentNames = argumentNames;
     }
 
     public CallStatementNode(
@@ -65,11 +63,21 @@ public sealed class CallStatementNode : StatementNode
         IReadOnlyList<ExpressionNode> arguments,
         AttributeCollection attributes,
         IReadOnlyList<string?>? argumentNames,
-        IReadOnlyList<string?>? argumentModifiers)
-        : this(span, target, fallible, arguments, attributes)
+        IReadOnlyList<string?>? argumentModifiers,
+        TextSpan? calleeSpan = null,
+        TextSpan? receiverSpan = null,
+        IReadOnlyList<string>? typeArguments = null)
+        : base(span)
     {
+        Target = target ?? throw new ArgumentNullException(nameof(target));
+        Fallible = fallible;
+        Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
+        Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         ArgumentNames = argumentNames;
         ArgumentModifiers = argumentModifiers;
+        CalleeSpan = calleeSpan ?? span;
+        ReceiverSpan = receiverSpan;
+        TypeArguments = typeArguments;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

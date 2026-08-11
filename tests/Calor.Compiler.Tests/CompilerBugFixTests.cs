@@ -319,14 +319,9 @@ public class CompilerBugFixTests
     }
 
     [Fact]
-    public void Binder_FallbackExpression_ReturnsOpaqueExpression()
+    public void Binder_OptionExpression_RetainsItsValue()
     {
-        // Unsupported expression types should produce an opaque BoundCallExpression,
-        // NOT BoundIntLiteral(0) which causes false positives in bug pattern checkers
-        // Probe construct must be one that STAYS unbound: SomeExpressionNode (the
-        // original probe) gained a real binder in #762 B2. AddressOfNode is F-1 Tier B
-        // (unsafe family, out of 0.13 binding scope) — stable through B8.
-        var someExpr = new AddressOfNode(DummySpan, new IntLiteralNode(DummySpan, 42));
+        var someExpr = new SomeExpressionNode(DummySpan, new IntLiteralNode(DummySpan, 42));
 
         var func = MakeFunction("Foo", "INT",
             body: new List<StatementNode> { new ReturnStatementNode(DummySpan, someExpr) });
@@ -338,21 +333,14 @@ public class CompilerBugFixTests
 
         Assert.NotNull(bound);
         var ret = bound.Functions.First().Body.OfType<BoundReturnStatement>().First();
-        // #762 B1: the fallback is now BoundIncompleteExpression — a BoundCallExpression
-        // SUBCLASS preserving the opaque shape bit-for-bit (checkers see the same node
-        // family), plus the explicit incomplete marker.
-        Assert.IsAssignableFrom<BoundCallExpression>(ret.Expression);
-        Assert.IsType<BoundIncompleteExpression>(ret.Expression);
-        // The opaque call should NOT be mistaken for a zero literal
+        var option = Assert.IsType<BoundSomeExpression>(ret.Expression);
+        Assert.Equal("Option<INT>", option.TypeName);
+        Assert.IsType<BoundIntLiteral>(option.Value);
         Assert.False(BoundNodeHelpers.IsLiteralZero(ret.Expression));
-        // The fallback must not report ERRORS (the original noise complaint) — but it
-        // reports exactly one Calor0259, which IS the incomplete-fraction instrument.
-        // B1 shipped it at Info; B8 promoted it to Warning (scoping doc §5: Tier A
-        // incomplete is zero, so a warning finally means something). Both properties
-        // pinned.
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
-        Assert.Contains(diagnostics,
-            d => d.Code == DiagnosticCode.AnalysisIncomplete && d.Severity == DiagnosticSeverity.Warning);
+        Assert.DoesNotContain(diagnostics,
+            d => d.Code is DiagnosticCode.AnalysisIncomplete
+                or DiagnosticCode.AnalysisUnsupportedNode);
     }
 
     #endregion

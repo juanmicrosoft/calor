@@ -36,6 +36,8 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     // Core nodes
     public virtual T Visit(ModuleNode node) => DefaultVisit(node)!;
     public virtual T Visit(FunctionNode node) => DefaultVisit(node)!;
+    public virtual T Visit(OutputNode node) => DefaultVisit(node)!;
+    public virtual T Visit(EffectsNode node) => DefaultVisit(node)!;
     public virtual T Visit(ParameterNode node) => DefaultVisit(node)!;
     public virtual T Visit(CallStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(ReturnStatementNode node) => DefaultVisit(node)!;
@@ -54,6 +56,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(WhileStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(DoWhileStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(IfStatementNode node) => DefaultVisit(node)!;
+    public virtual T Visit(ElseIfClauseNode node) => DefaultVisit(node)!;
     public virtual T Visit(BindStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(BinaryOperationNode node) => DefaultVisit(node)!;
     public virtual T Visit(UnaryOperationNode node) => DefaultVisit(node)!;
@@ -65,11 +68,15 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
 
     // Type system
     public virtual T Visit(RecordDefinitionNode node) => DefaultVisit(node)!;
+    public virtual T Visit(FieldDefinitionNode node) => DefaultVisit(node)!;
     public virtual T Visit(UnionTypeDefinitionNode node) => DefaultVisit(node)!;
+    public virtual T Visit(VariantDefinitionNode node) => DefaultVisit(node)!;
+    public virtual T Visit(TypeReferenceNode node) => DefaultVisit(node)!;
     public virtual T Visit(EnumDefinitionNode node) => DefaultVisit(node)!;
     public virtual T Visit(EnumMemberNode node) => DefaultVisit(node)!;
     public virtual T Visit(EnumExtensionNode node) => DefaultVisit(node)!;
     public virtual T Visit(RecordCreationNode node) => DefaultVisit(node)!;
+    public virtual T Visit(FieldAssignmentNode node) => DefaultVisit(node)!;
     public virtual T Visit(FieldAccessNode node) => DefaultVisit(node)!;
 
     // Option/Result
@@ -263,14 +270,4 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     public virtual T Visit(ProofObligationNode node) => DefaultVisit(node)!;
     // Dependent Types: Indexed Types (size-parameterized)
     public virtual T Visit(IndexedTypeNode node) => DefaultVisit(node)!;
-
-    // #762 item 8 (B8): real dispatch for the former no-op-Accept classes.
-    public virtual T Visit(OutputNode node) => DefaultVisit(node)!;
-    public virtual T Visit(EffectsNode node) => DefaultVisit(node)!;
-    public virtual T Visit(ElseIfClauseNode node) => DefaultVisit(node)!;
-    public virtual T Visit(FieldDefinitionNode node) => DefaultVisit(node)!;
-    public virtual T Visit(VariantDefinitionNode node) => DefaultVisit(node)!;
-    public virtual T Visit(TypeReferenceNode node) => DefaultVisit(node)!;
-    public virtual T Visit(FieldAssignmentNode node) => DefaultVisit(node)!;
-
 }

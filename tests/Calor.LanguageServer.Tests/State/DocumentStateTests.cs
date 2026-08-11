@@ -46,31 +46,22 @@ public class DocumentStateTests
     }
 
     [Fact]
-    public void Reanalyze_UnboundConstruct_PublishesWarningSeverityIncomplete_NotError()
+    public void Reanalyze_InteropConstruct_PublishesInfoSeverityUnsupported_NotError()
     {
-        // #762 B1→B8: the LSP binds every open document with the LIVE diagnostics bag,
-        // so the Calor0259 incomplete-fraction instrument is editor-visible. B1 shipped
-        // it at Info (37 Tier A classes were incomplete — Warning would flood); B8
-        // promoted it to WARNING per the scoping-doc §5 decision: Tier A incomplete is
-        // zero on both F-2 legs, the only remaining emitters are Tier B unsafe
-        // residuals, and a warning on those genuinely means "analysis does not cover
-        // this construct". Still never an Error.
-        // (Fixture history: ?? → forall → §SIZEOF as each family bound; §SIZEOF is
-        // Tier B residual, so this holds unless a 0.14+ unsafe story binds it.)
         var source = """
             §M{m001:TestModule}
-              §F{f001:Pick:pub} (i32:x) -> i32
-                §R §SIZEOF{i32}
+              §F{f001:Pick:pub} () -> object
+                §R §CS{DateTime.Now}
             """;
 
         var state = LspTestHarness.CreateDocument(source);
 
         Assert.False(state.Diagnostics.HasErrors);
-        var incomplete = state.Diagnostics.Where(
-            d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisIncomplete).ToList();
-        Assert.NotEmpty(incomplete);
-        Assert.All(incomplete,
-            d => Assert.Equal(Compiler.Diagnostics.DiagnosticSeverity.Warning, d.Severity));
+        var unsupported = state.Diagnostics.Where(
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisUnsupportedNode).ToList();
+        Assert.NotEmpty(unsupported);
+        Assert.All(unsupported,
+            d => Assert.Equal(Compiler.Diagnostics.DiagnosticSeverity.Info, d.Severity));
     }
 
     [Fact(Skip = "Phase 4d: mismatched-ID diagnostic is obsolete under indent-only (no closing tags)")]

@@ -195,14 +195,12 @@ public class BinderCoreFamilyTests
     }
 
     [Fact]
-    public void SelfRef_StaysExplicitlyIncomplete_WithDormancyReason()
+    public void SelfRef_BindsStructurallyWithoutIncompleteDiagnostic()
     {
-        // F-1 dormant rule: no legal program reaches the binder with a SelfRefNode, so a
-        // binder for it would be vacuous. Pinned as EXPLICIT incompleteness with the
-        // registered reason — not silently absent.
         var (expr, diags) = BindReturn(new SelfRefNode(S));
-        var inc = Assert.IsType<BoundIncompleteExpression>(expr);
-        Assert.Contains("dormant", inc.Reason);
-        Assert.Contains(diags, d => d.Code == DiagnosticCode.AnalysisIncomplete);
+        var self = Assert.IsType<BoundStructuralExpression>(expr);
+        Assert.Equal(nameof(SelfRefNode), self.NodeTypeName);
+        Assert.Equal("OBJECT", self.TypeName);
+        AssertComplete(diags);
     }
 }

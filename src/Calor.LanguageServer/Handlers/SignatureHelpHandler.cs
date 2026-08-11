@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.LanguageServer.State;
 using Calor.LanguageServer.Utilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -24,26 +25,52 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
     public override Task<SignatureHelp?> Handle(SignatureHelpParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null)
+        var snapshot = state?.Snapshot;
+        if (state == null || snapshot?.Ast == null)
         {
             return Task.FromResult<SignatureHelp?>(null);
         }
 
-        var offset = PositionConverter.ToOffset(request.Position, state.Source);
+        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
 
         // Find if we're inside a function call
-        var callContext = FindCallContext(state.Source, offset);
+        var callContext = FindCallContext(snapshot.Source, offset);
         if (callContext == null)
         {
             return Task.FromResult<SignatureHelp?>(null);
         }
 
+        var resolvedSymbol = SymbolFinder.FindResolvedCall(
+            snapshot.BoundModule,
+            offset);
+        if (resolvedSymbol != null)
+        {
+            return Task.FromResult<SignatureHelp?>(
+                BuildSignatureHelp(resolvedSymbol, callContext.ArgumentIndex));
+        }
+
+        var boundCall = SymbolFinder.FindBoundCallAtOffset(
+            snapshot.BoundModule,
+            offset,
+            callContext.FunctionName);
+        var projectCall = _workspace.ResolveProjectCall(state, snapshot, boundCall);
+        if (projectCall.Symbol != null)
+        {
+            return Task.FromResult<SignatureHelp?>(
+                BuildSignatureHelp(projectCall.Symbol, callContext.ArgumentIndex));
+        }
+
+        if (boundCall != null)
+        {
+            return Task.FromResult<SignatureHelp?>(null);
+        }
+
         // Find the function definition
-        var func = SymbolFinder.FindFunction(state.Ast, callContext.FunctionName);
+        var func = SymbolFinder.FindFunction(snapshot.Ast, callContext.FunctionName);
         if (func == null)
         {
             // Try to find a method in classes
-            var method = FindMethodInClasses(state.Ast, callContext.FunctionName);
+            var method = FindMethodInClasses(snapshot.Ast, callContext.FunctionName);
             if (method != null)
             {
                 return Task.FromResult<SignatureHelp?>(BuildSignatureHelp(method, callContext.ArgumentIndex));
@@ -76,6 +103,37 @@ public sealed class SignatureHelpHandler : SignatureHelpHandlerBase
             }),
             Parameters = new Container<ParameterInformation>(parameters),
             ActiveParameter = Math.Min(activeParameter, parameters.Count - 1)
+        };
+
+        return new SignatureHelp
+        {
+            Signatures = new Container<SignatureInformation>(signature),
+            ActiveSignature = 0,
+            ActiveParameter = activeParameter
+        };
+    }
+
+    private static SignatureHelp BuildSignatureHelp(
+        FunctionSymbol function,
+        int activeParameter)
+    {
+        var parameters = function.Parameters.Select(parameter => new ParameterInformation
+        {
+            Label = $"{parameter.Name}: {parameter.TypeName}",
+            Documentation = new StringOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = $"**{parameter.Name}**: `{parameter.TypeName}`"
+            })
+        }).ToList();
+
+        var signature = new SignatureInformation
+        {
+            Label = $"{function.DisplaySignature} -> {function.ReturnType}",
+            Parameters = new Container<ParameterInformation>(parameters),
+            ActiveParameter = parameters.Count == 0
+                ? 0
+                : Math.Min(activeParameter, parameters.Count - 1)
         };
 
         return new SignatureHelp

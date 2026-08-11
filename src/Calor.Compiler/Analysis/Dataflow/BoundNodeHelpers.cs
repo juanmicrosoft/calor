@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 
@@ -9,71 +10,157 @@ namespace Calor.Compiler.Analysis.Dataflow;
 public static class BoundNodeHelpers
 {
     /// <summary>
+    /// Enumerates a bound node and every structurally retained descendant.
+    /// </summary>
+    public static IEnumerable<BoundNode> DescendantsAndSelf(BoundNode? node)
+    {
+        if (node == null)
+            yield break;
+
+        yield return node;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
+        }
+    }
+
+    /// <summary>
+    /// Gets the nearest child expressions below a node, traversing through
+    /// structural helper nodes such as match cases, patterns, and initializers.
+    /// </summary>
+    public static IEnumerable<BoundExpression> GetChildExpressions(BoundNode node)
+    {
+        foreach (var child in node.ChildNodes)
+        {
+            if (child is BoundExpression expression)
+            {
+                yield return expression;
+                continue;
+            }
+
+            foreach (var nested in GetChildExpressions(child))
+                yield return nested;
+        }
+    }
+
+    /// <summary>
+    /// Gets expressions evaluated directly by a statement or helper node without
+    /// descending into nested statements, which are analyzed at their own CFG point.
+    /// </summary>
+    public static IEnumerable<BoundExpression> GetImmediateExpressions(BoundNode node)
+    {
+        foreach (var child in node.ChildNodes)
+        {
+            if (child is BoundExpression expression)
+            {
+                yield return expression;
+            }
+            else if (child is not BoundStatement)
+            {
+                foreach (var nested in GetImmediateExpressions(child))
+                    yield return nested;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets directly nested statements through structural helper nodes such as
+    /// catch clauses and match cases, without entering expression-owned bodies.
+    /// </summary>
+    public static IEnumerable<BoundStatement> GetImmediateStatements(BoundNode node)
+    {
+        foreach (var child in node.ChildNodes)
+        {
+            if (child is BoundStatement statement)
+            {
+                yield return statement;
+            }
+            else if (child is not BoundExpression)
+            {
+                foreach (var nested in GetImmediateStatements(child))
+                    yield return nested;
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets all variable references (uses) in an expression.
     /// </summary>
     public static IEnumerable<VariableSymbol> GetUsedVariables(BoundExpression? expression)
     {
         if (expression == null)
-            yield break;
+            return Array.Empty<VariableSymbol>();
 
-        switch (expression)
+        return GetUsedVariablesCore(
+                expression,
+                new HashSet<VariableSymbol>(VariableSymbolIdentityComparer.Instance))
+            .Distinct(VariableSymbolIdentityComparer.Instance);
+    }
+
+    private static IEnumerable<VariableSymbol> GetUsedVariablesCore(
+        BoundNode node,
+        HashSet<VariableSymbol> locallyBound)
+    {
+        if (node is BoundVariableExpression variable)
         {
-            default:
-                // #762 B2: B-series bound nodes recurse via the shared enumeration.
-                foreach (var child in BoundChildren.Of(expression))
-                    foreach (var v in GetUsedVariables(child))
-                        yield return v;
-                break;
+            if (!locallyBound.Contains(variable.Variable))
+                yield return variable.Variable;
+            yield break;
+        }
 
-            case BoundVariableExpression varExpr:
-                yield return varExpr.Variable;
-                break;
+        if (node is BoundCallExpression { ReceiverSymbol: not null } call
+            && !locallyBound.Contains(call.ReceiverSymbol))
+        {
+            yield return call.ReceiverSymbol;
+        }
 
-            case BoundBinaryExpression binExpr:
-                foreach (var v in GetUsedVariables(binExpr.Left))
-                    yield return v;
-                foreach (var v in GetUsedVariables(binExpr.Right))
-                    yield return v;
-                break;
+        var nestedLocals = locallyBound;
+        if (node is BoundLambdaExpression lambda)
+        {
+            nestedLocals = new HashSet<VariableSymbol>(
+                locallyBound,
+                VariableSymbolIdentityComparer.Instance);
+            nestedLocals.UnionWith(lambda.Parameters);
+            nestedLocals.UnionWith(GetDeclaredVariables(lambda));
+        }
+        else if (node is BoundQuantifierExpression quantifier)
+        {
+            nestedLocals = new HashSet<VariableSymbol>(
+                locallyBound,
+                VariableSymbolIdentityComparer.Instance);
+            nestedLocals.UnionWith(quantifier.BoundVariables);
+        }
 
-            case BoundUnaryExpression unaryExpr:
-                foreach (var v in GetUsedVariables(unaryExpr.Operand))
-                    yield return v;
-                break;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var used in GetUsedVariablesCore(child, nestedLocals))
+                yield return used;
+        }
+    }
 
-            // #762 B8: Tier-B residuals carry RetainedChildren on a
-            // BoundCallExpression-shaped node — walk those first.
-            case BoundIncompleteExpression incomplete:
-                foreach (var child in incomplete.RetainedChildren)
-                    foreach (var v in GetUsedVariables(child))
-                        yield return v;
-                break;
-
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                    foreach (var v in GetUsedVariables(arg))
-                        yield return v;
-                break;
-
-            case BoundFieldAccessExpression fieldAccess:
-                foreach (var v in GetUsedVariables(fieldAccess.Target))
-                    yield return v;
-                break;
-
-            case BoundNewExpression newExpr:
-                foreach (var arg in newExpr.Arguments)
-                    foreach (var v in GetUsedVariables(arg))
-                        yield return v;
-                break;
-
-            case BoundConditionalExpression condExpr:
-                foreach (var v in GetUsedVariables(condExpr.Condition))
-                    yield return v;
-                foreach (var v in GetUsedVariables(condExpr.WhenTrue))
-                    yield return v;
-                foreach (var v in GetUsedVariables(condExpr.WhenFalse))
-                    yield return v;
-                break;
+    private static IEnumerable<VariableSymbol> GetDeclaredVariables(BoundNode node)
+    {
+        foreach (var descendant in DescendantsAndSelf(node))
+        {
+            switch (descendant)
+            {
+                case BoundBindStatement bind:
+                    yield return bind.Variable;
+                    break;
+                case BoundForStatement forStatement:
+                    yield return forStatement.LoopVariable;
+                    break;
+                case BoundForeachStatement forEach:
+                    yield return forEach.LoopVariable;
+                    break;
+                case BoundUsingStatement { Resource: not null } usingStatement:
+                    yield return usingStatement.Resource;
+                    break;
+                case BoundCatchClause { ExceptionVariable: not null } catchClause:
+                    yield return catchClause.ExceptionVariable;
+                    break;
+            }
         }
     }
 
@@ -86,7 +173,11 @@ public static class BoundNodeHelpers
         {
             BoundBindStatement bind => bind.Variable,
             BoundAssignmentStatement assign when assign.Target is BoundVariableExpression varExpr => varExpr.Variable,
+            BoundAssignmentStatement assign when assign.Target is BoundFieldAccessExpression { ResolvedField: not null } field =>
+                field.ResolvedField,
             BoundCompoundAssignment compound when compound.Target is BoundVariableExpression varExpr => varExpr.Variable,
+            BoundCompoundAssignment compound when compound.Target is BoundFieldAccessExpression { ResolvedField: not null } field =>
+                field.ResolvedField,
             BoundForeachStatement forEach => forEach.LoopVariable,
             BoundUsingStatement usingStmt => usingStmt.Resource,
             _ => null
@@ -98,85 +189,33 @@ public static class BoundNodeHelpers
     /// </summary>
     public static IEnumerable<VariableSymbol> GetUsedVariables(BoundStatement statement)
     {
-        switch (statement)
+        var seen = new HashSet<VariableSymbol>(VariableSymbolIdentityComparer.Instance);
+        if (statement is BoundCallStatement { ReceiverSymbol: not null } call
+            && seen.Add(call.ReceiverSymbol))
         {
-            case BoundBindStatement bind:
-                foreach (var v in GetUsedVariables(bind.Initializer))
-                    yield return v;
-                break;
+            yield return call.ReceiverSymbol;
+        }
 
-            case BoundCallStatement call:
-                foreach (var arg in call.Arguments)
-                    foreach (var v in GetUsedVariables(arg))
-                        yield return v;
-                break;
+        if (statement is BoundAssignmentStatement
+            {
+                Target: BoundVariableExpression,
+            } assignment)
+        {
+            foreach (var variable in GetUsedVariables(assignment.Value))
+            {
+                if (seen.Add(variable))
+                    yield return variable;
+            }
+            yield break;
+        }
 
-            case BoundReturnStatement ret:
-                foreach (var v in GetUsedVariables(ret.Expression))
-                    yield return v;
-                break;
-
-            case BoundIfStatement ifStmt:
-                foreach (var v in GetUsedVariables(ifStmt.Condition))
-                    yield return v;
-                break;
-
-            case BoundWhileStatement whileStmt:
-                foreach (var v in GetUsedVariables(whileStmt.Condition))
-                    yield return v;
-                break;
-
-            case BoundForStatement forStmt:
-                foreach (var v in GetUsedVariables(forStmt.From))
-                    yield return v;
-                foreach (var v in GetUsedVariables(forStmt.To))
-                    yield return v;
-                if (forStmt.Step != null)
-                    foreach (var v in GetUsedVariables(forStmt.Step))
-                        yield return v;
-                break;
-
-            case BoundAssignmentStatement assign:
-                // For simple variable targets (x = expr), the target is defined, not used.
-                // Only yield uses from sub-expressions of the target (e.g., this.field → yield this).
-                if (assign.Target is not BoundVariableExpression)
-                    foreach (var v in GetUsedVariables(assign.Target))
-                        yield return v;
-                foreach (var v in GetUsedVariables(assign.Value))
-                    yield return v;
-                break;
-
-            case BoundCompoundAssignment compound:
-                foreach (var v in GetUsedVariables(compound.Target))
-                    yield return v;
-                foreach (var v in GetUsedVariables(compound.Value))
-                    yield return v;
-                break;
-
-            case BoundForeachStatement forEach:
-                foreach (var v in GetUsedVariables(forEach.Collection))
-                    yield return v;
-                break;
-
-            case BoundUsingStatement usingStmt:
-                foreach (var v in GetUsedVariables(usingStmt.ResourceExpression))
-                    yield return v;
-                break;
-
-            case BoundThrowStatement throwStmt:
-                foreach (var v in GetUsedVariables(throwStmt.Expression))
-                    yield return v;
-                break;
-
-            case BoundDoWhileStatement doWhile:
-                foreach (var v in GetUsedVariables(doWhile.Condition))
-                    yield return v;
-                break;
-
-            case BoundExpressionStatement exprStmt:
-                foreach (var v in GetUsedVariables(exprStmt.Expression))
-                    yield return v;
-                break;
+        foreach (var expression in GetImmediateExpressions(statement))
+        {
+            foreach (var variable in GetUsedVariables(expression))
+            {
+                if (seen.Add(variable))
+                    yield return variable;
+            }
         }
     }
 
@@ -186,7 +225,14 @@ public static class BoundNodeHelpers
     public static bool DefinesVariable(BoundStatement statement, VariableSymbol variable)
     {
         var defined = GetDefinedVariable(statement);
-        return defined != null && defined.Name == variable.Name;
+        return defined != null && SameSymbol(defined, variable);
+    }
+
+    public static bool SameSymbol(Symbol left, Symbol right)
+    {
+        if (!left.Id.IsNone && !right.Id.IsNone)
+            return left.Id == right.Id;
+        return ReferenceEquals(left, right);
     }
 
     /// <summary>
@@ -194,83 +240,50 @@ public static class BoundNodeHelpers
     /// </summary>
     public static IEnumerable<VariableSymbol> GetAllDefinedVariables(BoundFunction function)
     {
-        foreach (var stmt in function.Body)
+        foreach (var node in DescendantsAndSelf(function))
         {
-            foreach (var v in GetAllDefinedVariablesInStatement(stmt))
-                yield return v;
+            switch (node)
+            {
+                case BoundBindStatement bind:
+                    yield return bind.Variable;
+                    break;
+                case BoundForStatement forStatement:
+                    yield return forStatement.LoopVariable;
+                    break;
+                case BoundForeachStatement forEach:
+                    yield return forEach.LoopVariable;
+                    break;
+                case BoundUsingStatement { Resource: not null } usingStatement:
+                    yield return usingStatement.Resource;
+                    break;
+                case BoundCatchClause { ExceptionVariable: not null } catchClause:
+                    yield return catchClause.ExceptionVariable;
+                    break;
+            }
         }
     }
 
-    private static IEnumerable<VariableSymbol> GetAllDefinedVariablesInStatement(BoundStatement statement)
+    public static IEnumerable<BoundNode> GetAnalysisIncompleteNodes(BoundNode node)
     {
-        switch (statement)
-        {
-            case BoundBindStatement bind:
-                yield return bind.Variable;
-                break;
+        return DescendantsAndSelf(node)
+            .Where(descendant =>
+                descendant is BoundIncompleteExpression
+                    or BoundUnsupportedExpression
+                    or BoundInteropExpression
+                    or BoundUnsupportedStatement);
+    }
 
-            case BoundIfStatement ifStmt:
-                foreach (var s in ifStmt.ThenBody)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                    foreach (var s in elseIf.Body)
-                        foreach (var v in GetAllDefinedVariablesInStatement(s))
-                            yield return v;
-                if (ifStmt.ElseBody != null)
-                    foreach (var s in ifStmt.ElseBody)
-                        foreach (var v in GetAllDefinedVariablesInStatement(s))
-                            yield return v;
-                break;
+    private sealed class VariableSymbolIdentityComparer : IEqualityComparer<VariableSymbol>
+    {
+        public static VariableSymbolIdentityComparer Instance { get; } = new();
 
-            case BoundWhileStatement whileStmt:
-                foreach (var s in whileStmt.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
+        public bool Equals(VariableSymbol? x, VariableSymbol? y) =>
+            x != null && y != null && SameSymbol(x, y);
 
-            case BoundForStatement forStmt:
-                yield return forStmt.LoopVariable;
-                foreach (var s in forStmt.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
-
-            case BoundForeachStatement forEach:
-                yield return forEach.LoopVariable;
-                foreach (var s in forEach.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
-
-            case BoundDoWhileStatement doWhile:
-                foreach (var s in doWhile.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
-
-            case BoundUsingStatement usingStmt:
-                if (usingStmt.Resource != null)
-                    yield return usingStmt.Resource;
-                foreach (var s in usingStmt.Body)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                break;
-
-            case BoundTryStatement tryStmt:
-                foreach (var s in tryStmt.TryBody)
-                    foreach (var v in GetAllDefinedVariablesInStatement(s))
-                        yield return v;
-                foreach (var catchClause in tryStmt.CatchClauses)
-                    foreach (var s in catchClause.Body)
-                        foreach (var v in GetAllDefinedVariablesInStatement(s))
-                            yield return v;
-                if (tryStmt.FinallyBody != null)
-                    foreach (var s in tryStmt.FinallyBody)
-                        foreach (var v in GetAllDefinedVariablesInStatement(s))
-                            yield return v;
-                break;
-        }
+        public int GetHashCode(VariableSymbol obj) =>
+            obj.Id.IsNone
+                ? RuntimeHelpers.GetHashCode(obj)
+                : obj.Id.GetHashCode();
     }
 
     /// <summary>
@@ -278,48 +291,11 @@ public static class BoundNodeHelpers
     /// </summary>
     public static bool ContainsDivision(BoundExpression? expression, out BoundBinaryExpression? divisionExpr)
     {
-        divisionExpr = null;
-        if (expression == null)
-            return false;
-
-        switch (expression)
-        {
-            case BoundBinaryExpression binExpr:
-                if (binExpr.Operator == BinaryOperator.Divide || binExpr.Operator == BinaryOperator.Modulo)
-                {
-                    divisionExpr = binExpr;
-                    return true;
-                }
-                if (ContainsDivision(binExpr.Left, out divisionExpr))
-                    return true;
-                if (ContainsDivision(binExpr.Right, out divisionExpr))
-                    return true;
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                return ContainsDivision(unaryExpr.Operand, out divisionExpr);
-
-            case BoundIncompleteExpression incomplete:
-                foreach (var child in incomplete.RetainedChildren)
-                    if (ContainsDivision(child, out divisionExpr))
-                        return true;
-                break;
-
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                    if (ContainsDivision(arg, out divisionExpr))
-                        return true;
-                break;
-
-            default:
-                // #762 B2: B-series bound nodes recurse via the shared enumeration.
-                foreach (var child in BoundChildren.Of(expression))
-                    if (ContainsDivision(child, out divisionExpr))
-                        return true;
-                break;
-        }
-
-        return false;
+        divisionExpr = DescendantsAndSelf(expression)
+            .OfType<BoundBinaryExpression>()
+            .FirstOrDefault(binary =>
+                binary.Operator is BinaryOperator.Divide or BinaryOperator.Modulo);
+        return divisionExpr != null;
     }
 
     /// <summary>
@@ -350,41 +326,15 @@ public static class BoundNodeHelpers
         arrayExpr = null;
         indexExpr = null;
 
-        // Note: BoundNodes don't have BoundArrayAccessExpression yet
-        // This is a placeholder for when it's added
-        if (expression == null)
+        var access = DescendantsAndSelf(expression)
+            .OfType<BoundArrayAccessExpression>()
+            .FirstOrDefault();
+        if (access == null)
             return false;
 
-        switch (expression)
-        {
-            case BoundBinaryExpression binExpr:
-                if (ContainsArrayAccess(binExpr.Left, out arrayExpr, out indexExpr))
-                    return true;
-                return ContainsArrayAccess(binExpr.Right, out arrayExpr, out indexExpr);
-
-            case BoundUnaryExpression unaryExpr:
-                return ContainsArrayAccess(unaryExpr.Operand, out arrayExpr, out indexExpr);
-
-            default:
-                foreach (var child in BoundChildren.Of(expression))
-                    if (ContainsArrayAccess(child, out arrayExpr, out indexExpr))
-                        return true;
-                break;
-
-            case BoundIncompleteExpression incomplete:
-                foreach (var child in incomplete.RetainedChildren)
-                    if (ContainsArrayAccess(child, out arrayExpr, out indexExpr))
-                        return true;
-                break;
-
-            case BoundCallExpression callExpr:
-                foreach (var arg in callExpr.Arguments)
-                    if (ContainsArrayAccess(arg, out arrayExpr, out indexExpr))
-                        return true;
-                break;
-        }
-
-        return false;
+        arrayExpr = access.Array;
+        indexExpr = access.Indices.FirstOrDefault();
+        return true;
     }
 
     /// <summary>
@@ -406,9 +356,7 @@ public static class BoundNodeHelpers
         {
             BoundIntLiteral intLit => intLit.Value == 0,
             BoundFloatLiteral floatLit => floatLit.Value == 0.0,
-            // #762 B5 review C1: DEC:0 divisors bound as BoundDecimalLiteral post-B5;
-            // without this arm a hard Calor0920 ERROR silently became nothing.
-            BoundDecimalLiteral d => d.Value == 0m,
+            BoundDecimalLiteral decimalLiteral => decimalLiteral.Value == 0m,
             _ => false
         };
     }
@@ -418,9 +366,11 @@ public static class BoundNodeHelpers
     /// </summary>
     public static bool IsConstant(BoundExpression? expression)
     {
-        // BoundDecimalLiteral added with the B5 decimal repair (review C1's sibling gap:
-        // known-safe DEC divisors lost their constant suppression).
-        return expression is BoundIntLiteral or BoundFloatLiteral or BoundBoolLiteral or BoundStringLiteral or BoundDecimalLiteral;
+        return expression is BoundIntLiteral
+            or BoundFloatLiteral
+            or BoundDecimalLiteral
+            or BoundBoolLiteral
+            or BoundStringLiteral;
     }
 
     /// <summary>

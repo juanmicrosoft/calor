@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 
@@ -22,7 +23,7 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
     public void Check(BoundFunction function, DiagnosticBag diagnostics)
     {
         // Track which Option/Result variables have been checked
-        var checkedVariables = new HashSet<string>();
+        var checkedVariables = new HashSet<SymbolId>();
 
         foreach (var stmt in function.Body)
         {
@@ -34,7 +35,7 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
         BoundStatement stmt,
         BoundFunction function,
         DiagnosticBag diagnostics,
-        HashSet<string> checkedVariables,
+        HashSet<SymbolId> checkedVariables,
         List<BoundExpression> pathConditions)
     {
         switch (stmt)
@@ -54,13 +55,21 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
                 break;
 
             case BoundCallStatement call:
-                CheckCallExpression(call.Target, call.Arguments, call.Span, function, diagnostics, checkedVariables, pathConditions);
+                CheckCallExpression(
+                    call.Target,
+                    call.ReceiverSymbol,
+                    call.Span,
+                    diagnostics,
+                    checkedVariables,
+                    pathConditions);
+                foreach (var argument in call.Arguments)
+                    CheckExpression(argument, function, diagnostics, checkedVariables, pathConditions);
                 break;
 
             case BoundIfStatement ifStmt:
                 // Check if the condition is an Option/Result check
-                var (conditionChecks, isMatchCheck) = ExtractOptionChecks(ifStmt.Condition);
-                var thenChecked = new HashSet<string>(checkedVariables);
+                var conditionChecks = ExtractOptionChecks(ifStmt.Condition);
+                var thenChecked = new HashSet<SymbolId>(checkedVariables);
                 thenChecked.UnionWith(conditionChecks);
 
                 CheckExpression(ifStmt.Condition, function, diagnostics, checkedVariables, pathConditions);
@@ -74,8 +83,8 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
                 // Handle else-if
                 foreach (var elseIf in ifStmt.ElseIfClauses)
                 {
-                    var (elseIfChecks, _) = ExtractOptionChecks(elseIf.Condition);
-                    var elseIfChecked = new HashSet<string>(checkedVariables);
+                    var elseIfChecks = ExtractOptionChecks(elseIf.Condition);
+                    var elseIfChecked = new HashSet<SymbolId>(checkedVariables);
                     elseIfChecked.UnionWith(elseIfChecks);
 
                     CheckExpression(elseIf.Condition, function, diagnostics, checkedVariables, pathConditions);
@@ -99,8 +108,8 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
                 break;
 
             case BoundWhileStatement whileStmt:
-                var (whileChecks, _) = ExtractOptionChecks(whileStmt.Condition);
-                var whileChecked = new HashSet<string>(checkedVariables);
+                var whileChecks = ExtractOptionChecks(whileStmt.Condition);
+                var whileChecked = new HashSet<SymbolId>(checkedVariables);
                 whileChecked.UnionWith(whileChecks);
 
                 CheckExpression(whileStmt.Condition, function, diagnostics, checkedVariables, pathConditions);
@@ -169,6 +178,13 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
                     CheckExpression(throwStmt.Expression, function, diagnostics, checkedVariables, pathConditions);
                 }
                 break;
+
+            default:
+                foreach (var expression in BoundNodeHelpers.GetImmediateExpressions(stmt))
+                    CheckExpression(expression, function, diagnostics, checkedVariables, pathConditions);
+                foreach (var statement in BoundNodeHelpers.GetImmediateStatements(stmt))
+                    CheckStatement(statement, function, diagnostics, checkedVariables, pathConditions);
+                break;
         }
     }
 
@@ -176,70 +192,53 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
         BoundExpression expr,
         BoundFunction function,
         DiagnosticBag diagnostics,
-        HashSet<string> checkedVariables,
+        HashSet<SymbolId> checkedVariables,
         List<BoundExpression> pathConditions)
     {
-        switch (expr)
+        if (expr is BoundCallExpression callExpr)
         {
-            case BoundCallExpression callExpr:
-                CheckCallExpression(callExpr.Target, callExpr.Arguments, callExpr.Span, function, diagnostics, checkedVariables, pathConditions);
-                break;
-
-            case BoundBinaryExpression binExpr:
-                CheckExpression(binExpr.Left, function, diagnostics, checkedVariables, pathConditions);
-                CheckExpression(binExpr.Right, function, diagnostics, checkedVariables, pathConditions);
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                CheckExpression(unaryExpr.Operand, function, diagnostics, checkedVariables, pathConditions);
-                break;
-
-            case BoundConditionalExpression condExpr:
-                CheckExpression(condExpr.Condition, function, diagnostics, checkedVariables, pathConditions);
-                CheckExpression(condExpr.WhenTrue, function, diagnostics, checkedVariables, pathConditions);
-                CheckExpression(condExpr.WhenFalse, function, diagnostics, checkedVariables, pathConditions);
-                break;
+            CheckCallExpression(
+                callExpr.Target,
+                callExpr.ReceiverSymbol,
+                callExpr.Span,
+                diagnostics,
+                checkedVariables,
+                pathConditions);
         }
+
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            CheckExpression(child, function, diagnostics, checkedVariables, pathConditions);
     }
 
     private void CheckCallExpression(
         string target,
-        IReadOnlyList<BoundExpression> arguments,
+        VariableSymbol? receiverSymbol,
         Parsing.TextSpan span,
-        BoundFunction function,
         DiagnosticBag diagnostics,
-        HashSet<string> checkedVariables,
+        HashSet<SymbolId> checkedVariables,
         List<BoundExpression> pathConditions)
     {
         var lowerTarget = target.ToLowerInvariant();
 
         // Safe unwrap calls provide fallbacks — skip checking
         if (IsSafeUnwrapCall(lowerTarget))
-        {
-            // Still check arguments recursively
-            foreach (var arg in arguments)
-            {
-                CheckExpression(arg, function, diagnostics, checkedVariables, pathConditions);
-            }
             return;
-        }
 
         // Check for unsafe unwrap calls
         if (IsUnsafeUnwrapCall(lowerTarget))
         {
             // Check if the receiver has been verified
-            var receiverName = ExtractReceiverName(target);
-            if (receiverName != null && !checkedVariables.Contains(receiverName))
+            if (receiverSymbol != null && !checkedVariables.Contains(receiverSymbol.Id))
             {
-                if (!HasSafetyCheck(receiverName, pathConditions))
+                if (!HasSafetyCheck(receiverSymbol, pathConditions))
                 {
                     diagnostics.ReportWarning(
                         span,
                         DiagnosticCode.UnsafeUnwrap,
-                        $"Unsafe unwrap on '{receiverName}' without prior Some/Ok check");
+                        $"Unsafe unwrap on '{receiverSymbol.Name}' without prior Some/Ok check");
                 }
             }
-            else if (receiverName == null)
+            else if (receiverSymbol == null)
             {
                 // Can't determine receiver - warn
                 diagnostics.ReportWarning(
@@ -249,11 +248,6 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
             }
         }
 
-        // Recursively check arguments
-        foreach (var arg in arguments)
-        {
-            CheckExpression(arg, function, diagnostics, checkedVariables, pathConditions);
-        }
     }
 
     private static bool IsUnsafeUnwrapCall(string target)
@@ -279,82 +273,61 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
                target.EndsWith(".map_or_else");
     }
 
-    private static string? ExtractReceiverName(string target)
+    private static HashSet<SymbolId> ExtractOptionChecks(
+        BoundExpression condition)
     {
-        // Extract variable name from "variable.method" pattern
-        var dotIndex = target.LastIndexOf('.');
-        if (dotIndex > 0)
+        var checkedVariables = new HashSet<SymbolId>();
+
+        if (condition is BoundCallExpression callExpr)
         {
-            return target[..dotIndex];
-        }
-        return null;
-    }
-
-    private static (HashSet<string> CheckedVariables, bool IsMatchCheck) ExtractOptionChecks(BoundExpression condition)
-    {
-        var checkedVariables = new HashSet<string>();
-        var isMatchCheck = false;
-
-        switch (condition)
-        {
-            case BoundCallExpression callExpr:
-                var lowerTarget = callExpr.Target.ToLowerInvariant();
-
-                // Check for is_some, is_ok patterns
-                if (lowerTarget.EndsWith(".is_some") ||
-                    lowerTarget.EndsWith(".is_ok") ||
-                    lowerTarget.EndsWith(".has_value") ||
-                    lowerTarget.EndsWith(".is_present"))
-                {
-                    var receiver = ExtractReceiverName(callExpr.Target);
-                    if (receiver != null)
-                    {
-                        checkedVariables.Add(receiver);
-                    }
-                }
-                break;
-
-            case BoundBinaryExpression binExpr:
-                // Handle "x != null" or "x != None" patterns
-                if (binExpr.Operator == BinaryOperator.NotEqual)
-                {
-                    if (binExpr.Left is BoundVariableExpression varExpr)
-                    {
-                        // Check if right side is null/None literal
-                        if (IsNullLiteral(binExpr.Right))
-                        {
-                            checkedVariables.Add(varExpr.Variable.Name);
-                        }
-                    }
-                    else if (binExpr.Right is BoundVariableExpression varExpr2)
-                    {
-                        if (IsNullLiteral(binExpr.Left))
-                        {
-                            checkedVariables.Add(varExpr2.Variable.Name);
-                        }
-                    }
-                }
-
-                // Recurse into logical combinations
-                if (binExpr.Operator == BinaryOperator.And)
-                {
-                    var (leftChecks, _) = ExtractOptionChecks(binExpr.Left);
-                    var (rightChecks, _) = ExtractOptionChecks(binExpr.Right);
-                    checkedVariables.UnionWith(leftChecks);
-                    checkedVariables.UnionWith(rightChecks);
-                }
-                break;
+            var lowerTarget = callExpr.Target.ToLowerInvariant();
+            if (lowerTarget.EndsWith(".is_some")
+                || lowerTarget.EndsWith(".is_ok")
+                || lowerTarget.EndsWith(".has_value")
+                || lowerTarget.EndsWith(".is_present"))
+            {
+                if (callExpr.ReceiverSymbolId is { IsNone: false } receiverId)
+                    checkedVariables.Add(receiverId);
+            }
+            return checkedVariables;
         }
 
-        return (checkedVariables, isMatchCheck);
+        if (condition is not BoundBinaryExpression binary)
+            return checkedVariables;
+
+        if (binary.Operator == BinaryOperator.NotEqual)
+        {
+            if (binary.Left is BoundVariableExpression left
+                && IsNullLiteral(binary.Right)
+                && !left.Variable.Id.IsNone)
+            {
+                checkedVariables.Add(left.Variable.Id);
+            }
+            else if (binary.Right is BoundVariableExpression right
+                     && IsNullLiteral(binary.Left)
+                     && !right.Variable.Id.IsNone)
+            {
+                checkedVariables.Add(right.Variable.Id);
+            }
+        }
+
+        if (binary.Operator == BinaryOperator.And)
+        {
+            checkedVariables.UnionWith(ExtractOptionChecks(binary.Left));
+            checkedVariables.UnionWith(ExtractOptionChecks(binary.Right));
+        }
+
+        return checkedVariables;
     }
 
-    private static bool HasSafetyCheck(string variableName, List<BoundExpression> pathConditions)
+    private static bool HasSafetyCheck(
+        VariableSymbol variable,
+        List<BoundExpression> pathConditions)
     {
         foreach (var condition in pathConditions)
         {
-            var (checks, _) = ExtractOptionChecks(condition);
-            if (checks.Contains(variableName))
+            var checks = ExtractOptionChecks(condition);
+            if (checks.Contains(variable.Id))
                 return true;
         }
         return false;
@@ -364,10 +337,7 @@ public sealed class NullDereferenceChecker : IBugPatternChecker
     {
         // In Calor, None is the null equivalent
         // This would need to be extended when BoundNoneLiteral is added
-        return expr switch
-        {
-            BoundCallExpression call when call.Target.Equals("None", StringComparison.OrdinalIgnoreCase) => true,
-            _ => false
-        };
+        return expr is BoundCallExpression call
+            && call.Target.Equals("None", StringComparison.OrdinalIgnoreCase);
     }
 }

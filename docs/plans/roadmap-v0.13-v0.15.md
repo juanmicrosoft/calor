@@ -77,7 +77,7 @@ without renegotiation; DEFERRED items are named now so their absence is a decisi
   sharpening of the issue's "Required implementation" families: conversion, type/pattern tests,
   arrays/indexes, collections, lambdas, await, coalesce, match, quantifiers, string operations,
   interop) is 0.13's first to-do, frozen **before binder work merges**. This is a binder rebuild,
-  not a fix — today `BindExpression` handles ~20 of 61 concrete expression node classes — and it is
+  not a fix — today `BindExpression` handles ~20 of 60 concrete expression node classes — and it is
   the single item 0.14 and 0.15 cannot proceed without.
 - **Stable bound SymbolIds + exact identifier spans.**
 - **Truth-floor defects**: structural return/postcondition lowering (#764), keyword-arg verifier
@@ -164,12 +164,11 @@ gates 1, 4, 5, 6, 7, and gate 2's diagnostics leg.
    A-1.5.3-pinned conversion subjects), **zero analysis-incomplete occurrences (`Calor0259`) for
    the registered construct-class list** (F-1; the marker moved from the silent `<unsupported:>`
    tree string to a counted diagnostic by F-2's 2026-08-10 additive amendment — same denominator,
-   strictly better instrument); the residual incomplete-fraction outside those classes is
-   **published per release, reported-not-adjudicated** (the M-S2/PP-L4 route). The escape
-   category is thereby bounded: the gate cannot be passed by marking registered constructs
-   "incomplete". **Status: measured green by the B8 closure PR (2026-08-10)** — zero Tier A
-   `Calor0259` on both F-2 legs; residuals published in the F-1 B8 amendment (in-repo 1
-   `SizeOfNode`, conversion 17 `StackAllocNode`, all Tier B).
+   strictly better instrument). The escape category is thereby bounded: the gate cannot be
+   passed by marking registered constructs "incomplete". **Status: measured green after the
+   PR #900 structural-totality completion (2026-08-11)** — all 60 expression classes are
+   registered Tier A, with zero `Calor0259` occurrences on both recorded F-2 legs
+   (in-repo 0 / 4,612 bound expressions; conversion 0 / 19,348).
 2. **Full-vs-incremental identity**: byte-identical diagnostics, index contents, and review packets
    (after canonical ordering) across a **registered edit-script corpus** that includes the #883
    reproduction — plus an **incrementality witness** (the incremental path demonstrably reuses the
@@ -516,7 +515,7 @@ Two rotated lenses on the revised draft; both NEEDS-FIXES; all findings applied 
   27; erratum to file), #789 "substantially landed" overstated (five hermetic items still open →
   row corrected). Minors — blast surface ~800 committed vs ~1,600 headline, #792 already closed,
   the `§PROOF` obligation-elision third path added to the differential denominator, postmortem
-  citation sharpened to V4. Verified clean at count precision: 61 expression classes, 869 golden
+  citation sharpened to V4. Verified clean at count precision: 60 expression classes, 869 golden
   files, 217-program corpus, A-1.5.3's three pinned subjects, `SemanticsVersion.CheckCompatibility`
   silent-reinterpretation, no pre-existing index machinery (gate 8's "frozen before the index
   exists" framing is sound).

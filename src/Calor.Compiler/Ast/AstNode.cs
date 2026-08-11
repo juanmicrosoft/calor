@@ -494,6 +494,7 @@ public interface IAstVisitor<T>
 public sealed class AttributeCollection
 {
     private readonly Dictionary<string, string> _attributes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, TextSpan> _spans = new(StringComparer.Ordinal);
 
     public string? this[string key]
         => _attributes.TryGetValue(key, out var value) ? value : null;
@@ -503,8 +504,20 @@ public sealed class AttributeCollection
         _attributes[key] = value;
     }
 
+    public void Add(string key, string value, TextSpan span)
+    {
+        _attributes[key] = value;
+        _spans[key] = span;
+    }
+
     public bool TryGetValue(string key, out string? value)
         => _attributes.TryGetValue(key, out value);
+
+    public bool TryGetSpan(string key, out TextSpan span)
+        => _spans.TryGetValue(key, out span);
+
+    public TextSpan? GetSpan(string key)
+        => _spans.TryGetValue(key, out var span) ? span : null;
 
     public bool ContainsKey(string key)
         => _attributes.ContainsKey(key);

@@ -147,6 +147,77 @@ public class ClassMemberBindingTests
         Assert.Empty(errors);
     }
 
+    [Fact]
+    public void InheritedFields_ResolveAcrossHierarchy_WithVisibilityAndIdentity()
+    {
+        var source = """
+            §M{m001:Test}
+              §CL{c001:Base:pub}
+                §FLD{i32:shared:prot}
+                §FLD{i32:publicValue:pub}
+                §FLD{i32:internalValue:int}
+              §CL{c002:Middle:Base:pub}
+                §FLD{i32:secret:priv}
+              §CL{c003:Derived:Middle:pub}
+                §MT{m001:Use:pub} () -> i32
+                  §B{bare:i32} shared
+                  §B{viaThis:i32} §THIS.shared
+                  §B{viaBase:i32} §BASE.shared
+                  §B{viaPublic:i32} §THIS.publicValue
+                  §B{viaInternal:i32} §BASE.internalValue
+                  §B{hidden:object} §BASE.secret
+                  §R (+ bare (+ viaThis viaBase))
+            """;
+
+        var bound = Bind(source, out var diagnostics);
+        var use = bound.Functions.Single(function =>
+            function.Symbol.Name == "Derived.Use");
+        var shared = bound.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.IsField && symbol.Name == "shared");
+        var secret = bound.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.IsField && symbol.Name == "secret");
+        var publicValue = bound.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.IsField && symbol.Name == "publicValue");
+        var internalValue = bound.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.IsField && symbol.Name == "internalValue");
+        var sharedReferences = BoundNodeHelpers.DescendantsAndSelf(use)
+            .OfType<BoundVariableExpression>()
+            .Where(expression => expression.Variable.Name == "shared")
+            .ToArray();
+        var fieldAccesses = BoundNodeHelpers.DescendantsAndSelf(use)
+            .OfType<BoundFieldAccessExpression>()
+            .ToArray();
+
+        Assert.Equal("Base", shared.DeclaringTypeName);
+        Assert.Equal(Visibility.Protected, shared.Visibility);
+        Assert.Equal("Middle", secret.DeclaringTypeName);
+        Assert.Equal(Visibility.Private, secret.Visibility);
+        Assert.Equal(Visibility.Public, publicValue.Visibility);
+        Assert.Equal(Visibility.Internal, internalValue.Visibility);
+        Assert.Same(shared, Assert.Single(sharedReferences).Variable);
+        var sharedAccesses = fieldAccesses
+            .Where(access => access.FieldName == "shared")
+            .ToArray();
+        Assert.Equal(2, sharedAccesses.Length);
+        Assert.All(
+            sharedAccesses,
+            access => Assert.Same(shared, access.ResolvedField));
+        Assert.Same(
+            publicValue,
+            fieldAccesses.Single(access => access.FieldName == "publicValue").ResolvedField);
+        Assert.Same(
+            internalValue,
+            fieldAccesses.Single(access => access.FieldName == "internalValue").ResolvedField);
+        Assert.Null(fieldAccesses.Single(access => access.FieldName == "secret").ResolvedField);
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UndefinedReference
+            && diagnostic.Message.Contains("shared", StringComparison.Ordinal));
+    }
+
     #endregion
 
     #region Property Binding
@@ -251,16 +322,15 @@ public class ClassMemberBindingTests
     }
 
     [Fact]
-    public void ArityAwareLookup_FallsBackToFirstOverload()
+    public void ArityAwareLookup_DoesNotFallbackToIncompatibleOverload()
     {
         var scope = new Scope();
         scope.DeclareOverload(new FunctionSymbol("Bar", "i32",
             new List<VariableSymbol> { new("x", "str", false, true) }));
 
-        // No 0-arg overload, should fall back to first
+        // No 0-arg overload: an incompatible declaration must never be returned.
         var result = scope.LookupByArity("Bar", 0);
-        Assert.NotNull(result);
-        Assert.Equal("i32", result.ReturnType);
+        Assert.Null(result);
     }
 
     [Fact]
@@ -672,11 +742,10 @@ public class ClassMemberBindingTests
         // The return expression should be a binary division
         Assert.IsType<BoundBinaryExpression>(ret.Expression);
         var div = (BoundBinaryExpression)ret.Expression!;
-        // The RHS (DEC:100) should NOT be zero. #762 B5: decimals now bind as
-        // BoundDecimalLiteral at FULL precision (the old BoundFloatLiteral shape this
-        // pin asserted was itself the item-4 downcast defect).
-        Assert.IsType<BoundDecimalLiteral>(div.Right);
-        Assert.NotEqual(0m, ((BoundDecimalLiteral)div.Right).Value);
+        // The RHS (DEC:100) should NOT be zero
+        var literal = Assert.IsType<BoundDecimalLiteral>(div.Right);
+        Assert.Equal(100m, literal.Value);
+        Assert.Equal("DECIMAL", literal.TypeName);
     }
 
     #endregion
@@ -733,6 +802,113 @@ public class ClassMemberBindingTests
     #region Static Context Negative Tests
 
     [Fact]
+    public void StaticMethod_BareInstanceFieldsAndProperties_AreRejectedButStaticMembersResolve()
+    {
+        var source = @"
+§M{m001:Test}
+    §CL{c001:Utils:pub}
+        §FLD{i32:instanceField:priv}
+        §FLD{i32:StaticField:priv:stat}
+        §PROP{p001:InstanceProperty:i32:pub}
+          §GET
+        §/PROP{p001}
+        §PROP{p002:StaticProperty:i32:pub:stat}
+          §GET
+        §/PROP{p002}
+        §MT{m002:Use:pub:stat} () -> i32
+            §B{fieldValue:i32} instanceField
+            §B{propertyValue:i32} InstanceProperty
+            §R (+ StaticField StaticProperty)
+";
+
+        var bound = Bind(source, out var diagnostics);
+        var symbols = bound.SymbolsById.Values.OfType<VariableSymbol>().ToArray();
+        var method = bound.Functions.Single(function => function.Symbol.Name == "Utils.Use");
+        var resolvedStatics = BoundNodeHelpers.DescendantsAndSelf(method)
+            .OfType<BoundVariableExpression>()
+            .Where(expression => expression.Variable.Name is "StaticField" or "StaticProperty")
+            .ToArray();
+
+        Assert.Equal(
+            2,
+            diagnostics.Count(diagnostic =>
+                diagnostic.Code == DiagnosticCode.InstanceMemberInStaticContext));
+        Assert.True(symbols.Single(symbol => symbol.Name == "StaticField").IsStatic);
+        Assert.True(symbols.Single(symbol => symbol.Name == "StaticProperty").IsStatic);
+        Assert.False(symbols.Single(symbol => symbol.Name == "instanceField").IsStatic);
+        Assert.False(symbols.Single(symbol => symbol.Name == "InstanceProperty").IsStatic);
+        Assert.Equal(2, resolvedStatics.Length);
+        Assert.All(resolvedStatics, expression => Assert.True(expression.Variable.IsStatic));
+    }
+
+    [Fact]
+    public void ProgramCompile_StaticMethodBareInstanceMembers_FailsWithoutOptionalAnalysis()
+    {
+        var source = """
+            §M{m001:Test}
+              §CL{c001:Utils:pub}
+                §FLD{i32:instanceField:priv}
+                §PROP{p001:InstanceProperty:i32:pub:get}
+                §MT{m002:Use:pub:stat} () -> i32
+                  §B{fieldValue:i32} instanceField
+                  §R InstanceProperty
+            """;
+
+        var result = Calor.Compiler.Program.Compile(source);
+
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Equal(
+            2,
+            result.Diagnostics.Count(diagnostic =>
+                diagnostic.Code == DiagnosticCode.InstanceMemberInStaticContext));
+    }
+
+    [Fact]
+    public void StaticAndInstanceParameterlessConstructors_CoexistAndNewUsesInstanceConstructor()
+    {
+        var source = @"
+§M{m001:Test}
+    §CL{c001:Widget:pub}
+        §CTOR{cctor:stat}
+          §P STR:""static""
+        §/CTOR{cctor}
+        §CTOR{ctor:pub}
+          §P STR:""instance""
+        §/CTOR{ctor}
+    §F{f001:Create:pub} () -> Widget
+      §R §NEW{Widget} §/NEW
+";
+
+        var bound = Bind(source, out var diagnostics);
+        var staticConstructor = bound.Functions.Single(function =>
+            function.MemberKind == BoundMemberKind.StaticConstructor);
+        var instanceConstructor = bound.Functions.Single(function =>
+            function.MemberKind == BoundMemberKind.Constructor);
+        var creation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(
+                Assert.Single(bound.Functions.Single(function =>
+                    function.Symbol.Name == "Create").Body)).Expression);
+
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.DuplicateFunctionSignature);
+        Assert.Equal("Widget..cctor", staticConstructor.Symbol.Name);
+        Assert.Equal("Widget..ctor", instanceConstructor.Symbol.Name);
+        Assert.Same(instanceConstructor.Symbol, creation.ResolvedConstructor);
+        Assert.NotNull(creation.ResolvedTypeSymbolId);
+        Assert.NotNull(creation.ResolvedConstructorSymbolId);
+        Assert.NotEqual(
+            creation.ResolvedTypeSymbolId,
+            creation.ResolvedConstructorSymbolId);
+        Assert.Equal(
+            "Widget",
+            source.Substring(creation.TypeNameSpan.Start, creation.TypeNameSpan.Length));
+        Assert.DoesNotContain(
+            creation.ResolvedConstructors,
+            symbol => symbol.Id == staticConstructor.SymbolId);
+    }
+
+    [Fact]
     public void StaticMethod_ThisExpression_DoesNotResolve()
     {
         var source = @"
@@ -747,17 +923,13 @@ public class ClassMemberBindingTests
         Assert.NotNull(bound);
         var method = bound.Functions.FirstOrDefault(f => f.Symbol.Name == "Utils.StaticMethod");
         Assert.NotNull(method);
-        // #762 B1 (review Major 2): static-context §THIS is a CONTEXT error on a bound
-        // construct — it takes the QUIET opaque path: no Calor0259 (that would pollute
-        // the incomplete-fraction instrument with a non-incompleteness), and — matching
-        // the pre-B1 silent fallback — no other diagnostic either, until it gets a real
-        // semantic diagnostic in B2+. Discriminating both ways: instrument silence AND
-        // opacity are pinned.
         Assert.DoesNotContain(diagnostics,
             d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisIncomplete);
+        Assert.Contains(diagnostics,
+            d => d.Code == Compiler.Diagnostics.DiagnosticCode.AnalysisUnsupportedNode);
         var thisBound = method!.Body.OfType<Compiler.Binding.BoundCallStatement>()
             .SelectMany(c => c.Arguments)
-            .OfType<Compiler.Binding.BoundIncompleteExpression>()
+            .OfType<Compiler.Binding.BoundUnsupportedExpression>()
             .FirstOrDefault();
         Assert.NotNull(thisBound);
         Assert.Equal("ThisExpressionNode", thisBound!.NodeTypeName);

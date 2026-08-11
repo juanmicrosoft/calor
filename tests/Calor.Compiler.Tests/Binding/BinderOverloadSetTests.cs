@@ -10,9 +10,9 @@ namespace Calor.Compiler.Tests;
 /// <summary>
 /// #762 items 5–6 (B8, scoping doc D5): top-level functions register in overload sets
 /// (previously a same-name second declaration's TryDeclare silently failed and every
-/// call resolved to the first declaration); duplicate signatures, arity ties, and
-/// no-arity-match calls are explicit diagnostics; resolution is order-independent
-/// (the property two-pass binding exists to provide).
+/// call resolved to the first declaration); duplicate signatures, true applicability
+/// ties, and no-match calls are explicit diagnostics; exact types discriminate same-
+/// arity overloads, and resolution is order-independent.
 /// </summary>
 public class BinderOverloadSetTests
 {
@@ -75,25 +75,26 @@ public class BinderOverloadSetTests
     }
 
     [Fact]
-    public void ArityTie_IsANonSilentAmbiguityWarning()
+    public void SameArityOverloads_ResolveByExactArgumentTypes()
     {
-        // (i32) vs (str) — same arity, different types; string-typed bound arguments
-        // cannot discriminate in 0.13 (B5 decision record), so the tie is flagged.
+        // Structural binding now carries exact argument types, so arity alone does not
+        // make otherwise distinct overloads ambiguous.
         var (bound, diags) = Bind(
             Func("f001", "Pick", "i32", new[] { ("i32", "x") }),
             Func("f002", "Pick", "str", new[] { ("str", "s") }),
             Caller("f003", 1));
-        Assert.Contains(diags, d => d.Code == DiagnosticCode.AmbiguousOverload);
-        Assert.Equal("i32", CallerResolvedType(bound)); // first declaration, flagged
+        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.AmbiguousOverload);
+        Assert.Equal("i32", CallerResolvedType(bound));
     }
 
     [Fact]
-    public void NoArityMatch_IsANonSilentWarning()
+    public void NoArityMatch_IsANonSilentError()
     {
         var (_, diags) = Bind(
             Func("f001", "Pick", "i32", new[] { ("i32", "x") }),
             Caller("f002", 3));
-        Assert.Contains(diags, d => d.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.Contains(diags, d => d.Code == DiagnosticCode.NoMatchingOverload
+            && d.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]

@@ -1,11 +1,259 @@
 using Calor.LanguageServer.Handlers;
+using Calor.LanguageServer.State;
 using Calor.LanguageServer.Tests.Helpers;
+using Calor.LanguageServer.Utilities;
+using OmniSharp.Extensions.LanguageServer.Protocol;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Xunit;
 
 namespace Calor.LanguageServer.Tests.Handlers;
 
 public class RenameHandlerTests
 {
+    [Fact]
+    public async Task RenameFunctionDeclaration_EditsOnlyIdentifierTokenAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §F{f001:Compute:pub}
+                §O{i32}
+                §R 42
+            """;
+        var uri = DocumentUri.From("file:///rename.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Compute", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "Calculate",
+            },
+            CancellationToken.None);
+
+        var textEdit = Assert.Single(Assert.Single(edit!.Changes!).Value);
+        Assert.Equal(new Position(line - 1, column - 1), textEdit.Range.Start);
+        Assert.Equal(
+            new Position(line - 1, column - 1 + "Compute".Length),
+            textEdit.Range.End);
+    }
+
+    [Fact]
+    public async Task RenameFunctionCall_UsesExactCalleeSpanAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §F{f001:Compute:pub} () -> i32
+                §R 42
+              §F{f002:Use:pub} () -> i32
+                §R §C{Compute} §/C
+            """;
+        var uri = DocumentUri.From("file:///rename.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Compute", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "Calculate",
+            },
+            CancellationToken.None);
+
+        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.Equal(2, edits.Length);
+        Assert.All(edits, textEdit =>
+        {
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+            Assert.Equal("Compute", source[start..end]);
+            Assert.Equal("Calculate", textEdit.NewText);
+        });
+    }
+
+    [Fact]
+    public async Task RenameInheritedFieldAccesses_EditsOnlyFieldIdentifiersAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c001:Base:pub}
+                §FLD{i32:shared:prot}
+              §CL{c002:Derived:Base:pub}
+                §MT{m001:Use:pub} () -> i32
+                  §R (+ §THIS.shared §BASE.shared)
+            """;
+        var uri = DocumentUri.From("file:///rename-field.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("shared:prot", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "renamed",
+            },
+            CancellationToken.None);
+
+        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.Equal(3, edits.Length);
+        Assert.All(edits, textEdit =>
+        {
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+            Assert.Equal("shared", source[start..end]);
+            Assert.Equal("renamed", textEdit.NewText);
+        });
+    }
+
+    [Fact]
+    public async Task RenameConstructorResolvedNewExpression_EditsExactTypeTokensAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c001:Widget:pub}
+                §CTOR{ctor:pub}
+                §/CTOR{ctor}
+              §F{f001:Create:pub} () -> Widget
+                §R §NEW{Widget} §/NEW
+            """;
+        var uri = DocumentUri.From("file:///rename-new-type.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.LastIndexOf("Widget", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "Gadget",
+            },
+            CancellationToken.None);
+
+        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.Equal(3, edits.Length);
+        Assert.All(edits, textEdit =>
+        {
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+            Assert.Equal("Widget", source[start..end]);
+            Assert.Equal("Gadget", textEdit.NewText);
+        });
+        Assert.Equal(
+            new[]
+            {
+                source.IndexOf("Widget:pub", StringComparison.Ordinal),
+                source.IndexOf("-> Widget", StringComparison.Ordinal) + "-> ".Length,
+                source.LastIndexOf("Widget", StringComparison.Ordinal),
+            },
+            edits.Select(textEdit => PositionConverter.ToOffset(textEdit.Range.Start, source))
+                .Order()
+                .ToArray());
+    }
+
+    [Fact]
+    public async Task RenameLocalType_DoesNotEditQualifiedExternalTypeAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c001:Exception:pub}
+              §CL{c002:Holder:pub}
+                §FLD{Exception:local:priv}
+                §FLD{System.Exception:external:priv}
+            """;
+        var uri = DocumentUri.From("file:///rename-qualified-type.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Exception:pub", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "LocalException",
+            },
+            CancellationToken.None);
+
+        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.Equal(2, edits.Length);
+        Assert.Equal(
+            new[]
+            {
+                source.IndexOf("Exception:pub", StringComparison.Ordinal),
+                source.IndexOf("Exception:local", StringComparison.Ordinal),
+            },
+            edits.Select(textEdit => PositionConverter.ToOffset(textEdit.Range.Start, source))
+                .Order()
+                .ToArray());
+        Assert.DoesNotContain(
+            edits,
+            textEdit => PositionConverter.ToOffset(textEdit.Range.Start, source)
+                == source.LastIndexOf("Exception", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RenameTypeFromNewGenericArgument_EditsExactTypeTokensAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §F{f001:Create:pub} () -> object
+                §R §NEW{Box<Widget>} §/NEW
+              §CL{c001:Widget:pub}
+              §CL{c002:Box:pub}
+                §FLD{i32:_dummy:priv}
+            """;
+        var uri = DocumentUri.From("file:///rename-new-generic-type.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Widget>}", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new RenameHandler(workspace);
+
+        var edit = await handler.Handle(
+            new RenameParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                NewName = "Gadget",
+            },
+            CancellationToken.None);
+
+        var edits = Assert.Single(edit!.Changes!).Value.ToArray();
+        Assert.Equal(2, edits.Length);
+        Assert.All(edits, textEdit =>
+        {
+            var start = PositionConverter.ToOffset(textEdit.Range.Start, source);
+            var end = PositionConverter.ToOffset(textEdit.Range.End, source);
+            Assert.Equal("Widget", source[start..end]);
+        });
+        Assert.Equal(
+            new[]
+            {
+                source.IndexOf("Widget>}", StringComparison.Ordinal),
+                source.IndexOf("Widget:pub", StringComparison.Ordinal),
+            },
+            edits.Select(textEdit => PositionConverter.ToOffset(textEdit.Range.Start, source))
+                .Order()
+                .ToArray());
+    }
+
     [Fact]
     public void ReferenceCollectorForRename_FindsAllOccurrences()
     {

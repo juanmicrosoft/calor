@@ -923,5 +923,24 @@ public class BugPatternTests
         Assert.True(diagnostics.HasErrors || diagnostics.Warnings.Any(d => d.Code == DiagnosticCode.DivisionByZero));
     }
 
+    [Fact]
+    public void DivisionByZero_LiteralCastThatTruncatesToZero_ReportsError()
+    {
+        var source = @"
+§M{m001:Test}
+  §F{f001:Divide:pub} () -> i32
+    §R (/ INT:100 (cast i32 FLOAT:0.5))";
+
+        var func = GetFunction(source, out var parseDiagnostics);
+        Assert.False(parseDiagnostics.HasErrors);
+
+        var diagnostics = new DiagnosticBag();
+        new DivisionByZeroChecker(DefaultOptions).Check(func, diagnostics);
+
+        Assert.Contains(diagnostics.Errors, diagnostic =>
+            diagnostic.Code == DiagnosticCode.DivisionByZero
+            && diagnostic.Message.Contains("literal zero", StringComparison.Ordinal));
+    }
+
     #endregion
 }

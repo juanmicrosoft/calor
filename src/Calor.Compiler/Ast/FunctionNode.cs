@@ -20,10 +20,12 @@ public enum Visibility
 public sealed class OutputNode : AstNode
 {
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
 
-    public OutputNode(TextSpan span, string typeName) : base(span)
+    public OutputNode(TextSpan span, string typeName, TextSpan? typeNameSpan = null) : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);
@@ -54,6 +56,7 @@ public sealed class FunctionNode : AstNode
 {
     public string Id { get; }
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public Visibility Visibility { get; }
     public IReadOnlyList<TypeParameterNode> TypeParameters { get; }
     public IReadOnlyList<ParameterNode> Parameters { get; }
@@ -176,11 +179,13 @@ public sealed class FunctionNode : AstNode
         LockNode? lockNode,
         AuthorNode? author,
         TaskRefNode? taskRef,
-        bool isAsync = false)
+        bool isAsync = false,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         Visibility = visibility;
         TypeParameters = typeParameters ?? throw new ArgumentNullException(nameof(typeParameters));
         Parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
@@ -249,7 +254,9 @@ public enum ParameterModifier
 public sealed class ParameterNode : AstNode
 {
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public string TypeName { get; }
+    public TextSpan TypeNameSpan { get; }
     public ParameterModifier Modifier { get; }
     public AttributeCollection Attributes { get; }
 
@@ -307,11 +314,15 @@ public sealed class ParameterNode : AstNode
         AttributeCollection attributes,
         IReadOnlyList<CalorAttributeNode> csharpAttributes,
         ExpressionNode? defaultValue,
-        InlineRefinementInfo? inlineRefinement = null)
+        InlineRefinementInfo? inlineRefinement = null,
+        TextSpan? identifierSpan = null,
+        TextSpan? typeNameSpan = null)
         : base(span)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
+        TypeNameSpan = typeNameSpan ?? TextSpan.Empty;
         Modifier = modifier;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
         CSharpAttributes = csharpAttributes ?? Array.Empty<CalorAttributeNode>();

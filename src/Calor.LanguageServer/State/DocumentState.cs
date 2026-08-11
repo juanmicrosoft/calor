@@ -6,11 +6,23 @@ using Calor.Compiler.Parsing;
 
 namespace Calor.LanguageServer.State;
 
+public sealed record DocumentAnalysisSnapshot(
+    int Version,
+    string Source,
+    List<Token>? Tokens,
+    ModuleNode? Ast,
+    BoundModule? BoundModule,
+    DiagnosticBag Diagnostics,
+    List<DiagnosticWithFix> DiagnosticsWithFixes);
+
 /// <summary>
 /// Holds the analysis state for a single document.
 /// </summary>
 public sealed class DocumentState
 {
+    private readonly string _sourceIdentity;
+    private DocumentAnalysisSnapshot _snapshot;
+
     /// <summary>
     /// The document URI.
     /// </summary>
@@ -19,45 +31,56 @@ public sealed class DocumentState
     /// <summary>
     /// The document version (incremented on each change).
     /// </summary>
-    public int Version { get; private set; }
+    public int Version => Snapshot.Version;
 
     /// <summary>
     /// The source text content.
     /// </summary>
-    public string Source { get; private set; }
+    public string Source => Snapshot.Source;
 
     /// <summary>
     /// The parsed tokens.
     /// </summary>
-    public List<Token>? Tokens { get; private set; }
+    public List<Token>? Tokens => Snapshot.Tokens;
 
     /// <summary>
     /// The parsed AST.
     /// </summary>
-    public ModuleNode? Ast { get; private set; }
+    public ModuleNode? Ast => Snapshot.Ast;
 
     /// <summary>
     /// The bound module (with resolved symbols).
     /// </summary>
-    public BoundModule? BoundModule { get; private set; }
+    public BoundModule? BoundModule => Snapshot.BoundModule;
 
     /// <summary>
     /// All diagnostics from lexing, parsing, and binding.
     /// </summary>
-    public DiagnosticBag Diagnostics { get; private set; }
+    public DiagnosticBag Diagnostics => Snapshot.Diagnostics;
 
     /// <summary>
     /// Diagnostics with suggested fixes.
     /// </summary>
-    public List<DiagnosticWithFix> DiagnosticsWithFixes { get; private set; }
+    public List<DiagnosticWithFix> DiagnosticsWithFixes => Snapshot.DiagnosticsWithFixes;
 
-    public DocumentState(Uri uri, string source, int version = 0)
+    public DocumentAnalysisSnapshot Snapshot => Volatile.Read(ref _snapshot);
+
+    public DocumentState(
+        Uri uri,
+        string source,
+        int version = 0,
+        string? sourceIdentity = null)
     {
         Uri = uri;
-        Source = source;
-        Version = version;
-        Diagnostics = new DiagnosticBag();
-        DiagnosticsWithFixes = new List<DiagnosticWithFix>();
+        _sourceIdentity = SymbolSourceIdentity.Canonicalize(sourceIdentity ?? uri.ToString());
+        _snapshot = new DocumentAnalysisSnapshot(
+            version,
+            source,
+            null,
+            null,
+            null,
+            new DiagnosticBag(),
+            []);
     }
 
     /// <summary>
@@ -65,9 +88,19 @@ public sealed class DocumentState
     /// </summary>
     public void Update(string newSource, int newVersion)
     {
-        Source = newSource;
-        Version = newVersion;
-        Reanalyze();
+        var next = Analyze(newSource, newVersion);
+        while (true)
+        {
+            var current = Snapshot;
+            if (newVersion < current.Version)
+                return;
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(ref _snapshot, next, current),
+                    current))
+            {
+                return;
+            }
+        }
     }
 
     /// <summary>
@@ -75,39 +108,57 @@ public sealed class DocumentState
     /// </summary>
     public void Reanalyze()
     {
-        Diagnostics = new DiagnosticBag();
-        DiagnosticsWithFixes = new List<DiagnosticWithFix>();
-        Tokens = null;
-        Ast = null;
-        BoundModule = null;
+        while (true)
+        {
+            var current = Snapshot;
+            var next = Analyze(current.Source, current.Version);
+            if (ReferenceEquals(
+                    Interlocked.CompareExchange(ref _snapshot, next, current),
+                    current))
+            {
+                return;
+            }
+        }
+    }
+
+    private DocumentAnalysisSnapshot Analyze(string source, int version)
+    {
+        var diagnostics = new DiagnosticBag();
+        var diagnosticsWithFixes = new List<DiagnosticWithFix>();
+        List<Token>? tokens = null;
+        ModuleNode? ast = null;
+        BoundModule? boundModule = null;
 
         // Set file path for diagnostics
         var filePath = Uri.IsFile ? Uri.LocalPath : Uri.ToString();
-        Diagnostics.SetFilePath(filePath);
+        diagnostics.SetFilePath(filePath);
 
         try
         {
             // Phase 1: Lexing
-            var lexer = new Lexer(Source, Diagnostics);
-            Tokens = lexer.TokenizeAll();
+            var lexer = new Lexer(source, diagnostics);
+            tokens = lexer.TokenizeAll();
 
             // Phase 2: Parsing (uses indent-aware token stream)
-            var parserLexer = new Lexer(Source, new DiagnosticBag());
+            var parserLexer = new Lexer(source, new DiagnosticBag());
             var parserTokens = parserLexer.TokenizeAllForParser();
-            var parser = new Parser(parserTokens, Diagnostics);
-            Ast = parser.Parse();
+            var parser = new Parser(parserTokens, diagnostics);
+            ast = parser.Parse();
 
             // Phase 3: Binding (only if parsing succeeded without critical errors)
-            if (Ast != null && !Diagnostics.HasErrors)
+            if (ast != null && !diagnostics.HasErrors)
             {
                 try
                 {
-                    var binder = new Binder(Diagnostics);
-                    BoundModule = binder.Bind(Ast);
+                    var binder = new Binder(diagnostics, _sourceIdentity);
+                    boundModule = binder.Bind(ast);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // Binding can fail on malformed AST, continue without bound module
+                    diagnostics.ReportInfo(
+                        ast.Span,
+                        DiagnosticCode.AnalysisSkipped,
+                        $"Bound symbol analysis did not complete: {ex.GetType().Name}");
                 }
             }
 
@@ -115,12 +166,12 @@ public sealed class DocumentState
             // AST is available so quick-fixes for strict bind-inference
             // diagnostics surface in the IDE. Strict checks default-on per
             // v0.6.3 (RFC v0.6 bind-inference-formalization §6 Phase 4).
-            if (Ast != null)
+            if (ast != null)
             {
                 try
                 {
-                    var bindValidator = new BindValidationPass(Diagnostics, Source, strictInference: true);
-                    bindValidator.Check(Ast);
+                    var bindValidator = new BindValidationPass(diagnostics, source, strictInference: true);
+                    bindValidator.Check(ast);
                 }
                 catch (Exception)
                 {
@@ -130,12 +181,12 @@ public sealed class DocumentState
 
             // Phase 5: Return validation (Calor0205). Always runs when an AST is
             // available so the IDE surfaces value-returned-from-void-owner errors.
-            if (Ast != null)
+            if (ast != null)
             {
                 try
                 {
-                    var returnValidator = new ReturnValidationPass(Diagnostics);
-                    returnValidator.Check(Ast);
+                    var returnValidator = new ReturnValidationPass(diagnostics);
+                    returnValidator.Check(ast);
                 }
                 catch (Exception)
                 {
@@ -144,16 +195,25 @@ public sealed class DocumentState
             }
 
             // Populate DiagnosticsWithFixes from DiagnosticBag
-            DiagnosticsWithFixes.AddRange(Diagnostics.DiagnosticsWithFixes);
+            diagnosticsWithFixes.AddRange(diagnostics.DiagnosticsWithFixes);
         }
         catch (Exception ex)
         {
             // Log unexpected errors as diagnostics
-            Diagnostics.ReportError(
+            diagnostics.ReportError(
                 TextSpan.Empty,
                 "Calor9999",
                 $"Internal error: {ex.Message}");
         }
+
+        return new DocumentAnalysisSnapshot(
+            version,
+            source,
+            tokens,
+            ast,
+            boundModule,
+            diagnostics,
+            diagnosticsWithFixes);
     }
 
     /// <summary>

@@ -11,17 +11,20 @@ namespace Calor.Compiler.Analysis.Dataflow.Analyses;
 public sealed class LiveVariablesAnalysis
 {
     private readonly ControlFlowGraph _cfg;
-    private readonly Dictionary<BasicBlock, BlockDataflowResult<ImmutableHashSet<string>>> _results;
-    private readonly HashSet<string> _allVariables;
+    private readonly Dictionary<BasicBlock, BlockDataflowResult<ImmutableHashSet<SymbolId>>> _results;
+    private readonly IReadOnlyDictionary<SymbolId, VariableSymbol> _allVariables;
+    public IReadOnlyList<BoundNode> IncompleteNodes { get; }
+    public bool IsComplete => IncompleteNodes.Count == 0;
 
     public LiveVariablesAnalysis(ControlFlowGraph cfg)
     {
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
         _allVariables = CollectAllVariables(cfg);
+        IncompleteNodes = BoundNodeHelpers.GetAnalysisIncompleteNodes(cfg.Function).ToArray();
 
-        var lattice = new SetLattice<string>(_allVariables);
+        var lattice = new SetLattice<SymbolId>(_allVariables.Keys);
         var transfer = new LiveVariablesTransfer();
-        var analysis = new DataflowAnalysis<ImmutableHashSet<string>>(
+        var analysis = new DataflowAnalysis<ImmutableHashSet<SymbolId>>(
             lattice, transfer, DataflowDirection.Backward);
 
         _results = analysis.Analyze(cfg);
@@ -32,20 +35,28 @@ public sealed class LiveVariablesAnalysis
     /// </summary>
     public IEnumerable<string> GetLiveVariablesAtEntry(BasicBlock block)
     {
-        if (_results.TryGetValue(block, out var result))
-            return result.In.AsEnumerable();
-        return Enumerable.Empty<string>();
+        return GetLiveSymbolIdsAtEntry(block)
+            .Select(id => _allVariables.TryGetValue(id, out var variable) ? variable.Name : id.ToString());
     }
+
+    public IEnumerable<SymbolId> GetLiveSymbolIdsAtEntry(BasicBlock block) =>
+        _results.TryGetValue(block, out var result)
+            ? result.In.AsEnumerable()
+            : Enumerable.Empty<SymbolId>();
 
     /// <summary>
     /// Gets the variables that are live at the exit of a block.
     /// </summary>
     public IEnumerable<string> GetLiveVariablesAtExit(BasicBlock block)
     {
-        if (_results.TryGetValue(block, out var result))
-            return result.Out.AsEnumerable();
-        return Enumerable.Empty<string>();
+        return GetLiveSymbolIdsAtExit(block)
+            .Select(id => _allVariables.TryGetValue(id, out var variable) ? variable.Name : id.ToString());
     }
+
+    public IEnumerable<SymbolId> GetLiveSymbolIdsAtExit(BasicBlock block) =>
+        _results.TryGetValue(block, out var result)
+            ? result.Out.AsEnumerable()
+            : Enumerable.Empty<SymbolId>();
 
     /// <summary>
     /// Checks if a variable is live at a specific point.
@@ -55,15 +66,31 @@ public sealed class LiveVariablesAnalysis
         if (_results.TryGetValue(block, out var result))
         {
             var facts = atEntry ? result.In : result.Out;
-            return facts.Contains(variableName);
+            return facts.AsEnumerable().Any(id =>
+                _allVariables.TryGetValue(id, out var variable)
+                && string.Equals(variable.Name, variableName, StringComparison.Ordinal));
         }
         return false;
+    }
+
+    public bool IsLive(BasicBlock block, SymbolId variableId, bool atEntry = true)
+    {
+        if (!_results.TryGetValue(block, out var result))
+            return false;
+
+        return (atEntry ? result.In : result.Out).Contains(variableId);
     }
 
     /// <summary>
     /// Finds dead assignments (definitions where the variable is not live after).
     /// </summary>
     public IEnumerable<(BasicBlock Block, BoundStatement Statement, string Variable)> FindDeadAssignments()
+    {
+        return FindDeadAssignmentsWithSymbols()
+            .Select(item => (item.Block, item.Statement, item.Variable.Name));
+    }
+
+    public IEnumerable<(BasicBlock Block, BoundStatement Statement, VariableSymbol Variable)> FindDeadAssignmentsWithSymbols()
     {
         foreach (var block in _cfg.Blocks)
         {
@@ -78,48 +105,54 @@ public sealed class LiveVariablesAnalysis
                 var stmt = block.Statements[i];
                 var defined = BoundNodeHelpers.GetDefinedVariable(stmt);
 
-                if (defined != null && !liveAfter.Contains(defined.Name))
+                if (defined != null && !liveAfter.Contains(defined.Id))
                 {
                     // This definition is not live after - it's dead
-                    yield return (block, stmt, defined.Name);
+                    yield return (block, stmt, defined);
                 }
 
                 // Update liveAfter for the next iteration (going backwards)
                 // Gen: add used variables
                 foreach (var used in BoundNodeHelpers.GetUsedVariables(stmt))
                 {
-                    liveAfter = liveAfter.Add(used.Name);
+                    liveAfter = liveAfter.Add(used.Id);
                 }
 
                 // Kill: remove defined variables
                 if (defined != null)
                 {
-                    liveAfter = liveAfter.Remove(defined.Name);
+                    liveAfter = liveAfter.Remove(defined.Id);
                 }
             }
         }
     }
 
-    private static HashSet<string> CollectAllVariables(ControlFlowGraph cfg)
+    private static IReadOnlyDictionary<SymbolId, VariableSymbol> CollectAllVariables(ControlFlowGraph cfg)
     {
-        var variables = new HashSet<string>();
+        var variables = new Dictionary<SymbolId, VariableSymbol>();
 
         foreach (var block in cfg.Blocks)
         {
             foreach (var stmt in block.Statements)
             {
                 var defined = BoundNodeHelpers.GetDefinedVariable(stmt);
-                if (defined != null)
-                    variables.Add(defined.Name);
+                if (defined != null && !defined.Id.IsNone)
+                    variables.TryAdd(defined.Id, defined);
 
                 foreach (var used in BoundNodeHelpers.GetUsedVariables(stmt))
-                    variables.Add(used.Name);
+                {
+                    if (!used.Id.IsNone)
+                        variables.TryAdd(used.Id, used);
+                }
             }
 
             if (block.BranchCondition != null)
             {
                 foreach (var used in BoundNodeHelpers.GetUsedVariables(block.BranchCondition))
-                    variables.Add(used.Name);
+                {
+                    if (!used.Id.IsNone)
+                        variables.TryAdd(used.Id, used);
+                }
             }
         }
 
@@ -127,29 +160,30 @@ public sealed class LiveVariablesAnalysis
     }
 }
 
-internal sealed class LiveVariablesTransfer : ITransferFunction<ImmutableHashSet<string>>
+internal sealed class LiveVariablesTransfer : ITransferFunction<ImmutableHashSet<SymbolId>>
 {
-    public ImmutableHashSet<string> Transfer(BoundStatement statement, ImmutableHashSet<string> input)
+    public ImmutableHashSet<SymbolId> Transfer(BoundStatement statement, ImmutableHashSet<SymbolId> input)
     {
         var result = input;
 
         // Gen: add used variables (they must be live before this statement)
         foreach (var used in BoundNodeHelpers.GetUsedVariables(statement))
         {
-            result = result.Add(used.Name);
+            if (!used.Id.IsNone)
+                result = result.Add(used.Id);
         }
 
         // Kill: remove defined variables (they don't need to be live before this definition)
         var defined = BoundNodeHelpers.GetDefinedVariable(statement);
-        if (defined != null)
+        if (defined != null && !defined.Id.IsNone)
         {
-            result = result.Remove(defined.Name);
+            result = result.Remove(defined.Id);
         }
 
         return result;
     }
 
-    public ImmutableHashSet<string> TransferExpression(BoundExpression? expression, ImmutableHashSet<string> input)
+    public ImmutableHashSet<SymbolId> TransferExpression(BoundExpression? expression, ImmutableHashSet<SymbolId> input)
     {
         if (expression == null)
             return input;
@@ -157,7 +191,8 @@ internal sealed class LiveVariablesTransfer : ITransferFunction<ImmutableHashSet
         var result = input;
         foreach (var used in BoundNodeHelpers.GetUsedVariables(expression))
         {
-            result = result.Add(used.Name);
+            if (!used.Id.IsNone)
+                result = result.Add(used.Id);
         }
 
         return result;

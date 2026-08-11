@@ -54,7 +54,7 @@ public class BinderConversionPatternFamilyTests
     {
         var (expr, diags) = BindReturn(new TypeOperationNode(S, TypeOp.Cast,
             new IntLiteralNode(S, 42), "f64"));
-        var conv = Assert.IsType<BoundConversionExpression>(expr);
+        var conv = Assert.IsType<BoundTypeOperationExpression>(expr);
         Assert.Equal("f64", conv.TypeName); // the TARGET, not the operand's INT
         Assert.IsType<BoundIntLiteral>(conv.Operand);
         Assert.Equal(TypeOp.Cast, conv.Operation);
@@ -66,7 +66,7 @@ public class BinderConversionPatternFamilyTests
     {
         var (expr, _) = BindReturn(new TypeOperationNode(S, TypeOp.As,
             new ReferenceNode(S, "obj"), "MyClass"));
-        Assert.Equal("MyClass", Assert.IsType<BoundConversionExpression>(expr).TypeName);
+        Assert.Equal("MyClass", Assert.IsType<BoundTypeOperationExpression>(expr).TypeName);
     }
 
     [Fact]
@@ -74,10 +74,9 @@ public class BinderConversionPatternFamilyTests
     {
         var (expr, _) = BindReturn(new TypeOperationNode(S, TypeOp.Is,
             new ReferenceNode(S, "x"), "str"));
-        var test = Assert.IsType<BoundTypeTest>(expr);
+        var test = Assert.IsType<BoundTypeOperationExpression>(expr);
         Assert.Equal("BOOL", test.TypeName);
         Assert.Equal("str", test.TargetType);
-        Assert.Null(test.VariableName);
         // The defect shape: any checker seeing BoundBoolLiteral(true) here could fold.
         Assert.IsNotType<BoundBoolLiteral>(expr);
     }
@@ -87,7 +86,7 @@ public class BinderConversionPatternFamilyTests
     {
         var (expr, diags) = BindReturn(new IsPatternNode(S,
             new ReferenceNode(S, "x"), "Circle", "c"));
-        var test = Assert.IsType<BoundTypeTest>(expr);
+        var test = Assert.IsType<BoundIsPatternExpression>(expr);
         Assert.Equal("Circle", test.TargetType);
         Assert.Equal("c", test.VariableName);
         Assert.IsType<BoundVariableExpression>(test.Operand);
@@ -98,9 +97,9 @@ public class BinderConversionPatternFamilyTests
     public void TypeOf_BindsWithTypeResult()
     {
         var (expr, diags) = BindReturn(new TypeOfExpressionNode(S, "MyClass"));
-        var t = Assert.IsType<BoundTypeOfExpression>(expr);
+        var t = Assert.IsType<BoundStructuralExpression>(expr);
         Assert.Equal("TYPE", t.TypeName);
-        Assert.Equal("MyClass", t.TargetTypeName);
+        Assert.Equal("MyClass", t.Metadata["OperandType"]);
         AssertComplete(diags);
     }
 
@@ -109,9 +108,10 @@ public class BinderConversionPatternFamilyTests
     {
         var i = new BoundIntLiteral(S, 1);
         Assert.Equal([i], BoundChildren.Of(
-            new BoundConversionExpression(S, TypeOp.Cast, i, "f64")));
-        Assert.Equal([i], BoundChildren.Of(new BoundTypeTest(S, i, "str", null)));
-        Assert.Empty(BoundChildren.Of(new BoundTypeOfExpression(S, "T")));
+            new BoundTypeOperationExpression(S, TypeOp.Cast, i, "f64")));
+        Assert.Equal([i], BoundChildren.Of(new BoundIsPatternExpression(S, i, "str", null)));
+        Assert.Empty(BoundChildren.Of(
+            new BoundStructuralExpression(S, nameof(TypeOfExpressionNode), "TYPE")));
         Assert.Empty(BoundChildren.Of(new BoundDecimalLiteral(S, 1m)));
     }
 

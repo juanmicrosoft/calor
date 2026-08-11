@@ -1,3 +1,5 @@
+using Calor.Compiler.Binding;
+using Calor.Compiler.Parsing;
 using Calor.LanguageServer.Tests.Helpers;
 using Calor.LanguageServer.Utilities;
 using Xunit;
@@ -6,6 +8,228 @@ namespace Calor.LanguageServer.Tests.Utilities;
 
 public class SymbolFinderTests
 {
+    [Fact]
+    public void FindBoundReferences_SameNameSymbolsRemainSeparatedBySymbolId()
+    {
+        var firstId = SymbolId.Create("module", "function", "local:first");
+        var secondId = SymbolId.Create("module", "function", "local:second");
+        var first = new VariableSymbol(
+            firstId,
+            "value",
+            "INT",
+            isMutable: true,
+            declarationSpan: new TextSpan(1, 2, 1, 1));
+        var second = new VariableSymbol(
+            secondId,
+            "value",
+            "INT",
+            isMutable: true,
+            declarationSpan: new TextSpan(3, 4, 1, 3));
+        var functionSymbol = new FunctionSymbol(
+            SymbolId.Create("module", "function"),
+            "Test",
+            "INT",
+            [],
+            declarationSpan: new TextSpan(0, 20, 1, 0));
+        var function = new BoundFunction(
+            functionSymbol.DeclarationSpan,
+            functionSymbol,
+            [
+                new BoundBindStatement(first.DeclarationSpan, first, new BoundIntLiteral(first.DeclarationSpan, 1)),
+                new BoundBindStatement(second.DeclarationSpan, second, new BoundIntLiteral(second.DeclarationSpan, 2)),
+                new BoundExpressionStatement(
+                    new TextSpan(10, 11, 1, 10),
+                    new BoundVariableExpression(new TextSpan(10, 11, 1, 10), first)),
+                new BoundExpressionStatement(
+                    new TextSpan(12, 13, 1, 12),
+                    new BoundVariableExpression(new TextSpan(12, 13, 1, 12), second)),
+            ],
+            new Scope());
+        var module = new BoundModule(
+            functionSymbol.DeclarationSpan,
+            "Module",
+            [function],
+            new Dictionary<SymbolId, Symbol>
+            {
+                [functionSymbol.Id] = functionSymbol,
+                [first.Id] = first,
+                [second.Id] = second,
+            });
+
+        Assert.Equal(
+            [first.DeclarationSpan, new TextSpan(10, 11, 1, 10)],
+            SymbolFinder.FindBoundReferences(module, firstId, includeDeclaration: true));
+        Assert.Equal(
+            [second.DeclarationSpan, new TextSpan(12, 13, 1, 12)],
+            SymbolFinder.FindBoundReferences(module, secondId, includeDeclaration: true));
+    }
+
+    [Fact]
+    public void ParsedDeclarationIdentifierSpans_AreSafeRenameEdits()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c1:Container:pub}
+                §FLD{i32:field:priv}
+                §MT{m1:Compute:pub} (i32:parameter) -> i32
+                  §B{local:i32} parameter
+                  §R (+ local field)
+            """;
+        var state = LspTestHarness.CreateDocument(source);
+        var symbols = state.BoundModule!.SymbolsById.Values.ToArray();
+
+        foreach (var (name, symbol) in new[]
+                 {
+                     ("Container", symbols.Single(symbol => symbol.Name == "Container")),
+                     ("field", symbols.Single(symbol => symbol.Name == "field")),
+                     ("Compute", symbols.Single(symbol => symbol.Name == "Container.Compute")),
+                     ("parameter", symbols.Single(symbol => symbol.Name == "parameter")),
+                     ("local", symbols.Single(symbol => symbol.Name == "local")),
+                 })
+        {
+            Assert.Equal(
+                name,
+                source.Substring(symbol.DeclarationSpan.Start, symbol.DeclarationSpan.Length));
+        }
+    }
+
+    [Fact]
+    public void CallReceiverAndCallee_ResolveAndReferenceExactIdentifierSpans()
+    {
+        const string source = """
+            §M{m001:TestModule}
+              §CL{c1:Worker:pub}
+                §MT{m1:Pick:pub} (i32:value) -> i32
+                  §R value
+                §MT{m2:Ping:pub} () -> void
+                  §P STR:"ping"
+              §F{f1:Use:pub} (Worker:worker) -> i32
+                §C{worker.Ping}
+                §R §C{worker.Pick} §A INT:1 §/C
+            """;
+        var workspace = new Calor.LanguageServer.State.WorkspaceState();
+        var state = workspace.GetOrCreate(
+            OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From("file:///calls.calr"),
+            source);
+        var receiverOffset = source.IndexOf("worker.Pick", StringComparison.Ordinal);
+        var calleeOffset = receiverOffset + "worker.".Length;
+        var (receiverLine, receiverColumn) =
+            LspTestHarness.GetLineColumn(source, receiverOffset);
+        var (calleeLine, calleeColumn) =
+            LspTestHarness.GetLineColumn(source, calleeOffset);
+
+        var receiver = SymbolFinder.FindSymbolAtPosition(
+            state.Ast!,
+            receiverLine,
+            receiverColumn,
+            source,
+            state.BoundModule);
+        var callee = SymbolFinder.FindSymbolAtPosition(
+            state.Ast!,
+            calleeLine,
+            calleeColumn,
+            source,
+            state.BoundModule);
+        var parameter = state.BoundModule!.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .Single(symbol => symbol.Name == "worker");
+        var method = state.BoundModule.Functions
+            .Single(function => function.Symbol.Name == "Worker.Pick")
+            .Symbol;
+        var pingOffset = source.IndexOf("worker.Ping", StringComparison.Ordinal)
+            + "worker.".Length;
+        var (pingLine, pingColumn) =
+            LspTestHarness.GetLineColumn(source, pingOffset);
+        var ping = SymbolFinder.FindSymbolAtPosition(
+            state.Ast!,
+            pingLine,
+            pingColumn,
+            source,
+            state.BoundModule);
+        var pingMethod = state.BoundModule.Functions
+            .Single(function => function.Symbol.Name == "Worker.Ping")
+            .Symbol;
+
+        Assert.Equal("worker", receiver?.Name);
+        Assert.Equal(parameter.Id, receiver?.SymbolId);
+        Assert.Equal("worker", source.Substring(
+            receiver!.Span.Start,
+            receiver.Span.Length));
+        Assert.Equal("Pick", callee?.Name);
+        Assert.Equal(method.Id, callee?.SymbolId);
+        Assert.Equal("Pick", source.Substring(callee!.Span.Start, callee.Span.Length));
+        Assert.Equal("Ping", ping?.Name);
+        Assert.Equal(pingMethod.Id, ping?.SymbolId);
+        Assert.Equal("Ping", source.Substring(ping!.Span.Start, ping.Span.Length));
+
+        Assert.All(
+            SymbolFinder.FindBoundReferences(
+                state.BoundModule,
+                parameter.Id,
+                includeDeclaration: true),
+            span => Assert.Equal("worker", source.Substring(span.Start, span.Length)));
+        Assert.All(
+            workspace.FindProjectFunctionReferences(method, includeDeclaration: true),
+            reference => Assert.Equal(
+                "Pick",
+                reference.Snapshot.Source.Substring(
+                    reference.Span.Start,
+                    reference.Span.Length)));
+        Assert.All(
+            workspace.FindProjectFunctionReferences(pingMethod, includeDeclaration: true),
+            reference => Assert.Equal(
+                "Ping",
+                reference.Snapshot.Source.Substring(
+                    reference.Span.Start,
+                    reference.Span.Length)));
+    }
+
+    [Fact]
+    public void NestedLocalDeclarationSpans_AreIdentifierTokens()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §F{f1:Scopes:pub} ([str]:items, IDisposable:input) -> bool
+                §L{l1:index:0:1:1}
+                  §P index
+                §EACH{e1:item:str:position} items
+                  §P item
+                §USE{u1:resource:IDisposable} input
+                  §P STR:"using"
+                §TR{t1}
+                  §P STR:"try"
+                §CA{Exception:error}
+                  §P STR:"catch"
+                §/TR{t1}
+                §B{predicate} §LAM{lam1:lambdaValue:i32} (> lambdaValue 0) §/LAM{lam1}
+                §B{matched:i32} §W{match1} INT:1
+                  §K §VAR{captured} → captured
+                §R (forall ((quantified i32)) (>= quantified 0))
+            """;
+        var state = LspTestHarness.CreateDocument(source);
+        var symbols = state.BoundModule!.SymbolsById.Values
+            .OfType<VariableSymbol>()
+            .ToArray();
+
+        foreach (var name in new[]
+                 {
+                     "index",
+                     "item",
+                     "position",
+                     "resource",
+                     "error",
+                     "lambdaValue",
+                     "captured",
+                     "quantified",
+                 })
+        {
+            var symbol = symbols.Single(candidate => candidate.Name == name);
+            Assert.Equal(
+                name,
+                source.Substring(symbol.DeclarationSpan.Start, symbol.DeclarationSpan.Length));
+        }
+    }
+
     [Fact]
     public void FindDefinition_Function_ReturnsFunction()
     {

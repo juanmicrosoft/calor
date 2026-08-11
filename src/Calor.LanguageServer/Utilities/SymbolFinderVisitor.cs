@@ -644,11 +644,17 @@ public sealed class SymbolFinderVisitor
                 break;
 
             case CallStatementNode callStmt:
-                // Check if target name is at offset
-                VisitCallTarget(callStmt.Target, callStmt.Span);
+                VisitCallTarget(
+                    callStmt.Target,
+                    callStmt.ReceiverSpan,
+                    callStmt.CalleeSpan);
                 foreach (var arg in callStmt.Arguments)
                 {
-                    VisitExpression(arg);
+                    if (SpanContainsOffset(arg.Span))
+                    {
+                        VisitExpression(arg);
+                        break;
+                    }
                 }
                 break;
 
@@ -1082,15 +1088,23 @@ public sealed class SymbolFinderVisitor
                 break;
 
             case FieldAccessNode fieldAccess:
+                if (SpanContainsOffset(fieldAccess.Target.Span))
+                {
+                    VisitExpression(fieldAccess.Target);
+                    break;
+                }
                 // Resolve the type of the target expression to enable cross-file lookup
                 var targetType = ResolveExpressionType(fieldAccess.Target);
                 _result = new SymbolLookupResult(
                     fieldAccess.FieldName, "field access", null,
-                    fieldAccess.Span, null, fieldAccess, targetType);
+                    fieldAccess.FieldNameSpan, null, fieldAccess, targetType);
                 break;
 
             case CallExpressionNode callExpr:
-                VisitCallTarget(callExpr.Target, callExpr.Span);
+                VisitCallTarget(
+                    callExpr.Target,
+                    callExpr.ReceiverSpan,
+                    callExpr.CalleeSpan);
                 foreach (var arg in callExpr.Arguments)
                 {
                     if (SpanContainsOffset(arg.Span))
@@ -1101,9 +1115,17 @@ public sealed class SymbolFinderVisitor
                 break;
 
             case NewExpressionNode newExpr:
+                foreach (var argument in newExpr.Arguments)
+                {
+                    if (SpanContainsOffset(argument.Span))
+                    {
+                        VisitExpression(argument);
+                        return;
+                    }
+                }
                 _result = new SymbolLookupResult(
                     newExpr.TypeName, "constructor call", newExpr.TypeName,
-                    newExpr.Span, null, newExpr);
+                    newExpr.TypeNameSpan, null, newExpr);
                 break;
 
             case ThisExpressionNode:
@@ -1490,37 +1512,88 @@ public sealed class SymbolFinderVisitor
                 break;
 
             case CollectionCountNode countNode:
+                if (SpanContainsOffset(countNode.Collection.Span))
+                {
+                    VisitExpression(countNode.Collection);
+                    break;
+                }
                 _result = new SymbolLookupResult(
                     "Count", "count", "i32",
                     countNode.Span, null, countNode);
                 break;
+
+            default:
+                VisitNestedExpressionChild(expr);
+                break;
         }
     }
 
-    private void VisitCallTarget(string targetName, TextSpan span)
+    private void VisitNestedExpressionChild(AstNode node)
     {
-        // Parse the target name (e.g., "Math.Max" or "obj.Method")
+        foreach (var child in Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            if (!SpanContainsOffset(child.Span))
+                continue;
+
+            if (child is ExpressionNode expression)
+            {
+                VisitExpression(expression);
+                return;
+            }
+
+            VisitNestedExpressionChild(child);
+            if (_result != null)
+                return;
+        }
+    }
+
+    private void VisitCallTarget(
+        string targetName,
+        TextSpan? receiverSpan,
+        TextSpan calleeSpan)
+    {
         var parts = targetName.Split('.');
+        if (receiverSpan?.Contains(_targetOffset) == true)
+        {
+            var receiverName = parts[0];
+            var receiverSymbol = LookupInScope(receiverName);
+            _result = receiverSymbol == null
+                ? new SymbolLookupResult(
+                    receiverName,
+                    "call receiver",
+                    null,
+                    receiverSpan.Value)
+                : new SymbolLookupResult(
+                    receiverName,
+                    "variable reference",
+                    receiverSymbol.Type,
+                    receiverSpan.Value,
+                    receiverSymbol.Span,
+                    receiverSymbol.Node);
+            return;
+        }
+
+        if (!calleeSpan.Contains(_targetOffset))
+            return;
+
         if (parts.Length == 1)
         {
-            // Simple function call
             var symbol = LookupInScope(targetName);
             if (symbol != null)
             {
                 _result = new SymbolLookupResult(
                     targetName, "function call", symbol.Type,
-                    span, symbol.Span, symbol.Node);
+                    calleeSpan, symbol.Span, symbol.Node);
             }
             else
             {
                 _result = new SymbolLookupResult(
                     targetName, "function call", null,
-                    span, null, null);
+                    calleeSpan, null, null);
             }
         }
         else
         {
-            // Method call on object/type (e.g., "person.GetName" or "Math.Max")
             var targetPart = parts[0];
             var methodName = parts[^1];
 
@@ -1541,7 +1614,7 @@ public sealed class SymbolFinderVisitor
 
             _result = new SymbolLookupResult(
                 methodName, "method call", null,
-                span, null, null, containingType);
+                calleeSpan, null, null, containingType);
         }
     }
 

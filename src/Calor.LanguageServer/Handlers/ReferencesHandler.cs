@@ -25,22 +25,91 @@ public sealed class ReferencesHandler : ReferencesHandlerBase
     public override Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken cancellationToken)
     {
         var state = _workspace.Get(request.TextDocument.Uri);
-        if (state?.Ast == null)
+        var snapshot = state?.Snapshot;
+        if (state == null || snapshot?.Ast == null)
         {
             return Task.FromResult<LocationContainer?>(null);
         }
 
         // Convert LSP position to Calor position
         var (line, column) = PositionConverter.ToCalorPosition(request.Position);
+        var typeReferences = snapshot.BoundModule == null
+            ? Array.Empty<IndexedTypeReference>()
+            : TypeReferenceIndex.Build(snapshot.Ast, snapshot.BoundModule, snapshot.Source);
 
         // Find the symbol at the cursor position
-        var result = SymbolFinder.FindSymbolAtPosition(state.Ast, line, column, state.Source);
+        var result = SymbolFinder.FindSymbolAtPosition(
+            snapshot.Ast,
+            line,
+            column,
+            snapshot.Source,
+            snapshot.BoundModule,
+            typeReferences);
         if (result == null || string.IsNullOrEmpty(result.Name))
         {
             return Task.FromResult<LocationContainer?>(null);
         }
 
         var locations = new List<Location>();
+
+        if (result.SymbolId is { IsNone: false } symbolId)
+        {
+            if (snapshot.BoundModule?.SymbolsById.TryGetValue(symbolId, out var symbol) == true
+                && symbol is Calor.Compiler.Binding.FunctionSymbol function)
+            {
+                foreach (var reference in _workspace.FindProjectFunctionReferences(
+                             function,
+                             request.Context.IncludeDeclaration))
+                {
+                    locations.Add(new Location
+                    {
+                        Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(reference.Doc.Uri),
+                        Range = PositionConverter.ToLspRange(reference.Span, reference.Snapshot.Source),
+                    });
+                }
+            }
+            else if (snapshot.BoundModule != null)
+            {
+                foreach (var span in SymbolFinder.FindBoundReferences(
+                             snapshot.BoundModule,
+                             symbolId,
+                             request.Context.IncludeDeclaration,
+                             typeReferences))
+                {
+                    locations.Add(new Location
+                    {
+                        Uri = request.TextDocument.Uri,
+                        Range = PositionConverter.ToLspRange(span, snapshot.Source),
+                    });
+                }
+            }
+
+            return Task.FromResult<LocationContainer?>(
+                locations.Count == 0 ? null : new LocationContainer(locations));
+        }
+
+        var offset = PositionConverter.ToOffset(request.Position, snapshot.Source);
+        var boundCall = SymbolFinder.FindBoundCallAtOffset(snapshot.BoundModule, offset);
+        var projectCall = _workspace.ResolveProjectCall(state, snapshot, boundCall);
+        if (projectCall.Symbol != null)
+        {
+            foreach (var reference in _workspace.FindProjectFunctionReferences(
+                         projectCall.Symbol,
+                         request.Context.IncludeDeclaration))
+            {
+                locations.Add(new Location
+                {
+                    Uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(reference.Doc.Uri),
+                    Range = PositionConverter.ToLspRange(reference.Span, reference.Snapshot.Source),
+                });
+            }
+
+            return Task.FromResult<LocationContainer?>(
+                locations.Count == 0 ? null : new LocationContainer(locations));
+        }
+        if (boundCall != null)
+            return Task.FromResult<LocationContainer?>(null);
+
         var symbolName = result.Name;
 
         // Search for references in all open documents
@@ -272,10 +341,13 @@ public sealed class ReferenceCollector
                 break;
 
             case CallStatementNode call:
-                if (call.Target == _symbolName || call.Target.EndsWith("." + _symbolName))
+                if (CallCalleeMatches(call.Target, _symbolName))
                 {
-                    _references.Add(call.Span);
+                    _references.Add(call.CalleeSpan);
                 }
+                if (call.ReceiverSpan is { } statementReceiver
+                    && CallReceiverMatches(call.Target, _symbolName))
+                    _references.Add(statementReceiver);
                 foreach (var arg in call.Arguments)
                 {
                     VisitExpression(arg);
@@ -427,10 +499,13 @@ public sealed class ReferenceCollector
                 break;
 
             case CallExpressionNode callExpr:
-                if (callExpr.Target == _symbolName || callExpr.Target.EndsWith("." + _symbolName))
+                if (CallCalleeMatches(callExpr.Target, _symbolName))
                 {
-                    _references.Add(callExpr.Span);
+                    _references.Add(callExpr.CalleeSpan);
                 }
+                if (callExpr.ReceiverSpan is { } expressionReceiver
+                    && CallReceiverMatches(callExpr.Target, _symbolName))
+                    _references.Add(expressionReceiver);
                 foreach (var arg in callExpr.Arguments)
                 {
                     VisitExpression(arg);
@@ -448,7 +523,7 @@ public sealed class ReferenceCollector
             case NewExpressionNode newExpr:
                 if (newExpr.TypeName == _symbolName)
                 {
-                    _references.Add(newExpr.Span);
+                    _references.Add(newExpr.TypeNameSpan);
                 }
                 foreach (var arg in newExpr.Arguments)
                 {
@@ -632,5 +707,21 @@ public sealed class ReferenceCollector
                 }
                 break;
         }
+    }
+
+    private static bool CallCalleeMatches(string target, string symbolName)
+    {
+        var lastDot = target.LastIndexOf('.');
+        return string.Equals(
+            lastDot < 0 ? target : target[(lastDot + 1)..],
+            symbolName,
+            StringComparison.Ordinal);
+    }
+
+    private static bool CallReceiverMatches(string target, string symbolName)
+    {
+        var firstDot = target.IndexOf('.');
+        return firstDot > 0
+            && string.Equals(target[..firstDot], symbolName, StringComparison.Ordinal);
     }
 }

@@ -3,6 +3,7 @@ using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Commands;
 using Calor.Compiler.Diagnostics;
@@ -706,6 +707,31 @@ public class Program
         returnValidator.Check(ast);
         phaseSw.Stop();
         telemetry?.TrackPhase("ReturnValidation", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+
+        if (diagnostics.HasErrors)
+        {
+            TrackDiagnostics(telemetry, diagnostics);
+            return new CompilationResult(diagnostics, ast, "");
+        }
+
+        // Always-on semantic binding. The binder is the authoritative source for
+        // identity-sensitive correctness errors (undefined references, overload
+        // resolution, static-context instance access, and related diagnostics).
+        // Optional verification may bind again for its bound tree, so propagate
+        // only compilation errors and deduplicate them through the shared policy.
+        phaseSw.Restart();
+        var bindingDiagnostics = new DiagnosticBag();
+        bindingDiagnostics.SetFilePath(filePath);
+        var binder = new Binder(bindingDiagnostics, filePath);
+        binder.Bind(ast);
+        BindingDiagnosticPolicy.PropagateCompilationErrors(bindingDiagnostics, diagnostics);
+        phaseSw.Stop();
+        telemetry?.TrackPhase("SemanticBinding", phaseSw.ElapsedMilliseconds, !diagnostics.HasErrors);
+
+        if (options.Verbose)
+        {
+            status.WriteLine("Semantic binding completed");
+        }
 
         if (diagnostics.HasErrors)
         {

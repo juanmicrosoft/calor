@@ -9,13 +9,20 @@ public abstract class TypeDefinitionNode : AstNode
 {
     public string Id { get; }
     public string Name { get; }
+    public TextSpan IdentifierSpan { get; }
     public AttributeCollection Attributes { get; }
 
-    protected TypeDefinitionNode(TextSpan span, string id, string name, AttributeCollection attributes)
+    protected TypeDefinitionNode(
+        TextSpan span,
+        string id,
+        string name,
+        AttributeCollection attributes,
+        TextSpan? identifierSpan = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        IdentifierSpan = identifierSpan ?? span;
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
     }
 }
@@ -204,12 +211,18 @@ public sealed class FieldAccessNode : ExpressionNode
 {
     public ExpressionNode Target { get; }
     public string FieldName { get; }
+    public TextSpan FieldNameSpan { get; }
 
-    public FieldAccessNode(TextSpan span, ExpressionNode target, string fieldName)
+    public FieldAccessNode(
+        TextSpan span,
+        ExpressionNode target,
+        string fieldName,
+        TextSpan? fieldNameSpan = null)
         : base(span)
     {
         Target = target ?? throw new ArgumentNullException(nameof(target));
         FieldName = fieldName ?? throw new ArgumentNullException(nameof(fieldName));
+        FieldNameSpan = fieldNameSpan ?? span;
     }
 
     public override void Accept(IAstVisitor visitor) => visitor.Visit(this);

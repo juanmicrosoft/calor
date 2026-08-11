@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Diagnostics;
 using Microsoft.Z3;
@@ -152,6 +153,13 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
                     CheckExpression(throwStmt.Expression, function, diagnostics, pathConditions);
                 }
                 break;
+
+            default:
+                foreach (var expression in BoundNodeHelpers.GetImmediateExpressions(stmt))
+                    CheckExpression(expression, function, diagnostics, pathConditions);
+                foreach (var statement in BoundNodeHelpers.GetImmediateStatements(stmt))
+                    CheckStatement(statement, function, diagnostics, pathConditions);
+                break;
         }
     }
 
@@ -161,40 +169,27 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
         DiagnosticBag diagnostics,
         List<BoundExpression> pathConditions)
     {
-        // Note: BoundNodes don't have BoundArrayAccessExpression yet
-        // This checker is prepared for when it's added
-        // For now, we check for patterns that suggest array access
-
-        // Check subexpressions
-        switch (expr)
+        if (expr is BoundCallExpression callExpr && IsArrayAccessCall(callExpr))
         {
-            case BoundBinaryExpression binExpr:
-                CheckExpression(binExpr.Left, function, diagnostics, pathConditions);
-                CheckExpression(binExpr.Right, function, diagnostics, pathConditions);
-                break;
-
-            case BoundUnaryExpression unaryExpr:
-                CheckExpression(unaryExpr.Operand, function, diagnostics, pathConditions);
-                break;
-
-            case BoundCallExpression callExpr:
-                // Check if this is an array access call (e.g., arr.get(index))
-                if (IsArrayAccessCall(callExpr))
-                {
-                    CheckArrayAccess(callExpr, function, diagnostics, pathConditions);
-                }
-                foreach (var arg in callExpr.Arguments)
-                {
-                    CheckExpression(arg, function, diagnostics, pathConditions);
-                }
-                break;
-
-            case BoundConditionalExpression condExpr:
-                CheckExpression(condExpr.Condition, function, diagnostics, pathConditions);
-                CheckExpression(condExpr.WhenTrue, function, diagnostics, pathConditions);
-                CheckExpression(condExpr.WhenFalse, function, diagnostics, pathConditions);
-                break;
+            CheckArrayAccess(
+                callExpr.Arguments.FirstOrDefault(),
+                callExpr.Span,
+                function,
+                diagnostics,
+                pathConditions);
         }
+        else if (expr is BoundArrayAccessExpression arrayAccess)
+        {
+            CheckArrayAccess(
+                arrayAccess.Indices.FirstOrDefault(),
+                arrayAccess.Span,
+                function,
+                diagnostics,
+                pathConditions);
+        }
+
+        foreach (var child in BoundNodeHelpers.GetChildExpressions(expr))
+            CheckExpression(child, function, diagnostics, pathConditions);
     }
 
     private static bool IsArrayAccessCall(BoundCallExpression callExpr)
@@ -209,22 +204,20 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
     }
 
     private void CheckArrayAccess(
-        BoundCallExpression callExpr,
+        BoundExpression? indexExpr,
+        Parsing.TextSpan span,
         BoundFunction function,
         DiagnosticBag diagnostics,
         List<BoundExpression> pathConditions)
     {
-        // Assuming the first argument is the index
-        if (callExpr.Arguments.Count == 0)
+        if (indexExpr == null)
             return;
-
-        var indexExpr = callExpr.Arguments[0];
 
         // Check for negative literal index
         if (indexExpr is BoundIntLiteral intLit && intLit.Value < 0)
         {
             diagnostics.ReportError(
-                callExpr.Span,
+                span,
                 DiagnosticCode.IndexOutOfBounds,
                 $"Array access with negative literal index: {intLit.Value}");
             return;
@@ -239,7 +232,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
                 if (canBeNegative == true)
                 {
                     diagnostics.ReportWarning(
-                        callExpr.Span,
+                        span,
                         DiagnosticCode.IndexOutOfBounds,
                         "Potential array access with negative index");
                 }
@@ -250,7 +243,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
                 if (indexExpr is BoundVariableExpression varExpr)
                 {
                     diagnostics.ReportWarning(
-                        callExpr.Span,
+                        span,
                         DiagnosticCode.IndexOutOfBounds,
                         $"Array access with '{varExpr.Variable.Name}' may be out of bounds");
                 }
@@ -263,7 +256,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
         if (indexExpr is not BoundVariableExpression varExpr)
             return false;
 
-        var indexName = varExpr.Variable.Name;
+        var indexVariable = varExpr.Variable;
 
         foreach (var condition in pathConditions)
         {
@@ -272,7 +265,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
                 // Check for i >= 0
                 if (binExpr.Operator == BinaryOperator.GreaterOrEqual)
                 {
-                    if (IsVariableAndZero(binExpr.Left, binExpr.Right, indexName))
+                    if (IsVariableAndZero(binExpr.Left, binExpr.Right, indexVariable))
                         return true;
                 }
 
@@ -281,7 +274,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
                     binExpr.Operator == BinaryOperator.LessOrEqual)
                 {
                     if (binExpr.Left is BoundVariableExpression leftVar &&
-                        leftVar.Variable.Name == indexName)
+                        BoundNodeHelpers.SameSymbol(leftVar.Variable, indexVariable))
                     {
                         return true; // Assumes comparison with some length
                     }
@@ -305,7 +298,7 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
             // Declare parameters
             foreach (var param in function.Symbol.Parameters)
             {
-                translator.DeclareVariable(param.Name, param.TypeName);
+                translator.DeclareVariable(param);
             }
 
             // Translate path conditions
@@ -353,10 +346,13 @@ public sealed class IndexOutOfBoundsChecker : IBugPatternChecker
         }
     }
 
-    private static bool IsVariableAndZero(BoundExpression maybeVar, BoundExpression maybeZero, string variableName)
+    private static bool IsVariableAndZero(
+        BoundExpression maybeVar,
+        BoundExpression maybeZero,
+        VariableSymbol variable)
     {
         return maybeVar is BoundVariableExpression varExpr &&
-               varExpr.Variable.Name == variableName &&
+               BoundNodeHelpers.SameSymbol(varExpr.Variable, variable) &&
                maybeZero is BoundIntLiteral intLit &&
                intLit.Value == 0;
     }
