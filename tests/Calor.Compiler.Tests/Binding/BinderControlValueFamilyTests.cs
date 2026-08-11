@@ -145,7 +145,7 @@ public class BinderControlValueFamilyTests
             [new BoundMatchExpressionCase(new ConstantPatternNode(S, new IntLiteralNode(S, 0)),
                 guard, [], S)]);
         Assert.Equal(new BoundExpression[] { i, guard }, BoundChildren.Of(match));
-        var lam = new BoundLambda(S, "l", [], false, false, j, null);
+        var lam = new BoundLambda(S, "l", [], null, false, false, j, null);
         Assert.Equal([j], BoundChildren.Of(lam));
         Assert.Equal([i], BoundChildren.Of(new BoundAwaitExpression(S, i, null)));
     }
@@ -175,5 +175,136 @@ public class BinderControlValueFamilyTests
 
         Assert.Contains(result.Diagnostics,
             d => d.Code == DiagnosticCode.DivisionByZero && d.Span.Line == 4);
+    }
+
+    // ---- #908 adversarial-review pins (F1, F2, F4, F5, F3) ----
+
+    private static MatchCaseNode Arm(PatternNode pattern, ExpressionNode? guard, params StatementNode[] body)
+        => new(S, pattern, guard, body);
+
+    [Fact]
+    public void Match_ArmsHaveIndependentScopes_SameLocalNameLegal_NoOutwardLeak()
+    {
+        // #908 F1: at most one arm executes — two arms declaring the same local is
+        // valid (statement-match parity), and arm locals must not resolve after the
+        // match. Pre-fix: false Calor0201 on arm 2 and the leaked `tmp` bound cleanly.
+        StatementNode DeclareTmp() => new BindStatementNode(S, "tmp", "i32",
+            false, new IntLiteralNode(S, 7), new AttributeCollection());
+        var match = new MatchExpressionNode(S, "mx1", new ReferenceNode(S, "x"),
+            new[]
+            {
+                Arm(new ConstantPatternNode(S, new IntLiteralNode(S, 0)), null, DeclareTmp()),
+                Arm(new WildcardPatternNode(S), null, DeclareTmp()),
+            }, new AttributeCollection());
+        var func = new FunctionNode(S, "f001", "Probe", Visibility.Public,
+            new[] { new ParameterNode(S, "x", "i32", new AttributeCollection()) },
+            new OutputNode(S, "OBJECT"), null,
+            new StatementNode[]
+            {
+                new ExpressionStatementNode(S, match),
+                new ReturnStatementNode(S, new ReferenceNode(S, "tmp")), // leak probe
+            },
+            new AttributeCollection());
+        var module = new ModuleNode(S, "m001", "Test",
+            Array.Empty<UsingDirectiveNode>(), new[] { func }, new AttributeCollection());
+        var diagnostics = new DiagnosticBag();
+        new Binder(diagnostics).Bind(module);
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.DuplicateDefinition);
+        Assert.Contains(diagnostics,
+            d => d.Code == DiagnosticCode.UndefinedReference && d.Message.Contains("'tmp'"));
+    }
+
+    [Fact]
+    public void Match_VariablePattern_CaptureResolvesInGuardAndBody()
+    {
+        // #908 F1: a variable pattern declares its capture in the arm scope (typed by
+        // the scrutinee). Pre-fix: hard Calor0200 Errors on every use of the capture.
+        var match = new MatchExpressionNode(S, "mx1", new IntLiteralNode(S, 42),
+            new[]
+            {
+                Arm(new VariablePatternNode(S, "captured"),
+                    new BinaryOperationNode(S, BinaryOperator.GreaterThan,
+                        new ReferenceNode(S, "captured"), new IntLiteralNode(S, 0)),
+                    new ReturnStatementNode(S, new ReferenceNode(S, "captured"))),
+            }, new AttributeCollection());
+        var (expr, diags) = BindReturn(match);
+        Assert.IsType<BoundMatchExpression>(expr);
+        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.UndefinedReference);
+    }
+
+    [Fact]
+    public void Lambda_DuplicateParameterNames_ReportDuplicateDefinition()
+    {
+        // #908 F5: function parameters report Calor0201 on duplicates; lambda
+        // parameters must match (pre-fix: silent, body resolved to the first).
+        var lambda = new LambdaExpressionNode(S, "lam1",
+            new[]
+            {
+                new LambdaParameterNode(S, "y", "i32"),
+                new LambdaParameterNode(S, "y", "str"),
+            }, null,
+            isAsync: false, new ReferenceNode(S, "y"), null, new AttributeCollection());
+        var (_, diags) = BindReturn(lambda);
+        Assert.Contains(diags, d => d.Code == DiagnosticCode.DuplicateDefinition);
+    }
+
+    [Fact]
+    public void Lambda_EffectsRetained()
+    {
+        // #908 F4: per-family contract — every AST property retained. Effects ride
+        // along as AST until 0.15 effect-rows gives them checking semantics.
+        var effects = new EffectsNode(S, new Dictionary<string, string> { ["cw"] = "cw" });
+        var lambda = new LambdaExpressionNode(S, "lam1",
+            new[] { new LambdaParameterNode(S, "y", "i32") }, effects,
+            isAsync: false, new ReferenceNode(S, "y"), null, new AttributeCollection());
+        var (expr, _) = BindReturn(lambda);
+        var bound = Assert.IsType<BoundLambda>(expr);
+        Assert.Same(effects, bound.Effects);
+    }
+
+    [Fact]
+    public void Lambda_OwnParameterUse_NoUninitializedFalsePositive_EndToEnd()
+    {
+        // #908 F2: a lambda's own parameter is always initialized when its body runs.
+        // Binding lambda bodies made their parameter uses visible to the name-keyed
+        // uninitialized-variables analysis, which defaulted unknown names to
+        // Uninitialized — an Error-severity Calor0900 on EVERY expression-body lambda.
+        // The fix skips IsParameter symbols in use detection (function parameters are
+        // seeded Initialized at entry, so this drops no true finding).
+        const string source = """
+            §M{m001:Test}
+              §F{f001:Probe:pub} (List<i32>:items) -> i32
+                §B{n:i32} §C{items.Count} §A §LAM{lam001:y:i32} (> y 0) §/LAM{lam001} §/C
+                §R n
+            """;
+
+        var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
+        {
+            EnableVerificationAnalyses = true,
+        });
+
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.UninitializedVariable);
+    }
+
+    [Fact]
+    public void Match_ArmBodyDivision_NotYetVisibleToCheckers_CurrentStatePin()
+    {
+        // #908 F3 (current-state pin, NOT desired behavior): match-arm BODIES are
+        // bound statements reachable only through BoundMatchExpression — no checker
+        // traversal walks them yet (statement-match parity; consumer gap owned by
+        // #786). This pin documents the blindness so closing the gap flips a test.
+        var match = new MatchExpressionNode(S, "mx1", new ReferenceNode(S, "x"),
+            new[]
+            {
+                Arm(new WildcardPatternNode(S), null,
+                    new ReturnStatementNode(S,
+                        new BinaryOperationNode(S, BinaryOperator.Divide,
+                            new IntLiteralNode(S, 10), new IntLiteralNode(S, 0)))),
+            }, new AttributeCollection());
+        var (expr, diags) = BindReturn(match);
+        Assert.IsType<BoundMatchExpression>(expr);
+        Assert.DoesNotContain(diags, d => d.Code == DiagnosticCode.DivisionByZero);
     }
 }

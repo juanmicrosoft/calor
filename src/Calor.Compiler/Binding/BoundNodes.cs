@@ -993,13 +993,16 @@ public sealed class BoundNullConditional : BoundExpression
 
 /// <summary>One bound match arm: the PATTERN is retained as its AST node (pattern
 /// binding is its own design, deferred with #786's checker re-platform — several
-/// PatternNode subclasses carry the broken-Accept hazard, so consumers use properties);
-/// guard and body are DEFERRED (at most one arm executes).</summary>
+/// PatternNode subclasses carry the broken-Accept hazard, so consumers use properties).
+/// The GUARD is a deferred expression child (BoundChildren.DeferredOf); the BODY is
+/// bound STATEMENTS reachable only through this node — expression-level traversals do
+/// not walk them, a consumer gap owned by #786 (same gap as BoundLambda.StatementBody).</summary>
 public sealed record BoundMatchExpressionCase(
     PatternNode Pattern, BoundExpression? Guard,
     IReadOnlyList<BoundStatement> Body, TextSpan Span);
 
-/// <summary>#762 B6: match expression — scrutinee immediate, arms deferred.</summary>
+/// <summary>#762 B6: match expression — scrutinee immediate, guards deferred, arm
+/// bodies statement-level (see BoundMatchExpressionCase for the visibility gap).</summary>
 public sealed class BoundMatchExpression : BoundExpression
 {
     public string Id { get; }
@@ -1020,17 +1023,21 @@ public sealed class BoundLambda : BoundExpression
 {
     public string Id { get; }
     public IReadOnlyList<VariableSymbol> Parameters { get; }
+    /// <summary>Retained as AST (like BoundMatchExpressionCase.Pattern) — effect
+    /// CHECKING of lambda bodies is 0.15 effect-rows work; retention keeps the
+    /// declared row visible to consumers until then.</summary>
+    public EffectsNode? Effects { get; }
     public bool IsAsync { get; }
     public bool IsStatic { get; }
     public BoundExpression? ExpressionBody { get; }
     public IReadOnlyList<BoundStatement>? StatementBody { get; }
     public override string TypeName => "OBJECT";
     public BoundLambda(TextSpan span, string id, IReadOnlyList<VariableSymbol> parameters,
-        bool isAsync, bool isStatic, BoundExpression? expressionBody,
+        EffectsNode? effects, bool isAsync, bool isStatic, BoundExpression? expressionBody,
         IReadOnlyList<BoundStatement>? statementBody) : base(span)
     {
-        Id = id; Parameters = parameters; IsAsync = isAsync; IsStatic = isStatic;
-        ExpressionBody = expressionBody; StatementBody = statementBody;
+        Id = id; Parameters = parameters; Effects = effects; IsAsync = isAsync;
+        IsStatic = isStatic; ExpressionBody = expressionBody; StatementBody = statementBody;
     }
 }
 
