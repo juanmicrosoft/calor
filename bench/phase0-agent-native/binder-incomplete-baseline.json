@@ -6,7 +6,7 @@
   "Scope": "both F-2 legs; conversion leg skips when corpus submodules are absent",
   "Conversion": {
     "Incomplete": 0,
-    "ExpressionsBound": 19348,
+    "ExpressionsBound": 17903,
     "ConvertedAndBound": 305,
     "ConvertExceptions": 0,
     "EmptyOutput": 0,
