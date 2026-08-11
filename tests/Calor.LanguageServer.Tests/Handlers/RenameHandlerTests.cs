@@ -828,6 +828,14 @@ public class RenameHandlerTests
                 "UnrelatedFlags",
                 preprocessorSymbolCount: 8,
                 includeRenameTarget: false);
+            unrelated += """
+
+                  §CSHARP{public static class IdentifierTextOnly
+                {
+                    public const string Value = "Compute Calculate";
+                    // Compute Calculate
+                }}§/CSHARP
+                """;
             var targetPath = Path.Combine(root, "target.calr");
             File.WriteAllText(targetPath, source);
             File.WriteAllText(Path.Combine(root, "unrelated.calr"), unrelated);
@@ -877,6 +885,207 @@ public class RenameHandlerTests
     }
 
     [Fact]
+    public async Task RenameRejectsMethodCollisionInUnchangedPreprocessorFileAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:ConditionalCollision}
+                  §CL{c001:Worker:pub:partial}
+                    §MT{m001:Compute:pub} () -> i32
+                      §R INT:1
+                """;
+            const string conditional = """
+                §M{m002:ConditionalCollision}
+                  §CL{c002:Worker:pub:partial}
+                    §PP{COLLIDING_METHOD}
+                      §MT{m002:Calculate:pub} () -> i32
+                        §R INT:2
+                    §/PP{COLLIDING_METHOD}
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "conditional.calr"), conditional);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                4,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameRejectsFieldCollisionInUnchangedPreprocessorFileAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:ConditionalCollision}
+                  §CL{c001:Worker:pub:partial}
+                    §FLD{i32:stored:pub}
+                """;
+            const string conditional = """
+                §M{m002:ConditionalCollision}
+                  §CL{c002:Worker:pub:partial}
+                    §PP{COLLIDING_FIELD}
+                      §FLD{i32:value:pub}
+                    §/PP{COLLIDING_FIELD}
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "conditional.calr"), conditional);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "stored:pub",
+                "value"));
+            Assert.Equal(
+                4,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameRejectsGuardedRawCSharpStaleReferenceInUnchangedFileAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:RawGuard}
+                  §F{f001:Compute:pub} () -> i32
+                    §R INT:1
+                """;
+            const string guardedReference = """
+                §M{m002:RawGuard}
+                  §CSHARP{public static class RawProbe
+                {
+                #if PRIMARY_RAW
+                    public static int ReadPrimary() => 0;
+                #elif RAW_REFERENCE
+                    public static int Read() => RawGuardModule.Compute();
+                #endif
+                }}§/CSHARP
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "guarded-reference.calr"), guardedReference);
+            var guardedState = LspTestHarness.CreateDocument(guardedReference);
+            Assert.Contains(
+                "#elif RAW_REFERENCE",
+                new CSharpEmitter().Emit(guardedState.Ast!));
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                6,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RenameAllowsNonCollidingMembersInUnchangedPreprocessorFileAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            const string target = """
+                §M{m001:ConditionalControl}
+                  §CL{c001:Worker:pub:partial}
+                    §MT{m001:Compute:pub} () -> i32
+                      §R INT:1
+                    §FLD{i32:stored:pub}
+                """;
+            const string conditional = """
+                §M{m002:ConditionalControl}
+                  §CL{c002:Worker:pub:partial}
+                    §PP{UNRELATED_MEMBERS}
+                      §MT{m002:OtherMethod:pub} () -> i32
+                        §R INT:2
+                      §FLD{i32:otherField:pub}
+                    §/PP{UNRELATED_MEMBERS}
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "conditional.calr"), conditional);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.NotNull(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                2,
+                workspace.RenameValidationCompilationCount - before);
+
+            before = workspace.RenameValidationCompilationCount;
+            Assert.NotNull(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "stored:pub",
+                "value"));
+            Assert.Equal(
+                2,
+                workspace.RenameValidationCompilationCount - before);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task RenameFailsClosedWhenRelevantConfigurationBudgetIsExceededAsync()
     {
         var source = CreatePreprocessorRenameSource(
@@ -896,6 +1105,54 @@ public class RenameHandlerTests
         Assert.Equal(
             before,
             workspace.RenameValidationCompilationCount);
+    }
+
+    [Fact]
+    public async Task RenameFailsClosedWhenAffectedUnchangedFileExceedsCombinedBudgetAsync()
+    {
+        var root = CreateWorkspaceDirectory();
+        try
+        {
+            var target = CreatePreprocessorRenameSource(
+                "CombinedBudget",
+                preprocessorSymbolCount: 3);
+            const string conditional = """
+                §M{m002:CombinedBudget}
+                  §CL{c002:OtherFlags:pub}
+                    §PP{OTHER_FLAG_0}
+                      §FLD{i32:Calculate:pub}
+                    §/PP{OTHER_FLAG_0}
+                    §PP{OTHER_FLAG_1}
+                      §FLD{i32:Field1:pub}
+                    §/PP{OTHER_FLAG_1}
+                    §PP{OTHER_FLAG_2}
+                      §FLD{i32:Field2:pub}
+                    §/PP{OTHER_FLAG_2}
+                """;
+            var targetPath = Path.Combine(root, "target.calr");
+            File.WriteAllText(targetPath, target);
+            File.WriteAllText(Path.Combine(root, "conditional.calr"), conditional);
+
+            var workspace = new WorkspaceState(root);
+            var uri = DocumentUri.FromFileSystemPath(targetPath);
+            workspace.GetOrCreate(uri, target);
+            var before = workspace.RenameValidationCompilationCount;
+
+            Assert.Null(await RenameAtAsync(
+                workspace,
+                uri,
+                target,
+                "Compute:pub",
+                "Calculate"));
+            Assert.Equal(
+                before,
+                workspace.RenameValidationCompilationCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]

@@ -92,6 +92,7 @@ public sealed class WorkspaceState
         new(CreatePlatformReferences);
     // Validation is exhaustive through five relevant symbols (2^5 configurations).
     // Larger relevant condition sets fail closed instead of using an unsound sample.
+    private const int MaxRenamePreprocessorSymbols = 5;
     private const int MaxRenamePreprocessorConfigurations = 32;
 
     internal long WorkspaceFileReadCount => Interlocked.Read(ref _workspaceFileReadCount);
@@ -366,10 +367,12 @@ public sealed class WorkspaceState
 
     public Task<bool> ValidateRenameAsync(
         IReadOnlyList<ProjectSymbolOccurrence> occurrences,
+        string oldName,
         string newName,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(occurrences);
+        ArgumentException.ThrowIfNullOrWhiteSpace(oldName);
         ArgumentException.ThrowIfNullOrWhiteSpace(newName);
         if (occurrences.Count == 0)
             return Task.FromResult(false);
@@ -389,6 +392,7 @@ public sealed class WorkspaceState
                     var valid = ValidateRenameCore(
                         documents,
                         occurrences,
+                        oldName,
                         newName,
                         cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
@@ -410,6 +414,7 @@ public sealed class WorkspaceState
     private bool ValidateRenameCore(
         IReadOnlyList<WorkspaceDocumentSnapshot> documents,
         IReadOnlyList<ProjectSymbolOccurrence> occurrences,
+        string oldName,
         string newName,
         CancellationToken cancellationToken)
     {
@@ -549,30 +554,48 @@ public sealed class WorkspaceState
                 candidateSource));
         }
 
-        var relevantSymbols = syntaxSources
-            .Where(source => !string.Equals(
-                source.Baseline,
-                source.Candidate,
-                StringComparison.Ordinal))
-            .SelectMany(source =>
-                ExtractPreprocessorSymbols(source.Baseline)
-                    .Concat(ExtractPreprocessorSymbols(source.Candidate)))
+        var analyzedSources = syntaxSources
+            .Select(source =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var generatedChanged = !string.Equals(
+                    source.Baseline,
+                    source.Candidate,
+                    StringComparison.Ordinal);
+                var symbols = ExtractPreprocessorSymbols(source.Baseline)
+                    .Concat(ExtractPreprocessorSymbols(source.Candidate))
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                    .ToArray();
+                var sensitive = generatedChanged
+                    || (symbols.Length > 0
+                        && ContainsIdentifierToken(
+                            source.Baseline,
+                            oldName,
+                            newName,
+                            cancellationToken));
+                return (Source: source, Symbols: symbols, Sensitive: sensitive);
+            })
+            .ToArray();
+        var relevantSymbols = analyzedSources
+            .Where(source => source.Sensitive)
+            .SelectMany(source => source.Symbols)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(symbol => symbol, StringComparer.Ordinal)
             .ToArray();
-        if (relevantSymbols.Length >= 31
+        if (relevantSymbols.Length > MaxRenamePreprocessorSymbols
             || (1L << relevantSymbols.Length) > MaxRenamePreprocessorConfigurations)
         {
             return false;
         }
 
         var relevantSymbolSet = relevantSymbols.ToHashSet(StringComparer.Ordinal);
-        var parsedSources = syntaxSources
-            .Select(source =>
+        var parsedSources = analyzedSources
+            .Select(analyzed =>
             {
-                var sensitive = ExtractPreprocessorSymbols(source.Baseline)
-                        .Concat(ExtractPreprocessorSymbols(source.Candidate))
-                        .Any(relevantSymbolSet.Contains);
+                var source = analyzed.Source;
+                var sensitive = analyzed.Sensitive
+                    && analyzed.Symbols.Any(relevantSymbolSet.Contains);
                 SyntaxTree? baselineTree = null;
                 SyntaxTree? candidateTree = null;
                 if (!sensitive)
@@ -1737,6 +1760,64 @@ public sealed class WorkspaceState
                     yield return match.Value;
             }
         }
+    }
+
+    private static bool ContainsIdentifierToken(
+        string source,
+        string oldName,
+        string newName,
+        CancellationToken cancellationToken)
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            source,
+            cancellationToken: cancellationToken);
+        var root = tree.GetRoot(cancellationToken);
+        if (ContainsIdentifierToken(
+                root.DescendantTokens(descendIntoTrivia: true),
+                oldName,
+                newName,
+                cancellationToken))
+        {
+            return true;
+        }
+
+        foreach (var trivia in root.DescendantTrivia(descendIntoTrivia: true))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+                continue;
+
+            if (ContainsIdentifierToken(
+                    SyntaxFactory.ParseTokens(trivia.ToFullString()),
+                    oldName,
+                    newName,
+                    cancellationToken))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsIdentifierToken(
+        IEnumerable<SyntaxToken> tokens,
+        string oldName,
+        string newName,
+        CancellationToken cancellationToken)
+    {
+        foreach (var token in tokens)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (token.IsKind(SyntaxKind.IdentifierToken)
+                && (string.Equals(token.ValueText, oldName, StringComparison.Ordinal)
+                    || string.Equals(token.ValueText, newName, StringComparison.Ordinal)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static IReadOnlyList<CompilationError> GetAnalysisErrors(
