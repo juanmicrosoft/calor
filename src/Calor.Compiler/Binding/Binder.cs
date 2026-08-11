@@ -315,12 +315,14 @@ public sealed class Binder
     /// and the dispatch builder reads this table.</summary>
     private static readonly IReadOnlyDictionary<string, string> s_tierBReasons = new Dictionary<string, string>
     {
+        // B8: the four unsafe classes keep Tier B residual status (a binding-analysis
+        // story for raw pointers is out of 0.13 scope) but now RETAIN their bound
+        // children on the incomplete node (scoping doc D2's Tier-B extractors) — the
+        // reasons below feed the child-retaining arms, not the default loop.
         ["AddressOfNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
         ["PointerDereferenceNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
         ["StackAllocNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
         ["SizeOfNode"] = "unsafe/pointer family — F-1 Tier B, out of 0.13 binding scope",
-        ["GenericTypeNode"] = "helper-node candidate — #762 item 8 disposition lands in B8",
-        ["KeywordArgNode"] = "helper-node candidate — #762 item 8 disposition lands in B8",
         // B2: dormant per F-1 — the parser rejects '#' outside refinement predicates, so no
         // legal program places a SelfRefNode in a binder-visible position; a binder for it
         // would be vacuously green. Promoted to live WITH a corpus obligation if a
@@ -539,6 +541,43 @@ public sealed class Binder
                     return new BoundImplicationExpression(n.Span,
                         b.BindExpression(n.Antecedent), b.BindExpression(n.Consequent));
                 },
+            // #762 B8 — interop closure (F-1 Tier A interop row: verbatim content +
+            // stable type + explicit marker, never a zero-child erasure).
+            [typeof(RawCSharpExpressionNode)] = (b, e) =>
+                { var n = (RawCSharpExpressionNode)e; return new BoundRawCSharpExpression(n.Span, n.CSharpCode); },
+            [typeof(FallbackExpressionNode)] = (b, e) =>
+                { var n = (FallbackExpressionNode)e; return new BoundFallbackExpression(n.Span, n.OriginalCSharp, n.FeatureName, n.Suggestion); },
+            // #762 B8 — item-8 disposition: GenericTypeNode promoted to Tier A (it is a
+            // real expression-position type reference with real Accept dispatch; the
+            // F-1 amendment records the additive promotion).
+            [typeof(GenericTypeNode)] = (b, e) =>
+                { var n = (GenericTypeNode)e; return new BoundGenericTypeExpression(n.Span, n.TypeName, n.TypeArguments); },
+            // #762 B8 — Tier-B child extractors (scoping doc D2): the unsafe family
+            // stays incomplete (Calor0259 still fires; the analysis story is out of
+            // 0.13 scope) but its subtrees are no longer erased — children bind and
+            // ride on the incomplete node, deferred-marked (#762 item 3 end state).
+            [typeof(AddressOfNode)] = (b, e) =>
+                {
+                    var n = (AddressOfNode)e;
+                    return b.BindIncompleteWithChildren(e, s_tierBReasons["AddressOfNode"],
+                        new[] { b.BindExpression(n.Operand) });
+                },
+            [typeof(PointerDereferenceNode)] = (b, e) =>
+                {
+                    var n = (PointerDereferenceNode)e;
+                    return b.BindIncompleteWithChildren(e, s_tierBReasons["PointerDereferenceNode"],
+                        new[] { b.BindExpression(n.Operand) });
+                },
+            [typeof(StackAllocNode)] = (b, e) =>
+                {
+                    var n = (StackAllocNode)e;
+                    var children = new List<BoundExpression>();
+                    if (n.Size is not null) children.Add(b.BindExpression(n.Size));
+                    children.AddRange(n.Initializer.Select(b.BindExpression));
+                    return b.BindIncompleteWithChildren(e, s_tierBReasons["StackAllocNode"], children);
+                },
+            // (SizeOfNode has no expression children — it stays on the default
+            // BindIncomplete path via s_tierBReasons.)
         };
 
         // Every remaining concrete ExpressionNode subclass dispatches to BindIncomplete.
@@ -771,6 +810,20 @@ public sealed class Binder
             $"({reason}). Analyses treat this expression as an opaque value; its sub-expressions " +
             "are not yet visible to them.");
         return new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason);
+    }
+
+    /// <summary>#762 B8 (scoping doc D2): the Tier-B path that RETAINS bound children on
+    /// the incomplete node instead of erasing the subtree. Still incomplete — Calor0259
+    /// still fires (message without the "not visible" clause, which is no longer true) —
+    /// but the children are enumerable via BoundChildren.Of/DeferredOf.</summary>
+    private BoundExpression BindIncompleteWithChildren(
+        ExpressionNode expr, string reason, IReadOnlyList<BoundExpression> children)
+    {
+        _diagnostics.ReportInfo(expr.Span, DiagnosticCode.AnalysisIncomplete,
+            $"Analysis incomplete: '{expr.GetType().Name}' has no structural binding yet " +
+            $"({reason}). Analyses treat this expression as an opaque value; its sub-expressions " +
+            "are retained and visible to traversals, deferred-marked.");
+        return new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason, children);
     }
 
     /// <summary>

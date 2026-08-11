@@ -450,11 +450,40 @@ public sealed class BoundIncompleteExpression : BoundCallExpression
     /// <summary>Why this class is incomplete (F-1 tier reason or "family PR pending").</summary>
     public string Reason { get; }
 
-    public BoundIncompleteExpression(TextSpan span, string nodeTypeName, string reason)
+    /// <summary>#762 B8 (D2 Tier-B extractors): bound children of a residual class,
+    /// retained instead of erased. Deliberately NOT in Arguments — the node's
+    /// checker-visible BoundCallExpression shape stays zero-arg opaque; traversals see
+    /// these via BoundChildren.Of, deferred-marked via DeferredOf (the analysis story
+    /// for the wrapping construct is still out of scope).</summary>
+    public IReadOnlyList<BoundExpression> RetainedChildren { get; }
+
+    public BoundIncompleteExpression(TextSpan span, string nodeTypeName, string reason,
+        IReadOnlyList<BoundExpression>? retainedChildren = null)
         : base(span, $"<unsupported:{nodeTypeName}>", Array.Empty<BoundExpression>(), "OBJECT")
     {
         NodeTypeName = nodeTypeName;
         Reason = reason;
+        RetainedChildren = retainedChildren ?? Array.Empty<BoundExpression>();
+    }
+}
+
+/// <summary>#762 B8 (item-8 disposition): a generic-type reference in expression
+/// position (legacy §G / inline generic syntax), promoted to Tier A. TypeName is the
+/// composed parser-surface form ("List&lt;i32&gt;" — the two-layer vocabulary's second
+/// layer, no-space commas per the B5 decision record). No expression children.</summary>
+public sealed class BoundGenericTypeExpression : BoundExpression
+{
+    public string GenericTypeName { get; }
+    public IReadOnlyList<string> TypeArguments { get; }
+    public override string TypeName { get; }
+    public BoundGenericTypeExpression(TextSpan span, string genericTypeName,
+        IReadOnlyList<string> typeArguments) : base(span)
+    {
+        GenericTypeName = genericTypeName;
+        TypeArguments = typeArguments;
+        TypeName = typeArguments.Count == 0
+            ? genericTypeName
+            : $"{genericTypeName}<{string.Join(",", typeArguments)}>";
     }
 }
 
@@ -513,6 +542,11 @@ public static class BoundChildren
         BoundForallExpression fa => [fa.Body],
         BoundExistsExpression ex => [ex.Body],
         BoundImplicationExpression imp => [imp.Antecedent, imp.Consequent],
+        // #762 B8 — Tier-B residuals retain children (never erase the subtree); the
+        // wrapping construct's own analysis story is out of scope, so the same list is
+        // deferred-marked below. (Interop and BoundGenericTypeExpression have no
+        // expression children — verbatim C# text and type strings respectively.)
+        BoundIncompleteExpression inc => inc.RetainedChildren,
         // #762 B5 — conversion/pattern family.
         BoundConversionExpression conv => [conv.Operand],
         BoundTypeTest tt => [tt.Operand],
@@ -542,6 +576,9 @@ public static class BoundChildren
         BoundExistsExpression ex => [ex.Body],
         BoundImplicationExpression imp => [imp.Consequent],
         BoundLambda lam => lam.ExpressionBody is null ? [] : [lam.ExpressionBody],
+        // #762 B8: Tier-B retained children are visible but never treated as inline
+        // code — the wrapping construct's evaluation semantics are out of scope.
+        BoundIncompleteExpression inc => inc.RetainedChildren,
         _ => [],
     };
 }
@@ -1094,6 +1131,35 @@ public sealed class BoundExistsExpression : BoundExpression
     public BoundExistsExpression(TextSpan span, IReadOnlyList<VariableSymbol> boundVariables,
         BoundExpression body) : base(span)
     { BoundVariables = boundVariables; Body = body; }
+}
+
+/// <summary>#762 B8: interop — a verbatim C# expression (F-1 Tier A interop row:
+/// "explicit stable type + verbatim content retained + an explicit interop marker —
+/// never a zero-child erasure"). The content is C# text, not Calor AST, so there are
+/// no expression children to retain; the node is an opaque OBJECT value that names
+/// itself, and IsInterop is the explicit marker analyses key on.</summary>
+public sealed class BoundRawCSharpExpression : BoundExpression
+{
+    public string CSharpCode { get; }
+    public bool IsInterop => true;
+    public override string TypeName => "OBJECT";
+    public BoundRawCSharpExpression(TextSpan span, string csharpCode) : base(span)
+    { CSharpCode = csharpCode; }
+}
+
+/// <summary>#762 B8: interop — the C#→Calor converter's unconverted-feature fallback.
+/// Same Tier A interop contract as BoundRawCSharpExpression; FeatureName/Suggestion
+/// retained for diagnostics and tooling.</summary>
+public sealed class BoundFallbackExpression : BoundExpression
+{
+    public string OriginalCSharp { get; }
+    public string FeatureName { get; }
+    public string? Suggestion { get; }
+    public bool IsInterop => true;
+    public override string TypeName => "OBJECT";
+    public BoundFallbackExpression(TextSpan span, string originalCSharp, string featureName,
+        string? suggestion) : base(span)
+    { OriginalCSharp = originalCSharp; FeatureName = featureName; Suggestion = suggestion; }
 }
 
 /// <summary>#762 B7: logical implication (-> a b) ≡ !a || b. The consequent is

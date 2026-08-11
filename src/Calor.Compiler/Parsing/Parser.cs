@@ -2355,24 +2355,29 @@ public sealed class Parser
             return ParseLispCastExpression(startToken);
         }
 
-        // Parse arguments until we hit CloseParen
-        var args = new List<ExpressionNode>();
+        // Parse arguments until we hit CloseParen. The raw list is object-typed because
+        // a keyword argument is NOT an expression (#762 item 8, B8): KeywordArgNode is a
+        // parser-internal value object produced only here and consumed only by
+        // FilterKeywordArgs below.
+        var rawArgs = new List<object>();
         while (!Check(TokenKind.CloseParen) && !IsAtEnd)
         {
-            args.Add(ParseLispArgument(allowKeyword: true));
+            rawArgs.Add(ParseLispArgumentOrKeyword());
         }
 
         var endToken = Expect(TokenKind.CloseParen);
         var span = startToken.Span.Union(endToken.Span);
 
-        // #874: KeywordArgNode is produced only by ParseLispArgument, and the only legal
-        // position for one is as the FINAL argument of a recognized string operation (its
-        // comparison mode, consumed by the string-op branch below). Enforce that here, at
-        // the single point where every operator branch receives its arguments. Per-branch
-        // handling leaves escape routes (binary/ternary/unary operands, mid-position or
-        // doubled keywords, CALL targets), each ending in a null child from the node's
-        // no-op Accept and an unlocatable NRE — or silently invalid emitted C#.
-        args = FilterKeywordArgs(opText, args);
+        // #874: the only legal position for a keyword is as the FINAL argument of a
+        // recognized string operation (its comparison mode, consumed by the string-op
+        // branch below). Enforce that here, at the single point where every operator
+        // branch receives its arguments. Per-branch handling leaves escape routes
+        // (binary/ternary/unary operands, mid-position or doubled keywords, CALL
+        // targets) that previously ended in a null child from the node's no-op Accept
+        // and an unlocatable NRE — or silently invalid emitted C#. Post-item-8, a
+        // keyword cannot even TYPE as an expression, so escape is a compile error here
+        // rather than a runtime hazard downstream.
+        var (args, trailingKeyword) = FilterKeywordArgs(opText, rawArgs);
 
         // Handle ternary conditional: (? cond then else)
         if (opText == "?" && args.Count == 3)
@@ -2496,11 +2501,12 @@ public sealed class Parser
         var stringOp = StringOpExtensions.FromString(opText);
         if (stringOp.HasValue)
         {
-            // Extract keyword arguments (comparison modes) from the end of the args list
+            // The trailing comparison-mode keyword arrives pre-split by
+            // FilterKeywordArgs (args never contains keywords post-item-8).
             StringComparisonMode? comparisonMode = null;
             var nonKeywordArgs = args;
 
-            if (args.Count > 0 && args[^1] is KeywordArgNode keywordArg)
+            if (trailingKeyword is { } keywordArg)
             {
                 comparisonMode = StringComparisonModeExtensions.FromKeyword(keywordArg.Name);
                 if (comparisonMode == null)
@@ -2514,7 +2520,6 @@ public sealed class Parser
                         $"Operation '{opText}' does not support comparison modes");
                     comparisonMode = null;
                 }
-                nonKeywordArgs = args.Take(args.Count - 1).ToList();
             }
 
             // Handle substr disambiguation: 2 args = SubstringFrom, 3 args = Substring
@@ -2734,34 +2739,41 @@ public sealed class Parser
     /// unlocatable NullReferenceException, or silently invalid emitted C# (#874).
     /// Called once, at the single choke point where the lisp argument list is complete.
     /// </summary>
-    private List<ExpressionNode> FilterKeywordArgs(string opText, List<ExpressionNode> args)
+    private (List<ExpressionNode> Arguments, KeywordArgNode? TrailingKeyword) FilterKeywordArgs(
+        string opText, List<object> rawArgs)
     {
-        if (!args.Any(a => a is KeywordArgNode))
-            return args;
-
         // A single trailing keyword on a recognized string operation is legal; the
         // string-op branch consumes it and validates the mode name and operation support.
         var lastLegalIndex =
-            StringOpExtensions.FromString(opText).HasValue && args[^1] is KeywordArgNode
-                ? args.Count - 1
+            StringOpExtensions.FromString(opText).HasValue && rawArgs.Count > 0
+                && rawArgs[^1] is KeywordArgNode
+                ? rawArgs.Count - 1
                 : -1;
 
-        var kept = new List<ExpressionNode>(args.Count);
-        for (int i = 0; i < args.Count; i++)
+        var kept = new List<ExpressionNode>(rawArgs.Count);
+        KeywordArgNode? trailingKeyword = null;
+        for (int i = 0; i < rawArgs.Count; i++)
         {
-            if (args[i] is KeywordArgNode kw && i != lastLegalIndex)
+            if (rawArgs[i] is KeywordArgNode kw)
             {
-                _diagnostics.ReportError(kw.Span, DiagnosticCode.InvalidLispExpression,
-                    $"Keyword argument ':{kw.Name}' is not valid here. A comparison-mode " +
-                    "keyword is only allowed as the final argument of a built-in string " +
-                    "operation (e.g. starts, contains, equals — the lowercase forms).");
+                if (i == lastLegalIndex)
+                {
+                    trailingKeyword = kw;
+                }
+                else
+                {
+                    _diagnostics.ReportError(kw.Span, DiagnosticCode.InvalidLispExpression,
+                        $"Keyword argument ':{kw.Name}' is not valid here. A comparison-mode " +
+                        "keyword is only allowed as the final argument of a built-in string " +
+                        "operation (e.g. starts, contains, equals — the lowercase forms).");
+                }
             }
             else
             {
-                kept.Add(args[i]);
+                kept.Add((ExpressionNode)rawArgs[i]);
             }
         }
-        return kept;
+        return (kept, trailingKeyword);
     }
 
     private (TokenKind kind, string text, TextSpan span) ParseLispOperator()
@@ -2986,42 +2998,65 @@ public sealed class Parser
     /// operands — gets a diagnostic and a recovery node instead, so the keyword node can
     /// never leak into the AST through a side entrance (#874).
     /// </summary>
-    private ExpressionNode ParseLispArgument(bool allowKeyword = false)
+    /// <summary>Parses ':name' / ':hyphen-ated-name' with the colon current. Returns
+    /// null (after reporting) for a standalone colon.</summary>
+    private (string Name, TextSpan Span)? ParseKeywordSyntax()
     {
-        // Handle keyword argument syntax: :keyword or :hyphenated-keyword
-        if (Check(TokenKind.Colon))
+        var colonToken = Advance();
+        if (!Check(TokenKind.Identifier))
         {
-            var colonToken = Advance();
-            if (Check(TokenKind.Identifier))
-            {
-                var identToken = Advance();
-                var keywordName = identToken.Text;
-                var endSpan = identToken.Span;
-
-                // Handle hyphenated keywords (e.g., :ignore-case, :invariant-ignore-case)
-                while (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.Identifier)
-                {
-                    Advance(); // consume '-'
-                    var nextIdent = Advance();
-                    keywordName += "-" + nextIdent.Text;
-                    endSpan = nextIdent.Span;
-                }
-
-                var span = colonToken.Span.Union(endSpan);
-                if (!allowKeyword)
-                {
-                    _diagnostics.ReportError(span, DiagnosticCode.InvalidLispExpression,
-                        $"Keyword argument ':{keywordName}' is not valid here. A comparison-mode " +
-                        "keyword is only allowed as the final argument of a built-in string " +
-                        "operation (e.g. starts, contains, equals — the lowercase forms).");
-                    return new IntLiteralNode(span, 0);
-                }
-                return new KeywordArgNode(span, keywordName);
-            }
-            // Standalone colon - error
             _diagnostics.ReportError(colonToken.Span, DiagnosticCode.InvalidLispExpression,
                 "Expected identifier after ':' for keyword argument");
-            return new IntLiteralNode(colonToken.Span, 0);
+            return null;
+        }
+        var identToken = Advance();
+        var keywordName = identToken.Text;
+        var endSpan = identToken.Span;
+
+        // Handle hyphenated keywords (e.g., :ignore-case, :invariant-ignore-case)
+        while (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.Identifier)
+        {
+            Advance(); // consume '-'
+            var nextIdent = Advance();
+            keywordName += "-" + nextIdent.Text;
+            endSpan = nextIdent.Span;
+        }
+        return (keywordName, colonToken.Span.Union(endSpan));
+    }
+
+    /// <summary>#762 item 8 (B8): a keyword argument is a parser-internal VALUE OBJECT,
+    /// not an expression — this is its only producer, the lisp operator-argument loop
+    /// its only route, and FilterKeywordArgs its only consumer. Everywhere else a colon
+    /// keyword is a diagnostic (ParseLispArgument's colon path).</summary>
+    private object ParseLispArgumentOrKeyword()
+    {
+        if (Check(TokenKind.Colon))
+        {
+            var start = Current.Span;
+            var kw = ParseKeywordSyntax();
+            return kw is { } k
+                ? new KeywordArgNode(k.Span, k.Name)
+                : new IntLiteralNode(start, 0);
+        }
+        return ParseLispArgument();
+    }
+
+    private ExpressionNode ParseLispArgument()
+    {
+        // A keyword argument is not an expression; in expression position it is always
+        // a diagnostic (the operator-argument loop uses ParseLispArgumentOrKeyword).
+        if (Check(TokenKind.Colon))
+        {
+            var start = Current.Span;
+            var kw = ParseKeywordSyntax();
+            if (kw is { } k)
+            {
+                _diagnostics.ReportError(k.Span, DiagnosticCode.InvalidLispExpression,
+                    $"Keyword argument ':{k.Name}' is not valid here. A comparison-mode " +
+                    "keyword is only allowed as the final argument of a built-in string " +
+                    "operation (e.g. starts, contains, equals — the lowercase forms).");
+            }
+            return new IntLiteralNode(kw?.Span ?? start, 0);
         }
 
         ExpressionNode expr;
