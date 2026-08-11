@@ -115,3 +115,10 @@ bench/phase0-agent-native/epochs/**/.smokehash
 # WS2 MCP write-path reject replay payloads (run-internal; recorded in mcp-writes.jsonl)
 bench/phase0-agent-native/epochs/**/rejects/
 .DS_Store
+
+# Dogfood utility (§2.2): its ONLY source is .calr. The generated C# lands in
+# obj/calor/ and must never be committed — scripts/check-dogfood-utility.sh
+# fails the build if it is. Listed explicitly, not left to the global obj/ rule,
+# so the intent survives that rule being loosened.
+tools/calor-allowlist-audit/obj/
+tools/calor-allowlist-audit/bin/
