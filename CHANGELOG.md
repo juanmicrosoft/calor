@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-11
+
+The "Trustworthy Project Model" release (roadmap v0.13). Headline: the #762 binder
+rebuild is complete — all 60 accepted expression classes structurally bind (60/60
+Tier A; the unsafe/pointer classes were promoted from residual to structural by the
+final totality merge, and the Calor0259 analysis-incomplete instrument is RETIRED —
+no emitter remains because nothing is incomplete). Landed twice over: the reviewed
+B1–B8 incremental series plus the #900 consumer migrations (SymbolIds,
+full-signature overloads, exhaustive checker traversals, call graph, LSP
+rename/references/cross-file).
+Verification cache keys are exhaustive and semantics-versioned (#778), the MSBuild
+incremental cache fingerprints every diagnostics-affecting input (#788/#890 incl.
+the #883 IL-analysis inputs), and the Z3 asset chain is closed end-to-end with a
+registry-verified republish.
+
+**Release-gate scorecard (§2.5), stated plainly rather than claimed:**
+- **Green, measured**: gate 1 (binding totality — zero Tier A incomplete on both
+  corpus legs, ratcheted); gate 5 (verifier-runtime differential program — 65/65
+  forms, 1,170/1,170 cells, zero mismatches, CI-blocking); gate 6 (PP-S4 migration
+  fixture registry, enforcing).
+- **Executes post-publish**: gate 7 (clean-consumer per-RID; the osx-x64 leg's
+  oracle is now the documented loud degradation, per the chain-closure decision).
+- **NOT met — instruments unbuilt, disclosed**: gate 2's diagnostics leg
+  (full-vs-incremental identity: the F-3 edit-script corpus and identity harness
+  were registered but never built) and gate 4 (rename harness with
+  apply-recompile-and-test oracle and shadowing corpus). Those two are the
+  unconditional gates in the plan of record; this release ships without them and
+  says so — they are the top of 0.13.x. (Gate 2's index/packet legs are
+  conditional and defer with the index.)
+- **Not measurable, deferral recorded — including the one the plan said would not
+  happen again**: gates 3 and 8 depend on the persistent index / `calor query`,
+  which did not ship. Their SHOULD-tier deferral to 0.13.x is recorded here per
+  §2.5's tier-decision rule — and stated plainly: the roadmap's §2.2 index bullet
+  carried a pre-commitment ("executed, not deferred a fourth time"), and this IS
+  the fourth deferral. No euphemism; it is the first index work item in 0.13.x.
+
+Known channel state: the VS Code marketplace remains stuck at 0.3.8 (expired
+VSCE_PAT, maintainer-only); this release does not change that.
+
 ### Added
 - **Issue #779's residual verifier-vs-runtime differential gate (F-4)** now generates and executes
   1,170 deterministic cases: all 65 frozen modeled forms × `§Q`/`§S`/explicit `§PROOF` × nesting
@@ -35,7 +74,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - **The binder dispatches every expression class** (#762 B1): a single authoritative dispatch
   table replaces the partial switch; expressions without a structural binder yet produce an
-  explicit Info-severity `Calor0259` (analysis incomplete) instead of a silent opaque fallback,
+  explicit `Calor0259` (analysis incomplete; Info until B8, Warning at release) instead of a silent opaque fallback,
   counted by a ratcheted corpus instrument. `BoundCallExpression` is no longer `sealed` (the
   incomplete node subclasses it to preserve analysis behavior exactly) — an API-surface note
   for SDK consumers pattern-matching bound trees. MCP `analyze` no longer counts Info-severity
@@ -44,9 +83,10 @@ All notable changes to this project will be documented in this file.
   `ElideProvenGuards` on `CompilationOptions` and the MSBuild task). By default a `Proven`
   postcondition or `Discharged` `§PROOF` obligation keeps its runtime check — verification
   verdicts are diagnostic. This executes roadmap v0.13 §2.1: the elide surface has produced
-  seven false-`Proven` vectors to date and its differential gate (freeze registration F-4) is
-  not yet built; elision re-enables by default only when that gate is green (roadmap §3.5
-  gate 6). The `run`/`test` execution paths always keep guards regardless of the flag.
+  seven false-`Proven` vectors to date. Its differential gate (freeze registration F-4) is
+  now BUILT AND GREEN in this release (65/65 forms, 1,170/1,170 cells, zero mismatches — see
+  Added); flipping the default back on is a deliberate recorded decision for the next cycle
+  (roadmap §3.5 gate 6), not an automatic consequence of the gate turning green mid-cycle. The `run`/`test` execution paths always keep guards regardless of the flag.
   Note: `§PROOF` obligation guards have always ignored `--contract-mode` (pre-existing for
   Failed/Timeout); with the flip, a Discharged obligation under `--contract-mode off` now
   also emits its guard unless the opt-in is set — Off-mode output is guard-free by mode
@@ -100,13 +140,11 @@ All notable changes to this project will be documented in this file.
   stop shipping. Its removal retires that residual; the disclosure in
   `scripts/z3-upstream-4.15.7.sha256` is updated accordingly.
 
-### Known issues
-- **`libz3-osx-x64.dylib` is an arm64 binary and ships that way.** Upstream's
-  `z3-4.15.7-x64-osx-15.7.3.zip` and `z3-4.15.7-arm64-osx-15.7.3.zip` contain a byte-identical
-  arm64 `libz3.dylib`, so the `osx-x64` native is mislabeled at the RID. Intel Macs get a library
-  that cannot load and lose static verification silently — it degrades to "Z3 unavailable" rather
-  than failing loudly. Inherited from upstream, not introduced here; the remedy (source-build on
-  an Intel runner, drop the RID, or cross-compile) is undecided.
+### Resolved (was "Known issues" while this section accumulated)
+- **The mislabeled `libz3-osx-x64.dylib` no longer ships — resolved inside this release** by the
+  Z3 chain closure (see Removed above): the RID was dropped, the stale asset was deleted from the
+  binaries release, and the arch-vs-RID packaging assertion prevents recurrence. The earlier text
+  of this entry ("the remedy is undecided") described the pre-closure state.
 
 ## [0.12.1] - 2026-08-07
 
