@@ -1,0 +1,21 @@
+{
+  "id": "ES-07",
+  "title": "A finding on an unedited file survives every warm build",
+  "pins": "The disappearing-diagnostic shape, on a PER-FILE diagnostic. violating.calr is undocumented and never edited, so it reports Calor0601 on every build; stable.calr is documented and never edited, so it is the cache hit; churn.calr is edited every step to keep the build warm. Only diagnostic-clean files may be cached — if that rule were dropped, violating.calr would be skipped on the warm builds and its warnings would vanish, which the full-vs-incremental comparison catches. This is the shape #788 and #883 both had: findings present in a cold build and silently absent in a warm one. Distinct from ES-04, whose cross-module diagnostics are recomputed from summaries every run and therefore survive skipping by construction.",
+  "expectsReuse": true,
+  "reuseNote": "stable.calr is untouched with the file set and options constant, so it must be served from cache; violating.calr must not be, because it carries diagnostics.",
+  "steps": [
+    {
+      "dir": "step-00-finding-present",
+      "options": "docs-required"
+    },
+    {
+      "dir": "step-01-edit-neighbour",
+      "options": "docs-required"
+    },
+    {
+      "dir": "step-02-edit-neighbour-again",
+      "options": "docs-required"
+    }
+  ]
+}

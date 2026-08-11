@@ -1,0 +1,4 @@
+§M{m001:Undocumented}
+  §F{f001:Speak:pub} () -> void
+    §E{cw}
+    §P "no module context, no contracts"

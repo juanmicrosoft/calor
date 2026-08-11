@@ -1,0 +1,21 @@
+{
+  "id": "ES-05",
+  "title": "A diagnostics-affecting option flips against a warm cache",
+  "pins": "The #788 / #883 shape. Every diagnostics-affecting option must be in the options token: flipping one with a warm cache has to invalidate, or unchanged files are served from the previous option set and findings the new set would report never appear. The files are identical at every step, so a cache that ignores the option flip skips everything and returns the wrong answer.",
+  "expectsReuse": false,
+  "reuseNote": "An options-token change is a global invalidation by construction (#788). Zero reuse is exactly what makes the diagnostics correct here.",
+  "steps": [
+    {
+      "dir": "step-00-effects-on",
+      "options": "effects-on"
+    },
+    {
+      "dir": "step-01-effects-off",
+      "options": "effects-off"
+    },
+    {
+      "dir": "step-02-effects-on-again",
+      "options": "effects-on"
+    }
+  ]
+}

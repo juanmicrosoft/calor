@@ -1,0 +1,4 @@
+§M{m001:Alpha}
+  §F{f001:Greet:pub} () -> void
+    §E{}
+    §P "hello there"
