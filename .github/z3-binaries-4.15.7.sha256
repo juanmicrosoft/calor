@@ -8,21 +8,19 @@
 # extractions from upstream Z3Prover archives that the same run verified against
 # scripts/z3-upstream-4.15.7.sha256, so they are reproducible: all seven were
 # predicted from the pinned archives BEFORE the run and matched byte for byte.
-# The eighth, libz3-osx-arm64.dylib, is still built from source and is the only
-# entry not derivable from a pinned input — though it has now reproduced
-# bit-identically across three separate runs. It was previously annotated here
-# as necessary because "upstream's arm64-osx archive has assembly-loading
-# problems"; that justification does not hold — the upstream arm64-osx native is
-# verified working on ARM64 macOS (Calor.Verification.Tests 359/359, zero skips)
-# and download-z3.sh now uses it. Switching build-z3.yml to match is pending a
-# deliberate republish, bundled with the unresolved osx-x64 question below.
+# The eighth, libz3-osx-arm64.dylib, was built from source in that run; the Z3
+# chain closure (2026-08-11) switched build-z3.yml to the checksum-verified
+# upstream arm64-osx archive, so on the NEXT deliberate republish its hash here
+# WILL change (to bytes predictable from scripts/z3-upstream-4.15.7.sha256) and
+# every entry becomes derivable from a pinned input.
 #
-# ⚠ KNOWN DEFECT, NOT FIXED: libz3-osx-x64.dylib is an ARM64 binary. Upstream's
-# z3-4.15.7-x64-osx-15.7.3.zip and z3-4.15.7-arm64-osx-15.7.3.zip ship a
-# byte-identical arm64 libz3.dylib, so the hash below is correct for the bytes
-# we publish but the bytes themselves are mislabeled at the RID. Intel Macs get
-# a native that cannot load and lose verification silently (it fails soft to
-# "Z3 unavailable"). Inherited from upstream; the remedy is an open decision.
+# osx-x64 RESOLVED (2026-08-11, chain closure): upstream's x64-osx archive ships
+# an arm64 binary under the x64 label, so Intel Macs installed successfully and
+# silently lost verification. Decision: the RID is DROPPED — no honest asset
+# exists to ship. Its manifest entry is removed; publish-nuget no longer stages
+# it; build-z3.yml's arch-vs-RID assertion now fails the packaging job if any
+# upstream archive is ever mislabeled again. Intel macOS is unsupported for
+# verification.
 #
 # This replaces a 2026-07-31 trust-on-first-use manifest that had drifted. Two
 # entries changed, and neither because upstream changed:
@@ -48,7 +46,6 @@
 7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5  libz3-linux-arm64.so
 3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8  libz3-linux-x64.so
 038f356687ac800c2269ff4d289c7921ec5802dafca3ae6a2a4620defc807f9c  libz3-osx-arm64.dylib
-8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada  libz3-osx-x64.dylib
 f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562  libz3-win-arm64.dll
 d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56  libz3-win-x64.dll
 89d584e1e792961a5e5a9a8385f1416cf38251c48446bab8ba64f9a17000ebc9  libz3-win-x86.dll

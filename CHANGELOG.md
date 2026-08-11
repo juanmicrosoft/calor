@@ -21,6 +21,17 @@ All notable changes to this project will be documented in this file.
   supported, and report paths are LF-pinned. Current coverage is 65/65 solver-handled forms and
   1,170/1,170 solver-handled cells with zero mismatches; 40/65 forms currently elide.
 
+### Removed
+- **The `osx-x64` Z3 native is no longer shipped** (Z3 chain closure). Upstream's
+  x64-osx archive contains an arm64 binary under the x64 label, so Intel Macs
+  installed successfully and silently lost verification — no honest asset exists
+  to ship. Intel macOS is unsupported for verification (Z3-dependent features
+  report "Z3 unavailable"; compilation is unaffected). The osx-arm64 native now
+  ships from the same checksum-verified upstream archive as every other RID
+  (the last source-built, non-reproducible asset is gone), and a native
+  arch-vs-RID assertion in the packaging workflow fails closed if any upstream
+  archive is ever mislabeled again.
+
 ### Changed
 - **The binder dispatches every expression class** (#762 B1): a single authoritative dispatch
   table replaces the partial switch; expressions without a structural binder yet produce an

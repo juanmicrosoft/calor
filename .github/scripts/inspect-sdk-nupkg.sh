@@ -50,7 +50,7 @@ fi
 if [ "$ALL_RIDS" = "--all-rids" ]; then
   require "tasks/net10.0/runtimes/linux-x64/native/libz3.so"
   require "tasks/net10.0/runtimes/linux-arm64/native/libz3.so"
-  require "tasks/net10.0/runtimes/osx-x64/native/libz3.dylib"
+  # osx-x64 dropped (Z3 chain closure): Intel macOS unsupported for verification.
   require "tasks/net10.0/runtimes/osx-arm64/native/libz3.dylib"
   require "tasks/net10.0/runtimes/win-x64/native/libz3.dll"
   require "tasks/net10.0/runtimes/win-arm64/native/libz3.dll"

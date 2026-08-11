@@ -36,115 +36,29 @@ env:
   MANAGED_DLL_ARCHIVE: x64-glibc-2.39
 
 jobs:
-  # Build Z3 from source on ARM64 macOS ONLY.
-  #
-  # ⚠ THE STATED JUSTIFICATION FOR THIS JOB NO LONGER HOLDS. It used to read
-  # "the upstream arm64-osx archive has assembly-loading problems on that
-  # platform (same exception download-z3.sh makes at its Darwin/arm64 branch)".
-  # That branch is gone: download-z3.sh now takes the upstream arm64-osx native
-  # on ARM64 macOS, and it is verified working there (Calor.Verification.Tests
-  # 359/359, zero skips, on a SkippableFact-gated suite). So this job is now the
-  # ONLY producer of a non-reproducible asset, and it makes the shipped
-  # osx-arm64 native differ from the one every ARM64 macOS developer builds
-  # against.
-  #
-  # It is left in place for now only because switching it changes a published
-  # asset and so requires a deliberate republish + repin, which is bundled with
-  # the unresolved osx-x64 decision (upstream's x64-osx archive contains an
-  # arm64 binary — see the note on the prebuilt job below).
-  #
-  # Every other RID — including linux-arm64, which download-z3.sh has always
-  # taken from the upstream arm64-glibc-2.38 archive — uses the
-  # checksum-verified prebuilt path below, because a from-source C++ build is
-  # not reproducible and silently re-drifts the pin on every run.
-  build-z3-arm64:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            rid: osx-arm64
-            lib: libz3.dylib
-
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Install build dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3 git
-
-      - name: Build Z3 from source
-        run: |
-          git clone --depth 1 --branch "z3-${{ env.Z3_VERSION }}" https://github.com/Z3Prover/z3.git /tmp/z3
-          cd /tmp/z3
-          python3 scripts/mk_make.py --dotnet
-          cd build
-          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
-          cd dotnet
-          dotnet build -p:EnableSourceLink=false -p:EnableSourceControlManagerQueries=false
-
-      - name: Verify Z3 works
-        run: |
-          mkdir -p /tmp/z3-test && cd /tmp/z3-test
-
-          cat > test.csproj << 'CSPROJ'
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <OutputType>Exe</OutputType>
-              <TargetFramework>net10.0</TargetFramework>
-            </PropertyGroup>
-            <ItemGroup>
-              <Reference Include="Microsoft.Z3">
-                <HintPath>/tmp/z3/build/dotnet/bin/Debug/netstandard1.4/Microsoft.Z3.dll</HintPath>
-              </Reference>
-            </ItemGroup>
-          </Project>
-          CSPROJ
-
-          cat > Program.cs << 'CS'
-          using Microsoft.Z3;
-          using var ctx = new Context();
-          var x = ctx.MkIntConst("x");
-          var solver = ctx.MkSolver();
-          solver.Assert(ctx.MkGt(x, ctx.MkInt(0)));
-          if (solver.Check() != Status.SATISFIABLE) throw new System.Exception("Z3 failed");
-          System.Console.WriteLine("Z3 works!");
-          CS
-
-          # Copy native lib to output
-          dotnet build
-          cp /tmp/z3/build/${{ matrix.lib }} bin/Debug/net10.0/
-          dotnet run
-
-      # ONLY the native library. The source-built Microsoft.Z3.dll is a Debug
-      # netstandard1.4 assembly that embeds the builder's absolute obj path, so
-      # it differs on every run — and it used to win the `find | head -1` race in
-      # create-release, which is how a Debug, source-compiled managed wrapper
-      # ended up shipping inside the calor nupkg instead of the official Release
-      # assembly that download-z3.sh gives every developer and every CI test run.
-      # The managed DLL now comes from the canonical upstream archive below.
-      - name: Prepare artifacts
-        run: |
-          mkdir -p artifacts
-          cp /tmp/z3/build/${{ matrix.lib }} artifacts/
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: z3-${{ matrix.rid }}-${{ env.Z3_VERSION }}
-          path: artifacts/
-
-  # Download pre-built Z3 for every RID except osx-arm64. These archives are
+  # Z3 chain closure (roadmap §2.4, decided 2026-08-11):
+  # - The ARM64-macOS source-build job is GONE. Its stated justification had
+  #   already lapsed (download-z3.sh takes the upstream arm64-osx native on
+  #   ARM64 macOS, verified working); it was the only producer of a
+  #   non-reproducible asset, and it made the shipped osx-arm64 native differ
+  #   from the one every ARM64 macOS developer builds against. osx-arm64 now
+  #   ships the same checksum-verified upstream archive as every other RID.
+  # - osx-x64 is DROPPED: upstream's x64-osx archive contains an arm64 binary
+  #   under the x64 label, so Intel Macs installed successfully and SILENTLY
+  #   lost verification. No honest asset exists to ship; Intel macOS is
+  #   unsupported for verification and documented as such.
+  # - The native arch-vs-RID assertion below (held back until both decisions
+  #   landed) makes any future mislabeled upstream archive fail this job
+  #   instead of shipping.
+  # POST-MERGE PROCEDURE (one repin/republish): dispatch this workflow; then
+  #   `gh release delete-asset z3-binaries-<ver> libz3-osx-x64.dylib` (the
+  #   release action replaces same-named assets but never deletes unlisted
+  #   ones — without this the release claims osx-x64 is absent while the
+  #   mislabeled binary stays attached); then commit the regenerated
+  #   .github/z3-binaries-<ver>.sha256 block from the run's step summary.
+  #   Until that commit, publish-nuget and z3-pin-check fail closed (by
+  #   design) on the changed osx-arm64 asset hash.
+  # Download pre-built Z3 for every supported RID. These archives are
   # pinned by src/Calor.Compiler/scripts/z3-upstream-<ver>.sha256, so extraction
   # is deterministic and the resulting release assets are byte-stable across runs.
   download-z3-prebuilt:
@@ -156,21 +70,27 @@ jobs:
           - rid: linux-x64
             archive: x64-glibc-2.39
             lib: libz3.so
+            arch_marker: "x86-64"
           - rid: linux-arm64
             archive: arm64-glibc-2.38
             lib: libz3.so
-          - rid: osx-x64
-            archive: x64-osx-15.7.3
+            arch_marker: "aarch64"
+          - rid: osx-arm64
+            archive: arm64-osx-15.7.3
             lib: libz3.dylib
+            arch_marker: "arm64"
           - rid: win-x64
             archive: x64-win
             lib: libz3.dll
+            arch_marker: "x86-64"
           - rid: win-x86
             archive: x86-win
             lib: libz3.dll
+            arch_marker: "Intel 80386"
           - rid: win-arm64
             archive: arm64-win
             lib: libz3.dll
+            arch_marker: "Aarch64"
 
     steps:
       - uses: actions/checkout@v4
@@ -207,6 +127,19 @@ jobs:
 
           # Copy native library
           find . -name "${{ matrix.lib }}" -path "*/bin/*" -exec cp {} artifacts/ \;
+
+          # Native arch-vs-RID assertion (the check the osx-x64 mislabeling
+          # evaded): the binary's actual architecture must match the RID it is
+          # about to ship under. `file` reads Mach-O/ELF/PE headers directly.
+          DESC="$(file -b "artifacts/${{ matrix.lib }}")"
+          echo "native arch: $DESC"
+          case "$DESC" in
+            *"${{ matrix.arch_marker }}"*) ;;
+            *)
+              echo "::error::${{ matrix.rid }} native is not ${{ matrix.arch_marker }}: $DESC — upstream archive is mislabeled; refusing to ship"
+              exit 1
+              ;;
+          esac
 
           # The managed wrapper is emitted by ONE designated archive only.
           # The old code copied it from whichever archive happened to contain it
@@ -267,7 +200,7 @@ jobs:
 
   # Create/update the z3-binaries release with all artifacts
   create-release:
-    needs: [build-z3-arm64, download-z3-prebuilt]
+    needs: [download-z3-prebuilt]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -341,18 +274,20 @@ jobs:
           tag_name: z3-binaries-${{ env.Z3_VERSION }}
           name: Z3 Binaries v${{ env.Z3_VERSION }}
           body: |
-            Pre-built Z3 ${{ env.Z3_VERSION }} binaries for all supported platforms.
+            Pre-built Z3 ${{ env.Z3_VERSION }} binaries for all supported platforms —
+            every native is the checksum-verified upstream archive for its RID, with
+            the arch-vs-RID assertion enforced at packaging time.
 
-            **Built from source (ARM64):**
+            - linux-x64
             - linux-arm64
             - osx-arm64
-
-            **Downloaded from Z3 releases (x64/Windows):**
-            - linux-x64
-            - osx-x64
             - win-x64
             - win-x86
             - win-arm64
+
+            osx-x64 is deliberately absent: upstream ships an arm64 binary under the
+            x64 label, so Intel Macs would install successfully and silently lose
+            verification. Intel macOS is unsupported for verification.
 
             These binaries are used by the Calor NuGet package.
           files: release/*
