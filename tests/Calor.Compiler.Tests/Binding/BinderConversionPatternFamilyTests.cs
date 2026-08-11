@@ -99,7 +99,7 @@ public class BinderConversionPatternFamilyTests
     {
         var (expr, diags) = BindReturn(new TypeOfExpressionNode(S, "MyClass"));
         var t = Assert.IsType<BoundTypeOfExpression>(expr);
-        Assert.Equal("Type", t.TypeName);
+        Assert.Equal("TYPE", t.TypeName);
         Assert.Equal("MyClass", t.TargetTypeName);
         AssertComplete(diags);
     }
@@ -113,6 +113,87 @@ public class BinderConversionPatternFamilyTests
         Assert.Equal([i], BoundChildren.Of(new BoundTypeTest(S, i, "str", null)));
         Assert.Empty(BoundChildren.Of(new BoundTypeOfExpression(S, "T")));
         Assert.Empty(BoundChildren.Of(new BoundDecimalLiteral(S, 1m)));
+    }
+
+    [Fact]
+    public void DecimalZeroDivisor_ProducesHardError_UnderDefaultOptions()
+    {
+        // Review C1's regression pin: pre-B5 DEC:0 bound as BoundFloatLiteral(0.0) and
+        // IsLiteralZero caught it; the B5 BoundDecimalLiteral fell through to false and
+        // a hard ERROR silently became nothing. DEFAULT options (ReportOnlyVerified) —
+        // the literal-zero case must not need --all-findings.
+        const string source = @"
+§M{m001:Test}
+  §F{f001:Trap:pub} (i32:x) -> dec
+    §R (/ x DEC:0)";
+
+        // ReportOnlyVerified=true IS the CLI default (--analyze without --all-findings);
+        // BugPatternOptions' own default is false, so it must be set explicitly or this
+        // pin silently tests all-findings mode (the first draft's non-discrimination bug).
+        var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
+        {
+            EnableVerificationAnalyses = true,
+            VerificationAnalysisOptions = new Compiler.Analysis.VerificationAnalysisOptions
+            {
+                BugPatternOptions = new Compiler.Analysis.BugPatterns.BugPatternOptions
+                {
+                    ReportOnlyVerified = true
+                }
+            }
+        });
+
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.DivisionByZero
+                 && d.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void CastDivisor_KeepsVerifiedWarning_UnderDefaultOptions()
+    {
+        // Review C2's regression pin: the old Cast arm returned the operand bare, so a
+        // cast divisor reached Z3 as a variable; the B5 conversion wrapper made it
+        // untranslatable and the verified Warning vanished. CheckDivisor now unwraps
+        // conversions (numeric casts are zero-preserving).
+        const string source = @"
+§M{m001:Test}
+  §F{f001:Trap:pub} (i32:y) -> i64
+    §R (/ 100 (cast i64 y))";
+
+        var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
+        {
+            EnableVerificationAnalyses = true,
+            VerificationAnalysisOptions = new Compiler.Analysis.VerificationAnalysisOptions
+            {
+                BugPatternOptions = new Compiler.Analysis.BugPatterns.BugPatternOptions
+                {
+                    ReportOnlyVerified = true
+                }
+            }
+        });
+
+        // The VERIFIED warning, not an inconclusive Info — severity is the discriminator.
+        Assert.Contains(result.Diagnostics,
+            d => d.Code == DiagnosticCode.DivisionByZero
+                 && d.Severity != DiagnosticSeverity.Info);
+    }
+
+    [Fact]
+    public void PatternVariable_IsDeclaredInScope_UsableAfterTest()
+    {
+        // Review M3: `x is str s` DECLARES s. Pre-fix, s was retained into the bound
+        // node while every later use was a hard Undefined-variable error.
+        var test = new IsPatternNode(S, new ReferenceNode(S, "x"), "str", "s");
+        var use = new ReturnStatementNode(S, new ReferenceNode(S, "s"));
+        var func = new FunctionNode(S, "f001", "Probe", Visibility.Public,
+            new[] { new ParameterNode(S, "x", "OBJECT", new AttributeCollection()) }, new OutputNode(S, "str"), null,
+            new StatementNode[] { new ExpressionStatementNode(S, test), use },
+            new AttributeCollection());
+        var module = new ModuleNode(S, "m001", "Test",
+            Array.Empty<UsingDirectiveNode>(), new[] { func }, new AttributeCollection());
+        var diagnostics = new DiagnosticBag();
+        new Binder(diagnostics).Bind(module);
+        Assert.DoesNotContain(diagnostics,
+            d => d.Code == DiagnosticCode.UndefinedReference && d.Message.Contains("'s'"));
     }
 
     [Fact]

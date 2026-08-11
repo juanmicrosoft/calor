@@ -933,12 +933,12 @@ public sealed class BoundTypeTest : BoundExpression
     { Operand = operand; TargetType = targetType; VariableName = variableName; }
 }
 
-/// <summary>#762 B5: typeof — emits typeof(T) (System.Type); "Type" is the
-/// effect-resolution-style short spelling.</summary>
+/// <summary>#762 B5: typeof — emits typeof(T) (System.Type). "TYPE" per the
+/// canonical-caps literal-family convention (review M2: no third spelling family).</summary>
 public sealed class BoundTypeOfExpression : BoundExpression
 {
     public string TargetTypeName { get; }
-    public override string TypeName => "Type";
+    public override string TypeName => "TYPE";
     public BoundTypeOfExpression(TextSpan span, string targetTypeName) : base(span)
         => TargetTypeName = targetTypeName;
 }

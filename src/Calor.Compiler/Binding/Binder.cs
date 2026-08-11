@@ -363,8 +363,15 @@ public sealed class Binder
                 {
                     // B5: pattern tests no longer fold to literal true (#762 evidence).
                     var n = (IsPatternNode)e;
-                    return new BoundTypeTest(n.Span, b.BindExpression(n.Operand),
+                    var bound = new BoundTypeTest(n.Span, b.BindExpression(n.Operand),
                         n.TargetType, n.VariableName);
+                    // Review M3: the pattern VARIABLE (`x is Foo f`) is a declaration —
+                    // without this, `f` was "retained" into a node nothing consumes while
+                    // every later use was a hard Undefined-variable error. Scoped to the
+                    // enclosing bind scope (approximates C#'s definite-assignment scope).
+                    if (n.VariableName is not null)
+                        b._scope.TryDeclare(new VariableSymbol(n.VariableName, n.TargetType, isMutable: false));
+                    return bound;
                 },
             [typeof(TypeOfExpressionNode)] = (b, e) =>
                 { var n = (TypeOfExpressionNode)e; return new BoundTypeOfExpression(n.Span, n.TypeName); },

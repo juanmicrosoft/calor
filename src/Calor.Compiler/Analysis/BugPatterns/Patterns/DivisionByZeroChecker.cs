@@ -216,6 +216,13 @@ public sealed class DivisionByZeroChecker : IBugPatternChecker
         DiagnosticBag diagnostics,
         List<BoundExpression> pathConditions)
     {
+        // #762 B5 review C2: numeric casts are zero-preserving — see THROUGH the
+        // conversion wrapper or a cast divisor loses its Z3-verified warning and the
+        // Calor0926 suggester (the old Cast arm returned the operand bare, so this
+        // worked by accident before B5).
+        while (divisor is BoundConversionExpression conv)
+            divisor = conv.Operand;
+
         // Quick check: literal zero is always a bug
         if (BoundNodeHelpers.IsLiteralZero(divisor))
         {
