@@ -222,14 +222,25 @@ public sealed class VerificationCacheEntry
         // #778: an Unproven verdict is timeout-dependent — "could not prove within
         // the budget". Reusable only when the entry's budget was at least the
         // current one (a bigger current budget might prove what the smaller one
-        // could not). Definitive verdicts (Proven/Disproven/Assumed/…) are sound
-        // regardless of budget. Unknown budgets (null on either side) are treated
+        // could not). Proven/Disproven are sound regardless of budget (proofs and
+        // models are budget-free). NOTE (#914 review F2): Assumed proofs are stored
+        // with Status == Unproven (the frozen D-G2.2 mapping), so they ARE
+        // budget-gated here — deliberately: an Assumed can be a budget-limited
+        // downgrade of Proven (the divisor-nonzero entailment sub-check yields
+        // Assumed on solver UNKNOWN, including timeout), so a bigger budget might
+        // genuinely upgrade it. Unknown budgets (null on either side) are treated
         // as not-reusable for Unproven — conservative: a cold re-verify, never a
         // stale inconclusive.
         if (Status == ContractVerificationStatus.Unproven)
         {
-            if (SolverTimeoutMs is null || currentTimeoutMs is null
-                || SolverTimeoutMs < currentTimeoutMs)
+            if (SolverTimeoutMs is null || currentTimeoutMs is null)
+                return false;
+            // #914 review F1: Z3 treats timeout 0 (and uint.MaxValue) as NO timeout —
+            // 0 must rank as the LARGEST budget, not the smallest, or an
+            // infinite-budget run accepts any finite-budget Unproven (the exact
+            // stale-inconclusive vector this rule exists to close).
+            static ulong Effective(uint ms) => ms is 0 or uint.MaxValue ? ulong.MaxValue : ms;
+            if (Effective(SolverTimeoutMs.Value) < Effective(currentTimeoutMs.Value))
                 return false;
         }
 

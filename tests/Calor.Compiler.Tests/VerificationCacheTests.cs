@@ -303,8 +303,8 @@ public class VerificationCacheTests : IDisposable
         var canonical = hasher.GetCanonicalExpression(mul);
 
         Assert.Contains("(* ", canonical);
-        Assert.Contains("(+ REF:x REF:y)", canonical);
-        Assert.Contains("(- REF:a REF:b)", canonical);
+        Assert.Contains("(+ REF:1#x REF:1#y)", canonical);
+        Assert.Contains("(- REF:1#a REF:1#b)", canonical);
     }
 
     [Fact]
@@ -323,8 +323,10 @@ public class VerificationCacheTests : IDisposable
 
         var canonical = hasher.GetCanonicalExpression(forall);
 
-        Assert.Contains("(FORALL ((i i32))", canonical);
-        Assert.Contains("(>= REF:i INT:0)", canonical);
+        // #914 F4: raw names/types are length-prefixed ("1#i", "3#i32") so
+        // delimiter characters in SDK-supplied text cannot forge structure.
+        Assert.Contains("(FORALL ((1#i 3#i32))", canonical);
+        Assert.Contains("(>= REF:1#i INT:0)", canonical);
     }
 
     #endregion
@@ -1295,6 +1297,69 @@ public class VerificationCacheTests : IDisposable
         var proven = VerificationCacheEntry.FromResult(
             new ContractVerificationResult(ContractVerificationStatus.Proven), "h", "z", sem, 5000);
         Assert.True(proven.IsValidFor("z", sem, 30000)); // budget-independent
+    }
+
+
+    [Fact]
+    public void CacheEntry_TimeoutZeroMeansInfinite_NotSmallest()
+    {
+        // #914 review F1: Z3 treats timeout 0 (and uint.MaxValue) as NO timeout.
+        // Pre-fix, 0 ranked as the SMALLEST budget, so an infinite-budget run
+        // accepted any finite-budget Unproven — the stale-inconclusive vector.
+        const string sem = "calor-compile-semantics-v1";
+        var finiteUnproven = VerificationCacheEntry.FromResult(
+            new ContractVerificationResult(ContractVerificationStatus.Unproven), "h", "z", sem, 5000);
+        Assert.False(finiteUnproven.IsValidFor("z", sem, 0));              // infinite current: might prove
+        Assert.False(finiteUnproven.IsValidFor("z", sem, uint.MaxValue));  // same, Z3's other spelling
+
+        var infiniteUnproven = VerificationCacheEntry.FromResult(
+            new ContractVerificationResult(ContractVerificationStatus.Unproven), "h", "z", sem, 0);
+        Assert.True(infiniteUnproven.IsValidFor("z", sem, 30000)); // infinite budget covers any finite one
+        Assert.True(infiniteUnproven.IsValidFor("z", sem, 0));
+    }
+
+    [Fact]
+    public void UnhashableKey_LookupRefusesEvenIfAnEntryExistsOnDisk()
+    {
+        // #914 review F3: the STORE guard alone made the round-trip test pass — this
+        // pins the LOOKUP guard by planting a valid entry file at the unhashable
+        // key's on-disk path and asserting TryGet still refuses to serve it.
+        var options = new VerificationCacheOptions { Enabled = true, CacheDirectory = _testCacheDir };
+        var parameters = new List<(string Name, string TypeName)> { ("x", "i32") };
+        var pre = new RequiresNode(
+            EmptySpan,
+            new AwaitExpressionNode(EmptySpan, new ReferenceNode(EmptySpan, "x"), null),
+            null,
+            new AttributeCollection());
+
+        var hasher = new ContractHasher();
+        var hash = hasher.HashPrecondition(parameters, pre);
+        Assert.True(hasher.SawUnhashedKind); // sanity: this IS the unhashable class
+
+        var entry = VerificationCacheEntry.FromResult(
+            new ContractVerificationResult(ContractVerificationStatus.Proven), hash,
+            Calor.Compiler.Verification.Z3.Z3ContextFactory.GetZ3Version(),
+            Calor.Compiler.Incremental.BuildStateCache.CurrentCompilerSemanticsVersion, 5000);
+        var filePath = Path.Combine(_testCacheDir, hash[..2], hash + ".json");
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        File.WriteAllText(filePath, System.Text.Json.JsonSerializer.Serialize(entry,
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+
+        using var cache = new VerificationCache(options, 5000);
+        Assert.False(cache.TryGetPreconditionResult(parameters, pre, out _));
+    }
+
+    [Fact]
+    public void ParameterSerialization_IsDelimiterForgeryProof()
+    {
+        // #914 review F4 (confirmed pre-fix collision): [("a","T"),("b","U")] vs
+        // [("a","T,b:U")] hashed identically — raw text is now length-prefixed so
+        // delimiters inside SDK-supplied names/types cannot forge structure.
+        var hasher = new ContractHasher();
+        var pre = new RequiresNode(EmptySpan, new BoolLiteralNode(EmptySpan, true), null, new AttributeCollection());
+        var split = hasher.HashPrecondition([("a", "T"), ("b", "U")], pre);
+        var forged = hasher.HashPrecondition([("a", "T,b:U")], pre);
+        Assert.NotEqual(split, forged);
     }
 
 }
