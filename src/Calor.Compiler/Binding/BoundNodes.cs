@@ -1474,6 +1474,27 @@ public sealed class BoundObjectInitializer : BoundNode
     }
 }
 
+public sealed class BoundTypeReference
+{
+    public string Name { get; }
+    public TextSpan Span { get; }
+    public TypeSymbol? ResolvedType { get; }
+    public SymbolId? ResolvedTypeSymbolId => ResolvedType?.Id;
+    public IReadOnlyList<BoundTypeReference> TypeArguments { get; }
+
+    public BoundTypeReference(
+        string name,
+        TextSpan span,
+        TypeSymbol? resolvedType,
+        IReadOnlyList<BoundTypeReference>? typeArguments = null)
+    {
+        Name = name ?? throw new ArgumentNullException(nameof(name));
+        Span = span;
+        ResolvedType = resolvedType;
+        TypeArguments = typeArguments ?? Array.Empty<BoundTypeReference>();
+    }
+}
+
 /// <summary>
 /// Bound new expression: new TypeName(args).
 /// </summary>
@@ -1481,6 +1502,7 @@ public sealed class BoundNewExpression : BoundExpression
 {
     public override string TypeName { get; }
     public TextSpan TypeNameSpan { get; }
+    public BoundTypeReference TypeReference { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<BoundObjectInitializer> Initializers { get; }
@@ -1513,7 +1535,8 @@ public sealed class BoundNewExpression : BoundExpression
         FunctionSymbol? resolvedConstructor = null,
         TypeSymbol? resolvedType = null,
         TextSpan? typeNameSpan = null,
-        IReadOnlyList<FunctionSymbol>? resolvedConstructors = null)
+        IReadOnlyList<FunctionSymbol>? resolvedConstructors = null,
+        BoundTypeReference? typeReference = null)
         : base(span)
     {
         TypeName = typeName ?? "OBJECT";
@@ -1524,7 +1547,17 @@ public sealed class BoundNewExpression : BoundExpression
         ResolvedConstructor = resolvedConstructor;
         ResolvedConstructors = resolvedConstructors
             ?? (resolvedConstructor == null ? Array.Empty<FunctionSymbol>() : [resolvedConstructor]);
-        ResolvedType = resolvedType;
+        TypeReference = typeReference ?? new BoundTypeReference(
+            TypeName,
+            TypeNameSpan,
+            resolvedType,
+            TypeArguments
+                .Select(argument => new BoundTypeReference(
+                    argument,
+                    TextSpan.Empty,
+                    resolvedType: null))
+                .ToArray());
+        ResolvedType = resolvedType ?? TypeReference.ResolvedType;
         Children = [.. Arguments, .. Initializers.Select(initializer => initializer.Value)];
     }
 }

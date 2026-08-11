@@ -211,6 +211,119 @@ public sealed class SymbolAndOverloadBindingTests
     }
 
     [Fact]
+    public void ProgramCompile_KnownInternalNoMatch_FailsBeforeEmission()
+    {
+        const string source = """
+            §M{m1:Test}
+              §F{f1:Pick:pri} (i32:value) -> i32
+                §R value
+              §F{f2:Use:pub} () -> i32
+                §R §C{Pick} §A STR:"wrong" §/C
+            """;
+
+        var result = Calor.Compiler.Program.Compile(source);
+
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Single(result.Diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NoMatchingOverload));
+    }
+
+    [Fact]
+    public void ProgramCompile_KnownInternalAmbiguity_FailsBeforeEmission()
+    {
+        const string source = """
+            §M{m1:Test}
+              §F{f1:Pick<T>:pri} (T:value, i32:other) -> T
+                §R value
+              §F{f2:Pick<T>:pri} (i32:value, T:other) -> T
+                §R other
+              §F{f3:Use:pub} () -> i32
+                §R §C{Pick} §A INT:1 §A INT:2 §/C
+            """;
+
+        var result = Calor.Compiler.Program.Compile(source);
+
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
+        Assert.Single(result.Diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.AmbiguousOverload));
+    }
+
+    [Fact]
+    public void ProgramCompile_ExternalInteropCall_RemainsEmissionEligible()
+    {
+        const string source = """
+            §M{m1:Test}
+              §F{f1:Use:pub} () -> void
+                §C{Console.WriteLine} §A STR:"ok" §/C
+            """;
+
+        var result = Calor.Compiler.Program.Compile(
+            source,
+            filePath: null,
+            options: new CompilationOptions { EnforceEffects = false });
+
+        Assert.False(result.HasErrors);
+        Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.NoMatchingOverload
+                or DiagnosticCode.AmbiguousOverload);
+        Assert.Contains("Console.WriteLine(\"ok\");", result.GeneratedCode);
+    }
+
+    [Fact]
+    public void NewExpressionGenericTypeReferences_RetainExactNestedIdentities()
+    {
+        const string source = """
+            §M{m1:Test}
+              §F{f1:Create:pub} () -> object
+                §R §NEW{Box<List<Widget>>} §/NEW
+              §CL{c1:Widget:pub}
+              §CL{c2:List:pub}
+              §CL{c3:Box:pub}
+                §FLD{i32:_dummy:priv}
+            """;
+
+        var bound = ParseAndBind(source, out var diagnostics);
+        var creation = Assert.IsType<BoundNewExpression>(
+            Assert.IsType<BoundReturnStatement>(
+                Assert.Single(bound.Functions.Single().Body)).Expression);
+        var listReference = Assert.Single(creation.TypeReference.TypeArguments);
+        var widgetReference = Assert.Single(listReference.TypeArguments);
+
+        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
+        Assert.Equal("Box", source.Substring(
+            creation.TypeReference.Span.Start,
+            creation.TypeReference.Span.Length));
+        Assert.Equal("List", source.Substring(
+            listReference.Span.Start,
+            listReference.Span.Length));
+        Assert.Equal("Widget", source.Substring(
+            widgetReference.Span.Start,
+            widgetReference.Span.Length));
+        Assert.Equal(
+            bound.SymbolsById.Values.OfType<TypeSymbol>()
+                .Single(symbol => symbol.Name == "Box").Id,
+            creation.TypeReference.ResolvedTypeSymbolId);
+        Assert.Equal(
+            bound.SymbolsById.Values.OfType<TypeSymbol>()
+                .Single(symbol => symbol.Name == "List").Id,
+            listReference.ResolvedTypeSymbolId);
+        Assert.Equal(
+            bound.SymbolsById.Values.OfType<TypeSymbol>()
+                .Single(symbol => symbol.Name == "Widget").Id,
+            widgetReference.ResolvedTypeSymbolId);
+
+        var ast = Parse(source, new DiagnosticBag());
+        var astCreation = Assert.IsType<NewExpressionNode>(
+            Assert.IsType<ReturnStatementNode>(
+                Assert.Single(ast.Functions.Single().Body)).Expression);
+        Assert.Equal(
+            "new Box<List<Widget>>()",
+            new CSharpEmitter().Visit(astCreation));
+    }
+
+    [Fact]
     public void GenericArityAndParameterModifiers_DiscriminateOverloads()
     {
         var oneGeneric = Function(

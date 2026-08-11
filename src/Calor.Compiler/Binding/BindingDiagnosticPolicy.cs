@@ -16,12 +16,14 @@ public static class BindingDiagnosticPolicy
             return false;
 
         // Only promote diagnostics whose binder decision is complete without
-        // external .NET member/type knowledge. Resolution diagnostics such as
-        // UndefinedReference and NoMatchingOverload remain analysis-only until
-        // the binder can distinguish interop from genuine Calor errors.
+        // external .NET member/type knowledge. The binder emits overload
+        // diagnostics only after finding a known internal candidate set;
+        // unresolved external/interop calls remain NotFound and diagnostic-free.
         return diagnostic.Code is
             DiagnosticCode.DuplicateDefinition
             or DiagnosticCode.DuplicateFunctionSignature
+            or DiagnosticCode.AmbiguousOverload
+            or DiagnosticCode.NoMatchingOverload
             or DiagnosticCode.BindRequiresTypeOrInitializer
             or DiagnosticCode.InstanceMemberInStaticContext;
     }

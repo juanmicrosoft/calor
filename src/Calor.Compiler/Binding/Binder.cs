@@ -1167,6 +1167,7 @@ public sealed class Binder
     private BoundExpression BindNewExpression(NewExpressionNode newExpr)
     {
         var boundArgs = BindExpressions(newExpr.Arguments);
+        var boundTypeReference = BindTypeReference(newExpr.TypeReference);
         var resolution = ResolveCall(
             newExpr.Span,
             $"{newExpr.TypeName}..ctor",
@@ -1188,9 +1189,24 @@ public sealed class Binder
             boundArgs,
             initializers,
             resolution.Function,
-            ResolveTypeSymbol(newExpr.TypeName),
+            boundTypeReference.ResolvedType,
             newExpr.TypeNameSpan,
-            resolution.Functions);
+            resolution.Functions,
+            boundTypeReference);
+    }
+
+    private BoundTypeReference BindTypeReference(TypeReferenceNode typeReference)
+    {
+        var typeArguments = typeReference.TypeArguments
+            .Select(BindTypeReference)
+            .ToArray();
+        return new BoundTypeReference(
+            typeReference.Name,
+            typeReference.Span,
+            string.IsNullOrEmpty(typeReference.Name)
+                ? null
+                : ResolveTypeSymbol(typeReference.Name),
+            typeArguments);
     }
 
     private BoundExpression BindArrayAccess(ArrayAccessNode arrayAccess)
@@ -2114,7 +2130,10 @@ public sealed class Binder
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
-            if (resolution.Kind == OverloadResolutionKind.NoMatch)
+            var hasUnresolvedArguments = argumentTypes.Any(type =>
+                string.Equals(type, "<unresolved>", StringComparison.Ordinal));
+            if (!hasUnresolvedArguments
+                && resolution.Kind == OverloadResolutionKind.NoMatch)
             {
                 _diagnostics.ReportError(
                     span,
@@ -2123,7 +2142,8 @@ public sealed class Binder
                     $"{FormatCallSignature(argumentTypes, argumentModifiers, typeArguments)}. " +
                     $"Candidates: {FormatCandidates(resolution.Candidates)}");
             }
-            else if (resolution.Kind == OverloadResolutionKind.Ambiguous)
+            else if (!hasUnresolvedArguments
+                     && resolution.Kind == OverloadResolutionKind.Ambiguous)
             {
                 _diagnostics.ReportError(
                     span,
@@ -2165,8 +2185,92 @@ public sealed class Binder
             argumentTypes,
             argumentNames,
             argumentModifiers,
-            typeArguments);
+            typeArguments,
+            GetImplicitConversionCost);
     }
+
+    private int? GetImplicitConversionCost(string parameterType, string argumentType)
+    {
+        var parameter = TypeIdentity.Canonicalize(parameterType);
+        var argument = TypeIdentity.Canonicalize(argumentType);
+        if (string.Equals(parameter, argument, StringComparison.Ordinal))
+            return 0;
+        if (string.Equals(argument, "<unresolved>", StringComparison.Ordinal))
+            return null;
+
+        if (parameter == "OBJECT" && argument != "VOID")
+            return 50;
+
+        if (IsImplicitNumericConversion(argument, parameter))
+            return 10;
+
+        var parameterClass = ResolveClass(parameterType);
+        var argumentClass = ResolveClass(argumentType);
+        if (parameterClass == null || argumentClass == null)
+            return null;
+
+        var distance = 0;
+        var current = argumentClass;
+        var visited = new HashSet<ClassDefinitionNode>();
+        while (visited.Add(current))
+        {
+            if (ReferenceEquals(current, parameterClass))
+                return 20 + distance;
+
+            var baseClass = ResolveBaseClass(current);
+            if (baseClass == null)
+                break;
+            current = baseClass;
+            distance++;
+        }
+
+        return null;
+    }
+
+    private static bool IsImplicitNumericConversion(string from, string to) =>
+        (from, to) switch
+        {
+            ("INT[bits=8][signed=true]", "INT[bits=16][signed=true]"
+                or "INT"
+                or "LONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("INT[bits=8][signed=false]", "INT[bits=16][signed=true]"
+                or "INT[bits=16][signed=false]"
+                or "INT"
+                or "UINT"
+                or "LONG"
+                or "ULONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("INT[bits=16][signed=true]", "INT"
+                or "LONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("INT[bits=16][signed=false]", "INT"
+                or "UINT"
+                or "LONG"
+                or "ULONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("INT", "LONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("UINT", "LONG"
+                or "ULONG"
+                or "FLOAT[bits=32]"
+                or "FLOAT"
+                or "DECIMAL") => true,
+            ("LONG", "FLOAT[bits=32]" or "FLOAT" or "DECIMAL") => true,
+            ("ULONG", "FLOAT[bits=32]" or "FLOAT" or "DECIMAL") => true,
+            ("FLOAT[bits=32]", "FLOAT") => true,
+            _ => false,
+        };
 
     private bool IsFunctionAccessible(FunctionSymbol function)
     {

@@ -8109,7 +8109,7 @@ public sealed class Parser
         {
             typeName = rawTypeName[..angleIndex];
             var innerArgs = rawTypeName[(angleIndex + 1)..^1]; // "char,str"
-            typeArgs.AddRange(innerArgs.Split(',').Select(a => a.Trim()));
+            typeArgs.AddRange(SplitCallTypeArguments(innerArgs));
         }
         else
         {
@@ -8247,21 +8247,237 @@ public sealed class Parser
             : arguments.Count > 0 ? startToken.Span.Union(arguments[^1].Span)
             : startToken.Span;
         var rawTypeNameSpan = attrs.GetSpan("_pos0") ?? startToken.Span;
-        var typeNameSpan = new TextSpan(
-            rawTypeNameSpan.Start,
-            Math.Min(typeName.Length, rawTypeNameSpan.Length),
-            rawTypeNameSpan.Line,
-            rawTypeNameSpan.Column);
+        var typeReference = ParseTypeReference(rawTypeNameSpan)
+            ?? new TypeReferenceNode(
+                new TextSpan(
+                    rawTypeNameSpan.Start,
+                    Math.Min(typeName.Length, rawTypeNameSpan.Length),
+                    rawTypeNameSpan.Line,
+                    rawTypeNameSpan.Column),
+                typeName);
+        if (angleIndex < 0 && typeArgs.Count > 0)
+        {
+            typeReference = new TypeReferenceNode(
+                typeReference.Span,
+                typeReference.Name,
+                Enumerable.Range(1, typeArgs.Count)
+                    .Select(index =>
+                        attrs.GetSpan($"_pos{index}") is { } argumentSpan
+                            ? ParseTypeReference(argumentSpan)
+                                ?? new TypeReferenceNode(argumentSpan, typeArgs[index - 1])
+                            : new TypeReferenceNode(TextSpan.Empty, typeArgs[index - 1]))
+                    .ToArray());
+        }
+        var typeNameSpan = typeReference.Span.Length > 0
+            ? typeReference.Span
+            : rawTypeNameSpan;
         ExpressionNode expr = new NewExpressionNode(
             span,
             typeName,
             typeArgs,
             arguments,
             initializers,
-            typeNameSpan);
+            typeNameSpan,
+            typeReference);
 
         // Handle trailing member access (e.g., §NEW{Type}§/NEW.Method or §NEW{Type}§/NEW?.Prop)
         return ParseTrailingMemberAccess(expr);
+    }
+
+    private TypeReferenceNode? ParseTypeReference(TextSpan span)
+    {
+        if (span.Length <= 0)
+            return null;
+
+        var tokens = _tokens
+            .Where(token =>
+                !token.IsTrivia
+                && token.Kind is not TokenKind.Indent and not TokenKind.Dedent
+                && token.Span.Start >= span.Start
+                && token.Span.End <= span.End)
+            .ToArray();
+        return new TypeReferenceTokenReader(tokens).Parse();
+    }
+
+    private sealed class TypeReferenceTokenReader
+    {
+        private readonly IReadOnlyList<Token> _tokens;
+        private int _position;
+        private int _pendingGreaterClosers;
+
+        public TypeReferenceTokenReader(IReadOnlyList<Token> tokens)
+        {
+            _tokens = tokens;
+        }
+
+        public TypeReferenceNode? Parse()
+        {
+            while (Check(TokenKind.Question))
+                Advance();
+
+            if (Check(TokenKind.OpenBracket))
+            {
+                while (Check(TokenKind.OpenBracket))
+                    Advance();
+                var elementType = Parse();
+                while (Check(TokenKind.CloseBracket))
+                    Advance();
+                return elementType;
+            }
+
+            if (Check(TokenKind.OpenParen))
+                return ParseTupleType();
+
+            if (!IsTypeNameToken(Current))
+                return null;
+
+            var name = new System.Text.StringBuilder();
+            var nameToken = Advance();
+            name.Append(nameToken.Text);
+            while (TryConsumeQualifiedSeparator(out var separator))
+            {
+                if (!IsTypeNameToken(Current))
+                    break;
+
+                name.Append(separator);
+                nameToken = Advance();
+                name.Append(nameToken.Text);
+            }
+
+            var typeArguments = new List<TypeReferenceNode>();
+            if (Check(TokenKind.Less))
+            {
+                Advance();
+                while (!IsAtEnd && !IsGreater())
+                {
+                    var typeArgument = Parse();
+                    if (typeArgument != null)
+                        typeArguments.Add(typeArgument);
+                    else
+                        Advance();
+
+                    if (Check(TokenKind.Comma))
+                        Advance();
+                    else if (!IsGreater() && typeArgument == null)
+                        continue;
+                }
+
+                ConsumeGreater();
+            }
+
+            while (Check(TokenKind.Question)
+                   || Check(TokenKind.Star)
+                   || Check(TokenKind.StarStar))
+            {
+                Advance();
+            }
+            while (Check(TokenKind.OpenBracket))
+            {
+                Advance();
+                while (Check(TokenKind.Comma))
+                    Advance();
+                if (Check(TokenKind.CloseBracket))
+                    Advance();
+            }
+
+            return new TypeReferenceNode(nameToken.Span, name.ToString(), typeArguments);
+        }
+
+        private TypeReferenceNode ParseTupleType()
+        {
+            Advance();
+            var elements = new List<TypeReferenceNode>();
+            while (!IsAtEnd && !Check(TokenKind.CloseParen))
+            {
+                var element = Parse();
+                if (element != null)
+                    elements.Add(element);
+                else
+                    Advance();
+
+                if (Check(TokenKind.Comma))
+                    Advance();
+            }
+            if (Check(TokenKind.CloseParen))
+                Advance();
+
+            return new TypeReferenceNode(TextSpan.Empty, string.Empty, elements);
+        }
+
+        private bool TryConsumeQualifiedSeparator(out string separator)
+        {
+            if (Check(TokenKind.Dot))
+            {
+                Advance();
+                separator = ".";
+                return true;
+            }
+
+            if (Check(TokenKind.Colon) && Peek(1).Kind == TokenKind.Colon)
+            {
+                Advance();
+                Advance();
+                separator = "::";
+                return true;
+            }
+
+            separator = string.Empty;
+            return false;
+        }
+
+        private bool IsGreater() =>
+            _pendingGreaterClosers > 0
+            || Check(TokenKind.Greater)
+            || Check(TokenKind.GreaterGreater);
+
+        private void ConsumeGreater()
+        {
+            if (_pendingGreaterClosers > 0)
+            {
+                _pendingGreaterClosers--;
+                return;
+            }
+
+            if (Check(TokenKind.Greater))
+            {
+                Advance();
+            }
+            else if (Check(TokenKind.GreaterGreater))
+            {
+                Advance();
+                _pendingGreaterClosers = 1;
+            }
+        }
+
+        private bool IsAtEnd => _pendingGreaterClosers == 0 && _position >= _tokens.Count;
+
+        private Token Current =>
+            _pendingGreaterClosers > 0 || _position >= _tokens.Count
+                ? default
+                : _tokens[_position];
+
+        private Token Peek(int offset)
+        {
+            if (_pendingGreaterClosers > 0)
+                return default;
+            var index = _position + offset;
+            return index >= 0 && index < _tokens.Count ? _tokens[index] : default;
+        }
+
+        private bool Check(TokenKind kind) =>
+            _pendingGreaterClosers == 0
+            && _position < _tokens.Count
+            && _tokens[_position].Kind == kind;
+
+        private Token Advance()
+        {
+            if (_pendingGreaterClosers > 0 || _position >= _tokens.Count)
+                return default;
+            return _tokens[_position++];
+        }
+
+        private static bool IsTypeNameToken(Token token) =>
+            token.Kind == TokenKind.Identifier || token.IsKeyword;
     }
 
     /// <summary>

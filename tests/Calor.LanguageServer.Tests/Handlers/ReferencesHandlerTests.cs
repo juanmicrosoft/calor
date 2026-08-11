@@ -129,6 +129,94 @@ public class ReferencesHandlerTests
     }
 
     [Fact]
+    public async Task LocalTypeReferences_ExcludeQualifiedExternalTypeAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §CL{c001:Exception:pub}
+              §CL{c002:Holder:pub}
+                §FLD{Exception:local:priv}
+                §FLD{System.Exception:external:priv}
+            """;
+        var uri = DocumentUri.From("file:///references-qualified-type.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Exception:pub", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new ReferencesHandler(workspace);
+
+        var locations = await handler.Handle(
+            new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                Context = new ReferenceContext { IncludeDeclaration = true },
+            },
+            CancellationToken.None);
+
+        var references = locations!.ToArray();
+        Assert.Equal(2, references.Length);
+        Assert.Equal(
+            new[]
+            {
+                source.IndexOf("Exception:pub", StringComparison.Ordinal),
+                source.IndexOf("Exception:local", StringComparison.Ordinal),
+            },
+            references.Select(location =>
+                    PositionConverter.ToOffset(location.Range.Start, source))
+                .Order()
+                .ToArray());
+    }
+
+    [Fact]
+    public async Task NewGenericArgument_ReturnsExactNestedTypeReferenceAsync()
+    {
+        var source = """
+            §M{m001:TestModule}
+              §F{f001:Create:pub} () -> object
+                §R §NEW{Box<List<Widget>>} §/NEW
+              §CL{c001:Widget:pub}
+              §CL{c002:List:pub}
+              §CL{c003:Box:pub}
+                §FLD{i32:_dummy:priv}
+            """;
+        var uri = DocumentUri.From("file:///references-new-generic-type.calr");
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(uri, source);
+        var offset = source.IndexOf("Widget>>}", StringComparison.Ordinal);
+        var (line, column) = LspTestHarness.GetLineColumn(source, offset);
+        var handler = new ReferencesHandler(workspace);
+
+        var locations = await handler.Handle(
+            new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier(uri),
+                Position = new Position(line - 1, column - 1),
+                Context = new ReferenceContext { IncludeDeclaration = true },
+            },
+            CancellationToken.None);
+
+        var references = locations!.ToArray();
+        Assert.Equal(2, references.Length);
+        Assert.All(references, location =>
+        {
+            var start = PositionConverter.ToOffset(location.Range.Start, source);
+            var end = PositionConverter.ToOffset(location.Range.End, source);
+            Assert.Equal("Widget", source[start..end]);
+        });
+        Assert.Equal(
+            new[]
+            {
+                source.IndexOf("Widget>>}", StringComparison.Ordinal),
+                source.IndexOf("Widget:pub", StringComparison.Ordinal),
+            },
+            references.Select(location =>
+                    PositionConverter.ToOffset(location.Range.Start, source))
+                .Order()
+                .ToArray());
+    }
+
+    [Fact]
     public void ReferenceCollector_FindsVariableReferences()
     {
         var source = """

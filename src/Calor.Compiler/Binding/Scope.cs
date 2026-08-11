@@ -797,7 +797,8 @@ public sealed class Scope
         IReadOnlyList<string> argumentTypes,
         IReadOnlyList<string?>? argumentNames = null,
         IReadOnlyList<string?>? argumentModifiers = null,
-        IReadOnlyList<string>? typeArguments = null)
+        IReadOnlyList<string>? typeArguments = null,
+        Func<string, string, int?>? implicitConversionCost = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(argumentTypes);
@@ -806,7 +807,13 @@ public sealed class Scope
         {
             if (_symbols.ContainsKey(name))
                 return OverloadResolutionResult.NotFound();
-            return Parent?.ResolveOverload(name, argumentTypes, argumentNames, argumentModifiers, typeArguments)
+            return Parent?.ResolveOverload(
+                    name,
+                    argumentTypes,
+                    argumentNames,
+                    argumentModifiers,
+                    typeArguments,
+                    implicitConversionCost)
                 ?? OverloadResolutionResult.NotFound();
         }
 
@@ -819,6 +826,7 @@ public sealed class Scope
                     argumentNames,
                     argumentModifiers,
                     typeArguments,
+                    implicitConversionCost,
                     out var resolvedReturnType,
                     out var score))
             {
@@ -957,6 +965,7 @@ public sealed class Scope
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
         IReadOnlyList<string>? typeArguments,
+        Func<string, string, int?>? implicitConversionCost,
         out string resolvedReturnType,
         out int score)
     {
@@ -981,6 +990,7 @@ public sealed class Scope
             }
 
             var matches = true;
+            var conversionScore = 0;
             for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
             {
                 var parameter = function.Parameters[mapping.ParameterMap[argumentIndex]];
@@ -993,16 +1003,34 @@ public sealed class Scope
                 var parameterType = mapping.ExpandedParams[argumentIndex]
                     ? GetParamsElementType(parameter.TypeName)
                     : parameter.TypeName;
-                if (parameterType == null
-                    || !TypeIdentity.TryUnify(
+                if (parameterType == null)
+                {
+                    matches = false;
+                    break;
+                }
+
+                if (TypeIdentity.TryUnify(
                         parameterType,
                         argumentTypes[argumentIndex],
                         typeParameterSet,
                         substitutions))
                 {
+                    continue;
+                }
+
+                var resolvedParameterType = substitutions.Count == 0
+                    ? parameterType
+                    : TypeIdentity.Substitute(parameterType, substitutions);
+                var conversionCost = implicitConversionCost?.Invoke(
+                    resolvedParameterType,
+                    argumentTypes[argumentIndex]);
+                if (conversionCost == null)
+                {
                     matches = false;
                     break;
                 }
+
+                conversionScore += conversionCost.Value;
             }
 
             if (!matches
@@ -1013,7 +1041,8 @@ public sealed class Scope
 
             var candidateScore =
                 (mapping.UsesParams ? mapping.UsesExpandedParams ? 200 : 100 : 0)
-                + mapping.OmittedOptionalCount * 10;
+                + mapping.OmittedOptionalCount * 10
+                + conversionScore;
             if (candidateScore >= score)
                 continue;
 

@@ -799,7 +799,14 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
         }
 
         return argsChanged || initializersChanged
-            ? new NewExpressionNode(node.Span, node.TypeName, node.TypeArguments, newArgs, newInitializers)
+            ? new NewExpressionNode(
+                node.Span,
+                node.TypeName,
+                node.TypeArguments,
+                newArgs,
+                newInitializers,
+                node.TypeNameSpan,
+                node.TypeReference)
             : node;
     }
 

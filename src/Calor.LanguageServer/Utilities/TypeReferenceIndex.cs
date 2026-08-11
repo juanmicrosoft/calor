@@ -1,4 +1,5 @@
 using Calor.Compiler.Analysis;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Parsing;
@@ -32,6 +33,12 @@ public static class TypeReferenceIndex
             return Array.Empty<IndexedTypeReference>();
 
         var references = new List<IndexedTypeReference>();
+        foreach (var creation in BoundNodeHelpers.DescendantsAndSelf(boundModule)
+                     .OfType<BoundNewExpression>())
+        {
+            AddBoundTypeReference(creation.TypeReference, source, references);
+        }
+
         foreach (var node in DescendantsAndSelf(ast))
         {
             switch (node)
@@ -96,6 +103,26 @@ public static class TypeReferenceIndex
         }
     }
 
+    private static void AddBoundTypeReference(
+        BoundTypeReference reference,
+        string source,
+        ICollection<IndexedTypeReference> references)
+    {
+        if (reference.ResolvedTypeSymbolId is { IsNone: false } symbolId
+            && reference.Span.Length > 0
+            && reference.Span.Start >= 0
+            && reference.Span.End <= source.Length)
+        {
+            references.Add(new IndexedTypeReference(
+                symbolId,
+                source.Substring(reference.Span.Start, reference.Span.Length),
+                reference.Span));
+        }
+
+        foreach (var typeArgument in reference.TypeArguments)
+            AddBoundTypeReference(typeArgument, source, references);
+    }
+
     private static TypeSymbol? ResolveTypeSymbol(
         ReadOnlySpan<char> annotation,
         IReadOnlyList<IdentifierPart> identifiers,
@@ -103,14 +130,6 @@ public static class TypeReferenceIndex
         IReadOnlyList<TypeSymbol> typeSymbols)
     {
         var identifier = identifiers[index];
-        var simpleMatches = typeSymbols
-            .Where(symbol => string.Equals(symbol.Name, identifier.Text, StringComparison.Ordinal))
-            .ToArray();
-        if (simpleMatches.Length == 1)
-            return simpleMatches[0];
-        if (simpleMatches.Length == 0)
-            return null;
-
         var chainStart = index;
         while (chainStart > 0
                && IsQualifiedSeparator(
@@ -121,21 +140,43 @@ public static class TypeReferenceIndex
             chainStart--;
         }
 
-        for (var start = chainStart; start < index; start++)
+        var chainEnd = index;
+        while (chainEnd + 1 < identifiers.Count
+               && IsQualifiedSeparator(
+                   annotation,
+                   identifiers[chainEnd].End,
+                   identifiers[chainEnd + 1].Start))
         {
-            var qualifiedName = string.Join(
-                ".",
-                identifiers.Skip(start).Take(index - start + 1).Select(part => part.Text));
-            var qualifiedMatches = simpleMatches
-                .Where(symbol =>
-                    string.Equals(symbol.QualifiedName, qualifiedName, StringComparison.Ordinal)
-                    || symbol.QualifiedName.EndsWith("." + qualifiedName, StringComparison.Ordinal))
-                .ToArray();
-            if (qualifiedMatches.Length == 1)
-                return qualifiedMatches[0];
+            chainEnd++;
         }
 
-        return null;
+        if (chainStart != chainEnd)
+        {
+            if (index != chainEnd)
+                return null;
+
+            var qualifiedName = string.Join(
+                ".",
+                identifiers.Skip(chainStart).Take(chainEnd - chainStart + 1)
+                    .Select(part => part.Text));
+            var qualifiedMatches = typeSymbols
+                .Where(symbol =>
+                    string.Equals(symbol.Name, identifier.Text, StringComparison.Ordinal)
+                    && (string.Equals(
+                            symbol.QualifiedName,
+                            qualifiedName,
+                            StringComparison.Ordinal)
+                        || symbol.QualifiedName.EndsWith(
+                            "." + qualifiedName,
+                            StringComparison.Ordinal)))
+                .ToArray();
+            return qualifiedMatches.Length == 1 ? qualifiedMatches[0] : null;
+        }
+
+        var simpleMatches = typeSymbols
+            .Where(symbol => string.Equals(symbol.Name, identifier.Text, StringComparison.Ordinal))
+            .ToArray();
+        return simpleMatches.Length == 1 ? simpleMatches[0] : null;
     }
 
     private static bool IsQualifiedSeparator(

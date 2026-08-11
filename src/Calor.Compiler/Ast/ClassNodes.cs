@@ -871,6 +871,7 @@ public sealed class NewExpressionNode : ExpressionNode
 {
     public string TypeName { get; }
     public TextSpan TypeNameSpan { get; }
+    public TypeReferenceNode TypeReference { get; }
     public IReadOnlyList<string> TypeArguments { get; }
     public IReadOnlyList<ExpressionNode> Arguments { get; }
 
@@ -894,12 +895,19 @@ public sealed class NewExpressionNode : ExpressionNode
         IReadOnlyList<string> typeArguments,
         IReadOnlyList<ExpressionNode> arguments,
         IReadOnlyList<ObjectInitializerAssignment> initializers,
-        TextSpan? typeNameSpan = null)
+        TextSpan? typeNameSpan = null,
+        TypeReferenceNode? typeReference = null)
         : base(span)
     {
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         TypeNameSpan = typeNameSpan ?? span;
         TypeArguments = typeArguments ?? throw new ArgumentNullException(nameof(typeArguments));
+        TypeReference = typeReference ?? new TypeReferenceNode(
+            TypeNameSpan,
+            TypeName,
+            TypeArguments
+                .Select(argument => new TypeReferenceNode(TextSpan.Empty, argument))
+                .ToArray());
         Arguments = arguments ?? throw new ArgumentNullException(nameof(arguments));
         Initializers = initializers ?? Array.Empty<ObjectInitializerAssignment>();
     }
