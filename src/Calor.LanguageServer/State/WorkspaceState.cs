@@ -37,7 +37,8 @@ public sealed record ProjectSymbolOccurrence(
     SymbolId SymbolId,
     TextSpan Span,
     SymbolOccurrenceKind Kind,
-    bool IsOpen);
+    bool IsOpen,
+    bool IsSplitDeclaration = false);
 
 /// <summary>
 /// Manages document state for the entire workspace.
@@ -775,6 +776,45 @@ public sealed class WorkspaceState
                 ?? Enumerable.Empty<(WorkspaceDocumentSnapshot Owner, TypeSymbol Symbol)>())
             .ToArray();
 
+        // A module, or a type declared `partial` across several files, is a single
+        // declaration in the language but many per-file symbols in this index: each
+        // file's declaration carries its own SymbolId. Occurrence sets keyed on
+        // those ids are file-local rather than workspace-complete, so edits derived
+        // from them rename one part and silently split the module or the type.
+        // Mark those declarations so RenameHandler can refuse them.
+        var moduleDeclaringDocumentCounts = documents
+            .Where(document => document.Analysis.Ast != null)
+            .GroupBy(document => document.Analysis.Ast!.Name, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(document => document.Document.Uri.ToString())
+                    .Distinct(StringComparer.Ordinal)
+                    .Count(),
+                StringComparer.Ordinal);
+
+        // A module emits a C# namespace, so another file can import it by name.
+        // Using directives are not indexed as occurrences, so a module that is
+        // imported anywhere cannot be renamed workspace-completely either.
+        var importedNamespaces = documents
+            .Where(document => document.Analysis.Ast != null)
+            .SelectMany(document => document.Analysis.Ast!.Usings)
+            .Select(directive => directive.Namespace)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var declaringDocumentCounts = typeSymbols
+            .Where(candidate => !candidate.Symbol.Id.IsNone
+                && candidate.Owner.Analysis.Ast != null)
+            .GroupBy(candidate => (
+                Module: candidate.Owner.Analysis.Ast!.Name,
+                Type: candidate.Symbol.Name))
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(candidate => candidate.Owner.Document.Uri.ToString())
+                    .Distinct(StringComparer.Ordinal)
+                    .Count());
+
         foreach (var document in documents)
         {
             var boundModule = document.Analysis.BoundModule;
@@ -790,7 +830,13 @@ public sealed class WorkspaceState
                 document,
                 moduleId,
                 document.Analysis.Ast.IdentifierSpan,
-                SymbolOccurrenceKind.Definition);
+                SymbolOccurrenceKind.Definition,
+                isSplitDeclaration:
+                    (moduleDeclaringDocumentCounts.TryGetValue(
+                            document.Analysis.Ast.Name,
+                            out var declaringModuleDocuments)
+                        && declaringModuleDocuments > 1)
+                    || importedNamespaces.Contains(document.Analysis.Ast.Name));
 
             foreach (var symbol in boundModule.SymbolsById.Values)
             {
@@ -804,7 +850,12 @@ public sealed class WorkspaceState
                         document,
                         symbol.Id,
                         symbol.DeclarationSpan,
-                        SymbolOccurrenceKind.Definition);
+                        SymbolOccurrenceKind.Definition,
+                        isSplitDeclaration: symbol is TypeSymbol
+                            && declaringDocumentCounts.TryGetValue(
+                                (document.Analysis.Ast!.Name, symbol.Name),
+                                out var declaringDocuments)
+                            && declaringDocuments > 1);
                 }
             }
 
@@ -941,7 +992,8 @@ public sealed class WorkspaceState
             WorkspaceDocumentSnapshot document,
             SymbolId symbolId,
             TextSpan span,
-            SymbolOccurrenceKind kind)
+            SymbolOccurrenceKind kind,
+            bool isSplitDeclaration = false)
         {
             if (symbolId.IsNone
                 || !IsExactIdentifierSpan(document.Analysis.Source, span))
@@ -959,7 +1011,8 @@ public sealed class WorkspaceState
                 symbolId,
                 span,
                 kind,
-                _documents.ContainsKey(uri));
+                _documents.ContainsKey(uri),
+                isSplitDeclaration);
             byDocument[uri].Add(occurrence);
             if (!bySymbol.TryGetValue(symbolId, out var symbolOccurrences))
             {

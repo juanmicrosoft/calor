@@ -48,7 +48,13 @@ public sealed class RenameHandler : RenameHandlerBase
         var occurrences = _workspace.FindSymbolOccurrences(
             occurrence.SymbolId,
             includeDeclaration: true);
+        // Fail closed on declarations whose identity this index keys per file —
+        // module names, and types declared across several files. Their occurrence
+        // sets cover one part only, so applying the edit would rename that part and
+        // silently split the module or the type (no Calor diagnostic; the break
+        // surfaces only in generated C#).
         if (occurrences.Count == 0
+            || occurrences.Any(item => item.IsSplitDeclaration)
             || occurrences.Any(item =>
                 !IsExactIdentifierSpan(item.Snapshot.Source, item.Span, oldName))
             || !_workspace.AreOccurrenceSnapshotsCurrent(occurrences))
