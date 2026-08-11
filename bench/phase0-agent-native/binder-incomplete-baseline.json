@@ -1,12 +1,12 @@
 {
-  "IncompleteCount": 28,
+  "IncompleteCount": 1,
   "ParsedFiles": 443,
   "ParseFailures": 9,
-  "ExpressionsBound": 4415,
+  "ExpressionsBound": 4567,
   "Scope": "both F-2 legs; conversion leg skips when corpus submodules are absent",
   "Conversion": {
-    "Incomplete": 904,
-    "ExpressionsBound": 13179,
+    "Incomplete": 21,
+    "ExpressionsBound": 17661,
     "ConvertedAndBound": 305,
     "ConvertExceptions": 0,
     "EmptyOutput": 0,

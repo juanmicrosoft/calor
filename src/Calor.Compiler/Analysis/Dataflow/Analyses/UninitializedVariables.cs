@@ -94,6 +94,12 @@ public sealed class UninitializedVariablesAnalysis
             {
                 foreach (var v in BoundNodeHelpers.GetUsedVariables(block.BranchCondition))
                 {
+                    // Parameters are initialized by their caller: function parameters
+                    // are seeded Initialized at entry, and a LAMBDA parameter (a scope
+                    // this name-keyed analysis cannot see) is always initialized when
+                    // its body runs — flagging it is wrong on any execution (#908 F2).
+                    if (v.IsParameter)
+                        continue;
                     var state = currentFacts.GetState(v.Name);
                     if (state != InitializationState.Initialized)
                     {
@@ -108,6 +114,8 @@ public sealed class UninitializedVariablesAnalysis
                 // Check uses first
                 foreach (var v in BoundNodeHelpers.GetUsedVariables(stmt))
                 {
+                    if (v.IsParameter)
+                        continue;
                     var state = currentFacts.GetState(v.Name);
                     if (state != InitializationState.Initialized)
                     {

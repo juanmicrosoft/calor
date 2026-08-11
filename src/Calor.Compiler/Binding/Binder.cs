@@ -509,6 +509,15 @@ public sealed class Binder
                     return new BoundCharOperation(n.Span, n.Operation,
                         n.Arguments.Select(b.BindExpression).ToList());
                 },
+            // #762 B6 — control-value family (5 classes; the conversion-leg payload).
+            [typeof(NullCoalesceNode)] = (b, e) =>
+                { var n = (NullCoalesceNode)e; return new BoundNullCoalesce(n.Span, b.BindExpression(n.Left), b.BindExpression(n.Right)); },
+            [typeof(NullConditionalNode)] = (b, e) =>
+                { var n = (NullConditionalNode)e; return new BoundNullConditional(n.Span, b.BindExpression(n.Target), n.MemberName); },
+            [typeof(MatchExpressionNode)] = (b, e) => b.BindMatchExpression((MatchExpressionNode)e),
+            [typeof(LambdaExpressionNode)] = (b, e) => b.BindLambda((LambdaExpressionNode)e),
+            [typeof(AwaitExpressionNode)] = (b, e) =>
+                { var n = (AwaitExpressionNode)e; return new BoundAwaitExpression(n.Span, b.BindExpression(n.Awaited), n.ConfigureAwait); },
         };
 
         // Every remaining concrete ExpressionNode subclass dispatches to BindIncomplete.
@@ -748,6 +757,50 @@ public sealed class Binder
     /// errors on constructs that HAVE a binder (e.g. static 'this'). Counting those as
     /// "incomplete" would pollute the instrument, and the pre-B1 behavior was silent.
     /// </summary>
+    /// <summary>#762 B6: each arm gets its own child scope — at most one arm executes,
+    /// so same-named locals across arms are legal and arm locals must not leak outward
+    /// (mirrors BindMatchStatement). A variable pattern declares its capture in the arm
+    /// scope, typed by the scrutinee.</summary>
+    private BoundExpression BindMatchExpression(MatchExpressionNode match)
+    {
+        var target = BindExpression(match.Target);
+        var cases = new List<BoundMatchExpressionCase>();
+        foreach (var c in match.Cases)
+        {
+            using var _caseScope = PushScope(_scope.CreateChild());
+            if (c.Pattern is VariablePatternNode varPattern)
+                _scope.TryDeclare(new VariableSymbol(varPattern.Name, target.TypeName, isMutable: false));
+            var guard = c.Guard is null ? null : BindExpression(c.Guard);
+            var body = BindStatements(c.Body);
+            cases.Add(new BoundMatchExpressionCase(c.Pattern, guard, body, c.Span));
+        }
+        return new BoundMatchExpression(match.Span, match.Id, target, cases);
+    }
+
+    /// <summary>#762 B6: lambda parameters live in a child scope; both body forms bind
+    /// there. Bodies are DEFERRED (BoundChildren.DeferredOf) — bound for visibility,
+    /// marked conditionally-executed.</summary>
+    private BoundExpression BindLambda(LambdaExpressionNode lambda)
+    {
+        var lambdaScope = _scope.CreateChild();
+        using var _ = PushScope(lambdaScope);
+        var parameters = new List<VariableSymbol>();
+        foreach (var p in lambda.Parameters)
+        {
+            var sym = new VariableSymbol(p.Name, p.TypeName ?? "OBJECT", isMutable: false, isParameter: true);
+            if (!lambdaScope.TryDeclare(sym))
+            {
+                var suggestedName = GenerateUniqueName(p.Name);
+                _diagnostics.ReportDuplicateDefinitionWithFix(p.Span, p.Name, suggestedName);
+            }
+            parameters.Add(sym);
+        }
+        var exprBody = lambda.ExpressionBody is null ? null : BindExpression(lambda.ExpressionBody);
+        var stmtBody = lambda.StatementBody is null ? null : BindStatements(lambda.StatementBody);
+        return new BoundLambda(lambda.Span, lambda.Id, parameters, lambda.Effects,
+            lambda.IsAsync, lambda.IsStatic, exprBody, stmtBody);
+    }
+
     private BoundExpression BindIncompleteQuiet(ExpressionNode expr, string reason)
         => new BoundIncompleteExpression(expr.Span, expr.GetType().Name, reason);
 

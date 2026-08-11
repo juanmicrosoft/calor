@@ -497,6 +497,16 @@ public static class BoundChildren
         BoundCollectionContains cc => [cc.KeyOrValue],
         BoundCollectionCount cn => [cn.Collection],
         BoundTupleLiteral tl => tl.Elements,
+        // #762 B6 — control-value family. Of() enumerates ALL expression children
+        // (visibility — a /0 in a lambda body is still a bug worth surfacing); analyses
+        // that are OCCURRENCE-sensitive (dataflow/liveness/taint) must additionally
+        // consult DeferredOf() to avoid treating conditionally-executed subtrees as
+        // inline code (scoping doc D2's IsDeferredContext, realized as an enumeration).
+        BoundNullCoalesce nc => [nc.Left, nc.Right],
+        BoundNullConditional ncond => [ncond.Target],
+        BoundMatchExpression me => [me.Target, .. me.Cases.Where(c => c.Guard is not null).Select(c => c.Guard!)],
+        BoundLambda lam => lam.ExpressionBody is null ? [] : [lam.ExpressionBody],
+        BoundAwaitExpression aw => [aw.Awaited],
         // #762 B5 — conversion/pattern family.
         BoundConversionExpression conv => [conv.Operand],
         BoundTypeTest tt => [tt.Operand],
@@ -507,6 +517,20 @@ public static class BoundChildren
             .Where(p => p.Expression is not null).Select(p => p.Expression!),
         BoundStringBuilderOperation sb => sb.Arguments,
         BoundCharOperation co => co.Arguments,
+        _ => [],
+    };
+
+    /// <summary>
+    /// The subset of Of() whose evaluation is CONDITIONAL at runtime (lambda bodies,
+    /// coalesce fallbacks, match guards): occurrence-sensitive analyses treat these as
+    /// not-necessarily-executed. Value-safety traversals (e.g. division-by-literal-zero)
+    /// deliberately still walk them via Of().
+    /// </summary>
+    public static IEnumerable<BoundExpression> DeferredOf(BoundExpression expression) => expression switch
+    {
+        BoundNullCoalesce nc => [nc.Right],
+        BoundMatchExpression me => me.Cases.Where(c => c.Guard is not null).Select(c => c.Guard!),
+        BoundLambda lam => lam.ExpressionBody is null ? [] : [lam.ExpressionBody],
         _ => [],
     };
 }
@@ -941,6 +965,98 @@ public sealed class BoundTypeOfExpression : BoundExpression
     public override string TypeName => "TYPE";
     public BoundTypeOfExpression(TextSpan span, string targetTypeName) : base(span)
         => TargetTypeName = targetTypeName;
+}
+
+/// <summary>#762 B6: null-coalesce — the fallback is a DEFERRED child (evaluates only
+/// when the left is null); type follows the left operand.</summary>
+public sealed class BoundNullCoalesce : BoundExpression
+{
+    public BoundExpression Left { get; }
+    public BoundExpression Right { get; }
+    public override string TypeName { get; }
+    public BoundNullCoalesce(TextSpan span, BoundExpression left, BoundExpression right)
+        : base(span)
+    { Left = left; Right = right; TypeName = left.TypeName; }
+}
+
+/// <summary>#762 B6: null-conditional member access (x?.M) — the member's type is
+/// unknowable under string types; OBJECT placeholder until 0.14.</summary>
+public sealed class BoundNullConditional : BoundExpression
+{
+    public BoundExpression Target { get; }
+    public string MemberName { get; }
+    public override string TypeName => "OBJECT";
+    public BoundNullConditional(TextSpan span, BoundExpression target, string memberName)
+        : base(span)
+    { Target = target; MemberName = memberName; }
+}
+
+/// <summary>One bound match arm: the PATTERN is retained as its AST node (pattern
+/// binding is its own design, deferred with #786's checker re-platform — several
+/// PatternNode subclasses carry the broken-Accept hazard, so consumers use properties).
+/// The GUARD is a deferred expression child (BoundChildren.DeferredOf); the BODY is
+/// bound STATEMENTS reachable only through this node — expression-level traversals do
+/// not walk them, a consumer gap owned by #786 (same gap as BoundLambda.StatementBody).</summary>
+public sealed record BoundMatchExpressionCase(
+    PatternNode Pattern, BoundExpression? Guard,
+    IReadOnlyList<BoundStatement> Body, TextSpan Span);
+
+/// <summary>#762 B6: match expression — scrutinee immediate, guards deferred, arm
+/// bodies statement-level (see BoundMatchExpressionCase for the visibility gap).</summary>
+public sealed class BoundMatchExpression : BoundExpression
+{
+    public string Id { get; }
+    public BoundExpression Target { get; }
+    public IReadOnlyList<BoundMatchExpressionCase> Cases { get; }
+    public override string TypeName => "OBJECT";
+    public BoundMatchExpression(TextSpan span, string id, BoundExpression target,
+        IReadOnlyList<BoundMatchExpressionCase> cases) : base(span)
+    { Id = id; Target = target; Cases = cases; }
+}
+
+/// <summary>#762 B6: lambda — parameters declared in a child scope, bodies bound and
+/// DEFERRED. Expression bodies are expression children (visible to traversals via
+/// DeferredOf); STATEMENT bodies are bound statements reachable only through this node
+/// (expression-level traversals do not walk them — a consumer gap owned by #786).
+/// Function types are 0.15 (effect rows); OBJECT placeholder until then.</summary>
+public sealed class BoundLambda : BoundExpression
+{
+    public string Id { get; }
+    public IReadOnlyList<VariableSymbol> Parameters { get; }
+    /// <summary>Retained as AST (like BoundMatchExpressionCase.Pattern) — effect
+    /// CHECKING of lambda bodies is 0.15 effect-rows work; retention keeps the
+    /// declared row visible to consumers until then.</summary>
+    public EffectsNode? Effects { get; }
+    public bool IsAsync { get; }
+    public bool IsStatic { get; }
+    public BoundExpression? ExpressionBody { get; }
+    public IReadOnlyList<BoundStatement>? StatementBody { get; }
+    public override string TypeName => "OBJECT";
+    public BoundLambda(TextSpan span, string id, IReadOnlyList<VariableSymbol> parameters,
+        EffectsNode? effects, bool isAsync, bool isStatic, BoundExpression? expressionBody,
+        IReadOnlyList<BoundStatement>? statementBody) : base(span)
+    {
+        Id = id; Parameters = parameters; Effects = effects; IsAsync = isAsync;
+        IsStatic = isStatic; ExpressionBody = expressionBody; StatementBody = statementBody;
+    }
+}
+
+/// <summary>#762 B6: await — unwraps "Task&lt;T&gt;" → T / "Task" → VOID at the string level
+/// where the shape allows; ConfigureAwait retained.</summary>
+public sealed class BoundAwaitExpression : BoundExpression
+{
+    public BoundExpression Awaited { get; }
+    public bool? ConfigureAwait { get; }
+    public override string TypeName { get; }
+    public BoundAwaitExpression(TextSpan span, BoundExpression awaited, bool? configureAwait)
+        : base(span)
+    {
+        Awaited = awaited; ConfigureAwait = configureAwait;
+        var t = awaited.TypeName;
+        TypeName = t.StartsWith("Task<", StringComparison.Ordinal) && t.EndsWith(">", StringComparison.Ordinal)
+            ? t[5..^1]
+            : t is "Task" or "TASK" ? "VOID" : "OBJECT";
+    }
 }
 
 /// <summary>
