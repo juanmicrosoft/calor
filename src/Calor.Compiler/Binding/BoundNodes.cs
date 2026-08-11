@@ -29,6 +29,17 @@ public abstract class BoundStatement : BoundNode
 /// </summary>
 public abstract class BoundExpression : BoundNode
 {
+    /// <summary>
+    /// INFORMATIONAL type string — never compare for equality. The vocabulary is
+    /// deliberately two-layer (a pre-B-series reality): literal-family names are
+    /// canonical ("INT", "STRING", "DECIMAL"), while composed/derived forms use the
+    /// PARSER's surface spellings ("i32[]", "HashSet<i32>") so a bind statement's
+    /// variable and its initializer agree (the B3 alignment decision). Full
+    /// normalization is deferred BY DECISION (B5, resolving B4 review Major 1) to
+    /// 0.14's typed semantic representation, which replaces these strings wholesale
+    /// (roadmap §3.2) — a string-level unification now would either break parser
+    /// agreement or churn every family twice.
+    /// </summary>
     public abstract string TypeName { get; }
 
     protected BoundExpression(TextSpan span) : base(span) { }
@@ -486,6 +497,10 @@ public static class BoundChildren
         BoundCollectionContains cc => [cc.KeyOrValue],
         BoundCollectionCount cn => [cn.Collection],
         BoundTupleLiteral tl => tl.Elements,
+        // #762 B5 — conversion/pattern family.
+        BoundConversionExpression conv => [conv.Operand],
+        BoundTypeTest tt => [tt.Operand],
+        // (BoundTypeOfExpression and BoundDecimalLiteral have no expression children.)
         // #762 B4 — string family.
         BoundStringOperation so => so.Arguments,
         BoundInterpolatedString istr => istr.Parts
@@ -878,6 +893,54 @@ public sealed class BoundCharOperation : BoundExpression
             _ => "CHAR",
         };
     }
+}
+
+/// <summary>#762 B5 (item 4): decimal literal WITHOUT the double downcast the old
+/// switch applied ((double)value lost precision — the defect was visible in the arm).</summary>
+public sealed class BoundDecimalLiteral : BoundExpression
+{
+    public decimal Value { get; }
+    public override string TypeName => "DECIMAL";
+    public BoundDecimalLiteral(TextSpan span, decimal value) : base(span) => Value = value;
+}
+
+/// <summary>#762 B5: cast/as conversion — the operand is RETAINED as a child and the
+/// TypeName is the conversion TARGET (the old arm returned the operand itself, so a
+/// cast's static type was whatever the operand claimed — #762's evidence bullet).</summary>
+public sealed class BoundConversionExpression : BoundExpression
+{
+    public TypeOp Operation { get; }
+    public BoundExpression Operand { get; }
+    public string TargetType { get; }
+    public override string TypeName => TargetType;
+    public BoundConversionExpression(TextSpan span, TypeOp operation,
+        BoundExpression operand, string targetType) : base(span)
+    { Operation = operation; Operand = operand; TargetType = targetType; }
+}
+
+/// <summary>#762 B5: type test (both the `is` operator and is-pattern forms) — BOOL,
+/// with the operand retained and the pattern variable name carried. The old arms
+/// returned LITERAL TRUE, which a constant-aware checker could fold branches on.</summary>
+public sealed class BoundTypeTest : BoundExpression
+{
+    public BoundExpression Operand { get; }
+    public string TargetType { get; }
+    /// <summary>The is-pattern's declared variable (e.g. `x is Foo f`), if any.</summary>
+    public string? VariableName { get; }
+    public override string TypeName => "BOOL";
+    public BoundTypeTest(TextSpan span, BoundExpression operand, string targetType,
+        string? variableName) : base(span)
+    { Operand = operand; TargetType = targetType; VariableName = variableName; }
+}
+
+/// <summary>#762 B5: typeof — emits typeof(T) (System.Type). "TYPE" per the
+/// canonical-caps literal-family convention (review M2: no third spelling family).</summary>
+public sealed class BoundTypeOfExpression : BoundExpression
+{
+    public string TargetTypeName { get; }
+    public override string TypeName => "TYPE";
+    public BoundTypeOfExpression(TextSpan span, string targetTypeName) : base(span)
+        => TargetTypeName = targetTypeName;
 }
 
 /// <summary>

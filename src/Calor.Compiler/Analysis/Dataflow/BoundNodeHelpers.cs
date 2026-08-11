@@ -386,6 +386,9 @@ public static class BoundNodeHelpers
         {
             BoundIntLiteral intLit => intLit.Value == 0,
             BoundFloatLiteral floatLit => floatLit.Value == 0.0,
+            // #762 B5 review C1: DEC:0 divisors bound as BoundDecimalLiteral post-B5;
+            // without this arm a hard Calor0920 ERROR silently became nothing.
+            BoundDecimalLiteral d => d.Value == 0m,
             _ => false
         };
     }
@@ -395,7 +398,9 @@ public static class BoundNodeHelpers
     /// </summary>
     public static bool IsConstant(BoundExpression? expression)
     {
-        return expression is BoundIntLiteral or BoundFloatLiteral or BoundBoolLiteral or BoundStringLiteral;
+        // BoundDecimalLiteral added with the B5 decimal repair (review C1's sibling gap:
+        // known-safe DEC divisors lost their constant suppression).
+        return expression is BoundIntLiteral or BoundFloatLiteral or BoundBoolLiteral or BoundStringLiteral or BoundDecimalLiteral;
     }
 
     /// <summary>

@@ -339,8 +339,8 @@ public sealed class Binder
             [typeof(StringLiteralNode)] = (b, e) => { var n = (StringLiteralNode)e; return new BoundStringLiteral(n.Span, n.Value); },
             [typeof(BoolLiteralNode)] = (b, e) => { var n = (BoolLiteralNode)e; return new BoundBoolLiteral(n.Span, n.Value); },
             [typeof(FloatLiteralNode)] = (b, e) => { var n = (FloatLiteralNode)e; return new BoundFloatLiteral(n.Span, n.Value); },
-            // Known defect, preserved verbatim until B5 (#762 item 4): decimals downcast.
-            [typeof(DecimalLiteralNode)] = (b, e) => { var n = (DecimalLiteralNode)e; return new BoundFloatLiteral(n.Span, (double)n.Value); },
+            // B5 (#762 item 4): full-precision decimal — the downcast is gone.
+            [typeof(DecimalLiteralNode)] = (b, e) => { var n = (DecimalLiteralNode)e; return new BoundDecimalLiteral(n.Span, n.Value); },
             [typeof(ReferenceNode)] = (b, e) => b.BindReferenceExpression((ReferenceNode)e),
             [typeof(BinaryOperationNode)] = (b, e) => b.BindBinaryOperation((BinaryOperationNode)e),
             [typeof(UnaryOperationNode)] = (b, e) => b.BindUnaryOperation((UnaryOperationNode)e),
@@ -359,7 +359,22 @@ public sealed class Binder
             [typeof(FieldAccessNode)] = (b, e) => b.BindFieldAccess((FieldAccessNode)e),
             [typeof(NewExpressionNode)] = (b, e) => b.BindNewExpression((NewExpressionNode)e),
             [typeof(TypeOperationNode)] = (b, e) => b.BindTypeOperation((TypeOperationNode)e),
-            [typeof(IsPatternNode)] = (b, e) => b.BindIsPattern((IsPatternNode)e),
+            [typeof(IsPatternNode)] = (b, e) =>
+                {
+                    // B5: pattern tests no longer fold to literal true (#762 evidence).
+                    var n = (IsPatternNode)e;
+                    var bound = new BoundTypeTest(n.Span, b.BindExpression(n.Operand),
+                        n.TargetType, n.VariableName);
+                    // Review M3: the pattern VARIABLE (`x is Foo f`) is a declaration —
+                    // without this, `f` was "retained" into a node nothing consumes while
+                    // every later use was a hard Undefined-variable error. Scoped to the
+                    // enclosing bind scope (approximates C#'s definite-assignment scope).
+                    if (n.VariableName is not null)
+                        b._scope.TryDeclare(new VariableSymbol(n.VariableName, n.TargetType, isMutable: false));
+                    return bound;
+                },
+            [typeof(TypeOfExpressionNode)] = (b, e) =>
+                { var n = (TypeOfExpressionNode)e; return new BoundTypeOfExpression(n.Span, n.TypeName); },
             // #762 B2 — the core-9 family (SelfRefNode excepted: dormant, see s_tierBReasons).
             [typeof(SomeExpressionNode)] = (b, e) =>
                 { var n = (SomeExpressionNode)e; return new BoundSomeExpression(n.Span, b.BindExpression(n.Value)); },
@@ -544,25 +559,19 @@ public sealed class Binder
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
     {
+        // B5 (#762 items 1/4): casts and `as` produce a real conversion node carrying
+        // the TARGET type (the old arm returned the operand — a cast's static type was
+        // whatever the operand claimed); `is` produces a real BOOL type test (the old
+        // arm returned LITERAL TRUE, which constant-aware checkers could fold on).
         var operand = BindExpression(typeOp.Operand);
         return typeOp.Operation switch
         {
-            // Cast: bind inner expression and return it — the value is preserved,
-            // type changes to TargetType. This prevents (cast f64 nonZeroExpr)
-            // from becoming BoundIntLiteral(0) via the fallback path.
-            TypeOp.Cast => operand,
-            // Is: result is always BOOL
-            TypeOp.Is => new BoundBoolLiteral(typeOp.Span, true),
-            // As: result has the target type (nullable), bind inner
-            TypeOp.As => operand,
-            _ => BindFallbackExpression(typeOp)
+            TypeOp.Cast or TypeOp.As => new BoundConversionExpression(
+                typeOp.Span, typeOp.Operation, operand, typeOp.TargetType),
+            TypeOp.Is => new BoundTypeTest(typeOp.Span, operand, typeOp.TargetType, null),
+            // TypeOp is enum-complete above; fail loud if a member is ever added.
+            _ => throw new NotSupportedException($"Unknown TypeOp: {typeOp.Operation}"),
         };
-    }
-
-    private BoundExpression BindIsPattern(IsPatternNode isPattern)
-    {
-        BindExpression(isPattern.Operand); // bind for side effects
-        return new BoundBoolLiteral(isPattern.Span, true);
     }
 
     private BoundExpression BindNewExpression(NewExpressionNode newExpr)

@@ -164,9 +164,12 @@ items 1–3 (B1–B8 families), 4 (B5), 5–6 (B8), 7 (B8), 8 (B1 expression-hal
   vocabulary is bifurcated — scalars use canonical forms ("STRING") while composed types use
   surface forms ("str[]", "i32[]"), so array-element derivation yields "str" where scalar
   string expressions say "STRING". Latent (no consumer equality-compares bound TypeNames —
-  verified), but B5/B6 must not mint more derived types on top of it. Candidate: all bound
-  TypeNames pass through AttributeHelper's canonical expansion at construction. Decide and
-  apply in B5.
+  verified), but B5/B6 must not mint more derived types on top of it. DECIDED IN B5 (#907): **documented deferral** —
+  the two-layer vocabulary (canonical literal families + parser-surface composed forms) is
+  stated on `BoundExpression.TypeName` with the rationale (string unification would break the
+  B3 parser-agreement or churn every family twice); 0.14's typed representation replaces the
+  strings wholesale. Bound TypeNames are informational and never equality-compared; B6+ may
+  not mint spellings outside the two layers (the "Type"→"TYPE" correction enforced this).
 - **CI cost budget (review m2):** the corpus leg must stay under **5 minutes**; B1 measures and
   publishes the actual cost; the conversion leg's migrate outputs are cached per pinned subject
   commit (they are deterministic at a frozen commit).
