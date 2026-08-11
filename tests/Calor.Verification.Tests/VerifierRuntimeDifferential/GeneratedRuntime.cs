@@ -135,7 +135,8 @@ internal sealed class GeneratedRuntime : IDisposable
             ?? throw new InvalidOperationException("Generated Probe type was not found.");
         var value = Activator.CreateInstance(type)
             ?? throw new InvalidOperationException("Generated Probe instance could not be created.");
-        type.GetField("Value", BindingFlags.Public | BindingFlags.Instance)?.SetValue(value, 7);
+        type.GetField("Value", BindingFlags.Public | BindingFlags.Instance)
+            ?.SetValue(value, DifferentialGate.ProbeFieldWitness);
         return value;
     }
 

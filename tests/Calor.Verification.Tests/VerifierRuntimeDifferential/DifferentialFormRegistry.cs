@@ -359,9 +359,9 @@ internal static class DifferentialFormRegistry
     {
         var field = new FieldAccessNode(Span, Ref("probe"), "Value");
         return Bin(
-            provable ? BinaryOperator.Equal : BinaryOperator.NotEqual,
+            provable ? BinaryOperator.LessOrEqual : BinaryOperator.GreaterThan,
             field,
-            field);
+            Int(byte.MaxValue));
     }
 
     private static FormExpression NoParameters(ExpressionNode condition) =>

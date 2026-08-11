@@ -17,6 +17,8 @@ internal static class DifferentialGate
 {
     public const string PinnedWhitelistSha256 =
         "6dbdc9c0e1ec122ec1110013cb023ac51109ae5452b55ad00a0b782b471ec463";
+    internal const string ProbeFieldType = "u8";
+    internal const byte ProbeFieldWitness = byte.MaxValue;
 
     private const int MaximumDepth = 3;
     private static readonly TextSpan Span = TextSpan.Empty;
@@ -189,9 +191,9 @@ internal static class DifferentialGate
                 new ClassFieldNode(
                     Span,
                     "Value",
-                    "i32",
+                    ProbeFieldType,
                     Visibility.Public,
-                    new IntLiteralNode(Span, 7),
+                    new IntLiteralNode(Span, ProbeFieldWitness),
                     Attributes)
             ],
             methods: Array.Empty<MethodNode>(),
@@ -645,9 +647,9 @@ internal static class DifferentialGate
                     "§Q/§S/§PROOF acceptance of an unbound '#'.",
                 ["expression-kind:FieldAccessNode"] =
                     "The production contract pass and obligation solver derive field types from module " +
-                    "class declarations. Probe.Value is translated as a typed uninterpreted accessor and " +
-                    "executed against a generated Probe instance; proofs remain explicitly Assumed under " +
-                    "the nullable-reference model."
+                    "class declarations. Probe.Value is a u8 accessor checked against its 255 upper bound " +
+                    "and executed at that boundary; the historical guessed-i32 fallback cannot prove the " +
+                    "bound. Proofs remain explicitly Assumed under the nullable-reference model."
             },
             formCoverage,
             failSafeControls,

@@ -33,7 +33,7 @@
   },
   "encodingNotes": {
     "expression-kind:SelfRefNode": "The harness binds \u0027#\u0027 to an i32 parameter named \u0027__self__\u0027 before translation; the emitter\u0027s existing SelfRef lowering targets the same generated parameter. This exercises the modeled refinement meaning without claiming ordinary source-level \u00A7Q/\u00A7S/\u00A7PROOF acceptance of an unbound \u0027#\u0027.",
-    "expression-kind:FieldAccessNode": "The production contract pass and obligation solver derive field types from module class declarations. Probe.Value is translated as a typed uninterpreted accessor and executed against a generated Probe instance; proofs remain explicitly Assumed under the nullable-reference model."
+    "expression-kind:FieldAccessNode": "The production contract pass and obligation solver derive field types from module class declarations. Probe.Value is a u8 accessor checked against its 255 upper bound and executed at that boundary; the historical guessed-i32 fallback cannot prove the bound. Proofs remain explicitly Assumed under the nullable-reference model."
   },
   "forms": [
     {

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Runtime.CompilerServices;
+using Calor.Compiler.Ast;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Microsoft.Z3;
@@ -86,6 +87,35 @@ public sealed class VerifierRuntimeDifferentialTests
                 committedBytes.AsSpan().SequenceEqual(generatedBytes),
                 $"Committed report is stale: {path}. Set {UpdateReportsVariable}=1 and rerun this test.");
         }
+    }
+
+    [Fact]
+    public void FieldAccessProbeUsesU8BoundAndRejectsHistoricalI32Fallback()
+    {
+        Assert.True(
+            Z3ContextFactory.IsAvailable,
+            "Field-access regression cannot run: Z3 is unavailable.");
+
+        var form = DifferentialFormRegistry.Build().Single(
+            candidate => candidate.Id == "expression-kind:FieldAccessNode");
+        var bound = Assert.IsType<BinaryOperationNode>(
+            form.Build(CasePolarity.Provable).Condition);
+        Assert.Equal(BinaryOperator.LessOrEqual, bound.Operator);
+        Assert.IsType<FieldAccessNode>(bound.Left);
+        Assert.Equal(byte.MaxValue, Assert.IsType<IntLiteralNode>(bound.Right).Value);
+        Assert.Equal(byte.MaxValue, DifferentialGate.ProbeFieldWitness);
+
+        using var context = Z3ContextFactory.Create();
+        var registered = TranslateFieldBound(
+            context,
+            bound,
+            DifferentialGate.ProbeFieldType);
+        var guessed = TranslateFieldBound(context, bound, "i32");
+
+        Assert.Equal(8u, registered.Width);
+        Assert.Equal(Status.UNSATISFIABLE, registered.NegatedBoundStatus);
+        Assert.Equal(32u, guessed.Width);
+        Assert.Equal(Status.SATISFIABLE, guessed.NegatedBoundStatus);
     }
 
     [Fact]
@@ -178,5 +208,33 @@ public sealed class VerifierRuntimeDifferentialTests
         return fileExists(Path.Combine(directory, "Directory.Build.props"))
             && (directoryExists(Path.Combine(directory, ".git"))
                 || fileExists(Path.Combine(directory, ".git")));
+    }
+
+    private static (uint Width, Status NegatedBoundStatus) TranslateFieldBound(
+        Context context,
+        BinaryOperationNode bound,
+        string fieldType)
+    {
+        var translator = new ContractTranslator(context);
+        translator.SetUserTypeRegistry(
+            new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal)
+            {
+                ["probe"] = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["Value"] = fieldType
+                }
+            });
+        Assert.True(translator.DeclareVariable("probe", "Probe"));
+
+        var field = Assert.IsType<FieldAccessNode>(bound.Left);
+        var translatedField = translator.TranslateBitVecExpr(field);
+        Assert.NotNull(translatedField);
+
+        var translatedBound = translator.TranslateBoolExpr(bound);
+        Assert.NotNull(translatedBound);
+
+        using var solver = context.MkSolver();
+        solver.Assert(context.MkNot(translatedBound));
+        return (translatedField.SortSize, solver.Check());
     }
 }

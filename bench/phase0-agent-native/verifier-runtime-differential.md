@@ -33,7 +33,7 @@
 ## Encoding notes
 
 - `expression-kind:SelfRefNode` — The harness binds '#' to an i32 parameter named '__self__' before translation; the emitter's existing SelfRef lowering targets the same generated parameter. This exercises the modeled refinement meaning without claiming ordinary source-level §Q/§S/§PROOF acceptance of an unbound '#'.
-- `expression-kind:FieldAccessNode` — The production contract pass and obligation solver derive field types from module class declarations. Probe.Value is translated as a typed uninterpreted accessor and executed against a generated Probe instance; proofs remain explicitly Assumed under the nullable-reference model.
+- `expression-kind:FieldAccessNode` — The production contract pass and obligation solver derive field types from module class declarations. Probe.Value is a u8 accessor checked against its 255 upper bound and executed at that boundary; the historical guessed-i32 fallback cannot prove the bound. Proofs remain explicitly Assumed under the nullable-reference model.
 
 ## Explicit Assumed allowances
 

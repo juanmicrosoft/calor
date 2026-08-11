@@ -32,8 +32,11 @@ Every row asserts that its registered form actually occurs in the base AST.
 meaning without presenting unbound `#` as ordinary source-valid `§Q`/`§S`/`§PROOF`.
 
 `FieldAccessNode` runs through the production module-derived type registry. The contract pass and
-obligation solver derive `Probe.Value: i32` from the generated class declaration, translate it as a
-typed uninterpreted accessor, and execute the same access on the generated `Probe` instance.
+obligation solver derive `Probe.Value: u8` from the generated class declaration and translate it as
+an 8-bit unsigned uninterpreted accessor. The generated predicate checks the `255` upper bound and
+executes with the runtime witness at that boundary. The registered `u8` sort makes the bound
+provable (or explicitly assumed under the nullable-reference model); the historical guessed-`i32`
+fallback leaves a counterexample and therefore fails the gate rather than accidentally matching.
 
 ## Oracle
 
