@@ -12,8 +12,8 @@ public class TrxParserTests
             <?xml version="1.0" encoding="utf-8"?>
             <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
               <Results>
-                <UnitTestResult testName="Test1" outcome="Passed" duration="00:00:00.001" />
-                <UnitTestResult testName="Test2" outcome="Failed" duration="00:00:00.050">
+                <UnitTestResult testId="id-1" testName="Test1" outcome="Passed" duration="00:00:00.001" />
+                <UnitTestResult testId="id-2" testName="Test2" outcome="Failed" duration="00:00:00.050">
                   <Output>
                     <ErrorInfo>
                       <Message>Assert.Equal failed</Message>
@@ -21,8 +21,16 @@ public class TrxParserTests
                     </ErrorInfo>
                   </Output>
                 </UnitTestResult>
-                <UnitTestResult testName="Test3" outcome="NotExecuted" duration="00:00:00.000" />
+                <UnitTestResult testId="id-3" testName="Test3" outcome="NotExecuted" duration="00:00:00.000" />
               </Results>
+              <TestDefinitions>
+                <UnitTest id="id-1"><TestMethod /></UnitTest>
+                <UnitTest id="id-2"><TestMethod /></UnitTest>
+                <UnitTest id="id-3"><TestMethod /></UnitTest>
+              </TestDefinitions>
+              <ResultSummary outcome="Failed">
+                <Counters total="3" executed="2" passed="1" failed="1" notExecuted="0" />
+              </ResultSummary>
             </TestRun>
             """;
 
@@ -58,6 +66,10 @@ public class TrxParserTests
             <?xml version="1.0" encoding="utf-8"?>
             <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
               <Results />
+              <TestDefinitions />
+              <ResultSummary outcome="Completed">
+                <Counters total="0" executed="0" passed="0" failed="0" notExecuted="0" />
+              </ResultSummary>
             </TestRun>
             """;
 
@@ -142,9 +154,10 @@ public class TrxParserTests
                 Path.Combine(tmpDir, "B", "TestResults", "results.trx"),
                 MakeTrx("beta.tests.dll", "Beta.Tests.Suite", ("SharedName", "Failed"), ("OnlyInB", "Passed")));
 
-            var (results, trxFiles) = TrxParser.ParseAll(tmpDir);
+            var (results, trxFiles, parseErrors) = TrxParser.ParseAll(tmpDir);
 
             Assert.Equal(2, trxFiles.Count);
+            Assert.Empty(parseErrors);
             Assert.Equal(4, results.Count);
             Assert.Equal(3, results.Count(r => r.Outcome == "Passed"));
             Assert.Equal(1, results.Count(r => r.Outcome == "Failed"));
@@ -161,7 +174,7 @@ public class TrxParserTests
     }
 
     [Fact]
-    public void ParseAll_SkipsUnparseableTrx_KeepsRest()
+    public void ParseAll_ReportsUnparseableTrx()
     {
         var tmpDir = Path.Combine(Path.GetTempPath(), "trx-bad-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(tmpDir);
@@ -173,10 +186,66 @@ public class TrxParserTests
                 Path.Combine(tmpDir, "good.trx"),
                 MakeTrx("alpha.tests.dll", "Alpha.Tests.Suite", ("TestA", "Passed")));
 
-            var (results, trxFiles) = TrxParser.ParseAll(tmpDir);
+            var (results, trxFiles, parseErrors) = TrxParser.ParseAll(tmpDir);
 
             Assert.Single(trxFiles);
             Assert.Single(results);
+            Assert.Single(parseErrors);
+            Assert.Contains("bad.trx", parseErrors[0], StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public void ParseAll_ReportsStructurallyIncompleteTrx()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "trx-incomplete-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(tmpDir);
+
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(tmpDir, "partial.trx"),
+                """
+                <TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+                  <Results />
+                  <TestDefinitions />
+                </TestRun>
+                """);
+
+            var (results, trxFiles, parseErrors) = TrxParser.ParseAll(tmpDir);
+
+            Assert.Empty(trxFiles);
+            Assert.Empty(results);
+            Assert.Single(parseErrors);
+            Assert.Contains("ResultSummary/Counters", parseErrors[0], StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public void ParseAll_ReportsResultWithInvalidOutcome()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "trx-outcome-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(tmpDir);
+
+        try
+        {
+            var malformed = MakeTrx("alpha.tests.dll", "Alpha.Tests.Suite", ("TestA", "Unknown"));
+            File.WriteAllText(Path.Combine(tmpDir, "invalid-outcome.trx"), malformed);
+
+            var (results, trxFiles, parseErrors) = TrxParser.ParseAll(tmpDir);
+
+            Assert.Empty(trxFiles);
+            Assert.Empty(results);
+            Assert.Single(parseErrors);
+            Assert.Contains("invalid outcome", parseErrors[0], StringComparison.Ordinal);
         }
         finally
         {
@@ -195,6 +264,9 @@ public class TrxParserTests
                   <TestMethod codeBase="/work/bin/Debug/{assembly}" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="{className}" name="{t.Name}" />
                 </UnitTest>
             """));
+        var passed = tests.Count(test => test.Outcome == "Passed");
+        var failed = tests.Count(test => test.Outcome == "Failed");
+        var notExecuted = tests.Length - passed - failed;
 
         return $"""
             <?xml version="1.0" encoding="utf-8"?>
@@ -205,6 +277,9 @@ public class TrxParserTests
               <TestDefinitions>
             {definitions}
               </TestDefinitions>
+              <ResultSummary outcome="{(failed > 0 ? "Failed" : "Completed")}">
+                <Counters total="{tests.Length}" executed="{passed + failed}" passed="{passed}" failed="{failed}" notExecuted="{notExecuted}" />
+              </ResultSummary>
             </TestRun>
             """;
     }

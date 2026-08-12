@@ -170,6 +170,9 @@ public sealed class TestRunResult
     /// <summary>Every TRX file parsed for this run (all of them — never newest-only).</summary>
     public List<string> TrxFiles { get; init; } = [];
 
+    /// <summary>TRX files that could not be parsed; any entry makes the run incomplete.</summary>
+    public List<string> ParseErrors { get; init; } = [];
+
     /// <summary>True when counts came from console-output parsing because no structured TRX results were found.</summary>
     public bool UsedConsoleFallback { get; init; }
 

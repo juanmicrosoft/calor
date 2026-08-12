@@ -388,17 +388,16 @@ public class BugPatternTests
       §R (CALL opt.unwrap)";
 
         var func = GetFunction(source, out var parseDiag);
-        // May have parse errors if Option<i32> isn't recognized
-        if (parseDiag.HasErrors) return;
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
 
         var diagnostics = new DiagnosticBag();
         var checker = new NullDereferenceChecker(DefaultOptions);
         checker.Check(func, diagnostics);
 
         // Should warn about unwrap without is_some check
-        Assert.True(diagnostics.Warnings.Any(d =>
+        Assert.Contains(diagnostics.Warnings, d =>
             d.Code == DiagnosticCode.UnsafeUnwrap ||
-            d.Code == DiagnosticCode.NullDereference) || true);
+            d.Code == DiagnosticCode.NullDereference);
     }
 
     [Fact]
@@ -412,7 +411,7 @@ public class BugPatternTests
       §R (CALL opt.unwrap_or INT:0)";
 
         var func = GetFunction(source, out var parseDiag);
-        if (parseDiag.HasErrors) return;
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
 
         var diagnostics = new DiagnosticBag();
         var checker = new NullDereferenceChecker(DefaultOptions);
@@ -426,51 +425,6 @@ public class BugPatternTests
     #endregion
 
     #region Index Out of Bounds Tests
-
-    [Fact]
-    public void IndexOOB_NegativeLiteralIndex_ReportsError()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Access:pub}
-      §I{Array<i32>:arr}
-      §O{i32}
-      §R (CALL arr.get INT:-1)";
-
-        var func = GetFunction(source, out var parseDiag);
-        if (parseDiag.HasErrors) return;
-
-        var diagnostics = new DiagnosticBag();
-        var checker = new IndexOutOfBoundsChecker(DefaultOptions);
-        checker.Check(func, diagnostics);
-
-        // Negative literal index should be an error
-        var hasOobDiag = diagnostics.HasErrors ||
-            diagnostics.Warnings.Any(d => d.Code == DiagnosticCode.IndexOutOfBounds);
-        Assert.True(hasOobDiag || true); // May not trigger if arr.get not recognized
-    }
-
-    [Fact]
-    public void IndexOOB_VariableIndex_NoBoundsCheck_ReportsWarning()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Access:pub}
-      §I{Array<i32>:arr}
-      §I{i32:idx}
-      §O{i32}
-      §R (CALL arr.get idx)";
-
-        var func = GetFunction(source, out var parseDiag);
-        if (parseDiag.HasErrors) return;
-
-        var diagnostics = new DiagnosticBag();
-        var checker = new IndexOutOfBoundsChecker(DefaultOptions);
-        checker.Check(func, diagnostics);
-
-        // Variable index without bounds check should warn
-        Assert.True(diagnostics.Warnings.Any() || true); // May not trigger
-    }
 
     #endregion
 
@@ -821,7 +775,7 @@ public class BugPatternTests
         var yWarnings = diagnostics.Warnings
             .Where(d => d.Code == DiagnosticCode.DivisionByZero && d.Message.Contains("'y'"))
             .ToList();
-        Assert.True(yWarnings.Count == 0 || true); // May or may not detect guard
+        Assert.Empty(yWarnings);
     }
 
     [Fact]

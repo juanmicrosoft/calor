@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "warmupRuns": 1,
+  "measuredRuns": 3,
+  "expectedTestCount": 19,
+  "metrics": {
+    "performance-suite-seconds": {
+      "maximumMedian": 20.0,
+      "noisePolicy": "One warmup is discarded; three isolated runs are measured; the median must remain at or below the ratcheted maximum."
+    }
+  }
+}

@@ -661,38 +661,6 @@ public class McpServerTests
         Assert.Contains(":0", json);
     }
 
-    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic is obsolete under indent-only (no closing tags)")]
-    public async Task McpMessageHandler_HandleToolsCall_DiagnoseTool_WithMismatchedId_IncludesFix()
-    {
-        var handler = new McpMessageHandler();
-        var request = new JsonRpcRequest
-        {
-            Id = JsonDocument.Parse("22").RootElement,
-            Method = "tools/call",
-            Params = JsonDocument.Parse("""
-                {
-                    "name": "calor_check",
-                    "arguments": {
-                        "source": "§M{m001:Test} §F{f001:Add} §O{i32} §R 42"
-                    }
-                }
-                """).RootElement
-        };
-
-        var response = await handler.HandleRequestAsync(request);
-
-        Assert.NotNull(response);
-        Assert.Null(response.Error);
-        Assert.NotNull(response.Result);
-
-        var json = JsonSerializer.Serialize(response.Result, McpJsonOptions.Default);
-
-        // Verify mismatched ID error with fix
-        Assert.Contains("f001", json);
-        Assert.Contains("f002", json);
-        Assert.Contains("fix", json);
-    }
-
     [Fact]
     public async Task McpServer_ProcessMessage_DiagnoseToolWithSuggestions()
     {

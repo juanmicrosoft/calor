@@ -107,6 +107,7 @@ async Task<int> RunCommand(string[] runArgs)
         if (config == null)
         {
             Console.Error.WriteLine($"Unknown project: {projectName}. Use 'list' to see known projects.");
+            anyFailure = true;
             continue;
         }
 
@@ -175,7 +176,7 @@ async Task<int> RunCommand(string[] runArgs)
         }
         Console.WriteLine($"   Report: {mdPath}");
 
-        if (report.Comparison?.Regressions.Count > 0)
+        if (RoundTripExitPolicy.IsFailure(report))
             anyFailure = true;
     }
 

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "components": {
+    "verifier": { "path": "Verification/", "line": 74.0, "branch": 65.0 },
+    "emitter": { "path": "CodeGen/", "line": 82.0, "branch": 77.0 },
+    "binder": { "path": "Binding/", "line": 88.0, "branch": 78.0 },
+    "migration": { "path": "Migration/", "line": 78.0, "branch": 71.0 },
+    "dataflow": { "path": "Analysis/Dataflow/", "line": 66.0, "branch": 64.0 },
+    "taint": { "path": "Analysis/Security/", "line": 75.0, "branch": 67.0 },
+    "effects": { "path": "Effects/", "line": 51.0, "branch": 47.0 }
+  }
+}

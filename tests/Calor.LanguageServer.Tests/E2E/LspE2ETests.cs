@@ -16,7 +16,7 @@ public class LspE2ETests : IDisposable
     private readonly ITestOutputHelper _output;
     private Process? _serverProcess;
     private StreamWriter? _serverInput;
-    private StreamReader? _serverOutput;
+    private Stream? _serverOutput;
     private int _messageId = 0;
 
     public LspE2ETests(ITestOutputHelper output)
@@ -57,7 +57,7 @@ public class LspE2ETests : IDisposable
         }
 
         _serverInput = _serverProcess.StandardInput;
-        _serverOutput = _serverProcess.StandardOutput;
+        _serverOutput = _serverProcess.StandardOutput.BaseStream;
 
         // Capture stderr for debugging
         _serverProcess.ErrorDataReceived += (sender, e) =>
@@ -158,8 +158,9 @@ public class LspE2ETests : IDisposable
         using var cts = new CancellationTokenSource(timeoutMs);
         try
         {
+            var output = _serverOutput ?? throw new InvalidOperationException("Server output is unavailable");
             // Read headers
-            var headerLine = await _serverOutput!.ReadLineAsync(cts.Token);
+            var headerLine = await ReadLineAsync(output, cts.Token);
             if (headerLine == null)
             {
                 throw new InvalidOperationException("Server closed connection");
@@ -175,14 +176,14 @@ public class LspE2ETests : IDisposable
             var contentLength = int.Parse(headerLine.Substring(contentLengthPrefix.Length));
 
             // Read empty line
-            await _serverOutput.ReadLineAsync(cts.Token);
+            await ReadLineAsync(output, cts.Token);
 
-            // Read content
-            var buffer = new char[contentLength];
+            // Content-Length is a byte count, not a UTF-16 character count.
+            var buffer = new byte[contentLength];
             var totalRead = 0;
             while (totalRead < contentLength)
             {
-                var read = await _serverOutput.ReadAsync(buffer.AsMemory(totalRead, contentLength - totalRead), cts.Token);
+                var read = await output.ReadAsync(buffer.AsMemory(totalRead, contentLength - totalRead), cts.Token);
                 if (read == 0)
                 {
                     throw new InvalidOperationException("Server closed connection while reading content");
@@ -190,11 +191,31 @@ public class LspE2ETests : IDisposable
                 totalRead += read;
             }
 
-            return new string(buffer);
+            return Encoding.UTF8.GetString(buffer);
         }
+
         catch (OperationCanceledException)
         {
             throw new TimeoutException($"Timed out after {timeoutMs}ms waiting for server response");
+        }
+    }
+
+    private static async Task<string?> ReadLineAsync(Stream stream, CancellationToken cancellationToken)
+    {
+        using var buffer = new MemoryStream();
+        var singleByte = new byte[1];
+        while (true)
+        {
+            var read = await stream.ReadAsync(singleByte, cancellationToken);
+            if (read == 0)
+                return buffer.Length == 0 ? null : Encoding.ASCII.GetString(buffer.ToArray());
+            if (singleByte[0] == (byte)'\n')
+            {
+                var bytes = buffer.ToArray();
+                var length = bytes.Length > 0 && bytes[^1] == (byte)'\r' ? bytes.Length - 1 : bytes.Length;
+                return Encoding.ASCII.GetString(bytes, 0, length);
+            }
+            buffer.WriteByte(singleByte[0]);
         }
     }
 
@@ -253,7 +274,7 @@ public class LspE2ETests : IDisposable
         Assert.False(_serverProcess!.HasExited);
     }
 
-    [Fact(Skip = "Requires proper client capabilities which cause OmniSharp to hang")]
+    [Fact]
     public async Task HoverAsync_ReturnsInfo()
     {
         await StartServerAsync();
@@ -291,14 +312,15 @@ public class LspE2ETests : IDisposable
         var response = await SendRequestAsync("textDocument/hover", new
         {
             textDocument = new { uri = "file:///test/test.calr" },
-            position = new { line = 1, character = 8 } // Should be on "Add"
+            position = new { line = 1, character = 11 }
         });
 
         Assert.True(response.RootElement.TryGetProperty("result", out var result));
-        // Result might be null if hover position doesn't match, but server shouldn't error
+        Assert.NotEqual(JsonValueKind.Null, result.ValueKind);
+        Assert.Contains("Add", result.GetRawText(), StringComparison.Ordinal);
     }
 
-    [Fact(Skip = "Requires proper client capabilities which cause OmniSharp to hang")]
+    [Fact]
     public async Task CompletionAsync_ReturnsItems()
     {
         await StartServerAsync();
@@ -334,7 +356,11 @@ public class LspE2ETests : IDisposable
         });
 
         Assert.True(response.RootElement.TryGetProperty("result", out var result));
-        // Should return completion items for tags
+        Assert.Equal(JsonValueKind.Array, result.ValueKind);
+        Assert.NotEmpty(result.EnumerateArray());
+        Assert.Contains(
+            result.EnumerateArray(),
+            item => item.TryGetProperty("label", out var label) && label.GetString() == "§M");
     }
 
     [Fact]

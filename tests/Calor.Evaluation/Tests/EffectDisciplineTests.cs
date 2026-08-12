@@ -805,25 +805,6 @@ public static class Solution
     #region EffectAnalyzerRunner Integration Tests
 
     [Fact]
-    public void EffectAnalyzerRunner_LoadsAnalyzersOrFallsBackToHeuristics()
-    {
-        // This test verifies that EffectAnalysis works regardless of whether
-        // Roslyn analyzers are available or heuristics are used
-        var runner = new EffectAnalyzerRunner();
-
-        // Test that the runner can analyze code (either way)
-        var diagnostics = runner.Analyze(@"
-public static class Test
-{
-    public static string GetTime() => DateTime.Now.ToString();
-}", "flaky-test-prevention");
-
-        // Should detect DateTime.Now either via Roslyn or heuristics
-        Assert.True(diagnostics.Count > 0 || true, // Always passes - we just want to ensure no exception
-            "Analyzer runner should work (via Roslyn or heuristics)");
-    }
-
-    [Fact]
     public async Task EffectAnalysis_ReportsWhetherAnalyzersWereUsed()
     {
         var code = @"

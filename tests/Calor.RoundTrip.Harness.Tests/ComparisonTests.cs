@@ -122,6 +122,111 @@ public class ComparisonTests
     }
 
     [Fact]
+    public void ZeroTestRun_ReturnsIncomplete()
+    {
+        var empty = new TestRunResult { ExitCode = 0 };
+
+        var result = Compare(empty, empty, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+    }
+
+    [Fact]
+    public void AbortedTesthostWithoutFailures_ReturnsIncomplete()
+    {
+        var baseline = MakeTestRun("Test1:Passed");
+        var aborted = new TestRunResult { ExitCode = 1 };
+
+        var result = Compare(baseline, aborted, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+    }
+
+    [Fact]
+    public void ReducedTestInventory_ReturnsIncomplete()
+    {
+        var baseline = MakeTestRun("Test1:Passed", "Test2:Passed");
+        var roundTrip = MakeTestRun("Test1:Passed");
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+    }
+
+    [Fact]
+    public void PassingTestThatBecomesSkipped_IsARegression()
+    {
+        var baseline = MakeTestRun("Test1:Passed", "Test2:Passed");
+        var roundTrip = MakeTestRun("Test1:Passed", "Test2:Skipped");
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
+        Assert.Equal("Skipped", Assert.Single(result.Regressions).Outcome);
+    }
+
+    [Fact]
+    public void IdentitylessConsoleFallback_IsIncomplete()
+    {
+        var baseline = new TestRunResult
+        {
+            TotalTests = 1,
+            Passed = 1,
+            UsedConsoleFallback = true,
+        };
+        var roundTrip = new TestRunResult
+        {
+            TotalTests = 1,
+            Passed = 1,
+            UsedConsoleFallback = true,
+        };
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+    }
+
+    [Fact]
+    public void DuplicateTheoryIdentities_AreComparedAsAMultiset()
+    {
+        var baseline = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"));
+        var roundTrip = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
+            ("tests.dll", "Suite", "SameTheoryRow", "Failed"));
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
+        Assert.Single(result.Regressions);
+    }
+
+    [Fact]
+    public void SkippedTestThatBecomesFailed_IsARegression()
+    {
+        var baseline = MakeTestRun("Test1:Skipped");
+        var roundTrip = MakeTestRun("Test1:Failed");
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
+        Assert.Equal("Failed", Assert.Single(result.Regressions).Outcome);
+    }
+
+    [Fact]
+    public void FailedTestThatBecomesSkipped_IsARegression()
+    {
+        var baseline = MakeTestRun("Test1:Failed");
+        var roundTrip = MakeTestRun("Test1:Skipped");
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
+        Assert.Equal("Skipped", Assert.Single(result.Regressions).Outcome);
+    }
+
+    [Fact]
     public void DuplicateDisplayNames_AcrossAssemblies_NotConflated()
     {
         // Same display name "SharedName" in two assemblies: passing in alpha,

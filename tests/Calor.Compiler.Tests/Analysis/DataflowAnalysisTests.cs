@@ -164,9 +164,8 @@ public class DataflowAnalysisTests
         var cfg = ControlFlowGraph.Build(func);
         var analysis = new ReachingDefinitionsAnalysis(cfg);
 
-        // The definition of x should reach the exit
         var exitDefs = analysis.GetReachingDefinitionsAtExit(cfg.Exit).ToList();
-        Assert.NotNull(exitDefs);
+        Assert.Contains(exitDefs, definition => definition.VariableName == "x");
     }
 
     [Fact]
@@ -249,30 +248,8 @@ public class DataflowAnalysisTests
         var cfg = ControlFlowGraph.Build(func);
         var analysis = new LiveVariablesAnalysis(cfg);
 
-        // x should be live at entry since it's used in return
         var entryLive = analysis.GetLiveVariablesAtEntry(cfg.Entry).ToList();
-        Assert.NotNull(entryLive);
-    }
-
-    [Fact]
-    public void LiveVariables_UnusedBinding_Detected()
-    {
-        // Test dead code detection via unused binding
-        var source = @"
-§M{m001:Test}
-  §F{f001:Dead:pub}
-      §O{i32}
-      §B{x:i32} INT:1
-      §B{y:i32} INT:2
-      §R INT:0";
-
-        var func = GetFunction(source);
-        var cfg = ControlFlowGraph.Build(func);
-        var analysis = new LiveVariablesAnalysis(cfg);
-
-        var deadAssignments = analysis.FindDeadAssignments().ToList();
-        // x and y are assigned but never used - should be detected as dead
-        Assert.True(deadAssignments.Count >= 0); // May or may not detect
+        Assert.Contains("x", entryLive);
     }
 
     [Fact]
@@ -313,7 +290,7 @@ public class DataflowAnalysisTests
         var analysis = new LiveVariablesAnalysis(cfg);
 
         var exitLive = analysis.GetLiveVariablesAtExit(cfg.Exit).ToList();
-        Assert.NotNull(exitLive);
+        Assert.Contains("x", exitLive);
     }
 
     #endregion
@@ -729,29 +706,8 @@ public class DataflowAnalysisTests
         var cfg = ControlFlowGraph.Build(func);
         var analysis = new LiveVariablesAnalysis(cfg);
 
-        // x is used in return, should be live at entry
         var entryLive = analysis.GetLiveVariablesAtEntry(cfg.Entry);
-        Assert.NotNull(entryLive);
-    }
-
-    [Fact]
-    public void LiveVariables_UnusedVariable_NotLiveAtExit()
-    {
-        var source = @"
-§M{m001:Test}
-  §F{f001:Unused:pub}
-      §O{i32}
-      §B{unused:i32} INT:42
-      §R INT:0";
-
-        var func = GetFunction(source);
-        var cfg = ControlFlowGraph.Build(func);
-        var analysis = new LiveVariablesAnalysis(cfg);
-
-        // unused is never read, may be detected as dead
-        var deadAssignments = analysis.FindDeadAssignments().ToList();
-        // The binding should be detected as dead (assigned but never used)
-        Assert.True(deadAssignments.Count >= 0); // Implementation may or may not detect
+        Assert.Contains("x", entryLive);
     }
 
     [Fact]
@@ -770,8 +726,8 @@ public class DataflowAnalysisTests
         var cfg = ControlFlowGraph.Build(func);
         var analysis = new LiveVariablesAnalysis(cfg);
 
-        // x is used in condition, should be live
-        Assert.NotNull(analysis);
+        var entryLive = analysis.GetLiveVariablesAtEntry(cfg.Entry);
+        Assert.Contains("x", entryLive);
     }
 
     [Fact]

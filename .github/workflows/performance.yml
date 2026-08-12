@@ -25,5 +25,19 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Run performance tests
-        run: dotnet test tests/Calor.Performance.Tests -c Release --verbosity normal
+      - name: Build performance tests
+        run: dotnet build tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj -c Release
+
+      - name: Test performance gate fails closed
+        run: python3 scripts/run_performance_gate.py --self-test
+
+      - name: Run noise-controlled performance gate
+        run: python3 scripts/run_performance_gate.py
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: artifacts/performance/
+          retention-days: 90
