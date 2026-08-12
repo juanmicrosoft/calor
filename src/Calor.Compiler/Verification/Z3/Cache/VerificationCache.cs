@@ -17,7 +17,8 @@ public sealed class VerificationCache : IDisposable
     private readonly string? _z3Version;
     private readonly string? _keyScope;
     // #778: semantics-versioned, solver-config-aware keys.
-    private readonly string _semanticsVersion = Incremental.BuildStateCache.CurrentCompilerSemanticsVersion;
+    private readonly string _semanticsVersion =
+        $"{Incremental.BuildStateCache.CurrentCompilerSemanticsVersion}|{ContractTranslator.SemanticsVersion}";
     private readonly uint? _solverTimeoutMs;
     private readonly object _lock = new();
     // #778: ContractHasher carries per-call state (SawUnhashedKind); hash + flag read

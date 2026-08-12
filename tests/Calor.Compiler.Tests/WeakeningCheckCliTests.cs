@@ -189,11 +189,10 @@ public class WeakeningCheckCliTests : IDisposable
         Assert.False(json.Value.GetProperty("intactOrStrengthened").GetBoolean());
     }
 
-    // #826 review C4 follow-through: literals outside the signed 32-bit
-    // domain previously wrapped mod 2^32 and produced false DETERMINATE
-    // verdicts; they must now yield indeterminate.
+    // #780: wide literals retain their executable i64 width, so weakening
+    // checks can compare them without the old BV32 truncation.
     [Fact]
-    public void OutOfRangeLiteral_Indeterminate()
+    public void WideLiteral_WeakeningIsDeterminate()
     {
         const string bigFrozen = """
             §M{m001:Big}
@@ -208,8 +207,8 @@ public class WeakeningCheckCliTests : IDisposable
 
         Assert.Equal(0, exit);
         Assert.NotNull(json);
-        Assert.True(json.Value.GetProperty("indeterminate").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, json.Value.GetProperty("weakened").ValueKind);
+        Assert.False(json.Value.GetProperty("indeterminate").GetBoolean());
+        Assert.True(json.Value.GetProperty("weakened").GetBoolean());
     }
 
     [Fact]
