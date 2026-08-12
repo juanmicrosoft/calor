@@ -121,7 +121,13 @@ jobs:
         run: |
           set -euo pipefail
           # Avoid nested project-level and xUnit parallelism exhausting 2-core runners.
-          dotnet test -c Release --no-build --verbosity normal -m:1 2>&1 | tee test-output.log
+          (dotnet test -c Release --no-build --verbosity normal -m:1 2>&1 | tee test-output.log) &
+          test_pid=$!
+          while kill -0 "$test_pid" 2>/dev/null; do
+            sleep 30
+            echo "Tests are still running..."
+          done
+          wait "$test_pid"
 
       # Assert the PROPERTY that matters (no Z3-gated test skipped), not the presence of a
       # filename. An earlier version of this step checked only that some libz3.so existed
