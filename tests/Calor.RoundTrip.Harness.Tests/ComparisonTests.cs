@@ -154,6 +154,39 @@ public class ComparisonTests
     }
 
     [Fact]
+    public void PassingTestThatBecomesSkipped_IsARegression()
+    {
+        var baseline = MakeTestRun("Test1:Passed", "Test2:Passed");
+        var roundTrip = MakeTestRun("Test1:Passed", "Test2:Skipped");
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
+        Assert.Equal("Skipped", Assert.Single(result.Regressions).Outcome);
+    }
+
+    [Fact]
+    public void IdentitylessConsoleFallback_IsIncomplete()
+    {
+        var baseline = new TestRunResult
+        {
+            TotalTests = 1,
+            Passed = 1,
+            UsedConsoleFallback = true,
+        };
+        var roundTrip = new TestRunResult
+        {
+            TotalTests = 1,
+            Passed = 1,
+            UsedConsoleFallback = true,
+        };
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+    }
+
+    [Fact]
     public void DuplicateDisplayNames_AcrossAssemblies_NotConflated()
     {
         // Same display name "SharedName" in two assemblies: passing in alpha,

@@ -64,6 +64,17 @@ def check_manifest(root: Path, manifest: dict) -> list[str]:
         errors.append(f"excluded project paths do not exist: {', '.join(missing_exclusions)}")
 
     for item in manifest["projects"]:
+        expected_total = item.get("expectedTotal")
+        expected_skipped = item.get("expectedSkipped")
+        if not isinstance(expected_total, int) or expected_total <= 0:
+            errors.append(f"invalid expectedTotal for {item['path']}")
+        if (
+            not isinstance(expected_skipped, int)
+            or expected_skipped < 0
+            or isinstance(expected_total, int)
+            and expected_skipped >= expected_total
+        ):
+            errors.append(f"invalid expectedSkipped for {item['path']}")
         workflow = root / item["workflow"]
         if not workflow.is_file():
             errors.append(f"workflow does not exist for {item['path']}: {item['workflow']}")

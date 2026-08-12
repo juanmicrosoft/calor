@@ -34,7 +34,9 @@ jobs:
         run: bash scripts/check-calor-first-diff.sh
 
       - name: Test CI truth gates fail closed
-        run: python3 scripts/check_test_quality.py --self-test
+        run: |
+          python3 scripts/check_test_quality.py --self-test
+          python3 scripts/check_trx.py --self-test
 
       - name: Check test manifest, skips, and assertion quality
         run: python3 scripts/check_test_quality.py
@@ -178,6 +180,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -195,6 +199,7 @@ jobs:
       - name: Test coverage, mutation, and performance ratchets fail closed
         run: |
           python3 scripts/check_coverage.py --self-test
+          python3 scripts/check_trx.py --self-test
           python3 scripts/run_mutation_gate.py --self-test
           python3 scripts/run_performance_gate.py --self-test
           python3 scripts/run_flake_gate.py --self-test
@@ -296,6 +301,12 @@ jobs:
             grep -c "Z3 not available" test-output.log
             exit 1
           fi
+
+      - name: Enforce test inventory
+        run: >-
+          python3 scripts/check_trx.py
+          --trx "artifacts/test/${{ matrix.name }}.trx"
+          --project "${{ matrix.project }}"
 
       - name: Upload test report
         if: always()
@@ -611,7 +622,17 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Run ID validation tests
-        run: dotnet test tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj -c Release --verbosity normal
+        run: >-
+          dotnet test tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj -c Release
+          --logger "trx;LogFileName=ids.trx"
+          --results-directory artifacts/test
+          --verbosity normal
+
+      - name: Enforce ID test inventory
+        run: >-
+          python3 scripts/check_trx.py
+          --trx artifacts/test/ids.trx
+          --project tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj
 
       - name: Test sample ID gate fails closed
         run: bash scripts/check_sample_ids.sh --self-test

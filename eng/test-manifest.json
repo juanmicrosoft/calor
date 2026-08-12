@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
   "projects": [
-    { "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.Evaluation/Calor.Evaluation.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj", "workflow": ".github/workflows/performance.yml", "releaseCritical": true },
-    { "path": "tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true },
-    { "path": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true }
+    { "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 6776, "expectedSkipped": 2 },
+    { "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 370, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 309, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Evaluation/Calor.Evaluation.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 198, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 21, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 389, "expectedSkipped": 0 },
+    { "path": "tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 42, "expectedSkipped": 0 },
+    { "path": "tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 436, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj", "workflow": ".github/workflows/performance.yml", "releaseCritical": true, "expectedTotal": 19, "expectedSkipped": 0 },
+    { "path": "tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 199, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 37, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 88, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 387, "expectedSkipped": 0 }
   ],
   "excludedProjects": [
     { "path": "tests/DebugRT/DebugRT.csproj", "reason": "manual scratch console harness" },

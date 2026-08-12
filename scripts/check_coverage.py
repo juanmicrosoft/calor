@@ -10,7 +10,7 @@ from pathlib import Path
 def evaluate(reports: list[Path], baseline_path: Path) -> tuple[dict, list[str]]:
     baseline = json.loads(baseline_path.read_text(encoding="utf-8"))["components"]
     lines: dict[str, dict[tuple[str, int], int]] = {name: {} for name in baseline}
-    branches: dict[str, dict[tuple[str, int, str], bool]] = {
+    branches: dict[str, dict[tuple[str, int, str], tuple[int, int]]] = {
         name: {} for name in baseline
     }
 
@@ -36,11 +36,15 @@ def evaluate(reports: list[Path], baseline_path: Path) -> tuple[dict, list[str]]
                     if conditions:
                         for condition in conditions:
                             condition_id = condition.attrib.get("number", "")
-                            coverage = condition.attrib.get("coverage", "0%")
+                            coverage_text = condition.attrib.get("coverage", "0%").rstrip("%")
+                            coverage = float(coverage_text)
+                            total = 2 if condition.attrib.get("type") == "jump" else 1
+                            covered = round(total * coverage / 100)
                             branch_key = (source_path, key[1], condition_id)
+                            previous = branches[name].get(branch_key, (0, total))
                             branches[name][branch_key] = (
-                                branches[name].get(branch_key, False)
-                                or coverage.startswith("100")
+                                max(previous[0], covered),
+                                max(previous[1], total),
                             )
                     else:
                         condition = line.attrib.get("condition-coverage")
@@ -50,9 +54,10 @@ def evaluate(reports: list[Path], baseline_path: Path) -> tuple[dict, list[str]]
                                 covered, total = map(int, match.groups())
                                 for index in range(total):
                                     branch_key = (source_path, key[1], str(index))
+                                    previous = branches[name].get(branch_key, (0, 1))
                                     branches[name][branch_key] = (
-                                        branches[name].get(branch_key, False)
-                                        or index < covered
+                                        max(previous[0], int(index < covered)),
+                                        1,
                                     )
 
     results = {"schemaVersion": 1, "components": {}}
@@ -60,8 +65,8 @@ def evaluate(reports: list[Path], baseline_path: Path) -> tuple[dict, list[str]]
     for name, limits in baseline.items():
         line_total = len(lines[name])
         line_covered = sum(hits > 0 for hits in lines[name].values())
-        branch_total = len(branches[name])
-        branch_covered = sum(branches[name].values())
+        branch_total = sum(total for _, total in branches[name].values())
+        branch_covered = sum(covered for covered, _ in branches[name].values())
         line_rate = 100 * line_covered / line_total if line_total else 0
         branch_rate = 100 * branch_covered / branch_total if branch_total else 0
         results["components"][name] = {

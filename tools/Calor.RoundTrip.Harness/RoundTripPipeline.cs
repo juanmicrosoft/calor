@@ -640,14 +640,7 @@ public sealed class RoundTripPipeline
 
         if (baseline.UsedConsoleFallback || roundTrip.UsedConsoleFallback)
         {
-            comparison.Status =
-                baseline.UsedConsoleFallback == roundTrip.UsedConsoleFallback &&
-                baseline.TotalTests == roundTrip.TotalTests &&
-                baseline.Passed == roundTrip.Passed &&
-                baseline.Failed == roundTrip.Failed &&
-                baseline.Skipped == roundTrip.Skipped
-                    ? ComparisonStatus.Pass
-                    : ComparisonStatus.Incomplete;
+            comparison.Status = ComparisonStatus.Incomplete;
             return comparison;
         }
 
@@ -667,14 +660,11 @@ public sealed class RoundTripPipeline
             .Select(t => t.Identity)
             .ToHashSet();
 
-        var roundTripFailedSet = roundTrip.Results
-            .Where(t => t.Outcome == "Failed")
-            .Select(t => t.Identity)
-            .ToHashSet();
+        var roundTripByIdentity = roundTrip.Results.ToDictionary(t => t.Identity);
 
         comparison.Regressions = baselinePassedSet
-            .Intersect(roundTripFailedSet)
-            .Select(id => roundTrip.Results.First(t => t.Identity == id))
+            .Where(id => roundTripByIdentity[id].Outcome != "Passed")
+            .Select(id => roundTripByIdentity[id])
             .ToList();
 
         // Pre-existing failures
