@@ -323,7 +323,7 @@ jobs:
           # into Calor packages.
           ASSETS="Microsoft.Z3.dll libz3-linux-x64.so libz3-linux-arm64.so libz3-osx-arm64.dylib libz3-win-x64.dll libz3-win-x86.dll libz3-win-arm64.dll"
           for asset in $ASSETS; do
-            curl -fL -sS --retry 5 --retry-delay 3 -o "$STAGING/$asset" "${RELEASE_URL}/${asset}"
+            curl -fL -sS --retry 10 --retry-all-errors --retry-max-time 300 -o "$STAGING/$asset" "${RELEASE_URL}/${asset}"
           done
 
           while read -r hash asset size; do
