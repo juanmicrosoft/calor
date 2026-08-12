@@ -56,6 +56,8 @@ turns on the Z3 verify gate so contract refutations surface at build time.
 Linux x64/arm64, macOS arm64, and Windows x64/arm64. CI restores from a local
 feed, repeats restore offline, and performs clean Debug/Release, incremental,
 design-time, and runtime consumer checks on every supported RID.
+Windows x86 is not supported because .NET 10 does not publish an x86 SDK.
+Intel macOS is not supported because upstream Z3 does not provide a valid x64 binary.
 
 ### 2. Write the first module
 

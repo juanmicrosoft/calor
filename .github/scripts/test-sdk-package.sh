@@ -29,11 +29,10 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 FEED="$WORK/feed"
 CONSUMER="$WORK/consumer"
-export NUGET_PACKAGES="$WORK/packages"   # fresh cache: restore must come from the feed
 mkdir -p "$FEED"
 
 echo "== 1. pack Calor.Sdk -> local feed =="
-dotnet pack "$REPO_ROOT/src/Calor.Sdk/Calor.Sdk.csproj" -c Release -o "$FEED" /p:Version="$VERSION"
+dotnet pack "$REPO_ROOT/src/Calor.Sdk/Calor.Sdk.csproj" -c Release -o "$FEED" -p:Version="$VERSION"
 
 NUPKG="$FEED/Calor.Sdk.$VERSION.nupkg"
 if [ ! -f "$NUPKG" ]; then
@@ -79,6 +78,8 @@ if [ -n "${CALOR_SDK_EXPECTED_RID:-}" ]; then
   echo "OK: package contains and loads Z3 for runner RID $ACTUAL_RID"
 fi
 
+export NUGET_PACKAGES="$WORK/packages"   # fresh consumer cache: restore must come from the feed
+
 echo "== 3. materialize consumer from template =="
 cp -R "$REPO_ROOT/tests/SdkConsumer" "$CONSUMER"
 # Substitute placeholders (the template is deliberately unbuildable in place).
@@ -107,7 +108,7 @@ echo "== 6. clean Release build (CalorVerify=true; Z3 canary) =="
 dotnet clean CalorLib.Tests/CalorLib.Tests.csproj -c Release
 BUILD_LOG="$WORK/build.log"
 if ! dotnet build CalorLib.Tests/CalorLib.Tests.csproj -c Release --no-restore \
-  /p:CalorVerbose=true >"$BUILD_LOG" 2>&1; then
+  -p:CalorVerbose=true >"$BUILD_LOG" 2>&1; then
   echo "ERROR: consumer build failed" >&2
   cat "$BUILD_LOG" >&2
   exit 1
@@ -129,7 +130,7 @@ echo "OK: verify gate ran in the task context (Calor0712 canary present, no Calo
 echo "== 7. incremental Release rebuild =="
 INCREMENTAL_LOG="$WORK/incremental.log"
 dotnet build CalorLib.Tests/CalorLib.Tests.csproj -c Release --no-restore \
-  /p:CalorVerbose=true --verbosity normal >"$INCREMENTAL_LOG" 2>&1
+  -p:CalorVerbose=true --verbosity normal >"$INCREMENTAL_LOG" 2>&1
 if ! grep -q "Calor: skipping (up-to-date):" "$INCREMENTAL_LOG"; then
   echo "ERROR: packaged SDK incremental rebuild did not report an up-to-date Calor input" >&2
   cat "$INCREMENTAL_LOG" >&2
@@ -138,8 +139,8 @@ fi
 
 echo "== 8. design-time build =="
 dotnet msbuild CalorLib/CalorLib.csproj \
-  /t:Compile /p:Configuration=Release /p:DesignTimeBuild=true \
-  /p:BuildingProject=false /p:ProvideCommandLineArgs=true /v:minimal
+  -t:Compile -p:Configuration=Release -p:DesignTimeBuild=true \
+  -p:BuildingProject=false -p:ProvideCommandLineArgs=true -v:minimal
 
 echo "== 9. clean Debug build =="
 dotnet clean CalorLib.Tests/CalorLib.Tests.csproj -c Debug
