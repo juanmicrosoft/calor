@@ -2,10 +2,10 @@
 name: create-release
 description: >-
     Automate the Calor release process end-to-end: bump version across Directory.Build.props,
-    VSCode extension, website, and changelog files; run the statistical benchmark suite
+    website, and changelog files; run the statistical benchmark suite
     (30 runs); open and merge a release PR; create the GitHub release with proper pre-release
-    tagging; trigger the website deploy; and verify the packages reached nuget.org and the
-    platform VSIX artifacts are attached to the GitHub release. Use when the user asks to "cut a release",
+    tagging; trigger the website deploy; and verify both packages reached nuget.org.
+    Use when the user asks to "cut a release",
     "create a release", "ship a version", "release vX.Y.Z", or "do a release".
 allowed-tools: Bash, Read, Write, Edit
 user-invocable: true
@@ -13,7 +13,11 @@ user-invocable: true
 
 # /create-release - Create a New Calor Release
 
-This skill automates the release process: bump versions across all components, run benchmarks, create a PR, merge it, create a GitHub release with proper tagging, and **confirm the NuGet packages and release VSIX artifacts actually published**. Step 8 is not optional — creating the release only *triggers* the workflows, and in this repo they have failed silently for long stretches.
+This skill automates the release process: bump versions across all components, run benchmarks, create a PR, merge it, create a GitHub release with proper tagging, and **confirm the NuGet packages actually published**. Step 8 is not optional — creating the release only *triggers* the workflow, and in this repo it has failed silently for long stretches.
+
+**VS Code extension support was withdrawn after v0.13.1.** There is no VSIX build, no Marketplace
+publish, and no `editors/vscode` tree. Any step below that mentions them describes a channel that
+no longer exists — the only release artifacts are the two NuGet packages.
 
 ## Steps to Perform
 
@@ -66,7 +70,6 @@ Update these files with the new version:
 | File | What to Update |
 |------|----------------|
 | `Directory.Build.props` | `<Version>X.Y.Z</Version>` |
-| `editors/vscode/package.json` | `"version": "X.Y.Z"` |
 | `website/package.json` | `"version": "X.Y.Z"` |
 | `CHANGELOG.md` | Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and add benchmark summary |
 | `website/content/changelog.mdx` | Add new version section at the top (same content as CHANGELOG.md but MDX format, no benchmark stats) |
@@ -112,7 +115,7 @@ Extract the key metrics from the benchmark markdown output's Executive Summary s
 
 ```bash
 git checkout -b release/vX.Y.Z
-git add Directory.Build.props editors/vscode/package.json website/package.json CHANGELOG.md website/public/data/benchmark-results.json website/content/changelog.mdx website/src/components/landing/WhatsNewBanner.tsx
+git add Directory.Build.props website/package.json CHANGELOG.md website/public/data/benchmark-results.json website/content/changelog.mdx website/src/components/landing/WhatsNewBanner.tsx
 git commit -m "chore: bump version to X.Y.Z"
 git push -u origin release/vX.Y.Z
 ```
@@ -132,7 +135,6 @@ gh pr create --title "Release vX.Y.Z" --body "$(cat <<'EOF'
 
 ## Checklist
 - [ ] Version updated in Directory.Build.props
-- [ ] Version updated in editors/vscode/package.json
 - [ ] Version updated in website/package.json
 - [ ] CHANGELOG.md updated with version, date, and benchmark summary
 - [ ] website/content/changelog.mdx updated with version and changes (no benchmark stats)
@@ -221,25 +223,21 @@ Trigger the website deploy (the `nextjs-gh-pages` workflow runs on release creat
 gh workflow run nextjs-gh-pages.yml
 ```
 
-### 8. Verify NuGet and the release VSIX artifacts — DO NOT SKIP
+### 8. Verify NuGet — DO NOT SKIP
 
-**Creating the release triggers `publish-nuget` and `build-vsix-release`; it does not make either
-succeed.** A tag and website can go live while packages or release assets are absent, so the
-release can look complete when it is not. `publish-vscode` is deliberately absent from the
-release event: Marketplace publishing is opportunistic-only under the roadmap's 2026-08-11
-amendment.
+**Creating the release triggers `publish-nuget`; it does not make it succeed.** A tag and website
+can go live while the packages are absent, so the release can look complete when it is not.
 
-**Wait for both release workflows first.** Querying nuget.org or the GitHub release before they
-finish shows the previous version or an empty asset list and looks like failure.
+**Wait for the publish workflow first.** Querying nuget.org before it finishes shows the previous
+version and looks like failure.
 
 ```bash
 VER=0.12.1   # the version you cut
 
-# Watch both release artifact workflows to completion (get the run ids for THIS tag)
+# Watch the publish workflow to completion (get the run id for THIS tag)
 gh run list --event release --limit 10 \
   --json databaseId,workflowName,headBranch,status,conclusion \
-  --jq ".[] | select(.headBranch==\"v$VER\" and (.workflowName==\"Publish to NuGet\" or .workflowName==\"Build VS Code Release Assets\")) | \"\(.databaseId)\t\(.workflowName)\t\(.status)\t\(.conclusion)\""
-# then, for each run id:
+  --jq ".[] | select(.headBranch==\"v$VER\" and .workflowName==\"Publish to NuGet\") | \"\(.databaseId)\t\(.status)\t\(.conclusion)\""
 gh run watch <run-id>
 ```
 
@@ -252,13 +250,7 @@ re-check before concluding it failed:
 curl -s https://api.nuget.org/v3-flatcontainer/calor/index.json     | jq -r '.versions[-3:][]'
 curl -s https://api.nuget.org/v3-flatcontainer/calor.sdk/index.json | jq -r '.versions[-3:][]'
 
-# GitHub release — all six platform VSIX files must be attached
-assets="$(gh release view "v$VER" --json assets --jq '.assets[].name')"
-for target in win32-x64 win32-arm64 darwin-x64 darwin-arm64 linux-x64 linux-arm64; do
-  grep -qx "calor-$target-$VER.vsix" <<<"$assets" || {
-    echo "ERROR: missing calor-$target-$VER.vsix"; exit 1;
-  }
-done
+# (No release assets are expected: the VSIX channel was removed after v0.13.1.)
 ```
 
 Strongest check for NuGet — install the published tool and exercise Z3, which is the part most
@@ -283,11 +275,11 @@ Known failure modes, so they are recognised rather than re-diagnosed:
 | Symptom | Cause | Fix |
 |---|---|---|
 | `sha256sum: WARNING: N computed checksums did NOT match` | The pinned `z3-binaries` release drifted | Republish via `build-z3.yml` (`workflow_dispatch`), commit the manifest it prints, **then re-publish via `workflow_dispatch`, not `gh run rerun`** — see below. **Never rehash the live assets.** |
-| `error IL3000` during the VSIX build | `Assembly.Location` under single-file publish | Code fix. `test.yml`'s `vsix-single-file-publish` job should have caught this on the PR. |
+| `test` job aborts with `terminate called after throwing 'std::system_error'` | Native (Z3) crash taking down the test host; `publish` is correctly skipped | Re-dispatch; if it reproduces, stop and investigate — a repeating native crash is not flake |
 
-The Marketplace is not part of release verification. Its listing deliberately remains at v0.3.8.
-If a maintainer later mints a publisher token, `publish-vscode.yml` may be dispatched manually;
-success or failure there does not change whether the release shipped.
+There is no editor-extension channel to verify. VS Code support was withdrawn after v0.13.1 and
+the Marketplace listing is abandoned at v0.3.8; the language server (`calor lsp`) ships inside the
+`calor` NuGet package, so verifying that package covers it.
 
 #### Retrying a failed publish (do NOT re-cut the version)
 
@@ -300,22 +292,13 @@ the failing channel only.
   identically. Use the dispatch path instead, which checks out the default branch and takes a
   version override: `gh workflow run publish-nuget.yml -f version=$VER`. Safe to repeat — the push
   uses `--skip-duplicate`.
-- **VSIX release assets.** Re-dispatch the idempotent attachment workflow for the existing tag:
-  `gh workflow run build-vsix-release.yml -f tag=v$VER`. It rebuilds all six targets and replaces
-  same-named release assets with `--clobber`; do not re-cut the tag.
-- **Marketplace (opportunistic only).** If a valid token exists and demand justifies an update,
-  run `gh workflow run publish-vscode.yml -f version=$VER`. A failure is not a partial release and
-  does not block or reopen the release.
-- **Partial release is normal and recoverable.** NuGet or the GitHub release assets may land while
-  the other fails. Record which required artifact is live, fix only the broken workflow, and do
-  not touch the tag.
+- **A failed publish never justifies re-cutting.** Fix the cause and re-dispatch; the tag stays.
 
 Note that republishing `z3-binaries` retroactively changes what **every past tag** resolves to, so
 older tags' manifests become invalid. That is a reason to prefer fixing forward.
 
-Report the release as shipped only after nuget.org and the GitHub release confirm the required
-artifacts — and if only one landed, say exactly which one. Do not report Marketplace state as a
-release failure.
+Report the release as shipped only after nuget.org confirms **both** packages at the new version.
+If only one landed, say exactly which one.
 
 ## Version Calculation Logic
 

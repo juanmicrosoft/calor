@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+- **VS Code extension support is withdrawn.** The `editors/vscode` tree, the VSIX release-asset
+  workflow, the Marketplace publishing workflow, and the single-file publish guard are all removed.
+  The extension had no Marketplace presence since v0.3.8 and no demonstrated demand, and its VSIX
+  build was a recurring release blocker (#951: six parallel platform builds each fetching Z3
+  archives with no retry).
+
+  **The language server is unaffected.** `calor lsp` speaks standard LSP over stdio and works with
+  any LSP-capable editor; diagnostics, definition, references, symbol-exact rename, formatting and
+  semantic tokens all remain supported and tested.
+
 ## [0.13.1] - 2026-08-12
 
 ### Benchmark Results (Statistical: 30 runs)
@@ -72,13 +83,11 @@ All notable changes to this project will be documented in this file.
   `CALOR_LSP_EXPERIMENTAL` gate and production name-only reference/rename
   collectors were removed after the exact-span gate passed.
 
-- **VS Code Marketplace publishing is no longer a release commitment.** The extension and
-  bundled LSP remain supported as six platform-specific VSIX artifacts attached to each GitHub
-  release, and the PR-only single-file publish check remains a required guard. The Marketplace
-  listing deliberately stays at v0.3.8 unless a publisher token is minted and a maintainer chooses
-  to update it. The channel has been broken since v0.4.0, five months of staleness produced zero
-  complaints, and recurring token/publish-chain maintenance is not justified by demonstrated
-  demand.
+- **VS Code Marketplace publishing is no longer a release commitment.** The Marketplace listing
+  deliberately stays at v0.3.8. The channel has been broken since v0.4.0, five months of staleness
+  produced zero complaints, and recurring token/publish-chain maintenance is not justified by
+  demonstrated demand. (Superseded immediately after this release: VS Code extension support was
+  withdrawn entirely — see the Unreleased section.)
 
 ### Note on scope
 This is a 0.13.x release. It completes the 0.13 project-model program and its
