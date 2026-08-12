@@ -145,7 +145,7 @@ public class StructAndOperatorTests
         var compilationResult = Program.Compile(
             calorSource,
             null,
-            new CompilationOptions { UnsafeTranspileOnly = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 
@@ -166,7 +166,7 @@ public class StructAndOperatorTests
         var compilationResult = Program.Compile(
             calorSource,
             null,
-            new CompilationOptions { UnsafeTranspileOnly = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 
@@ -688,7 +688,7 @@ public class StructAndOperatorTests
         var compilationResult = Program.Compile(
             calorSource,
             null,
-            new CompilationOptions { UnsafeTranspileOnly = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 
@@ -722,7 +722,7 @@ public class StructAndOperatorTests
         var compilationResult = Program.Compile(
             calorSource,
             null,
-            new CompilationOptions { UnsafeTranspileOnly = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 

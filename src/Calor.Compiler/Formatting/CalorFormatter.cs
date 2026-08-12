@@ -113,7 +113,10 @@ public sealed class CalorFormatter
 
         // Classify generated-C# failures separately below instead of folding them
         // into the semantic-error fallback.
-        var structuralOptions = new CompilationOptions { UnsafeTranspileOnly = true };
+        var structuralOptions = new CompilationOptions
+        {
+            DeferGeneratedOutputValidation = true
+        };
         var originalCompilation = Program.Compile(original, filePath, structuralOptions);
         var formattedCompilation = Program.Compile(formatted, filePath, structuralOptions);
         if (originalCompilation.HasErrors != formattedCompilation.HasErrors)

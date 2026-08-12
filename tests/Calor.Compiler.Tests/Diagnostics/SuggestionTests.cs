@@ -139,7 +139,7 @@ public class SuggestionTests
         var result = Program.Compile(
             source,
             "test.calr",
-            new CompilationOptions { UnsafeTranspileOnly = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
 
         Assert.True(result.HasErrors);
         var error = result.Diagnostics.First(d => d.IsError);
@@ -598,7 +598,7 @@ public class SuggestionTests
         var result = Program.Compile(
             source,
             "test.calr",
-            new CompilationOptions { UnsafeTranspileOnly = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
 
         Assert.Equal(shouldError, result.HasErrors);
     }

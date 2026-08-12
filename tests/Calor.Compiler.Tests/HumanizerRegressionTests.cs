@@ -48,7 +48,7 @@ public class HumanizerRegressionTests
         var compileResult = Program.Compile(calrText, "humanizer-regression.calr", new CompilationOptions
         {
             EnforceEffects = false,
-            UnsafeTranspileOnly = true,
+            DeferGeneratedOutputValidation = true,
         });
 
         Assert.False(compileResult.HasErrors,

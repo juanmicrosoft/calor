@@ -95,7 +95,8 @@ internal static class CompilationDriver
         DiagnosticBag? diagnosticSink = null,
         DriverCacheSettings? cache = null,
         Action<FileInfo, string>? onSkipped = null,
-        Action<FileInfo, string, ModuleNode>? onAst = null)
+        Action<FileInfo, string, ModuleNode>? onAst = null,
+        Action<FileInfo>? onFailed = null)
     {
         var compiled = new List<FileResult>();
         var pending = new List<PendingFile>();
@@ -207,6 +208,7 @@ internal static class CompilationDriver
                         skipped.Add(file);
                         skippedGeneratedSources.Add(new GeneratedCSharpSource(
                             File.ReadAllText(outputPath),
+                            outputPath,
                             file.FullName));
                         moduleSummaries.Add((cachedEntry.EffectSummary, file.FullName));
                         onSkipped?.Invoke(file, outputPath);
@@ -258,6 +260,7 @@ internal static class CompilationDriver
                         : null,
                     result.Diagnostics,
                     validated: false);
+                onFailed?.Invoke(file);
                 anyErrors = true;
                 continue;
             }
@@ -278,7 +281,10 @@ internal static class CompilationDriver
         {
             var generatedSources = pending
                 .Select(item => new GeneratedCSharpSource(
-                    item.Result.GeneratedCode, item.File.FullName))
+                    item.Result.GeneratedCode,
+                    cache?.OutputPathFor(item.File)
+                        ?? Path.ChangeExtension(item.File.FullName, ".g.cs"),
+                    item.File.FullName))
                 .Concat(skippedGeneratedSources)
                 .ToList();
             var references = pending
@@ -318,26 +324,17 @@ internal static class CompilationDriver
             }
         }
 
-        var telemetry = Calor.Compiler.Telemetry.CalorTelemetry.IsInitialized
-            ? Calor.Compiler.Telemetry.CalorTelemetry.Instance
-            : null;
-        foreach (var item in pending)
-        {
-            Program.TrackCompilationOutcome(
-                telemetry,
-                item.Result.Diagnostics,
-                validated: !item.Options.UnsafeTranspileOnly && !generatedValidationFailed);
-        }
-
         // Cross-module effect enforcement over successfully compiled modules —
         // runs even when other files failed, so all reportable violations surface
         // in one pass (top-level compile semantics). Skipped files participate
         // through their cache-restored summaries.
+        var crossModuleDiagnostics = new DiagnosticBag();
         if (crossModuleEnforcement && moduleSummaries.Count > 1)
         {
             var registry = CrossModuleEffectRegistry.Build(moduleSummaries);
             foreach (var diagnostic in registry.BuildDiagnostics)
             {
+                crossModuleDiagnostics.Add(diagnostic);
                 if (diagnosticSink != null)
                 {
                     diagnosticSink.Add(diagnostic);
@@ -353,6 +350,7 @@ internal static class CompilationDriver
 
             foreach (var diagnostic in crossDiagnostics)
             {
+                crossModuleDiagnostics.Add(diagnostic);
                 if (diagnosticSink != null)
                 {
                     diagnosticSink.Add(diagnostic);
@@ -367,9 +365,32 @@ internal static class CompilationDriver
                     anyErrors = true;
                 }
             }
+
+            Program.TrackDiagnostics(
+                Calor.Compiler.Telemetry.CalorTelemetry.IsInitialized
+                    ? Calor.Compiler.Telemetry.CalorTelemetry.Instance
+                    : null,
+                crossModuleDiagnostics);
         }
 
-        if (!generatedValidationFailed)
+        var publishFailed = generatedValidationFailed || crossModuleDiagnostics.HasErrors;
+        var telemetry = Calor.Compiler.Telemetry.CalorTelemetry.IsInitialized
+            ? Calor.Compiler.Telemetry.CalorTelemetry.Instance
+            : null;
+        foreach (var item in pending)
+        {
+            var outcomeDiagnostics = new DiagnosticBag();
+            outcomeDiagnostics.AddRange(item.Result.Diagnostics);
+            outcomeDiagnostics.AddRange(crossModuleDiagnostics);
+            Program.TrackCompilationOutcome(
+                telemetry,
+                outcomeDiagnostics,
+                validated: !item.Options.UnsafeTranspileOnly &&
+                    !generatedValidationFailed &&
+                    !crossModuleDiagnostics.HasErrors);
+        }
+
+        if (!publishFailed)
         {
             foreach (var item in pending)
             {
@@ -386,16 +407,19 @@ internal static class CompilationDriver
                     var entry = BuildStateCache.CreateFileEntry(
                         item.StatBeforeRead, item.SourceBytes);
                     entry.EffectSummary = item.EffectSummary;
-                    var writtenOutputPath = cache.OutputPathFor(item.File);
-                    entry.OutputContentHash = File.Exists(writtenOutputPath)
-                        ? BuildStateCache.ComputeFileHash(writtenOutputPath)
-                        : null;
+                    entry.OutputContentHash = BuildStateCache.ComputeContentHash(
+                        System.Text.Encoding.UTF8.GetBytes(item.Result.GeneratedCode));
                     newState.Files[item.RelativeKey] = entry;
                 }
             }
         }
+        else
+        {
+            foreach (var item in pending)
+                onFailed?.Invoke(item.File);
+        }
 
-        if (newState != null && cache != null && !generatedValidationFailed)
+        if (newState != null && cache != null && !publishFailed)
         {
             BuildStateCache.Save(newState, cache.StateDirectory);
         }
@@ -473,6 +497,8 @@ internal static class CompilationDriver
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (name, definingModules) in byName)
         {
+            foreach (var module in definingModules)
+                map[$"{module}.{name}"] = module;
             if (definingModules.Count == 1)
                 map[name] = definingModules[0];
         }

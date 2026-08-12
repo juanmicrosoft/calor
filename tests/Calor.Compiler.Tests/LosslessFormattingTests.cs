@@ -858,7 +858,10 @@ public sealed class LosslessFormattingTests : IDisposable
                 $"{relativePath}: {once.ConservativeFallbackReason}");
             Assert.NotEqual(probedSource, once.Formatted);
 
-            var structuralOptions = new CompilationOptions { UnsafeTranspileOnly = true };
+            var structuralOptions = new CompilationOptions
+            {
+                DeferGeneratedOutputValidation = true
+            };
             var before = Program.Compile(probedSource, path, structuralOptions);
             var after = Program.Compile(once.Formatted, path, structuralOptions);
             Assert.False(

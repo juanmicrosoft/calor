@@ -59,6 +59,13 @@ public static class ReviewPacketCommand
             aliases: ["--json"],
             description: "Emit the envelope document (packet under data) to stdout");
 
+        var referenceOption = new Option<FileInfo[]>(
+            aliases: ["--reference", "-r"],
+            description: "Assembly reference used to validate generated C# (repeatable)")
+        {
+            AllowMultipleArgumentsPerToken = true
+        };
+
         var command = new Command("review-packet",
             "Assemble a per-change review packet that leads with the unproven remainder")
         {
@@ -69,7 +76,8 @@ public static class ReviewPacketCommand
             contractModeOption,
             timeoutOption,
             outputOption,
-            jsonOption
+            jsonOption,
+            referenceOption
         };
 
         // Exit code returned through ctx.ExitCode: a code parked only on
@@ -84,7 +92,8 @@ public static class ReviewPacketCommand
                 ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug",
                 (uint)Math.Max(1, ctx.ParseResult.GetValueForOption(timeoutOption)),
                 ctx.ParseResult.GetValueForOption(outputOption),
-                ctx.ParseResult.GetValueForOption(jsonOption));
+                ctx.ParseResult.GetValueForOption(jsonOption),
+                ctx.ParseResult.GetValueForOption(referenceOption) ?? []);
         });
 
         return command;
@@ -98,11 +107,28 @@ public static class ReviewPacketCommand
         string contractMode,
         uint timeoutMs,
         FileInfo? output,
-        bool json)
+        bool json,
+        FileInfo[] references)
     {
         try
         {
             var inputs = new List<ReviewPacketBuilder.InputFile>();
+            foreach (var reference in references)
+            {
+                if (reference.Exists)
+                    continue;
+
+                var message = $"Reference assembly not found: {reference.FullName}";
+                if (json)
+                {
+                    Console.WriteLine(EnvelopeWriter.Serialize("review-packet", null,
+                        [new Diagnostic(DiagnosticCode.ReviewPacketCommandError,
+                            DiagnosticSeverity.Error, message, reference.FullName,
+                            line: 1, column: 1)]));
+                }
+                Console.Error.WriteLine($"Error: {message}");
+                return 1;
+            }
             foreach (var file in files)
             {
                 if (!file.Exists)
@@ -144,7 +170,8 @@ public static class ReviewPacketCommand
                 VerificationTimeoutMs: timeoutMs,
                 ChangedDeclarations: changed.Length > 0 ? changed : null,
                 ChangedLineRanges: changedRanges,
-                BaselineRef: baselineRef));
+                BaselineRef: baselineRef,
+                ReferencedAssemblyPaths: references.Select(reference => reference.FullName).ToList()));
 
             var diagnostics = new List<Diagnostic>(result.CompileDiagnostics);
             foreach (var selector in result.UnmatchedChangedDeclarations)

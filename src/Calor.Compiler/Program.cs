@@ -31,6 +31,11 @@ public class Program
             aliases: ["--output", "-o"],
             description: "The output C# file path");
 
+        var referenceOption = new Option<FileInfo[]>(
+            aliases: ["--reference", "-r"],
+            description: "Assembly reference used to validate generated C# (repeatable)")
+        { Arity = ArgumentArity.ZeroOrMore };
+
         var verboseOption = new Option<bool>(
             aliases: ["--verbose", "-v"],
             description: "Enable verbose output");
@@ -158,6 +163,7 @@ public class Program
         {
             inputOption,
             outputOption,
+            referenceOption,
             verboseOption,
             strictApiOption,
             requireDocsOption,
@@ -200,6 +206,8 @@ public class Program
                 telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
             }
             var output = ctx.ParseResult.GetValueForOption(outputOption);
+            var references = ctx.ParseResult.GetValueForOption(referenceOption)
+                ?? Array.Empty<FileInfo>();
             var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
             var strictApi = ctx.ParseResult.GetValueForOption(strictApiOption);
             var requireDocs = ctx.ParseResult.GetValueForOption(requireDocsOption);
@@ -246,7 +254,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards);
+                ctx.ExitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards);
             }
             catch (Exception ex)
             {
@@ -324,10 +332,10 @@ public class Program
         return result;
     }
 
-    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = false)
-        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards));
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = false)
+        => Task.FromResult(CompileCore(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards));
 
-    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = false)
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = false)
     {
         // Structured diagnostic output (--format json|sarif): diagnostics are
         // aggregated across files and serialized once through the shared
@@ -384,6 +392,21 @@ public class Program
                     anyMissing = true;
                 }
             }
+            foreach (var reference in references)
+            {
+                if (!reference.Exists)
+                {
+                    diagnosticSink?.Add(new Diagnostic(
+                        DiagnosticCode.CliInputNotFound,
+                        $"Reference assembly not found: {reference.FullName}",
+                        new TextSpan(0, 0, 1, 1),
+                        DiagnosticSeverity.Error,
+                        reference.FullName));
+                    Console.Error.WriteLine(
+                        $"Error: Reference assembly not found: {reference.FullName}");
+                    anyMissing = true;
+                }
+            }
             if (anyMissing)
             {
                 return Finish(1);
@@ -425,7 +448,9 @@ public class Program
                         stateDirectory,
                         BuildOptionsToken(strictApi, requireDocs, enforceEffects, strictEffects,
                             permissiveEffects, contractMode, verify, verificationTimeout, analyze,
-                            allFindings, strictBindInference, experimentalFlags),
+                            allFindings, strictBindInference, experimentalFlags,
+                            references.Select(reference =>
+                                $"{reference.FullName}:{Incremental.BuildStateCache.ComputeFileHash(reference.FullName)}")),
                         ClearFirst: clearCache,
                         OutputPathFor: file => Path.ChangeExtension(file.FullName, ".g.cs"));
                 }
@@ -456,6 +481,9 @@ public class Program
                         EnforceEffects = enforceEffects,
                         EnableTypeChecking = !transpileOnly && !noTypeCheck && CompilationOptions.TypeCheckingDefault,
                         UnsafeTranspileOnly = transpileOnly,
+                        ReferencedAssemblyPaths = references
+                            .Select(reference => reference.FullName)
+                            .ToList(),
                         StrictEffects = strictEffects,
                         UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
                         ContractMode = parsedContractMode,
@@ -500,7 +528,17 @@ public class Program
                         Directory.CreateDirectory(outputDir);
                     }
 
-                    File.WriteAllText(outputPath, result.GeneratedCode);
+                    var temporaryPath = outputPath + $".{Guid.NewGuid():N}.tmp";
+                    try
+                    {
+                        File.WriteAllText(temporaryPath, result.GeneratedCode);
+                        File.Move(temporaryPath, outputPath, overwrite: true);
+                    }
+                    finally
+                    {
+                        if (File.Exists(temporaryPath))
+                            File.Delete(temporaryPath);
+                    }
 
                     // In structured mode stdout is reserved for the serialized
                     // diagnostics; status messages go to stderr.
@@ -524,7 +562,14 @@ public class Program
                 },
                 onAst: declarationIds != null
                     ? (file, source, ast) => declarationIds.AddFile(file.FullName, source, ast)
-                    : null);
+                    : null,
+                onFailed: file =>
+                {
+                    var failedOutputPath = output?.FullName
+                        ?? Path.ChangeExtension(file.FullName, ".g.cs");
+                    if (File.Exists(failedOutputPath))
+                        File.Delete(failedOutputPath);
+                });
 
             return Finish(driverResult.AnyErrors ? 1 : 0);
         }
@@ -550,16 +595,21 @@ public class Program
     internal static string BuildOptionsToken(bool strictApi, bool requireDocs, bool enforceEffects,
         bool strictEffects, bool permissiveEffects, string contractMode, bool verify,
         int verificationTimeout, bool analyze, bool allFindings, bool strictBindInference,
-        string[]? experimentalFlags)
+        string[]? experimentalFlags,
+        IEnumerable<string>? referenceDescriptors = null)
     {
         var experimental = experimentalFlags == null
             ? ""
             : string.Join(",", experimentalFlags.OrderBy(f => f, StringComparer.Ordinal));
+        var references = referenceDescriptors == null
+            ? ""
+            : string.Join(",", referenceDescriptors.Order(StringComparer.Ordinal));
         return $"strictApi:{strictApi}|requireDocs:{requireDocs}|enforceEffects:{enforceEffects}" +
                $"|strictEffects:{strictEffects}|permissiveEffects:{permissiveEffects}" +
                $"|contractMode:{contractMode.ToLowerInvariant()}|verify:{verify}" +
                $"|verificationTimeout:{verificationTimeout}|analyze:{analyze}|allFindings:{allFindings}" +
-               $"|strictBindInference:{strictBindInference}|experimental:{experimental}";
+               $"|strictBindInference:{strictBindInference}|experimental:{experimental}" +
+               $"|references:{references}";
     }
 
     private static void WriteHelp(TextWriter writer)
@@ -1000,10 +1050,16 @@ public class Program
             !options.UnsafeTranspileOnly &&
             !options.DeferGeneratedOutputValidation)
         {
-            var generatedPath = filePath ?? "generated.g.cs";
+            var generatedPath = filePath == null
+                ? "generated.g.cs"
+                : Path.ChangeExtension(filePath, ".g.cs");
             var validation = GeneratedCSharpCompiler.Validate(
-                [new GeneratedCSharpSource(generatedCode, generatedPath)],
-                options.ReferencedAssemblyPaths);
+                [new GeneratedCSharpSource(generatedCode, generatedPath, filePath)],
+                new GeneratedCSharpCompilationContext
+                {
+                    ReferencePaths = options.ReferencedAssemblyPaths,
+                    AllowUnsafe = options.AllowUnsafeCode
+                });
             AddGeneratedOutputDiagnostics(validation, diagnostics, generatedPath);
         }
 
@@ -1169,6 +1225,12 @@ public sealed class CompilationOptions
     /// Populated from MSBuild @(ReferencePath) items.
     /// </summary>
     public IReadOnlyList<string>? ReferencedAssemblyPaths { get; init; }
+
+    /// <summary>
+    /// Whether generated C# validation accepts unsafe code. Standalone compilation
+    /// defaults to true; project surfaces override this with the project's setting.
+    /// </summary>
+    public bool AllowUnsafeCode { get; init; } = true;
 
     /// <summary>
     /// Explicitly emit C# without Roslyn validation. This mode is unsafe and must

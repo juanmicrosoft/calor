@@ -1471,7 +1471,7 @@ public class CSharpToCalorConversionTests
             new CompilationOptions
             {
                 EnforceEffects = false,
-                UnsafeTranspileOnly = true,
+                DeferGeneratedOutputValidation = true,
             });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
@@ -1510,7 +1510,7 @@ public class CSharpToCalorConversionTests
             new CompilationOptions
             {
                 EnforceEffects = false,
-                UnsafeTranspileOnly = true,
+                DeferGeneratedOutputValidation = true,
             });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
@@ -1550,7 +1550,7 @@ public class CSharpToCalorConversionTests
             new CompilationOptions
             {
                 EnforceEffects = false,
-                UnsafeTranspileOnly = true,
+                DeferGeneratedOutputValidation = true,
             });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
@@ -1703,7 +1703,7 @@ public class CSharpToCalorConversionTests
         var compilationResult = Program.Compile(
             conversionResult.CalorSource!,
             null,
-            new CompilationOptions { UnsafeTranspileOnly = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\nCalor: {conversionResult.CalorSource}\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
         Assert.Contains("new int[]", compilationResult.GeneratedCode);
@@ -2036,7 +2036,7 @@ public class CSharpToCalorConversionTests
             new CompilationOptions
             {
                 EnforceEffects = false,
-                UnsafeTranspileOnly = true,
+                DeferGeneratedOutputValidation = true,
             });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\nCalor: {conversionResult.CalorSource}\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
@@ -2415,7 +2415,7 @@ public class CSharpToCalorConversionTests
         var compilationResult = Program.Compile(
             conversionResult.CalorSource!,
             null,
-            new CompilationOptions { UnsafeTranspileOnly = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             $"Lambda roundtrip failed:\nCalor:\n{conversionResult.CalorSource}\nErrors:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
     }

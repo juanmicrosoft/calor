@@ -43,6 +43,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 |:-------|:------|:---------|:------------|
 | `--input` | `-i` | Yes | Input Calor source file |
 | `--output` | `-o` | Yes | Output C# file path |
+| `--reference` | `-r` | No | Assembly reference used by Roslyn validation; repeat for multiple project or package assemblies |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 | `--verify` | | No | Enable static contract verification with Z3 |
 | `--analyze` | | No | Enable static analysis (dataflow, bug patterns, taint tracking) |
@@ -85,7 +86,9 @@ Caching is **opt-in** for plain compiles; `calor watch` always caches
 overrides `--cache`; `--clear-cache` deletes the state file first. Add
 `.calor-build-state.json` to `.gitignore` (`calor init` does this for you).
 Only diagnostic-clean, Roslyn-valid files are cached, so warnings reappear on
-every run and invalid generated output can never become a cache hit.
+every run and invalid generated output can never become a cache hit. A failed
+compile removes any prior output for the failed file, so downstream C# globs
+cannot consume stale generated code.
 
 ---
 
@@ -104,8 +107,11 @@ syntax/emitter inspection of incomplete source. This mode is explicitly
 unsafe, does not populate the incremental cache, and does not emit the normal
 success message.
 
-For MSBuild projects, `<CalorTranspileOnly>true</CalorTranspileOnly>` provides
-the same unsafe behavior. The default is `false`.
+For MSBuild projects, validation also includes existing `@(Compile)` C# files
+and honors `AllowUnsafeBlocks`, `OutputType`, `DefineConstants`, and
+`LangVersion`, including whether `ImplicitUsings` is enabled.
+`<CalorTranspileOnly>true</CalorTranspileOnly>` provides the same unsafe
+behavior as the CLI; the default is `false`.
 
 ---
 

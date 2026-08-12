@@ -165,6 +165,42 @@ public class CliMultiFileTests : IDisposable
     }
 
     [Fact]
+    public void MultiFile_ExplicitCallRemainsQualifiedWhenBareNameIsAmbiguous()
+    {
+        var alphaPath = Path.Combine(_tempDir, "alpha.calr");
+        var betaPath = Path.Combine(_tempDir, "beta.calr");
+        var consumerPath = Path.Combine(_tempDir, "consumer.calr");
+        File.WriteAllText(alphaPath, """
+            §M{m001:Alpha}
+              §F{f001:Emit:pub} () -> i32
+                §R INT:1
+            """);
+        File.WriteAllText(betaPath, """
+            §M{m002:Beta}
+              §F{f002:Emit:pub} () -> i32
+                §R INT:2
+            """);
+        File.WriteAllText(consumerPath, """
+            §M{m003:Consumer}
+              §F{f003:Read:pub} () -> i32
+                §R §C{Alpha.Emit} §/C
+            """);
+        var map = CompilationDriver.BuildCrossModuleFunctionMap(
+            [new FileInfo(alphaPath), new FileInfo(betaPath), new FileInfo(consumerPath)]);
+        Assert.Equal("Alpha", map["Alpha.Emit"]);
+        Assert.Equal("Beta", map["Beta.Emit"]);
+
+        var (exit, stdOut, stdErr) = RunCli(
+            "--input", alphaPath, "--input", betaPath, "--input", consumerPath,
+            "--no-enforce-effects");
+
+        Assert.True(exit == 0, $"compile failed: {stdOut}{stdErr}");
+        Assert.Contains(
+            "global::Alpha.AlphaModule.Emit()",
+            File.ReadAllText(Path.Combine(_tempDir, "consumer.g.cs")));
+    }
+
+    [Fact]
     public void MultiFile_CrossModuleCall_OutputsCompileUnderRoslyn()
     {
         var (storePath, catalogPath) = WriteCrossModuleCallPair();

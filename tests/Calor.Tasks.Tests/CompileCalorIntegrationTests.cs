@@ -92,6 +92,7 @@ public class CompileCalorIntegrationTests : IDisposable
             }).ToArray(),
             OutputDirectory = _outputDir,
             ProjectDirectory = _projectDir,
+            ImplicitUsings = "enable",
             Verbose = true
         };
         return task;
@@ -310,6 +311,72 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.False(failingTask.Execute());
         Assert.Empty(failingTask.GeneratedFiles);
         Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public void GeneratedCSharpValidation_IncludesExistingProjectSources()
+    {
+        var projectSource = CreateSourceFile(
+            "ProjectApi.cs",
+            "public static class ProjectApi { public static int Value => 42; }");
+        var calorSource = CreateSourceFile(
+            "Consumer.calr",
+            """
+            §M{m001:Consumer}
+              §CL{c001:Reader:pub}
+                §CSHARP{
+                  public int Read() => ProjectApi.Value;
+                }§/CSHARP
+            """);
+        var task = CreateTask(calorSource);
+        task.ProjectSourceFiles = [new TaskItem(projectSource)];
+
+        Assert.True(task.Execute());
+        Assert.Single(task.GeneratedFiles);
+    }
+
+    [Fact]
+    public void GeneratedCSharpValidation_UsesProjectUnsafeSetting()
+    {
+        var src = CreateSourceFile(
+            "UnsafeBlock.calr",
+            """
+            §M{m001:UnsafeBlock}
+              §CL{c001:Worker:pub}
+                §MT{m001:Run:pub} () -> void
+                  §E{unsafe}
+                  §UNSAFE{u1}
+                    §B{~x:i32} INT:42
+                  §/UNSAFE{u1}
+            """);
+        var rejected = CreateTask(src);
+        rejected.AllowUnsafeBlocks = false;
+        Assert.False(rejected.Execute());
+
+        var accepted = CreateTask(src);
+        accepted.AllowUnsafeBlocks = true;
+        Assert.True(
+            accepted.Execute(),
+            string.Join("; ", ((TestBuildEngine)accepted.BuildEngine).Errors));
+    }
+
+    [Fact]
+    public void GeneratedCSharpValidation_HonorsDisabledImplicitUsings()
+    {
+        var src = CreateSourceFile(
+            "ImplicitUsings.calr",
+            """
+            §M{m001:ImplicitUsings}
+              §CL{c001:Reader:pub}
+                §CSHARP{public string Read() => File.ReadAllText("input.txt");}§/CSHARP
+            """);
+        var task = CreateTask(src);
+        task.ImplicitUsings = "disable";
+
+        Assert.False(task.Execute());
+        Assert.Contains(
+            ((TestBuildEngine)task.BuildEngine).Errors,
+            error => error.Contains("CS0103", StringComparison.Ordinal));
     }
 
     [Fact]

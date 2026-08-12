@@ -43,7 +43,7 @@
   </Target>
 
   <PropertyGroup>
-    <_CalorCompileCalorDependsOn>ResolveAssemblyReferences</_CalorCompileCalorDependsOn>
+    <_CalorCompileCalorDependsOn>ResolveAssemblyReferences;GenerateMSBuildEditorConfigFile</_CalorCompileCalorDependsOn>
   </PropertyGroup>
 
   <!-- Validate CalorCompilerOverride (runs unconditionally, not subject to incremental build skip) -->
@@ -75,6 +75,17 @@
         EnforceEffects="$(CalorEnforceEffects)"
         TypeCheck="$(CalorTypeCheck)"
         TranspileOnly="$(CalorTranspileOnly)"
+        ProjectSourceFiles="@(Compile)"
+        AllowUnsafeBlocks="$(AllowUnsafeBlocks)"
+        ProjectOutputType="$(OutputType)"
+        DefineConstants="$(DefineConstants)"
+        LanguageVersion="$(LangVersion)"
+        ImplicitUsings="$(ImplicitUsings)"
+        Nullable="$(Nullable)"
+        TreatWarningsAsErrors="$(TreatWarningsAsErrors)"
+        AnalyzerConfigPath="$(GeneratedMSBuildEditorConfigFile)"
+        AnalyzerAssemblies="@(Analyzer)"
+        AdditionalFiles="@(AdditionalFiles)"
         Verify="$(CalorVerify)"
         ElideProvenGuards="$(CalorElideProvenGuards)"
         EnableILAnalysis="$(CalorEnableILAnalysis)"

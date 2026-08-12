@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Calor.Compiler.Analysis;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Effects;
+using Calor.Compiler.Incremental;
 using Calor.Compiler.Mcp.Tools;
 using Calor.Compiler.Verification.Z3;
 
@@ -46,6 +47,10 @@ public sealed class ProjectMigrator
 
         var processedCount = 0;
         var totalCount = entriesToProcess.Count;
+        var crossModuleMap = plan.Direction == MigrationDirection.CalorToCSharp
+            ? CompilationDriver.BuildCrossModuleFunctionMap(
+                entriesToProcess.Select(entry => new FileInfo(entry.SourcePath)).ToList())
+            : null;
 
         var wasCancelled = false;
 
@@ -58,7 +63,8 @@ public sealed class ProjectMigrator
                 try
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var result = await ProcessEntryAsync(entry, plan.Direction, dryRun, cancellationToken);
+                    var result = await ProcessEntryAsync(
+                        entry, plan.Direction, dryRun, crossModuleMap, cancellationToken);
 
                     var newCount = Interlocked.Increment(ref processedCount);
                     progress?.Report(new MigrationProgress
@@ -97,7 +103,8 @@ public sealed class ProjectMigrator
             {
                 if (cancellationToken.IsCancellationRequested)
                     break;
-                var result = await ProcessEntryAsync(entry, plan.Direction, dryRun, cancellationToken);
+                var result = await ProcessEntryAsync(
+                    entry, plan.Direction, dryRun, crossModuleMap, cancellationToken);
                 reportBuilder.AddFileResult(result);
 
                 processedCount++;
@@ -137,7 +144,14 @@ public sealed class ProjectMigrator
         if (plan.Direction == MigrationDirection.CSharpToCalor &&
             _options.Fidelity == ConversionFidelity.Lossless)
         {
-            await FinalizeLosslessProjectAsync(report, dryRun, cancellationToken);
+            await FinalizeLosslessProjectAsync(
+                report, plan.ProjectPath, dryRun, cancellationToken);
+            RefreshSummary(report);
+        }
+        else if (plan.Direction == MigrationDirection.CalorToCSharp)
+        {
+            await FinalizeCalorToCSharpProjectAsync(
+                report, plan.ProjectPath, dryRun, cancellationToken);
             RefreshSummary(report);
         }
 
@@ -228,7 +242,12 @@ public sealed class ProjectMigrator
         }
     }
 
-    private async Task<FileMigrationResult> ProcessEntryAsync(MigrationPlanEntry entry, MigrationDirection direction, bool dryRun, CancellationToken cancellationToken = default)
+    private async Task<FileMigrationResult> ProcessEntryAsync(
+        MigrationPlanEntry entry,
+        MigrationDirection direction,
+        bool dryRun,
+        IReadOnlyDictionary<string, string>? crossModuleMap,
+        CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.UtcNow;
 
@@ -249,7 +268,8 @@ public sealed class ProjectMigrator
             }
             else
             {
-                return await ProcessCalorToCSharpAsync(entry, dryRun, startTime, cts.Token);
+                return await ProcessCalorToCSharpAsync(
+                    entry, dryRun, startTime, crossModuleMap, cts.Token);
             }
         }
         catch (OperationCanceledException)
@@ -465,6 +485,7 @@ public sealed class ProjectMigrator
 
     private static async Task FinalizeLosslessProjectAsync(
         MigrationReport report,
+        string projectPath,
         bool dryRun,
         CancellationToken cancellationToken)
     {
@@ -489,13 +510,63 @@ public sealed class ProjectMigrator
             return;
         }
 
-        var sources = converted
-            .Select(result => result.GeneratedCSharp)
-            .Where(source => !string.IsNullOrWhiteSpace(source))
-            .Cast<string>()
-            .ToArray();
-        var validation = CodeGen.GeneratedCSharpCompiler.Validate(sources);
-        var errors = validation.SyntaxErrors.Concat(validation.CompilationErrors).ToList();
+        IReadOnlyList<ProjectCompilationInputs> projectInputs;
+        try
+        {
+            projectInputs = await ResolveProjectCompilationInputsAsync(
+                projectPath, cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException
+                                   or System.Text.Json.JsonException)
+        {
+            MarkProjectValidationFailure(
+                converted,
+                $"Project references could not be resolved for generated C# validation: {ex.Message}");
+            return;
+        }
+        var convertedSourcePaths = converted
+            .Select(result => Path.GetFullPath(result.SourcePath))
+            .ToHashSet(BuildStateCache.GetPathComparer());
+        var errors = projectInputs.SelectMany(inputs =>
+        {
+            var targetSourcePaths = inputs.SourcePaths
+                .Select(Path.GetFullPath)
+                .ToHashSet(BuildStateCache.GetPathComparer());
+            var sources = converted
+                .Where(result => !string.IsNullOrWhiteSpace(result.GeneratedCSharp))
+                .Where(result => targetSourcePaths.Count == 0 ||
+                    targetSourcePaths.Contains(Path.GetFullPath(result.SourcePath)))
+                .Select(result => new CodeGen.GeneratedCSharpSource(
+                    result.GeneratedCSharp!,
+                    Path.ChangeExtension(result.OutputPath ?? result.SourcePath, ".g.cs"),
+                    result.OutputPath))
+                .ToArray();
+            if (sources.Length == 0)
+                return [];
+
+            var additionalSources = inputs.SourcePaths
+                .Where(path => !convertedSourcePaths.Contains(Path.GetFullPath(path)))
+                .Select(path => new CodeGen.GeneratedCSharpSource(
+                    File.ReadAllText(path), path));
+            var validation = CodeGen.GeneratedCSharpCompiler.Validate(
+                sources,
+                new CodeGen.GeneratedCSharpCompilationContext
+                {
+                    ReferencePaths = inputs.ReferencePaths,
+                    AdditionalSources = additionalSources,
+                    AllowUnsafe = inputs.AllowUnsafe,
+                    OutputKind = inputs.OutputKind,
+                    LanguageVersion = inputs.LanguageVersion,
+                    PreprocessorSymbols = inputs.PreprocessorSymbols,
+                    IncludeImplicitGlobalUsings = inputs.IncludeImplicitGlobalUsings,
+                    AnalyzerPaths = inputs.AnalyzerPaths,
+                    AdditionalFilePaths = inputs.AdditionalFilePaths,
+                    NullableContextOptions = inputs.NullableContextOptions,
+                    TreatWarningsAsErrors = inputs.TreatWarningsAsErrors,
+                    AnalyzerConfigPath = inputs.AnalyzerConfigPath
+                });
+            return validation.SyntaxErrors.Concat(validation.CompilationErrors);
+        }).ToList();
         if (errors.Count > 0)
         {
             foreach (var result in converted)
@@ -512,6 +583,7 @@ public sealed class ProjectMigrator
                     });
                 }
             }
+
             return;
         }
 
@@ -529,6 +601,130 @@ public sealed class ProjectMigrator
                     result.OutputPath,
                     result.ConvertedSource,
                     cancellationToken: cancellationToken);
+            }
+        }
+    }
+
+    private static async Task FinalizeCalorToCSharpProjectAsync(
+        MigrationReport report,
+        string projectPath,
+        bool dryRun,
+        CancellationToken cancellationToken)
+    {
+        var converted = report.FileResults
+            .Where(result => result.Status == FileMigrationStatus.Success &&
+                result.OutputPath != null &&
+                result.GeneratedCSharp != null)
+            .ToList();
+        if (report.FileResults.Any(result =>
+                result.Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut))
+        {
+            MarkProjectValidationFailure(
+                converted,
+                "Calor-to-C# project migration was not written because another file failed compilation.");
+            return;
+        }
+
+        try
+        {
+            var projectInputs = await ResolveProjectCompilationInputsAsync(
+                projectPath, cancellationToken);
+            var generatedOutputPaths = converted
+                .Select(result => Path.GetFullPath(result.OutputPath!))
+                .ToHashSet(BuildStateCache.GetPathComparer());
+            foreach (var inputs in projectInputs)
+            {
+                var targetCalorPaths = inputs.CalorSourcePaths
+                    .Select(Path.GetFullPath)
+                    .ToHashSet(BuildStateCache.GetPathComparer());
+                var targetConverted = converted
+                    .Where(result => targetCalorPaths.Count == 0 ||
+                        targetCalorPaths.Contains(Path.GetFullPath(result.SourcePath)))
+                    .ToList();
+                if (targetConverted.Count == 0)
+                    continue;
+                var sources = targetConverted.Select(result =>
+                    new CodeGen.GeneratedCSharpSource(
+                        result.GeneratedCSharp!,
+                        result.OutputPath!,
+                        result.SourcePath));
+                var additionalSources = inputs.SourcePaths
+                    .Where(path => !generatedOutputPaths.Contains(Path.GetFullPath(path)))
+                    .Select(path => new CodeGen.GeneratedCSharpSource(
+                        File.ReadAllText(path), path))
+                    .ToList();
+                var validation = CodeGen.GeneratedCSharpCompiler.Validate(
+                    sources,
+                    new CodeGen.GeneratedCSharpCompilationContext
+                    {
+                        ReferencePaths = inputs.ReferencePaths,
+                        AdditionalSources = additionalSources,
+                        AllowUnsafe = inputs.AllowUnsafe,
+                        OutputKind = inputs.OutputKind,
+                        LanguageVersion = inputs.LanguageVersion,
+                        PreprocessorSymbols = inputs.PreprocessorSymbols,
+                        IncludeImplicitGlobalUsings = inputs.IncludeImplicitGlobalUsings,
+                        AnalyzerPaths = inputs.AnalyzerPaths,
+                        AdditionalFilePaths = inputs.AdditionalFilePaths,
+                        NullableContextOptions = inputs.NullableContextOptions,
+                        TreatWarningsAsErrors = inputs.TreatWarningsAsErrors,
+                        AnalyzerConfigPath = inputs.AnalyzerConfigPath
+                    });
+                if (validation.CompilationSuccess)
+                    continue;
+
+                var messages = validation.CompilationErrors
+                    .Take(20)
+                    .Select(error =>
+                        $"Calor project C# validation failed ({error.Id}): {error.GetMessage()}")
+                    .ToList();
+                MarkProjectValidationFailure(converted, messages);
+                return;
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException
+                                   or System.Text.Json.JsonException)
+        {
+            MarkProjectValidationFailure(
+                converted,
+                $"Project references could not be resolved for generated C# validation: {ex.Message}");
+            return;
+        }
+
+        if (dryRun)
+            return;
+
+        foreach (var result in converted)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await ConversionFileWriter.WriteAtomicAsync(
+                result.OutputPath!,
+                result.GeneratedCSharp!,
+                cancellationToken: cancellationToken);
+        }
+    }
+
+    private static void MarkProjectValidationFailure(
+        IEnumerable<FileMigrationResult> results,
+        string message)
+        => MarkProjectValidationFailure(results, [message]);
+
+    private static void MarkProjectValidationFailure(
+        IEnumerable<FileMigrationResult> results,
+        IReadOnlyList<string> messages)
+    {
+        foreach (var result in results)
+        {
+            result.Status = FileMigrationStatus.Failed;
+            result.OutputPath = null;
+            foreach (var message in messages)
+            {
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "project-csharp-validation",
+                    Message = message
+                });
             }
         }
     }
@@ -560,30 +756,304 @@ public sealed class ProjectMigrator
             .Distinct());
     }
 
+    private sealed record ProjectCompilationInputs(
+        IReadOnlyList<string> ReferencePaths,
+        IReadOnlyList<string> SourcePaths,
+        IReadOnlyList<string> CalorSourcePaths,
+        bool AllowUnsafe,
+        Microsoft.CodeAnalysis.OutputKind OutputKind,
+        Microsoft.CodeAnalysis.CSharp.LanguageVersion LanguageVersion,
+        IReadOnlyList<string> PreprocessorSymbols,
+        bool IncludeImplicitGlobalUsings,
+        IReadOnlyList<string> AnalyzerPaths,
+        IReadOnlyList<string> AdditionalFilePaths,
+        Microsoft.CodeAnalysis.NullableContextOptions NullableContextOptions,
+        bool TreatWarningsAsErrors,
+        string? AnalyzerConfigPath);
+
+    private static async Task<IReadOnlyList<ProjectCompilationInputs>> ResolveProjectCompilationInputsAsync(
+        string projectPath,
+        CancellationToken cancellationToken)
+    {
+        var projectFile = FindProjectFile(projectPath);
+        if (projectFile == null)
+        {
+            return [new ProjectCompilationInputs(
+                [], [], [], true,
+                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary,
+                Microsoft.CodeAnalysis.CSharp.LanguageVersion.Default,
+                [], true, [], [],
+                Microsoft.CodeAnalysis.NullableContextOptions.Disable,
+                false, null)];
+        }
+
+        var targetFrameworks = await ResolveTargetFrameworksAsync(
+            projectFile, cancellationToken);
+        var results = new List<ProjectCompilationInputs>();
+        foreach (var targetFramework in targetFrameworks)
+        {
+            results.Add(await ResolveProjectCompilationInputAsync(
+                projectFile, targetFramework, cancellationToken));
+        }
+        return results;
+    }
+
+    private static async Task<ProjectCompilationInputs> ResolveProjectCompilationInputAsync(
+        string projectFile,
+        string? targetFramework,
+        CancellationToken cancellationToken)
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("msbuild");
+        startInfo.ArgumentList.Add(projectFile);
+        startInfo.ArgumentList.Add(
+            "-t:ResolveAssemblyReferences;GenerateMSBuildEditorConfigFile");
+        startInfo.ArgumentList.Add(
+            "-getItem:ReferencePath,Compile,CalorCompile,Analyzer,AdditionalFiles");
+        startInfo.ArgumentList.Add(
+            "-getProperty:AllowUnsafeBlocks,OutputType,DefineConstants,LangVersion,ImplicitUsings,Nullable,TreatWarningsAsErrors,GeneratedMSBuildEditorConfigFile");
+        if (!string.IsNullOrWhiteSpace(targetFramework))
+        {
+            startInfo.ArgumentList.Add($"-property:TargetFramework={targetFramework}");
+        }
+        startInfo.ArgumentList.Add("-verbosity:quiet");
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Unable to start dotnet msbuild.");
+        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        var output = await outputTask;
+        var error = await errorTask;
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"dotnet msbuild failed with exit code {process.ExitCode}: {error.Trim()}");
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(output);
+        if (!document.RootElement.TryGetProperty("Items", out var items) ||
+            !items.TryGetProperty("ReferencePath", out var references) ||
+            !document.RootElement.TryGetProperty("Properties", out var properties))
+        {
+            throw new InvalidOperationException(
+                "dotnet msbuild did not return project compilation inputs.");
+        }
+
+        var referencePaths = references.EnumerateArray()
+            .Select(item => item.GetProperty("Identity").GetString())
+            .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            .Select(path => Path.GetFullPath(path!))
+            .Distinct(BuildStateCache.GetPathComparer())
+            .ToList();
+        var projectDirectory = Path.GetDirectoryName(projectFile)!;
+        var sourcePaths = items.TryGetProperty("Compile", out var compileItems)
+            ? compileItems.EnumerateArray()
+                .Select(item => item.GetProperty("Identity").GetString())
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => Path.IsPathRooted(path!)
+                    ? Path.GetFullPath(path!)
+                    : Path.GetFullPath(Path.Combine(projectDirectory, path!)))
+                .Where(File.Exists)
+                .Distinct(BuildStateCache.GetPathComparer())
+                .ToList()
+            : [];
+        var allowUnsafeText = GetProperty(properties, "AllowUnsafeBlocks");
+        var outputType = GetProperty(properties, "OutputType");
+        var languageVersionText = GetProperty(properties, "LangVersion");
+        var implicitUsings = GetProperty(properties, "ImplicitUsings");
+        var languageVersion = Microsoft.CodeAnalysis.CSharp.LanguageVersionFacts.TryParse(
+            languageVersionText, out var parsedLanguageVersion)
+            ? parsedLanguageVersion
+            : Microsoft.CodeAnalysis.CSharp.LanguageVersion.Default;
+
+        return new ProjectCompilationInputs(
+            referencePaths,
+            sourcePaths,
+            ResolveItems(items, "CalorCompile", projectDirectory),
+            allowUnsafeText.Equals("true", StringComparison.OrdinalIgnoreCase),
+            outputType.Equals("winexe", StringComparison.OrdinalIgnoreCase)
+                ? Microsoft.CodeAnalysis.OutputKind.WindowsApplication
+                : outputType.Equals("exe", StringComparison.OrdinalIgnoreCase)
+                ? Microsoft.CodeAnalysis.OutputKind.ConsoleApplication
+                : Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary,
+            languageVersion,
+            GetProperty(properties, "DefineConstants").Split(
+                [';', ','],
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            implicitUsings.Equals("enable", StringComparison.OrdinalIgnoreCase) ||
+                implicitUsings.Equals("true", StringComparison.OrdinalIgnoreCase),
+            ResolveItems(items, "Analyzer", projectDirectory),
+            ResolveItems(items, "AdditionalFiles", projectDirectory),
+            ParseNullableContextOptions(GetProperty(properties, "Nullable")),
+            GetProperty(properties, "TreatWarningsAsErrors")
+                .Equals("true", StringComparison.OrdinalIgnoreCase),
+            ResolveOptionalPath(
+                GetProperty(properties, "GeneratedMSBuildEditorConfigFile"),
+                projectDirectory));
+
+        static string GetProperty(System.Text.Json.JsonElement properties, string name)
+            => properties.TryGetProperty(name, out var property)
+                ? property.GetString() ?? string.Empty
+                : string.Empty;
+
+        static IReadOnlyList<string> ResolveItems(
+            System.Text.Json.JsonElement items,
+            string name,
+            string projectDirectory)
+            => items.TryGetProperty(name, out var values)
+                ? values.EnumerateArray()
+                    .Select(item => item.GetProperty("Identity").GetString())
+                    .Where(path => !string.IsNullOrWhiteSpace(path))
+                    .Select(path => Path.IsPathRooted(path!)
+                        ? Path.GetFullPath(path!)
+                        : Path.GetFullPath(Path.Combine(projectDirectory, path!)))
+                    .Where(File.Exists)
+                    .Distinct(BuildStateCache.GetPathComparer())
+                    .ToList()
+                : [];
+
+        static string? ResolveOptionalPath(string path, string projectDirectory)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+            var fullPath = Path.IsPathRooted(path)
+                ? Path.GetFullPath(path)
+                : Path.GetFullPath(Path.Combine(projectDirectory, path));
+            return File.Exists(fullPath) ? fullPath : null;
+        }
+
+        static Microsoft.CodeAnalysis.NullableContextOptions ParseNullableContextOptions(
+            string value)
+            => value.ToLowerInvariant() switch
+            {
+                "enable" => Microsoft.CodeAnalysis.NullableContextOptions.Enable,
+                "warnings" => Microsoft.CodeAnalysis.NullableContextOptions.Warnings,
+                "annotations" => Microsoft.CodeAnalysis.NullableContextOptions.Annotations,
+                _ => Microsoft.CodeAnalysis.NullableContextOptions.Disable
+            };
+    }
+
+    private static async Task<IReadOnlyList<string?>> ResolveTargetFrameworksAsync(
+        string projectFile,
+        CancellationToken cancellationToken)
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("msbuild");
+        startInfo.ArgumentList.Add(projectFile);
+        startInfo.ArgumentList.Add("-getProperty:TargetFramework,TargetFrameworks");
+        startInfo.ArgumentList.Add("-verbosity:quiet");
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Unable to start dotnet msbuild.");
+        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        var output = await outputTask;
+        var error = await errorTask;
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"dotnet msbuild failed with exit code {process.ExitCode}: {error.Trim()}");
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(output);
+        if (!document.RootElement.TryGetProperty("Properties", out var properties))
+            throw new InvalidOperationException("dotnet msbuild did not return project properties.");
+
+        var targetFrameworks = properties.TryGetProperty("TargetFrameworks", out var plural)
+            ? plural.GetString()
+            : null;
+        if (!string.IsNullOrWhiteSpace(targetFrameworks))
+        {
+            return targetFrameworks.Split(
+                    ';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(value => (string?)value)
+                .ToList();
+        }
+
+        var targetFramework = properties.TryGetProperty("TargetFramework", out var single)
+            ? single.GetString()
+            : null;
+        return [string.IsNullOrWhiteSpace(targetFramework) ? null : targetFramework];
+    }
+
+    private static string? FindProjectFile(string projectPath)
+    {
+        if (File.Exists(projectPath) &&
+            string.Equals(Path.GetExtension(projectPath), ".csproj",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return Path.GetFullPath(projectPath);
+        }
+
+        var directory = Directory.Exists(projectPath)
+            ? projectPath
+            : Path.GetDirectoryName(projectPath);
+        if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+            return null;
+
+        var originalDirectory = Path.GetFullPath(directory);
+        for (var current = originalDirectory;
+             current != null;
+             current = Directory.GetParent(current)?.FullName)
+        {
+            var projects = Directory.GetFiles(
+                current, "*.csproj", SearchOption.TopDirectoryOnly);
+            if (projects.Length == 1)
+                return Path.GetFullPath(projects[0]);
+            if (projects.Length > 1)
+            {
+                throw new InvalidOperationException(
+                    $"Project context is ambiguous: '{current}' contains multiple project files.");
+            }
+        }
+
+        var nestedProjects = Directory.GetFiles(
+            originalDirectory, "*.csproj", SearchOption.AllDirectories);
+        if (nestedProjects.Length == 1)
+            return Path.GetFullPath(nestedProjects[0]);
+        if (nestedProjects.Length > 1)
+        {
+            throw new InvalidOperationException(
+                $"Project context is ambiguous: '{originalDirectory}' contains multiple project files.");
+        }
+
+        return null;
+    }
+
     private async Task<FileMigrationResult> ProcessCalorToCSharpAsync(
         MigrationPlanEntry entry,
         bool dryRun,
         DateTime startTime,
+        IReadOnlyDictionary<string, string>? crossModuleMap,
         CancellationToken cancellationToken)
     {
         var source = await File.ReadAllTextAsync(entry.SourcePath, cancellationToken);
-        var result = Program.Compile(
-            source,
-            entry.SourcePath,
-            new CompilationOptions { CancellationToken = cancellationToken });
+        var compileOptions = new CompilationOptions
+        {
+            DeferGeneratedOutputValidation = true,
+            CancellationToken = cancellationToken
+        };
+        compileOptions.CrossModuleFunctionModules = crossModuleMap;
+        var result = Program.Compile(source, entry.SourcePath, compileOptions);
 
         FileMetrics? metrics = null;
         if (!result.HasErrors && _options.IncludeBenchmark)
         {
             metrics = BenchmarkIntegration.CalculateMetrics(source, result.GeneratedCode);
-        }
-
-        if (!dryRun && !result.HasErrors)
-        {
-            await ConversionFileWriter.WriteAtomicAsync(
-                entry.OutputPath,
-                result.GeneratedCode,
-                cancellationToken: cancellationToken);
         }
 
         var status = result.HasErrors
@@ -607,7 +1077,8 @@ public sealed class ProjectMigrator
             Status = status,
             Duration = DateTime.UtcNow - startTime,
             Issues = issues,
-            Metrics = metrics
+            Metrics = metrics,
+            GeneratedCSharp = result.HasErrors ? null : result.GeneratedCode
         };
     }
 

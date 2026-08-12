@@ -274,7 +274,7 @@ public class IncrementalCliBuildTests : IDisposable
     }
 
     [Fact]
-    public void CrossModuleViolation_SurfacesFromCachedSummaries_OnFullySkippedWarmBuild()
+    public void CrossModuleViolation_IsNeverPublishedOrCached()
     {
         var callee = WriteSource("callee.calr", """
             §M{m001:OrderService}
@@ -292,11 +292,11 @@ public class IncrementalCliBuildTests : IDisposable
         Assert.True(cold.Result.AnyErrors);
         Assert.Contains(cold.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
 
-        // Warm build: both files are skipped, yet the violation must still be
-        // reported — cross-module enforcement runs over the cached summaries.
+        // Failed aggregate enforcement is not cached or published, so the warm
+        // build recompiles both files and reports the violation again.
         var warm = Run([callee, caller]);
+        Assert.Empty(warm.Result.Skipped);
         Assert.Empty(warm.CompiledFiles);
-        Assert.Equal(2, warm.Result.Skipped.Count);
         Assert.True(warm.Result.AnyErrors);
         Assert.Contains(warm.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
     }
@@ -323,16 +323,13 @@ public class IncrementalCliBuildTests : IDisposable
         var cold = Run([callee, caller]);
         Assert.True(cold.Result.AnyErrors);
 
-        // Null out the callee's persisted summary, simulating a degraded state file.
+        // Cross-module failures do not persist cache state.
         var state = BuildStateCache.Load(_tempDir);
-        Assert.NotNull(state);
-        state!.Files["callee2.calr"].EffectSummary = null;
-        BuildStateCache.Save(state, _tempDir);
+        Assert.Null(state);
 
         var warm = Run([callee, caller]);
-        // The degraded entry is recompiled, not skipped...
-        Assert.Contains(callee, warm.CompiledFiles);
-        // ...and the cross-module violation still fails the warm build.
+        Assert.Empty(warm.Result.Skipped);
+        Assert.Empty(warm.CompiledFiles);
         Assert.True(warm.Result.AnyErrors);
         Assert.Contains(warm.Diagnostics, d => d.Code == DiagnosticCode.ForbiddenEffect);
     }

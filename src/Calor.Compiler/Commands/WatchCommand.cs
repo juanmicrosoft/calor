@@ -337,7 +337,17 @@ internal sealed class WatchSession
                 onCompiled: (file, compileResult) =>
                 {
                     var outputPath = Path.ChangeExtension(file.FullName, ".g.cs");
-                    File.WriteAllText(outputPath, compileResult.GeneratedCode);
+                    var temporaryPath = outputPath + $".{Guid.NewGuid():N}.tmp";
+                    try
+                    {
+                        File.WriteAllText(temporaryPath, compileResult.GeneratedCode);
+                        File.Move(temporaryPath, outputPath, overwrite: true);
+                    }
+                    finally
+                    {
+                        if (File.Exists(temporaryPath))
+                            File.Delete(temporaryPath);
+                    }
                     if (_settings.Verbose)
                     {
                         _status.WriteLine($"Compiled: {outputPath}");
@@ -354,7 +364,13 @@ internal sealed class WatchSession
                 },
                 onAst: declarationIds != null
                     ? (file, source, ast) => declarationIds.AddFile(file.FullName, source, ast)
-                    : null);
+                    : null,
+                onFailed: file =>
+                {
+                    var outputPath = Path.ChangeExtension(file.FullName, ".g.cs");
+                    if (File.Exists(outputPath))
+                        File.Delete(outputPath);
+                });
 
             summary = new DriverResultSummary(result.Compiled.Count, result.Skipped.Count, result.AnyErrors);
         }

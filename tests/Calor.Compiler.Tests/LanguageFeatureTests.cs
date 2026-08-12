@@ -34,7 +34,7 @@ public class LanguageFeatureTests
         var result = Program.Compile(source, null, new CompilationOptions
         {
             EnforceEffects = false,
-            UnsafeTranspileOnly = true,
+            DeferGeneratedOutputValidation = true,
         });
         Assert.False(result.HasErrors, $"Compilation errors: {string.Join("; ", result.Diagnostics)}");
         return result.GeneratedCode ?? "";

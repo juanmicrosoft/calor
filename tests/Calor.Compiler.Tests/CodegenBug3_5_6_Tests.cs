@@ -271,7 +271,7 @@ public class CodegenBug3_5_6_Tests
         var compilationResult = Program.Compile(
             convResult.CalorSource!,
             null,
-            new CompilationOptions { UnsafeTranspileOnly = true });
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             "Roundtrip parse failed:\n" +
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));

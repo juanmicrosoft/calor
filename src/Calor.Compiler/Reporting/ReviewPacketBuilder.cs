@@ -30,7 +30,8 @@ public sealed class ReviewPacketBuilder
         IReadOnlyList<string>? ChangedDeclarations = null,
         IReadOnlyDictionary<string, IReadOnlyList<(int StartLine, int EndLine)>>? ChangedLineRanges = null,
         string? BaselineRef = null,
-        string? ProjectDirectory = null);
+        string? ProjectDirectory = null,
+        IReadOnlyList<string>? ReferencedAssemblyPaths = null);
 
     /// <summary>One input file: path plus source text.</summary>
     public sealed record InputFile(string Path, string Source);
@@ -112,7 +113,9 @@ public sealed class ReviewPacketBuilder
             anyRefinements |= module.RefinementTypes.Count > 0;
             compiledModules.Add((file, module));
             generatedSources.Add(new CodeGen.GeneratedCSharpSource(
-                result.GeneratedCode, file.Path));
+                result.GeneratedCode,
+                System.IO.Path.ChangeExtension(file.Path, ".g.cs"),
+                file.Path));
 
             CollectContracts(packet, file, module, compileOptions.VerificationResults);
             CollectModuleDisclosure(packet, file, module, options);
@@ -120,7 +123,8 @@ public sealed class ReviewPacketBuilder
 
         if (!hasCompileErrors && generatedSources.Count > 0)
         {
-            var validation = CodeGen.GeneratedCSharpCompiler.Validate(generatedSources);
+            var validation = CodeGen.GeneratedCSharpCompiler.Validate(
+                generatedSources, options.ReferencedAssemblyPaths);
             if (!validation.CompilationSuccess)
             {
                 var diagnostics = new DiagnosticBag();

@@ -1,5 +1,8 @@
 using Calor.Compiler.Reporting;
 using Calor.Compiler.Verification.Z3;
+using Calor.Compiler.CodeGen;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Xunit;
 
 namespace Calor.Verification.Tests;
@@ -43,6 +46,45 @@ public class ReviewPacketTests
         return ReviewPacketBuilder.Build(
             [new ReviewPacketBuilder.InputFile("pricing.calr", source)],
             options ?? new ReviewPacketBuilder.Options());
+    }
+
+    [Fact]
+    public void Packet_ValidatesGeneratedCodeAgainstExplicitReferences()
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            "namespace External.Library; public sealed class Api { }");
+        var compilation = CSharpCompilation.Create(
+            "External.Library",
+            [tree],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        var referencePath = Path.Combine(
+            Path.GetTempPath(),
+            $"calor-review-reference-{Guid.NewGuid():N}.dll");
+
+        try
+        {
+            var emit = compilation.Emit(referencePath);
+            Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+            const string source = """
+                §M{m001:Review}
+                  §CL{c001:Consumer:pub}
+                    §CSHARP{public External.Library.Api Create() => new External.Library.Api();}§/CSHARP
+                """;
+
+            var result = Build(
+                source,
+                new ReviewPacketBuilder.Options(
+                    ReferencedAssemblyPaths: [referencePath]));
+
+            Assert.False(
+                result.HasCompileErrors,
+                string.Join(Environment.NewLine, result.CompileDiagnostics));
+        }
+        finally
+        {
+            File.Delete(referencePath);
+        }
     }
 
     [SkippableFact]
