@@ -350,12 +350,15 @@ public sealed class RoundTripPipeline
                 });
 
                 // Step 3a: Convert C# → Calor
-                var conversionTask = Task.Run(
-                    () => converter.Convert(originalSource, csFile),
-                    token);
-                var conversionResult = await conversionTask.WaitAsync(
-                    config.ConversionTimeout,
-                    token);
+                using var conversionCancellation =
+                    CancellationTokenSource.CreateLinkedTokenSource(token);
+                conversionCancellation.CancelAfter(config.ConversionTimeout);
+                var conversionResult = await Task.Run(
+                    () => converter.Convert(
+                        originalSource,
+                        csFile,
+                        conversionCancellation.Token),
+                    CancellationToken.None);
                 token.ThrowIfCancellationRequested();
 
                 result.ConversionSuccess = conversionResult.Success;
@@ -426,7 +429,7 @@ public sealed class RoundTripPipeline
             {
                 throw;
             }
-            catch (TimeoutException)
+            catch (OperationCanceledException) when (!token.IsCancellationRequested)
             {
                 result.Status = FileStatus.ConversionTimedOut;
                 result.Errors =
@@ -531,7 +534,7 @@ public sealed class RoundTripPipeline
                     return;
                 }
 
-                var failed = active
+                var directlyFailed = active
                     .Where(candidate => build.Errors.Any(error =>
                         BuildErrorReferencesFile(
                             validationDir,
@@ -540,9 +543,14 @@ public sealed class RoundTripPipeline
                         BuildErrorReferencesFile(
                             workDir,
                             candidate.FilePath,
-                            error) ||
-                        CandidateIsReferenced(candidate, error)))
+                            error)))
                     .ToList();
+                var failed = directlyFailed.Count > 0
+                    ? directlyFailed
+                    : active
+                        .Where(candidate => build.Errors.Any(error =>
+                            CandidateIsReferenced(candidate, error)))
+                        .ToList();
                 if (failed.Count == 0)
                 {
                     Console.WriteLine(

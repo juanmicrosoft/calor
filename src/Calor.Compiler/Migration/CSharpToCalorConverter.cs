@@ -161,7 +161,10 @@ public sealed class CSharpToCalorConverter
     /// <summary>
     /// Converts C# source code to Calor source code.
     /// </summary>
-    public ConversionResult Convert(string csharpSource, string? sourceFile = null)
+    public ConversionResult Convert(
+        string csharpSource,
+        string? sourceFile = null,
+        CancellationToken cancellationToken = default)
     {
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
@@ -169,6 +172,7 @@ public sealed class CSharpToCalorConverter
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM.
             // Stripping keeps the first #if branch UNEVALUATED and deletes the
             // alternates — a semantic loss, recorded per directive (#770/#773).
@@ -198,8 +202,12 @@ public sealed class CSharpToCalorConverter
 
             // Step 1: Parse C# with Roslyn (use Latest language version to accept all C# features)
             var parseOptions = new CSharpParseOptions(LanguageVersion.Preview);
-            var syntaxTree = CSharpSyntaxTree.ParseText(csharpSource, parseOptions);
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                csharpSource,
+                parseOptions,
+                cancellationToken: cancellationToken);
             var root = syntaxTree.GetCompilationUnitRoot();
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Check for parse errors.
             // Skip CS1028 ("Unexpected preprocessor directive") — occurs with "# endregion"
@@ -256,8 +264,15 @@ public sealed class CSharpToCalorConverter
             try
             {
                 var moduleName = _options.ModuleName ?? DeriveModuleName(sourceFile, root);
-                var visitor = new RoslynSyntaxVisitor(context, semanticModel);
+                var visitor = new RoslynSyntaxVisitor(
+                    context,
+                    semanticModel,
+                    cancellationToken);
                 calorAst = visitor.Convert(root, moduleName);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception visitorEx)
             {
@@ -286,6 +301,7 @@ public sealed class CSharpToCalorConverter
             // Step 3: Emit Calor source code
             var emitter = new CalorEmitter(context);
             var calorSource = emitter.Emit(calorAst);
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Step 3b (#717): post-conversion parse validation. If the emitted Calor
             // does not parse and we are in a C#-preserving mode (Interop /
@@ -375,6 +391,10 @@ public sealed class CSharpToCalorConverter
                 Duration = DateTime.UtcNow - startTime
             };
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             // If the visitor crashed partway through, try to emit whatever was
@@ -410,7 +430,7 @@ public sealed class CSharpToCalorConverter
         // (e.g., regex patterns containing \uD800-\uDBFF in string literals)
         var encoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
         var source = await File.ReadAllTextAsync(csharpFilePath, encoding, cancellationToken);
-        var result = Convert(source, csharpFilePath);
+        var result = Convert(source, csharpFilePath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return result;
     }

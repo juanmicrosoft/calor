@@ -1,3 +1,4 @@
+using Calor.Compiler.Migration;
 using Calor.RoundTrip.Harness;
 using Xunit;
 
@@ -228,6 +229,86 @@ public sealed class RoundTripPipelineSafetyTests
         {
             Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task ProjectValidation_PrefersDirectErrorPathOverMentionedType()
+    {
+        var root = CreateProject(
+            "public static class A { public static B Read() => new(); }");
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Lib", "B.cs"),
+                "public sealed class B { public int Value => 1; }");
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Safety.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Compile Include="Lib/**/*.cs" />
+                  </ItemGroup>
+                </Project>
+                """);
+            var results = new List<FileConversionResult>
+            {
+                new()
+                {
+                    FilePath = "Lib/Invalid.cs",
+                    Status = FileStatus.Replaced,
+                    EmittedCSharp =
+                        "public static class A { public static B Read() => \"wrong\"; }"
+                },
+                new()
+                {
+                    FilePath = "Lib/B.cs",
+                    Status = FileStatus.Replaced,
+                    EmittedCSharp =
+                        "public sealed class B { public int Value => 2; }"
+                },
+            };
+            var config = new RoundTripConfig
+            {
+                ProjectName = "DirectAttribution",
+                OriginalProjectPath = root,
+                LibrarySourceRelativePath = "Lib",
+                SolutionOrProjectFile = "Safety.csproj",
+            };
+
+            await new RoundTripPipeline().ValidateAndPublishProjectCandidatesAsync(
+                root,
+                config,
+                results,
+                CancellationToken.None);
+
+            Assert.Equal(FileStatus.EmitCompilationError, results[0].Status);
+            Assert.Equal(FileStatus.Replaced, results[1].Status);
+            Assert.Contains(
+                "Value => 2",
+                await File.ReadAllTextAsync(Path.Combine(root, "Lib", "B.cs")));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Converter_ObservesPreCanceledToken()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var converter = new CSharpToCalorConverter();
+
+        Assert.ThrowsAny<OperationCanceledException>(() =>
+            converter.Convert(
+                "public static class A { }",
+                "A.cs",
+                cancellation.Token));
     }
 
     [Fact]

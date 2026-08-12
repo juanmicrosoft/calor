@@ -576,6 +576,7 @@ jobs:
 
       - name: Post round-trip results to PR
         if: >-
+          always() &&
           github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
@@ -588,11 +589,17 @@ jobs:
             body += '| Project | Verdict | Tests | Inventory Δ | Native | Total coverage | Interop | Gaps |\n';
             body += '|---------|---------|-------|-------------|--------|----------------|---------|------|\n';
 
-            const files = fs.readdirSync('conversion-reports')
-              .filter(f => f.endsWith('-roundtrip.json'));
+            const reportsDir = 'conversion-reports';
+            const files = fs.existsSync(reportsDir)
+              ? fs.readdirSync(reportsDir).filter(f => f.endsWith('-roundtrip.json'))
+              : [];
+
+            if (files.length === 0) {
+              body += ':x: The round-trip job produced no JSON reports. Check the failed workflow logs.\n';
+            }
 
             for (const file of files) {
-              const data = JSON.parse(fs.readFileSync(`conversion-reports/${file}`));
+              const data = JSON.parse(fs.readFileSync(`${reportsDir}/${file}`));
               const emoji = data.verdict === 'pass' ? ':white_check_mark:' : ':x:';
               const fidelity = data.fidelity;
 
