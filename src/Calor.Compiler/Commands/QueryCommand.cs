@@ -28,8 +28,144 @@ public static class QueryCommand
             CreateFacetCommand("symbol", "Where a name is declared"),
             CreateFacetCommand("callers", "What calls a declaration"),
             CreateFacetCommand("callees", "What a declaration calls"),
+            CreateImpactCommand(),
         };
         return command;
+    }
+
+    private static Command CreateImpactCommand()
+    {
+        var subjectArgument = new Argument<string>(
+            name: "subject",
+            description: "Declaration name to treat as changed (or a file with --file)");
+        var pathOption = new Option<string>(
+            aliases: ["--project"],
+            description: "Project directory",
+            getDefaultValue: () => ".");
+        var inFileOption = new Option<string?>(
+            aliases: ["--in-file"],
+            description: "Disambiguate when several files declare the name");
+        var fileOption = new Option<bool>(
+            aliases: ["--file"],
+            description: "Treat the subject as a whole changed FILE rather than one declaration");
+        var noBuildOption = new Option<bool>(
+            aliases: ["--no-build"],
+            description: "Refuse a missing or stale index instead of rebuilding it");
+
+        var command = new Command("impact", "What a change could affect")
+        {
+            subjectArgument, pathOption, inFileOption, fileOption, noBuildOption,
+        };
+
+        command.SetHandler((InvocationContext context) =>
+        {
+            context.ExitCode = ExecuteImpact(
+                context.ParseResult.GetValueForArgument(subjectArgument),
+                context.ParseResult.GetValueForOption(pathOption)!,
+                context.ParseResult.GetValueForOption(inFileOption),
+                context.ParseResult.GetValueForOption(fileOption),
+                context.ParseResult.GetValueForOption(noBuildOption));
+        });
+
+        return command;
+    }
+
+    private static int ExecuteImpact(
+        string subject,
+        string projectDirectory,
+        string? inFile,
+        bool wholeFile,
+        bool noBuild)
+    {
+        if (!Directory.Exists(projectDirectory))
+        {
+            Console.Error.WriteLine($"Error: directory not found: {projectDirectory}");
+            return 1;
+        }
+
+        var index = Resolve(projectDirectory, noBuild, out var error);
+        if (index == null)
+        {
+            Console.Error.WriteLine(error);
+            return 1;
+        }
+
+        IReadOnlyList<IndexedDeclaration> affected;
+        string described;
+        if (wholeFile)
+        {
+            var normalized = subject.Replace('\\', '/');
+            if (!index.Files.ContainsKey(normalized))
+            {
+                Console.Error.WriteLine($"Error: '{subject}' is not an indexed source file.");
+                return 1;
+            }
+            affected = index.FindImpactOfFile(normalized);
+            described = $"the whole file {normalized}";
+        }
+        else
+        {
+            var declarations = index.FindDeclarations(subject);
+            if (declarations.Count == 0)
+            {
+                Console.Error.WriteLine(
+                    $"Error: no declaration named '{subject}'. Use --file to ask about a file.");
+                return 1;
+            }
+
+            IndexedDeclaration target;
+            if (declarations.Count == 1)
+            {
+                target = declarations[0];
+            }
+            else
+            {
+                var matches = inFile == null
+                    ? declarations
+                    : declarations.Where(declaration => string.Equals(
+                        declaration.File, inFile, StringComparison.Ordinal)).ToArray();
+                if (matches.Count != 1)
+                {
+                    Console.Error.WriteLine(
+                        $"Error: '{subject}' is declared in {declarations.Count} places; "
+                            + "narrow it with --in-file:");
+                    foreach (var declaration in declarations)
+                        Console.Error.WriteLine($"  {Describe(declaration)}");
+                    return 1;
+                }
+                target = matches[0];
+            }
+
+            affected = index.FindImpactOfDeclarations([target.SymbolId]);
+            described = Describe(target);
+        }
+
+        foreach (var declaration in affected.OrderBy(
+                     declaration => $"{declaration.File}:{declaration.Line}",
+                     StringComparer.Ordinal))
+        {
+            Console.WriteLine($"  {Describe(declaration)}");
+        }
+
+        var affectedFiles = affected
+            .Select(declaration => declaration.File)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        Console.WriteLine(
+            affected.Count == 0
+                ? $"impact: nothing calls into {described}"
+                : $"impact: {affected.Count} declaration(s) in {affectedFiles} file(s) "
+                    + $"affected by a change to {described}");
+
+        if (wholeFile)
+        {
+            Console.WriteLine(
+                "impact: file-grained — a change to ANY declaration in this file "
+                    + "implicates all of these. Ask about a declaration for a precise answer.");
+        }
+
+        ReportResidual(index, index.ImpactAnswerIsPartial());
+        return 0;
     }
 
     private static Command CreateFacetCommand(string facet, string description)

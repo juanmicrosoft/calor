@@ -82,6 +82,44 @@
       "inFile": "asks-across.calr",
       "expect": [],
       "partial": true
+    },
+    {
+      "why": "Declaration-seeded impact, the default. Changing Scale affects ScaleTwice (same file, but a DIFFERENT declaration, so genuinely affected) and Run in another file. Under the rejected file-grained scheme ScaleTwice was wrongly excluded as part of the seed.",
+      "facet": "impact",
+      "name": "Scale",
+      "inFile": "math.calr",
+      "expect": [
+        "app.calr:2:Run",
+        "math.calr:5:ScaleTwice"
+      ],
+      "partial": true
+    },
+    {
+      "why": "Nothing calls ScaleTwice, so changing it affects nothing. Under file granularity this same question returned Run — the over-report that made the facet useless.",
+      "facet": "impact",
+      "name": "ScaleTwice",
+      "inFile": "math.calr",
+      "expect": [],
+      "partial": true
+    },
+    {
+      "why": "Only the same-file caller resolves; the cross-file call to Shared is ambiguous, which is why this is partial rather than complete.",
+      "facet": "impact",
+      "name": "Shared",
+      "inFile": "ambiguous2.calr",
+      "expect": [
+        "ambiguous2.calr:5:AsksShared"
+      ],
+      "partial": true
+    },
+    {
+      "why": "Whole-file impact is still offered for 'I rewrote this file'. math.calr holds Scale and ScaleTwice, so only Run is downstream of the file as a unit.",
+      "facet": "impact-file",
+      "name": "math.calr",
+      "expect": [
+        "app.calr:2:Run"
+      ],
+      "partial": true
     }
   ]
 }

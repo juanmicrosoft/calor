@@ -50,6 +50,43 @@ public sealed class QueryGoldenTests : IDisposable
         var golden = LoadGoldens()[position];
         var index = BuildFixtureIndex();
 
+        if (golden.Facet == "impact-file")
+        {
+            // Whole-file impact: the subject is a file, kept for "I rewrote this".
+            var impacted = index.FindImpactOfFile(golden.Name);
+            Assert.Equal(
+                golden.Expect.OrderBy(entry => entry, StringComparer.Ordinal).ToArray(),
+                impacted
+                    .Select(declaration =>
+                        $"{declaration.File}:{declaration.Line}:{declaration.Name}")
+                    .OrderBy(entry => entry, StringComparer.Ordinal)
+                    .ToArray());
+            Assert.Equal(golden.Partial, index.ImpactAnswerIsPartial());
+            return;
+        }
+
+        if (golden.Facet == "impact")
+        {
+            // Declaration-seeded impact — the default, and the reason the
+            // granularity was changed: file seeding answered exactly right for
+            // 1% of functions on a real corpus.
+            var subjectDeclarations = index.FindDeclarations(golden.Name);
+            var target = golden.InFile == null
+                ? Assert.Single(subjectDeclarations)
+                : Assert.Single(subjectDeclarations.Where(
+                    declaration => declaration.File == golden.InFile));
+            var impacted = index.FindImpactOfDeclarations([target.SymbolId]);
+            Assert.Equal(
+                golden.Expect.OrderBy(entry => entry, StringComparer.Ordinal).ToArray(),
+                impacted
+                    .Select(declaration =>
+                        $"{declaration.File}:{declaration.Line}:{declaration.Name}")
+                    .OrderBy(entry => entry, StringComparer.Ordinal)
+                    .ToArray());
+            Assert.Equal(golden.Partial, index.ImpactAnswerIsPartial());
+            return;
+        }
+
         var declarations = index.FindDeclarations(golden.Name);
         Assert.True(
             declarations.Count > 0,
