@@ -18,7 +18,52 @@ jobs:
   # the full test suite and the M-A1 packaged-SDK consumer check pass on the
   # same commit being published.
   test:
+    # One project per runner, mirroring test.yml's matrix.
+    #
+    # This job previously ran all 13 release-critical projects SEQUENTIALLY on a
+    # single runner, and that is what blocked the v0.13.1 publish twice: the
+    # first attempt died with `terminate called after throwing 'std::system_error'`
+    # (thread/process creation failing under resource exhaustion) and the second
+    # took SIGTERM (exit 143) immediately after Calor.Performance.Tests — i.e.
+    # entering Calor.RoundTrip.Harness.Tests, which drives full builds and test
+    # runs of three external corpus repositories. Neither run came near the
+    # 40-minute timeout; the runner simply gave out.
+    #
+    # test.yml has always sharded these, which is why the same suite passes
+    # there. The gate is unchanged in strength — `publish` still needs every leg
+    # green on the commit being released — only the packing changes.
+    name: test (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: compiler
+            project: tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+          - name: conversion
+            project: tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj
+          - name: enforcement
+            project: tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj
+          - name: evaluation
+            project: tests/Calor.Evaluation/Calor.Evaluation.csproj
+          - name: experimental
+            project: tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj
+          - name: ids
+            project: tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj
+          - name: il-analysis
+            project: tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj
+          - name: language-server
+            project: tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj
+          - name: performance
+            project: tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj
+          - name: roundtrip-harness
+            project: tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj
+          - name: semantics
+            project: tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj
+          - name: tasks
+            project: tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj
+          - name: verification
+            project: tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj
 
     steps:
       - name: Checkout code
@@ -34,7 +79,7 @@ jobs:
       # This is the RELEASE GATE. Without seeding, src/Calor.Compiler/{z3,runtimes}/ are
       # empty at MSBuild evaluation time (they are gitignored), the csproj's
       # `<None Include="runtimes\**\*">` glob matches nothing, the natives never reach the
-      # test hosts, and all 358 Z3-backed tests SKIP — so the gate that authorizes shipping
+      # test hosts, and all Z3-backed tests SKIP — so the gate that authorizes shipping
       # to NuGet would go green having verified none of the verification surface. The
       # `publish` job below already stages the natives before restore for this same reason.
       - name: Seed Z3 native libraries (before MSBuild evaluation)
@@ -46,26 +91,34 @@ jobs:
       - name: Build
         run: dotnet build -c Release --no-restore
 
-      - name: Run every release-critical test project
+      - name: Assert this project is release-critical in the manifest
+        # Guards the matrix against drift: if a project is added to or removed
+        # from the manifest's release-critical set without updating this list,
+        # the gate would silently stop covering it.
+        run: |
+          set -euo pipefail
+          python3 - "${{ matrix.project }}" <<'PY'
+          import json, sys
+          project = sys.argv[1]
+          manifest = json.load(open("eng/test-manifest.json"))["projects"]
+          if not any(p["path"] == project and p["releaseCritical"] for p in manifest):
+              sys.exit(f"::error::{project} is not release-critical in eng/test-manifest.json")
+          PY
+
+      - name: Run project tests
         run: |
           set -euo pipefail
           mkdir -p artifacts/test
-          project_count=0
-          while IFS= read -r project; do
-            project_count=$((project_count + 1))
-            name=$(basename "$project" .csproj)
-            dotnet test "$project" -c Release \
-              --logger "trx;LogFileName=$name.trx" \
-              --results-directory artifacts/test \
-              --verbosity normal 2>&1 | tee -a test-output.log
-            python3 scripts/check_trx.py \
-              --trx "artifacts/test/$name.trx" \
-              --project "$project"
-          done < <(python3 -c 'import json; print("\n".join(p["path"] for p in json.load(open("eng/test-manifest.json"))["projects"] if p["releaseCritical"]))')
-          if [ "$project_count" -eq 0 ]; then
-            echo "::error::No release-critical test projects were selected."
-            exit 1
-          fi
+          dotnet test "${{ matrix.project }}" -c Release --no-build \
+            --logger "trx;LogFileName=${{ matrix.name }}.trx" \
+            --results-directory artifacts/test \
+            --verbosity normal 2>&1 | tee test-output.log
+
+      - name: Enforce test inventory
+        run: >-
+          python3 scripts/check_trx.py
+          --trx "artifacts/test/${{ matrix.name }}.trx"
+          --project "${{ matrix.project }}"
 
       # Assert the property that matters, not a filename: no Z3-gated test may skip on the
       # commit being released. This regression is invisible by construction otherwise —
@@ -83,7 +136,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: release-test-reports
+          name: release-test-reports-${{ matrix.name }}
           path: artifacts/test/
           retention-days: 90
 
