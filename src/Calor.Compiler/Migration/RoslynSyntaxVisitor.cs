@@ -59,8 +59,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     public RoslynSyntaxVisitor(
         ConversionContext context,
-        SemanticModel? semanticModel = null,
-        CancellationToken cancellationToken = default)
+        SemanticModel? semanticModel = null)
+        : this(context, semanticModel, CancellationToken.None)
+    {
+    }
+
+    public RoslynSyntaxVisitor(
+        ConversionContext context,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken)
         : base(SyntaxWalkerDepth.Node)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));

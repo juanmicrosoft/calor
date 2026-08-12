@@ -524,6 +524,7 @@ jobs:
             }
 
   roundtrip-verification:
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: conversion-scorecard

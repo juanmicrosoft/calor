@@ -163,8 +163,16 @@ public sealed class CSharpToCalorConverter
     /// </summary>
     public ConversionResult Convert(
         string csharpSource,
-        string? sourceFile = null,
-        CancellationToken cancellationToken = default)
+        string? sourceFile = null)
+        => Convert(csharpSource, sourceFile, CancellationToken.None);
+
+    /// <summary>
+    /// Converts C# source code to Calor source code with cooperative cancellation.
+    /// </summary>
+    public ConversionResult Convert(
+        string csharpSource,
+        string? sourceFile,
+        CancellationToken cancellationToken)
     {
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
