@@ -54,6 +54,38 @@ public sealed class IndexedCallEdge
 }
 
 /// <summary>
+/// A contract clause declared on a declaration.
+///
+/// The index records what is DECLARED, never a proof status. Outcomes come from
+/// running the verifier (`calor verify`, `review-packet`); an index that carried
+/// a stale "Proven" would be worse than one that carries none, because the whole
+/// point of a proof is that you can rely on it.
+/// </summary>
+public sealed class IndexedContract
+{
+    public string SymbolId { get; set; } = "";
+    public string Kind { get; set; } = "";
+    public int Index { get; set; }
+    public string Text { get; set; } = "";
+    public string File { get; set; } = "";
+    public int Line { get; set; }
+}
+
+/// <summary>
+/// An assumption declared on a module or a declaration — the things a reader is
+/// being asked to take on trust, which is exactly what a reviewer wants listed.
+/// </summary>
+public sealed class IndexedAssumption
+{
+    public string SymbolId { get; set; } = "";
+    public string Scope { get; set; } = "";
+    public string Category { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string File { get; set; } = "";
+    public int Line { get; set; }
+}
+
+/// <summary>
 /// A call site that resolved to nothing.
 /// </summary>
 public sealed class IndexedUnresolvedCall
@@ -110,7 +142,7 @@ public sealed class IndexResidual
 /// </summary>
 public sealed class ProjectIndex
 {
-    public const string CurrentFormatVersion = "2.0";
+    public const string CurrentFormatVersion = "3.0";
 
     public string FormatVersion { get; set; } = CurrentFormatVersion;
     public string CompilerSemanticsVersion { get; set; } =
@@ -131,6 +163,8 @@ public sealed class ProjectIndex
     public List<IndexedDeclaration> Declarations { get; set; } = [];
     public List<IndexedOccurrence> Occurrences { get; set; } = [];
     public List<IndexedCallEdge> CallEdges { get; set; } = [];
+    public List<IndexedContract> Contracts { get; set; } = [];
+    public List<IndexedAssumption> Assumptions { get; set; } = [];
     public IndexResidual Residual { get; set; } = new();
 
     public static string PathFor(string outputDirectory) =>
@@ -294,6 +328,32 @@ public sealed class ProjectIndex
             .ToArray();
     }
 
+    /// <summary>Contracts declared on a symbol.</summary>
+    public IReadOnlyList<IndexedContract> FindContracts(string symbolId)
+    {
+        ArgumentNullException.ThrowIfNull(symbolId);
+        return Contracts
+            .Where(contract => string.Equals(
+                contract.SymbolId, symbolId, StringComparison.Ordinal))
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Assumptions in force for a symbol: its own, plus the module-scoped ones
+    /// declared in its file. A module assumption applies to everything in that
+    /// module, so omitting it would under-report what a reader must trust.
+    /// </summary>
+    public IReadOnlyList<IndexedAssumption> FindAssumptions(string symbolId, string file)
+    {
+        ArgumentNullException.ThrowIfNull(symbolId);
+        return Assumptions
+            .Where(assumption =>
+                string.Equals(assumption.SymbolId, symbolId, StringComparison.Ordinal)
+                || (assumption.Scope == "module"
+                    && string.Equals(assumption.File, file, StringComparison.Ordinal)))
+            .ToArray();
+    }
+
     /// <summary>
     /// What a change to <paramref name="file"/> could affect: every declaration
     /// reachable by following call edges INTO the declarations that file holds,
@@ -450,6 +510,15 @@ public sealed class ProjectIndex
             .ThenBy(item => item.Line)
             .ThenBy(item => item.Column)
             .ThenBy(item => item.CalleeSymbolId, StringComparer.Ordinal)];
+        Contracts = [.. Contracts
+            .OrderBy(item => item.File, StringComparer.Ordinal)
+            .ThenBy(item => item.Line)
+            .ThenBy(item => item.Kind, StringComparer.Ordinal)
+            .ThenBy(item => item.Index)];
+        Assumptions = [.. Assumptions
+            .OrderBy(item => item.File, StringComparer.Ordinal)
+            .ThenBy(item => item.Line)
+            .ThenBy(item => item.Description, StringComparer.Ordinal)];
         Residual.UnreadableFiles.Sort(StringComparer.Ordinal);
         Residual.UnresolvedCalls = [.. Residual.UnresolvedCalls
             .OrderBy(item => item.File, StringComparer.Ordinal)

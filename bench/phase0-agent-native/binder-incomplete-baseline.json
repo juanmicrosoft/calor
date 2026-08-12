@@ -1,8 +1,8 @@
 {
   "IncompleteCount": 0,
-  "ParsedFiles": 505,
+  "ParsedFiles": 506,
   "ParseFailures": 9,
-  "ExpressionsBound": 4698,
+  "ExpressionsBound": 4702,
   "Scope": "both F-2 legs; conversion leg skips when corpus submodules are absent",
   "Conversion": {
     "Incomplete": 0,

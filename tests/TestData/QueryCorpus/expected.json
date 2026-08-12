@@ -120,6 +120,46 @@
         "app.calr:2:Run"
       ],
       "partial": true
+    },
+    {
+      "why": "Contracts declared on a function, in source order and kind. The index records what is DECLARED — a proof status would have to come from the verifier, and a stale 'Proven' is worse than none.",
+      "facet": "contracts",
+      "name": "Bounded",
+      "inFile": "contracts.calr",
+      "expect": [
+        "contracts.calr:5:precondition",
+        "contracts.calr:6:postcondition"
+      ],
+      "partial": false
+    },
+    {
+      "why": "A function with no contracts reports none, rather than inheriting its neighbour's.",
+      "facet": "contracts",
+      "name": "Plain",
+      "inFile": "contracts.calr",
+      "expect": [],
+      "partial": false
+    },
+    {
+      "why": "Assumptions in force = the declaration's own PLUS the module-wide one. Omitting module scope would under-report what a reader is being asked to trust.",
+      "facet": "assumptions",
+      "name": "Bounded",
+      "inFile": "contracts.calr",
+      "expect": [
+        "contracts.calr:2:module",
+        "contracts.calr:7:declaration"
+      ],
+      "partial": false
+    },
+    {
+      "why": "The discriminating pair: Plain inherits the MODULE assumption but not Bounded's declaration-scoped one. A scope-blind implementation returns both and passes the Bounded case while failing here.",
+      "facet": "assumptions",
+      "name": "Plain",
+      "inFile": "contracts.calr",
+      "expect": [
+        "contracts.calr:2:module"
+      ],
+      "partial": false
     }
   ]
 }
