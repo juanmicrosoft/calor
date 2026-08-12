@@ -75,7 +75,6 @@ public static class TrxParser
         var expectedExecuted = ParseCounter(counters, "executed");
         var expectedPassed = ParseCounter(counters, "passed");
         var expectedFailed = ParseCounter(counters, "failed");
-        var expectedNotExecuted = ParseCounter(counters, "notExecuted");
         if (expectedTotal != results.Count)
             throw new InvalidDataException(
                 $"TRX counter total {expectedTotal} does not match {results.Count} results.");
@@ -87,9 +86,9 @@ public static class TrxParser
         if (expectedExecuted != results.Count - actualNotExecuted)
             throw new InvalidDataException(
                 $"TRX counter executed {expectedExecuted} does not match result outcomes.");
-        if (expectedPassed != actualPassed ||
-            expectedFailed != actualFailed ||
-            expectedNotExecuted != actualNotExecuted)
+        // VSTest/xUnit emits notExecuted="0" even when concrete results contain
+        // NotExecuted entries, so derive skipped counts from total - executed.
+        if (expectedPassed != actualPassed || expectedFailed != actualFailed)
             throw new InvalidDataException("TRX outcome counters do not match result outcomes.");
 
         return results;

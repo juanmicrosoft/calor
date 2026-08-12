@@ -29,7 +29,7 @@ public class TrxParserTests
                 <UnitTest id="id-3"><TestMethod /></UnitTest>
               </TestDefinitions>
               <ResultSummary outcome="Failed">
-                <Counters total="3" executed="2" passed="1" failed="1" notExecuted="1" />
+                <Counters total="3" executed="2" passed="1" failed="1" notExecuted="0" />
               </ResultSummary>
             </TestRun>
             """;
