@@ -1,0 +1,11 @@
+§M{m006:Contracted}
+  §AS{env} "the clock is monotonic"
+  §F{f001:Bounded:pub} (i32:n) -> i32
+    §E{}
+    §Q (>= n 0)
+    §S (>= result 1)
+    §AS{perf} "callers pass small values"
+    §R (+ n INT:1)
+  §F{f002:Plain:pub} () -> i32
+    §E{}
+    §R INT:0

@@ -65,6 +65,27 @@ public sealed class QueryGoldenTests : IDisposable
             return;
         }
 
+        if (golden.Facet is "contracts" or "assumptions")
+        {
+            var owners = index.FindDeclarations(golden.Name);
+            var owner = golden.InFile == null
+                ? Assert.Single(owners)
+                : Assert.Single(owners.Where(
+                    declaration => declaration.File == golden.InFile));
+
+            var rendered = golden.Facet == "contracts"
+                ? index.FindContracts(owner.SymbolId)
+                    .Select(contract => $"{contract.File}:{contract.Line}:{contract.Kind}")
+                : index.FindAssumptions(owner.SymbolId, owner.File)
+                    .Select(assumption =>
+                        $"{assumption.File}:{assumption.Line}:{assumption.Scope}");
+
+            Assert.Equal(
+                golden.Expect.OrderBy(entry => entry, StringComparer.Ordinal).ToArray(),
+                rendered.OrderBy(entry => entry, StringComparer.Ordinal).ToArray());
+            return;
+        }
+
         if (golden.Facet == "impact")
         {
             // Declaration-seeded impact — the default, and the reason the

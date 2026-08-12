@@ -29,6 +29,8 @@ public static class QueryCommand
             CreateFacetCommand("callers", "What calls a declaration"),
             CreateFacetCommand("callees", "What a declaration calls"),
             CreateImpactCommand(),
+            CreateFacetCommand("contracts", "Contracts declared on a declaration"),
+            CreateFacetCommand("assumptions", "Assumptions in force for a declaration"),
         };
         return command;
     }
@@ -265,6 +267,40 @@ public static class QueryCommand
                 return 1;
             }
             subject = matches[0];
+        }
+
+        if (facet == "contracts")
+        {
+            var contracts = index.FindContracts(subject.SymbolId);
+            foreach (var contract in contracts)
+                Console.WriteLine($"  {contract.File}:{contract.Line} {contract.Kind}: {contract.Text}");
+            Console.WriteLine(
+                contracts.Count == 0
+                    ? $"query: no contracts declared on {Describe(subject)}"
+                    : $"query: {contracts.Count} contract(s) on {Describe(subject)}");
+            // The index records what is DECLARED. A proof status would have to
+            // come from the verifier, and a stale "Proven" is worse than none.
+            Console.WriteLine(
+                "query: declared contracts only — run `calor verify` for proof outcomes");
+            return 0;
+        }
+
+        if (facet == "assumptions")
+        {
+            var assumptions = index.FindAssumptions(subject.SymbolId, subject.File);
+            foreach (var assumption in assumptions)
+            {
+                var scope = assumption.Scope == "module" ? "module-wide" : "on this declaration";
+                var category = string.IsNullOrEmpty(assumption.Category)
+                    ? "" : $"[{assumption.Category}] ";
+                Console.WriteLine(
+                    $"  {assumption.File}:{assumption.Line} ({scope}) {category}{assumption.Description}");
+            }
+            Console.WriteLine(
+                assumptions.Count == 0
+                    ? $"query: nothing is assumed for {Describe(subject)}"
+                    : $"query: {assumptions.Count} assumption(s) in force for {Describe(subject)}");
+            return 0;
         }
 
         var (answer, partial) = facet switch

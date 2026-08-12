@@ -135,6 +135,58 @@ public static class ProjectIndexBuilder
             }
         }
 
+        foreach (var document in symbols.Documents)
+        {
+            var relative = Relative(options.ProjectDirectory, document.FilePath);
+            var moduleId = document.BoundModule.SymbolsById.Values
+                .OfType<FunctionSymbol>()
+                .Select(symbol => symbol.Id.Value)
+                .FirstOrDefault() ?? "";
+
+            // Module-scoped assumptions apply to everything in the file, so they
+            // are recorded against the file rather than any one declaration.
+            foreach (var assumption in document.Ast.Assumptions)
+            {
+                var (line, _) = LineColumn(document.Source, assumption.Span.Start);
+                index.Assumptions.Add(new IndexedAssumption
+                {
+                    SymbolId = "",
+                    Scope = "module",
+                    Category = assumption.Category?.ToString() ?? "",
+                    Description = assumption.Description,
+                    File = relative,
+                    Line = line,
+                });
+            }
+
+            foreach (var function in document.Ast.Functions)
+            {
+                var symbol = document.BoundModule.Functions
+                    .FirstOrDefault(bound => bound.Symbol.Name == function.Name)?.Symbol;
+                if (symbol == null || symbol.Id.IsNone)
+                    continue;
+
+                AddContracts(index, document, relative, symbol.Id.Value,
+                    "precondition", function.Preconditions.Select(node => node.Span));
+                AddContracts(index, document, relative, symbol.Id.Value,
+                    "postcondition", function.Postconditions.Select(node => node.Span));
+
+                foreach (var assumption in function.Assumptions)
+                {
+                    var (line, _) = LineColumn(document.Source, assumption.Span.Start);
+                    index.Assumptions.Add(new IndexedAssumption
+                    {
+                        SymbolId = symbol.Id.Value,
+                        Scope = "declaration",
+                        Category = assumption.Category?.ToString() ?? "",
+                        Description = assumption.Description,
+                        File = relative,
+                        Line = line,
+                    });
+                }
+            }
+        }
+
         var sourcesByPath = symbols.Documents.ToDictionary(
             document => document.FilePath,
             document => document.Source,
@@ -166,6 +218,33 @@ public static class ProjectIndexBuilder
 
         index.Canonicalize();
         return index;
+    }
+
+    private static void AddContracts(
+        ProjectIndex index,
+        IndexedDocument document,
+        string relative,
+        string symbolId,
+        string kind,
+        IEnumerable<Calor.Compiler.Parsing.TextSpan> spans)
+    {
+        var position = 0;
+        foreach (var span in spans)
+        {
+            var (line, _) = LineColumn(document.Source, span.Start);
+            var text = span.Start >= 0 && span.Length > 0 && span.End <= document.Source.Length
+                ? document.Source.Substring(span.Start, span.Length).Trim()
+                : "";
+            index.Contracts.Add(new IndexedContract
+            {
+                SymbolId = symbolId,
+                Kind = kind,
+                Index = position++,
+                Text = text,
+                File = relative,
+                Line = line,
+            });
+        }
     }
 
     /// <summary>
