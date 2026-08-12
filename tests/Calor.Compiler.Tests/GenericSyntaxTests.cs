@@ -156,7 +156,7 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-              §IFACE{i001:IRepository:pub}<T>
+              §IFACE{i001:IRepository}<T>
                   §WHERE T : class
                   §MT{m001:Get}
                       §I{i32:id}
@@ -237,7 +237,7 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-              §IFACE{i001:IRepository:pub}<T>
+              §IFACE{i001:IRepository}<T>
                   §WHERE T : class
                   §MT{m001:GetById}
                       §I{i32:id}
@@ -423,7 +423,7 @@ public class GenericSyntaxTests
     {
         var source = """
             §M{m001:Test}
-              §IFACE{i001:IFactory:pub}<T>
+              §IFACE{i001:IFactory}<T>
                   §WHERE T : new
                   §MT{m001:Create}
                       §O{T}
@@ -780,7 +780,7 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-              §IFACE{i001:IMapper:pub}
+              §IFACE{i001:IMapper}
                   §MT{m001:Map}<TSource, TDest>
                       §I{TSource:source}
                       §O{TDest}
@@ -796,7 +796,7 @@ public class GenericSyntaxTests
     {
         var calor = """
             §M{m001:Test}
-              §IFACE{i001:IConverter:pub}<T>
+              §IFACE{i001:IConverter}<T>
                   §WHERE T : class
                   §MT{m001:Convert}<U>
                       §I{T:input}

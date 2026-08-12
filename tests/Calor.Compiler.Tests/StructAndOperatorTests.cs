@@ -142,7 +142,10 @@ public class StructAndOperatorTests
                 §FLD{i32:Value:pub}
             """;
 
-        var compilationResult = Program.Compile(calorSource);
+        var compilationResult = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 
@@ -160,7 +163,10 @@ public class StructAndOperatorTests
                 §FLD{f64:X:pub}
             """;
 
-        var compilationResult = Program.Compile(calorSource);
+        var compilationResult = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 
@@ -679,7 +685,10 @@ public class StructAndOperatorTests
                     §R (+ a b)
             """;
 
-        var compilationResult = Program.Compile(calorSource);
+        var compilationResult = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 
@@ -710,7 +719,10 @@ public class StructAndOperatorTests
                     §R (+ a b)
             """;
 
-        var compilationResult = Program.Compile(calorSource);
+        var compilationResult = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 

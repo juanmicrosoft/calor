@@ -303,6 +303,248 @@ public sealed class LosslessConversionContractTests
     }
 
     [Fact]
+    public async Task ProjectMigration_CalorToCSharpValidatesCrossFileReferencesTogether()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"calor-project-reverse-cross-file-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var libraryPath = Path.Combine(directory, "Library.calr");
+        var consumerPath = Path.Combine(directory, "Consumer.calr");
+        await File.WriteAllTextAsync(
+            libraryPath,
+            """
+            §M{m001:Library}
+              §F{f001:Square:pub} (i32:x) -> i32
+                §R (* x x)
+            """);
+        await File.WriteAllTextAsync(
+            consumerPath,
+            """
+            §M{m002:Consumer}
+              §F{f002:UseSquare:pub} (i32:x) -> i32
+                §R §C{Square} §A x §/C
+            """);
+
+        var plan = new MigrationPlan
+        {
+            ProjectPath = directory,
+            Direction = MigrationDirection.CalorToCSharp,
+            Entries =
+            [
+                Entry(libraryPath),
+                Entry(consumerPath)
+            ]
+        };
+        var migrator = new ProjectMigrator(new MigrationPlanOptions
+        {
+            Parallel = false
+        });
+
+        try
+        {
+            var report = await migrator.ExecuteAsync(plan);
+
+            Assert.All(
+                report.FileResults,
+                result => Assert.Equal(FileMigrationStatus.Success, result.Status));
+            Assert.True(File.Exists(Path.ChangeExtension(libraryPath, ".g.cs")));
+            Assert.True(File.Exists(Path.ChangeExtension(consumerPath, ".g.cs")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+
+        static MigrationPlanEntry Entry(string sourcePath) => new()
+        {
+            SourcePath = sourcePath,
+            OutputPath = Path.ChangeExtension(sourcePath, ".g.cs"),
+            Convertibility = FileConvertibility.Full,
+            FileSizeBytes = new FileInfo(sourcePath).Length
+        };
+    }
+
+    [Fact]
+    public async Task ProjectMigration_CalorToCSharpUsesExistingProjectSources()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"calor-project-existing-source-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var projectPath = Path.Combine(directory, "Sample.csproj");
+        var sourcePath = Path.Combine(directory, "Consumer.calr");
+        await File.WriteAllTextAsync(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net10.0;net10.0</TargetFrameworks>
+                <ImplicitUsings>enable</ImplicitUsings>
+              </PropertyGroup>
+            </Project>
+            """);
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "Existing.cs"),
+            "public sealed class Existing { }");
+        await File.WriteAllTextAsync(
+            sourcePath,
+            """
+            §M{m001:Consumer}
+              §CL{c001:Factory:pub}
+                §CSHARP{public Existing Create() => new Existing();}§/CSHARP
+            """);
+        await RestoreAsync(projectPath);
+        var plan = new MigrationPlan
+        {
+            ProjectPath = projectPath,
+            Direction = MigrationDirection.CalorToCSharp,
+            Entries =
+            [
+                new MigrationPlanEntry
+                {
+                    SourcePath = sourcePath,
+                    OutputPath = Path.ChangeExtension(sourcePath, ".g.cs"),
+                    Convertibility = FileConvertibility.Full,
+                    FileSizeBytes = new FileInfo(sourcePath).Length
+                }
+            ]
+        };
+
+        try
+        {
+            var report = await new ProjectMigrator(
+                new MigrationPlanOptions { Parallel = false }).ExecuteAsync(plan);
+
+            Assert.Equal(FileMigrationStatus.Success, Assert.Single(report.FileResults).Status);
+            Assert.True(File.Exists(Path.ChangeExtension(sourcePath, ".g.cs")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProjectMigration_AmbiguousDirectoryProjectContextFailsExplicitly()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"calor-project-ambiguous-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var sourcePath = Path.Combine(directory, "Consumer.calr");
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "First.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        await File.WriteAllTextAsync(
+            Path.Combine(directory, "Second.csproj"),
+            "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        await File.WriteAllTextAsync(
+            sourcePath,
+            """
+            §M{m001:Consumer}
+              §F{f001:Read:pub} () -> i32
+                §R INT:42
+            """);
+        var plan = new MigrationPlan
+        {
+            ProjectPath = directory,
+            Direction = MigrationDirection.CalorToCSharp,
+            Entries =
+            [
+                new MigrationPlanEntry
+                {
+                    SourcePath = sourcePath,
+                    OutputPath = Path.ChangeExtension(sourcePath, ".g.cs"),
+                    Convertibility = FileConvertibility.Full,
+                    FileSizeBytes = new FileInfo(sourcePath).Length
+                }
+            ]
+        };
+
+        try
+        {
+            var report = await new ProjectMigrator(
+                new MigrationPlanOptions { Parallel = false }).ExecuteAsync(plan);
+
+            var result = Assert.Single(report.FileResults);
+            Assert.Equal(FileMigrationStatus.Failed, result.Status);
+            Assert.Contains(
+                result.Issues,
+                issue => issue.Message.Contains("ambiguous", StringComparison.OrdinalIgnoreCase));
+            Assert.False(File.Exists(Path.ChangeExtension(sourcePath, ".g.cs")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProjectMigration_CalorToCSharpHonorsUnsafeProjectSetting()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"calor-project-unsafe-setting-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var projectPath = Path.Combine(directory, "Sample.csproj");
+        var sourcePath = Path.Combine(directory, "Unsafe.calr");
+        await File.WriteAllTextAsync(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+                <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+                <ImplicitUsings>enable</ImplicitUsings>
+              </PropertyGroup>
+            </Project>
+            """);
+        await File.WriteAllTextAsync(
+            sourcePath,
+            """
+            §M{m001:Unsafe}
+              §CL{c001:Worker:pub}
+                §MT{m001:Run:pub} () -> void
+                  §E{unsafe}
+                  §UNSAFE{u001}
+                    §B{~x:i32} INT:42
+                  §/UNSAFE{u001}
+            """);
+        await RestoreAsync(projectPath);
+        var plan = new MigrationPlan
+        {
+            ProjectPath = projectPath,
+            Direction = MigrationDirection.CalorToCSharp,
+            Entries =
+            [
+                new MigrationPlanEntry
+                {
+                    SourcePath = sourcePath,
+                    OutputPath = Path.ChangeExtension(sourcePath, ".g.cs"),
+                    Convertibility = FileConvertibility.Full,
+                    FileSizeBytes = new FileInfo(sourcePath).Length
+                }
+            ]
+        };
+
+        try
+        {
+            var report = await new ProjectMigrator(
+                new MigrationPlanOptions { Parallel = false }).ExecuteAsync(plan);
+
+            var result = Assert.Single(report.FileResults);
+            Assert.Equal(FileMigrationStatus.Failed, result.Status);
+            Assert.Contains(result.Issues, issue => issue.Message.Contains("CS0227"));
+            Assert.False(File.Exists(Path.ChangeExtension(sourcePath, ".g.cs")));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ProjectMigration_TimedOutLossyConversionCannotWriteLater()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"calor-project-timeout-{Guid.NewGuid():N}");
@@ -349,5 +591,25 @@ public sealed class LosslessConversionContractTests
             }
             Directory.Delete(directory);
         }
+    }
+
+    private static async Task RestoreAsync(string projectPath)
+    {
+        var startInfo = new System.Diagnostics.ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("restore");
+        startInfo.ArgumentList.Add(projectPath);
+        startInfo.ArgumentList.Add("--ignore-failed-sources");
+        using var process = System.Diagnostics.Process.Start(startInfo)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        Assert.True(
+            process.ExitCode == 0,
+            $"{await stdout}{Environment.NewLine}{await stderr}");
     }
 }

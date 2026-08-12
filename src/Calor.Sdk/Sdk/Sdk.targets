@@ -10,6 +10,7 @@
     <CalorEnforceEffects Condition="'$(CalorEnforceEffects)' == ''">true</CalorEnforceEffects>
     <!-- Type checking: default true, matching CompilationOptions.EnableTypeChecking (v0.12) -->
     <CalorTypeCheck Condition="'$(CalorTypeCheck)' == ''">true</CalorTypeCheck>
+    <CalorTranspileOnly Condition="'$(CalorTranspileOnly)' == ''">false</CalorTranspileOnly>
   </PropertyGroup>
 
   <!-- When consumed from the Calor.Sdk package, the bundled Calor.Runtime.dll
@@ -41,8 +42,8 @@
     </PropertyGroup>
   </Target>
 
-  <PropertyGroup Condition="'$(CalorEnableILAnalysis)' == 'true'">
-    <_CalorCompileCalorDependsOn>ResolveAssemblyReferences</_CalorCompileCalorDependsOn>
+  <PropertyGroup>
+    <_CalorCompileCalorDependsOn>ResolveAssemblyReferences;GenerateMSBuildEditorConfigFile</_CalorCompileCalorDependsOn>
   </PropertyGroup>
 
   <!-- Validate CalorCompilerOverride (runs unconditionally, not subject to incremental build skip) -->
@@ -73,6 +74,18 @@
         Verbose="$(CalorVerbose)"
         EnforceEffects="$(CalorEnforceEffects)"
         TypeCheck="$(CalorTypeCheck)"
+        TranspileOnly="$(CalorTranspileOnly)"
+        ProjectSourceFiles="@(Compile)"
+        AllowUnsafeBlocks="$(AllowUnsafeBlocks)"
+        ProjectOutputType="$(OutputType)"
+        DefineConstants="$(DefineConstants)"
+        LanguageVersion="$(LangVersion)"
+        ImplicitUsings="$(ImplicitUsings)"
+        Nullable="$(Nullable)"
+        TreatWarningsAsErrors="$(TreatWarningsAsErrors)"
+        AnalyzerConfigPath="$(GeneratedMSBuildEditorConfigFile)"
+        AnalyzerAssemblies="@(Analyzer)"
+        AdditionalFiles="@(AdditionalFiles)"
         Verify="$(CalorVerify)"
         ElideProvenGuards="$(CalorElideProvenGuards)"
         EnableILAnalysis="$(CalorEnableILAnalysis)"

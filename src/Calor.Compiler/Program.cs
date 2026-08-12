@@ -31,6 +31,11 @@ public class Program
             aliases: ["--output", "-o"],
             description: "The output C# file path");
 
+        var referenceOption = new Option<FileInfo[]>(
+            aliases: ["--reference", "-r"],
+            description: "Assembly reference used to validate generated C# (repeatable)")
+        { Arity = ArgumentArity.ZeroOrMore };
+
         var verboseOption = new Option<bool>(
             aliases: ["--verbose", "-v"],
             description: "Enable verbose output");
@@ -60,6 +65,11 @@ public class Program
         var noTypeCheckOption = new Option<bool>(
             aliases: ["--no-type-check"],
             description: "Disable the type checker (opt out of the v0.12 default-on behavior)",
+            getDefaultValue: () => false);
+
+        var transpileOnlyOption = new Option<bool>(
+            aliases: ["--transpile-only"],
+            description: "UNSAFE: emit C# without type checking or Roslyn validation; no validated-success claim or incremental cache entry is produced",
             getDefaultValue: () => false);
 
         var strictEffectsOption = new Option<bool>(
@@ -153,12 +163,14 @@ public class Program
         {
             inputOption,
             outputOption,
+            referenceOption,
             verboseOption,
             strictApiOption,
             requireDocsOption,
             enforceEffectsOption,
             noEnforceEffectsOption,
             noTypeCheckOption,
+            transpileOnlyOption,
             strictEffectsOption,
             permissiveEffectsOption,
             contractModeOption,
@@ -194,6 +206,8 @@ public class Program
                 telemetry.SetAgents(CalorConfigManager.GetAgentString(discovered?.Config));
             }
             var output = ctx.ParseResult.GetValueForOption(outputOption);
+            var references = ctx.ParseResult.GetValueForOption(referenceOption)
+                ?? Array.Empty<FileInfo>();
             var verbose = ctx.ParseResult.GetValueForOption(verboseOption);
             var strictApi = ctx.ParseResult.GetValueForOption(strictApiOption);
             var requireDocs = ctx.ParseResult.GetValueForOption(requireDocsOption);
@@ -202,6 +216,7 @@ public class Program
             // --no-enforce-effects always wins over the default-on behavior (D-W2.5)
             if (noEnforceEffects) enforceEffects = false;
             var noTypeCheck = ctx.ParseResult.GetValueForOption(noTypeCheckOption);
+            var transpileOnly = ctx.ParseResult.GetValueForOption(transpileOnlyOption);
             var strictEffects = ctx.ParseResult.GetValueForOption(strictEffectsOption);
             var permissiveEffects = ctx.ParseResult.GetValueForOption(permissiveEffectsOption);
             var contractMode = ctx.ParseResult.GetValueForOption(contractModeOption) ?? "debug";
@@ -223,6 +238,7 @@ public class Program
             telemetry?.TrackEvent("CompileOptions", new Dictionary<string, string>
             {
                 ["strictApi"] = strictApi.ToString(),
+                ["transpileOnly"] = transpileOnly.ToString(),
                 ["requireDocs"] = requireDocs.ToString(),
                 ["enforceEffects"] = enforceEffects.ToString(),
                 ["strictEffects"] = strictEffects.ToString(),
@@ -238,7 +254,7 @@ public class Program
 
             try
             {
-                ctx.ExitCode = await CompileAsync(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards);
+                ctx.ExitCode = await CompileAsync(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimental, strictBindInference, format, elideProvenGuards);
             }
             catch (Exception ex)
             {
@@ -316,10 +332,10 @@ public class Program
         return result;
     }
 
-    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = false)
-        => Task.FromResult(CompileCore(input, output, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards));
+    private static Task<int> CompileAsync(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings = false, string[]? experimentalFlags = null, bool strictBindInference = true, string format = "text", bool elideProvenGuards = false)
+        => Task.FromResult(CompileCore(input, output, references, verbose, strictApi, requireDocs, enforceEffects, noTypeCheck, transpileOnly, strictEffects, permissiveEffects, contractMode, verify, cache, noCache, clearCache, verificationTimeout, analyze, allFindings, experimentalFlags, strictBindInference, format, elideProvenGuards));
 
-    private static int CompileCore(FileInfo[]? input, FileInfo? output, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = false)
+    private static int CompileCore(FileInfo[]? input, FileInfo? output, FileInfo[] references, bool verbose, bool strictApi, bool requireDocs, bool enforceEffects, bool noTypeCheck, bool transpileOnly, bool strictEffects, bool permissiveEffects, string contractMode, bool verify, bool cache, bool noCache, bool clearCache, int verificationTimeout, bool analyze, bool allFindings, string[]? experimentalFlags, bool strictBindInference, string format = "text", bool elideProvenGuards = false)
     {
         // Structured diagnostic output (--format json|sarif): diagnostics are
         // aggregated across files and serialized once through the shared
@@ -376,6 +392,21 @@ public class Program
                     anyMissing = true;
                 }
             }
+            foreach (var reference in references)
+            {
+                if (!reference.Exists)
+                {
+                    diagnosticSink?.Add(new Diagnostic(
+                        DiagnosticCode.CliInputNotFound,
+                        $"Reference assembly not found: {reference.FullName}",
+                        new TextSpan(0, 0, 1, 1),
+                        DiagnosticSeverity.Error,
+                        reference.FullName));
+                    Console.Error.WriteLine(
+                        $"Error: Reference assembly not found: {reference.FullName}");
+                    anyMissing = true;
+                }
+            }
             if (anyMissing)
             {
                 return Finish(1);
@@ -394,6 +425,11 @@ public class Program
             }
 
             var parsedContractMode = CompilationDriver.ParseContractMode(contractMode);
+            if (transpileOnly)
+            {
+                Console.Error.WriteLine(
+                    "warning: --transpile-only is unsafe; generated C# is not type-checked or Roslyn-validated and will not be cached.");
+            }
 
             // Incremental-build cache (.calor-build-state.json next to the outputs):
             // OPT-IN via --cache for plain compiles (calor watch always caches —
@@ -406,13 +442,15 @@ public class Program
             if (output == null)
             {
                 var stateDirectory = Incremental.BuildStateCache.ComputeCommonDirectory(input);
-                if (cache && !noCache)
+                if (cache && !noCache && !transpileOnly)
                 {
                     buildCache = new CompilationDriver.DriverCacheSettings(
                         stateDirectory,
                         BuildOptionsToken(strictApi, requireDocs, enforceEffects, strictEffects,
                             permissiveEffects, contractMode, verify, verificationTimeout, analyze,
-                            allFindings, strictBindInference, experimentalFlags),
+                            allFindings, strictBindInference, experimentalFlags,
+                            references.Select(reference =>
+                                $"{reference.FullName}:{Incremental.BuildStateCache.ComputeFileHash(reference.FullName)}")),
                         ClearFirst: clearCache,
                         OutputPathFor: file => Path.ChangeExtension(file.FullName, ".g.cs"));
                 }
@@ -441,7 +479,11 @@ public class Program
                         StrictApi = strictApi,
                         RequireDocs = requireDocs,
                         EnforceEffects = enforceEffects,
-                        EnableTypeChecking = !noTypeCheck && CompilationOptions.TypeCheckingDefault,
+                        EnableTypeChecking = !transpileOnly && !noTypeCheck && CompilationOptions.TypeCheckingDefault,
+                        UnsafeTranspileOnly = transpileOnly,
+                        ReferencedAssemblyPaths = references
+                            .Select(reference => reference.FullName)
+                            .ToList(),
                         StrictEffects = strictEffects,
                         UnknownCallPolicy = permissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
                         ContractMode = parsedContractMode,
@@ -486,7 +528,17 @@ public class Program
                         Directory.CreateDirectory(outputDir);
                     }
 
-                    File.WriteAllText(outputPath, result.GeneratedCode);
+                    var temporaryPath = outputPath + $".{Guid.NewGuid():N}.tmp";
+                    try
+                    {
+                        File.WriteAllText(temporaryPath, result.GeneratedCode);
+                        File.Move(temporaryPath, outputPath, overwrite: true);
+                    }
+                    finally
+                    {
+                        if (File.Exists(temporaryPath))
+                            File.Delete(temporaryPath);
+                    }
 
                     // In structured mode stdout is reserved for the serialized
                     // diagnostics; status messages go to stderr.
@@ -497,7 +549,9 @@ public class Program
                         statusOut.WriteLine($"Output written to: {outputPath}");
                     }
 
-                    statusOut.WriteLine($"Compilation successful: {outputPath}");
+                    statusOut.WriteLine(transpileOnly
+                        ? $"Unsafe transpilation output written: {outputPath}"
+                        : $"Compilation successful: {outputPath}");
                 },
                 diagnosticSink: diagnosticSink,
                 cache: buildCache,
@@ -508,7 +562,14 @@ public class Program
                 },
                 onAst: declarationIds != null
                     ? (file, source, ast) => declarationIds.AddFile(file.FullName, source, ast)
-                    : null);
+                    : null,
+                onFailed: file =>
+                {
+                    var failedOutputPath = output?.FullName
+                        ?? Path.ChangeExtension(file.FullName, ".g.cs");
+                    if (File.Exists(failedOutputPath))
+                        File.Delete(failedOutputPath);
+                });
 
             return Finish(driverResult.AnyErrors ? 1 : 0);
         }
@@ -534,16 +595,21 @@ public class Program
     internal static string BuildOptionsToken(bool strictApi, bool requireDocs, bool enforceEffects,
         bool strictEffects, bool permissiveEffects, string contractMode, bool verify,
         int verificationTimeout, bool analyze, bool allFindings, bool strictBindInference,
-        string[]? experimentalFlags)
+        string[]? experimentalFlags,
+        IEnumerable<string>? referenceDescriptors = null)
     {
         var experimental = experimentalFlags == null
             ? ""
             : string.Join(",", experimentalFlags.OrderBy(f => f, StringComparer.Ordinal));
+        var references = referenceDescriptors == null
+            ? ""
+            : string.Join(",", referenceDescriptors.Order(StringComparer.Ordinal));
         return $"strictApi:{strictApi}|requireDocs:{requireDocs}|enforceEffects:{enforceEffects}" +
                $"|strictEffects:{strictEffects}|permissiveEffects:{permissiveEffects}" +
                $"|contractMode:{contractMode.ToLowerInvariant()}|verify:{verify}" +
                $"|verificationTimeout:{verificationTimeout}|analyze:{analyze}|allFindings:{allFindings}" +
-               $"|strictBindInference:{strictBindInference}|experimental:{experimental}";
+               $"|strictBindInference:{strictBindInference}|experimental:{experimental}" +
+               $"|references:{references}";
     }
 
     private static void WriteHelp(TextWriter writer)
@@ -668,7 +734,7 @@ public class Program
         }
 
         // Type checking (optional)
-        if (options.EnableTypeChecking)
+        if (options.EnableTypeChecking && !options.UnsafeTranspileOnly)
         {
             phaseSw.Restart();
             var typeChecker = new TypeChecking.TypeChecker(diagnostics);
@@ -980,15 +1046,29 @@ public class Program
             status.WriteLine("Code generation completed successfully");
         }
 
-        // Compilation outcome telemetry
-        try
+        if (!diagnostics.HasErrors &&
+            !options.UnsafeTranspileOnly &&
+            !options.DeferGeneratedOutputValidation)
         {
-            telemetry?.TrackCompilationOutcome(!diagnostics.HasErrors,
-                diagnostics.Errors.Count(), diagnostics.Warnings.Count());
+            var generatedPath = filePath == null
+                ? "generated.g.cs"
+                : Path.ChangeExtension(filePath, ".g.cs");
+            var validation = GeneratedCSharpCompiler.Validate(
+                [new GeneratedCSharpSource(generatedCode, generatedPath, filePath)],
+                new GeneratedCSharpCompilationContext
+                {
+                    ReferencePaths = options.ReferencedAssemblyPaths,
+                    AllowUnsafe = options.AllowUnsafeCode
+                });
+            AddGeneratedOutputDiagnostics(validation, diagnostics, generatedPath);
         }
-        catch
+
+        if (!options.DeferGeneratedOutputValidation)
         {
-            // Never crash the CLI
+            TrackCompilationOutcome(
+                telemetry,
+                diagnostics,
+                validated: !options.UnsafeTranspileOnly);
         }
 
         TrackDiagnostics(telemetry, diagnostics);
@@ -1011,7 +1091,49 @@ public class Program
         return new CompilationResult(diagnostics, ast, generatedCode);
     }
 
-    private static void TrackDiagnostics(CalorTelemetry? telemetry, DiagnosticBag diagnostics)
+    internal static void AddGeneratedOutputDiagnostics(
+        GeneratedCSharpValidation validation,
+        DiagnosticBag diagnostics,
+        string fallbackFilePath)
+    {
+        foreach (var roslynDiagnostic in validation.CompilationErrors)
+        {
+            var mapped = roslynDiagnostic.Location.IsInSource
+                ? roslynDiagnostic.Location.GetMappedLineSpan()
+                : default;
+            var start = mapped.StartLinePosition;
+            var filePath = !roslynDiagnostic.Location.IsInSource ||
+                string.IsNullOrEmpty(mapped.Path)
+                    ? fallbackFilePath
+                    : mapped.Path;
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCode.CodeGenCompilationError,
+                $"Generated C# failed compilation ({roslynDiagnostic.Id}): {roslynDiagnostic.GetMessage()}",
+                new TextSpan(0, 0, start.Line + 1, start.Character + 1),
+                DiagnosticSeverity.Error,
+                filePath));
+        }
+    }
+
+    internal static void TrackCompilationOutcome(
+        CalorTelemetry? telemetry,
+        DiagnosticBag diagnostics,
+        bool validated)
+    {
+        try
+        {
+            telemetry?.TrackCompilationOutcome(
+                validated && !diagnostics.HasErrors,
+                diagnostics.Errors.Count(),
+                diagnostics.Warnings.Count());
+        }
+        catch
+        {
+            // Never crash the compiler for telemetry.
+        }
+    }
+
+    internal static void TrackDiagnostics(CalorTelemetry? telemetry, DiagnosticBag diagnostics)
     {
         if (telemetry == null) return;
 
@@ -1103,6 +1225,24 @@ public sealed class CompilationOptions
     /// Populated from MSBuild @(ReferencePath) items.
     /// </summary>
     public IReadOnlyList<string>? ReferencedAssemblyPaths { get; init; }
+
+    /// <summary>
+    /// Whether generated C# validation accepts unsafe code. Standalone compilation
+    /// defaults to true; project surfaces override this with the project's setting.
+    /// </summary>
+    public bool AllowUnsafeCode { get; init; } = true;
+
+    /// <summary>
+    /// Explicitly emit C# without Roslyn validation. This mode is unsafe and must
+    /// never be reported as a validated compilation success.
+    /// </summary>
+    public bool UnsafeTranspileOnly { get; set; }
+
+    /// <summary>
+    /// Multi-file orchestration defers validation until every generated tree is
+    /// available for one project-aware Roslyn compilation.
+    /// </summary>
+    public bool DeferGeneratedOutputValidation { get; set; }
 
     /// <summary>
     /// Shared compilation context for reusing expensive state across file compilations.

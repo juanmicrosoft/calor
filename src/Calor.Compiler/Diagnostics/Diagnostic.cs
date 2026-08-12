@@ -756,6 +756,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string PostconditionCheckNotLowered = "Calor1001";
 
+    /// <summary>
+    /// Error: Generated C# failed Roslyn compilation.
+    /// </summary>
+    public const string CodeGenCompilationError = "Calor1002";
+
     // C# Interop diagnostics (Calor1010-1019)
 
     /// <summary>

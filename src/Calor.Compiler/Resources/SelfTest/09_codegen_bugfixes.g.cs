@@ -47,7 +47,7 @@ namespace Transliterator
 
             }
 
-            Console.WriteLine(new StringBuilder(), new StringBuilder());
+            Console.WriteLine("{0} {1}", new StringBuilder(), new StringBuilder());
             return sb.ToString();
         }
 

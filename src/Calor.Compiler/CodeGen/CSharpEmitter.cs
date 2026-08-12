@@ -110,9 +110,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     private bool IsVarDeclaredInScope(string name)
     {
+        var sanitizedName = SanitizeIdentifier(name);
         for (var i = _declScopes.Count - 1; i >= 0; i--)
         {
-            if (_declScopes[i].Contains(name))
+            if (_declScopes[i].Contains(name) ||
+                _declScopes[i].Contains(sanitizedName))
             {
                 return true;
             }
@@ -845,6 +847,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// </summary>
     private string QualifyCrossModuleTarget(string target)
     {
+        if (CrossModuleFunctionModules != null && target.Contains('.'))
+        {
+            var separator = target.LastIndexOf('.');
+            var module = target[..separator];
+            var function = target[(separator + 1)..];
+            if (CrossModuleFunctionModules.TryGetValue(target, out var explicitModule) &&
+                explicitModule == module &&
+                explicitModule != _currentModuleName)
+            {
+                var explicitNamespace = SanitizeNamespace(explicitModule);
+                var explicitClass = SanitizeIdentifier(explicitModule.Split('.').Last()) + "Module";
+                return $"global::{explicitNamespace}.{explicitClass}.{function}";
+            }
+        }
+
         if (CrossModuleFunctionModules == null
             || _suppressCrossModuleQualification
             || target.Length == 0
@@ -1246,6 +1263,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node.Name is "null" or "true" or "false")
         {
             return node.Name;
+        }
+        if (node.Name == "default")
+        {
+            return IsVarDeclaredInScope(node.Name) ||
+                _currentClassMemberNames.Contains(node.Name) ||
+                _classMemberScopes.Any(scope => scope.Members.Contains(node.Name))
+                ? SanitizeIdentifier(node.Name)
+                : node.Name;
         }
 
         // Handle member access like "args.Length" - preserve the dot notation
@@ -5885,6 +5910,28 @@ public sealed class GeneratedCSharpValidation
     }
 }
 
+/// <summary>A generated C# source, its generated path, and its originating Calor path.</summary>
+public sealed record GeneratedCSharpSource(string Text, string Path, string? SourcePath = null);
+
+/// <summary>Project compilation inputs required to validate generated C# faithfully.</summary>
+public sealed record GeneratedCSharpCompilationContext
+{
+    public IEnumerable<string>? ReferencePaths { get; init; }
+    public IEnumerable<GeneratedCSharpSource>? AdditionalSources { get; init; }
+    public bool AllowUnsafe { get; init; } = true;
+    public Microsoft.CodeAnalysis.OutputKind OutputKind { get; init; } =
+        Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary;
+    public Microsoft.CodeAnalysis.CSharp.LanguageVersion LanguageVersion { get; init; } =
+        Microsoft.CodeAnalysis.CSharp.LanguageVersion.Default;
+    public IEnumerable<string>? PreprocessorSymbols { get; init; }
+    public bool IncludeImplicitGlobalUsings { get; init; } = true;
+    public IEnumerable<string>? AnalyzerPaths { get; init; }
+    public IEnumerable<string>? AdditionalFilePaths { get; init; }
+    public Microsoft.CodeAnalysis.NullableContextOptions NullableContextOptions { get; init; }
+    public bool TreatWarningsAsErrors { get; init; }
+    public string? AnalyzerConfigPath { get; init; }
+}
+
 /// <summary>
 /// Shared Roslyn compilation helper for validating generated C# (#771/#761).
 ///
@@ -5953,12 +6000,40 @@ public static class GeneratedCSharpCompiler
     /// error diagnostics. Warnings are ignored.
     /// </summary>
     public static GeneratedCSharpValidation Validate(params string[] csharpSources)
+        => Validate(
+            csharpSources.Select((source, index) =>
+                new GeneratedCSharpSource(source, $"generated-{index}.g.cs")));
+
+    /// <summary>
+    /// Parses and compiles generated sources together using the process framework
+    /// references plus project references supplied by the invoking surface.
+    /// </summary>
+    public static GeneratedCSharpValidation Validate(
+        IEnumerable<GeneratedCSharpSource> csharpSources,
+        IEnumerable<string>? projectReferencePaths = null)
+        => Validate(
+            csharpSources,
+            new GeneratedCSharpCompilationContext
+            {
+                ReferencePaths = projectReferencePaths
+            });
+
+    /// <summary>
+    /// Parses and compiles generated sources with the invoking project's source,
+    /// reference, language, and unsafe-code settings.
+    /// </summary>
+    public static GeneratedCSharpValidation Validate(
+        IEnumerable<GeneratedCSharpSource> csharpSources,
+        GeneratedCSharpCompilationContext context)
     {
         var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
-            Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview);
+            context.LanguageVersion,
+            preprocessorSymbols: context.PreprocessorSymbols ?? []);
 
         var sourceTrees = csharpSources
-            .Select(s => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(s, parseOptions))
+            .Concat(context.AdditionalSources ?? [])
+            .Select(source => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                source.Text, parseOptions, source.Path))
             .ToList();
 
         var syntaxErrors = sourceTrees
@@ -5966,23 +6041,277 @@ public static class GeneratedCSharpCompiler
             .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
             .ToList();
 
-        var trees = new List<Microsoft.CodeAnalysis.SyntaxTree>
+        var trees = new List<Microsoft.CodeAnalysis.SyntaxTree>();
+        if (context.IncludeImplicitGlobalUsings)
         {
-            Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(GlobalUsingsPreamble, parseOptions),
-        };
+            trees.Add(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                GlobalUsingsPreamble, parseOptions));
+        }
         trees.AddRange(sourceTrees);
 
-        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+        Microsoft.CodeAnalysis.Compilation compilation =
+            Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
             "GeneratedCSharpValidation",
             trees,
-            References,
+            BuildProjectReferences(context.ReferencePaths),
             new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
-                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+                context.OutputKind,
+                allowUnsafe: context.AllowUnsafe,
+                nullableContextOptions: context.NullableContextOptions,
+                generalDiagnosticOption: context.TreatWarningsAsErrors
+                    ? Microsoft.CodeAnalysis.ReportDiagnostic.Error
+                    : Microsoft.CodeAnalysis.ReportDiagnostic.Default));
 
-        var compilationErrors = compilation.GetDiagnostics()
-            .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+        var generatorDiagnostics = RunSourceGenerators(
+            ref compilation,
+            parseOptions,
+            context.AnalyzerPaths,
+            context.AdditionalFilePaths,
+            context.AnalyzerConfigPath);
+        var compilationErrors = generatorDiagnostics
+            .Concat(compilation.GetDiagnostics())
+            .Where(d =>
+                d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error ||
+                context.TreatWarningsAsErrors &&
+                d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Warning)
             .ToList();
 
         return new GeneratedCSharpValidation(syntaxErrors, compilationErrors);
+    }
+
+    private static IReadOnlyList<Microsoft.CodeAnalysis.Diagnostic> RunSourceGenerators(
+        ref Microsoft.CodeAnalysis.Compilation compilation,
+        Microsoft.CodeAnalysis.CSharp.CSharpParseOptions parseOptions,
+        IEnumerable<string>? analyzerPaths,
+        IEnumerable<string>? additionalFilePaths,
+        string? analyzerConfigPath)
+    {
+        var paths = (analyzerPaths ?? [])
+            .Where(File.Exists)
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (paths.Count == 0)
+            return [];
+
+        var loader = new ValidationAnalyzerAssemblyLoader();
+        foreach (var path in paths)
+            loader.AddDependencyLocation(path);
+        var generators = paths
+            .Select(path => new Microsoft.CodeAnalysis.Diagnostics.AnalyzerFileReference(
+                path, loader))
+            .SelectMany(reference => reference.GetGenerators(
+                Microsoft.CodeAnalysis.LanguageNames.CSharp))
+            .ToList();
+        if (generators.Count == 0)
+            return [];
+
+        var additionalTexts = (additionalFilePaths ?? [])
+            .Where(File.Exists)
+            .Select(path => (Microsoft.CodeAnalysis.AdditionalText)
+                new FileAdditionalText(Path.GetFullPath(path)))
+            .ToList();
+        var driver = Microsoft.CodeAnalysis.CSharp.CSharpGeneratorDriver.Create(
+            generators,
+            additionalTexts,
+            parseOptions,
+            optionsProvider: CreateAnalyzerConfigOptionsProvider(analyzerConfigPath));
+        driver.RunGeneratorsAndUpdateCompilation(
+            compilation, out var updatedCompilation, out var diagnostics);
+        compilation = updatedCompilation;
+        return diagnostics;
+    }
+
+    private sealed class ValidationAnalyzerAssemblyLoader
+        : Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader
+    {
+        public void AddDependencyLocation(string fullPath)
+        {
+        }
+
+        public System.Reflection.Assembly LoadFromPath(string fullPath)
+            => System.Reflection.Assembly.LoadFrom(fullPath);
+    }
+
+    private sealed class FileAdditionalText(string path) : Microsoft.CodeAnalysis.AdditionalText
+    {
+        public override string Path { get; } = path;
+
+        public override Microsoft.CodeAnalysis.Text.SourceText? GetText(
+            CancellationToken cancellationToken = default)
+            => Microsoft.CodeAnalysis.Text.SourceText.From(
+                File.ReadAllText(Path), System.Text.Encoding.UTF8);
+    }
+
+    private static Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptionsProvider
+        CreateAnalyzerConfigOptionsProvider(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return new ValidationAnalyzerConfigOptionsProvider(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), []);
+
+        var globalValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var sections = new List<AnalyzerConfigSection>();
+        Dictionary<string, string>? currentValues = null;
+        foreach (var rawLine in File.ReadLines(path))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0 || line.StartsWith('#') || line.StartsWith(';'))
+                continue;
+            if (line.StartsWith('[') && line.EndsWith(']'))
+            {
+                currentValues = new Dictionary<string, string>(
+                    StringComparer.OrdinalIgnoreCase);
+                sections.Add(new AnalyzerConfigSection(
+                    line[1..^1].Replace('\\', '/'), currentValues));
+                continue;
+            }
+
+            var parts = line.Split('=', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length != 2 || parts[0].Equals(
+                    "is_global", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            (currentValues ?? globalValues)[parts[0]] = parts[1];
+        }
+        return new ValidationAnalyzerConfigOptionsProvider(globalValues, sections);
+    }
+
+    private sealed class ValidationAnalyzerConfigOptionsProvider(
+        IReadOnlyDictionary<string, string> globalValues,
+        IReadOnlyList<AnalyzerConfigSection> sections)
+        : Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptionsProvider
+    {
+        private readonly Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions _global =
+            new ValidationAnalyzerConfigOptions(globalValues);
+        private static readonly Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions Empty =
+            new ValidationAnalyzerConfigOptions(
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+
+        public override Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GlobalOptions
+            => _global;
+
+        public override Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GetOptions(
+            Microsoft.CodeAnalysis.SyntaxTree tree)
+            => GetPathOptions(tree.FilePath);
+
+        public override Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GetOptions(
+            Microsoft.CodeAnalysis.AdditionalText textFile)
+            => GetPathOptions(textFile.Path);
+
+        private Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions GetPathOptions(
+            string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return Empty;
+
+            var normalizedPath = Path.GetFullPath(path).Replace('\\', '/');
+            Dictionary<string, string>? values = null;
+            foreach (var section in sections)
+            {
+                if (!Matches(section.Pattern, normalizedPath))
+                    continue;
+                values ??= new Dictionary<string, string>(
+                    StringComparer.OrdinalIgnoreCase);
+                foreach (var pair in section.Values)
+                    values[pair.Key] = pair.Value;
+            }
+            return values == null ? Empty : new ValidationAnalyzerConfigOptions(values);
+        }
+
+        private static bool Matches(string pattern, string normalizedPath)
+        {
+            var normalizedPattern = pattern.Replace('\\', '/');
+            if (string.Equals(
+                    normalizedPattern, normalizedPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            return System.IO.Enumeration.FileSystemName.MatchesSimpleExpression(
+                    normalizedPattern, normalizedPath, ignoreCase: true) ||
+                System.IO.Enumeration.FileSystemName.MatchesSimpleExpression(
+                    normalizedPattern, Path.GetFileName(normalizedPath), ignoreCase: true);
+        }
+    }
+
+    private sealed record AnalyzerConfigSection(
+        string Pattern,
+        IReadOnlyDictionary<string, string> Values);
+
+    private sealed class ValidationAnalyzerConfigOptions(
+        IReadOnlyDictionary<string, string> values)
+        : Microsoft.CodeAnalysis.Diagnostics.AnalyzerConfigOptions
+    {
+        public override bool TryGetValue(string key, out string value)
+            => values.TryGetValue(key, out value!);
+    }
+
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+        "SingleFile",
+        "IL3000",
+        Justification = "Assembly.Location is checked for empty string; the embedded runtime is skipped in single-file mode.")]
+    private static IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference> BuildProjectReferences(
+        IEnumerable<string>? projectReferencePaths)
+    {
+        var explicitPaths = (projectReferencePaths ?? [])
+            .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (explicitPaths.Count == 0)
+            return References;
+
+        var explicitNames = explicitPaths
+            .Select(TryGetAssemblyName)
+            .Where(name => name != null)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (explicitNames.Contains("System.Runtime"))
+        {
+            var projectReferences = explicitPaths
+                .Select(path => Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path))
+                .ToList();
+            var calorRuntime = typeof(Calor.Runtime.ContractKind).Assembly.Location;
+            if (!string.IsNullOrEmpty(calorRuntime) &&
+                !explicitNames.Contains(
+                    System.Reflection.AssemblyName.GetAssemblyName(calorRuntime).Name))
+            {
+                projectReferences.Add(
+                    Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(calorRuntime));
+            }
+            return projectReferences;
+        }
+
+        var references = References
+            .Where(reference =>
+            {
+                var path = (reference as Microsoft.CodeAnalysis.PortableExecutableReference)?.FilePath;
+                var name = path == null ? null : TryGetAssemblyName(path);
+                return name == null || !explicitNames.Contains(name);
+            })
+            .ToList();
+        references.AddRange(explicitPaths.Select(path =>
+            Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path)));
+        return references;
+    }
+
+    private static string? TryGetAssemblyName(string path)
+    {
+        try
+        {
+            return System.Reflection.AssemblyName.GetAssemblyName(path).Name;
+        }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+        catch (FileLoadException)
+        {
+            return null;
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
     }
 }

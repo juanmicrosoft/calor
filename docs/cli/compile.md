@@ -43,6 +43,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 |:-------|:------|:---------|:------------|
 | `--input` | `-i` | Yes | Input Calor source file |
 | `--output` | `-o` | Yes | Output C# file path |
+| `--reference` | `-r` | No | Assembly reference used by Roslyn validation; repeat for multiple project or package assemblies |
 | `--verbose` | `-v` | No | Show detailed compilation output |
 | `--verify` | | No | Enable static contract verification with Z3 |
 | `--analyze` | | No | Enable static analysis (dataflow, bug patterns, taint tracking) |
@@ -56,7 +57,8 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--require-docs` | | No | Require documentation on public functions |
 | `--enforce-effects` | | No | Enforce effect declarations (default: true) |
 | `--no-enforce-effects` | | No | Disable effect enforcement (opt out of the v0.11 default-on behavior) |
-| `--no-type-check` | | No | Disable the type checker (opt out of the v0.12 default-on behavior). Applies to this command only; set `CALOR_NO_TYPE_CHECK=1` to opt out on `run`, `test`, `watch`, `verify` and the MSBuild task as well |
+| `--no-type-check` | | No | Disable Calor semantic type checking. Generated C# is still validated by Roslyn before success is reported |
+| `--transpile-only` | | No | **Unsafe:** emit C# without Calor type checking or Roslyn validation. Output is not cached and the CLI reports `Unsafe transpilation output written`, not compilation success |
 
 ---
 
@@ -83,7 +85,33 @@ Caching is **opt-in** for plain compiles; `calor watch` always caches
 (see [watch](/calor/cli/watch/)). `--no-cache` is the explicit off switch and
 overrides `--cache`; `--clear-cache` deletes the state file first. Add
 `.calor-build-state.json` to `.gitignore` (`calor init` does this for you).
-Only diagnostic-clean files are cached, so warnings reappear on every run.
+Only diagnostic-clean, Roslyn-valid files are cached, so warnings reappear on
+every run and invalid generated output can never become a cache hit. A failed
+compile removes any prior output for the failed file, so downstream C# globs
+cannot consume stale generated code.
+
+---
+
+## Validated compilation and unsafe transpilation
+
+Normal compilation guarantees that all generated C# from the invocation
+compiles successfully with Roslyn. For multi-file input, Calor validates every
+generated syntax tree together so cross-file symbols resolve, using the
+framework, `Calor.Runtime`, and project references supplied by the invoking
+CLI or MSBuild surface. Roslyn errors are reported as `Calor1002` diagnostics
+and mapped back to `.calr` locations through generated `#line` directives.
+
+`--no-type-check` disables only Calor's semantic type checker; it does not
+disable the generated-output guarantee. Use `--transpile-only` only for
+syntax/emitter inspection of incomplete source. This mode is explicitly
+unsafe, does not populate the incremental cache, and does not emit the normal
+success message.
+
+For MSBuild projects, validation also includes existing `@(Compile)` C# files
+and honors `AllowUnsafeBlocks`, `OutputType`, `DefineConstants`, and
+`LangVersion`, including whether `ImplicitUsings` is enabled.
+`<CalorTranspileOnly>true</CalorTranspileOnly>` provides the same unsafe
+behavior as the CLI; the default is `false`.
 
 ---
 
@@ -107,7 +135,8 @@ The compiler performs these steps:
 2. **Validate** - Check syntax and semantic correctness
 3. **Transform** - Convert Calor AST to C# AST
 4. **Generate** - Emit formatted C# source code
-5. **Write** - Save to the output file
+5. **Roslyn validate** - Compile all generated trees together with project references
+6. **Write** - Save validated output to the output file
 
 ---
 
@@ -186,7 +215,7 @@ Or use the MSBuild integration which handles this automatically.
 | Code | Meaning |
 |:-----|:--------|
 | `0` | Compilation successful |
-| `1` | Compilation failed (syntax errors, validation errors) |
+| `1` | Compilation failed (Calor errors or invalid generated C#) |
 | `2` | Error (file not found, invalid arguments) |
 
 ---

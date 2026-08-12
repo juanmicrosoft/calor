@@ -1016,6 +1016,7 @@ public class AttributeConversionTests
         var calorSource = """
             §M{m1:Test}
               §F{f1:GetName}
+                  §I{i32:value}
                   §O{str}
                   §R (nameof value)
             """;

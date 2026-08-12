@@ -2464,7 +2464,8 @@ public class Demo
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
-            UnknownCallPolicy = UnknownCallPolicy.Permissive
+            UnknownCallPolicy = UnknownCallPolicy.Permissive,
+            DeferGeneratedOutputValidation = true,
         });
 
         // Should compile successfully (no errors)

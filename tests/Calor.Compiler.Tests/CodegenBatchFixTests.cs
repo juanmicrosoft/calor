@@ -310,7 +310,10 @@ public class CodegenBatchFixTests
 
         Assert.True(conversionResult.Success, string.Join("\n", conversionResult.Issues.Select(i => i.Message)));
 
-        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        var compilationResult = Program.Compile(
+            conversionResult.CalorSource!,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
         Assert.Contains("21.35m", compilationResult.GeneratedCode);

@@ -102,7 +102,10 @@ public class DuplicateBindingTests
         Assert.True(result.Success, $"[{name}] conversion failed");
         Assert.NotNull(result.CalorSource);
 
-        var compiled = Program.Compile(result.CalorSource!);
+        var compiled = Program.Compile(
+            result.CalorSource!,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         Assert.False(compiled.Diagnostics.HasErrors,
             $"[{name}] calor -i rejected converter output:\n" + result.CalorSource);
 

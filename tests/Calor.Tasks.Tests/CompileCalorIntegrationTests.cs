@@ -92,6 +92,7 @@ public class CompileCalorIntegrationTests : IDisposable
             }).ToArray(),
             OutputDirectory = _outputDir,
             ProjectDirectory = _projectDir,
+            ImplicitUsings = "enable",
             Verbose = true
         };
         return task;
@@ -263,6 +264,137 @@ public class CompileCalorIntegrationTests : IDisposable
         var cache2 = BuildStateCache.Load(_outputDir);
         Assert.NotNull(cache2);
         Assert.Empty(cache2.Files);
+    }
+
+    [Fact]
+    public void GeneratedCSharpFailure_FailsBuildAndIsNotCached()
+    {
+        var src = CreateSourceFile(
+            "GeneratedError.calr",
+            """
+            §M{m001:GeneratedError}
+              §F{f001:Main:pub} () -> void
+                §B{x:i32} STR:"not an int"
+            """);
+        var task = CreateTask(src);
+        task.TypeCheck = false;
+
+        Assert.False(task.Execute());
+        var engine = (TestBuildEngine)task.BuildEngine;
+        Assert.Contains(
+            engine.Errors,
+            error => error.Contains("Generated C# failed compilation", StringComparison.Ordinal));
+        Assert.Empty(task.GeneratedFiles);
+        Assert.False(File.Exists(Path.Combine(_outputDir, "GeneratedError.g.cs")));
+        Assert.Null(BuildStateCache.Load(_outputDir));
+    }
+
+    [Fact]
+    public void GeneratedCSharpFailure_RemovesPriorValidOutputWithoutReplacingIt()
+    {
+        var src = CreateSourceFile("GeneratedError.calr", ValidCalorSource);
+        var successfulTask = CreateTask(src);
+        Assert.True(successfulTask.Execute());
+        var outputPath = successfulTask.GeneratedFiles.Single().ItemSpec;
+        Assert.True(File.Exists(outputPath));
+
+        File.WriteAllText(
+            src,
+            """
+            §M{m001:GeneratedError}
+              §F{f001:Main:pub} () -> void
+                §B{x:i32} STR:"not an int"
+            """);
+        var failingTask = CreateTask(src);
+        failingTask.TypeCheck = false;
+
+        Assert.False(failingTask.Execute());
+        Assert.Empty(failingTask.GeneratedFiles);
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public void GeneratedCSharpValidation_IncludesExistingProjectSources()
+    {
+        var projectSource = CreateSourceFile(
+            "ProjectApi.cs",
+            "public static class ProjectApi { public static int Value => 42; }");
+        var calorSource = CreateSourceFile(
+            "Consumer.calr",
+            """
+            §M{m001:Consumer}
+              §CL{c001:Reader:pub}
+                §CSHARP{
+                  public int Read() => ProjectApi.Value;
+                }§/CSHARP
+            """);
+        var task = CreateTask(calorSource);
+        task.ProjectSourceFiles = [new TaskItem(projectSource)];
+
+        Assert.True(task.Execute());
+        Assert.Single(task.GeneratedFiles);
+    }
+
+    [Fact]
+    public void GeneratedCSharpValidation_UsesProjectUnsafeSetting()
+    {
+        var src = CreateSourceFile(
+            "UnsafeBlock.calr",
+            """
+            §M{m001:UnsafeBlock}
+              §CL{c001:Worker:pub}
+                §MT{m001:Run:pub} () -> void
+                  §E{unsafe}
+                  §UNSAFE{u1}
+                    §B{~x:i32} INT:42
+                  §/UNSAFE{u1}
+            """);
+        var rejected = CreateTask(src);
+        rejected.AllowUnsafeBlocks = false;
+        Assert.False(rejected.Execute());
+
+        var accepted = CreateTask(src);
+        accepted.AllowUnsafeBlocks = true;
+        Assert.True(
+            accepted.Execute(),
+            string.Join("; ", ((TestBuildEngine)accepted.BuildEngine).Errors));
+    }
+
+    [Fact]
+    public void GeneratedCSharpValidation_HonorsDisabledImplicitUsings()
+    {
+        var src = CreateSourceFile(
+            "ImplicitUsings.calr",
+            """
+            §M{m001:ImplicitUsings}
+              §CL{c001:Reader:pub}
+                §CSHARP{public string Read() => File.ReadAllText("input.txt");}§/CSHARP
+            """);
+        var task = CreateTask(src);
+        task.ImplicitUsings = "disable";
+
+        Assert.False(task.Execute());
+        Assert.Contains(
+            ((TestBuildEngine)task.BuildEngine).Errors,
+            error => error.Contains("CS0103", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TranspileOnly_EmitsWithoutCreatingCache()
+    {
+        var src = CreateSourceFile(
+            "Unsafe.calr",
+            """
+            §M{m001:Unsafe}
+              §F{f001:Main:pub} () -> void
+                §B{x:i32} STR:"not an int"
+            """);
+        var task = CreateTask(src);
+        task.TranspileOnly = true;
+
+        Assert.True(task.Execute());
+        Assert.Single(task.GeneratedFiles);
+        Assert.Null(BuildStateCache.Load(_outputDir));
     }
 
     // Test 22c: Exception path — source deleted between cache check and compile

@@ -858,8 +858,12 @@ public sealed class LosslessFormattingTests : IDisposable
                 $"{relativePath}: {once.ConservativeFallbackReason}");
             Assert.NotEqual(probedSource, once.Formatted);
 
-            var before = Program.Compile(probedSource, path);
-            var after = Program.Compile(once.Formatted, path);
+            var structuralOptions = new CompilationOptions
+            {
+                DeferGeneratedOutputValidation = true
+            };
+            var before = Program.Compile(probedSource, path, structuralOptions);
+            var after = Program.Compile(once.Formatted, path, structuralOptions);
             Assert.False(
                 before.HasErrors,
                 $"{relativePath} before: {string.Join("; ", before.Diagnostics.Errors)}");
@@ -884,19 +888,30 @@ public sealed class LosslessFormattingTests : IDisposable
             successfulTransformations++;
         }
 
-        Assert.Equal(
-            expectedParseFailures.Order(StringComparer.Ordinal),
-            actualParseFailures.Order(StringComparer.Ordinal));
-        Assert.Equal(
-            expectedSemanticFallbacks.Order(StringComparer.Ordinal),
-            actualSemanticFallbacks.Order(StringComparer.Ordinal));
-        Assert.Equal(
-            expectedGeneratedFallbacks.Order(StringComparer.Ordinal),
-            actualGeneratedFallbacks.Order(StringComparer.Ordinal));
+        AssertMatchingPathSets("parse failures", expectedParseFailures, actualParseFailures);
+        AssertMatchingPathSets(
+            "semantic fallbacks",
+            expectedSemanticFallbacks,
+            actualSemanticFallbacks);
+        AssertMatchingPathSets(
+            "generated C# fallbacks",
+            expectedGeneratedFallbacks,
+            actualGeneratedFallbacks);
         Assert.Equal(
             baseline.GetProperty("successfulTransformationCount").GetInt32(),
             successfulTransformations);
         Assert.Equal(successfulTransformations, commentProbes);
+    }
+
+    private static void AssertMatchingPathSets(
+        string category,
+        HashSet<string> expected,
+        HashSet<string> actual)
+    {
+        Assert.True(
+            expected.SetEquals(actual),
+            $"{category} changed. Added: [{string.Join(", ", actual.Except(expected).Order())}]. " +
+            $"Removed: [{string.Join(", ", expected.Except(actual).Order())}].");
     }
 
     private static string[] GetTrackedCalorFiles(string repoRoot)

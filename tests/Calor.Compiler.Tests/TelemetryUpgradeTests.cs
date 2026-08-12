@@ -367,6 +367,7 @@ public class TelemetryUpgradeTests
             .Where(e => e.Name == "CompilationOutcome").ToList();
         Assert.NotEmpty(outcomeEvents);
         var evt = outcomeEvents[0];
+        Assert.Equal("true", evt.Properties["success"]);
         // W1 Slice 2 (#834 review M2): no content hash on the wire.
         Assert.False(evt.Properties.ContainsKey("inputHash"));
         // Must not contain source code
@@ -374,6 +375,155 @@ public class TelemetryUpgradeTests
         {
             Assert.DoesNotContain("§M{m001", value);
             Assert.DoesNotContain("§R (+ a b)", value);
+        }
+    }
+
+    [Fact]
+    public void ProgramCompile_InvalidGeneratedCSharp_ReportsFailedOutcome()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+        using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
+        telemetry.SetCommand("compile");
+
+        var result = Program.Compile(
+            """
+            §M{m001:Invalid}
+              §F{f001:Main:pub} () -> void
+                §B{x:i32} STR:"not an int"
+            """,
+            "invalid.calr",
+            new CompilationOptions { EnableTypeChecking = false });
+
+        Assert.True(result.HasErrors);
+        var outcome = Assert.Single(
+            channel.Items.OfType<EventTelemetry>()
+                .Where(item => item.Name == "CompilationOutcome"));
+        Assert.Equal("false", outcome.Properties["success"]);
+        Assert.True(outcome.Metrics["errorCount"] > 0);
+    }
+
+    [Fact]
+    public void CompilationDriver_CalorError_ReportsFailedOutcome()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+        using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
+        telemetry.SetCommand("compile");
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            $"calor-telemetry-{Guid.NewGuid():N}.calr");
+        File.WriteAllText(
+            path,
+            """
+            §M{m001:Invalid}
+              §F{f001:Main:pub} () -> i32
+                §R missing
+            """);
+
+        try
+        {
+            var result = CompilationDriver.CompileAll(
+                [new FileInfo(path)],
+                _ => new CompilationOptions(),
+                crossModuleEnforcement: false,
+                crossModulePolicy: Effects.UnknownCallPolicy.Strict);
+
+            Assert.True(result.AnyErrors);
+            var outcome = Assert.Single(
+                channel.Items.OfType<EventTelemetry>()
+                    .Where(item => item.Name == "CompilationOutcome"));
+            Assert.Equal("false", outcome.Properties["success"]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void CompilationDriver_GeneratedValidationError_ReportsFailedOutcome()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+        using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
+        telemetry.SetCommand("compile");
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            $"calor-generated-telemetry-{Guid.NewGuid():N}.calr");
+        File.WriteAllText(
+            path,
+            """
+            §M{m001:Invalid}
+              §F{f001:Main:pub} () -> void
+                §B{x:i32} STR:"not an int"
+            """);
+
+        try
+        {
+            var result = CompilationDriver.CompileAll(
+                [new FileInfo(path)],
+                _ => new CompilationOptions { EnableTypeChecking = false },
+                crossModuleEnforcement: false,
+                crossModulePolicy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+
+            Assert.True(result.AnyErrors);
+            var outcome = Assert.Single(
+                channel.Items.OfType<EventTelemetry>()
+                    .Where(item => item.Name == "CompilationOutcome"));
+            Assert.Equal("false", outcome.Properties["success"]);
+            Assert.True(outcome.Metrics["errorCount"] > 0);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void CompilationDriver_CrossModuleError_DoesNotReportSuccess()
+    {
+        var (telemetry, channel) = CreateTestTelemetry();
+        using var _ = CalorTelemetry.SetInstanceForTesting(telemetry);
+        telemetry.SetCommand("compile");
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            $"calor-cross-telemetry-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var libraryPath = Path.Combine(directory, "Library.calr");
+        var consumerPath = Path.Combine(directory, "Consumer.calr");
+        File.WriteAllText(
+            libraryPath,
+            """
+            §M{m001:Library}
+              §F{f001:Write:pub} () -> void
+                §E{cw}
+                §P "written"
+            """);
+        File.WriteAllText(
+            consumerPath,
+            """
+            §M{m002:Consumer}
+              §F{f002:Run:pub} () -> void
+                §C{Write} §/C
+            """);
+
+        try
+        {
+            var result = CompilationDriver.CompileAll(
+                [new FileInfo(libraryPath), new FileInfo(consumerPath)],
+                _ => new CompilationOptions { EnforceEffects = false },
+                crossModuleEnforcement: true,
+                crossModulePolicy: Calor.Compiler.Effects.UnknownCallPolicy.Strict);
+
+            Assert.True(result.AnyErrors);
+            var outcomes = channel.Items.OfType<EventTelemetry>()
+                .Where(item => item.Name == "CompilationOutcome")
+                .ToList();
+            Assert.Equal(2, outcomes.Count);
+            Assert.All(outcomes, outcome => Assert.Equal("false", outcome.Properties["success"]));
+            Assert.All(outcomes, outcome => Assert.True(outcome.Metrics["errorCount"] > 0));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
         }
     }
 

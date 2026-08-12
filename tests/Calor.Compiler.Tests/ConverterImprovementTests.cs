@@ -693,7 +693,10 @@ public class ConverterImprovementTests
                     §R x
             """;
 
-        var compilationResult = Program.Compile(calorSource);
+        var compilationResult = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
 
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
@@ -711,7 +714,10 @@ public class ConverterImprovementTests
                     §R items
             """;
 
-        var compilationResult = Program.Compile(calorSource);
+        var compilationResult = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
 
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
@@ -730,7 +736,10 @@ public class ConverterImprovementTests
                     §R x
             """;
 
-        var compilationResult = Program.Compile(calorSource);
+        var compilationResult = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
 
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));

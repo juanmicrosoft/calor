@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Calor.Compiler;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 
 namespace Calor.Tasks;
@@ -22,6 +23,14 @@ internal sealed record CompileCalorCacheInputs(
     bool Verbose,
     bool EnforceEffects,
     bool EnableTypeChecking,
+    bool UnsafeTranspileOnly,
+    bool AllowUnsafeBlocks,
+    string ProjectOutputType,
+    string DefineConstants,
+    string LanguageVersion,
+    string ImplicitUsings,
+    string Nullable,
+    bool TreatWarningsAsErrors,
     bool VerifyContracts,
     bool EnableILAnalysis,
     string ExperimentalFlags,
@@ -41,6 +50,14 @@ internal sealed record CompileCalorCacheInputs(
         Append(builder, "verbose", Verbose ? "true" : "false");
         Append(builder, "enforceEffects", EnforceEffects ? "true" : "false");
         Append(builder, "enableTypeChecking", EnableTypeChecking ? "true" : "false");
+        Append(builder, "unsafeTranspileOnly", UnsafeTranspileOnly ? "true" : "false");
+        Append(builder, "allowUnsafeBlocks", AllowUnsafeBlocks ? "true" : "false");
+        Append(builder, "projectOutputType", ProjectOutputType);
+        Append(builder, "defineConstants", DefineConstants);
+        Append(builder, "languageVersion", LanguageVersion);
+        Append(builder, "implicitUsings", ImplicitUsings);
+        Append(builder, "nullable", Nullable);
+        Append(builder, "treatWarningsAsErrors", TreatWarningsAsErrors ? "true" : "false");
         Append(builder, "verifyContracts", VerifyContracts ? "true" : "false");
         Append(builder, "enableILAnalysis", EnableILAnalysis ? "true" : "false");
         Append(builder, "experimentalFlags", ExperimentalFlags);
@@ -140,6 +157,45 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
     public bool TypeCheck { get; set; } = true;
 
     /// <summary>
+    /// Explicitly emit generated C# without type checking or Roslyn validation.
+    /// Unsafe outputs are never recorded in the incremental cache.
+    /// </summary>
+    public bool TranspileOnly { get; set; }
+
+    /// <summary>Existing C# files compiled alongside the generated output.</summary>
+    public ITaskItem[] ProjectSourceFiles { get; set; } = Array.Empty<ITaskItem>();
+
+    /// <summary>Whether the consuming C# project permits unsafe code.</summary>
+    public bool AllowUnsafeBlocks { get; set; }
+
+    /// <summary>The consuming project's MSBuild OutputType.</summary>
+    public string ProjectOutputType { get; set; } = "Library";
+
+    /// <summary>The consuming project's preprocessor symbols.</summary>
+    public string DefineConstants { get; set; } = string.Empty;
+
+    /// <summary>The consuming project's C# language version.</summary>
+    public string LanguageVersion { get; set; } = string.Empty;
+
+    /// <summary>The consuming project's MSBuild ImplicitUsings setting.</summary>
+    public string ImplicitUsings { get; set; } = string.Empty;
+
+    /// <summary>The consuming project's nullable context setting.</summary>
+    public string Nullable { get; set; } = string.Empty;
+
+    /// <summary>Whether the consuming project promotes compiler warnings to errors.</summary>
+    public bool TreatWarningsAsErrors { get; set; }
+
+    /// <summary>The generated analyzer config passed to source generators.</summary>
+    public string AnalyzerConfigPath { get; set; } = string.Empty;
+
+    /// <summary>Roslyn analyzers and source generators used by the consuming project.</summary>
+    public ITaskItem[] AnalyzerAssemblies { get; set; } = Array.Empty<ITaskItem>();
+
+    /// <summary>Additional files supplied to source generators.</summary>
+    public ITaskItem[] AdditionalFiles { get; set; } = Array.Empty<ITaskItem>();
+
+    /// <summary>
     /// Run static contract verification during compilation (Annex A-1.3
     /// instrumentation item 1): refutations surface as Calor0712-band build
     /// diagnostics (Warning severity — the build still succeeds). Off by
@@ -189,14 +245,20 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             BuildStateCache.CurrentCompilerSemanticsVersion,
             Verbose,
             EnforceEffects,
-            TypeCheck && CompilationOptions.TypeCheckingDefault,
+            !TranspileOnly && TypeCheck && CompilationOptions.TypeCheckingDefault,
+            TranspileOnly,
+            AllowUnsafeBlocks,
+            ProjectOutputType,
+            DefineConstants,
+            LanguageVersion,
+            ImplicitUsings,
+            Nullable,
+            TreatWarningsAsErrors,
             Verify,
             EnableILAnalysis,
             canonicalExperimentalFlags,
             DescribePath(ProjectDirectory, includeContent: false),
-            EnableILAnalysis
-                ? referencedAssemblies.Select(reference => reference.Descriptor).ToList()
-                : [],
+            referencedAssemblies.Select(reference => reference.Descriptor).ToList(),
             resolvedImplementations.Select((path, index) =>
                 path == null
                     ? $"unresolved:{referencedAssemblies[index].Descriptor}"
@@ -498,6 +560,13 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         }
 
         var generatedFiles = new List<ITaskItem>();
+        var pendingOutputs = new List<(
+            string InputPath,
+            string OutputPath,
+            string RelativePath,
+            byte[] GeneratedBytes,
+            BuildFileEntry CacheEntry)>();
+        var generatedValidationFailed = false;
         var success = true;
         var pathComparer = BuildStateCache.GetPathComparer();
         var currentRelativePaths = new HashSet<string>(pathComparer);
@@ -663,7 +732,13 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 {
                     Verbose = Verbose,
                     EnforceEffects = EnforceEffects,
-                    EnableTypeChecking = TypeCheck && CompilationOptions.TypeCheckingDefault,
+                    EnableTypeChecking = !TranspileOnly && TypeCheck && CompilationOptions.TypeCheckingDefault,
+                    UnsafeTranspileOnly = TranspileOnly,
+                    AllowUnsafeCode = AllowUnsafeBlocks,
+                    ReferencedAssemblyPaths = referencedAssemblyInputs
+                        .Where(reference => reference.Exists)
+                        .Select(reference => reference.Path)
+                        .ToList(),
                     ProjectDirectory = ProjectDirectory,
                     Context = compilationContext,
                     EnableILAnalysis = EnableILAnalysis,
@@ -671,6 +746,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     VerifyContracts = Verify,
                     ElideProvenGuards = ElideProvenGuards
                 };
+                compileOptions.DeferGeneratedOutputValidation = true;
                 compileOptions.CrossModuleFunctionModules = crossModuleMap;
                 var result = Program.Compile(source, inputPath, compileOptions);
 
@@ -704,9 +780,6 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 }
 
                 var generatedBytes = new UTF8Encoding(false).GetBytes(result.GeneratedCode);
-                File.WriteAllBytes(outputPath, generatedBytes);
-                CacheTestHook?.Invoke(inputPath, CompileCalorTestPhase.BeforeCacheEntrySaved);
-
                 EffectSummary? summary = null;
                 if (result.Ast != null)
                 {
@@ -726,13 +799,8 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                     Line = diagnostic.Span.Line,
                     Column = diagnostic.Span.Column
                 }).ToList();
-                newState.Files[relativePath] = fileEntry;
-
-                var item = new TaskItem(outputPath);
-                item.SetMetadata("SourceFile", inputPath);
-                generatedFiles.Add(item);
-
-                Log.LogMessage(MessageImportance.Normal, "Generated: {0}", outputPath);
+                pendingOutputs.Add((
+                    inputPath, outputPath, relativePath, generatedBytes, fileEntry));
             }
             catch (Exception ex)
             {
@@ -745,6 +813,126 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
                 }
 
                 success = false;
+            }
+        }
+
+        if (!TranspileOnly && (generatedFiles.Count > 0 || pendingOutputs.Count > 0))
+        {
+            var generatedSources = generatedFiles
+                .Select(item => item.GetMetadata("SourceFile") is { Length: > 0 } sourcePath
+                    ? new Calor.Compiler.CodeGen.GeneratedCSharpSource(
+                        File.ReadAllText(item.ItemSpec), item.ItemSpec, sourcePath)
+                    : new Calor.Compiler.CodeGen.GeneratedCSharpSource(
+                        File.ReadAllText(item.ItemSpec), item.ItemSpec))
+                .Concat(pendingOutputs.Select(item =>
+                    new Calor.Compiler.CodeGen.GeneratedCSharpSource(
+                        Encoding.UTF8.GetString(item.GeneratedBytes),
+                        item.OutputPath,
+                        item.InputPath)))
+                .ToList();
+            var generatedOutputPaths = generatedFiles
+                .Select(item => Path.GetFullPath(item.ItemSpec))
+                .Concat(pendingOutputs.Select(item => Path.GetFullPath(item.OutputPath)))
+                .ToHashSet(pathComparer);
+            var projectSources = ProjectSourceFiles
+                .Select(item => item.GetMetadata("FullPath") is { Length: > 0 } fullPath
+                    ? fullPath
+                    : item.ItemSpec)
+                .Where(File.Exists)
+                .Select(Path.GetFullPath)
+                .Where(path => !generatedOutputPaths.Contains(path))
+                .Select(path => new Calor.Compiler.CodeGen.GeneratedCSharpSource(
+                    File.ReadAllText(path), path))
+                .ToList();
+            var validation = Calor.Compiler.CodeGen.GeneratedCSharpCompiler.Validate(
+                generatedSources,
+                new Calor.Compiler.CodeGen.GeneratedCSharpCompilationContext
+                {
+                    ReferencePaths = referencedAssemblyInputs
+                        .Where(reference => reference.IsUsable)
+                        .Select(reference => reference.Path),
+                    AdditionalSources = projectSources,
+                    AllowUnsafe = AllowUnsafeBlocks,
+                    OutputKind = ParseOutputKind(ProjectOutputType),
+                    LanguageVersion = ParseLanguageVersion(LanguageVersion),
+                    IncludeImplicitGlobalUsings = IsImplicitUsingsEnabled(ImplicitUsings),
+                    AnalyzerPaths = AnalyzerAssemblies
+                        .Select(item => item.GetMetadata("FullPath") is { Length: > 0 } fullPath
+                            ? fullPath
+                            : item.ItemSpec),
+                    AdditionalFilePaths = AdditionalFiles
+                        .Select(item => item.GetMetadata("FullPath") is { Length: > 0 } fullPath
+                            ? fullPath
+                            : item.ItemSpec),
+                    NullableContextOptions = ParseNullableContextOptions(Nullable),
+                    TreatWarningsAsErrors = TreatWarningsAsErrors,
+                    AnalyzerConfigPath = AnalyzerConfigPath,
+                    PreprocessorSymbols = DefineConstants.Split(
+                        [';', ','],
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                });
+            if (!validation.CompilationSuccess)
+            {
+                generatedValidationFailed = true;
+                success = false;
+                var diagnostics = new DiagnosticBag();
+                Program.AddGeneratedOutputDiagnostics(
+                    validation,
+                    diagnostics,
+                    generatedSources[0].Path);
+                foreach (var diagnostic in diagnostics)
+                {
+                    LogDiagnostic(
+                        diagnostic.Code,
+                        "error",
+                        diagnostic.Message,
+                        diagnostic.FilePath ?? generatedSources[0].Path,
+                        diagnostic.Span.Line,
+                        diagnostic.Span.Column);
+                }
+
+                foreach (var pending in pendingOutputs)
+                {
+                    if (File.Exists(pending.OutputPath))
+                    {
+                        try { File.Delete(pending.OutputPath); } catch { /* best-effort */ }
+                    }
+                }
+            }
+        }
+
+        if (!generatedValidationFailed)
+        {
+            foreach (var pending in pendingOutputs)
+            {
+                try
+                {
+                    File.WriteAllBytes(pending.OutputPath, pending.GeneratedBytes);
+                    CacheTestHook?.Invoke(
+                        pending.InputPath, CompileCalorTestPhase.BeforeCacheEntrySaved);
+                    if (!TranspileOnly)
+                    {
+                        newState.Files[pending.RelativePath] = pending.CacheEntry;
+                    }
+
+                    var item = new TaskItem(pending.OutputPath);
+                    item.SetMetadata("SourceFile", pending.InputPath);
+                    generatedFiles.Add(item);
+                    Log.LogMessage(
+                        MessageImportance.Normal, "Generated: {0}", pending.OutputPath);
+                }
+                catch (Exception ex)
+                {
+                    Log.LogError(
+                        "Failed to write generated output for {0}: {1}",
+                        pending.InputPath,
+                        ex.Message);
+                    if (File.Exists(pending.OutputPath))
+                    {
+                        try { File.Delete(pending.OutputPath); } catch { /* best-effort */ }
+                    }
+                    success = false;
+                }
             }
         }
 
@@ -859,7 +1047,10 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
         // 6. Save new cache state
         try
         {
-            BuildStateCache.Save(newState, OutputDirectory);
+            if (!TranspileOnly && !generatedValidationFailed)
+            {
+                BuildStateCache.Save(newState, OutputDirectory);
+            }
         }
         catch (Exception ex)
         {
@@ -878,7 +1069,7 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             }
         }
 
-        GeneratedFiles = generatedFiles.ToArray();
+        GeneratedFiles = generatedValidationFailed ? [] : generatedFiles.ToArray();
         return success;
         }
         finally
@@ -941,4 +1132,34 @@ public sealed class CompileCalor : Microsoft.Build.Utilities.Task
             new MemoryStream(bytes), Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
         return reader.ReadToEnd();
     }
+
+    private static Microsoft.CodeAnalysis.OutputKind ParseOutputKind(string outputType)
+        => outputType.ToLowerInvariant() switch
+        {
+            "exe" => Microsoft.CodeAnalysis.OutputKind.ConsoleApplication,
+            "winexe" => Microsoft.CodeAnalysis.OutputKind.WindowsApplication,
+            _ => Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary
+        };
+
+    private static Microsoft.CodeAnalysis.CSharp.LanguageVersion ParseLanguageVersion(
+        string languageVersion)
+        => Microsoft.CodeAnalysis.CSharp.LanguageVersionFacts.TryParse(
+            languageVersion,
+            out var parsed)
+            ? parsed
+            : Microsoft.CodeAnalysis.CSharp.LanguageVersion.Default;
+
+    private static bool IsImplicitUsingsEnabled(string value)
+        => value.Equals("enable", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("true", StringComparison.OrdinalIgnoreCase);
+
+    private static Microsoft.CodeAnalysis.NullableContextOptions ParseNullableContextOptions(
+        string value)
+        => value.ToLowerInvariant() switch
+        {
+            "enable" => Microsoft.CodeAnalysis.NullableContextOptions.Enable,
+            "warnings" => Microsoft.CodeAnalysis.NullableContextOptions.Warnings,
+            "annotations" => Microsoft.CodeAnalysis.NullableContextOptions.Annotations,
+            _ => Microsoft.CodeAnalysis.NullableContextOptions.Disable
+        };
 }
