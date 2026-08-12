@@ -62,7 +62,8 @@ public sealed class ContractTranslator
     /// <summary>
     /// Tracks metadata for bit-vector expressions (width and signedness).
     /// </summary>
-    private readonly Dictionary<Expr, BitVecInfo> _exprInfo = new();
+    private readonly Dictionary<Expr, BitVecInfo> _exprInfo =
+        new(ReferenceEqualityComparer.Instance);
 
     private record struct BitVecInfo(uint Width, bool IsSigned);
 
@@ -657,9 +658,10 @@ public sealed class ContractTranslator
     {
         // Shift counts wider than 32 bits have no C# typing (the count operand
         // must convert to int); refuse rather than guess (review #833 C3).
-        if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift && right.SortSize > 32)
+        if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift
+            && (right.SortSize > 32 || right.SortSize == 32 && !IsSigned(right)))
         {
-            return "a shift count wider than 32 bits has no C# typing (the count must be an int)";
+            return "the shift count is not implicitly convertible to int";
         }
 
         // Genuinely-mixed signedness (no literal rescue) below 64 bits is MODELED
@@ -743,7 +745,7 @@ public sealed class ContractTranslator
     private BitVecExpr ConvertIntegral(BitVecExpr operand, uint targetWidth, bool targetSigned)
     {
         if (operand.SortSize == targetWidth)
-            return TrackBitVec(operand, targetWidth, targetSigned);
+            return operand;
 
         var converted = IsSigned(operand)
             ? _ctx.MkSignExt(targetWidth - operand.SortSize, operand)

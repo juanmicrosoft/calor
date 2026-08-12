@@ -11,9 +11,39 @@ public sealed class NumericExecutableSemanticsTests
 {
     private static readonly TextSpan Span = TextSpan.Empty;
     private static readonly AttributeCollection Attributes = new();
+    private static readonly BinaryOperator[] Operators =
+    [
+        BinaryOperator.Add,
+        BinaryOperator.Subtract,
+        BinaryOperator.Multiply,
+        BinaryOperator.Divide,
+        BinaryOperator.Modulo,
+        BinaryOperator.Equal,
+        BinaryOperator.NotEqual,
+        BinaryOperator.LessThan,
+        BinaryOperator.LessOrEqual,
+        BinaryOperator.GreaterThan,
+        BinaryOperator.GreaterOrEqual,
+        BinaryOperator.BitwiseAnd,
+        BinaryOperator.BitwiseOr,
+        BinaryOperator.BitwiseXor,
+        BinaryOperator.LeftShift,
+        BinaryOperator.RightShift
+    ];
 
-    public static IEnumerable<object[]> IntegralPromotionCases()
+    [SkippableFact]
+    public void IntegralOperatorsMatchExecutableCSharpSemantics()
     {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        IntegralOperatorsMatchExecutableCSharpSemanticsCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void IntegralOperatorsMatchExecutableCSharpSemanticsCore()
+    {
+        using var context = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(context);
+
         foreach (var (leftType, leftValues) in IntegralValues())
         {
             foreach (var (rightType, rightValues) in IntegralValues())
@@ -21,85 +51,164 @@ public sealed class NumericExecutableSemanticsTests
                 foreach (var left in leftValues)
                 {
                     foreach (var right in rightValues)
-                        yield return [leftType, left, rightType, right];
+                    {
+                        foreach (var op in Operators)
+                            VerifyCase(verifier, leftType, left, rightType, right, op);
+                    }
+                }
+
+            }
+        }
+    }
+
+    [SkippableFact]
+    public void UnaryNegationMatchesExecutableCSharpSemantics()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        UnaryNegationMatchesExecutableCSharpSemanticsCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void UnaryNegationMatchesExecutableCSharpSemanticsCore()
+    {
+        using var context = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(context);
+
+        foreach (var (type, values) in IntegralValues())
+        {
+            foreach (var value in values)
+            {
+                object? runtimeResult = null;
+                Exception? runtimeError = null;
+                try
+                {
+                    dynamic operand = value;
+                    runtimeResult = -operand;
+                }
+                catch (Exception error) when (error is RuntimeBinderException or OverflowException)
+                {
+                    runtimeError = error;
+                }
+
+                var negation = new UnaryOperationNode(
+                    Span,
+                    UnaryOperator.Negate,
+                    Reference("value"));
+                var result = verifier.VerifyPostcondition(
+                    [("value", type)],
+                    "bool",
+                    [Requires(Equal(Reference("value"), Literal(value)))],
+                    Ensures(Equal(negation, Literal(runtimeResult ?? 0))));
+                var label = $"-{type}({value})";
+
+                if (runtimeError is RuntimeBinderException)
+                {
+                    Assert.True(
+                        result.Status == ContractVerificationStatus.Unsupported,
+                        $"{label}: C# rejects the expression but verification returned {result.Status}");
+                }
+                else if (runtimeError is not null)
+                {
+                    Assert.True(
+                        result.Status != ContractVerificationStatus.Proven,
+                        $"{label}: C# throws {runtimeError.GetType().Name} but verification returned Proven");
+                }
+                else
+                {
+                    Assert.True(
+                        result.Status == ContractVerificationStatus.Proven,
+                        $"{label}: expected Proven, got {result.Status}: {result.CounterexampleDescription}");
                 }
             }
         }
     }
 
-    [SkippableTheory]
-    [MemberData(nameof(IntegralPromotionCases))]
-    public void AdditionMatchesExecutableCSharpPromotion(
+    private static void VerifyCase(
+        Z3Verifier verifier,
         string leftType,
         object leftValue,
         string rightType,
-        object rightValue)
+        object rightValue,
+        BinaryOperator op)
     {
-        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        AdditionMatchesExecutableCSharpPromotionCore(
-            leftType,
-            leftValue,
-            rightType,
-            rightValue);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void AdditionMatchesExecutableCSharpPromotionCore(
-        string leftType,
-        object leftValue,
-        string rightType,
-        object rightValue)
-    {
-        using var context = Z3ContextFactory.Create();
-        using var verifier = new Z3Verifier(context);
-
         object? runtimeResult = null;
-        RuntimeBinderException? runtimeError = null;
+        Exception? runtimeError = null;
         try
         {
-            runtimeResult = AddDynamic(leftValue, rightValue);
+            runtimeResult = EvaluateDynamic(leftValue, rightValue, op);
         }
-        catch (RuntimeBinderException error)
+        catch (Exception error) when (error is RuntimeBinderException
+                                      or DivideByZeroException
+                                      or OverflowException)
         {
             runtimeError = error;
         }
 
-        var parameters = new List<(string Name, string TypeName)>
-        {
-            ("left", leftType),
-            ("right", rightType)
-        };
-        var preconditions = new[]
-        {
-            Requires(Equal(Reference("left"), Literal(leftValue))),
-            Requires(Equal(Reference("right"), Literal(rightValue)))
-        };
-        var sum = new BinaryOperationNode(
+        var operation = new BinaryOperationNode(
             Span,
-            BinaryOperator.Add,
+            op,
             Reference("left"),
             Reference("right"));
-        var postcondition = Ensures(Equal(sum, Literal(runtimeResult ?? 0)));
+        ExpressionNode condition = runtimeResult is bool expectedBoolean
+            ? expectedBoolean
+                ? operation
+                : new UnaryOperationNode(Span, UnaryOperator.Not, operation)
+            : Equal(operation, Literal(runtimeResult ?? 0));
         var result = verifier.VerifyPostcondition(
-            parameters,
+            [("left", leftType), ("right", rightType)],
             "bool",
-            preconditions,
-            postcondition);
+            [
+                Requires(Equal(Reference("left"), Literal(leftValue))),
+                Requires(Equal(Reference("right"), Literal(rightValue)))
+            ],
+            Ensures(condition));
 
-        if (runtimeError is not null)
+        var label = $"{leftType}({leftValue}) {op} {rightType}({rightValue})";
+        if (runtimeError is RuntimeBinderException)
         {
-            Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+            Assert.True(
+                result.Status == ContractVerificationStatus.Unsupported,
+                $"{label}: C# rejects the expression but verification returned {result.Status}");
             return;
         }
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        if (runtimeError is not null)
+        {
+            Assert.True(
+                result.Status != ContractVerificationStatus.Proven,
+                $"{label}: C# throws {runtimeError.GetType().Name} but verification returned Proven");
+            return;
+        }
+
+        Assert.True(
+            result.Status == ContractVerificationStatus.Proven,
+            $"{label}: expected Proven, got {result.Status}: {result.CounterexampleDescription}");
     }
 
-    private static object AddDynamic(object left, object right)
+    private static object EvaluateDynamic(object left, object right, BinaryOperator op)
     {
         dynamic dynamicLeft = left;
         dynamic dynamicRight = right;
-        return dynamicLeft + dynamicRight;
+        return op switch
+        {
+            BinaryOperator.Add => dynamicLeft + dynamicRight,
+            BinaryOperator.Subtract => dynamicLeft - dynamicRight,
+            BinaryOperator.Multiply => dynamicLeft * dynamicRight,
+            BinaryOperator.Divide => dynamicLeft / dynamicRight,
+            BinaryOperator.Modulo => dynamicLeft % dynamicRight,
+            BinaryOperator.Equal => dynamicLeft == dynamicRight,
+            BinaryOperator.NotEqual => dynamicLeft != dynamicRight,
+            BinaryOperator.LessThan => dynamicLeft < dynamicRight,
+            BinaryOperator.LessOrEqual => dynamicLeft <= dynamicRight,
+            BinaryOperator.GreaterThan => dynamicLeft > dynamicRight,
+            BinaryOperator.GreaterOrEqual => dynamicLeft >= dynamicRight,
+            BinaryOperator.BitwiseAnd => dynamicLeft & dynamicRight,
+            BinaryOperator.BitwiseOr => dynamicLeft | dynamicRight,
+            BinaryOperator.BitwiseXor => dynamicLeft ^ dynamicRight,
+            BinaryOperator.LeftShift => dynamicLeft << dynamicRight,
+            BinaryOperator.RightShift => dynamicLeft >> dynamicRight,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, null)
+        };
     }
 
     private static IEnumerable<(string Type, object[] Values)> IntegralValues()
@@ -132,14 +241,9 @@ public sealed class NumericExecutableSemanticsTests
         short number => new IntLiteralNode(Span, number),
         ushort number => new IntLiteralNode(Span, number),
         int number => new IntLiteralNode(Span, number),
-        uint number => new IntLiteralNode(Span, number, isHex: false, isUnsigned: true, number),
+        uint number => new IntLiteralNode(Span, number, false, true, number),
         long number => new IntLiteralNode(Span, number) { IsLong = true },
-        ulong number => new IntLiteralNode(
-            Span,
-            unchecked((long)number),
-            isHex: false,
-            isUnsigned: true,
-            number)
+        ulong number => new IntLiteralNode(Span, unchecked((long)number), false, true, number)
         {
             IsLong = true
         },
