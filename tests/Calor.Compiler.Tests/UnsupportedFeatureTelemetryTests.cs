@@ -125,7 +125,7 @@ public class UnsupportedFeatureTelemetryTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = true });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success);
@@ -151,6 +151,7 @@ public class UnsupportedFeatureTelemetryTests
 
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             GracefulFallback = true
         });
 
@@ -405,7 +406,7 @@ public class UnsupportedFeatureTelemetryTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = true });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success);

@@ -481,7 +481,7 @@ public class CharOperationTests
     {
         // The C# to Calor converter converts char static methods to char operations
         var csharp = $"public class Test {{ public object M(char c) {{ return {csharpExpr}; }} }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -498,7 +498,7 @@ public class CharOperationTests
         // The C# to Calor converter converts (int)c to char-code
         // Verify the CalorEmitter produces the expected output
         var csharp = "public class Test { public int M(char c) { return (int)c; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -514,7 +514,7 @@ public class CharOperationTests
     {
         // The C# to Calor converter converts (char)n to char-from-code
         var csharp = "public class Test { public char M(int n) { return (char)n; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -531,7 +531,7 @@ public class CharOperationTests
         // Without semantic model, variable indexing defaults to §IDX (not char-at)
         // Only string literals produce char-at
         var csharp = "public class Test { public char M(string s) { return s[0]; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -546,7 +546,7 @@ public class CharOperationTests
     {
         // Without semantic model, variable indexing defaults to §IDX (not char-at)
         var csharp = "public class Test { public char M(string s, int i) { return s[i]; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -567,7 +567,7 @@ public class CharOperationTests
     public void Migration_CharOperation_RoundTripsToCalor(string csharpExpr, string expectedCalorOp)
     {
         var csharp = $"public class Test {{ public object M(char c) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -583,7 +583,7 @@ public class CharOperationTests
     {
         // String literal indexing should produce char-at
         var csharp = "public class Test { public char M() { return \"hello\"[0]; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -598,7 +598,7 @@ public class CharOperationTests
     public void Migration_CharCode_RoundTripsToCalor()
     {
         var csharp = "public class Test { public int M(char c) { return (int)c; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -613,7 +613,7 @@ public class CharOperationTests
     public void Migration_CharFromCode_RoundTripsToCalor()
     {
         var csharp = "public class Test { public char M(int n) { return (char)n; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -629,7 +629,7 @@ public class CharOperationTests
     {
         // Test cross-category: char.IsLetter(s.ToUpper()[0])
         var csharp = "public class Test { public bool M(string s) { return char.IsLetter(s.ToUpper()[0]); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -649,7 +649,7 @@ public class CharOperationTests
     {
         // (int)someDouble should NOT become char-code - it's a numeric conversion
         var csharp = "public class Test { public int M(double d) { return (int)d; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -666,7 +666,7 @@ public class CharOperationTests
     {
         // (char)someObject should NOT become char-from-code without more context
         var csharp = "public class Test { public char M(object obj) { return (char)obj; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));

@@ -542,7 +542,7 @@ public class GenericSyntaxTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
@@ -564,7 +564,7 @@ public class GenericSyntaxTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
@@ -584,7 +584,7 @@ public class GenericSyntaxTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
@@ -609,7 +609,7 @@ public class GenericSyntaxTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
@@ -634,7 +634,7 @@ public class GenericSyntaxTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));

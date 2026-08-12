@@ -751,7 +751,7 @@ public class Test
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { Mode = ConversionMode.Interop });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, Mode = ConversionMode.Interop });
         var result = converter.Convert(csharp);
         Assert.True(result.Success, GetErrorMessage(result));
 

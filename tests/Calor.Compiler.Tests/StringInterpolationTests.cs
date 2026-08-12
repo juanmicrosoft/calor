@@ -118,7 +118,7 @@ public static class Formatting
     public static string Format(int a, int b) => $""{a} + {b} = {a + b}"";
 }
 ";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var conversionResult = converter.Convert(csharp, "test.cs");
         Assert.True(conversionResult.Success,
             $"Conversion failed: {string.Join("; ", conversionResult.Issues.Select(i => i.Message))}");
@@ -147,7 +147,7 @@ public static class MultiLine
     public static string Format(string title, string body) => $""Title: {title}\nBody: {body}"";
 }
 ";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var conversionResult = converter.Convert(csharp, "test.cs");
         Assert.True(conversionResult.Success,
             $"Conversion failed: {string.Join("; ", conversionResult.Issues.Select(i => i.Message))}");
@@ -171,7 +171,7 @@ public static class NumberFormat
     public static string FormatNumber(double value) => $""Value: {value:F2}"";
 }
 ";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var conversionResult = converter.Convert(csharp, "test.cs");
         Assert.True(conversionResult.Success,
             $"Conversion failed: {string.Join("; ", conversionResult.Issues.Select(i => i.Message))}");

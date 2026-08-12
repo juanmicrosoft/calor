@@ -1156,7 +1156,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = true });
         var result = converter.Convert(csharpSource);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -1183,7 +1183,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = false });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = false });
         var result = converter.Convert(csharpSource);
 
         // __makeref is now supported, so conversion should succeed
@@ -1232,7 +1232,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharpSource);
 
         Assert.True(result.Success);
@@ -1253,7 +1253,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var conversionResult = converter.Convert(csharpSource);
 
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
@@ -1314,7 +1314,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var conversionResult = converter.Convert(csharpSource);
 
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
@@ -4000,8 +4000,8 @@ public class CSharpToCalorConversionTests
             """;
 
         // Same module name = same namespace — should merge
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "MyApp" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "MyApp" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 
@@ -4062,8 +4062,8 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Reg" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Other" }).Convert(csharp2);
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "Reg" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "Other" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 
@@ -4093,8 +4093,8 @@ public class CSharpToCalorConversionTests
             """;
 
         // Different module names = different namespaces — should NOT merge
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "App.Models" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "App.Views" }).Convert(csharp2);
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "App.Models" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "App.Views" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 

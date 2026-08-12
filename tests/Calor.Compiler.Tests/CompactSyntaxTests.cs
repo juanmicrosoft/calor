@@ -918,7 +918,7 @@ public class CompactSyntaxTests
             """;
 
         // Step 1: C# -> Calor AST
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var convResult = converter.Convert(csharpSource);
         Assert.True(convResult.Success,
             $"C# to Calor conversion failed: {string.Join("\n", convResult.Issues.Select(i => i.Message))}");
@@ -954,7 +954,7 @@ public class CompactSyntaxTests
             """;
 
         // Step 1: C# -> Calor AST
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var convResult = converter.Convert(csharpSource);
         Assert.True(convResult.Success,
             $"C# to Calor conversion failed: {string.Join("\n", convResult.Issues.Select(i => i.Message))}");
@@ -993,7 +993,7 @@ public class CompactSyntaxTests
             """;
 
         // Step 1: C# -> Calor AST
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var convResult = converter.Convert(csharpSource);
         Assert.True(convResult.Success,
             $"C# to Calor conversion failed: {string.Join("\n", convResult.Issues.Select(i => i.Message))}");

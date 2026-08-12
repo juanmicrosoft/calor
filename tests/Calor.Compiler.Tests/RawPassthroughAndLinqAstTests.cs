@@ -124,7 +124,7 @@ public class RawPassthroughAndLinqAstTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         // The conversion should succeed (no exceptions)
@@ -159,7 +159,7 @@ public class RawPassthroughAndLinqAstTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.NotNull(result.Ast);
@@ -196,7 +196,7 @@ public class RawPassthroughAndLinqAstTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.NotNull(result.Ast);
@@ -231,7 +231,7 @@ public class RawPassthroughAndLinqAstTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.NotNull(result.Ast);

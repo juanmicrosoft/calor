@@ -286,7 +286,7 @@ public class EventAccessorTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -314,7 +314,7 @@ public class EventAccessorTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -343,7 +343,7 @@ public class EventAccessorTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));

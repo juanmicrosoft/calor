@@ -41,7 +41,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = true });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -130,7 +130,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = true });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -402,7 +402,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = true });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -431,7 +431,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = true });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -516,7 +516,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = true });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));

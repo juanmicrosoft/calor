@@ -968,7 +968,7 @@ public class CodeGenBugFixTests
     public void Array_CSharpInit_EmitterRoundTrip()
     {
         // C# array init → converter → Calor → parse → emit C#
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var conversionResult = converter.Convert("int[] nums = new int[] { 1, 2, 3 };");
 
         Assert.True(conversionResult.Success,

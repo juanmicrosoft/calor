@@ -11,7 +11,7 @@ public class CalorEmitterEscapeTests
 {
     private static string ConvertToCalor(string csharpSource)
     {
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharpSource);
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => $"[{i.Severity}] {i.Message}")));
         Assert.NotNull(result.CalorSource);

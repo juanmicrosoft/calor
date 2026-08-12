@@ -317,7 +317,7 @@ public class TypeOperationTests
     public void Migration_CSharpCast_ConvertsToTypeOperationNode()
     {
         var csharp = "public class Test { public int M(object x) { return (int)x; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -332,7 +332,7 @@ public class TypeOperationTests
     public void Migration_CSharpIs_ConvertsToTypeOperationNode()
     {
         var csharp = "public class Test { public bool M(object x) { return x is string; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -347,7 +347,7 @@ public class TypeOperationTests
     public void Migration_CSharpAs_ConvertsToTypeOperationNode()
     {
         var csharp = "public class Test { public string M(object x) { return x as string; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -362,7 +362,7 @@ public class TypeOperationTests
     public void Migration_CSharpCast_RoundTripsToCalor()
     {
         var csharp = "public class Test { public int M(object x) { return (int)x; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -377,7 +377,7 @@ public class TypeOperationTests
     public void Migration_CSharpAs_RoundTripsToCalor()
     {
         var csharp = "public class Test { public string M(object x) { return x as string; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -392,7 +392,7 @@ public class TypeOperationTests
     public void Migration_CSharpIs_RoundTripsToCalor()
     {
         var csharp = "public class Test { public bool M(object x) { return x is string; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -408,7 +408,7 @@ public class TypeOperationTests
     {
         // "x is string s" — declaration pattern, variable binding is not preserved but type check is
         var csharp = "public class Test { public bool M(object x) { if (x is string s) return true; return false; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));

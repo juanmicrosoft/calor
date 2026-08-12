@@ -300,7 +300,7 @@ public class RegexOperationTests
         var csharp = $@"
 using System.Text.RegularExpressions;
 public class Test {{ public object M(string s) {{ return {csharpExpr}; }} }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -318,7 +318,7 @@ public class Test {{ public object M(string s) {{ return {csharpExpr}; }} }}";
         var csharp = @"
 using System.Text.RegularExpressions;
 public class Test { public string M(string s) { return Regex.Replace(s, ""\\s+"", ""-""); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -335,7 +335,7 @@ public class Test { public string M(string s) { return Regex.Replace(s, ""\\s+""
         // The C# to Calor converter converts fully qualified Regex.IsMatch
         var csharp = @"
 public class Test { public bool M(string s) { return System.Text.RegularExpressions.Regex.IsMatch(s, ""\\d+""); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -356,7 +356,7 @@ public class Test { public bool M(string s) { return System.Text.RegularExpressi
         var csharp = $@"
 using System.Text.RegularExpressions;
 public class Test {{ public object M(string s) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
