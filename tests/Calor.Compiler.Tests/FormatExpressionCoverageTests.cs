@@ -113,7 +113,10 @@ public class FormatExpressionCoverageTests
                 }
             }
             """;
-        var converter = new Migration.CSharpToCalorConverter();
+        var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions
+        {
+            Fidelity = Migration.ConversionFidelity.Lossy
+        });
         var convResult = converter.Convert(csharp);
         Assert.True(convResult.Success, string.Join("\n", convResult.Issues.Select(i => i.ToString())));
 
@@ -381,7 +384,10 @@ public class FormatExpressionCoverageTests
                 }
             }
             """;
-        var converter = new Migration.CSharpToCalorConverter();
+        var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions
+        {
+            Fidelity = Migration.ConversionFidelity.Lossy
+        });
         var convResult = converter.Convert(csharp);
         Assert.True(convResult.Success, string.Join("\n", convResult.Issues.Select(i => i.ToString())));
 
