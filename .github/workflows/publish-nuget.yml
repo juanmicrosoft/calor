@@ -64,7 +64,22 @@ jobs:
   sdk-consumer:
     # M-A1: a template consumer restores/builds/tests green against the
     # packaged Calor.Sdk from a local feed (wedge plan v0.11 D-W1.2, PP-A1).
-    runs-on: ubuntu-latest
+    name: sdk-consumer (${{ matrix.rid }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            rid: linux-x64
+          - runner: ubuntu-24.04-arm
+            rid: linux-arm64
+          - runner: macos-14
+            rid: osx-arm64
+          - runner: windows-latest
+            rid: win-x64
+          - runner: windows-11-arm
+            rid: win-arm64
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
@@ -78,6 +93,8 @@ jobs:
       - name: Run M-A1 consumer check
         env:
           CALOR_SDK_REQUIRE_ALL_RIDS: "1"
+          CALOR_SDK_VERSION: ${{ github.event.inputs.version }}
+          CALOR_SDK_EXPECTED_RID: ${{ matrix.rid }}
         run: bash .github/scripts/test-sdk-package.sh
 
   publish:
@@ -103,7 +120,6 @@ jobs:
           mkdir -p src/Calor.Compiler/runtimes/linux-arm64/native
           mkdir -p src/Calor.Compiler/runtimes/osx-arm64/native
           mkdir -p src/Calor.Compiler/runtimes/win-x64/native
-          mkdir -p src/Calor.Compiler/runtimes/win-x86/native
           mkdir -p src/Calor.Compiler/runtimes/win-arm64/native
 
           # W1 Slice 2 (#789): fail-closed, checksum-verified downloads. The old
@@ -117,6 +133,9 @@ jobs:
           fi
 
           STAGING="$(mktemp -d)"
+          # The checksum manifest also tracks the standalone win-x86 Z3 build,
+          # but .NET 10 has no x86 SDK, so that asset is verified but not staged
+          # into Calor packages.
           ASSETS="Microsoft.Z3.dll libz3-linux-x64.so libz3-linux-arm64.so libz3-osx-arm64.dylib libz3-win-x64.dll libz3-win-x86.dll libz3-win-arm64.dll"
           for asset in $ASSETS; do
             curl -fL -sS --retry 5 --retry-delay 3 -o "$STAGING/$asset" "${RELEASE_URL}/${asset}"
@@ -129,7 +148,6 @@ jobs:
           mv "$STAGING/libz3-linux-arm64.so"  src/Calor.Compiler/runtimes/linux-arm64/native/libz3.so
           mv "$STAGING/libz3-osx-arm64.dylib" src/Calor.Compiler/runtimes/osx-arm64/native/libz3.dylib
           mv "$STAGING/libz3-win-x64.dll"     src/Calor.Compiler/runtimes/win-x64/native/libz3.dll
-          mv "$STAGING/libz3-win-x86.dll"     src/Calor.Compiler/runtimes/win-x86/native/libz3.dll
           mv "$STAGING/libz3-win-arm64.dll"   src/Calor.Compiler/runtimes/win-arm64/native/libz3.dll
 
           echo "Downloaded and checksum-verified Z3 binaries:"

@@ -93,6 +93,18 @@ jobs:
           --filter "FullyQualifiedName~EditScriptIdentityTests"
           --verbosity normal
 
+      - name: Run corpus binder ratchet
+        run: |
+          set -euo pipefail
+          dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj \
+            -c Release --no-build \
+            --filter "FullyQualifiedName~BinderIncompleteRatchetTests.ConversionLeg_IncompleteCount_MatchesBaseline" \
+            --verbosity normal 2>&1 | tee binder-ratchet.log
+          if grep -q "corpus submodules not initialized" binder-ratchet.log; then
+            echo "::error::Corpus binder ratchet skipped despite recursive checkout."
+            exit 1
+          fi
+
       # §2.2 dogfood utility: built from .calr through Calor.Sdk and then RUN,
       # against this repository's own allowlist. Building it proves the SDK path
       # works; running it is what makes the repo actually depend on a Calor
@@ -117,33 +129,6 @@ jobs:
           -c Release --no-build
           --filter "FullyQualifiedName~RenameHarnessTests"
           --verbosity normal
-
-      - name: Run all tests
-        run: |
-          set -euo pipefail
-          # Avoid nested project-level and xUnit parallelism exhausting 2-core runners.
-          (dotnet test -c Release --no-build --verbosity normal -m:1 2>&1 | tee test-output.log) &
-          test_pid=$!
-          while kill -0 "$test_pid" 2>/dev/null; do
-            sleep 30
-            echo "Tests are still running..."
-          done
-          wait "$test_pid"
-
-      # Assert the PROPERTY that matters (no Z3-gated test skipped), not the presence of a
-      # filename. An earlier version of this step checked only that some libz3.so existed
-      # anywhere under bin/Release, which would pass on a wrong-RID copy that cannot load,
-      # and could not detect a present-but-unloadable native (e.g. a glibc bump on the
-      # runner). This check fails in all of those cases. Without it the regression is
-      # invisible by construction: the tests skip rather than fail.
-      - name: Assert no Z3-gated test silently skipped
-        run: |
-          set -euo pipefail
-          if grep -q "Z3 not available" test-output.log; then
-            echo "::error::Z3-gated tests skipped — natives did not reach the test hosts."
-            grep -c "Z3 not available" test-output.log
-            exit 1
-          fi
 
       # F-4 / #779: generated solver-vs-runtime differential. This blocking Fact
       # fails rather than skips when Z3 is unavailable. It verifies the frozen
@@ -180,8 +165,56 @@ jobs:
       - name: Check agent-facing docs against the implementation (spec drift)
         run: dotnet run --project src/Calor.Compiler -c Release --no-build -- self-check docs
 
+  remaining-tests:
+    name: tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: conversion
+            project: tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj
+          - name: experimental
+            project: tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj
+          - name: il-analysis
+            project: tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj
+          - name: language-server
+            project: tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj
+          - name: roundtrip-harness
+            project: tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj
+          - name: tasks
+            project: tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj
+          - name: verification
+            project: tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Seed before MSBuild evaluation so any Z3-backed project receives its
+      # native runtime asset instead of silently skipping verification tests.
+      - name: Seed Z3 native libraries
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
+      - name: Run project tests
+        run: |
+          set -euo pipefail
+          dotnet test "${{ matrix.project }}" -c Release --verbosity normal 2>&1 | tee test-output.log
+          if grep -q "Z3 not available" test-output.log; then
+            echo "::error::Z3-gated tests skipped — natives did not reach this test host."
+            grep -c "Z3 not available" test-output.log
+            exit 1
+          fi
+
   enforcement-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -212,8 +245,8 @@ jobs:
           dotnet test tests/Calor.Compiler.Tests -c Release --no-build --verbosity normal 2>&1 | tee test-output.log
           dotnet test tests/Calor.Evaluation -c Release --no-build --verbosity normal
 
-      # This job runs Calor.Compiler.Tests, which carries 44 Z3-gated tests. Same guard as
-      # the `test` job — a skip here would otherwise be silent.
+      # This job runs Calor.Compiler.Tests, which carries 44 Z3-gated tests.
+      # A skip here would otherwise be silent.
       - name: Assert no Z3-gated test silently skipped
         run: |
           set -euo pipefail
@@ -583,7 +616,22 @@ jobs:
     # consumer project restores, builds, and tests green against the PACKAGED
     # Calor.Sdk from a local feed — never a source-tree ProjectReference.
     # Includes package-content inspection and the in-task Z3 verify canary.
-    runs-on: ubuntu-latest
+    name: sdk-package-consumer (${{ matrix.rid }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            rid: linux-x64
+          - runner: ubuntu-24.04-arm
+            rid: linux-arm64
+          - runner: macos-14
+            rid: osx-arm64
+          - runner: windows-latest
+            rid: win-x64
+          - runner: windows-11-arm
+            rid: win-arm64
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
@@ -599,6 +647,7 @@ jobs:
           # download-z3.sh populates all supported RIDs on CI, so the packed
           # nupkg must carry every one of them.
           CALOR_SDK_REQUIRE_ALL_RIDS: "1"
+          CALOR_SDK_EXPECTED_RID: ${{ matrix.rid }}
         run: bash .github/scripts/test-sdk-package.sh
 
   verify-phase1:

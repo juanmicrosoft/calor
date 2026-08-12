@@ -1,8 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk;Calor.Sdk/CALOR_SDK_VERSION_PLACEHOLDER">
 
-  <!-- The Calor MSBuild SDK, resolved from the package feed via
-       global.json msbuild-sdks — NOT a source-tree reference. -->
-  <Sdk Name="Calor.Sdk" />
+  <!-- Explicitly versioned package SDK reference — never a source-tree reference
+       and never an implicit global.json msbuild-sdks mapping. -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

@@ -140,8 +140,6 @@ public static class Z3ContextFactory
                 libPaths.Add(Path.Combine(basePath, "libz3.dylib"));
                 if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
                     libPaths.Add(Path.Combine(basePath, "runtimes", "osx-arm64", "native", "libz3.dylib"));
-                else
-                    libPaths.Add(Path.Combine(basePath, "runtimes", "osx-x64", "native", "libz3.dylib"));
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {

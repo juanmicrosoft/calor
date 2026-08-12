@@ -76,7 +76,7 @@
   <Target Name="DownloadZ3" BeforeTargets="BeforeBuild" Condition="!Exists('$(Z3Dir)/.provenance') OR !Exists('$(Z3Dir)/Microsoft.Z3.dll') OR !Exists('$(Z3RuntimesDir)')">
     <Message Importance="high" Text="Downloading Z3 libraries..." />
     <Exec Command="bash &quot;$(MSBuildThisFileDirectory)scripts/download-z3.sh&quot;" Condition="'$(OS)' != 'Windows_NT'" />
-    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)scripts\download-z3.ps1&quot;" Condition="'$(OS)' == 'Windows_NT'" />
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildThisFileDirectory)scripts\download-z3.ps1&quot;" Condition="'$(OS)' == 'Windows_NT'" />
   </Target>
 
   <!-- Copy Microsoft.Z3.dll to output (skip during publish since Reference already includes it) -->
@@ -84,10 +84,13 @@
     <None Include="$(Z3Dir)\Microsoft.Z3.dll" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" Condition="Exists('$(Z3Dir)\Microsoft.Z3.dll')" />
   </ItemGroup>
 
-  <!-- Include Z3 native libraries for all platforms -->
+  <!-- Include Z3 native libraries for supported .NET 10 platforms.
+       osx-x64 has no valid upstream binary; win-x86 has no .NET 10 SDK. -->
   <!-- For global tools, these go to tools/net10.0/any/runtimes/ via CopyToOutputDirectory -->
   <ItemGroup>
-    <None Include="runtimes\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="runtimes\**\*"
+          Exclude="runtimes\osx-x64\**\*;runtimes\win-x86\**\*"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Also copy the current platform's native library to output root for P/Invoke discovery -->
