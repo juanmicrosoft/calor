@@ -175,7 +175,7 @@ async Task<int> RunCommand(string[] runArgs)
         }
         Console.WriteLine($"   Report: {mdPath}");
 
-        if (report.Comparison?.Regressions.Count > 0)
+        if (RoundTripExitPolicy.IsFailure(report))
             anyFailure = true;
     }
 

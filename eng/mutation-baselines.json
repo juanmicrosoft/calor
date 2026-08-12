@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "minimumScore": 100.0,
+  "mutants": [
+    {
+      "id": "verifier-modeled-form-gate",
+      "component": "verifier",
+      "file": "src/Calor.Compiler/Verification/Z3/Z3Verifier.cs",
+      "before": "if (!ModeledForms.TryValidate(contractExpr, out var gateOffending))",
+      "after": "if (ModeledForms.TryValidate(contractExpr, out var gateOffending))",
+      "project": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj",
+      "filter": "FullyQualifiedName~ModeledFormsTests.Verifier_GatesOutOfWhitelistContract_AsUnsupportedWithReason"
+    },
+    {
+      "id": "emitter-brace-escaping",
+      "component": "emitter",
+      "file": "src/Calor.Compiler/Migration/CalorEmitter.cs",
+      "before": "if (!input.Contains('{') && !input.Contains('}'))",
+      "after": "if (input.Contains('{') && input.Contains('}'))",
+      "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+      "filter": "FullyQualifiedName~CalorEmitterEscapeTests.EscapeBracesInIdentifier_PlainBraces_Escapes"
+    },
+    {
+      "id": "binder-expression-dispatch",
+      "component": "binder",
+      "file": "src/Calor.Compiler/Binding/Binder.cs",
+      "before": "            [typeof(AddressOfNode)] = static (binder, expression) => binder.BindAddressOf((AddressOfNode)expression),\n",
+      "after": "",
+      "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+      "filter": "FullyQualifiedName~BinderDispatchCompletenessTests.DispatchTable_CoversEveryConcreteExpressionNode_Exactly"
+    },
+    {
+      "id": "migration-structural-id-recognition",
+      "component": "migration",
+      "file": "src/Calor.Compiler/Migration/StructuralIdDropper.cs",
+      "before": "if (!AttributeHelper.LooksLikeId(firstPositional))",
+      "after": "if (AttributeHelper.LooksLikeId(firstPositional))",
+      "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+      "filter": "FullyQualifiedName~StructuralIdDropperTests.T_5_7_a_DropsModuleId"
+    },
+    {
+      "id": "dataflow-branch-transfer",
+      "component": "dataflow",
+      "file": "src/Calor.Compiler/Analysis/Dataflow/Analyses/LiveVariables.cs",
+      "before": "return result;",
+      "after": "return ImmutableHashSet<SymbolId>.Empty;",
+      "occurrence": 2,
+      "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+      "filter": "FullyQualifiedName~DataflowAnalysisTests.LiveVariables_VariableUsedInCondition_IsLive"
+    },
+    {
+      "id": "taint-user-input-default",
+      "component": "taint",
+      "file": "src/Calor.Compiler/Analysis/Security/TaintAnalysis.cs",
+      "before": "public bool TrackUserInput { get; init; } = true;",
+      "after": "public bool TrackUserInput { get; init; } = false;",
+      "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+      "filter": "FullyQualifiedName~TaintAnalysisTests.TaintAnalysisOptions_Default_TracksUserInput"
+    },
+    {
+      "id": "effects-subset-enforcement",
+      "component": "effects",
+      "file": "src/Calor.Compiler/Effects/EffectEnforcementPass.cs",
+      "before": "if (!computedEffects.IsSubsetOf(declaredEffects))",
+      "after": "if (computedEffects.IsSubsetOf(declaredEffects))",
+      "project": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj",
+      "filter": "FullyQualifiedName~EffectEnforcementTests.SelfRecursiveFunction_WithUndeclaredEffect_StillFails"
+    }
+  ]
+}

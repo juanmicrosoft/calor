@@ -360,25 +360,6 @@ public class SuggestionTests
         Assert.False(fixedResult.HasErrors, $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
     }
 
-    [Fact(Skip = "Phase 4d: mismatched-id concept removed under indent-only form")]
-    public void ApplyFix_MismatchedId_GeneratesFix()
-    {
-        // Source with mismatched ID
-        var source = "§M{m001:Test} §F{f001:Add} §O{i32} §R 42";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-        var fixDiagnostics = result.Diagnostics.DiagnosticsWithFixes
-            .Where(d => d.Code == DiagnosticCode.MismatchedId)
-            .ToList();
-        Assert.NotEmpty(fixDiagnostics);
-
-        // Verify fix has the right content (even if position needs improvement)
-        var fix = fixDiagnostics.First();
-        Assert.Contains("f001", fix.Fix.Description);
-        Assert.Equal("f001", fix.Fix.Edits[0].NewText);
-    }
-
     [Theory]
     [InlineData("§M{m001:Test} §F{f001:Fn} §O{bool} §R (cotains \"hello\" \"h\")", "cotains", "contains")]
     [InlineData("§M{m001:Test} §F{f001:Fn} §O{str} §R (uper \"hello\")", "uper", "upper")]
@@ -600,24 +581,6 @@ public class SuggestionTests
         Assert.Contains("MODUL", error.Message);
     }
 
-    [Fact(Skip = "Phase 4d: missing close tag concept removed under indent-only form")]
-    public void MissingCloseTag_GeneratesInsertFix()
-    {
-        // Missing closing tag should suggest inserting it
-        var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R 42";
-        var result = Program.Compile(source, "test.calr");
-
-        Assert.True(result.HasErrors);
-
-        // Should have fixes for missing closing tags
-        var fixDiagnostics = result.Diagnostics.DiagnosticsWithFixes;
-        Assert.NotEmpty(fixDiagnostics);
-
-        // Should suggest inserting closing tags
-        var insertFix = fixDiagnostics.FirstOrDefault(d => d.Fix.Description.Contains("Insert"));
-        Assert.NotNull(insertFix);
-    }
-
     [Theory]
     [InlineData("+", false)] // Valid operator
     [InlineData("-", false)]
@@ -695,44 +658,6 @@ public class SuggestionTests
         var fixedSource = ApplyFix(source, typoFix.Fix);
 
         // Step 4: Verify it compiles
-        var fixedResult = Program.Compile(fixedSource, "test.calr");
-        Assert.False(fixedResult.HasErrors,
-            $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");
-    }
-
-    /// <summary>
-    /// Tests that mismatched ID errors have fix suggestions with correct positions.
-    /// </summary>
-    [Fact(Skip = "Phase 4d: mismatched-id concept removed under indent-only form")]
-    public void AgentSimulation_MismatchedIdFix_HasCorrectPositionAndContent()
-    {
-        var source = @"§M{m001:Test}
-§F{f001:Add}
-§O{i32}
-§R 42
-§/F{f002}
-§/M{m001}";
-
-        // Step 1: Compile and get diagnostics
-        var result = Program.Compile(source, "test.calr");
-        Assert.True(result.HasErrors);
-
-        // Step 2: Find the mismatched ID fix
-        var idFix = result.Diagnostics.DiagnosticsWithFixes
-            .FirstOrDefault(d => d.Code == DiagnosticCode.MismatchedId);
-        Assert.NotNull(idFix);
-
-        // Step 3: Verify the fix has correct content and position
-        Assert.Contains("f001", idFix.Fix.Description);
-        Assert.Single(idFix.Fix.Edits);
-        var edit = idFix.Fix.Edits[0];
-        Assert.Equal("f001", edit.NewText);
-        Assert.Equal(5, edit.StartLine); // Line 5: §/F{f002}
-        Assert.Equal(5, edit.StartColumn); // Column 5: where "f002" starts (after "§/F{")
-        Assert.Equal(9, edit.EndColumn); // Column 9: end of "f002"
-
-        // Step 4: Apply the fix using the ApplyFix helper
-        var fixedSource = ApplyFix(source, idFix.Fix);
         var fixedResult = Program.Compile(fixedSource, "test.calr");
         Assert.False(fixedResult.HasErrors,
             $"Fixed code should compile. Errors: {string.Join(", ", fixedResult.Diagnostics.Select(d => d.Message))}");

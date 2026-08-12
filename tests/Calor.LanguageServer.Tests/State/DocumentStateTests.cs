@@ -64,22 +64,6 @@ public class DocumentStateTests
             d => Assert.Equal(Compiler.Diagnostics.DiagnosticSeverity.Info, d.Severity));
     }
 
-    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic is obsolete under indent-only (no closing tags)")]
-    public void Reanalyze_MismatchedId_HasDiagnosticsWithFixes()
-    {
-        var source = """
-            §M{m001:TestModule}
-            §F{f001:Test}
-            §R 0
-            """;
-
-        var state = LspTestHarness.CreateDocument(source);
-
-        Assert.True(state.Diagnostics.HasErrors);
-        Assert.NotEmpty(state.DiagnosticsWithFixes);
-        Assert.Contains(state.DiagnosticsWithFixes, d => d.Code == "Calor0101"); // MismatchedId
-    }
-
     [Fact]
     public void Update_ChangesSource()
     {
@@ -186,24 +170,6 @@ public class DocumentStateTests
         // Parsing should succeed, binding might have errors
         Assert.NotNull(state.Ast);
         Assert.NotEmpty(state.Ast.Functions);
-    }
-
-    [Fact(Skip = "Phase 4d: source no longer produces fixes under indent-only (mismatched-ID concept gone)")]
-    public void DiagnosticsWithFixes_ContainsFixInfo()
-    {
-        var source = """
-            §M{m001:TestModule}
-            §F{f001:Test}
-            §R 0
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-
-        Assert.NotEmpty(fixes);
-        var fix = fixes.First();
-        Assert.NotNull(fix.Fix);
-        Assert.NotEmpty(fix.Fix.Description);
-        Assert.NotEmpty(fix.Fix.Edits);
     }
 
     [Fact]

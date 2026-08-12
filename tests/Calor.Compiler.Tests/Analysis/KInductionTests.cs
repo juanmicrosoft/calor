@@ -580,7 +580,7 @@ public class KInductionTests
     [Fact]
     public void InvariantTemplate_MonotonicallyIncreasing_DetectsCounterNames()
     {
-        var counterNames = new[] { "counter", "count", "cnt", "idx", "index", "iter" };
+        var counterNames = new[] { "counter", "count", "sum", "total" };
 
         foreach (var name in counterNames)
         {
@@ -591,8 +591,8 @@ public class KInductionTests
 
             var invariant = InvariantTemplates.MonotonicallyIncreasing.Generate(context);
 
-            // Should generate invariant for counter-like names
-            Assert.True(invariant != null || true); // May or may not match all names
+            Assert.NotNull(invariant);
+            Assert.Contains(name, invariant, StringComparison.Ordinal);
         }
     }
 

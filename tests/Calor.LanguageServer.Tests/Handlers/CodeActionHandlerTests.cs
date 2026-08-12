@@ -5,77 +5,6 @@ namespace Calor.LanguageServer.Tests.Handlers;
 
 public class CodeActionHandlerTests
 {
-    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
-    public void MismatchedId_GeneratesFix()
-    {
-        var source = """
-            §M{m001:TestModule}
-            §F{f001:Test}
-            §R 0
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-
-        Assert.NotEmpty(fixes);
-        Assert.Contains(fixes, f => f.Code == "Calor0101");
-
-        var fix = fixes.First(f => f.Code == "Calor0101");
-        Assert.Equal("Change 'f002' to 'f001'", fix.Fix.Description);
-        Assert.Single(fix.Fix.Edits);
-    }
-
-    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
-    public void MismatchedModuleId_GeneratesFix()
-    {
-        var source = """
-            §M{m001:TestModule}
-            §F{f001:Test}
-            §R 0
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-
-        Assert.NotEmpty(fixes);
-        Assert.Contains(fixes, f => f.Code == "Calor0101" && f.Fix.Description.Contains("m001"));
-    }
-
-    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
-    public void FixEdit_HasCorrectPosition()
-    {
-        var source = """
-            §M{m001:TestModule}
-            §F{f001:Test}
-            §R 0
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-        var fix = fixes.First(f => f.Code == "Calor0101");
-
-        Assert.Single(fix.Fix.Edits);
-        var edit = fix.Fix.Edits[0];
-
-        // The edit should be for replacing 'f002' with 'f001'
-        Assert.Equal("f001", edit.NewText);
-    }
-
-    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
-    public void MultipleMismatchedIds_GeneratesMultipleFixes()
-    {
-        var source = """
-            §M{m001:TestModule}
-            §F{f001:Test}
-            §L{l001:i:0:10}
-            §P i
-            §R 0
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-
-        // Should have at least 2 fixes (for f002 and l002)
-        Assert.True(fixes.Count >= 2);
-        Assert.All(fixes, f => Assert.Equal("Calor0101", f.Code));
-    }
-
     [Fact]
     public void ValidSource_NoFixes()
     {
@@ -215,28 +144,6 @@ public class CodeActionHandlerTests
         Assert.Contains("x2", duplicateFix.Fix.Description);
     }
 
-    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
-    public void MismatchedId_FixPositionIsCorrect()
-    {
-        var source = """
-            §M{m001:TestModule}
-            §F{f001:Test:pub}
-            §O{i32}
-            §R 0
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-        var fix = fixes.First(f => f.Code == "Calor0101");
-
-        Assert.Single(fix.Fix.Edits);
-        var edit = fix.Fix.Edits[0];
-
-        // Verify the fix replaces "wrong" with "f001"
-        Assert.Equal("f001", edit.NewText);
-        // Line 5 (1-indexed), after "§/F{" which is column 4
-        Assert.Equal(5, edit.StartLine);
-    }
-
     [Fact]
     public void MultipleFixes_AllHaveCorrectEdits()
     {
@@ -259,26 +166,6 @@ public class CodeActionHandlerTests
 
         Assert.NotNull(counterFix);
         Assert.NotNull(resultFix);
-    }
-
-    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic Calor0101 is obsolete under indent-only")]
-    public void NestedStructure_FixesWorkCorrectly()
-    {
-        var source = """
-            §M{m001:TestModule}
-            §F{f001:Outer:pub}
-            §O{i32}
-            §L{l001:i:0:10:1}
-            §P i
-            §R 0
-            """;
-
-        var fixes = LspTestHarness.GetDiagnosticsWithFixes(source);
-
-        // Should fix l002 -> l001
-        Assert.NotEmpty(fixes);
-        var loopFix = fixes.FirstOrDefault(f => f.Fix.Edits[0].NewText == "l001");
-        Assert.NotNull(loopFix);
     }
 
     [Fact]

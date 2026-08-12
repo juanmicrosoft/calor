@@ -100,41 +100,6 @@ public class DiagnoseToolFixTests
         Assert.Equal(0, json.GetProperty("errorCount").GetInt32());
     }
 
-    [Fact(Skip = "Phase 4d: mismatched-ID diagnostic is obsolete under indent-only (no closing tags)")]
-    public async Task ExecuteAsync_WithMismatchedId_IncludesFix()
-    {
-        var args = JsonDocument.Parse("""
-            {
-                "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Add} §O{i32} §R 42"
-            }
-            """).RootElement;
-
-        var result = await _tool.ExecuteAsync(args);
-
-        var text = result.Content[0].Text!;
-        var json = JsonDocument.Parse(text).RootElement;
-
-        // Should have an error about mismatched IDs
-        Assert.True(json.GetProperty("diagnostics").GetArrayLength() > 0);
-
-        // Find the mismatched ID diagnostic
-        var diagnostics = json.GetProperty("diagnostics");
-        var foundMismatch = false;
-        foreach (var diag in diagnostics.EnumerateArray())
-        {
-            var message = diag.GetProperty("message").GetString()!;
-            if (message.Contains("f002") && message.Contains("f001"))
-            {
-                foundMismatch = true;
-                Assert.True(diag.TryGetProperty("fix", out var fix));
-                Assert.True(fix.TryGetProperty("edits", out _));
-                break;
-            }
-        }
-        Assert.True(foundMismatch, "Expected a mismatched ID diagnostic");
-    }
-
     [Fact]
     public async Task ExecuteAsync_WithFourFieldHeader_Apply_HealsToReturningSource()
     {
