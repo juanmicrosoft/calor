@@ -68,7 +68,7 @@ jobs:
           # Fetch exactly the assets the manifest names, so an asset that is in the
           # manifest but missing from the release fails here too (curl -f).
           while read -r asset; do
-            curl -fL -sS --retry 5 --retry-delay 3 -o "$STAGING/$asset" "${RELEASE_URL}/${asset}"
+            curl -fL -sS --retry 10 --retry-all-errors --retry-max-time 300 -o "$STAGING/$asset" "${RELEASE_URL}/${asset}"
           done < <(grep -v '^#' "$MANIFEST" | awk 'NF {print $2}')
 
           while read -r hash asset size; do
@@ -97,7 +97,7 @@ jobs:
           trap 'rm -rf "$STAGING"' EXIT
 
           while read -r zip; do
-            curl -fL -sS --retry 5 --retry-delay 3 -o "$STAGING/$zip" "${BASE}/${zip}"
+            curl -fL -sS --retry 10 --retry-all-errors --retry-max-time 300 -o "$STAGING/$zip" "${BASE}/${zip}"
           done < <(grep -v '^#' "$MANIFEST" | awk 'NF {print $2}')
 
           while read -r hash asset size; do
