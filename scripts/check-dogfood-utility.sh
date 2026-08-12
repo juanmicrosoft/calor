@@ -47,6 +47,14 @@ if [[ "$calr_count" -eq 0 ]]; then
   violations+=("no .calr source under $utility — the utility must be written in Calor")
 fi
 
+# The project index is build output: it is derived from sources, carries
+# machine-specific hashes, and would conflict on every merge. Same rule as the
+# generated C# above, checked repository-wide rather than only under the utility.
+mapfile -t tracked_indexes < <(git ls-files '*.calor-index.json')
+for path in "${tracked_indexes[@]}"; do
+  violations+=("$path (committed project index — it is build output, not source)")
+done
+
 if ((${#violations[@]} > 0)); then
   echo "Dogfood guard failed:" >&2
   printf '  %s\n' "${violations[@]}" >&2

@@ -51,9 +51,6 @@ src/Calor.Compiler/Commands/RenameCommand.cs
 # edges out of the binder, which Calor has no access to. The "# pending" markers
 # below are required by the guard's own pre-registration rule and are removed by
 # the PR that lands the files.
-# pending: lands with the S1 index PR
 src/Calor.Compiler/Indexing/ProjectIndex.cs
-# pending: lands with the S1 index PR
 src/Calor.Compiler/Indexing/ProjectIndexBuilder.cs
-# pending: lands with the S1 index PR
 src/Calor.Compiler/Commands/IndexCommand.cs

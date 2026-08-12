@@ -37,6 +37,24 @@ public sealed record IndexedDocument(
     BoundModule BoundModule);
 
 /// <summary>
+/// A call resolved to a declaration, attributed to the function containing it.
+/// </summary>
+public sealed record ProjectCallEdge(
+    SymbolId CallerSymbolId,
+    SymbolId CalleeSymbolId,
+    string FilePath,
+    TextSpan Span);
+
+/// <summary>
+/// What resolution could not account for. Kept beside the edges rather than
+/// discarded: a caller list computed from partial resolution is only honest if
+/// the part it could not resolve travels with it.
+/// </summary>
+public sealed record ProjectResolutionResidual(
+    IReadOnlyList<string> UnresolvedCalls,
+    IReadOnlyList<string> AmbiguousCallees);
+
+/// <summary>
 /// A project-wide map from <see cref="SymbolId"/> to the identifier tokens that
 /// denote it, built from bound trees rather than from text.
 ///
@@ -49,8 +67,18 @@ public sealed class ProjectSymbolIndex
 {
     private readonly Dictionary<SymbolId, List<SymbolOccurrence>> _bySymbol = [];
     private readonly Dictionary<string, List<SymbolOccurrence>> _byFile;
+    private readonly List<ProjectCallEdge> _callEdges = [];
+    private readonly List<string> _unresolvedCalls = [];
+    private readonly SortedSet<string> _ambiguousCallees = new(StringComparer.Ordinal);
 
     public IReadOnlyList<IndexedDocument> Documents { get; }
+
+    /// <summary>Calls resolved to a declaration, attributed to their containing function.</summary>
+    public IReadOnlyList<ProjectCallEdge> CallEdges => _callEdges;
+
+    /// <summary>What resolution could not account for; travels with the edges.</summary>
+    public ProjectResolutionResidual Residual =>
+        new(_unresolvedCalls, [.. _ambiguousCallees]);
 
     private ProjectSymbolIndex(IReadOnlyList<IndexedDocument> documents)
     {
@@ -119,6 +147,12 @@ public sealed class ProjectSymbolIndex
         index.Populate();
         return index;
     }
+
+    /// <summary>Every indexed occurrence in one file, in document order.</summary>
+    public IReadOnlyList<SymbolOccurrence> OccurrencesIn(string filePath) =>
+        _byFile.TryGetValue(filePath, out var occurrences)
+            ? occurrences
+            : Array.Empty<SymbolOccurrence>();
 
     public IReadOnlyList<SymbolOccurrence> Occurrences(SymbolId symbolId) =>
         _bySymbol.TryGetValue(symbolId, out var occurrences)
@@ -250,6 +284,36 @@ public sealed class ProjectSymbolIndex
                 }
             }
 
+            // Call edges are collected per function rather than from a flat walk,
+            // because an edge needs the function that CONTAINS the call, and a
+            // flat walk of the module has no notion of "containing".
+            foreach (var function in document.BoundModule.Functions)
+            {
+                foreach (var node in Descendants(function))
+                {
+                    if (node is not BoundCallExpression call)
+                        continue;
+
+                    var callee = call.ResolvedSymbols.Count > 0
+                        ? call.ResolvedSymbols[0]
+                        : ResolveAcrossDocuments(call);
+                    if (callee is { Id.IsNone: false })
+                    {
+                        _callEdges.Add(new ProjectCallEdge(
+                            function.Symbol.Id, callee.Id, document.FilePath, call.CalleeSpan));
+                    }
+                    else
+                    {
+                        // Named, not counted: "3 unresolved" tells a reader
+                        // nothing they can act on.
+                        _unresolvedCalls.Add(
+                            $"{document.FilePath}: {call.Target}");
+                        if (IsAmbiguousAcrossDocuments(call))
+                            _ambiguousCallees.Add(call.Target);
+                    }
+                }
+            }
+
             // Module names are indexed so a rename can be refused explicitly
             // rather than silently doing nothing.
             var moduleId = SymbolId.Create(
@@ -290,6 +354,26 @@ public sealed class ProjectSymbolIndex
                 .ToArray();
 
             return candidates.Length == 1 ? candidates[0] : null;
+        }
+
+        // Distinguishes "no such name" from "several declarations share it".
+        // Both drop the edge, but only the second is a resolution *limit* worth
+        // reporting separately — it is what 0.14's typed signatures fix.
+        bool IsAmbiguousAcrossDocuments(BoundCallExpression call)
+        {
+            var target = call.Target;
+            if (string.IsNullOrEmpty(target) || target.Contains('.', StringComparison.Ordinal))
+                return false;
+
+            return Documents
+                .SelectMany(candidate => candidate.BoundModule.SymbolsById.Values
+                    .OfType<FunctionSymbol>())
+                .Where(symbol => !symbol.Id.IsNone
+                    && string.Equals(
+                        BareFunctionName(symbol.Name), target, StringComparison.Ordinal))
+                .DistinctBy(symbol => symbol.Id)
+                .Take(2)
+                .Count() > 1;
         }
 
         void Add(

@@ -75,6 +75,79 @@ public sealed class EditScriptIdentityTests : IDisposable
 
     [Theory]
     [MemberData(nameof(RegisteredScripts))]
+    public void IndexContentsAreIdenticalToAFullRebuild(string scriptName)
+    {
+        // Gate 2's index-contents leg (roadmap §2.5 gate 2), which became live
+        // when the index shipped. It rides the corpus that already exists rather
+        // than adding a second one.
+        //
+        // v1 rebuilds the index wholesale, so this leg is not yet load-bearing
+        // against an incremental index — it pins the *canonical form*: the index
+        // built for a given workspace state must serialise byte-identically no
+        // matter what states preceded it. That is what makes the comparison
+        // meaningful the day an incremental path exists.
+        var script = LoadScript(scriptName);
+
+        var fresh = new List<string>();
+        foreach (var step in script.Steps)
+        {
+            var workspace = CreateTempDir();
+            SyncWorkspace(workspace, step.SourceDirectory);
+            fresh.Add(SerializeIndex(workspace, step));
+        }
+
+        var sequential = new List<string>();
+        var reused = CreateTempDir();
+        foreach (var step in script.Steps)
+        {
+            SyncWorkspace(reused, step.SourceDirectory);
+            sequential.Add(SerializeIndex(reused, step));
+        }
+
+        for (var index = 0; index < script.Steps.Count; index++)
+            Assert.Equal(fresh[index], sequential[index]);
+    }
+
+    /// <summary>
+    /// The index for a workspace, serialised canonically with the volatile
+    /// header stripped. Compiler and manifest hashes depend on the machine and
+    /// the temp path, not on the workspace's contents, so comparing them would
+    /// make the test fail for reasons that have nothing to do with the index.
+    /// </summary>
+    private static string SerializeIndex(string workspace, ScriptStep step)
+    {
+        var sources = Directory.GetFiles(workspace, "*.calr")
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+        var index = Indexing.ProjectIndexBuilder.Build(
+            new Indexing.ProjectIndexBuilder.Options(workspace, step.Options, sources));
+
+        var lines = new List<string>();
+        foreach (var declaration in index.Declarations)
+        {
+            lines.Add(
+                $"decl|{declaration.File}|{declaration.Line}|{declaration.Column}"
+                    + $"|{declaration.Kind}|{declaration.Name}");
+        }
+        foreach (var edge in index.CallEdges)
+            lines.Add($"edge|{edge.File}|{edge.Line}|{edge.Column}");
+        foreach (var occurrence in index.Occurrences)
+        {
+            lines.Add(
+                $"occ|{occurrence.File}|{occurrence.Line}|{occurrence.Column}|{occurrence.Kind}");
+        }
+        foreach (var unreadable in index.Residual.UnreadableFiles)
+            lines.Add($"residual-unreadable|{unreadable}");
+        foreach (var unresolved in index.Residual.UnresolvedCalls)
+            lines.Add($"residual-unresolved|{unresolved}");
+        foreach (var ambiguous in index.Residual.AmbiguousCallees)
+            lines.Add($"residual-ambiguous|{ambiguous}");
+
+        return string.Join("\n", lines);
+    }
+
+    [Theory]
+    [MemberData(nameof(RegisteredScripts))]
     public void CacheReuseMatchesTheScriptsRegisteredExpectation(string scriptName)
     {
         // The anti-vacuity leg. Byte-identical diagnostics are free if the

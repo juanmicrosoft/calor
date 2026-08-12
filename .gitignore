@@ -122,3 +122,8 @@ bench/phase0-agent-native/epochs/**/rejects/
 # so the intent survives that rule being loosened.
 tools/calor-allowlist-audit/obj/
 tools/calor-allowlist-audit/bin/
+
+# Project index (§2.2): build output derived from sources, carrying
+# machine-specific hashes. scripts/check-dogfood-utility.sh fails if one is
+# committed.
+.calor-index.json
