@@ -15,11 +15,21 @@ public static class TrxParser
     public static List<TestResult> Parse(string trxPath)
     {
         var doc = XDocument.Load(trxPath);
-        var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
+        var root = doc.Root ?? throw new InvalidDataException("TRX has no document element.");
+        if (root.Name.LocalName != "TestRun")
+            throw new InvalidDataException("TRX root element must be TestRun.");
+
+        var ns = root.GetDefaultNamespace();
+        var resultsElement = root.Element(ns + "Results")
+            ?? throw new InvalidDataException("TRX is missing Results.");
+        var definitionsElement = root.Element(ns + "TestDefinitions")
+            ?? throw new InvalidDataException("TRX is missing TestDefinitions.");
+        var counters = root.Element(ns + "ResultSummary")?.Element(ns + "Counters")
+            ?? throw new InvalidDataException("TRX is missing ResultSummary/Counters.");
 
         // Index TestDefinitions by test id for identity joining.
         var definitions = new Dictionary<string, (string Assembly, string ClassName, string ExecutorUri)>();
-        foreach (var unitTest in doc.Descendants(ns + "UnitTest"))
+        foreach (var unitTest in definitionsElement.Elements(ns + "UnitTest"))
         {
             var id = unitTest.Attribute("id")?.Value;
             if (id == null) continue;
@@ -34,13 +44,18 @@ public static class TrxParser
             definitions[id] = (assembly, className, adapter);
         }
 
-        return doc.Descendants(ns + "UnitTestResult")
+        var results = resultsElement.Elements(ns + "UnitTestResult")
             .Select(e =>
             {
-                var testId = e.Attribute("testId")?.Value;
-                var def = testId != null && definitions.TryGetValue(testId, out var d)
-                    ? d
-                    : ("", "", "");
+                var testId = e.Attribute("testId")?.Value
+                    ?? throw new InvalidDataException("TRX result is missing testId.");
+                if (!definitions.TryGetValue(testId, out var def))
+                    throw new InvalidDataException(
+                        $"TRX result references missing test definition '{testId}'.");
+                var outcome = e.Attribute("outcome")?.Value
+                    ?? throw new InvalidDataException("TRX result is missing outcome.");
+                if (outcome is not ("Passed" or "Failed" or "NotExecuted" or "Skipped"))
+                    throw new InvalidDataException($"TRX result has invalid outcome '{outcome}'.");
 
                 return new TestResult
                 {
@@ -48,13 +63,44 @@ public static class TrxParser
                     Assembly = def.Item1,
                     ClassName = def.Item2,
                     ExecutorUri = def.Item3,
-                    Outcome = e.Attribute("outcome")?.Value ?? "Unknown",
+                    Outcome = outcome,
                     Duration = TimeSpan.TryParse(e.Attribute("duration")?.Value, out var dur) ? dur : TimeSpan.Zero,
                     ErrorMessage = e.Descendants(ns + "Message").FirstOrDefault()?.Value,
                     StackTrace = e.Descendants(ns + "StackTrace").FirstOrDefault()?.Value,
                 };
             })
             .ToList();
+
+        var expectedTotal = ParseCounter(counters, "total");
+        var expectedExecuted = ParseCounter(counters, "executed");
+        var expectedPassed = ParseCounter(counters, "passed");
+        var expectedFailed = ParseCounter(counters, "failed");
+        var expectedNotExecuted = ParseCounter(counters, "notExecuted");
+        if (expectedTotal != results.Count)
+            throw new InvalidDataException(
+                $"TRX counter total {expectedTotal} does not match {results.Count} results.");
+
+        var actualNotExecuted = results.Count(result =>
+            result.Outcome is "NotExecuted" or "Skipped");
+        var actualPassed = results.Count(result => result.Outcome == "Passed");
+        var actualFailed = results.Count(result => result.Outcome == "Failed");
+        if (expectedExecuted != results.Count - actualNotExecuted)
+            throw new InvalidDataException(
+                $"TRX counter executed {expectedExecuted} does not match result outcomes.");
+        if (expectedPassed != actualPassed ||
+            expectedFailed != actualFailed ||
+            expectedNotExecuted != actualNotExecuted)
+            throw new InvalidDataException("TRX outcome counters do not match result outcomes.");
+
+        return results;
+    }
+
+    private static int ParseCounter(XElement counters, string name)
+    {
+        var value = counters.Attribute(name)?.Value;
+        return int.TryParse(value, out var parsed)
+            ? parsed
+            : throw new InvalidDataException($"TRX counter '{name}' is missing or invalid.");
     }
 
     /// <summary>
@@ -70,13 +116,17 @@ public static class TrxParser
 
     /// <summary>
     /// Parse and aggregate every TRX file under the working directory.
-    /// Returns the combined results plus the list of files parsed.
+    /// Returns the combined results, parsed files, and any parse failures.
     /// </summary>
-    public static (List<TestResult> Results, List<string> TrxFiles) ParseAll(string workDir)
+    public static (
+        List<TestResult> Results,
+        List<string> TrxFiles,
+        List<string> ParseErrors) ParseAll(string workDir)
     {
         var trxFiles = FindTrxFiles(workDir);
         var results = new List<TestResult>();
         var parsed = new List<string>();
+        var parseErrors = new List<string>();
 
         foreach (var trx in trxFiles)
         {
@@ -87,11 +137,13 @@ public static class TrxParser
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"  WARNING: failed to parse TRX file {trx}: {ex.Message}");
+                var error = $"failed to parse TRX file {trx}: {ex.Message}";
+                Console.Error.WriteLine($"  ERROR: {error}");
+                parseErrors.Add(error);
             }
         }
 
-        return (results, parsed);
+        return (results, parsed, parseErrors);
     }
 
     /// <summary>

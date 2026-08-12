@@ -197,7 +197,17 @@ public sealed class RoundTripPipeline
             config.DotnetPath, args, workDir, config.TestTimeout);
 
         // Parse and aggregate ALL TRX files (one per test assembly)
-        var (testResults, trxFiles) = TrxParser.ParseAll(workDir);
+        var (testResults, trxFiles, parseErrors) = TrxParser.ParseAll(workDir);
+        if (parseErrors.Count > 0)
+        {
+            return new TestRunResult
+            {
+                ExitCode = exitCode == 0 ? -2 : exitCode,
+                ParseErrors = parseErrors,
+                Stdout = stdout,
+                Stderr = stderr,
+            };
+        }
 
         // Fallback: if TRX parsing found no results, parse console output
         if (testResults.Count == 0)
@@ -644,42 +654,67 @@ public sealed class RoundTripPipeline
             return comparison;
         }
 
-        var baselineInventory = baseline.Results.Select(t => t.Identity).ToHashSet();
-        var roundTripInventory = roundTrip.Results.Select(t => t.Identity).ToHashSet();
-        if (!baselineInventory.SetEquals(roundTripInventory))
+        var baselineByIdentity = baseline.Results
+            .GroupBy(t => t.Identity)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var roundTripByIdentity = roundTrip.Results
+            .GroupBy(t => t.Identity)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        if (!baselineByIdentity.Keys.ToHashSet().SetEquals(roundTripByIdentity.Keys) ||
+            baselineByIdentity.Any(pair =>
+                roundTripByIdentity[pair.Key].Count != pair.Value.Count))
         {
             comparison.Status = ComparisonStatus.Incomplete;
             return comparison;
         }
 
-        // Find regressions: passing in baseline, failing after round-trip.
-        // Match on the robust Identity (assembly + executor + class + display name)
-        // so duplicate display names across test assemblies never collide.
-        var baselinePassedSet = baseline.Results
-            .Where(t => t.Outcome == "Passed")
-            .Select(t => t.Identity)
-            .ToHashSet();
+        // Compare outcome multiplicities per robust identity. Theory adapters can
+        // emit duplicate identities, so this is a multiset comparison rather than
+        // a one-result dictionary.
+        foreach (var (identity, baselineResults) in baselineByIdentity)
+        {
+            var baselinePassed = baselineResults.Count(t => t.Outcome == "Passed");
+            var baselineFailed = baselineResults.Count(t => t.Outcome == "Failed");
+            var baselineSkipped = baselineResults.Count(t =>
+                t.Outcome is "Skipped" or "NotExecuted");
+            var roundTripResults = roundTripByIdentity[identity];
+            var roundTripPassed = roundTripResults.Count(t => t.Outcome == "Passed");
+            var roundTripFailed = roundTripResults.Count(t => t.Outcome == "Failed");
+            var roundTripSkipped = roundTripResults.Count(t =>
+                t.Outcome is "Skipped" or "NotExecuted");
 
-        var roundTripByIdentity = roundTrip.Results.ToDictionary(t => t.Identity);
-
-        comparison.Regressions = baselinePassedSet
-            .Where(id => roundTripByIdentity[id].Outcome != "Passed")
-            .Select(id => roundTripByIdentity[id])
-            .ToList();
+            var passDeficit = Math.Max(0, baselinePassed - roundTripPassed);
+            var failedExcess = Math.Max(0, roundTripFailed - baselineFailed);
+            var skippedExcess = Math.Max(0, roundTripSkipped - baselineSkipped);
+            var regressionCount = Math.Max(passDeficit, failedExcess + skippedExcess);
+            var regressions = roundTripResults
+                .Where(t => t.Outcome == "Failed")
+                .Take(failedExcess)
+                .Concat(roundTripResults
+                    .Where(t => t.Outcome is "Skipped" or "NotExecuted")
+                    .Take(skippedExcess))
+                .ToList();
+            regressions.AddRange(
+                roundTripResults
+                    .Where(t => t.Outcome != "Passed" && !regressions.Contains(t))
+                    .Take(regressionCount - regressions.Count));
+            comparison.Regressions.AddRange(regressions);
+        }
 
         // Pre-existing failures
-        var baselineFailedSet = baseline.Results
-            .Where(t => t.Outcome == "Failed")
-            .Select(t => t.Identity)
-            .ToHashSet();
-
-        comparison.PreExistingFailures = baselineFailedSet.Count;
+        comparison.PreExistingFailures = baseline.Results.Count(t => t.Outcome == "Failed");
 
         // New passes: failing in baseline, passing in round-trip
-        comparison.NewPasses = roundTrip.Results
-            .Where(t => t.Outcome == "Passed" && baselineFailedSet.Contains(t.Identity))
-            .Select(t => t.TestName)
-            .ToList();
+        foreach (var (identity, baselineResults) in baselineByIdentity)
+        {
+            var baselinePassed = baselineResults.Count(t => t.Outcome == "Passed");
+            var roundTripPassed = roundTripByIdentity[identity].Count(t => t.Outcome == "Passed");
+            comparison.NewPasses.AddRange(
+                roundTripByIdentity[identity]
+                    .Where(t => t.Outcome == "Passed")
+                    .Take(Math.Max(0, roundTripPassed - baselinePassed))
+                    .Select(t => t.TestName));
+        }
 
         // Verdict
         if (comparison.Regressions.Count == 0)

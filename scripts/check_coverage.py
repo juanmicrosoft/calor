@@ -34,18 +34,32 @@ def evaluate(reports: list[Path], baseline_path: Path) -> tuple[dict, list[str]]
                     )
                     conditions = line.findall("./conditions/condition")
                     if conditions:
-                        for condition in conditions:
-                            condition_id = condition.attrib.get("number", "")
-                            coverage_text = condition.attrib.get("coverage", "0%").rstrip("%")
-                            coverage = float(coverage_text)
-                            total = 2 if condition.attrib.get("type") == "jump" else 1
-                            covered = round(total * coverage / 100)
-                            branch_key = (source_path, key[1], condition_id)
-                            previous = branches[name].get(branch_key, (0, total))
-                            branches[name][branch_key] = (
-                                max(previous[0], covered),
-                                max(previous[1], total),
+                        if any(condition.attrib.get("type") == "switch" for condition in conditions):
+                            match = re.search(
+                                r"\((\d+)/(\d+)\)",
+                                line.attrib.get("condition-coverage", ""),
                             )
+                            if match:
+                                covered, total = map(int, match.groups())
+                                branch_key = (source_path, key[1], "aggregate")
+                                previous = branches[name].get(branch_key, (0, total))
+                                branches[name][branch_key] = (
+                                    max(previous[0], covered),
+                                    max(previous[1], total),
+                                )
+                        else:
+                            for condition in conditions:
+                                condition_id = condition.attrib.get("number", "")
+                                coverage_text = condition.attrib.get("coverage", "0%").rstrip("%")
+                                coverage = float(coverage_text)
+                                total = 2
+                                covered = round(total * coverage / 100)
+                                branch_key = (source_path, key[1], condition_id)
+                                previous = branches[name].get(branch_key, (0, total))
+                                branches[name][branch_key] = (
+                                    max(previous[0], covered),
+                                    max(previous[1], total),
+                                )
                     else:
                         condition = line.attrib.get("condition-coverage")
                         if condition:

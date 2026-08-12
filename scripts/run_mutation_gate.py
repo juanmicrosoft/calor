@@ -23,6 +23,15 @@ def test_status(return_code: int, output: str) -> str:
     return "error"
 
 
+def passing_test_run(return_code: int, output: str) -> bool:
+    return (
+        return_code == 0
+        and "Passed!" in output
+        and re.search(r"Passed:\s+[1-9]\d*", output) is not None
+        and re.search(r"Failed:\s+0\b", output) is not None
+    )
+
+
 def self_test() -> None:
     if test_status(0, "Passed!") != "survived":
         raise AssertionError("a surviving mutant did not fail the gate")
@@ -30,6 +39,10 @@ def self_test() -> None:
         raise AssertionError("a killed mutant was not recognized")
     if test_status(1, "Build FAILED.") != "error":
         raise AssertionError("a build failure was incorrectly credited as a killed mutant")
+    if passing_test_run(0, "Passed! - Failed: 0, Passed: 0"):
+        raise AssertionError("a zero-test baseline was accepted")
+    if not passing_test_run(0, "Passed! - Failed: 0, Passed: 1"):
+        raise AssertionError("a passing nonzero baseline was rejected")
     print("Mutation gate negative self-test passed.")
 
 
@@ -49,6 +62,30 @@ def main() -> int:
     logs = output_path.parent / "logs"
     logs.mkdir(exist_ok=True)
     results = []
+
+    for mutant in baseline["mutants"]:
+        completed = subprocess.run(
+            [
+                "dotnet",
+                "test",
+                mutant["project"],
+                "-c",
+                "Release",
+                "--no-restore",
+                "--filter",
+                mutant["filter"],
+                "--verbosity",
+                "minimal",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        combined = completed.stdout + completed.stderr
+        (logs / f"{mutant['id']}-baseline.log").write_text(combined, encoding="utf-8")
+        if not passing_test_run(completed.returncode, combined):
+            print(f"ERROR: {mutant['id']}: original filtered tests did not pass")
+            return 1
 
     for mutant in baseline["mutants"]:
         source = Path(mutant["file"])
