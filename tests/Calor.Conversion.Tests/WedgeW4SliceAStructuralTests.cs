@@ -29,6 +29,7 @@ public class WedgeW4SliceAStructuralTests
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = "W4SliceA",
             GracefulFallback = true,
             AutoGenerateIds = true,

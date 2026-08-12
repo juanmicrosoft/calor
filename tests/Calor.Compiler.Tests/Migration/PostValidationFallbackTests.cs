@@ -47,7 +47,7 @@ public class PostValidationFallbackTests
     [Fact]
     public void UnparseableMember_IsWrappedInCSharpBlock_UnderPassthrough()
     {
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true })
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true })
         {
             ParseValidatorOverride = CondemnOutsideCSharp("Breakme"),
         };
@@ -80,7 +80,7 @@ public class PostValidationFallbackTests
         const string src =
             "namespace N1 { public class Foo { public int A() => 1; } } " +
             "namespace N2 { public class Foo { public int B() => 2; } }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true });
 
         var result = converter.Convert(src);
 
@@ -108,7 +108,7 @@ public class PostValidationFallbackTests
         // be rewrapped. With everything declared unparseable, the output stays invalid —
         // and passthrough must return failure WITH a warning, never Success=true + broken
         // text (which is exactly the pre-#717 behavior).
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true })
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true })
         {
             ParseValidatorOverride = _ => false,
         };
@@ -146,7 +146,7 @@ public class PostValidationFallbackTests
     [Fact]
     public void CleanConversion_TriggersNoFallback()
     {
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true });
 
         var result = converter.Convert(TwoClasses);
 

@@ -177,6 +177,34 @@ public class MigrateToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FixPhase_InvalidFixLeavesExistingFileUnchanged()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-invalid-fix-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var path = Path.Combine(tempDir, "Invalid.calr");
+        const string source = "§M{m1:Test}\n§B{b1:value:StringBuilder} §NEW{object}§/NEW";
+        await File.WriteAllTextAsync(path, source);
+
+        try
+        {
+            var args = JsonDocument.Parse(
+                $$"""{"projectPath": "{{tempDir.Replace("\\", "\\\\")}}", "phase": "fix"}""").RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            var file = Assert.Single(json.GetProperty("perFile").EnumerateArray());
+            Assert.Equal("fix_incomplete", file.GetProperty("status").GetString());
+            Assert.True(file.GetProperty("fixesApplied").GetInt32() > 0);
+            Assert.Equal(source, await File.ReadAllTextAsync(path));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public void ResolveDirectory_WithDirectory_ReturnsPath()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-test-{Guid.NewGuid():N}");
@@ -368,4 +396,3 @@ public class MigrateToolTests
         }
     }
 }
-

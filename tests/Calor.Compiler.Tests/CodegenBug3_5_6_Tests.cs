@@ -12,7 +12,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class CodegenBug3_5_6_Tests
 {
-    private readonly CSharpToCalorConverter _converter = new();
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
     #region Bug 6: static class not emitted
 

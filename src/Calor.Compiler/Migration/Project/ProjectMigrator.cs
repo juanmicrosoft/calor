@@ -134,8 +134,18 @@ public sealed class ProjectMigrator
         var report = reportBuilder.Build();
         report.Summary.WasCancelled = wasCancelled;
 
+        if (plan.Direction == MigrationDirection.CSharpToCalor &&
+            _options.Fidelity == ConversionFidelity.Lossless)
+        {
+            await FinalizeLosslessProjectAsync(report, dryRun, cancellationToken);
+            RefreshSummary(report);
+        }
+
         // Post-conversion: merge partial classes if enabled
-        if (_options.MergePartialClasses && !dryRun && plan.Direction == MigrationDirection.CSharpToCalor)
+        if (_options.MergePartialClasses &&
+            _options.Fidelity == ConversionFidelity.Lossy &&
+            !dryRun &&
+            plan.Direction == MigrationDirection.CSharpToCalor)
         {
             await MergePartialClassesAsync(report);
         }
@@ -271,6 +281,7 @@ public sealed class ProjectMigrator
         {
             IncludeBenchmark = _options.IncludeBenchmark,
             Fidelity = _options.Fidelity,
+            ValidateRoundTripCSharp = _options.Fidelity != ConversionFidelity.Lossless,
             PassthroughOnError = _options.PassthroughOnError,
             UseImplicitCallCloser = _options.UseImplicitCallCloser
         };
@@ -300,7 +311,10 @@ public sealed class ProjectMigrator
             metrics = BenchmarkIntegration.CalculateMetrics(originalSource, result.CalorSource);
         }
 
-        if (!dryRun && result.Success && result.CalorSource != null)
+        if (!dryRun &&
+            _options.Fidelity == ConversionFidelity.Lossy &&
+            result.Success &&
+            result.CalorSource != null)
         {
             // Use replacement fallback for files with unpairable surrogates (e.g., regex patterns with \uD800)
             var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
@@ -313,6 +327,36 @@ public sealed class ProjectMigrator
 
         // Validate: parse and compile the generated Calor to catch false-positive "success"
         var issues = result.Issues.ToList();
+        string? generatedCSharp = null;
+        if (_options.Fidelity == ConversionFidelity.Lossless &&
+            result.Success &&
+            result.CalorSource != null)
+        {
+            var compileResult = Program.Compile(
+                result.CalorSource,
+                entry.OutputPath,
+                new CompilationOptions
+                {
+                    EnforceEffects = false,
+                    UnknownCallPolicy = UnknownCallPolicy.Permissive
+                });
+            if (compileResult.HasErrors)
+            {
+                status = FileMigrationStatus.Failed;
+                issues.AddRange(compileResult.Diagnostics.Errors.Select(diagnostic => new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "roundtrip-calor-validation",
+                    Message = $"Generated Calor failed compilation: {diagnostic.Message}",
+                    Line = diagnostic.Span.Line,
+                    Column = diagnostic.Span.Column
+                }));
+            }
+            else
+            {
+                generatedCSharp = compileResult.GeneratedCode;
+            }
+        }
         if (_options.ValidateOutput && result.Success && result.CalorSource != null)
         {
             var parseResult = CalorSourceHelper.Parse(result.CalorSource, entry.OutputPath);
@@ -384,14 +428,115 @@ public sealed class ProjectMigrator
         return new FileMigrationResult
         {
             SourcePath = entry.SourcePath,
-            OutputPath = result.Success ? entry.OutputPath : null,
+            OutputPath = status is FileMigrationStatus.Success or FileMigrationStatus.Partial
+                ? entry.OutputPath
+                : null,
             Status = status,
             Duration = DateTime.UtcNow - startTime,
             Issues = issues,
             Losses = result.Losses,
             Metrics = metrics,
-            Analysis = analysisResult
+            Analysis = analysisResult,
+            ConvertedSource = result.CalorSource,
+            GeneratedCSharp = generatedCSharp
         };
+    }
+
+    private static async Task FinalizeLosslessProjectAsync(
+        MigrationReport report,
+        bool dryRun,
+        CancellationToken cancellationToken)
+    {
+        var converted = report.FileResults
+            .Where(result => result.Status is FileMigrationStatus.Success or FileMigrationStatus.Partial)
+            .ToList();
+
+        if (report.FileResults.Any(result =>
+                result.Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut))
+        {
+            foreach (var result in converted)
+            {
+                result.Status = FileMigrationStatus.Failed;
+                result.OutputPath = null;
+                result.Issues.Add(new ConversionIssue
+                {
+                    Severity = ConversionIssueSeverity.Error,
+                    Feature = "lossless-project-validation",
+                    Message = "Lossless project migration was not written because another file failed conversion."
+                });
+            }
+            return;
+        }
+
+        var sources = converted
+            .Select(result => result.GeneratedCSharp)
+            .Where(source => !string.IsNullOrWhiteSpace(source))
+            .Cast<string>()
+            .ToArray();
+        var validation = CodeGen.GeneratedCSharpCompiler.Validate(sources);
+        var errors = validation.SyntaxErrors.Concat(validation.CompilationErrors).ToList();
+        if (errors.Count > 0)
+        {
+            foreach (var result in converted)
+            {
+                result.Status = FileMigrationStatus.Failed;
+                result.OutputPath = null;
+                foreach (var error in errors.Take(20))
+                {
+                    result.Issues.Add(new ConversionIssue
+                    {
+                        Severity = ConversionIssueSeverity.Error,
+                        Feature = "roundtrip-csharp-validation",
+                        Message = $"Lossless project C# validation failed ({error.Id}): {error.GetMessage()}"
+                    });
+                }
+            }
+            return;
+        }
+
+        if (dryRun)
+        {
+            return;
+        }
+
+        foreach (var result in converted)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (result.OutputPath != null && result.ConvertedSource != null)
+            {
+                await ConversionFileWriter.WriteAtomicAsync(
+                    result.OutputPath,
+                    result.ConvertedSource,
+                    cancellationToken: cancellationToken);
+            }
+        }
+    }
+
+    private static void RefreshSummary(MigrationReport report)
+    {
+        var summary = report.Summary;
+        var allIssues = report.FileResults.SelectMany(result => result.Issues).ToList();
+
+        summary.SuccessfulFiles = report.FileResults.Count(result => result.Status == FileMigrationStatus.Success);
+        summary.PartialFiles = report.FileResults.Count(result => result.Status == FileMigrationStatus.Partial);
+        summary.FailedFiles = report.FileResults.Count(result => result.Status == FileMigrationStatus.Failed);
+        summary.SkippedFiles = report.FileResults.Count(result => result.Status == FileMigrationStatus.Skipped);
+        summary.TimedOutFiles = report.FileResults.Count(result => result.Status == FileMigrationStatus.TimedOut);
+        summary.TotalErrors = allIssues.Count(issue => issue.Severity == ConversionIssueSeverity.Error);
+        summary.TotalWarnings = allIssues.Count(issue => issue.Severity == ConversionIssueSeverity.Warning);
+
+        summary.MostCommonIssues.Clear();
+        summary.MostCommonIssues.AddRange(allIssues
+            .GroupBy(issue => issue.Message)
+            .OrderByDescending(group => group.Count())
+            .Take(10)
+            .Select(group => $"{group.Key} ({group.Count()}x)"));
+
+        summary.UnsupportedFeatures.Clear();
+        summary.UnsupportedFeatures.AddRange(allIssues
+            .Where(issue => issue.Feature != null && !FeatureSupport.IsFullySupported(issue.Feature))
+            .Select(issue => issue.Feature!)
+            .Distinct());
     }
 
     private async Task<FileMigrationResult> ProcessCalorToCSharpAsync(MigrationPlanEntry entry, bool dryRun, DateTime startTime)

@@ -268,7 +268,7 @@ public sealed class ConversionContext
     public bool GracefulFallback { get; set; } = true;
 
     /// <summary>The fidelity contract applied to this conversion.</summary>
-    public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossy;
+    public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
 
     /// <summary>
     /// The module name to use (derived from file name if not set).

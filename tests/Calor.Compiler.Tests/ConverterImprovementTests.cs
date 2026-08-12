@@ -14,7 +14,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class ConverterImprovementTests
 {
-    private readonly CSharpToCalorConverter _converter = new();
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
     #region A1: Throw Expressions
 
@@ -1307,7 +1307,7 @@ public class ConverterImprovementTests
     {
         // Use C# converter to get a sealed override method in the AST,
         // then verify CalorEmitter emits "seal" not "sealed"
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var csharp = """
             public class Base
             {

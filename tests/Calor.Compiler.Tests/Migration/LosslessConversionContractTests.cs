@@ -170,4 +170,117 @@ public sealed class LosslessConversionContractTests
             FileSizeBytes = new FileInfo(sourcePath).Length
         };
     }
+
+    [Fact]
+    public async Task ProjectMigration_LosslessValidatesCrossFileReferencesTogether()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"calor-project-cross-file-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var sharedPath = Path.Combine(directory, "Shared.cs");
+        var consumerPath = Path.Combine(directory, "Consumer.cs");
+        await File.WriteAllTextAsync(sharedPath, "namespace Demo; public class Shared { }");
+        await File.WriteAllTextAsync(
+            consumerPath,
+            "namespace Demo; public class Consumer { public Shared Create() => new Shared(); }");
+
+        var plan = new MigrationPlan
+        {
+            ProjectPath = directory,
+            Direction = MigrationDirection.CSharpToCalor,
+            Entries =
+            [
+                Entry(sharedPath),
+                Entry(consumerPath)
+            ]
+        };
+        var migrator = new ProjectMigrator(new MigrationPlanOptions
+        {
+            Parallel = false,
+            MergePartialClasses = false,
+            Fidelity = ConversionFidelity.Lossless
+        });
+
+        try
+        {
+            var report = await migrator.ExecuteAsync(plan);
+
+            Assert.All(report.FileResults, result => Assert.Equal(FileMigrationStatus.Success, result.Status));
+            Assert.True(File.Exists(Path.ChangeExtension(sharedPath, ".calr")));
+            Assert.True(File.Exists(Path.ChangeExtension(consumerPath, ".calr")));
+        }
+        finally
+        {
+            foreach (var file in Directory.GetFiles(directory))
+            {
+                File.Delete(file);
+            }
+            Directory.Delete(directory);
+        }
+
+        static MigrationPlanEntry Entry(string sourcePath) => new()
+        {
+            SourcePath = sourcePath,
+            OutputPath = Path.ChangeExtension(sourcePath, ".calr"),
+            Convertibility = FileConvertibility.Full,
+            FileSizeBytes = new FileInfo(sourcePath).Length
+        };
+    }
+
+    [Fact]
+    public async Task ProjectMigration_LosslessAggregateFailureWritesNothingAndRefreshesSummary()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"calor-project-invalid-reference-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var validPath = Path.Combine(directory, "Valid.cs");
+        var invalidPath = Path.Combine(directory, "Invalid.cs");
+        await File.WriteAllTextAsync(validPath, "namespace Demo; public class Valid { }");
+        await File.WriteAllTextAsync(
+            invalidPath,
+            "namespace Demo; public class Invalid { public Missing Create() => new Missing(); }");
+
+        var plan = new MigrationPlan
+        {
+            ProjectPath = directory,
+            Direction = MigrationDirection.CSharpToCalor,
+            Entries =
+            [
+                Entry(validPath),
+                Entry(invalidPath)
+            ]
+        };
+        var migrator = new ProjectMigrator(new MigrationPlanOptions
+        {
+            Parallel = false,
+            MergePartialClasses = false,
+            Fidelity = ConversionFidelity.Lossless
+        });
+
+        try
+        {
+            var report = await migrator.ExecuteAsync(plan);
+
+            Assert.All(report.FileResults, result => Assert.Equal(FileMigrationStatus.Failed, result.Status));
+            Assert.Equal(0, report.Summary.SuccessfulFiles);
+            Assert.Equal(2, report.Summary.FailedFiles);
+            Assert.True(report.Summary.TotalErrors > 0);
+            Assert.False(File.Exists(Path.ChangeExtension(validPath, ".calr")));
+            Assert.False(File.Exists(Path.ChangeExtension(invalidPath, ".calr")));
+        }
+        finally
+        {
+            foreach (var file in Directory.GetFiles(directory))
+            {
+                File.Delete(file);
+            }
+            Directory.Delete(directory);
+        }
+
+        static MigrationPlanEntry Entry(string sourcePath) => new()
+        {
+            SourcePath = sourcePath,
+            OutputPath = Path.ChangeExtension(sourcePath, ".calr"),
+            Convertibility = FileConvertibility.Full,
+            FileSizeBytes = new FileInfo(sourcePath).Length
+        };
+    }
 }

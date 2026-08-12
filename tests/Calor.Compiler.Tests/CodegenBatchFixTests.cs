@@ -292,7 +292,7 @@ public class CodegenBatchFixTests
     public void Gap_Converter_DecimalLiteral_ProducesDECPrefix()
     {
         // C# decimal literal → converter → Calor should contain DEC:
-        var converter = new Migration.CSharpToCalorConverter();
+        var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var result = converter.Convert("decimal price = 21.35m;");
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
@@ -305,7 +305,7 @@ public class CodegenBatchFixTests
     public void Gap_Converter_DecimalLiteral_FullRoundtrip()
     {
         // C# decimal → converter → Calor → parse → emit C# should contain 'm' suffix
-        var converter = new Migration.CSharpToCalorConverter();
+        var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var conversionResult = converter.Convert("decimal price = 21.35m;");
 
         Assert.True(conversionResult.Success, string.Join("\n", conversionResult.Issues.Select(i => i.Message)));
@@ -320,7 +320,7 @@ public class CodegenBatchFixTests
     public void Gap_Converter_DecimalZero_ProducesDECPrefix()
     {
         // C# 0.00m → converter → Calor should contain DEC:0
-        var converter = new Migration.CSharpToCalorConverter();
+        var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var result = converter.Convert("decimal zero = 0.00m;");
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
@@ -332,7 +332,7 @@ public class CodegenBatchFixTests
     public void Gap_Converter_ArrayInitializer_ProducesArrTags()
     {
         // C# new int[] { 1, 2, 3 } → converter → CalorEmitter → should contain §ARR not bare {}
-        var converter = new Migration.CSharpToCalorConverter();
+        var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var result = converter.Convert("int[] nums = new int[] { 1, 2, 3 };");
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.Message)));
@@ -345,7 +345,7 @@ public class CodegenBatchFixTests
     public void Gap_Converter_ArrayInitializer_FullRoundtrip()
     {
         // C# array init → converter → Calor → parse → emit C# → should contain new int[]
-        var converter = new Migration.CSharpToCalorConverter();
+        var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var conversionResult = converter.Convert("int[] nums = new int[] { 1, 2, 3 };");
 
         Assert.True(conversionResult.Success, string.Join("\n", conversionResult.Issues.Select(i => i.Message)));
@@ -369,7 +369,7 @@ public class CodegenBatchFixTests
             }
             """;
 
-        var converter = new Migration.CSharpToCalorConverter();
+        var converter = new Migration.CSharpToCalorConverter(new Migration.ConversionOptions { Fidelity = Migration.ConversionFidelity.Lossy });
         var conversionResult = converter.Convert(csharpSource);
 
         Assert.True(conversionResult.Success, string.Join("\n", conversionResult.Issues.Select(i => i.Message)));

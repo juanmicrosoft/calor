@@ -295,7 +295,33 @@ public sealed class MigrateTool : McpToolBase
                 var totalFixes = fixes1.Count + fixes2.Count + fixes3.Count;
 
                 if (totalFixes > 0)
-                    await File.WriteAllTextAsync(path, fixedFinal, ct);
+                {
+                    var validation = Program.Compile(
+                        fixedFinal,
+                        path,
+                        new CompilationOptions
+                        {
+                            ContractMode = ContractMode.Off,
+                            UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                            CancellationToken = ct
+                        });
+                    if (validation.HasErrors)
+                    {
+                        perFile.Add(new MigrateFileResult
+                        {
+                            Path = Path.GetRelativePath(directory, path),
+                            Status = "fix_incomplete",
+                            Errors = BuildCompileEnvelope(validation, path, fixedFinal)
+                                .Where(entry => entry.Severity == "error")
+                                .ToList(),
+                            FixesApplied = totalFixes
+                        });
+                        continue;
+                    }
+
+                    await ConversionFileWriter.WriteAtomicAsync(path, fixedFinal, cancellationToken: ct);
+                }
 
                 perFile.Add(new MigrateFileResult
                 {
@@ -503,9 +529,6 @@ public sealed class MigrateTool : McpToolBase
 
                     if (totalFixes > 0)
                     {
-                        await File.WriteAllTextAsync(path, fixedFinal, ct);
-
-                        // Re-compile
                         var compileOptions = new CompilationOptions
                         {
                             ContractMode = ContractMode.Off,
@@ -514,6 +537,13 @@ public sealed class MigrateTool : McpToolBase
                             CancellationToken = ct
                         };
                         var recompile = Program.Compile(fixedFinal, path, compileOptions);
+                        if (!recompile.HasErrors)
+                        {
+                            await ConversionFileWriter.WriteAtomicAsync(
+                                path,
+                                fixedFinal,
+                                cancellationToken: ct);
+                        }
 
                         var relativePath = Path.GetRelativePath(directory, path);
                         var sourceKey = allPerFile.Keys

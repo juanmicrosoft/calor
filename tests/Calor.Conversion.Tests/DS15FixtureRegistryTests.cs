@@ -85,6 +85,7 @@ public class DS15FixtureRegistryTests
         // 3. Conversion match: input.cs converts to exactly expected.calr.
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = "Fixture",
             GracefulFallback = true,
             AutoGenerateIds = true

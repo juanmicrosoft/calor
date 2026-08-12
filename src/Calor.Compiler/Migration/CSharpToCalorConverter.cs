@@ -70,11 +70,10 @@ public enum ConversionMode
 public sealed class ConversionOptions
 {
     /// <summary>
-    /// Fidelity contract for the low-level conversion API. Legacy programmatic
-    /// callers retain lossy behavior unless they select Lossless; user-facing CLI,
-    /// MCP, and project-migration surfaces explicitly default to Lossless.
+    /// Fidelity contract for conversion. Lossless is the safe default; lossy
+    /// substitutions and drops require explicit caller opt-in.
     /// </summary>
-    public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossy;
+    public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
 
     /// <summary>
     /// The module name to use in the generated Calor code.
@@ -137,6 +136,12 @@ public sealed class ConversionOptions
     /// Default is <c>true</c> (matches <see cref="ConversionContext.UseImplicitCallCloser"/>).
     /// </summary>
     public bool UseImplicitCallCloser { get; set; } = true;
+
+    /// <summary>
+    /// Whether lossless conversion validates generated C# as a standalone unit.
+    /// Project migration disables this per file and validates all generated files together.
+    /// </summary>
+    public bool ValidateRoundTripCSharp { get; set; } = true;
 }
 
 /// <summary>
@@ -339,7 +344,7 @@ public sealed class CSharpToCalorConverter
 
             if (_options.Fidelity == ConversionFidelity.Lossless)
             {
-                ValidateLosslessRoundTrip(calorSource, context);
+                ValidateLosslessRoundTrip(calorSource, context, _options.ValidateRoundTripCSharp);
             }
 
             var destructiveLosses = context.Losses.Count(loss => loss.IsSemanticLoss);
@@ -454,30 +459,33 @@ public sealed class CSharpToCalorConverter
     /// </summary>
     private static void ReconcileEmitterFallbacks(string calorSource, ConversionContext context)
     {
-        var markers = CountOccurrences(calorSource, "§CSHARP{")
-                    + CountOccurrences(calorSource, "§CS{")
-                    + CountOccurrences(calorSource, "§RAW"); // "§/RAW" does not contain "§RAW"
-
-        var ledgered = context.Losses.Count(l => l.Kind == ConversionLossKind.InteropPreserved);
-        var unledgered = markers - ledgered;
-        for (var i = 0; i < unledgered; i++)
+        var markerLines = FindMarkerLines(calorSource);
+        var ledgered = context.Losses.Count(loss =>
+            loss.Kind is ConversionLossKind.InteropPreserved or ConversionLossKind.EmitterFallback);
+        foreach (var line in markerLines.Skip(ledgered))
         {
             context.RecordLoss(ConversionLossKind.EmitterFallback, "emitter-fallback",
                 "Raw C# fallback (§CS{…}/§RAW/§CSHARP) present in the emitted Calor without a ledger entry — " +
-                "produced by an emitter-internal fallback path; the output is not fully native");
+                "produced by an emitter-internal fallback path; location is in the generated Calor",
+                line);
         }
     }
 
-    private static int CountOccurrences(string text, string value)
+    private static List<int> FindMarkerLines(string text)
     {
-        var count = 0;
-        var index = 0;
-        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        var markers = new[] { "§CSHARP{", "§CS{", "§RAW" };
+        var lines = new List<int>();
+        foreach (var marker in markers)
         {
-            count++;
-            index += value.Length;
+            var index = 0;
+            while ((index = text.IndexOf(marker, index, StringComparison.Ordinal)) >= 0)
+            {
+                lines.Add(1 + text.AsSpan(0, index).Count('\n'));
+                index += marker.Length;
+            }
         }
-        return count;
+        lines.Sort();
+        return lines;
     }
 
     /// <summary>True if <paramref name="calorSource"/> lexes and parses without errors.</summary>
@@ -725,9 +733,17 @@ public sealed class CSharpToCalorConverter
         };
     }
 
-    private static void ValidateLosslessRoundTrip(string calorSource, ConversionContext context)
+    private static void ValidateLosslessRoundTrip(
+        string calorSource,
+        ConversionContext context,
+        bool validateGeneratedCSharp)
     {
         CompilationResult compileResult;
+        if (!validateGeneratedCSharp)
+        {
+            return;
+        }
+
         try
         {
             compileResult = global::Calor.Compiler.Program.Compile(
@@ -957,7 +973,7 @@ public static class Converter
         if (result.Success && result.CalorSource != null)
         {
             var calorPath = outputPath ?? Path.ChangeExtension(csharpPath, ".calr");
-            await File.WriteAllTextAsync(calorPath, result.CalorSource);
+            await ConversionFileWriter.WriteAtomicAsync(calorPath, result.CalorSource);
         }
 
         return result;
@@ -974,7 +990,7 @@ public static class Converter
         if (!result.HasErrors && !string.IsNullOrEmpty(result.GeneratedCode))
         {
             var csPath = outputPath ?? Path.ChangeExtension(calorPath, ".g.cs");
-            await File.WriteAllTextAsync(csPath, result.GeneratedCode);
+            await ConversionFileWriter.WriteAtomicAsync(csPath, result.GeneratedCode);
         }
 
         return result;

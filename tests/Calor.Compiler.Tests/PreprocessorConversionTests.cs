@@ -14,7 +14,11 @@ public class PreprocessorConversionTests
 {
     private static string ConvertToCalor(string csharpSource)
     {
-        var converter = new CSharpToCalorConverter(new ConversionOptions { StripPreprocessor = false });
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            StripPreprocessor = false
+        });
         var result = converter.Convert(csharpSource);
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
@@ -339,6 +343,7 @@ public class Test
 }";
         var result = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             StripPreprocessor = false
         }).Convert(csharp);
         Assert.False(result.Success);

@@ -44,7 +44,7 @@ public class E2ERoundtripTests
         // Arrange
         var outputCsPath = Path.Combine(scenarioPath, "output.g.cs");
         var csharpSource = File.ReadAllText(outputCsPath);
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
         // Act
         var result = converter.Convert(csharpSource, outputCsPath);
@@ -76,7 +76,7 @@ public class E2ERoundtripTests
         // Arrange
         var outputCsPath = Path.Combine(scenarioPath, "output.g.cs");
         var csharpSource = File.ReadAllText(outputCsPath);
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
         // Act - Convert C# to Calor
         var conversionResult = converter.Convert(csharpSource, outputCsPath);

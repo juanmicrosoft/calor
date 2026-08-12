@@ -283,7 +283,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -333,7 +333,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -357,7 +357,7 @@ public class ConverterQualityTests
             """;
 
         // C# → Calor
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var convResult = converter.Convert(csharp);
         Assert.True(convResult.Success, GetErrorMessage(convResult));
 
@@ -458,7 +458,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -485,7 +485,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -552,7 +552,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -582,7 +582,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -610,7 +610,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -651,7 +651,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -699,7 +699,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -732,7 +732,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -761,7 +761,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -788,7 +788,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -816,7 +816,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -846,7 +846,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -879,7 +879,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -910,7 +910,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -937,7 +937,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -970,7 +970,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -996,7 +996,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -1020,7 +1020,7 @@ public class ConverterQualityTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -1045,7 +1045,7 @@ public class Foo
         return result;
     }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
@@ -1080,7 +1080,7 @@ public class Foo
     }
     private void AddToken(string s) { }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
@@ -1106,7 +1106,7 @@ public class Foo
         return (byte[]?)value;
     }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);

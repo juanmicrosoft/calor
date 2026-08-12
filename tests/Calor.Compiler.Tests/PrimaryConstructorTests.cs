@@ -10,7 +10,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class PrimaryConstructorTests
 {
-    private readonly CSharpToCalorConverter _converter = new();
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
     [Fact]
     public void SimplePrimaryConstructor_SynthesizesFieldsAndConstructor()
