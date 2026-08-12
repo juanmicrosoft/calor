@@ -81,8 +81,6 @@ jobs:
 
       - name: Build
         env:
-          http_proxy: http://127.0.0.1:9
-          https_proxy: http://127.0.0.1:9
           HTTP_PROXY: http://127.0.0.1:9
           HTTPS_PROXY: http://127.0.0.1:9
         run: dotnet build -c Release --no-restore
@@ -186,8 +184,6 @@ jobs:
 
       - name: Pack offline and assert tracked worktree is unchanged
         env:
-          http_proxy: http://127.0.0.1:9
-          https_proxy: http://127.0.0.1:9
           HTTP_PROXY: http://127.0.0.1:9
           HTTPS_PROXY: http://127.0.0.1:9
         run: |
