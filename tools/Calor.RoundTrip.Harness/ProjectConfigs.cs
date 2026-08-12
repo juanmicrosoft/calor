@@ -63,6 +63,8 @@ public static class ProjectConfigs
             SolutionOrProjectFile = "SyntheticLib.Tests/SyntheticLib.Tests.csproj",
             DotnetPath = dotnetPath,
             TargetFramework = "net10.0",
+            MinimumCoverageFraction = 0.625,
+            MinimumNativeFraction = 0.625,
         };
     }
 
@@ -80,6 +82,8 @@ public static class ProjectConfigs
             SolutionOrProjectFile = "GeoLib.Tests/GeoLib.Tests.csproj",
             DotnetPath = dotnetPath,
             TargetFramework = "net10.0",
+            MinimumCoverageFraction = 0.25,
+            MinimumNativeFraction = 0.25,
         };
     }
 
@@ -108,6 +112,8 @@ public static class ProjectConfigs
         DotnetPath = dotnetPath,
         TargetFramework = "net8.0",
         ExtraBuildProperties = "-p:NuGetAudit=false -p:TreatWarningsAsErrors=false",
+        MinimumCoverageFraction = 0.55,
+        MinimumNativeFraction = 0.40,
     };
 
     // Serilog — pinned v4.3.1 (0597ddfb), Apache-2.0. Both library and test target
@@ -122,6 +128,17 @@ public static class ProjectConfigs
         DotnetPath = dotnetPath,
         TargetFramework = "net10.0",
         ExtraBuildProperties = "-p:NuGetAudit=false -p:TreatWarningsAsErrors=false",
+        // Known conversion breakers stay visible as denominator failures.
+        ExcludePatterns =
+        [
+            .. RoundTripConfig.DefaultExcludePatterns(),
+            "**/Core/Logger.cs",
+            "**/Core/Sinks/RestrictedSink.cs",
+            "**/Core/Sinks/SecondaryLoggerSink.cs",
+            "**/Rendering/ReusableStringWriter.cs",
+        ],
+        MinimumCoverageFraction = 0.30,
+        MinimumNativeFraction = 0.25,
     };
 
     // FluentValidation — pinned 12.1.1 (71b3c60c), Apache-2.0. Library targets
@@ -136,5 +153,7 @@ public static class ProjectConfigs
         DotnetPath = dotnetPath,
         TargetFramework = "net8.0",
         ExtraBuildProperties = "-p:NuGetAudit=false -p:TreatWarningsAsErrors=false",
+        MinimumCoverageFraction = 0.50,
+        MinimumNativeFraction = 0.48,
     };
 }

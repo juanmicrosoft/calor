@@ -43,6 +43,7 @@ public class TrxParserTests
             Assert.Equal(3, results.Count);
 
             Assert.Equal("Test1", results[0].TestName);
+            Assert.Equal("id-1", results[0].TestCaseId);
             Assert.Equal("Passed", results[0].Outcome);
 
             Assert.Equal("Test2", results[1].TestName);
@@ -128,6 +129,8 @@ public class TrxParserTests
             Assert.Equal("alpha.tests.dll", r.Assembly);
             Assert.Equal("Alpha.Tests.Suite", r.ClassName);
             Assert.Equal("executor://xunit/VsTestRunner2/netcoreapp", r.ExecutorUri);
+            Assert.Equal("Alpha.Tests.Suite.TestA", r.FullyQualifiedName);
+            Assert.Equal("id-0", r.TestCaseId);
             Assert.Contains("alpha.tests.dll", r.Identity);
             Assert.Contains("Alpha.Tests.Suite", r.Identity);
         }
@@ -146,13 +149,14 @@ public class TrxParserTests
 
         try
         {
-            // Two assemblies, each with its own TRX — including a DUPLICATE display name.
+            // Two projects with the same assembly/class/display identity. Project
+            // provenance from the TRX path must keep them distinct.
             File.WriteAllText(
                 Path.Combine(tmpDir, "A", "TestResults", "results.trx"),
-                MakeTrx("alpha.tests.dll", "Alpha.Tests.Suite", ("SharedName", "Passed"), ("OnlyInA", "Passed")));
+                MakeTrx("shared.tests.dll", "Shared.Tests.Suite", ("SharedName", "Passed"), ("OnlyInA", "Passed")));
             File.WriteAllText(
                 Path.Combine(tmpDir, "B", "TestResults", "results.trx"),
-                MakeTrx("beta.tests.dll", "Beta.Tests.Suite", ("SharedName", "Failed"), ("OnlyInB", "Passed")));
+                MakeTrx("shared.tests.dll", "Shared.Tests.Suite", ("SharedName", "Failed"), ("OnlyInB", "Passed")));
 
             var (results, trxFiles, parseErrors) = TrxParser.ParseAll(tmpDir);
 
@@ -166,11 +170,37 @@ public class TrxParserTests
             var shared = results.Where(r => r.TestName == "SharedName").ToList();
             Assert.Equal(2, shared.Count);
             Assert.NotEqual(shared[0].Identity, shared[1].Identity);
+            Assert.Equal(["A", "B"], shared.Select(result => result.Project).Order().ToArray());
         }
         finally
         {
             Directory.Delete(tmpDir, true);
         }
+    }
+
+    [Fact]
+    public void Identity_IncludesFullyQualifiedNameAndTheoryDataRow()
+    {
+        var first = new TestResult
+        {
+            Project = "Tests",
+            Assembly = "tests.dll",
+            ExecutorUri = "executor://xunit",
+            FullyQualifiedName = "Suite.Theory",
+            TestCaseId = "row-1",
+            TestName = "Suite.Theory(value: 1)",
+        };
+        var second = new TestResult
+        {
+            Project = first.Project,
+            Assembly = first.Assembly,
+            ExecutorUri = first.ExecutorUri,
+            FullyQualifiedName = first.FullyQualifiedName,
+            TestCaseId = "row-2",
+            TestName = "Suite.Theory(value: 2)",
+        };
+
+        Assert.NotEqual(first.Identity, second.Identity);
     }
 
     [Fact]

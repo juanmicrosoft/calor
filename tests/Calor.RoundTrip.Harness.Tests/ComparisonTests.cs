@@ -143,6 +143,32 @@ public class ComparisonTests
     }
 
     [Fact]
+    public void NonzeroExitWithCompleteStructuredFailures_ReportsRegressions()
+    {
+        var baseline = MakeTestRun("Test1:Passed", "Test2:Passed");
+        var roundTrip = new TestRunResult
+        {
+            ExitCode = 1,
+            TotalTests = 2,
+            Passed = 1,
+            Failed = 1,
+            Results =
+            [
+                new TestResult { TestName = "Test1", Outcome = "Passed" },
+                new TestResult { TestName = "Test2", Outcome = "Failed" },
+            ],
+        };
+
+        var result = Compare(
+            baseline,
+            roundTrip,
+            new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
+        Assert.Equal("Test2", Assert.Single(result.Regressions).TestName);
+    }
+
+    [Fact]
     public void ReducedTestInventory_ReturnsIncomplete()
     {
         var baseline = MakeTestRun("Test1:Passed", "Test2:Passed");
@@ -187,7 +213,7 @@ public class ComparisonTests
     }
 
     [Fact]
-    public void DuplicateTheoryIdentities_AreComparedAsAMultiset()
+    public void DuplicateTheoryIdentities_CompareOutcomeCounts()
     {
         var baseline = MakeRun(
             ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
@@ -199,7 +225,52 @@ public class ComparisonTests
         var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
 
         Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
-        Assert.Single(result.Regressions);
+        Assert.Equal("Failed", Assert.Single(result.Regressions).Outcome);
+    }
+
+    [Fact]
+    public void DuplicateTheoryIdentities_WithUnchangedOutcomes_Pass()
+    {
+        var baseline = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"));
+        var roundTrip = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"));
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Pass, result.Status);
+        Assert.Empty(result.Regressions);
+    }
+
+    [Fact]
+    public void DuplicateTheoryIdentity_CountChange_IsIncomplete()
+    {
+        var baseline = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"));
+        var roundTrip = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"));
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+    }
+
+    [Fact]
+    public void SameTheoryDisplayName_WithDistinctCaseIds_DetectsRegression()
+    {
+        var baseline = MakeTheoryRun(("row-1", "Passed"), ("row-2", "Passed"));
+        var roundTrip = MakeTheoryRun(("row-1", "Passed"), ("row-2", "Failed"));
+
+        var result = Compare(
+            baseline,
+            roundTrip,
+            new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
+        Assert.Equal("row-2", Assert.Single(result.Regressions).TestCaseId);
     }
 
     [Fact]
@@ -277,10 +348,33 @@ public class ComparisonTests
 
         return new TestRunResult
         {
-            ExitCode = results.Any(r => r.Outcome == "Failed") ? 1 : 0,
+            ExitCode = 0,
             TotalTests = results.Count,
             Passed = results.Count(r => r.Outcome == "Passed"),
             Failed = results.Count(r => r.Outcome == "Failed"),
+            Results = results,
+        };
+    }
+
+    private static TestRunResult MakeTheoryRun(
+        params (string TestCaseId, string Outcome)[] entries)
+    {
+        var results = entries.Select(entry => new TestResult
+        {
+            Project = "Tests",
+            Assembly = "tests.dll",
+            ExecutorUri = "executor://xunit",
+            FullyQualifiedName = "Suite.Theory",
+            TestCaseId = entry.TestCaseId,
+            TestName = "Suite.Theory(value: duplicate)",
+            Outcome = entry.Outcome,
+        }).ToList();
+        return new TestRunResult
+        {
+            ExitCode = results.Any(result => result.Outcome == "Failed") ? 1 : 0,
+            TotalTests = results.Count,
+            Passed = results.Count(result => result.Outcome == "Passed"),
+            Failed = results.Count(result => result.Outcome == "Failed"),
             Results = results,
         };
     }
@@ -295,7 +389,7 @@ public class ComparisonTests
 
         return new TestRunResult
         {
-            ExitCode = results.Any(r => r.Outcome == "Failed") ? 1 : 0,
+            ExitCode = 0,
             TotalTests = results.Count,
             Passed = results.Count(r => r.Outcome == "Passed"),
             Failed = results.Count(r => r.Outcome == "Failed"),

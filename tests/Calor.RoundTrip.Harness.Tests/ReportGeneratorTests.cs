@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Calor.Compiler.Migration;
 using Calor.RoundTrip.Harness;
 using Xunit;
 
@@ -64,7 +65,7 @@ public class ReportGeneratorTests
         var json = ReportGenerator.GenerateJson(report);
 
         var doc = JsonDocument.Parse(json);
-        Assert.Equal("buildfailed", doc.RootElement.GetProperty("verdict").GetString());
+        Assert.Equal("fail", doc.RootElement.GetProperty("verdict").GetString());
         Assert.False(doc.RootElement.GetProperty("build_succeeded").GetBoolean());
     }
 
@@ -72,14 +73,18 @@ public class ReportGeneratorTests
     public void GenerateJson_FileCounts_AreAccurate()
     {
         var report = CreatePassingReport();
+        report.ExcludedFileCount = 2;
+        report.Fidelity = ProjectFidelity.Compute(report);
         var json = ReportGenerator.GenerateJson(report);
 
         var doc = JsonDocument.Parse(json);
         var files = doc.RootElement.GetProperty("files");
 
-        Assert.Equal(3, files.GetProperty("total").GetInt32());
+        Assert.Equal(5, files.GetProperty("total").GetInt32());
         Assert.Equal(2, files.GetProperty("replaced").GetInt32());
         Assert.Equal(1, files.GetProperty("compile_error").GetInt32());
+        Assert.Equal(2, files.GetProperty("excluded_by_pattern").GetInt32());
+        Assert.Contains("2/5 (40.0%)", ReportGenerator.GenerateMarkdown(report));
     }
 
     [Fact]
@@ -92,6 +97,21 @@ public class ReportGeneratorTests
             Status = FileStatus.Reverted,
             RevertReason = "build-recovery round 1",
         });
+        report.FileResults[0].ApplyLossLedger(
+        [
+            new()
+            {
+                Kind = ConversionLossKind.InteropPreserved,
+                Feature = "record",
+                Description = "preserved as interop"
+            },
+            new()
+            {
+                Kind = ConversionLossKind.Dropped,
+                Feature = "checked-expression",
+                Description = "overflow semantics dropped"
+            },
+        ]);
         report.Fidelity = ProjectFidelity.Compute(report);
         var json = ReportGenerator.GenerateJson(report);
 
@@ -102,6 +122,10 @@ public class ReportGeneratorTests
         Assert.Equal(4, coverage.GetProperty("total_convertible_files").GetInt32());
         Assert.Equal(1, coverage.GetProperty("reverted").GetInt32());
         Assert.Equal(0.5, coverage.GetProperty("coverage_fraction").GetDouble());
+        Assert.Equal(1, coverage.GetProperty("total_interop_blocks").GetInt32());
+        Assert.Equal(
+            "checked-expression",
+            coverage.GetProperty("distinct_gaps")[0].GetString());
 
         var build = fidelity.GetProperty("build");
         Assert.True(build.GetProperty("succeeded").GetBoolean());
@@ -187,42 +211,50 @@ public class ReportGeneratorTests
         return report;
     }
 
-    private static RoundTripReport CreatePassingReport() => new()
+    private static RoundTripReport CreatePassingReport()
     {
-        ProjectName = "TestProject",
-        CalorVersion = "0.2.9",
-        StartedAt = DateTimeOffset.UtcNow.AddSeconds(-10),
-        FinishedAt = DateTimeOffset.UtcNow,
-        Baseline = new TestRunResult
+        var report = new RoundTripReport
         {
-            ExitCode = 0, TotalTests = 10, Passed = 10, Failed = 0, Skipped = 0,
-            Results = Enumerable.Range(1, 10).Select(i => new TestResult
+            ProjectName = "TestProject",
+            CalorVersion = "0.2.9",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-10),
+            FinishedAt = DateTimeOffset.UtcNow,
+            BaselineBuildResult = new BuildResult { Succeeded = true, ExitCode = 0 },
+            Baseline = new TestRunResult
             {
-                TestName = $"Test{i}", Outcome = "Passed"
-            }).ToList(),
-        },
-        FileResults =
-        [
-            new() { FilePath = "Lib/Foo.cs", Status = FileStatus.Replaced, ConversionRate = 100 },
-            new() { FilePath = "Lib/Bar.cs", Status = FileStatus.Replaced, ConversionRate = 95 },
-            new() { FilePath = "Lib/Baz.cs", Status = FileStatus.CompileError, ConversionRate = 80, Errors = ["Parse error"] },
-        ],
-        BuildResult = new BuildResult { Succeeded = true, ExitCode = 0 },
-        RoundTripTests = new TestRunResult
-        {
-            ExitCode = 0, TotalTests = 10, Passed = 10, Failed = 0, Skipped = 0,
-            Results = Enumerable.Range(1, 10).Select(i => new TestResult
+                ExitCode = 0, TotalTests = 10, Passed = 10, Failed = 0, Skipped = 0,
+                TrxFiles = ["baseline.trx"],
+                Results = Enumerable.Range(1, 10).Select(i => new TestResult
+                {
+                    TestName = $"Test{i}", Outcome = "Passed"
+                }).ToList(),
+            },
+            FileResults =
+            [
+                new() { FilePath = "Lib/Foo.cs", Status = FileStatus.Replaced, ConversionRate = 100 },
+                new() { FilePath = "Lib/Bar.cs", Status = FileStatus.Replaced, ConversionRate = 95 },
+                new() { FilePath = "Lib/Baz.cs", Status = FileStatus.CompileError, ConversionRate = 80, Errors = ["Parse error"] },
+            ],
+            BuildResult = new BuildResult { Succeeded = true, ExitCode = 0 },
+            RoundTripTests = new TestRunResult
             {
-                TestName = $"Test{i}", Outcome = "Passed"
-            }).ToList(),
-        },
-        Comparison = new TestComparison
-        {
-            Status = ComparisonStatus.Pass,
-            BaselineTotal = 10, BaselinePassed = 10,
-            RoundTripTotal = 10, RoundTripPassed = 10,
-        },
-    };
+                ExitCode = 0, TotalTests = 10, Passed = 10, Failed = 0, Skipped = 0,
+                TrxFiles = ["roundtrip.trx"],
+                Results = Enumerable.Range(1, 10).Select(i => new TestResult
+                {
+                    TestName = $"Test{i}", Outcome = "Passed"
+                }).ToList(),
+            },
+            Comparison = new TestComparison
+            {
+                Status = ComparisonStatus.Pass,
+                BaselineTotal = 10, BaselinePassed = 10,
+                RoundTripTotal = 10, RoundTripPassed = 10,
+            },
+        };
+        report.Fidelity = ProjectFidelity.Compute(report);
+        return report;
+    }
 
     private static RoundTripReport CreateBuildFailedReport() => new()
     {

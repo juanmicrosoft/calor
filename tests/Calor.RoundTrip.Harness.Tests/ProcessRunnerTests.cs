@@ -72,4 +72,21 @@ public class ProcessRunnerTests
         Assert.NotNull(root);
         Assert.True(Directory.Exists(root));
     }
+
+    [Fact]
+    public async Task RunAsync_CancellationTerminatesChildProcess()
+    {
+        var (fileName, arguments) = OperatingSystem.IsWindows()
+            ? ("cmd.exe", "/c ping -n 30 127.0.0.1 > nul")
+            : ("/bin/sh", "-c \"sleep 30\"");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            ProcessRunner.RunAsync(
+                fileName,
+                arguments,
+                Directory.GetCurrentDirectory(),
+                TimeSpan.FromMinutes(1),
+                cancellationToken: cancellation.Token));
+    }
 }

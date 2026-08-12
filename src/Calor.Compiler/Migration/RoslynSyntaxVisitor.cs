@@ -15,6 +15,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 {
     private readonly ConversionContext _context;
     private readonly SemanticModel? _semanticModel;
+    private readonly CancellationToken _cancellationToken;
     private readonly List<UsingDirectiveNode> _usings = new();
     private readonly List<InterfaceDefinitionNode> _interfaces = new();
     private readonly List<ClassDefinitionNode> _classes = new();
@@ -56,10 +57,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     public IReadOnlyList<StatementNode> TopLevelStatements => _topLevelStatements;
 
-    public RoslynSyntaxVisitor(ConversionContext context, SemanticModel? semanticModel = null) : base(SyntaxWalkerDepth.Node)
+    public RoslynSyntaxVisitor(
+        ConversionContext context,
+        SemanticModel? semanticModel = null)
+        : this(context, semanticModel, CancellationToken.None)
+    {
+    }
+
+    public RoslynSyntaxVisitor(
+        ConversionContext context,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken)
+        : base(SyntaxWalkerDepth.Node)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _semanticModel = semanticModel;
+        _cancellationToken = cancellationToken;
+    }
+
+    public override void Visit(SyntaxNode? node)
+    {
+        _cancellationToken.ThrowIfCancellationRequested();
+        base.Visit(node);
     }
 
     /// <summary>
@@ -67,6 +86,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     public ModuleNode Convert(CompilationUnitSyntax root, string moduleName)
     {
+        _cancellationToken.ThrowIfCancellationRequested();
         // Sanitize module name: strip backtick (C# generic arity indicator e.g. MyType`2)
         // and @ prefix to avoid lexer conflicts
         moduleName = moduleName.Replace("`", "").Replace("@", "");
@@ -88,10 +108,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // two or more namespaces, so those types are refused (interop) instead of
         // silently merged when the module flattens all namespaces.
         ScanCrossNamespaceCollisions(root);
+        _cancellationToken.ThrowIfCancellationRequested();
 
         // Scan for module-level #if blocks wrapping type declarations
         // (disabled by preprocessor — Roslyn excludes them from the tree)
         ScanModuleLevelPreprocessorBlocks(root);
+        _cancellationToken.ThrowIfCancellationRequested();
 
         // Visit all nodes
         Visit(root);

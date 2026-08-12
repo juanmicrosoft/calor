@@ -26,7 +26,8 @@ public sealed class RoundTripConfig
     public string? WorkingDirectory { get; init; }
 
     /// <summary>
-    /// Files/patterns to EXCLUDE from conversion.
+    /// Source files/patterns to EXCLUDE from conversion. Build outputs under
+    /// bin/ and obj/ are not source candidates and are removed before matching.
     /// </summary>
     public List<string> ExcludePatterns { get; init; } = DefaultExcludePatterns();
 
@@ -43,6 +44,9 @@ public sealed class RoundTripConfig
     /// than trusting it, but the generous timeout keeps normal cold-cache runs valid.
     /// </summary>
     public TimeSpan BuildTimeout { get; init; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>Maximum time allowed for one in-process source conversion.</summary>
+    public TimeSpan ConversionTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>dotnet test additional arguments (e.g., --filter for specific tests).</summary>
     public string? TestFilter { get; init; }
@@ -70,6 +74,14 @@ public sealed class RoundTripConfig
 
     /// <summary>Maximum regressions to trigger bisect.</summary>
     public int BisectMaxRegressions { get; init; } = 50;
+
+    /// <summary>Minimum fraction of all candidate files that must be converted and kept.</summary>
+    public double MinimumCoverageFraction { get; init; }
+
+    /// <summary>Minimum fraction of all candidate files that must be converted natively with zero losses.</summary>
+    public double MinimumNativeFraction { get; init; }
+
+    internal Action<string>? FileConversionStarted { get; init; }
 
     public static List<string> DefaultExcludePatterns() =>
     [
