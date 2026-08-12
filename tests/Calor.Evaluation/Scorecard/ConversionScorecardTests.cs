@@ -26,8 +26,8 @@ public class ConversionScorecardTests
     // Baselines are exact (no slack): the corpus and converter are
     // deterministic, and per-fixture zero-regression is enforced against
     // baseline.json by NoRegressionsVsCommittedBaseline.
-    private const int BASELINE_FULLY_CONVERTED = 93;
-    private const int BASELINE_ROUNDTRIP = 93;
+    private const int BASELINE_FULLY_CONVERTED = 95;
+    private const int BASELINE_ROUNDTRIP = 95;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
     {
@@ -61,8 +61,7 @@ public class ConversionScorecardTests
     public void ConversionRate_AboveBaseline()
     {
         _output.WriteLine($"Fully converted: {Scorecard.FullyConverted}/{Scorecard.Total} (baseline: {BASELINE_FULLY_CONVERTED})");
-        Assert.True(Scorecard.FullyConverted >= BASELINE_FULLY_CONVERTED,
-            $"Fully converted {Scorecard.FullyConverted} < baseline {BASELINE_FULLY_CONVERTED}");
+        Assert.Equal(BASELINE_FULLY_CONVERTED, Scorecard.FullyConverted);
     }
 
     [Fact]
@@ -82,8 +81,7 @@ public class ConversionScorecardTests
     public void RoundTrip_AboveBaseline()
     {
         _output.WriteLine($"Round-trip: {Scorecard.RoundTripPassing}/{Scorecard.Total} (baseline: {BASELINE_ROUNDTRIP})");
-        Assert.True(Scorecard.RoundTripPassing >= BASELINE_ROUNDTRIP,
-            $"Round-trip {Scorecard.RoundTripPassing} < baseline {BASELINE_ROUNDTRIP}");
+        Assert.Equal(BASELINE_ROUNDTRIP, Scorecard.RoundTripPassing);
     }
 
     [Fact]
@@ -119,14 +117,15 @@ public class ConversionScorecardTests
     public async Task NoRegressionsVsCommittedBaseline()
     {
         var baselinePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scorecard", "baseline.json");
-        if (!File.Exists(baselinePath))
-        {
-            _output.WriteLine($"Baseline not found at {baselinePath} — skipping regression check");
-            return;
-        }
+        Assert.True(File.Exists(baselinePath),
+            $"Committed scorecard baseline is missing: {baselinePath}");
 
         var baseline = await ScorecardComparison.LoadBaselineAsync(baselinePath);
         var diff = ScorecardComparison.Compare(baseline, Scorecard);
+
+        Assert.Equal(
+            baseline.Results.Select(result => result.Id).OrderBy(id => id),
+            Scorecard.Results.Select(result => result.Id).OrderBy(id => id));
 
         _output.WriteLine($"Baseline: {baseline.RoundTripPassing}/{baseline.Total}");
         _output.WriteLine($"Current:  {Scorecard.RoundTripPassing}/{Scorecard.Total}");

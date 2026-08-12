@@ -34,6 +34,10 @@ public static class TestHelpers
     /// Returns null if there are parse errors or parser throws.
     /// </summary>
     public static string? CompileCalorToCSharp(string calorSource)
+        => CompileCalorToCSharpWithDiagnostics(calorSource).GeneratedCode;
+
+    public static CalorCompilationAttempt CompileCalorToCSharpWithDiagnostics(
+        string calorSource)
     {
         try
         {
@@ -42,20 +46,28 @@ public static class TestHelpers
 
             var lexer = new Lexer(calorSource, diagnostics);
             var tokens = lexer.TokenizeAllForParser();
-            if (diagnostics.HasErrors) return null;
+            if (diagnostics.HasErrors)
+                return new CalorCompilationAttempt(null, FormatDiagnostics(diagnostics));
 
             var parser = new Parser(tokens, diagnostics);
             var module = parser.Parse();
-            if (diagnostics.HasErrors) return null;
+            if (diagnostics.HasErrors)
+                return new CalorCompilationAttempt(null, FormatDiagnostics(diagnostics));
 
             var emitter = new CSharpEmitter();
-            return emitter.Emit(module);
+            return new CalorCompilationAttempt(
+                emitter.Emit(module),
+                FormatDiagnostics(diagnostics));
         }
-        catch
+        catch (Exception ex)
         {
-            // Parser may throw for unsupported Calor syntax
-            return null;
+            return new CalorCompilationAttempt(
+                null,
+                [$"Compiler exception: {ex.GetType().Name}: {ex.Message}"]);
         }
+
+        static IReadOnlyList<string> FormatDiagnostics(DiagnosticBag diagnostics)
+            => diagnostics.Select(diagnostic => diagnostic.ToString()).ToList();
     }
 
     /// <summary>
@@ -75,6 +87,10 @@ public static class TestHelpers
     public static RoundTripResult FullRoundTrip(string csharpSource, string? moduleName = null)
     {
         var conversionResult = ConvertCSharp(csharpSource, moduleName);
+        var semanticLosses = conversionResult.Losses
+            .Where(loss => loss.IsSemanticLoss)
+            .Select(loss => loss.ToString())
+            .ToList();
 
         if (!conversionResult.Success || conversionResult.CalorSource == null)
         {
@@ -82,10 +98,13 @@ public static class TestHelpers
             {
                 ConversionSuccess = false,
                 ConversionIssues = conversionResult.Issues.Select(i => i.Message).ToList(),
+                SemanticLosses = semanticLosses,
             };
         }
 
-        var emittedCSharp = CompileCalorToCSharp(conversionResult.CalorSource);
+        var calorCompilation = CompileCalorToCSharpWithDiagnostics(
+            conversionResult.CalorSource);
+        var emittedCSharp = calorCompilation.GeneratedCode;
 
         if (emittedCSharp == null)
         {
@@ -94,6 +113,8 @@ public static class TestHelpers
                 ConversionSuccess = true,
                 CalorSource = conversionResult.CalorSource,
                 CalorParseSuccess = false,
+                CalorDiagnostics = calorCompilation.Diagnostics.ToList(),
+                SemanticLosses = semanticLosses,
             };
         }
 
@@ -104,10 +125,12 @@ public static class TestHelpers
             ConversionSuccess = true,
             CalorSource = conversionResult.CalorSource,
             CalorParseSuccess = true,
+            CalorDiagnostics = calorCompilation.Diagnostics.ToList(),
             EmittedCSharp = emittedCSharp,
             RoslynErrors = validation.FormattedCompilationErrors.ToList(),
             CSharpSyntaxSuccess = validation.SyntaxSuccess,
             RoslynSuccess = validation.CompilationSuccess,
+            SemanticLosses = semanticLosses,
         };
     }
 
@@ -127,8 +150,10 @@ public sealed class RoundTripResult
     public List<string> ConversionIssues { get; init; } = new();
     public string? CalorSource { get; init; }
     public bool CalorParseSuccess { get; init; }
+    public List<string> CalorDiagnostics { get; init; } = new();
     public string? EmittedCSharp { get; init; }
     public List<string> RoslynErrors { get; init; } = new();
+    public List<string> SemanticLosses { get; init; } = new();
 
     /// <summary>The emitted C# parses with zero syntax errors (#771 split status).</summary>
     public bool CSharpSyntaxSuccess { get; init; }
@@ -136,5 +161,14 @@ public sealed class RoundTripResult
     /// <summary>The emitted C# compiles with zero Roslyn errors (full semantic compilation).</summary>
     public bool RoslynSuccess { get; init; }
 
-    public bool FullSuccess => ConversionSuccess && CalorParseSuccess && RoslynSuccess;
+    public bool CSharpCompilationSuccess => RoslynSuccess;
+
+    public bool FullSuccess => ConversionSuccess &&
+        CalorParseSuccess &&
+        RoslynSuccess &&
+        SemanticLosses.Count == 0;
 }
+
+public sealed record CalorCompilationAttempt(
+    string? GeneratedCode,
+    IReadOnlyList<string> Diagnostics);

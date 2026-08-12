@@ -81,7 +81,8 @@ public static class ScorecardReportGenerator
             sb.AppendLine("|----|------|--------|-----------|");
             foreach (var r in failed)
             {
-                var topIssue = r.ConversionIssues.FirstOrDefault()
+                var topIssue = r.SemanticLossDiagnostics.FirstOrDefault()
+                    ?? r.ConversionIssues.FirstOrDefault()
                     ?? r.CompilationDiagnostics.FirstOrDefault()
                     ?? "-";
                 // Truncate long issues for table readability

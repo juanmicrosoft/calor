@@ -381,6 +381,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -453,15 +455,26 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            const { execFileSync } = require('child_process');
             const current = JSON.parse(fs.readFileSync('conversion-scorecard.json', 'utf8'));
 
-            // Load committed baseline
             const baselinePath = 'tests/Calor.Evaluation/Scorecard/baseline.json';
-            if (!fs.existsSync(baselinePath)) {
-              core.warning('No baseline.json found — skipping regression check');
-              return;
+            let baselineJson;
+            if (context.eventName === 'pull_request') {
+              const baseSha = context.payload.pull_request.base.sha;
+              baselineJson = execFileSync(
+                'git',
+                ['show', `${baseSha}:${baselinePath}`],
+                { encoding: 'utf8' });
+              core.info(`Comparing against baseline from PR base ${baseSha}`);
+            } else {
+              if (!fs.existsSync(baselinePath)) {
+                core.setFailed(`Committed scorecard baseline is missing: ${baselinePath}`);
+                return;
+              }
+              baselineJson = fs.readFileSync(baselinePath, 'utf8');
             }
-            const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+            const baseline = JSON.parse(baselineJson);
 
             // Compare round-trip counts
             const baselineRt = baseline.roundTripPassing;
@@ -473,19 +486,33 @@ jobs:
             core.info(`Delta: ${delta >= 0 ? '+' : ''}${delta}`);
 
             // Detect per-snippet regressions
-            const baselineById = {};
-            for (const r of baseline.results) baselineById[r.id] = r;
+            const currentById = {};
+            for (const r of current.results) currentById[r.id] = r;
 
             const regressions = [];
-            for (const r of current.results) {
-              const b = baselineById[r.id];
-              if (!b) continue;
-              // W1 Slice 3: roslynParseSuccess split into cSharpSyntaxSuccess +
-              // cSharpCompilationSuccess — reading the old field would be
-              // undefined and silently fail-open (no regression ever flagged).
-              const bPass = b.conversionSuccess && b.compilationSuccess && b.cSharpSyntaxSuccess && b.cSharpCompilationSuccess;
-              const cPass = r.conversionSuccess && r.compilationSuccess && r.cSharpSyntaxSuccess && r.cSharpCompilationSuccess;
-              if (bPass && !cPass) regressions.push(r.id);
+            const statusRank = {
+              Crashed: 0,
+              Blocked: 1,
+              PartiallyConverted: 2,
+              FullyConverted: 3,
+            };
+            for (const b of baseline.results) {
+              const r = currentById[b.id];
+              if (!r) {
+                regressions.push(b.id);
+                continue;
+              }
+              const bPass = b.conversionSuccess &&
+                b.compilationSuccess &&
+                b.cSharpCompilationSuccess &&
+                (b.semanticLossCount ?? 0) === 0;
+              const cPass = r.conversionSuccess &&
+                r.compilationSuccess &&
+                r.cSharpCompilationSuccess &&
+                (r.semanticLossCount ?? 0) === 0;
+              if (statusRank[r.status] < statusRank[b.status] || (bPass && !cPass)) {
+                regressions.push(b.id);
+              }
             }
 
             if (regressions.length > 0) {

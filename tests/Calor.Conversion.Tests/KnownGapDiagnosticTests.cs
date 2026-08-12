@@ -36,26 +36,33 @@ public class KnownGapDiagnosticTests
 
     [Theory]
     [MemberData(nameof(KnownGapData))]
-    public void KnownGap_ProducesOutputOrDiagnostic(string id, string description, string csharpSource)
+    public void KnownGap_OutputCompilesOrConversionFailsExplicitly(
+        string id,
+        string description,
+        string csharpSource)
     {
         _output.WriteLine($"[{id}] {description}");
 
-        var result = TestHelpers.ConvertCSharp(csharpSource, $"Gap_{id.Replace("-", "_")}");
+        var conversion = TestHelpers.ConvertCSharp(
+            csharpSource, $"Gap_{id.Replace("-", "_")}");
+        var result = TestHelpers.FullRoundTrip(
+            csharpSource, $"Gap_{id.Replace("-", "_")}");
 
-        // Must produce EITHER:
-        // 1. CalorSource output (with graceful fallback/TODO comments), OR
-        // 2. Clear diagnostic issues in the result
-        var hasOutput = result.CalorSource != null && result.CalorSource.Length > 0;
-        var hasDiagnostics = result.Issues.Count > 0;
+        if (!result.ConversionSuccess)
+        {
+            Assert.NotEmpty(result.ConversionIssues);
+            return;
+        }
 
-        _output.WriteLine($"  Success: {result.Success}");
-        _output.WriteLine($"  Has output: {hasOutput}");
-        _output.WriteLine($"  Diagnostics: {result.Issues.Count}");
-        foreach (var issue in result.Issues)
-            _output.WriteLine($"    - {issue.Message}");
-
-        Assert.True(hasOutput || hasDiagnostics,
-            $"[{id}] {description}: Expected either Calor output or diagnostics, got neither.");
+        Assert.True(
+            result.CalorParseSuccess,
+            $"[{id}] fallback Calor failed to compile: " +
+            string.Join("; ", result.CalorDiagnostics));
+        if (!result.CSharpCompilationSuccess)
+        {
+            Assert.Contains(conversion.Losses, loss => loss.IsSemanticLoss);
+            Assert.NotEmpty(result.RoslynErrors);
+        }
     }
 
     [Theory]

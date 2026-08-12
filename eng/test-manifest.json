@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "projects": [
     { "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 6806, "expectedSkipped": 2 },
-    { "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 370, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 374, "expectedSkipped": 0 },
     { "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 309, "expectedSkipped": 0 },
-    { "path": "tests/Calor.Evaluation/Calor.Evaluation.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 198, "expectedSkipped": 0 },
+    { "path": "tests/Calor.Evaluation/Calor.Evaluation.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 202, "expectedSkipped": 0 },
     { "path": "tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 21, "expectedSkipped": 0 },
     { "path": "tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 389, "expectedSkipped": 0 },
     { "path": "tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 42, "expectedSkipped": 0 },

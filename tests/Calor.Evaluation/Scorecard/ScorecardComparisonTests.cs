@@ -185,6 +185,72 @@ public class ScorecardComparisonTests
         Assert.Equal(0, diff.ConversionDelta);
     }
 
+    [Fact]
+    public void Compare_FailsWhenFixtureDropsFromPartialToBlocked()
+    {
+        var baseline = MakeScorecard(("001", false));
+        var currentResult = MakeScorecard(("001", false)).Results[0] with
+        {
+            Status = SnippetStatus.Blocked,
+            CompilationSuccess = false
+        };
+        var current = MakeScorecard(("001", false)) with
+        {
+            Results = [currentResult],
+            PartiallyConverted = 0,
+            Blocked = 1
+        };
+
+        var diff = ScorecardComparison.Compare(baseline, current);
+
+        Assert.Equal(["001"], diff.Regressions);
+    }
+
+    [Fact]
+    public void Compare_FailsWhenBaselineFixtureIsMissing()
+    {
+        var baseline = MakeScorecard(("001", true), ("002", true));
+        var current = MakeScorecard(("001", true));
+
+        var diff = ScorecardComparison.Compare(baseline, current);
+
+        Assert.Equal(["002"], diff.Regressions);
+    }
+
+    [Fact]
+    public void RoundTripSuccess_RejectsSemanticLossEvenWhenCompilationPasses()
+    {
+        var result = MakeScorecard(("001", true)).Results[0] with
+        {
+            SemanticLossCount = 1,
+            SemanticLossDiagnostics = ["Dropped checked-overflow semantics"]
+        };
+
+        Assert.False(result.RoundTripSuccess);
+    }
+
+    [Fact]
+    public void MarkdownReport_SurfacesSemanticLossDiagnostic()
+    {
+        var result = MakeScorecard(("001", true)).Results[0] with
+        {
+            Status = SnippetStatus.PartiallyConverted,
+            SemanticLossCount = 1,
+            SemanticLossDiagnostics = ["Dropped checked-overflow semantics"]
+        };
+        var scorecard = MakeScorecard(("001", true)) with
+        {
+            FullyConverted = 0,
+            PartiallyConverted = 1,
+            RoundTripPassing = 0,
+            Results = [result]
+        };
+
+        var markdown = ScorecardReportGenerator.GenerateMarkdown(scorecard);
+
+        Assert.Contains("Dropped checked-overflow semantics", markdown);
+    }
+
     private static ConversionScorecard MakeScorecard(params (string id, bool roundTripSuccess)[] snippets)
     {
         var results = snippets.Select(s =>
