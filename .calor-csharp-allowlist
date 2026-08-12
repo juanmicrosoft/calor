@@ -54,3 +54,9 @@ src/Calor.Compiler/Commands/RenameCommand.cs
 src/Calor.Compiler/Indexing/ProjectIndex.cs
 src/Calor.Compiler/Indexing/ProjectIndexBuilder.cs
 src/Calor.Compiler/Commands/IndexCommand.cs
+
+# Index + query v1, slice S2 (docs/plans/index-query-v1-scoping.md §7) — the
+# query surface over the persisted index. Compiler-internal, same rationale as
+# the S1 entries above.
+# pending: lands with the S2 query PR
+src/Calor.Compiler/Commands/QueryCommand.cs
