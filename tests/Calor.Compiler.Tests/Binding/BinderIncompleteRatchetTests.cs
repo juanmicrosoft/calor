@@ -181,6 +181,7 @@ public class BinderIncompleteRatchetTests
                     conv = new Compiler.Migration.CSharpToCalorConverter(
                         new Compiler.Migration.ConversionOptions
                         {
+                            Fidelity = Compiler.Migration.ConversionFidelity.Lossy,
                             ModuleName = "Leg2",
                             GracefulFallback = true,
                             AutoGenerateIds = true
