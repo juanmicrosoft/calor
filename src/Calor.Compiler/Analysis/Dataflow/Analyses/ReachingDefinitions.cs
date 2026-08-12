@@ -9,10 +9,13 @@ public readonly record struct DefinitionSite(
     string VariableName,
     int BlockId,
     int StatementIndex,
-    BoundStatement Statement,
-    SymbolId VariableId = default)
+    BoundStatement? Statement,
+    SymbolId VariableId = default,
+    int DefinitionOrdinal = -1,
+    SyntheticOperation? SyntheticOperation = null)
 {
-    public override string ToString() => $"{VariableName}@BB{BlockId}:{StatementIndex}";
+    public override string ToString() =>
+        $"{VariableName}@BB{BlockId}:{StatementIndex}#{DefinitionOrdinal}";
 }
 
 /// <summary>
@@ -26,6 +29,7 @@ public sealed class ReachingDefinitionsAnalysis
     private readonly List<DefinitionSite> _allDefinitions;
     public IReadOnlyList<BoundNode> IncompleteNodes { get; }
     public bool IsComplete => IncompleteNodes.Count == 0;
+    public DataflowAnalysisResult<ImmutableHashSet<DefinitionSite>> AnalysisResult { get; }
 
     public ReachingDefinitionsAnalysis(ControlFlowGraph cfg)
     {
@@ -36,9 +40,15 @@ public sealed class ReachingDefinitionsAnalysis
         var lattice = new SetLattice<DefinitionSite>(_allDefinitions);
         var transfer = new ReachingDefinitionsTransfer(_allDefinitions);
         var analysis = new DataflowAnalysis<ImmutableHashSet<DefinitionSite>>(
-            lattice, transfer, DataflowDirection.Forward);
+            lattice,
+            transfer,
+            DataflowDirection.Forward,
+            ImmutableHashSet<DefinitionSite>.Empty,
+            ImmutableHashSet<DefinitionSite>.Empty,
+            ImmutableHashSet<DefinitionSite>.Empty);
 
-        _results = analysis.Analyze(cfg);
+        AnalysisResult = analysis.AnalyzeWithMetadata(cfg);
+        _results = AnalysisResult.Blocks;
     }
 
     /// <summary>
@@ -95,21 +105,40 @@ public sealed class ReachingDefinitionsAnalysis
     private static List<DefinitionSite> CollectAllDefinitions(ControlFlowGraph cfg)
     {
         var definitions = new List<DefinitionSite>();
+        var definitionOrdinal = 0;
 
-        foreach (var block in cfg.Blocks)
+        foreach (var block in cfg.ReachableBlocks)
         {
             for (var i = 0; i < block.Statements.Count; i++)
             {
                 var stmt = block.Statements[i];
                 var defined = BoundNodeHelpers.GetDefinedVariable(stmt);
-                if (defined != null)
+                if (defined != null && !block.IsDefinitionDeferred(i))
                 {
                     definitions.Add(new DefinitionSite(
                         defined.Name,
                         block.Id,
                         i,
                         stmt,
-                        defined.Id));
+                        defined.Id,
+                        definitionOrdinal++));
+                }
+            }
+
+            for (var i = 0; i < block.SyntheticOperations.Count; i++)
+            {
+                var operation = block.SyntheticOperations[i];
+                var defined = BoundNodeHelpers.GetDefinedVariable(operation);
+                if (defined != null)
+                {
+                    definitions.Add(new DefinitionSite(
+                        defined.Name,
+                        block.Id,
+                        block.Statements.Count + i,
+                        operation.SourceStatement,
+                        defined.Id,
+                        definitionOrdinal++,
+                        operation));
                 }
             }
         }
@@ -128,8 +157,30 @@ internal sealed class ReachingDefinitionsTransfer : ITransferFunction<ImmutableH
     }
 
     public ImmutableHashSet<DefinitionSite> Transfer(BoundStatement statement, ImmutableHashSet<DefinitionSite> input)
+        => TransferDefinition(
+            BoundNodeHelpers.GetDefinedVariable(statement),
+            input,
+            definition => ReferenceEquals(definition.Statement, statement));
+
+    public ImmutableHashSet<DefinitionSite> Transfer(
+        BasicBlock block,
+        int statementIndex,
+        BoundStatement statement,
+        ImmutableHashSet<DefinitionSite> input)
+        => block.IsDefinitionDeferred(statementIndex)
+            ? input
+            : TransferDefinition(
+                BoundNodeHelpers.GetDefinedVariable(statement),
+                input,
+                definition => definition.BlockId == block.Id
+                    && definition.StatementIndex == statementIndex
+                    && ReferenceEquals(definition.Statement, statement));
+
+    private ImmutableHashSet<DefinitionSite> TransferDefinition(
+        VariableSymbol? defined,
+        ImmutableHashSet<DefinitionSite> input,
+        Func<DefinitionSite, bool> matchesDefinition)
     {
-        var defined = BoundNodeHelpers.GetDefinedVariable(statement);
         if (defined == null)
             return input;
 
@@ -142,15 +193,55 @@ internal sealed class ReachingDefinitionsTransfer : ITransferFunction<ImmutableH
         }
 
         // Gen: add the new definition
-        var newDef = _allDefinitions.FirstOrDefault(d =>
-            d.Statement == statement && SameVariable(d, defined));
+        var newDef = _allDefinitions.FirstOrDefault(definition =>
+            matchesDefinition(definition) && SameVariable(definition, defined));
 
-        if (newDef.Statement != null)
+        if (newDef.DefinitionOrdinal >= 0)
         {
             return afterKill.Add(newDef);
         }
 
         return afterKill;
+    }
+
+    public ImmutableHashSet<DefinitionSite> TransferSynthetic(
+        SyntheticOperation operation,
+        ImmutableHashSet<DefinitionSite> input)
+        => TransferSyntheticCore(operation, input, definition =>
+            ReferenceEquals(definition.SyntheticOperation, operation));
+
+    public ImmutableHashSet<DefinitionSite> TransferSynthetic(
+        BasicBlock block,
+        int operationIndex,
+        SyntheticOperation operation,
+        ImmutableHashSet<DefinitionSite> input)
+        => TransferSyntheticCore(operation, input, definition =>
+            definition.BlockId == block.Id
+            && definition.StatementIndex == block.Statements.Count + operationIndex
+            && ReferenceEquals(definition.SyntheticOperation, operation));
+
+    private ImmutableHashSet<DefinitionSite> TransferSyntheticCore(
+        SyntheticOperation operation,
+        ImmutableHashSet<DefinitionSite> input,
+        Func<DefinitionSite, bool> matchesDefinition)
+    {
+        var defined = BoundNodeHelpers.GetDefinedVariable(operation);
+        if (defined == null)
+            return input;
+
+        var afterKill = input;
+        foreach (var definition in input.AsEnumerable().Where(definition =>
+                     SameVariable(definition, defined)))
+        {
+            afterKill = afterKill.Remove(definition);
+        }
+
+        var generated = _allDefinitions.FirstOrDefault(definition =>
+            matchesDefinition(definition)
+            && SameVariable(definition, defined));
+        return generated.DefinitionOrdinal >= 0
+            ? afterKill.Add(generated)
+            : afterKill;
     }
 
     private static bool SameVariable(DefinitionSite definition, VariableSymbol variable)
@@ -159,7 +250,9 @@ internal sealed class ReachingDefinitionsTransfer : ITransferFunction<ImmutableH
             return definition.VariableId == variable.Id;
 
         return ReferenceEquals(
-            BoundNodeHelpers.GetDefinedVariable(definition.Statement),
+            definition.Statement != null
+                ? BoundNodeHelpers.GetDefinedVariable(definition.Statement)
+                : definition.SyntheticOperation?.DefinedVariable,
             variable);
     }
 

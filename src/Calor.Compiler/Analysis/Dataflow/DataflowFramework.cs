@@ -42,10 +42,27 @@ public interface ITransferFunction<T> where T : IEquatable<T>
     /// </summary>
     T Transfer(BoundStatement statement, T input);
 
+    T Transfer(
+        BasicBlock block,
+        int statementIndex,
+        BoundStatement statement,
+        T input) => Transfer(statement, input);
+
     /// <summary>
     /// Computes the dataflow facts after evaluating an expression (for condition blocks).
     /// </summary>
     T TransferExpression(BoundExpression? expression, T input);
+
+    /// <summary>
+    /// Computes the dataflow facts after an implicit CFG operation.
+    /// </summary>
+    T TransferSynthetic(SyntheticOperation operation, T input) => input;
+
+    T TransferSynthetic(
+        BasicBlock block,
+        int operationIndex,
+        SyntheticOperation operation,
+        T input) => TransferSynthetic(operation, input);
 }
 
 /// <summary>
@@ -73,6 +90,39 @@ public sealed class BlockDataflowResult<T>
     }
 }
 
+public sealed class DataflowAnalysisResult<T> where T : IEquatable<T>
+{
+    public Dictionary<BasicBlock, BlockDataflowResult<T>> Blocks { get; }
+    public int Iterations { get; }
+    public bool IsConverged { get; }
+    public IReadOnlyList<BasicBlock> ReachableBlocks { get; }
+
+    internal DataflowAnalysisResult(
+        Dictionary<BasicBlock, BlockDataflowResult<T>> blocks,
+        int iterations,
+        bool isConverged,
+        IReadOnlyList<BasicBlock> reachableBlocks)
+    {
+        Blocks = blocks;
+        Iterations = iterations;
+        IsConverged = isConverged;
+        ReachableBlocks = reachableBlocks;
+    }
+}
+
+public sealed class DataflowConvergenceException : InvalidOperationException
+{
+    public int Iterations { get; }
+    public int MaximumIterations { get; }
+
+    public DataflowConvergenceException(int iterations, int maximumIterations)
+        : base($"Dataflow analysis did not converge within {maximumIterations} iterations")
+    {
+        Iterations = iterations;
+        MaximumIterations = maximumIterations;
+    }
+}
+
 /// <summary>
 /// Generic dataflow analysis framework using worklist algorithm.
 /// </summary>
@@ -82,17 +132,45 @@ public sealed class DataflowAnalysis<T> where T : IEquatable<T>
     private readonly IDataflowLattice<T> _lattice;
     private readonly ITransferFunction<T> _transfer;
     private readonly DataflowDirection _direction;
+    private readonly T _entryBoundary;
+    private readonly T _exitBoundary;
+    private readonly T _joinIdentity;
     private readonly int _maxIterations;
+    public DataflowAnalysisResult<T>? LastResult { get; private set; }
 
     public DataflowAnalysis(
         IDataflowLattice<T> lattice,
         ITransferFunction<T> transfer,
         DataflowDirection direction = DataflowDirection.Forward,
         int maxIterations = 1000)
+        : this(
+            lattice,
+            transfer,
+            direction,
+            direction == DataflowDirection.Forward ? lattice.Top : lattice.Bottom,
+            direction == DataflowDirection.Backward ? lattice.Top : lattice.Bottom,
+            lattice.Bottom,
+            maxIterations)
+    {
+    }
+
+    public DataflowAnalysis(
+        IDataflowLattice<T> lattice,
+        ITransferFunction<T> transfer,
+        DataflowDirection direction,
+        T entryBoundary,
+        T exitBoundary,
+        T joinIdentity,
+        int maxIterations = 1000)
     {
         _lattice = lattice ?? throw new ArgumentNullException(nameof(lattice));
         _transfer = transfer ?? throw new ArgumentNullException(nameof(transfer));
         _direction = direction;
+        _entryBoundary = entryBoundary;
+        _exitBoundary = exitBoundary;
+        _joinIdentity = joinIdentity;
+        if (maxIterations <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxIterations));
         _maxIterations = maxIterations;
     }
 
@@ -100,138 +178,164 @@ public sealed class DataflowAnalysis<T> where T : IEquatable<T>
     /// Runs the dataflow analysis on a control flow graph.
     /// </summary>
     /// <returns>A dictionary mapping each block to its dataflow results.</returns>
-    public Dictionary<BasicBlock, BlockDataflowResult<T>> Analyze(ControlFlowGraph cfg)
+    public Dictionary<BasicBlock, BlockDataflowResult<T>> Analyze(ControlFlowGraph cfg) =>
+        AnalyzeWithMetadata(cfg).Blocks;
+
+    public DataflowAnalysisResult<T> AnalyzeWithMetadata(ControlFlowGraph cfg)
     {
+        ArgumentNullException.ThrowIfNull(cfg);
+        LastResult = null;
         var results = new Dictionary<BasicBlock, BlockDataflowResult<T>>();
 
-        // Initialize all blocks with bottom
+        // Retain compatibility for callers that query an unreachable Exit block, but
+        // only reachable blocks participate in fixed-point computation.
         foreach (var block in cfg.Blocks)
         {
-            results[block] = new BlockDataflowResult<T>(_lattice.Bottom);
+            results[block] = new BlockDataflowResult<T>(_joinIdentity);
         }
 
-        // Entry/exit block initialization
-        if (_direction == DataflowDirection.Forward)
-        {
-            results[cfg.Entry].In = _lattice.Top;
-        }
-        else
-        {
-            results[cfg.Exit].Out = _lattice.Top;
-        }
+        results[cfg.Entry].In = _entryBoundary;
+        results[cfg.Exit].Out = _exitBoundary;
 
-        // Get blocks in appropriate order
-        var worklist = _direction == DataflowDirection.Forward
-            ? new Queue<BasicBlock>(cfg.GetReversePostOrder())
-            : new Queue<BasicBlock>(cfg.GetPostOrder());
-
-        var inWorklist = new HashSet<BasicBlock>(worklist);
+        var orderedBlocks = _direction == DataflowDirection.Forward
+            ? cfg.GetReversePostOrder()
+            : cfg.GetPostOrder();
+        var reachable = cfg.ReachableBlocks.ToHashSet();
+        var worklist = new Queue<BasicBlock>(orderedBlocks);
+        var inWorklist = new HashSet<BasicBlock>(orderedBlocks);
         var iterations = 0;
 
-        while (worklist.Count > 0 && iterations < _maxIterations)
+        while (worklist.Count > 0)
         {
+            if (iterations >= _maxIterations)
+                throw new DataflowConvergenceException(iterations, _maxIterations);
+
             iterations++;
             var block = worklist.Dequeue();
             inWorklist.Remove(block);
-
             var result = results[block];
-            var changed = false;
 
             if (_direction == DataflowDirection.Forward)
             {
-                // Compute IN as join of all predecessors' OUT
-                var newIn = block.Predecessors.Count == 0
-                    ? result.In
-                    : block.Predecessors
-                        .Select(p => results[p].Out)
-                        .Aggregate(_lattice.Bottom, _lattice.Join);
-
-                if (!newIn.Equals(result.In))
+                var newIn = ReferenceEquals(block, cfg.Entry)
+                    ? _entryBoundary
+                    : JoinFacts(
+                        block.IncomingEdges
+                            .Where(edge => reachable.Contains(edge.Source))
+                            .OrderBy(edge => edge.Source.Ordinal)
+                            .Select(edge => results[edge.Source].Out));
+                var currentFacts = newIn;
+                for (var index = 0; index < block.Statements.Count; index++)
                 {
-                    result.In = newIn;
-                    changed = true;
+                    currentFacts = _transfer.Transfer(
+                        block,
+                        index,
+                        block.Statements[index],
+                        currentFacts);
                 }
-
-                // Compute OUT using transfer function
-                var currentFacts = result.In;
-
-                // Apply transfer for branch condition (if any)
-                currentFacts = _transfer.TransferExpression(block.BranchCondition, currentFacts);
-
-                // Apply transfer for each statement
-                foreach (var stmt in block.Statements)
+                for (var index = 0; index < block.SyntheticOperations.Count; index++)
                 {
-                    currentFacts = _transfer.Transfer(stmt, currentFacts);
+                    currentFacts = _transfer.TransferSynthetic(
+                        block,
+                        index,
+                        block.SyntheticOperations[index],
+                        currentFacts);
                 }
+                currentFacts = _transfer.TransferExpression(
+                    block.Terminator.Condition,
+                    currentFacts);
 
-                if (!currentFacts.Equals(result.Out))
-                {
-                    result.Out = currentFacts;
-                    changed = true;
-                }
+                var changed = !newIn.Equals(result.In)
+                    || !currentFacts.Equals(result.Out);
+                result.In = newIn;
+                result.Out = currentFacts;
 
-                // Add successors to worklist if changed
                 if (changed)
                 {
-                    foreach (var succ in block.Successors)
-                    {
-                        if (!inWorklist.Contains(succ))
-                        {
-                            worklist.Enqueue(succ);
-                            inWorklist.Add(succ);
-                        }
-                    }
+                    Enqueue(
+                        block.OutgoingEdges
+                            .Where(edge => reachable.Contains(edge.Target))
+                            .Select(edge => edge.Target),
+                        worklist,
+                        inWorklist);
                 }
             }
-            else // Backward
+            else
             {
-                // Compute OUT as join of all successors' IN
-                var newOut = block.Successors.Count == 0
-                    ? result.Out
-                    : block.Successors
-                        .Select(s => results[s].In)
-                        .Aggregate(_lattice.Bottom, _lattice.Join);
-
-                if (!newOut.Equals(result.Out))
+                var newOut = ReferenceEquals(block, cfg.Exit)
+                    ? _exitBoundary
+                    : JoinFacts(
+                        block.OutgoingEdges
+                            .Where(edge => reachable.Contains(edge.Target))
+                            .OrderBy(edge => edge.Target.Ordinal)
+                            .Select(edge => results[edge.Target].In));
+                var currentFacts = _transfer.TransferExpression(
+                    block.Terminator.Condition,
+                    newOut);
+                for (var index = block.SyntheticOperations.Count - 1; index >= 0; index--)
                 {
-                    result.Out = newOut;
-                    changed = true;
+                    currentFacts = _transfer.TransferSynthetic(
+                        block,
+                        index,
+                        block.SyntheticOperations[index],
+                        currentFacts);
+                }
+                for (var index = block.Statements.Count - 1; index >= 0; index--)
+                {
+                    currentFacts = _transfer.Transfer(
+                        block,
+                        index,
+                        block.Statements[index],
+                        currentFacts);
                 }
 
-                // Compute IN using transfer function (in reverse order for backward)
-                var currentFacts = result.Out;
+                var changed = !newOut.Equals(result.Out)
+                    || !currentFacts.Equals(result.In);
+                result.Out = newOut;
+                result.In = currentFacts;
 
-                // Apply transfer for each statement in reverse
-                for (var i = block.Statements.Count - 1; i >= 0; i--)
-                {
-                    currentFacts = _transfer.Transfer(block.Statements[i], currentFacts);
-                }
-
-                // Apply transfer for branch condition
-                currentFacts = _transfer.TransferExpression(block.BranchCondition, currentFacts);
-
-                if (!currentFacts.Equals(result.In))
-                {
-                    result.In = currentFacts;
-                    changed = true;
-                }
-
-                // Add predecessors to worklist if changed
                 if (changed)
                 {
-                    foreach (var pred in block.Predecessors)
-                    {
-                        if (!inWorklist.Contains(pred))
-                        {
-                            worklist.Enqueue(pred);
-                            inWorklist.Add(pred);
-                        }
-                    }
+                    Enqueue(
+                        block.IncomingEdges
+                            .Where(edge => reachable.Contains(edge.Source))
+                            .Select(edge => edge.Source),
+                        worklist,
+                        inWorklist);
                 }
             }
         }
 
-        return results;
+        LastResult = new DataflowAnalysisResult<T>(
+            results,
+            iterations,
+            isConverged: true,
+            cfg.ReachableBlocks);
+        return LastResult;
+    }
+
+    private T JoinFacts(IEnumerable<T> facts)
+    {
+        using var enumerator = facts.GetEnumerator();
+        if (!enumerator.MoveNext())
+            return _joinIdentity;
+
+        var result = enumerator.Current;
+        while (enumerator.MoveNext())
+            result = _lattice.Join(result, enumerator.Current);
+        return result;
+    }
+
+    private static void Enqueue(
+        IEnumerable<BasicBlock> blocks,
+        Queue<BasicBlock> worklist,
+        HashSet<BasicBlock> inWorklist)
+    {
+        foreach (var block in blocks.Distinct().OrderBy(block => block.Ordinal))
+        {
+            if (inWorklist.Add(block))
+                worklist.Enqueue(block);
+        }
     }
 }
 
