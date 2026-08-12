@@ -161,6 +161,76 @@ public sealed class RoundTripPipelineSafetyTests
     }
 
     [Fact]
+    public async Task ProjectValidation_UsesActualProjectSettingsBeforePublication()
+    {
+        var root = CreateProject(
+            """
+            public static class Conditional
+            {
+                public static int Read() => 1;
+            }
+            """);
+        try
+        {
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Safety.csproj"),
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net10.0</TargetFramework>
+                    <DefineConstants>FEATURE_ENABLED</DefineConstants>
+                    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Compile Include="Lib/**/*.cs" />
+                  </ItemGroup>
+                </Project>
+                """);
+            var sourcePath = Path.Combine(root, "Lib", "Invalid.cs");
+            var original = await File.ReadAllTextAsync(sourcePath);
+            var results = new List<FileConversionResult>
+            {
+                new()
+                {
+                    FilePath = "Lib/Invalid.cs",
+                    Status = FileStatus.Replaced,
+                    EmittedCSharp =
+                        """
+                        public static class Conditional
+                        {
+                        #if FEATURE_ENABLED
+                            public static int Read() => "wrong";
+                        #else
+                            public static int Read() => 1;
+                        #endif
+                        }
+                        """
+                },
+            };
+            var config = new RoundTripConfig
+            {
+                ProjectName = "ProjectSettings",
+                OriginalProjectPath = root,
+                LibrarySourceRelativePath = "Lib",
+                SolutionOrProjectFile = "Safety.csproj",
+            };
+
+            await new RoundTripPipeline().ValidateAndPublishProjectCandidatesAsync(
+                root,
+                config,
+                results,
+                CancellationToken.None);
+
+            Assert.Equal(FileStatus.EmitCompilationError, results[0].Status);
+            Assert.Equal(original, await File.ReadAllTextAsync(sourcePath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task AggregateValidation_IgnoresSourcesOutsideConfiguredLibrary()
     {
         var root = CreateProject("public static class A { public static int Read() => 1; }");

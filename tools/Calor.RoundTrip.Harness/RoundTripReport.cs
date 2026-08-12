@@ -201,6 +201,9 @@ public sealed class TestResult
     /// <summary>Fully qualified test name from the TRX definition.</summary>
     public string FullyQualifiedName { get; init; } = "";
 
+    /// <summary>Stable adapter-provided test-case identifier, including theory row identity.</summary>
+    public string TestCaseId { get; init; } = "";
+
     /// <summary>Executor URI (adapter identity) from the TRX definition, when present.</summary>
     public string ExecutorUri { get; init; } = "";
 
@@ -216,7 +219,7 @@ public sealed class TestResult
     /// </summary>
     [JsonIgnore]
     public string Identity =>
-        $"{Project}::{Assembly}::{ExecutorUri}::{FullyQualifiedName}::{TestName}";
+        $"{Project}::{Assembly}::{ExecutorUri}::{FullyQualifiedName}::{TestCaseId}::{TestName}";
 }
 
 public sealed class TestComparison

@@ -73,14 +73,18 @@ public class ReportGeneratorTests
     public void GenerateJson_FileCounts_AreAccurate()
     {
         var report = CreatePassingReport();
+        report.ExcludedFileCount = 2;
+        report.Fidelity = ProjectFidelity.Compute(report);
         var json = ReportGenerator.GenerateJson(report);
 
         var doc = JsonDocument.Parse(json);
         var files = doc.RootElement.GetProperty("files");
 
-        Assert.Equal(3, files.GetProperty("total").GetInt32());
+        Assert.Equal(5, files.GetProperty("total").GetInt32());
         Assert.Equal(2, files.GetProperty("replaced").GetInt32());
         Assert.Equal(1, files.GetProperty("compile_error").GetInt32());
+        Assert.Equal(2, files.GetProperty("excluded_by_pattern").GetInt32());
+        Assert.Contains("2/5 (40.0%)", ReportGenerator.GenerateMarkdown(report));
     }
 
     [Fact]

@@ -43,6 +43,7 @@ public class TrxParserTests
             Assert.Equal(3, results.Count);
 
             Assert.Equal("Test1", results[0].TestName);
+            Assert.Equal("id-1", results[0].TestCaseId);
             Assert.Equal("Passed", results[0].Outcome);
 
             Assert.Equal("Test2", results[1].TestName);
@@ -129,6 +130,7 @@ public class TrxParserTests
             Assert.Equal("Alpha.Tests.Suite", r.ClassName);
             Assert.Equal("executor://xunit/VsTestRunner2/netcoreapp", r.ExecutorUri);
             Assert.Equal("Alpha.Tests.Suite.TestA", r.FullyQualifiedName);
+            Assert.Equal("id-0", r.TestCaseId);
             Assert.Contains("alpha.tests.dll", r.Identity);
             Assert.Contains("Alpha.Tests.Suite", r.Identity);
         }
@@ -185,6 +187,7 @@ public class TrxParserTests
             Assembly = "tests.dll",
             ExecutorUri = "executor://xunit",
             FullyQualifiedName = "Suite.Theory",
+            TestCaseId = "row-1",
             TestName = "Suite.Theory(value: 1)",
         };
         var second = new TestResult
@@ -193,6 +196,7 @@ public class TrxParserTests
             Assembly = first.Assembly,
             ExecutorUri = first.ExecutorUri,
             FullyQualifiedName = first.FullyQualifiedName,
+            TestCaseId = "row-2",
             TestName = "Suite.Theory(value: 2)",
         };
 

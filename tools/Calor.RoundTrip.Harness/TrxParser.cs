@@ -73,6 +73,7 @@ public static class TrxParser
                     ClassName = def.Item2,
                     ExecutorUri = def.Item3,
                     FullyQualifiedName = def.Item4,
+                    TestCaseId = testId,
                     Outcome = outcome,
                     Duration = TimeSpan.TryParse(e.Attribute("duration")?.Value, out var dur) ? dur : TimeSpan.Zero,
                     ErrorMessage = e.Descendants(ns + "Message").FirstOrDefault()?.Value,

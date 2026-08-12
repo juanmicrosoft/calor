@@ -141,8 +141,11 @@ The blocking thresholds are explicit and overridable with `--min-coverage` and
 Serilog's `Core/Logger.cs` is an explicit conversion exclusion because its
 conversion exceeds the per-file timeout. `Rendering/ReusableStringWriter.cs` is
 also excluded because regression bisect attributes 43 test failures to its
-round-tripped output. Both remain in the denominator as coverage failures; they
-are not silently removed from the measurement.
+round-tripped output. `Core/Sinks/RestrictedSink.cs` and
+`Core/Sinks/SecondaryLoggerSink.cs` are likewise excluded after bisect attributed
+one and two async-disposal regressions respectively. All exclusions remain in the
+denominator as coverage failures; they are not silently removed from the
+measurement.
 
 Notes for the tranche-2 bar-setters:
 

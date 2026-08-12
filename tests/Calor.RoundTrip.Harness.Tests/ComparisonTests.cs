@@ -213,7 +213,7 @@ public class ComparisonTests
     }
 
     [Fact]
-    public void DuplicateTheoryIdentities_AreComparedAsAMultiset()
+    public void DuplicateTheoryIdentities_AreIncomplete()
     {
         var baseline = MakeRun(
             ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
@@ -224,8 +224,23 @@ public class ComparisonTests
 
         var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
 
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+        Assert.Empty(result.Regressions);
+    }
+
+    [Fact]
+    public void SameTheoryDisplayName_WithDistinctCaseIds_DetectsRegression()
+    {
+        var baseline = MakeTheoryRun(("row-1", "Passed"), ("row-2", "Passed"));
+        var roundTrip = MakeTheoryRun(("row-1", "Passed"), ("row-2", "Failed"));
+
+        var result = Compare(
+            baseline,
+            roundTrip,
+            new BuildResult { Succeeded = true });
+
         Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
-        Assert.Single(result.Regressions);
+        Assert.Equal("row-2", Assert.Single(result.Regressions).TestCaseId);
     }
 
     [Fact]
@@ -307,6 +322,29 @@ public class ComparisonTests
             TotalTests = results.Count,
             Passed = results.Count(r => r.Outcome == "Passed"),
             Failed = results.Count(r => r.Outcome == "Failed"),
+            Results = results,
+        };
+    }
+
+    private static TestRunResult MakeTheoryRun(
+        params (string TestCaseId, string Outcome)[] entries)
+    {
+        var results = entries.Select(entry => new TestResult
+        {
+            Project = "Tests",
+            Assembly = "tests.dll",
+            ExecutorUri = "executor://xunit",
+            FullyQualifiedName = "Suite.Theory",
+            TestCaseId = entry.TestCaseId,
+            TestName = "Suite.Theory(value: duplicate)",
+            Outcome = entry.Outcome,
+        }).ToList();
+        return new TestRunResult
+        {
+            ExitCode = results.Any(result => result.Outcome == "Failed") ? 1 : 0,
+            TotalTests = results.Count,
+            Passed = results.Count(result => result.Outcome == "Passed"),
+            Failed = results.Count(result => result.Outcome == "Failed"),
             Results = results,
         };
     }

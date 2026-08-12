@@ -181,7 +181,10 @@ async Task<int> RunCommand(string[] runArgs)
         Console.WriteLine($"   Baseline: {report.Baseline?.Passed}/{report.Baseline?.TotalTests} passing");
         Console.WriteLine($"   Round-trip: {report.RoundTripTests?.Passed ?? 0}/{report.RoundTripTests?.TotalTests ?? 0} passing");
         Console.WriteLine($"   Regressions: {report.Comparison?.Regressions.Count ?? -1}");
-        Console.WriteLine($"   Files converted: {report.FileResults.Count(f => f.Status == FileStatus.Replaced)}/{report.FileResults.Count}");
+        var sourceCandidateCount = report.Fidelity?.Coverage.TotalConvertibleFiles
+            ?? report.FileResults.Count + report.ExcludedFileCount;
+        Console.WriteLine(
+            $"   Files converted: {report.FileResults.Count(f => f.Status == FileStatus.Replaced)}/{sourceCandidateCount}");
         if (report.Inconclusive)
         {
             Console.WriteLine($"   Coverage: INCONCLUSIVE — {report.InconclusiveReason}");

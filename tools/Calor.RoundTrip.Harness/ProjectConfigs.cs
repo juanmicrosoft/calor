@@ -133,6 +133,8 @@ public static class ProjectConfigs
         [
             .. RoundTripConfig.DefaultExcludePatterns(),
             "**/Core/Logger.cs",
+            "**/Core/Sinks/RestrictedSink.cs",
+            "**/Core/Sinks/SecondaryLoggerSink.cs",
             "**/Rendering/ReusableStringWriter.cs",
         ],
         MinimumCoverageFraction = 0.30,

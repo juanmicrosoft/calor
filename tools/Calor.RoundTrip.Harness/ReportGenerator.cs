@@ -47,7 +47,8 @@ public static class ReportGenerator
             sb.AppendLine($"| Baseline tests | {report.Baseline.Passed} passed, {report.Baseline.Failed} failed, {report.Baseline.Skipped} skipped |");
 
         var replaced = report.FileResults.Count(f => f.Status == FileStatus.Replaced);
-        var totalFiles = report.FileResults.Count;
+        var totalFiles = report.Fidelity?.Coverage.TotalConvertibleFiles
+            ?? report.FileResults.Count + report.ExcludedFileCount;
         var pct = totalFiles > 0 ? (double)replaced / totalFiles * 100 : 0;
         sb.AppendLine($"| Files converted | {replaced}/{totalFiles} ({pct:F1}%) |");
         sb.AppendLine($"| Files reverted by recovery | {report.FileResults.Count(f => f.Status == FileStatus.Reverted)} |");
@@ -252,7 +253,8 @@ public static class ReportGenerator
             regressions = report.Comparison?.Regressions.Count ?? -1,
             files = new
             {
-                total = report.FileResults.Count,
+                total = report.Fidelity?.Coverage.TotalConvertibleFiles
+                    ?? report.FileResults.Count + report.ExcludedFileCount,
                 replaced = report.FileResults.Count(f => f.Status == FileStatus.Replaced),
                 reverted = report.FileResults.Count(f => f.Status == FileStatus.Reverted),
                 conversion_failed = report.FileResults.Count(f => f.Status == FileStatus.ConversionFailed),

@@ -450,17 +450,20 @@ public sealed class RoundTripPipeline
         var orderedResults = results
             .OrderBy(result => result.FilePath, StringComparer.Ordinal)
             .ToList();
-        await ValidateAndPublishGeneratedFilesAsync(
-            workDir,
-            orderedResults,
-            allCsFiles,
-            cancellationToken);
         if (File.Exists(Path.Combine(workDir, config.SolutionOrProjectFile)))
         {
-            await ValidatePublishedProjectAsync(
+            await ValidateAndPublishProjectCandidatesAsync(
                 workDir,
                 config,
                 orderedResults,
+                cancellationToken);
+        }
+        else
+        {
+            await ValidateAndPublishGeneratedFilesAsync(
+                workDir,
+                orderedResults,
+                allCsFiles,
                 cancellationToken);
         }
 
@@ -475,69 +478,130 @@ public sealed class RoundTripPipeline
         return orderedResults;
     }
 
-    private async Task ValidatePublishedProjectAsync(
+    internal async Task ValidateAndPublishProjectCandidatesAsync(
         string workDir,
         RoundTripConfig config,
         List<FileConversionResult> results,
         CancellationToken cancellationToken)
     {
-        while (true)
+        var candidates = results
+            .Where(result =>
+                result.Status == FileStatus.Replaced &&
+                result.EmittedCSharp != null)
+            .ToList();
+        if (candidates.Count == 0)
+            return;
+
+        var validationDir = Path.Combine(
+            Path.GetTempPath(),
+            "calor-roundtrip-validation",
+            config.ProjectName,
+            Guid.NewGuid().ToString("N")[..8]);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var build = await BuildProjectAsync(workDir, config, cancellationToken);
-            if (build.Succeeded)
-                return;
-
-            var active = results
-                .Where(result => result.Status == FileStatus.Replaced)
-                .ToList();
-            var failed = active
-                .Where(candidate => build.Errors.Any(error =>
-                    BuildErrorReferencesFile(workDir, candidate.FilePath, error) ||
-                    CandidateIsReferenced(candidate, error)))
-                .ToList();
-            if (failed.Count == 0)
+            CopyDirectory(workDir, validationDir, cancellationToken);
+            foreach (var candidate in candidates)
             {
-                Console.WriteLine(
-                    $"  Project validation could not attribute {build.Errors.Count} build error(s); rejecting all {active.Count} remaining candidates");
-                failed = active;
-            }
-            else
-            {
-                Console.WriteLine(
-                    $"  Project validation rejected {failed.Count} candidate(s): " +
-                    string.Join(", ", failed.Select(candidate => candidate.FilePath)));
+                var path = Path.Combine(validationDir, candidate.FilePath);
+                await File.WriteAllTextAsync(
+                    path,
+                    candidate.EmittedCSharp!,
+                    cancellationToken);
             }
 
-            foreach (var candidate in failed)
+            while (true)
             {
-                var originalPath = Path.Combine(
-                    config.OriginalProjectPath,
-                    candidate.FilePath);
-                var workPath = Path.Combine(workDir, candidate.FilePath);
-                if (File.Exists(originalPath))
-                {
-                    var original = await File.ReadAllTextAsync(
-                        originalPath,
-                        cancellationToken);
-                    await File.WriteAllTextAsync(
-                        workPath,
-                        original,
-                        cancellationToken);
-                }
-                candidate.Status = FileStatus.EmitCompilationError;
-                candidate.Errors = build.Errors
-                    .Where(error =>
-                        BuildErrorReferencesFile(workDir, candidate.FilePath, error) ||
-                        CandidateIsReferenced(candidate, error))
-                    .Take(10)
+                cancellationToken.ThrowIfCancellationRequested();
+                var build = await BuildProjectAsync(
+                    validationDir,
+                    config,
+                    cancellationToken);
+                var active = candidates
+                    .Where(result => result.Status == FileStatus.Replaced)
                     .ToList();
-                if (candidate.Errors.Count == 0)
-                    candidate.Errors = build.Errors.Take(10).ToList();
-            }
+                if (build.Succeeded)
+                {
+                    foreach (var candidate in active)
+                    {
+                        await File.WriteAllTextAsync(
+                            Path.Combine(workDir, candidate.FilePath),
+                            candidate.EmittedCSharp!,
+                            cancellationToken);
+                    }
+                    return;
+                }
 
-            if (failed.Count == active.Count)
-                return;
+                var failed = active
+                    .Where(candidate => build.Errors.Any(error =>
+                        BuildErrorReferencesFile(
+                            validationDir,
+                            candidate.FilePath,
+                            error) ||
+                        BuildErrorReferencesFile(
+                            workDir,
+                            candidate.FilePath,
+                            error) ||
+                        CandidateIsReferenced(candidate, error)))
+                    .ToList();
+                if (failed.Count == 0)
+                {
+                    Console.WriteLine(
+                        $"  Project validation could not attribute {build.Errors.Count} build error(s); rejecting all {active.Count} remaining candidates");
+                    foreach (var error in build.Errors.Take(5))
+                        Console.WriteLine($"    {error}");
+                    failed = active;
+                }
+                else
+                {
+                    Console.WriteLine(
+                        $"  Project validation rejected {failed.Count} candidate(s): " +
+                        string.Join(", ", failed.Select(candidate => candidate.FilePath)));
+                }
+
+                foreach (var candidate in failed)
+                {
+                    var originalPath = Path.Combine(
+                        config.OriginalProjectPath,
+                        candidate.FilePath);
+                    var validationPath = Path.Combine(
+                        validationDir,
+                        candidate.FilePath);
+                    if (File.Exists(originalPath))
+                    {
+                        var original = await File.ReadAllTextAsync(
+                            originalPath,
+                            cancellationToken);
+                        await File.WriteAllTextAsync(
+                            validationPath,
+                            original,
+                            cancellationToken);
+                    }
+                    candidate.Status = FileStatus.EmitCompilationError;
+                    candidate.Errors = build.Errors
+                        .Where(error =>
+                            BuildErrorReferencesFile(
+                                validationDir,
+                                candidate.FilePath,
+                                error) ||
+                            BuildErrorReferencesFile(
+                                workDir,
+                                candidate.FilePath,
+                                error) ||
+                            CandidateIsReferenced(candidate, error))
+                        .Take(10)
+                        .ToList();
+                    if (candidate.Errors.Count == 0)
+                        candidate.Errors = build.Errors.Take(10).ToList();
+                }
+
+                if (failed.Count == active.Count)
+                    return;
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(validationDir))
+                Directory.Delete(validationDir, recursive: true);
         }
     }
 
@@ -1078,17 +1142,19 @@ public sealed class RoundTripPipeline
         var roundTripByIdentity = roundTrip.Results
             .GroupBy(t => t.Identity)
             .ToDictionary(group => group.Key, group => group.ToList());
+        if (baselineByIdentity.Any(pair => pair.Value.Count != 1) ||
+            roundTripByIdentity.Any(pair => pair.Value.Count != 1))
+        {
+            comparison.Status = ComparisonStatus.Incomplete;
+            return comparison;
+        }
         if (!baselineByIdentity.Keys.ToHashSet().SetEquals(roundTripByIdentity.Keys) ||
-            baselineByIdentity.Any(pair =>
-                roundTripByIdentity[pair.Key].Count != pair.Value.Count))
+            baselineByIdentity.Count != roundTripByIdentity.Count)
         {
             comparison.Status = ComparisonStatus.Incomplete;
             return comparison;
         }
 
-        // Compare outcome multiplicities per robust identity. Theory adapters can
-        // emit duplicate identities, so this is a multiset comparison rather than
-        // a one-result dictionary.
         foreach (var (identity, baselineResults) in baselineByIdentity)
         {
             var baselinePassed = baselineResults.Count(t => t.Outcome == "Passed");
