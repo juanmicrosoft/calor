@@ -287,6 +287,7 @@ public class CSharpInteropBlockTests
 
         var options = new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = "TestModule",
             GracefulFallback = true,
             Mode = ConversionMode.Interop
@@ -317,6 +318,7 @@ public class CSharpInteropBlockTests
 
         var options = new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = "TestModule",
             GracefulFallback = true,
             Mode = ConversionMode.Interop
@@ -352,6 +354,7 @@ public class CSharpInteropBlockTests
 
         var options = new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = "TestModule",
             GracefulFallback = true,
             Mode = ConversionMode.Standard
@@ -384,6 +387,7 @@ public class CSharpInteropBlockTests
 
         var options = new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = "TestModule",
             GracefulFallback = true,
             Mode = ConversionMode.Interop
@@ -497,6 +501,7 @@ public class CSharpInteropBlockTests
 
         var options = new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = "TestModule",
             GracefulFallback = true,
             Mode = ConversionMode.Interop

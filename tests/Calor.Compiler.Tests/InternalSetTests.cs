@@ -13,7 +13,10 @@ public class Foo
 {
     public string Name { get; internal set; }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy
+        });
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
         Assert.NotNull(result.CalorSource);
@@ -29,7 +32,10 @@ public class Foo
     public int Value { get; internal set; }
     public string Label { get; private set; }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy
+        });
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
         Assert.NotNull(result.CalorSource);

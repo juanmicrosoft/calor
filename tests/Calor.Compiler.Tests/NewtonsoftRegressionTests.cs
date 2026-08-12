@@ -11,7 +11,11 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class NewtonsoftRegressionTests
 {
-    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { StripPreprocessor = false });
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions
+    {
+        Fidelity = ConversionFidelity.Lossy,
+        StripPreprocessor = false
+    });
 
     private ConversionResult Convert(string csharpSource)
     {

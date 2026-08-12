@@ -9,6 +9,7 @@ using Xunit;
 
 namespace Calor.Compiler.Tests.Mcp;
 
+[Collection("TelemetrySingleton")]
 public class SyntaxHelpToolTests
 {
     private readonly HelpTool _tool = new();

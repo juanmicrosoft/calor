@@ -12,6 +12,11 @@ public class McpSerialCollection : ICollectionFixture<McpMemoryHeadroomFixture>
 {
 }
 
+[CollectionDefinition("TelemetrySingleton", DisableParallelization = true)]
+public sealed class TelemetrySingletonCollection
+{
+}
+
 /// <summary>
 /// #897 second failure mode (first seen on the B8 CI run): the MCP server's
 /// memory-pressure breaker trips when the test HOST process is already holding the
