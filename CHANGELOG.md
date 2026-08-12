@@ -4,7 +4,57 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-08-12
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Categories**: Calor wins 7, C# wins 1
+- **Highlights**:
+  - Comprehension: 1.84x (Calor)
+  - ErrorDetection: 1.49x (Calor)
+  - TokenEconomics: 1.42x (Calor)
+  - RefactoringStability: 1.38x (Calor)
+  - InformationDensity: 0.98x (C#)
+- **Benchmarks Evaluated**: 217 (Calor compiled 217, C# 216)
+
+### Note on 0.13.1
+
+**0.13.1 was tagged but never published.** Four publish attempts failed — two on repository defects
+(a publish gate that exhausted a single runner, and download retries configured with
+`--retry-delay`, which *disables* curl's exponential backoff and so gave up after ~15s), one on the
+#897 MCP bug below, and one on a GitHub incident affecting release-asset downloads. Rather than
+publish 0.13.1 from a `main` that had since gained a compiler-internals rewrite it did not describe,
+that version is abandoned and its contents ship here, described accurately. Nothing was ever pushed
+to nuget.org under 0.13.1.
+
+### Changed
+- **CFG and dataflow rebuilt around explicit semantics (#960).** Control flow is constructed from
+  explicit terminators and typed edges instead of positional inference; loop, exception, catch,
+  finally, using, return, throw, break and continue now route structurally. Dataflow boundaries are
+  separated from lattice identities and fail explicitly rather than silently on non-convergence;
+  initialization, liveness and reaching-definitions analyses are symbol-keyed and semantically
+  ordered. CFG/dataflow failures surface as `Calor0932` internal diagnostics instead of being
+  absorbed.
+- **Builds and releases are hermetic and supply-chain verified (#954).** Build-time Z3 downloads and
+  `deps.json` mutation are removed: Z3 is restored by an explicit bootstrap, and every supported
+  binary is verified against committed SHA-256 *and* byte-size pins before compilation. NuGet
+  versions are centralized with committed lock files and locked restores in CI and releases. Adds
+  offline build/test/pack, corrupt/missing-asset, lock-mismatch, clean-worktree and runtime-load
+  gates, plus SPDX SBOMs and SLSA-style provenance.
+- **Round-trip verification is failure-safe (#950).** Project round-trip conversion runs in lossless
+  mode and validates generated C# before publication, failing closed on build, process, TRX,
+  inventory and coverage failures with explicit thresholds. Excluded and failed items stay visible
+  in reports rather than being silently dropped.
+
 ### Fixed
+- **Z3 downloads survive a real outage (#951).** Every fetch path used
+  `--retry 5 --retry-delay 3`. Per `curl(1)`, "By using `--retry-delay` you disable this exponential
+  backoff algorithm" — so the flag that reads as hardening switched the backoff off, pinning retries
+  to a flat 3s and exhausting them in ~15 seconds, which is shorter than a routine CDN blip.
+  Measured at `--retry 5`: 16s with the old flags, 32s with backoff restored. Fixed across the
+  bootstrap scripts and all four workflow fetch sites, including the publish path itself, and
+  `--retry-all-errors` added so failures that are not an HTTP status (e.g. a dropped connection)
+  enter the retry loop at all. The Windows path, which had no retry whatsoever, now backs off too.
 - **MCP heavy-tool admission control no longer charges a host process's memory to the next tool
   call (#897).** `calor_compile`, `calor_convert`, `calor_analyze` and `calor_batch` are gated on
   process memory before they start, measured with `Process.WorkingSet64` — the *whole* process.
