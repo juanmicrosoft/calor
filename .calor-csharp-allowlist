@@ -59,3 +59,11 @@ src/Calor.Compiler/Commands/IndexCommand.cs
 # query surface over the persisted index. Compiler-internal, same rationale as
 # the S1 entries above.
 src/Calor.Compiler/Commands/QueryCommand.cs
+
+# MCP memory admission policy (#897) — the type that carries the heavy-tool
+# admission rule out of McpMessageHandler so it can differ between the stdio
+# server (which owns its process) and an embedded host (which does not).
+# Compiler-internal MCP protocol machinery, same class as the rest of
+# src/Calor.Compiler/Mcp/; Calor has no access to Process.WorkingSet64 or the
+# GC memory info this policy is built from.
+src/Calor.Compiler/Mcp/McpMemoryAdmissionPolicy.cs
