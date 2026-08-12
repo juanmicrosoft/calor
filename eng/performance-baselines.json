@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "warmupRuns": 1,
   "measuredRuns": 3,
-  "expectedTestCount": 19,
+  "expectedTestCount": 21,
   "metrics": {
     "performance-suite-seconds": {
-      "maximumMedian": 20.0,
-      "noisePolicy": "One warmup is discarded; three isolated runs are measured; the median must remain at or below the ratcheted maximum."
+      "maximumMedian": 21.0,
+      "noisePolicy": "One warmup is discarded; three isolated runs are measured; the median must remain at or below the ratcheted maximum. Raised 20.0 -> 21.0 on 2026-08-12 for the gate-8 index/query coverage (IndexPerformanceTests): the suite measured ~19.8s against a 20.0s ceiling, i.e. ~1% headroom, so any added coverage breached it. Observed run-to-run spread is ~0.5s, so the new ceiling sits ~0.9s above the measured median rather than hugging it. The added tests were first made cheaper — one shared index build via a class fixture instead of three — before the ceiling moved at all."
     }
   }
 }

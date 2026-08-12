@@ -116,10 +116,23 @@ gate 2's identity alone would pass an identically-wrong index.
 **Gate 8 — performance envelope.** Index build ≤ 30s, warm `calor query`
 ≤ 500ms, measured in CI.
 
-- **Denominator: FluentValidation** — 208 non-test `.cs` files, ~25.7k lines,
-  the largest of the three pinned subjects (serilog 112/14.0k, MediatR 76/4.1k).
-  Named here so "largest" is not re-decided later against a smaller subject.
-- Numbers are published per release whether or not they pass.
+- **Denominator: CORRECTED (2026-08-12).** This doc originally named
+  FluentValidation, chosen as the largest pinned subject by **C# size** (208
+  files / 25.7k lines). That was the wrong measure: what the index consumes is
+  the **converted Calor**, and FluentValidation converts to 62 files / 2.2k
+  lines — 45% of its files, the converter's fidelity-over-coverage posture
+  working as designed. Measured against the C# line count, the gate would have
+  claimed a scale the index never sees.
+
+  The subject is therefore the in-repo **`fixture-10k`** corpus (106 files /
+  11.1k lines, 5,445 declarations, 587 call edges, zero residual), with
+  converted FluentValidation retained as a smaller second data point.
+- Numbers are published per release whether or not they pass. **First
+  measurement (2026-08-12), in-process on `fixture-10k`:** index build
+  **0.40s** against a 30s budget; warm queries **0.0–0.3ms** across all six
+  facets against a 500ms budget. End-to-end through the published binary,
+  which is what a user feels: **0.74s** build, **0.12s** query — the remainder
+  is process startup (~80ms floor), not query work.
 
 **Gate 2's index-contents leg** rides along: the ES-01..ES-07 corpus and
 `EditScriptIdentityTests` already exist, so the leg is an added assertion that
