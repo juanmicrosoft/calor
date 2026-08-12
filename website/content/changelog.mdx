@@ -10,13 +10,27 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
-### Removed
+## [0.13.2] - 2026-08-12
 
-- **VS Code extension support is withdrawn.** The extension tree, VSIX release assets, Marketplace publishing, and the single-file publish guard are removed. The language server is unaffected: `calor lsp` speaks standard LSP over stdio and works with any LSP-capable editor.
+Hardening release. The compiler's control-flow and dataflow foundation is rebuilt on explicit semantics, and the build and release chain becomes hermetic and supply-chain verified.
+
+**0.13.1 was tagged but never published.** Four publish attempts failed and nothing was ever pushed to nuget.org under that version. Rather than publish it from a `main` that had since gained a compiler-internals rewrite it did not describe, 0.13.1 is abandoned and its contents ship here, described accurately.
 
 ### Changed
 
-- **VS Code Marketplace publishing is opportunistic, not a release commitment.** Current extension builds remain supported as platform-specific VSIX files attached to GitHub releases, and CI continues to exercise the bundled single-file LSP. The Marketplace listing deliberately remains at v0.3.8 unless a publishing token is minted; five months of stale listing produced no demand signal that justifies keeping token rotation in the release path.
+- **Z3 translation aligned with executable C# semantics.** Integral literal width and signedness survive translation, and C# numeric promotions apply across arithmetic, comparison, equality, shifts and overflow. Operations with no executable C# semantics stay fail-closed rather than approximated. Translator semantics are versioned in proof results and cache validity, so **existing verification caches are invalidated by this release** and proofs are re-established under the corrected semantics.
+- **CFG and dataflow rebuilt around explicit semantics.** Control flow is constructed from explicit terminators and typed edges rather than positional inference; loop, exception, catch, finally, using, return, throw, break and continue route structurally. Dataflow fails explicitly rather than silently on non-convergence, and initialization, liveness and reaching-definitions analyses are symbol-keyed and semantically ordered.
+- **Builds and releases are hermetic and supply-chain verified.** Z3 is restored by an explicit bootstrap instead of downloaded mid-build, and every supported binary is verified against committed SHA-256 and byte-size pins before compilation. NuGet versions are centralized with committed lock files and locked restores, alongside offline build/test/pack, corrupt-asset, lock-mismatch and runtime-load gates, SPDX SBOMs and SLSA-style provenance.
+- **Round-trip verification is failure-safe.** Conversion runs in lossless mode and validates generated C# before publication, failing closed rather than reporting success on build, process or coverage failures. Excluded and failed items stay visible in reports.
+
+### Fixed
+
+- **Z3 downloads survive a real outage.** Every fetch path used `--retry 5 --retry-delay 3` — and per `curl(1)`, setting `--retry-delay` *disables* exponential backoff, so the flag that reads as hardening pinned retries to a flat 3s and gave up in about fifteen seconds, shorter than a routine CDN blip. Backoff is restored across every fetch site, including the publish path, and the Windows path — which had no retry at all — now backs off too.
+- **MCP tools no longer refuse work because their host is using memory.** The heavy-tool admission gate measured whole-process memory and applied everywhere, so a handler embedded in someone else's process charged that process's memory to the next tool call and refused it. The gate now applies only to the stdio server, which owns its process.
+
+### Removed
+
+- **VS Code extension support is withdrawn.** The extension tree, VSIX release assets, Marketplace publishing, and the single-file publish guard are removed. The language server is unaffected: `calor lsp` speaks standard LSP over stdio and works with any LSP-capable editor.
 
 ## [0.13.1] - 2026-08-12
 
