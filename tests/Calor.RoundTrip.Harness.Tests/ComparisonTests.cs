@@ -213,7 +213,7 @@ public class ComparisonTests
     }
 
     [Fact]
-    public void DuplicateTheoryIdentities_AreIncomplete()
+    public void DuplicateTheoryIdentities_CompareOutcomeCounts()
     {
         var baseline = MakeRun(
             ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
@@ -224,8 +224,38 @@ public class ComparisonTests
 
         var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
 
-        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+        Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
+        Assert.Equal("Failed", Assert.Single(result.Regressions).Outcome);
+    }
+
+    [Fact]
+    public void DuplicateTheoryIdentities_WithUnchangedOutcomes_Pass()
+    {
+        var baseline = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"));
+        var roundTrip = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"));
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Pass, result.Status);
         Assert.Empty(result.Regressions);
+    }
+
+    [Fact]
+    public void DuplicateTheoryIdentity_CountChange_IsIncomplete()
+    {
+        var baseline = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"),
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"));
+        var roundTrip = MakeRun(
+            ("tests.dll", "Suite", "SameTheoryRow", "Passed"));
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
     }
 
     [Fact]

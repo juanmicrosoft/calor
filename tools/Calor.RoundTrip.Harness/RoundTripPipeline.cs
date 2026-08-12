@@ -1150,14 +1150,13 @@ public sealed class RoundTripPipeline
         var roundTripByIdentity = roundTrip.Results
             .GroupBy(t => t.Identity)
             .ToDictionary(group => group.Key, group => group.ToList());
-        if (baselineByIdentity.Any(pair => pair.Value.Count != 1) ||
-            roundTripByIdentity.Any(pair => pair.Value.Count != 1))
-        {
-            comparison.Status = ComparisonStatus.Incomplete;
-            return comparison;
-        }
+        // Some adapters emit indistinguishable theory rows with the same case ID and
+        // display name. Compare their outcome counts as one equivalence class, but
+        // fail closed if the number of rows in any class changes.
         if (!baselineByIdentity.Keys.ToHashSet().SetEquals(roundTripByIdentity.Keys) ||
-            baselineByIdentity.Count != roundTripByIdentity.Count)
+            baselineByIdentity.Count != roundTripByIdentity.Count ||
+            baselineByIdentity.Any(pair =>
+                roundTripByIdentity[pair.Key].Count != pair.Value.Count))
         {
             comparison.Status = ComparisonStatus.Incomplete;
             return comparison;
