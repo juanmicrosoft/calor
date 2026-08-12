@@ -1296,6 +1296,23 @@ public sealed class EffectEnforcementPass
                 }
             }
 
+            // A MODULE-QUALIFIED call into another module of the same multi-file
+            // compilation (#925). The bare-name path already accepts these; this
+            // path did not, so naming the module explicitly — the clearer thing
+            // to write — produced a WORSE result than leaving it bare: the call
+            // fell through to "unknown external", which then forbade it inside a
+            // pure function even when the callee was itself pure.
+            //
+            // The driver's map holds "Module.Function" keys for every module and
+            // the bare name only when unambiguous, so membership here is already
+            // the exactly-one-match rule the rest of resolution uses. As in the
+            // bare case, this pass contributes nothing: the cross-module pass
+            // charges the callee's declared effects.
+            if (_context.CrossModuleFunctionNames.Contains(target))
+            {
+                return EffectSet.Empty;
+            }
+
             // Permissive mode: assume pure for unknown calls (no diagnostic)
             if (_context.Policy == UnknownCallPolicy.Permissive)
             {
