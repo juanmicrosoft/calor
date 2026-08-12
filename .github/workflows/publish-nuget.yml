@@ -109,7 +109,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/test
-          dotnet test "${{ matrix.project }}" -c Release --no-build \
+          dotnet test "${{ matrix.project }}" -c Release \
             --logger "trx;LogFileName=${{ matrix.name }}.trx" \
             --results-directory artifacts/test \
             --verbosity normal 2>&1 | tee test-output.log
