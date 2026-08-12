@@ -91,7 +91,10 @@ public class SyntaxLookupMcpIntegrationTests
         using var input = new MemoryStream(Encoding.UTF8.GetBytes(framedRequest));
         using var output = new MemoryStream();
 
-        var server = new McpServer(input, output);
+        // Memory admission disabled: the test host does not own this process (#897).
+        var server = new McpServer(
+            McpMemoryAdmissionPolicy.Disabled,
+            new StreamReader(input, Encoding.UTF8, leaveOpen: true), output);
         await server.RunAsync();
 
         output.Position = 0;

@@ -9,6 +9,9 @@ namespace Calor.Compiler.Mcp;
 public sealed class McpServer
 {
     private readonly McpMessageHandler _handler;
+
+    /// <summary>The message handler backing this server. Exposed so tests can pin its admission policy.</summary>
+    internal McpMessageHandler Handler => _handler;
     private readonly TextReader _reader;
     private readonly Stream _output;
     private readonly TextWriter? _log;
@@ -30,12 +33,26 @@ public sealed class McpServer
     /// </summary>
     public McpServer(TextReader reader, Stream output, bool verbose = false, TextWriter? log = null,
         string? rootDirectory = null)
+        // The server owns its process, so process-wide memory admission control is
+        // sound here — and only here. See McpMemoryAdmissionPolicy.
+        : this(McpMemoryAdmissionPolicy.FromEnvironment(), reader, output, verbose, log, rootDirectory)
+    {
+    }
+
+    /// <summary>
+    /// Creates an MCP server with an explicit memory admission policy. Internal because
+    /// the only caller that should ever pass something other than
+    /// <see cref="McpMemoryAdmissionPolicy.FromEnvironment"/> is a test host, which — like
+    /// any embedding process — does not own its memory on the server's behalf.
+    /// </summary>
+    internal McpServer(McpMemoryAdmissionPolicy memoryAdmission, TextReader reader, Stream output,
+        bool verbose = false, TextWriter? log = null, string? rootDirectory = null)
     {
         _reader = reader ?? throw new ArgumentNullException(nameof(reader));
         _output = output ?? throw new ArgumentNullException(nameof(output));
         _verbose = verbose;
         _log = log;
-        _handler = new McpMessageHandler(verbose, log, rootDirectory);
+        _handler = new McpMessageHandler(memoryAdmission, verbose, log, rootDirectory);
     }
 
     /// <summary>
