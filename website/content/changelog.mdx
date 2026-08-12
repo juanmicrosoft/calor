@@ -10,6 +10,10 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+### Removed
+
+- **VS Code extension support is withdrawn.** The extension tree, VSIX release assets, Marketplace publishing, and the single-file publish guard are removed. The language server is unaffected: `calor lsp` speaks standard LSP over stdio and works with any LSP-capable editor.
+
 ### Changed
 
 - **VS Code Marketplace publishing is opportunistic, not a release commitment.** Current extension builds remain supported as platform-specific VSIX files attached to GitHub releases, and CI continues to exercise the bundled single-file LSP. The Marketplace listing deliberately remains at v0.3.8 unless a publishing token is minted; five months of stale listing produced no demand signal that justifies keeping token rotation in the release path.

@@ -116,18 +116,18 @@ calor init --ai github
 calor --input program.calr --output program.g.cs
 ```
 
-### VS Code Extension
+### Editor Support
 
-The supported installation path is a platform-specific VSIX attached to the
-[current GitHub release](https://github.com/juanmicrosoft/calor/releases). Download
-the package for your platform, then run **Extensions: Install from VSIX...** in
-VS Code. The extension is a thin client for Calor's first-class language server
-and also includes the `.calr` grammar.
+Calor ships a first-class **language server** (`calor lsp`) speaking the standard
+Language Server Protocol over stdio: diagnostics, go-to-definition, references,
+symbol-exact rename, formatting, and semantic tokens. Any LSP-capable editor can
+use it — see [the LSP docs](docs/cli/lsp.md) for how to point your editor at it.
 
-The Marketplace listing deliberately remains at v0.3.8. Marketplace updates
-are opportunistic and happen only if a publishing token is minted; they are not
-a release commitment or gate. The extension, its language server bundle, and
-the release VSIX artifacts remain supported.
+**VS Code extension support was withdrawn after v0.13.1.** The extension was
+distributed as platform-specific VSIX assets on each release; that channel is
+gone, along with the `editors/vscode` tree and its publishing workflows. The
+Marketplace listing was already frozen at v0.3.8 and is not maintained. The
+language server itself is unaffected and remains supported.
 
 ### AI Integration Comparison
 
