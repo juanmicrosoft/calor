@@ -1028,7 +1028,13 @@ public class Program
 
         // Code generation
         phaseSw.Restart();
-        var emitter = new CSharpEmitter(options.ContractMode, options.VerificationResults, inheritanceResult, options.ObligationResults, diagnostics)
+        var emitter = new CSharpEmitter(
+            options.ContractMode,
+            options.VerificationResults,
+            inheritanceResult,
+            options.ObligationResults,
+            diagnostics,
+            options.ObligationPolicy)
         {
             ElideProvenGuards = options.ElideProvenGuards
         };

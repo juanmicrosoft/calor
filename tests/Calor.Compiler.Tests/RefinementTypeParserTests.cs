@@ -334,7 +334,7 @@ public sealed class RefinementTypeParserTests
     }
 
     [Fact]
-    public void CSharpEmit_ProofObligation_EmitsComment()
+    public void CSharpEmit_ProofObligation_EmitsRuntimeGuard()
     {
         var source = """
             §M{m001:Test}
@@ -346,11 +346,12 @@ public sealed class RefinementTypeParserTests
 
         var csharp = ParseAndEmitCSharp(source);
 
-        Assert.Contains("// TODO: proof obligation [p1: positive]", csharp);
+        Assert.Contains("if (!(x >= 0))", csharp);
+        Assert.Contains("Proof obligation [p1: positive] violated", csharp);
     }
 
     [Fact]
-    public void CSharpEmit_ProofObligationWithoutDescription_EmitsComment()
+    public void CSharpEmit_ProofObligationWithoutDescription_EmitsRuntimeGuard()
     {
         var source = """
             §M{m001:Test}
@@ -362,7 +363,8 @@ public sealed class RefinementTypeParserTests
 
         var csharp = ParseAndEmitCSharp(source);
 
-        Assert.Contains("// TODO: proof obligation [p1]", csharp);
+        Assert.Contains("if (!(x >= 0))", csharp);
+        Assert.Contains("Proof obligation [p1] violated", csharp);
     }
 
     // ───── CalorEmitter: Round-trip ─────
@@ -722,8 +724,8 @@ public sealed class RefinementTypeParserTests
         Assert.DoesNotContain("§", csharp);
         Assert.DoesNotContain("RTYPE", csharp);
 
-        // Should contain the proof obligation comment
-        Assert.Contains("// TODO: proof obligation", csharp);
+        // Unverified proof obligations remain executable runtime guards.
+        Assert.Contains("Proof obligation [p1: result] violated", csharp);
 
         // Verify it compiles with Roslyn
         var errors = RoslynCompile(csharp);

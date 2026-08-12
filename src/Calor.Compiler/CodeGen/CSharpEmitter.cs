@@ -57,10 +57,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private string? _currentFunctionId;
     private string? _currentFilePath;
     private string _currentNamespace = "";
+    private string? _currentInlineReturnRefinement;
+    private int _inlineReturnGuardCounter;
     private readonly EmitContractMode _contractMode;
     private readonly ModuleVerificationResult? _verificationResults;
     private readonly ModuleInheritanceResult? _inheritanceResult;
     private readonly Verification.Obligations.ObligationTracker? _obligationTracker;
+    private readonly Verification.Obligations.ObligationPolicy _obligationPolicy;
     private readonly Diagnostics.DiagnosticBag? _diagnostics;
 
     // Track current indices for contract emission
@@ -76,11 +79,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     // Starts with a base scope so isolated statement/expression emission (tests, or any
     // path not entered through a function/method ResetDeclScopes) always has a live scope.
     private readonly List<HashSet<string>> _declScopes = new() { new(StringComparer.Ordinal) };
+    private readonly List<Dictionary<string, string>> _refinementDeclScopes =
+        new() { new(StringComparer.Ordinal) };
 
     private void ResetDeclScopes(IReadOnlyList<ParameterNode>? parameters = null)
     {
         _declScopes.Clear();
         _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
+        _refinementDeclScopes.Clear();
+        _refinementDeclScopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
         if (parameters != null)
         {
             // Parameters live in the base scope so a mutable §B{~param} rebind is a
@@ -89,12 +96,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             // into its base scope too (#732).
             foreach (var p in parameters)
             {
-                _declScopes[0].Add(SanitizeIdentifier(p.Name));
+                var name = SanitizeIdentifier(p.Name);
+                _declScopes[0].Add(name);
+                if (_refinementTypes.ContainsKey(p.TypeName))
+                {
+                    _refinementDeclScopes[0][name] = p.TypeName;
+                }
             }
         }
     }
 
-    private void PushDeclScope() => _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
+    private void PushDeclScope()
+    {
+        _declScopes.Add(new HashSet<string>(StringComparer.Ordinal));
+        _refinementDeclScopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+    }
 
     private void PopDeclScope()
     {
@@ -105,6 +121,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (_declScopes.Count > 1)
         {
             _declScopes.RemoveAt(_declScopes.Count - 1);
+            _refinementDeclScopes.RemoveAt(_refinementDeclScopes.Count - 1);
         }
     }
 
@@ -134,6 +151,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _declScopes[^1].Add(name);
     }
 
+    private void DeclareRefinementInScope(string name, string typeName)
+    {
+        System.Diagnostics.Debug.Assert(
+            _refinementDeclScopes.Count > 0,
+            "DeclareRefinementInScope with no active scope");
+        _refinementDeclScopes[^1][SanitizeIdentifier(name)] = typeName;
+    }
+
+    private bool TryGetRefinementType(string name, out string typeName)
+    {
+        var sanitizedName = SanitizeIdentifier(name);
+        for (var i = _refinementDeclScopes.Count - 1; i >= 0; i--)
+        {
+            if (_refinementDeclScopes[i].TryGetValue(sanitizedName, out typeName!))
+                return true;
+        }
+
+        typeName = "";
+        return false;
+    }
+
 
     // AST-level namespace usage tracking for conditional using emission
     private bool _usesCalorRuntime;
@@ -142,6 +180,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     // Indexed type name → base type for erasure (populated during Visit(ModuleNode))
     private readonly Dictionary<string, string> _indexedTypeErasure = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, RefinementTypeNode> _refinementTypes =
+        new(StringComparer.Ordinal);
 
     public CSharpEmitter() : this(EmitContractMode.Debug)
     {
@@ -164,7 +204,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public CSharpEmitter(ContractMode contractMode, ModuleVerificationResult? verificationResults, ModuleInheritanceResult? inheritanceResult,
         Verification.Obligations.ObligationTracker? obligationTracker = null,
-        Diagnostics.DiagnosticBag? diagnostics = null)
+        Diagnostics.DiagnosticBag? diagnostics = null,
+        Verification.Obligations.ObligationPolicy? obligationPolicy = null)
     {
         _contractMode = contractMode switch
         {
@@ -176,11 +217,13 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _inheritanceResult = inheritanceResult;
         _obligationTracker = obligationTracker;
         _diagnostics = diagnostics;
+        _obligationPolicy = obligationPolicy ?? Verification.Obligations.ObligationPolicy.Default;
     }
 
     public CSharpEmitter(EmitContractMode contractMode)
     {
         _contractMode = contractMode;
+        _obligationPolicy = Verification.Obligations.ObligationPolicy.Default;
     }
 
     /// <summary>
@@ -310,6 +353,35 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (!skipEmptyLine || !string.IsNullOrEmpty(code))
         {
             AppendLine(code);
+            if (statement is BindStatementNode
+                {
+                    TypeName: not null,
+                    Initializer: not null
+                } bind
+                && _refinementTypes.ContainsKey(bind.TypeName))
+            {
+                EmitRefinementValueGuard(bind.TypeName, SanitizeIdentifier(bind.Name));
+            }
+            else if (statement is AssignmentStatementNode
+                {
+                    Target: ReferenceNode target
+                }
+                && TryGetRefinementType(target.Name, out var assignmentRefinement))
+            {
+                EmitRefinementValueGuard(
+                    assignmentRefinement,
+                    SanitizeIdentifier(target.Name));
+            }
+            else if (statement is CompoundAssignmentStatementNode
+                {
+                    Target: ReferenceNode compoundTarget
+                }
+                && TryGetRefinementType(compoundTarget.Name, out var compoundRefinement))
+            {
+                EmitRefinementValueGuard(
+                    compoundRefinement,
+                    SanitizeIdentifier(compoundTarget.Name));
+            }
         }
         EndLineMapping(mapped);
     }
@@ -382,6 +454,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         foreach (var itype in node.IndexedTypes)
         {
             _indexedTypeErasure[itype.Name] = itype.BaseTypeName;
+        }
+        foreach (var refinementType in node.RefinementTypes)
+        {
+            _refinementTypes[refinementType.Name] = refinementType;
         }
 
         var isGlobalNamespace = node.Name == "_global" || string.IsNullOrEmpty(node.Name);
@@ -670,6 +746,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             mappedReturnType = WrapInTask(mappedReturnType);
         }
         var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+        var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
+        var canLowerReturnChecks = CanLowerPostconditions(node.Body);
+        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
+        _currentInlineReturnRefinement =
+            hasReturnRefinement && !canLowerReturnChecks ? returnType : null;
+        _inlineReturnGuardCounter = 0;
 
         var parameters = string.Join(", ", node.Parameters.Select(p => Visit(p)));
 
@@ -731,11 +813,14 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var check = Visit(requires);
             AppendLine(check);
         }
+        EmitRefinementParameterGuards(node.Parameters);
 
         // If we have postconditions and a return value, we need special handling.
         // W1 Slice 1 (T2): only when the body shape is one the lowering can
         // instrument faithfully — otherwise emit the body untransformed and say so.
-        if (node.Postconditions.Count > 0 && hasReturnValue && CanLowerPostconditions(node.Body))
+        if ((node.Postconditions.Count > 0 || hasReturnRefinement)
+            && hasReturnValue
+            && canLowerReturnChecks)
         {
             AppendLine($"{mappedReturnType} __result__ = default;");
             AppendLine();
@@ -764,6 +849,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 var check = SubstituteResultIdentifier(Visit(ensures));
                 AppendLine(check);
             }
+            EmitReturnRefinementGuard(returnType, "__result__");
 
             AppendLine("return __result__;");
         }
@@ -771,7 +857,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         {
             if (node.Postconditions.Count > 0 && hasReturnValue)
             {
-                // Unlowerable body shape: real returns preserved, checks omitted LOUDLY.
+                // Unlowerable postconditions are omitted loudly. Return refinements
+                // are still guarded directly at every return statement.
                 ReportPostconditionChecksNotLowered(node.Name, node.Span);
             }
 
@@ -800,6 +887,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         Dedent();
         AppendLine("}");
+        _currentInlineReturnRefinement = previousInlineReturnRefinement;
 
         return "";
     }
@@ -924,6 +1012,25 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         var expr = node.Expression.Accept(this);
+        if (_currentInlineReturnRefinement != null
+            && _refinementTypes.TryGetValue(
+                _currentInlineReturnRefinement,
+                out var refinementType))
+        {
+            var resultName = $"__refinedReturn{_inlineReturnGuardCounter++}";
+            var substituted = Verification.Obligations.FactCollector
+                .SubstituteSelfRefStatic(refinementType.Predicate, resultName);
+            var condition = substituted.Accept(this);
+            var continuationIndent = Environment.NewLine
+                + new string(' ', _indentLevel * 4);
+            return $"var {resultName} = {expr};"
+                + continuationIndent
+                + $"if (!({condition})) throw new InvalidOperationException("
+                + $"\"Return value violates refinement type '{refinementType.Name}'\");"
+                + continuationIndent
+                + $"return {resultName};";
+        }
+
         return $"return {expr};";
     }
 
@@ -1454,6 +1561,11 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // scopes create new shadowing variables, while mutable binds reassign.
         if (node.IsMutable && IsVarDeclaredInScope(varName))
         {
+            if (node.TypeName != null && _refinementTypes.ContainsKey(node.TypeName))
+            {
+                DeclareRefinementInScope(varName, node.TypeName);
+            }
+
             // Mutable rebind - emit assignment only
             if (node.Initializer != null)
             {
@@ -1464,6 +1576,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
 
         DeclareVarInScope(varName);
+        if (node.TypeName != null && _refinementTypes.ContainsKey(node.TypeName))
+        {
+            DeclareRefinementInScope(varName, node.TypeName);
+        }
 
         if (node.Initializer != null)
         {
@@ -2880,6 +2996,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             mappedReturnType = WrapInTask(mappedReturnType);
         }
         var hasReturnValue = returnType.ToUpperInvariant() != "VOID";
+        var hasReturnRefinement = _refinementTypes.ContainsKey(returnType);
         var methodName = SanitizeIdentifier(node.Name);
 
         // Build type parameters
@@ -2934,6 +3051,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             var check = Visit(requires);
             AppendLine(check);
         }
+        EmitRefinementParameterGuards(node.Parameters);
 
         // Emit inherited preconditions (only if method has no explicit contracts)
         if (!node.HasContracts && inheritedContracts != null)
@@ -2951,10 +3069,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             ? node.Postconditions
             : (inheritedContracts?.Postconditions ?? Array.Empty<EnsuresNode>());
         var hasInheritedPostconditions = !node.HasContracts && inheritedContracts != null && inheritedContracts.Postconditions.Count > 0;
+        var canLowerReturnChecks = CanLowerPostconditions(node.Body);
+        var previousInlineReturnRefinement = _currentInlineReturnRefinement;
+        _currentInlineReturnRefinement =
+            hasReturnRefinement && !canLowerReturnChecks ? returnType : null;
+        _inlineReturnGuardCounter = 0;
 
         // Handle postconditions similar to FunctionNode
         // (W1 Slice 1 T2: only for lowerable body shapes — see CanLowerPostconditions)
-        if (effectivePostconditions.Count > 0 && hasReturnValue && CanLowerPostconditions(node.Body))
+        if ((effectivePostconditions.Count > 0 || hasReturnRefinement)
+            && hasReturnValue
+            && canLowerReturnChecks)
         {
             AppendLine($"{mappedReturnType} __result__ = default;");
             AppendLine();
@@ -2993,6 +3118,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     AppendLine(check);
                 }
             }
+            EmitReturnRefinementGuard(returnType, "__result__");
 
             AppendLine("return __result__;");
         }
@@ -3035,8 +3161,57 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         Dedent();
         AppendLine("}");
+        _currentInlineReturnRefinement = previousInlineReturnRefinement;
 
         return "";
+    }
+
+    private void EmitRefinementParameterGuards(IReadOnlyList<ParameterNode> parameters)
+    {
+        foreach (var parameter in parameters)
+        {
+            var predicate = parameter.InlineRefinement?.Predicate;
+            var description = $"inline refinement for parameter '{parameter.Name}'";
+            if (predicate is null
+                && _refinementTypes.TryGetValue(parameter.TypeName, out var refinementType))
+            {
+                predicate = refinementType.Predicate;
+                description = $"refinement type '{refinementType.Name}' for parameter '{parameter.Name}'";
+            }
+
+            if (predicate is null)
+                continue;
+
+            var substituted = Verification.Obligations.FactCollector
+                .SubstituteSelfRefStatic(predicate, parameter.Name);
+            var condition = substituted.Accept(this);
+            AppendLine($"if (!({condition})) throw new ArgumentOutOfRangeException(" +
+                $"nameof({SanitizeIdentifier(parameter.Name)}), \"Violation of {description}\");");
+        }
+    }
+
+    private void EmitReturnRefinementGuard(string returnType, string resultName)
+    {
+        if (!_refinementTypes.TryGetValue(returnType, out var refinementType))
+            return;
+
+        var substituted = Verification.Obligations.FactCollector
+            .SubstituteSelfRefStatic(refinementType.Predicate, resultName);
+        var condition = substituted.Accept(this);
+        AppendLine($"if (!({condition})) throw new InvalidOperationException(" +
+            $"\"Return value violates refinement type '{refinementType.Name}'\");");
+    }
+
+    private void EmitRefinementValueGuard(string refinementTypeName, string valueName)
+    {
+        if (!_refinementTypes.TryGetValue(refinementTypeName, out var refinementType))
+            return;
+
+        var substituted = Verification.Obligations.FactCollector
+            .SubstituteSelfRefStatic(refinementType.Predicate, valueName);
+        var condition = substituted.Accept(this);
+        AppendLine($"if (!({condition})) throw new ArgumentOutOfRangeException(" +
+            $"nameof({valueName}), \"Value violates refinement type '{refinementType.Name}'\");");
     }
 
     private static readonly Dictionary<string, string> CilNameToOperator = new()
@@ -4435,6 +4610,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 ? erasedBase + calorType.Substring(genericIdx)
                 : erasedBase;
         }
+        else if (_refinementTypes.TryGetValue(lookupName, out var refinementType))
+        {
+            baseTypeName = refinementType.BaseTypeName;
+        }
 
         // Use the centralized TypeMapper for bidirectional type mapping
         return TypeMapper.CalorToCSharp(baseTypeName);
@@ -5828,13 +6007,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
             if (matching != null)
             {
+                var action = _obligationPolicy.GetAction(matching.Status);
+                var requiresGuard = Verification.Obligations.ObligationPolicy.RequiresGuard(action);
                 switch (matching.Status)
                 {
                     // Elision is opt-in (roadmap v0.13 §2.1): a Discharged obligation
                     // drops its guard only when the caller asked for it; otherwise the
                     // verdict is diagnostic and the check stays.
                     case Verification.Obligations.ObligationStatus.Discharged
-                        when ElideProvenGuards:
+                        when ElideProvenGuards && !requiresGuard:
                         AppendLine($"// PROVEN: proof obligation [{node.Id}{desc}]");
                         return "";
 
@@ -5861,8 +6042,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             }
         }
 
-        // Default: no tracker or pending status — emit as comment
-        AppendLine($"// TODO: proof obligation [{node.Id}{desc}]");
+        // No tracker means no proof was established. Preserve executable protection.
+        var fallbackCondition = node.Condition.Accept(this);
+        AppendLine($"if (!({fallbackCondition})) throw new InvalidOperationException(" +
+            $"\"Proof obligation [{node.Id}{desc}] violated\");");
         return "";
     }
 }

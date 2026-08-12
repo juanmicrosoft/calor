@@ -87,9 +87,22 @@ public sealed class ObligationSolver : IDisposable
             }
         }
 
-        // For RefinementEntry obligations, push the self-variable
+        if (obligation.Kind == ObligationKind.RefinementReturn
+            && info.OutputType is not null
+            && !translator.DeclareVariable(
+                "result",
+                ResolveRefinementBaseType(info.OutputType, info.RefinementTypes)))
+        {
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                ContractTranslator.DiagnoseUnsupportedType(info.OutputType))));
+            obligation.SolverDuration = sw.Elapsed;
+            return;
+        }
+
+        // Refinement predicates use # for the constrained entry or return value.
         // so # in the predicate resolves to the parameter being checked
-        if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
+        if (obligation.Kind is ObligationKind.RefinementEntry or ObligationKind.RefinementReturn
+            && obligation.ParameterName != null)
         {
             translator.PushSelfVariable(obligation.ParameterName);
         }
@@ -104,7 +117,8 @@ public sealed class ObligationSolver : IDisposable
                 ?? "Obligation condition could not be translated to Z3")));
             obligation.SolverDuration = sw.Elapsed;
 
-            if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
+            if (obligation.Kind is ObligationKind.RefinementEntry or ObligationKind.RefinementReturn
+                && obligation.ParameterName != null)
                 translator.PopSelfVariable();
             return;
         }
@@ -222,7 +236,8 @@ public sealed class ObligationSolver : IDisposable
         }
         finally
         {
-            if (obligation.Kind == ObligationKind.RefinementEntry && obligation.ParameterName != null)
+            if (obligation.Kind is ObligationKind.RefinementEntry or ObligationKind.RefinementReturn
+                && obligation.ParameterName != null)
                 translator.PopSelfVariable();
         }
     }
@@ -237,6 +252,10 @@ public sealed class ObligationSolver : IDisposable
         {
             indexedTypes[itype.Name] = itype;
         }
+        var refinementTypes = module.RefinementTypes.ToDictionary(
+            type => type.Name,
+            type => type.BaseTypeName,
+            StringComparer.Ordinal);
 
         foreach (var func in module.Functions)
         {
@@ -276,7 +295,8 @@ public sealed class ObligationSolver : IDisposable
                 func.Preconditions,
                 func.Output?.TypeName,
                 factCollector.ScopedFacts,
-                extraVars);
+                extraVars,
+                refinementTypes);
         }
 
         foreach (var cls in module.Classes)
@@ -292,7 +312,8 @@ public sealed class ObligationSolver : IDisposable
                     method.Preconditions,
                     method.Output?.TypeName,
                     new List<ScopedFact>(),
-                    new List<(string, string)>());
+                    new List<(string, string)>(),
+                    refinementTypes);
             }
         }
 
@@ -304,7 +325,13 @@ public sealed class ObligationSolver : IDisposable
         IReadOnlyList<RequiresNode> Preconditions,
         string? OutputType,
         List<ScopedFact> CollectedFacts,
-        List<(string Name, string TypeName)> ExtraVariables);
+        List<(string Name, string TypeName)> ExtraVariables,
+        IReadOnlyDictionary<string, string> RefinementTypes);
+
+    private static string ResolveRefinementBaseType(
+        string typeName,
+        IReadOnlyDictionary<string, string> refinementTypes) =>
+        refinementTypes.TryGetValue(typeName, out var baseType) ? baseType : typeName;
 
     public void Dispose()
     {

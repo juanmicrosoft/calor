@@ -115,6 +115,33 @@ public sealed class FactScopingTests
             f.Fact is BinaryOperationNode { Operator: BinaryOperator.LessThan });
     }
 
+    [Fact]
+    public void NegativeStepForLoop_UsesInclusiveDescendingBounds()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Descending:priv}
+                §O{i32}
+                §L{l1:i:INT:2:INT:0:INT:-1}
+                  §P (>= i INT:0)
+                §R INT:0
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+
+        var collector = new FactCollector();
+        collector.CollectFromFunction(Assert.Single(module.Functions));
+
+        Assert.Contains(
+            collector.Facts,
+            fact => fact is BinaryOperationNode { Operator: BinaryOperator.LessOrEqual });
+        Assert.Contains(
+            collector.Facts,
+            fact => fact is BinaryOperationNode { Operator: BinaryOperator.GreaterOrEqual });
+    }
+
     [SkippableFact]
     public void ContradictorySiblingGuards_DoNotVacuouslyDischargeObligations()
     {

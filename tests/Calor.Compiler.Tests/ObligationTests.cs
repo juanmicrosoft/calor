@@ -50,6 +50,29 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void Generate_NestedProofObligation_CreatesObligation()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §IF{i1} (> x INT:0)
+                    §PROOF{p1:positive} (> x INT:0)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+
+        var obligation = Assert.Single(tracker.Obligations);
+        Assert.Equal(ObligationKind.ProofObligation, obligation.Kind);
+        Assert.Equal("p1", obligation.SourceProofId);
+    }
+
+    [Fact]
     public void Generate_InlineRefinement_CreatesRefinementEntryObligation()
     {
         var source = """
@@ -500,6 +523,45 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_PolicyAlwaysGuard_OverridesProvenGuardElision()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Main:pub}
+                  §I{i32:x}
+                  §O{void}
+                  §PROOF{p1:check} (>= x INT:0)
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+        Assert.Single(tracker.Obligations).Status = ObligationStatus.Discharged;
+
+        var policy = new ObligationPolicy
+        {
+            Discharged = ObligationAction.AlwaysGuard
+        };
+        var emitter = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            null,
+            tracker,
+            diagnostics: null,
+            obligationPolicy: policy)
+        {
+            ElideProvenGuards = true
+        };
+
+        var csharp = emitter.Emit(module);
+
+        Assert.Contains("throw new InvalidOperationException", csharp);
+        Assert.DoesNotContain("// PROVEN:", csharp);
+    }
+
+    [Fact]
     public void CSharpEmit_DischargedObligation_DefaultKeepsGuard()
     {
         // v0.13 default: verification is diagnostic. Without the opt-in, a Discharged
@@ -626,7 +688,7 @@ public sealed class ObligationTests
     }
 
     [Fact]
-    public void CSharpEmit_NoTracker_EmitsTodoComment()
+    public void CSharpEmit_NoTracker_EmitsRuntimeGuard()
     {
         var source = """
             §M{m001:Test}
@@ -639,10 +701,311 @@ public sealed class ObligationTests
         var module = Parse(source, out var diagnostics);
         Assert.False(diagnostics.HasErrors);
 
-        // No tracker — should emit TODO comment (M0 behavior)
+        // No tracker means no proof exists, so the runtime check must remain.
         var emitter = new CSharpEmitter();
         var csharp = emitter.Emit(module);
 
-        Assert.Contains("// TODO: proof obligation", csharp);
+        Assert.Contains("throw new InvalidOperationException", csharp);
+        Assert.DoesNotContain("// TODO: proof obligation", csharp);
+    }
+
+    [Fact]
+    public void DefaultPolicy_GuardsIncompleteOutcomes()
+    {
+        var policy = ObligationPolicy.Default;
+
+        Assert.True(ObligationPolicy.RequiresGuard(
+            policy.GetAction(ObligationStatus.Timeout)));
+        Assert.True(ObligationPolicy.RequiresGuard(
+            policy.GetAction(ObligationStatus.Unsupported)));
+        Assert.True(ObligationPolicy.RequiresGuard(
+            policy.GetAction(ObligationStatus.Pending)));
+        Assert.True(ObligationPolicy.RequiresGuard(
+            policy.GetAction(ObligationStatus.Boundary)));
+    }
+
+    [Fact]
+    public void CSharpEmit_InlineRefinedParameter_EmitsEntryGuard()
+    {
+        var source = """
+            §M{m001:Test}
+              §F{f001:Use:pub}
+                  §I{i32:age} | (>= # INT:0)
+                  §O{void}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var csharp = new CSharpEmitter().Emit(module);
+
+        Assert.Contains("if (!(age >= 0))", csharp);
+        Assert.Contains("ArgumentOutOfRangeException", csharp);
+    }
+
+    [Fact]
+    public void CSharpEmit_NamedRefinedParameter_ErasesTypeAndEmitsEntryGuard()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:Nat:i32} (>= # INT:0)
+              §F{f001:Use:pub}
+                  §I{Nat:value}
+                  §O{void}
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var csharp = new CSharpEmitter().Emit(module);
+
+        Assert.Contains("void Use(int value)", csharp);
+        Assert.Contains("if (!(value >= 0))", csharp);
+    }
+
+    [Fact]
+    public void Generate_NamedRefinedReturn_CreatesReturnObligation()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:Nat:i32} (>= # INT:0)
+              §F{f001:Get:pub}
+                  §O{Nat}
+                  §R INT:1
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+
+        var obligation = Assert.Single(tracker.Obligations);
+        Assert.Equal(ObligationKind.RefinementReturn, obligation.Kind);
+        Assert.Equal("result", obligation.ParameterName);
+    }
+
+    [Fact]
+    public void CSharpEmit_NamedRefinedReturn_ErasesTypeAndEmitsGuard()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:Nat:i32} (>= # INT:0)
+              §F{f001:Get:pub}
+                  §O{Nat}
+                  §R INT:1
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var csharp = new CSharpEmitter().Emit(module);
+
+        Assert.Contains("int Get()", csharp);
+        Assert.Contains("if (!(__result__ >= 0))", csharp);
+        Assert.Contains("Return value violates refinement type 'Nat'", csharp);
+    }
+
+    [Fact]
+    public void Generate_RefinedBinding_CreatesSubtypeObligation()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:Nat:i32} (>= # INT:0)
+              §F{f001:Use:pub}
+                  §O{void}
+                  §B{value:Nat} INT:1
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+
+        var obligation = Assert.Single(tracker.Obligations);
+        Assert.Equal(ObligationKind.Subtype, obligation.Kind);
+        Assert.Equal("value", obligation.ParameterName);
+    }
+
+    [Fact]
+    public void Generate_RefinedAssignment_CreatesSubtypeTransitionObligation()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:Nat:i32} (>= # INT:0)
+              §F{f001:Use:pub}
+                  §O{i32}
+                  §B{~value:Nat} INT:1
+                  §ASSIGN value INT:-1
+                  §R value
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var tracker = new ObligationTracker();
+        new ObligationGenerator(tracker).Generate(module);
+
+        var obligations = tracker.Obligations
+            .Where(obligation => obligation.Kind == ObligationKind.Subtype)
+            .ToArray();
+        Assert.Equal(2, obligations.Length);
+        Assert.Contains(
+            obligations,
+            obligation => obligation.Description.Contains(
+                "must preserve refinement type",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CSharpEmit_RefinedBinding_ErasesTypeAndEmitsGuard()
+    {
+        var source = """
+            §M{m001:Test}
+              §RTYPE{r1:Nat:i32} (>= # INT:0)
+              §F{f001:Use:pub}
+                  §O{void}
+                  §B{value:Nat} INT:1
+            """;
+
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors);
+
+        var csharp = new CSharpEmitter().Emit(module);
+
+        Assert.Contains("int value = 1;", csharp);
+        Assert.Contains("if (!(value >= 0))", csharp);
+        Assert.Contains("Value violates refinement type 'Nat'", csharp);
+    }
+
+    [Fact]
+    public void CSharpEmit_RefinedParameterGuard_RejectsInvalidRuntimeValue()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §F{f001:RequirePositive:pub}
+                  §I{i32:value} | (> # INT:0)
+                  §O{i32}
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "RequirePositive", -1);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_RefinedReturnGuard_RejectsInvalidRuntimeValue()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:BadReturn:pub}
+                  §O{Positive}
+                  §R INT:-1
+            """);
+
+        var exception = InvokeGenerated(csharp, "BadReturn");
+
+        Assert.IsType<InvalidOperationException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_NestedRefinedReturnGuard_RejectsInvalidRuntimeValue()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:BadNestedReturn:pub}
+                  §I{bool:takeBadPath}
+                  §O{Positive}
+                  §IF{i1} takeBadPath
+                    §R INT:-1
+                  §R INT:1
+            """);
+
+        var exception = InvokeGenerated(csharp, "BadNestedReturn", true);
+
+        Assert.IsType<InvalidOperationException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_RefinedBindingGuard_RejectsInvalidRuntimeValue()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:BadBinding:pub}
+                  §O{i32}
+                  §B{value:Positive} INT:-1
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "BadBinding");
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    [Fact]
+    public void CSharpEmit_RefinedAssignmentGuard_RejectsInvalidRuntimeValue()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:Positive:i32} (> # INT:0)
+              §F{f001:BadAssignment:pub}
+                  §O{i32}
+                  §B{~value:Positive} INT:1
+                  §ASSIGN value INT:-1
+                  §R value
+            """);
+
+        var exception = InvokeGenerated(csharp, "BadAssignment");
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    private static string Emit(string source)
+    {
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors,
+            $"Errors: {string.Join(", ", diagnostics.Select(d => d.Message))}");
+        return new CSharpEmitter().Emit(module);
+    }
+
+    private static Exception InvokeGenerated(
+        string csharp,
+        string methodName,
+        params object?[] arguments)
+    {
+        var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(csharp);
+        var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+            .Split(Path.PathSeparator)
+            .Select(path => Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path));
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+            $"ObligationRuntime_{Guid.NewGuid():N}",
+            [syntaxTree],
+            references,
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
+                Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+
+        using var stream = new MemoryStream();
+        var emitResult = compilation.Emit(stream);
+        Assert.True(
+            emitResult.Success,
+            string.Join(Environment.NewLine, emitResult.Diagnostics));
+
+        var assembly = System.Reflection.Assembly.Load(stream.ToArray());
+        var type = Assert.Single(assembly.GetTypes(), candidate =>
+            candidate.GetMethod(
+                methodName,
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static) is not null);
+        var method = type.GetMethod(
+            methodName,
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
+        var invocation = Assert.Throws<System.Reflection.TargetInvocationException>(
+            () => method.Invoke(null, arguments));
+
+        return Assert.IsAssignableFrom<Exception>(invocation.InnerException);
     }
 }

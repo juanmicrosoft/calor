@@ -127,18 +127,49 @@ public sealed class FactCollector
 
     /// <summary>
     /// Extracts loop bounds from a for-loop.
-    /// §L{id:i:from:to:step} yields facts: i >= from AND i < to, scoped to the body.
+    /// §L{id:i:from:to:step} uses inclusive bounds, matching C# emission.
     /// </summary>
     private void CollectFromForLoop(ForStatementNode forStmt)
     {
         var dummySpan = new TextSpan(0, 0, 1, 1);
         var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName);
 
-        var geFrom = new BinaryOperationNode(dummySpan, BinaryOperator.GreaterOrEqual, loopVar, forStmt.From);
-        AddGuardFact(geFrom, forStmt.Body);
-
-        var ltTo = new BinaryOperationNode(dummySpan, BinaryOperator.LessThan, loopVar, forStmt.To);
-        AddGuardFact(ltTo, forStmt.Body);
+        var isNegativeStep = forStmt.Step is IntLiteralNode { Value: < 0 }
+            or UnaryOperationNode { Operator: UnaryOperator.Negate };
+        if (!isNegativeStep)
+        {
+            AddGuardFact(
+                new BinaryOperationNode(
+                    dummySpan,
+                    BinaryOperator.GreaterOrEqual,
+                    loopVar,
+                    forStmt.From),
+                forStmt.Body);
+            AddGuardFact(
+                new BinaryOperationNode(
+                    dummySpan,
+                    BinaryOperator.LessOrEqual,
+                    loopVar,
+                    forStmt.To),
+                forStmt.Body);
+        }
+        else
+        {
+            AddGuardFact(
+                new BinaryOperationNode(
+                    dummySpan,
+                    BinaryOperator.LessOrEqual,
+                    loopVar,
+                    forStmt.From),
+                forStmt.Body);
+            AddGuardFact(
+                new BinaryOperationNode(
+                    dummySpan,
+                    BinaryOperator.GreaterOrEqual,
+                    loopVar,
+                    forStmt.To),
+                forStmt.Body);
+        }
 
         CollectFromStatements(forStmt.Body);
     }

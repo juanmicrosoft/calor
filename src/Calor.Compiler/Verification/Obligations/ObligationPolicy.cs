@@ -39,10 +39,10 @@ public sealed class ObligationPolicy
     public ObligationAction Boundary { get; init; } = ObligationAction.AlwaysGuard;
 
     /// <summary>Action for obligations with unsupported constructs.</summary>
-    public ObligationAction Unsupported { get; init; } = ObligationAction.WarnOnly;
+    public ObligationAction Unsupported { get; init; } = ObligationAction.WarnAndGuard;
 
     /// <summary>Action for obligations still pending (solver not run).</summary>
-    public ObligationAction Pending { get; init; } = ObligationAction.WarnOnly;
+    public ObligationAction Pending { get; init; } = ObligationAction.WarnAndGuard;
 
     /// <summary>
     /// Default policy: failed=Error, boundary=AlwaysGuard, timeout=WarnAndGuard.
@@ -69,8 +69,8 @@ public sealed class ObligationPolicy
         Failed = ObligationAction.WarnAndGuard,
         Timeout = ObligationAction.WarnAndGuard,
         Boundary = ObligationAction.AlwaysGuard,
-        Unsupported = ObligationAction.Ignore,
-        Pending = ObligationAction.Ignore
+        Unsupported = ObligationAction.WarnAndGuard,
+        Pending = ObligationAction.WarnAndGuard
     };
 
     /// <summary>
