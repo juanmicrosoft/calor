@@ -15,9 +15,9 @@ export function WhatsNewBanner() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <Sparkles className="h-4 w-4 text-calor-cerulean flex-shrink-0" />
           <p className="text-center">
-            <span className="font-semibold text-calor-cerulean">v0.13.0</span>
+            <span className="font-semibold text-calor-cerulean">v0.13.1</span>
             <span className="text-muted-foreground mx-1.5">&mdash;</span>
-            <span className="text-foreground">The Trustworthy Project Model release is live. Install the current VS Code extension from the release VSIX artifacts; the v0.3.8 Marketplace listing is now an intentionally opportunistic channel, not a release gate.</span>
+            <span className="text-foreground">The project model is now queryable: `calor index` and `calor query` answer who calls what, what a change affects, and what a declaration assumes — and say plainly when an answer is incomplete.</span>
             <Link
               href="/docs/changelog/"
               className="ml-2 font-medium text-calor-cerulean hover:text-calor-cerulean/80 underline underline-offset-4"
