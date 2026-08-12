@@ -15,7 +15,8 @@ This guide helps you set up a development environment for contributing to Calor.
 
 | Requirement | Version | Purpose |
 |:------------|:--------|:--------|
-| .NET SDK | 8.0+ | Build and run |
+| .NET SDK | 10.0+ | Build and run |
+| Python | 3.11+ | Hermetic asset and release metadata verification |
 | Git | Any recent | Version control |
 | Editor | VS Code, Rider, VS | Code editing |
 
@@ -28,12 +29,21 @@ This guide helps you set up a development environment for contributing to Calor.
 git clone https://github.com/YOUR_USERNAME/calor.git
 cd calor
 
-# Build everything
-dotnet build
+# Explicitly bootstrap checksum-verified native dependencies once
+bash src/Calor.Compiler/scripts/download-z3.sh
+# Windows: pwsh src/Calor.Compiler/scripts/download-z3.ps1
+
+# Restore the committed dependency graph, then build without network access
+dotnet restore --locked-mode
+dotnet build --no-restore
 
 # Run tests
-dotnet test
+dotnet test --no-restore
 ```
+
+Normal build/test/pack targets never download dependencies or rewrite tracked
+source resources. To refresh embedded self-test fixtures explicitly, run
+`python3 scripts/sync-self-test-resources.py`.
 
 ---
 

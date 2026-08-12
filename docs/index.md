@@ -116,7 +116,10 @@ Benchmark results are updated with each release. Current data reflects evaluatio
 ```bash
 # Clone and build
 git clone https://github.com/juanmicrosoft/calor.git
-cd calor && dotnet build
+cd calor
+bash src/Calor.Compiler/scripts/download-z3.sh
+dotnet restore --locked-mode
+dotnet build --no-restore
 
 # Compile Calor to C#
 dotnet run --project src/Calor.Compiler -- \

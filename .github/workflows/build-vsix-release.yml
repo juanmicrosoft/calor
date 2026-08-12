@@ -52,6 +52,16 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Bootstrap verified Z3 assets
+        if: runner.os != 'Windows'
+        shell: bash
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
+      - name: Bootstrap verified Z3 assets (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pwsh -NoProfile -File src/Calor.Compiler/scripts/download-z3.ps1
+
       - name: Build Language Server
         run: |
           cd editors/vscode
@@ -97,7 +107,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -108,6 +125,22 @@ jobs:
         with:
           name: vscode-extension-all-platforms
           path: vsix-packages/**/*.vsix
+
+      - name: Generate SBOM and provenance
+        run: |
+          python3 scripts/generate-release-metadata.py \
+            --name "calor-vsix-${{ github.sha }}" \
+            --artifacts ./vsix-packages \
+            --output ./release-metadata \
+            --repository "${{ github.server_url }}/${{ github.repository }}" \
+            --commit "${{ github.sha }}"
+
+      - name: Attest VSIX packages
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            vsix-packages/**/*.vsix
+            release-metadata/*.json
 
       - name: Attach VSIX packages to GitHub release
         env:
@@ -122,4 +155,4 @@ jobs:
             echo "::error::expected 6 platform VSIX packages, found ${#vsixes[@]}"
             exit 1
           fi
-          gh release upload "$RELEASE_TAG" "${vsixes[@]}" --clobber
+          gh release upload "$RELEASE_TAG" "${vsixes[@]}" release-metadata/*.json --clobber

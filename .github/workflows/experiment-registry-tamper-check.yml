@@ -26,6 +26,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Bootstrap verified Z3 assets
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
       - name: Extract base-branch version of registry.json
         run: |
           git show origin/${{ github.base_ref }}:docs/experiments/registry.json > /tmp/registry-base.json 2>/dev/null \

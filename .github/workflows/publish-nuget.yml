@@ -41,7 +41,7 @@ jobs:
         run: bash src/Calor.Compiler/scripts/download-z3.sh
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore --locked-mode
 
       - name: Build
         run: dotnet build -c Release --no-restore
@@ -148,7 +148,7 @@ jobs:
 
       - name: Restore and build
         run: |
-          dotnet restore
+          dotnet restore --locked-mode
           dotnet build -c Release --no-restore
           dotnet build tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj -c Release
 
@@ -219,6 +219,10 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     needs: [test, sdk-consumer, release-quality]
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout code
@@ -260,7 +264,10 @@ jobs:
             curl -fL -sS --retry 5 --retry-delay 3 -o "$STAGING/$asset" "${RELEASE_URL}/${asset}"
           done
 
-          (cd "$STAGING" && grep -v '^#' "$GITHUB_WORKSPACE/$MANIFEST" | sha256sum --check --strict -)
+          while read -r hash asset size; do
+            test "$(wc -c < "$STAGING/$asset" | tr -d ' ')" = "$size"
+          done < <(grep -v '^#' "$MANIFEST" | awk 'NF')
+          (cd "$STAGING" && grep -v '^#' "$GITHUB_WORKSPACE/$MANIFEST" | awk 'NF {print $1 "  " $2}' | sha256sum --check --strict -)
 
           mv "$STAGING/Microsoft.Z3.dll"      src/Calor.Compiler/z3/Microsoft.Z3.dll
           mv "$STAGING/libz3-linux-x64.so"    src/Calor.Compiler/runtimes/linux-x64/native/libz3.so
@@ -273,7 +280,7 @@ jobs:
           find src/Calor.Compiler/z3 src/Calor.Compiler/runtimes -type f -ls
 
       - name: Restore dependencies
-        run: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj
+        run: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj --locked-mode
 
       - name: Build
         run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-restore
@@ -297,6 +304,22 @@ jobs:
           SDK_NUPKG=$(ls ./nupkg/Calor.Sdk.*.nupkg)
           bash .github/scripts/inspect-sdk-nupkg.sh "$SDK_NUPKG" --all-rids
 
+      - name: Generate SBOM and provenance
+        run: |
+          python3 scripts/generate-release-metadata.py \
+            --name "calor-nuget-${{ github.sha }}" \
+            --artifacts ./nupkg \
+            --output ./release-metadata \
+            --repository "${{ github.server_url }}/${{ github.repository }}" \
+            --commit "${{ github.sha }}"
+
+      - name: Attest NuGet packages
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            ./nupkg/*.nupkg
+            ./release-metadata/*.json
+
       - name: Push to NuGet
         run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
@@ -304,4 +327,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nuget-package
-          path: ./nupkg/*.nupkg
+          path: |
+            ./nupkg/*.nupkg
+            ./release-metadata/*.json
+
+      - name: Attach release metadata
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" ./release-metadata/*.json --clobber
