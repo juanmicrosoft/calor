@@ -233,7 +233,14 @@ public sealed class ProjectMigrator
         var startTime = DateTime.UtcNow;
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(TimeSpan.FromSeconds(_options.PerFileTimeoutSeconds));
+        if (_options.PerFileTimeoutSeconds == 0)
+        {
+            cts.Cancel();
+        }
+        else
+        {
+            cts.CancelAfter(TimeSpan.FromSeconds(_options.PerFileTimeoutSeconds));
+        }
         try
         {
             if (direction == MigrationDirection.CSharpToCalor)

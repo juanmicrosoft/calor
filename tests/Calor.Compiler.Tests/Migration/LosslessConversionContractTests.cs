@@ -309,11 +309,7 @@ public sealed class LosslessConversionContractTests
         Directory.CreateDirectory(directory);
         var sourcePath = Path.Combine(directory, "Slow.cs");
         var outputPath = Path.ChangeExtension(sourcePath, ".calr");
-        await File.WriteAllTextAsync(
-            sourcePath,
-            string.Join(
-                Environment.NewLine,
-                Enumerable.Range(0, 10_000).Select(index => $"public class Item{index} {{ }}")));
+        await File.WriteAllTextAsync(sourcePath, "public class Item { }");
         await File.WriteAllTextAsync(outputPath, "original");
 
         var plan = new MigrationPlan
@@ -341,7 +337,6 @@ public sealed class LosslessConversionContractTests
         try
         {
             var report = await migrator.ExecuteAsync(plan);
-            await Task.Delay(250);
 
             Assert.Equal(FileMigrationStatus.TimedOut, Assert.Single(report.FileResults).Status);
             Assert.Equal("original", await File.ReadAllTextAsync(outputPath));
