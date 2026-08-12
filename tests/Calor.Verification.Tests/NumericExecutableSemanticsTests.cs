@@ -118,6 +118,9 @@ public sealed class NumericExecutableSemanticsTests
                     Assert.True(
                         result.Status == ContractVerificationStatus.Proven,
                         $"{label}: expected Proven, got {result.Status}: {result.CounterexampleDescription}");
+                    Assert.False(
+                        result.EffectiveOutcome.IsVacuous,
+                        $"{label}: operand constraints were unsatisfiable, so the proof tested no runtime value");
                 }
             }
         }
@@ -183,10 +186,15 @@ public sealed class NumericExecutableSemanticsTests
         Assert.True(
             result.Status == ContractVerificationStatus.Proven,
             $"{label}: expected Proven, got {result.Status}: {result.CounterexampleDescription}");
+        Assert.False(
+            result.EffectiveOutcome.IsVacuous,
+            $"{label}: operand constraint was unsatisfiable, so the proof tested no runtime value");
     }
 
     private static object EvaluateDynamic(object left, object right, BinaryOperator op)
     {
+        // Generated Calor C# uses the language default unchecked context for
+        // add/subtract/multiply, so dynamic dispatch is the executable oracle.
         dynamic dynamicLeft = left;
         dynamic dynamicRight = right;
         return op switch
