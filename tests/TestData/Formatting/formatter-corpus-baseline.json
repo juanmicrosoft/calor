@@ -1,6 +1,6 @@
 {
-  "trackedFileCount": 871,
-  "successfulTransformationCount": 638,
+  "trackedFileCount": 876,
+  "successfulTransformationCount": 641,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -171,6 +171,8 @@
       "tests/TestData/LintScenarios/06_statements/try_catch_when.calr",
       "tests/TestData/LintScenarios/06_statements/try_finally_return.calr",
       "tests/TestData/LintScenarios/06_statements/try_multi_catch_finally.calr",
+      "tests/TestData/QueryCorpus/project/app.calr",
+      "tests/TestData/QueryCorpus/project/asks-across.calr",
       "tests/TestData/RenameScripts/RN-01-function-across-files/app.calr"
     ],
     "generatedCSharpErrors": [

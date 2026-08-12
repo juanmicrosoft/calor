@@ -42,6 +42,16 @@ public sealed class IndexedCallEdge
 }
 
 /// <summary>
+/// A call site that resolved to nothing.
+/// </summary>
+public sealed class IndexedUnresolvedCall
+{
+    public string CallerSymbolId { get; set; } = "";
+    public string Target { get; set; } = "";
+    public string File { get; set; } = "";
+}
+
+/// <summary>
 /// What the index could NOT account for. Every query reports this alongside its
 /// answer, because Calor binds one file at a time: cross-file edges come from a
 /// unique-name match that drops ambiguity, so an answer is "what we can name",
@@ -53,8 +63,12 @@ public sealed class IndexResidual
     /// <summary>Files that did not parse or bind, so nothing in them is indexed.</summary>
     public List<string> UnreadableFiles { get; set; } = [];
 
-    /// <summary>Call sites whose callee could not be resolved to a declaration.</summary>
-    public List<string> UnresolvedCalls { get; set; } = [];
+    /// <summary>
+    /// Call sites whose callee could not be resolved, each recorded with the
+    /// function it sits in — without that, "what does X call?" cannot tell
+    /// whether its own answer is partial.
+    /// </summary>
+    public List<IndexedUnresolvedCall> UnresolvedCalls { get; set; } = [];
 
     /// <summary>Callee names matching more than one declaration, so the edge was dropped.</summary>
     public List<string> AmbiguousCallees { get; set; } = [];
@@ -212,6 +226,86 @@ public sealed class ProjectIndex
         }
     }
 
+    // --- queries -----------------------------------------------------------
+
+    /// <summary>
+    /// Declarations bearing a name. Returns every match rather than picking one:
+    /// two declarations sharing a name is the situation the caller most needs to
+    /// see, not one the index should resolve on their behalf.
+    /// </summary>
+    public IReadOnlyList<IndexedDeclaration> FindDeclarations(string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return Declarations
+            .Where(declaration => string.Equals(
+                declaration.Name, name, StringComparison.Ordinal))
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Declarations whose body contains a resolved call to <paramref name="symbolId"/>.
+    ///
+    /// This is "the callers we can name". A call site that did not resolve
+    /// contributes nothing here and appears in <see cref="Residual"/> instead —
+    /// which is why callers must be reported together with the residual, never
+    /// alone.
+    /// </summary>
+    public IReadOnlyList<IndexedDeclaration> FindCallers(string symbolId)
+    {
+        ArgumentNullException.ThrowIfNull(symbolId);
+        var callerIds = CallEdges
+            .Where(edge => string.Equals(
+                edge.CalleeSymbolId, symbolId, StringComparison.Ordinal))
+            .Select(edge => edge.CallerSymbolId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return Declarations
+            .Where(declaration => callerIds.Contains(declaration.SymbolId))
+            .ToArray();
+    }
+
+    /// <summary>Declarations this one calls, by the same resolution limits.</summary>
+    public IReadOnlyList<IndexedDeclaration> FindCallees(string symbolId)
+    {
+        ArgumentNullException.ThrowIfNull(symbolId);
+        var calleeIds = CallEdges
+            .Where(edge => string.Equals(
+                edge.CallerSymbolId, symbolId, StringComparison.Ordinal))
+            .Select(edge => edge.CalleeSymbolId)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return Declarations
+            .Where(declaration => calleeIds.Contains(declaration.SymbolId))
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Whether the residual could change what an answer MEANS. Partiality is
+    /// facet-specific, which the first version of this method got wrong: it
+    /// keyed on the queried name appearing in the residual, but the residual
+    /// names the CALLEE, so "what does X call?" never came out partial even when
+    /// a call inside X had failed to resolve. The gate-3 golden corpus caught it.
+    /// </summary>
+    public bool DeclarationLookupIsPartial() => Residual.UnreadableFiles.Count > 0;
+
+    /// <summary>
+    /// Callers of a symbol are partial when a call that failed to resolve, or a
+    /// name several declarations share, might have been a call TO it.
+    /// </summary>
+    public bool CallersAnswerIsPartial(string name) =>
+        Residual.UnreadableFiles.Count > 0
+        || Residual.AmbiguousCallees.Contains(name, StringComparer.Ordinal)
+        || Residual.UnresolvedCalls.Any(entry =>
+            string.Equals(entry.Target, name, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Callees of a symbol are partial when a call INSIDE it failed to resolve.
+    /// </summary>
+    public bool CalleesAnswerIsPartial(string symbolId) =>
+        Residual.UnreadableFiles.Count > 0
+        || Residual.UnresolvedCalls.Any(entry =>
+            string.Equals(entry.CallerSymbolId, symbolId, StringComparison.Ordinal));
+
     public void Canonicalize()
     {
         Files = Files
@@ -233,7 +327,10 @@ public sealed class ProjectIndex
             .ThenBy(item => item.Column)
             .ThenBy(item => item.CalleeSymbolId, StringComparer.Ordinal)];
         Residual.UnreadableFiles.Sort(StringComparer.Ordinal);
-        Residual.UnresolvedCalls.Sort(StringComparer.Ordinal);
+        Residual.UnresolvedCalls = [.. Residual.UnresolvedCalls
+            .OrderBy(item => item.File, StringComparer.Ordinal)
+            .ThenBy(item => item.Target, StringComparer.Ordinal)
+            .ThenBy(item => item.CallerSymbolId, StringComparer.Ordinal)];
         Residual.AmbiguousCallees.Sort(StringComparer.Ordinal);
     }
 }

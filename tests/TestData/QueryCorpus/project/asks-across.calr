@@ -1,0 +1,7 @@
+§M{m005:Across}
+  §F{f001:AsksAmbiguous:pub} () -> i32
+    §E{}
+    §R §C{Shared} §/C
+  §F{f002:AsksMissing:pub} () -> i32
+    §E{}
+    §R §C{NoSuchFunction} §/C

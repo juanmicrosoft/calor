@@ -1,0 +1,7 @@
+§M{m001:MathLib}
+  §F{f001:Scale:pub} (i32:n) -> i32
+    §E{}
+    §R (* n INT:2)
+  §F{f002:ScaleTwice:pub} (i32:n) -> i32
+    §E{}
+    §R §C{Scale} §A §C{Scale} §A n §/C §/C

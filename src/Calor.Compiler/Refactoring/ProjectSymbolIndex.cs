@@ -51,8 +51,21 @@ public sealed record ProjectCallEdge(
 /// the part it could not resolve travels with it.
 /// </summary>
 public sealed record ProjectResolutionResidual(
-    IReadOnlyList<string> UnresolvedCalls,
+    IReadOnlyList<ProjectUnresolvedCall> UnresolvedCalls,
     IReadOnlyList<string> AmbiguousCallees);
+
+/// <summary>
+/// A call that resolved to nothing, recorded WITH the function it sits in.
+///
+/// The containing function is not decoration: "what does X call?" is partial
+/// exactly when a call inside X failed to resolve, and without the caller the
+/// residual cannot answer that. The gate-3 golden corpus caught this — the first
+/// version recorded only the target name.
+/// </summary>
+public sealed record ProjectUnresolvedCall(
+    SymbolId CallerSymbolId,
+    string Target,
+    string FilePath);
 
 /// <summary>
 /// A project-wide map from <see cref="SymbolId"/> to the identifier tokens that
@@ -68,7 +81,7 @@ public sealed class ProjectSymbolIndex
     private readonly Dictionary<SymbolId, List<SymbolOccurrence>> _bySymbol = [];
     private readonly Dictionary<string, List<SymbolOccurrence>> _byFile;
     private readonly List<ProjectCallEdge> _callEdges = [];
-    private readonly List<string> _unresolvedCalls = [];
+    private readonly List<ProjectUnresolvedCall> _unresolvedCalls = [];
     private readonly SortedSet<string> _ambiguousCallees = new(StringComparer.Ordinal);
 
     public IReadOnlyList<IndexedDocument> Documents { get; }
@@ -305,9 +318,11 @@ public sealed class ProjectSymbolIndex
                     else
                     {
                         // Named, not counted: "3 unresolved" tells a reader
-                        // nothing they can act on.
-                        _unresolvedCalls.Add(
-                            $"{document.FilePath}: {call.Target}");
+                        // nothing they can act on. The containing function is
+                        // recorded too, so "what does X call?" can tell whether
+                        // its own answer is partial.
+                        _unresolvedCalls.Add(new ProjectUnresolvedCall(
+                            function.Symbol.Id, call.Target, document.FilePath));
                         if (IsAmbiguousAcrossDocuments(call))
                             _ambiguousCallees.Add(call.Target);
                     }

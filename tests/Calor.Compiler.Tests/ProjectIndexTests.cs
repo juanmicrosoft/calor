@@ -240,7 +240,7 @@ public sealed class ProjectIndexTests : IDisposable
         var index = ProjectIndexBuilder.Build(OptionsFor(dir));
 
         Assert.False(index.Residual.IsEmpty);
-        Assert.Contains(index.Residual.UnresolvedCalls, entry => entry.Contains("Missing"));
+        Assert.Contains(index.Residual.UnresolvedCalls, entry => entry.Target == "Missing");
         // `Shared` is declared twice, so the cross-file call from c.calr cannot
         // be attributed — and the ambiguity is named, not merely counted.
         Assert.Contains("Shared", index.Residual.AmbiguousCallees);
