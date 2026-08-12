@@ -6247,6 +6247,10 @@ public static class GeneratedCSharpCompiler
             => values.TryGetValue(key, out value!);
     }
 
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+        "SingleFile",
+        "IL3000",
+        Justification = "Assembly.Location is checked for empty string; the embedded runtime is skipped in single-file mode.")]
     private static IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference> BuildProjectReferences(
         IEnumerable<string>? projectReferencePaths)
     {
