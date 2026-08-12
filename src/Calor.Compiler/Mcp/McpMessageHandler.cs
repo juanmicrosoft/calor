@@ -23,16 +23,21 @@ public sealed class McpMessageHandler
     private static readonly int MaxConcurrentTools = Math.Max(2, Environment.ProcessorCount / 2);
     private readonly SemaphoreSlim _concurrencyLimiter = new(MaxConcurrentTools);
 
-    // Reject new heavy work when the process exceeds this memory threshold.
-    // Defaults to 50% of available physical memory (min 512 MB). Override with CALOR_MCP_MAX_MEMORY_MB.
-    private static readonly long MemoryPressureThresholdBytes =
-        long.TryParse(Environment.GetEnvironmentVariable("CALOR_MCP_MAX_MEMORY_MB"), out var mb)
-            ? mb * 1024L * 1024L
-            : Math.Max(512L * 1024L * 1024L, (long)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes * 0.5));
+    private readonly McpMemoryAdmissionPolicy _memoryAdmission;
     private CancellationToken _serverCancellation;
 
     public McpMessageHandler(bool verbose = false, TextWriter? log = null, string? rootDirectory = null)
+        : this(McpMemoryAdmissionPolicy.Disabled, verbose, log, rootDirectory)
     {
+    }
+
+    internal McpMessageHandler(
+        McpMemoryAdmissionPolicy memoryAdmission,
+        bool verbose = false,
+        TextWriter? log = null,
+        string? rootDirectory = null)
+    {
+        _memoryAdmission = memoryAdmission;
         _verbose = verbose;
         _log = log;
 
@@ -165,6 +170,9 @@ public sealed class McpMessageHandler
     /// <summary>Sets the server-level cancellation token for propagation to tool calls.</summary>
     internal void SetCancellation(CancellationToken cancellationToken) => _serverCancellation = cancellationToken;
 
+    /// <summary>The memory admission policy in force. Exposed so tests can pin which contexts gate on process memory.</summary>
+    internal McpMemoryAdmissionPolicy MemoryAdmission => _memoryAdmission;
+
     private void RegisterTool(IMcpTool tool)
     {
         _tools[tool.Name] = tool;
@@ -294,24 +302,41 @@ public sealed class McpMessageHandler
         var sw = Stopwatch.StartNew();
         McpToolResult result;
 
-        // Wait for memory pressure to subside before running heavy tools
-        if (tool is BatchTool or ConvertTool or CompileTool or AnalyzeTool)
+        // Wait for memory pressure to subside before running heavy tools.
+        //
+        // This is admission control for a long-lived stdio server: `calor mcp` owns
+        // its process, so process RSS is a fair proxy for "how much the tools I have
+        // been running are costing". It is measured with WorkingSet64, which counts
+        // the WHOLE process — so in any host the handler does not own, it attributes
+        // the host's memory to the next MCP tool and refuses it. Enabled only when a
+        // server opts in (see McpServer); direct/embedded construction gets
+        // McpMemoryAdmissionPolicy.Disabled.
+        //
+        // That distinction is not hypothetical. Six tests here construct the handler
+        // directly and ran inside an xUnit host holding 6,810 tests' worth of heap
+        // plus Roslyn and Z3. The host crossed the 50%-of-RAM threshold on Linux CI
+        // runners but not on higher-memory dev machines, so each of the six spent the
+        // full 30s wait and then failed with "Server under memory pressure" — green
+        // locally, red on CI, and blamed on flakiness (#897) for two weeks. An
+        // embedded host's memory is not the MCP tool's to police.
+        if (_memoryAdmission.Enabled && tool is BatchTool or ConvertTool or CompileTool or AnalyzeTool)
         {
+            var threshold = _memoryAdmission.ThresholdBytes;
             var memoryUsed = GetProcessMemory();
-            if (memoryUsed > MemoryPressureThresholdBytes)
+            if (memoryUsed > threshold)
             {
                 var usedMb = memoryUsed / (1024 * 1024);
                 Log($"Tool {callParams.Name} waiting for memory pressure to subside ({usedMb} MB used)");
 
-                // Try a GC and wait up to 30s for memory to drop
+                // Try a GC and wait for memory to drop
                 GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
-                const int maxWaitMs = 30_000;
-                const int pollIntervalMs = 2_000;
+                var maxWaitMs = (int)_memoryAdmission.MaxWait.TotalMilliseconds;
+                var pollIntervalMs = (int)_memoryAdmission.PollInterval.TotalMilliseconds;
                 var waited = 0;
                 while (waited < maxWaitMs)
                 {
                     memoryUsed = GetProcessMemory();
-                    if (memoryUsed <= MemoryPressureThresholdBytes)
+                    if (memoryUsed <= threshold)
                         break;
                     var jitter = Random.Shared.Next(0, 500); // 0-500ms random jitter to avoid thundering herd
                     await Task.Delay(pollIntervalMs + jitter, _serverCancellation);
@@ -319,14 +344,15 @@ public sealed class McpMessageHandler
                 }
 
                 memoryUsed = GetProcessMemory();
-                if (memoryUsed > MemoryPressureThresholdBytes)
+                if (memoryUsed > threshold)
                 {
                     usedMb = memoryUsed / (1024 * 1024);
-                    var thresholdMb = MemoryPressureThresholdBytes / (1024 * 1024);
+                    var thresholdMb = threshold / (1024 * 1024);
+                    var waitedSeconds = _memoryAdmission.MaxWait.TotalSeconds;
                     Log($"Tool {callParams.Name} rejected after waiting: memory still at {usedMb} MB");
                     return JsonRpcResponse.Success(request.Id,
                         McpToolResult.Error($"Server under memory pressure ({usedMb} MB used, {thresholdMb} MB threshold) " +
-                            "after waiting 30s. Wait for current operations to finish, then retry. " +
+                            $"after waiting {waitedSeconds:0.#}s. Wait for current operations to finish, then retry. " +
                             "Set CALOR_MCP_MAX_MEMORY_MB to adjust the threshold."));
                 }
 
