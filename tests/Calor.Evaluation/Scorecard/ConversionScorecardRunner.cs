@@ -106,12 +106,15 @@ public class ConversionScorecardRunner
 
         if (!conversionResult.Success || string.IsNullOrWhiteSpace(conversionResult.CalorSource))
         {
+            var producedCalor = !string.IsNullOrWhiteSpace(conversionResult.CalorSource);
             return new SnippetResult(
                 Id: entry.Id,
                 FileName: entry.File,
                 Level: entry.Level,
                 Features: entry.Features,
-                Status: SnippetStatus.Blocked,
+                Status: producedCalor
+                    ? SnippetStatus.PartiallyConverted
+                    : SnippetStatus.Blocked,
                 ConversionSuccess: false,
                 ConversionErrors: conversionErrors,
                 ConversionWarnings: conversionWarnings,

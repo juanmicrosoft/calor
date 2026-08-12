@@ -87,6 +87,10 @@ public static class TestHelpers
     public static RoundTripResult FullRoundTrip(string csharpSource, string? moduleName = null)
     {
         var conversionResult = ConvertCSharp(csharpSource, moduleName);
+        var semanticLosses = conversionResult.Losses
+            .Where(loss => loss.IsSemanticLoss)
+            .Select(loss => loss.ToString())
+            .ToList();
 
         if (!conversionResult.Success || conversionResult.CalorSource == null)
         {
@@ -94,6 +98,7 @@ public static class TestHelpers
             {
                 ConversionSuccess = false,
                 ConversionIssues = conversionResult.Issues.Select(i => i.Message).ToList(),
+                SemanticLosses = semanticLosses,
             };
         }
 
@@ -109,6 +114,7 @@ public static class TestHelpers
                 CalorSource = conversionResult.CalorSource,
                 CalorParseSuccess = false,
                 CalorDiagnostics = calorCompilation.Diagnostics.ToList(),
+                SemanticLosses = semanticLosses,
             };
         }
 
@@ -124,6 +130,7 @@ public static class TestHelpers
             RoslynErrors = validation.FormattedCompilationErrors.ToList(),
             CSharpSyntaxSuccess = validation.SyntaxSuccess,
             RoslynSuccess = validation.CompilationSuccess,
+            SemanticLosses = semanticLosses,
         };
     }
 
@@ -146,6 +153,7 @@ public sealed class RoundTripResult
     public List<string> CalorDiagnostics { get; init; } = new();
     public string? EmittedCSharp { get; init; }
     public List<string> RoslynErrors { get; init; } = new();
+    public List<string> SemanticLosses { get; init; } = new();
 
     /// <summary>The emitted C# parses with zero syntax errors (#771 split status).</summary>
     public bool CSharpSyntaxSuccess { get; init; }
@@ -155,7 +163,10 @@ public sealed class RoundTripResult
 
     public bool CSharpCompilationSuccess => RoslynSuccess;
 
-    public bool FullSuccess => ConversionSuccess && CalorParseSuccess && RoslynSuccess;
+    public bool FullSuccess => ConversionSuccess &&
+        CalorParseSuccess &&
+        RoslynSuccess &&
+        SemanticLosses.Count == 0;
 }
 
 public sealed record CalorCompilationAttempt(

@@ -4263,6 +4263,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             result.Add(new RawCSharpNode(GetTextSpan(node), node.ToFullString()));
             return result;
         }
+        _context.RecordLoss(
+            ConversionLossKind.Dropped,
+            "checked-block",
+            $"{keyword} overflow semantics were stripped",
+            node.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
         result.Add(new FallbackCommentNode(GetTextSpan(node), keyword, "checked-block",
             "Checked/unchecked semantics stripped; handle overflow manually if needed"));
 
@@ -6154,7 +6159,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 SizeOfExpressionSyntax sizeOf => ConvertSizeOfExpression(sizeOf),
                 RangeExpressionSyntax rangeExpr => ConvertRangeExpression(rangeExpr),
                 WithExpressionSyntax withExpr => ConvertWithExpression(withExpr),
-                CheckedExpressionSyntax checkedExpr => ConvertExpression(checkedExpr.Expression),
+                CheckedExpressionSyntax checkedExpr => ConvertCheckedExpression(checkedExpr),
                 AnonymousMethodExpressionSyntax anonMethod => ConvertAnonymousMethodExpression(anonMethod),
                 RefExpressionSyntax refExpr => ConvertExpression(refExpr.Expression),
                 AliasQualifiedNameSyntax aliasName => new ReferenceNode(GetTextSpan(aliasName), aliasName.Name.ToString()),
@@ -6989,6 +6994,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         => _semanticModel?.GetTypeInfo(collection).ConvertedType is IArrayTypeSymbol
             ? "ToArray"
             : "ToList";
+
+    private ExpressionNode ConvertCheckedExpression(CheckedExpressionSyntax expression)
+    {
+        var keyword = expression.IsKind(SyntaxKind.CheckedExpression)
+            ? "checked"
+            : "unchecked";
+        _context.RecordFeatureUsage($"{keyword}-expression");
+        _context.RecordLoss(
+            ConversionLossKind.Dropped,
+            $"{keyword}-expression",
+            $"{keyword} overflow semantics were stripped",
+            expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+        return ConvertExpression(expression.Expression);
+    }
 
     private string? InferTypeFromExpression(ExpressionSyntax expr)
     {
