@@ -10,8 +10,8 @@ namespace Calor.Verification.Tests;
 /// <summary>
 /// W1 Slice 1 soundness-batch pins (wedge-w1-prereqs.md §1.1 T1 + D6–D10):
 /// the whitelisted divergences that could mint a false Proven-that-elides are
-/// closed — by refusal (Replace, narrow-int arithmetic, 64-bit mixed
-/// signedness, unregistered fields), by correct modeling (sub-64-bit mixed
+/// closed — by refusal (Replace, 64-bit mixed signedness, unregistered fields),
+/// by correct modeling (integer literals, narrow arithmetic, sub-64-bit mixed
 /// signedness via C# promotion; unsigned-with-literal typing), or by side
 /// conditions (contract-expression division → Assumed unless entailed).
 /// </summary>
@@ -41,14 +41,14 @@ public class W1Slice1SoundnessTests
     // ---- T1: narrow-int arithmetic (D1 class) ----
 
     [SkippableFact]
-    public void NarrowIntArithmetic_IsRefused()
+    public void NarrowIntArithmetic_UsesCSharpPromotion()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        NarrowIntArithmetic_IsRefusedCore();
+        NarrowIntArithmetic_UsesCSharpPromotionCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void NarrowIntArithmetic_IsRefusedCore()
+    private void NarrowIntArithmetic_UsesCSharpPromotionCore()
     {
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
@@ -63,7 +63,7 @@ public class W1Slice1SoundnessTests
                 BinOp(BinaryOperator.Add, Ref("x"), Ref("y")),
                 Int(128))));
 
-        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
     }
 
     [SkippableFact]
@@ -87,17 +87,18 @@ public class W1Slice1SoundnessTests
             Ensures(BinOp(BinaryOperator.LessOrEqual, Ref("x"), Int(127))));
 
         Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.Equal(ContractTranslator.SemanticsVersion, result.TranslatorSemanticsVersion);
     }
 
     [SkippableFact]
-    public void NarrowIntNegation_IsRefused()
+    public void NarrowIntNegation_UsesCSharpPromotion()
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
-        NarrowIntNegation_IsRefusedCore();
+        NarrowIntNegation_UsesCSharpPromotionCore();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private void NarrowIntNegation_IsRefusedCore()
+    private void NarrowIntNegation_UsesCSharpPromotionCore()
     {
         using var ctx = Z3ContextFactory.Create();
         using var verifier = new Z3Verifier(ctx);
@@ -111,7 +112,80 @@ public class W1Slice1SoundnessTests
                 new UnaryOperationNode(TextSpan.Empty, UnaryOperator.Negate, Ref("x")),
                 Int(-128))));
 
-        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+        Assert.True(
+            result.Status == ContractVerificationStatus.Proven,
+            $"{result.Status}: {result.CounterexampleDescription}");
+    }
+
+    [SkippableFact]
+    public void NarrowUnsignedArithmetic_PromotesToSignedInt()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        NarrowUnsignedArithmetic_PromotesToSignedIntCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void NarrowUnsignedArithmetic_PromotesToSignedIntCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        var result = Verify(verifier,
+            [("x", "u8"), ("y", "u8")],
+            [
+                Requires(BinOp(BinaryOperator.Equal, Ref("x"), Int(byte.MaxValue))),
+                Requires(BinOp(BinaryOperator.Equal, Ref("y"), Int(byte.MaxValue)))
+            ],
+            Ensures(BinOp(BinaryOperator.Equal,
+                BinOp(BinaryOperator.Add, Ref("x"), Ref("y")),
+                Int(510))));
+
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+    }
+
+    [SkippableFact]
+    public void WideSignedLiteral_PreservesI64Value()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        WideSignedLiteral_PreservesI64ValueCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void WideSignedLiteral_PreservesI64ValueCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+        const long wide = 4_294_967_296L;
+
+        var result = Verify(verifier,
+            [("x", "i64")],
+            [Requires(BinOp(BinaryOperator.Equal, Ref("x"), Int(wide)))],
+            Ensures(BinOp(BinaryOperator.NotEqual, Ref("x"), Int(0))));
+
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+    }
+
+    [SkippableFact]
+    public void UncheckedI32Overflow_UsesBitVectorWraparound()
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
+        UncheckedI32Overflow_UsesBitVectorWraparoundCore();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void UncheckedI32Overflow_UsesBitVectorWraparoundCore()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+
+        var result = Verify(verifier,
+            [("x", "i32")],
+            [Requires(BinOp(BinaryOperator.Equal, Ref("x"), Int(int.MaxValue)))],
+            Ensures(BinOp(BinaryOperator.Equal,
+                BinOp(BinaryOperator.Add, Ref("x"), Int(1)),
+                Int(int.MinValue))));
+
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
     }
 
     // ---- D10: mixed signedness ----
@@ -137,7 +211,9 @@ public class W1Slice1SoundnessTests
             [],
             Ensures(BinOp(BinaryOperator.NotEqual, Int(-1), Ref("x"))));
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.True(
+            result.Status == ContractVerificationStatus.Proven,
+            $"{result.Status}: {result.CounterexampleDescription}");
     }
 
     [SkippableFact]

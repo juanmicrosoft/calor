@@ -46,6 +46,9 @@ public record ContractVerificationResult(
     TimeSpan? Duration = null,
     ProofOutcome? Outcome = null)
 {
+    /// <summary>The executable-semantics model used for this verification result.</summary>
+    public string TranslatorSemanticsVersion { get; init; } = ContractTranslator.SemanticsVersion;
+
     /// <summary>Builds a result whose legacy fields are all derived from the choke-point outcome.</summary>
     public static ContractVerificationResult FromOutcome(
         ProofOutcome outcome,
