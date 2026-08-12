@@ -103,6 +103,13 @@ jobs:
             -c Release --no-restore
           dotnet tools/calor-allowlist-audit/bin/Release/net10.0/calor-allowlist-audit.dll
 
+      - name: Run index/query correctness gate
+        run: >-
+          dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj
+          -c Release --no-build
+          --filter "FullyQualifiedName~QueryGoldenTests|FullyQualifiedName~ProjectIndexTests"
+          --verbosity normal
+
       - name: Run rename gate
         run: >-
           dotnet test tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj

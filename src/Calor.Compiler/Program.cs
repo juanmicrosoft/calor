@@ -268,6 +268,8 @@ public class Program
         rootCommand.AddCommand(InitCommand.Create());
         rootCommand.AddCommand(FormatCommand.Create());
         rootCommand.AddCommand(RenameCommand.Create());
+        rootCommand.AddCommand(IndexCommand.Create());
+        rootCommand.AddCommand(QueryCommand.Create());
         rootCommand.AddCommand(LintCommand.Create());
         rootCommand.AddCommand(AssessCommand.Create());
         rootCommand.AddCommand(AnalyzeConvertibilityCommand.Create());

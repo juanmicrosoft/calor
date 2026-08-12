@@ -1,0 +1,283 @@
+using Calor.Compiler.Indexing;
+using Xunit;
+
+namespace Calor.Compiler.Tests;
+
+/// <summary>
+/// Index persistence and — the part that matters — staleness.
+///
+/// A missing index is harmless: you notice. A STALE index that answers anyway
+/// is #788/#883 in a new component, and it is the failure this suite exists to
+/// make impossible.
+/// </summary>
+public sealed class ProjectIndexTests : IDisposable
+{
+    private readonly List<string> _dirs = [];
+
+    public void Dispose()
+    {
+        foreach (var dir in _dirs)
+        {
+            try { Directory.Delete(dir, recursive: true); } catch { }
+        }
+    }
+
+    private string NewProject(params (string Name, string Source)[] files)
+    {
+        var dir = Path.Combine(
+            Path.GetTempPath(), "calor-index-" + Guid.NewGuid().ToString("N")[..12]);
+        Directory.CreateDirectory(dir);
+        _dirs.Add(dir);
+        foreach (var (name, source) in files)
+            File.WriteAllText(Path.Combine(dir, name), source);
+        return dir;
+    }
+
+    private static ProjectIndexBuilder.Options OptionsFor(string dir, string token = "t") =>
+        new(dir, token, ProjectIndexBuilder.DiscoverSources(dir));
+
+    private const string Library = """
+        §M{m001:Lib}
+          §F{f001:Double:pub} (i32:n) -> i32
+            §E{}
+            §R (* n INT:2)
+        """;
+
+    private const string App = """
+        §M{m002:App}
+          §F{f001:Run:pub} () -> i32
+            §E{}
+            §R §C{Double} §A INT:5 §/C
+        """;
+
+    // --- staleness: every recorded input must be compared -------------------
+
+    public static TheoryData<string> HeaderInputs()
+    {
+        var data = new TheoryData<string>();
+        foreach (var input in new[]
+                 { "compiler", "options", "manifest", "sources", "format", "semantics" })
+        {
+            data.Add(input);
+        }
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(HeaderInputs))]
+    public void EveryRecordedHeaderInputIsCompared(string input)
+    {
+        // The discriminating test the scoping doc requires: mutate one recorded
+        // input and the index must refuse to be considered fresh. An input the
+        // builder records but the check ignores is a silent staleness hole —
+        // precisely the defect #788 and #883 were.
+        var dir = NewProject(("lib.calr", Library), ("app.calr", App));
+        var options = OptionsFor(dir);
+        var index = ProjectIndexBuilder.Build(options);
+        var inputs = ProjectIndexBuilder.CurrentInputs(options);
+
+        Assert.Equal(
+            ProjectIndex.Freshness.Fresh,
+            index.CheckFreshness(
+                inputs.CompilerHash, inputs.OptionsHash, inputs.ManifestHash, inputs.Files));
+
+        var compiler = inputs.CompilerHash;
+        var optionsHash = inputs.OptionsHash;
+        var manifest = inputs.ManifestHash;
+        var files = new Dictionary<string, string>(inputs.Files, StringComparer.Ordinal);
+        var expected = ProjectIndex.Freshness.Fresh;
+
+        switch (input)
+        {
+            case "compiler":
+                compiler = "different";
+                expected = ProjectIndex.Freshness.CompilerChanged;
+                break;
+            case "options":
+                optionsHash = "different";
+                expected = ProjectIndex.Freshness.OptionsChanged;
+                break;
+            case "manifest":
+                manifest = "different";
+                expected = ProjectIndex.Freshness.ManifestChanged;
+                break;
+            case "sources":
+                files["lib.calr"] = "different";
+                expected = ProjectIndex.Freshness.SourcesChanged;
+                break;
+            case "format":
+                index.FormatVersion = "0.0-old";
+                expected = ProjectIndex.Freshness.FormatChanged;
+                break;
+            case "semantics":
+                index.CompilerSemanticsVersion = "calor-semantics-from-another-era";
+                expected = ProjectIndex.Freshness.SemanticsChanged;
+                break;
+        }
+
+        Assert.Equal(
+            expected,
+            index.CheckFreshness(compiler, optionsHash, manifest, files));
+    }
+
+    [Fact]
+    public void AddingOrRemovingAFileIsStale()
+    {
+        var dir = NewProject(("lib.calr", Library), ("app.calr", App));
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+
+        File.WriteAllText(Path.Combine(dir, "extra.calr"), """
+            §M{m003:Extra}
+              §F{f001:Nothing:pub} () -> i32
+                §E{}
+                §R INT:0
+            """);
+        var afterAdd = ProjectIndexBuilder.CurrentInputs(OptionsFor(dir));
+        Assert.Equal(
+            ProjectIndex.Freshness.SourcesChanged,
+            index.CheckFreshness(
+                afterAdd.CompilerHash, afterAdd.OptionsHash, afterAdd.ManifestHash, afterAdd.Files));
+
+        File.Delete(Path.Combine(dir, "extra.calr"));
+        File.Delete(Path.Combine(dir, "app.calr"));
+        var afterDelete = ProjectIndexBuilder.CurrentInputs(OptionsFor(dir));
+        Assert.Equal(
+            ProjectIndex.Freshness.SourcesChanged,
+            index.CheckFreshness(
+                afterDelete.CompilerHash, afterDelete.OptionsHash,
+                afterDelete.ManifestHash, afterDelete.Files));
+    }
+
+    // --- persistence -------------------------------------------------------
+
+    [Fact]
+    public void SaveAndLoadRoundTripsContents()
+    {
+        var dir = NewProject(("lib.calr", Library), ("app.calr", App));
+        var built = ProjectIndexBuilder.Build(OptionsFor(dir));
+        var output = Path.Combine(dir, "obj", "calor");
+        built.Save(output);
+
+        var (loaded, status) = ProjectIndex.Load(output);
+        Assert.Equal(ProjectIndex.Freshness.Fresh, status);
+        Assert.NotNull(loaded);
+        Assert.Equal(built.Declarations.Count, loaded!.Declarations.Count);
+        Assert.Equal(built.CallEdges.Count, loaded.CallEdges.Count);
+        Assert.Equal(built.Files, loaded.Files);
+
+        var inputs = ProjectIndexBuilder.CurrentInputs(OptionsFor(dir));
+        Assert.Equal(
+            ProjectIndex.Freshness.Fresh,
+            loaded.CheckFreshness(
+                inputs.CompilerHash, inputs.OptionsHash, inputs.ManifestHash, inputs.Files));
+    }
+
+    [Fact]
+    public void CorruptIndexIsUnreadableRatherThanTrusted()
+    {
+        var dir = NewProject(("lib.calr", Library));
+        var output = Path.Combine(dir, "obj", "calor");
+        Directory.CreateDirectory(output);
+        File.WriteAllText(ProjectIndex.PathFor(output), "{ this is not json");
+
+        var (index, status) = ProjectIndex.Load(output);
+        Assert.Null(index);
+        Assert.Equal(ProjectIndex.Freshness.Unreadable, status);
+    }
+
+    [Fact]
+    public void BuildIsDeterministicRegardlessOfInputOrder()
+    {
+        // Gate 2 compares index contents byte-for-byte, so ordering may not
+        // follow the order files happened to be enumerated in.
+        var dir = NewProject(("lib.calr", Library), ("app.calr", App));
+        var sources = ProjectIndexBuilder.DiscoverSources(dir);
+
+        var forward = ProjectIndexBuilder.Build(
+            new ProjectIndexBuilder.Options(dir, "t", sources));
+        var reversed = ProjectIndexBuilder.Build(
+            new ProjectIndexBuilder.Options(dir, "t", sources.Reverse().ToArray()));
+
+        var a = Path.Combine(dir, "a");
+        var b = Path.Combine(dir, "b");
+        forward.Save(a);
+        reversed.Save(b);
+        Assert.Equal(
+            File.ReadAllText(ProjectIndex.PathFor(a)),
+            File.ReadAllText(ProjectIndex.PathFor(b)));
+    }
+
+    // --- residual ----------------------------------------------------------
+
+    [Fact]
+    public void UnresolvedAndAmbiguousCallsAreNamedNotDropped()
+    {
+        // An index that reports its edges and stays silent about what it could
+        // not resolve is the shape this project keeps paying for.
+        var dir = NewProject(
+            ("a.calr", """
+                §M{m001:A}
+                  §F{f001:Shared:pub} () -> i32
+                    §E{}
+                    §R INT:1
+                  §F{f002:Caller:pub} () -> i32
+                    §E{}
+                    §R §C{Missing} §/C
+                """),
+            ("b.calr", """
+                §M{m002:B}
+                  §F{f001:Shared:pub} () -> i32
+                    §E{}
+                    §R INT:2
+                """),
+            ("c.calr", """
+                §M{m003:C}
+                  §F{f001:Ask:pub} () -> i32
+                    §E{}
+                    §R §C{Shared} §/C
+                """));
+
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+
+        Assert.False(index.Residual.IsEmpty);
+        Assert.Contains(index.Residual.UnresolvedCalls, entry => entry.Target == "Missing");
+        // `Shared` is declared twice, so the cross-file call from c.calr cannot
+        // be attributed — and the ambiguity is named, not merely counted.
+        Assert.Contains("Shared", index.Residual.AmbiguousCallees);
+        Assert.DoesNotContain(
+            index.CallEdges,
+            edge => edge.File == "c.calr");
+    }
+
+    [Fact]
+    public void UnreadableFilesAreReportedNotSilentlySkipped()
+    {
+        var dir = NewProject(
+            ("good.calr", Library),
+            ("broken.calr", "§M{m009:Broken}\n  this is not Calor\n"));
+
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+        Assert.Contains("broken.calr", index.Residual.UnreadableFiles);
+        Assert.Contains(index.Declarations, declaration => declaration.Name == "Double");
+    }
+
+    // --- contents ----------------------------------------------------------
+
+    [Fact]
+    public void CrossFileCallProducesAnEdgeWithItsCaller()
+    {
+        var dir = NewProject(("lib.calr", Library), ("app.calr", App));
+        var index = ProjectIndexBuilder.Build(OptionsFor(dir));
+
+        var callee = Assert.Single(
+            index.Declarations.Where(declaration => declaration.Name == "Double"));
+        var caller = Assert.Single(
+            index.Declarations.Where(declaration => declaration.Name == "Run"));
+        var edge = Assert.Single(index.CallEdges);
+
+        Assert.Equal(caller.SymbolId, edge.CallerSymbolId);
+        Assert.Equal(callee.SymbolId, edge.CalleeSymbolId);
+        Assert.Equal("app.calr", edge.File);
+        Assert.True(index.Residual.IsEmpty);
+    }
+}

@@ -44,3 +44,18 @@ src/Calor.Compiler/Reporting/ReviewPacketBuilder.cs
 src/Calor.Compiler/Refactoring/ProjectSymbolIndex.cs
 src/Calor.Compiler/Refactoring/RenameEngine.cs
 src/Calor.Compiler/Commands/RenameCommand.cs
+
+# Index + query v1, slice S1 (docs/plans/index-query-v1-scoping.md §7) —
+# persistent project index over the bound tree and its CLI. Compiler-internal
+# machinery of the same kind as #754: it reads symbols, occurrences and call
+# edges out of the binder, which Calor has no access to. The "# pending" markers
+# below are required by the guard's own pre-registration rule and are removed by
+# the PR that lands the files.
+src/Calor.Compiler/Indexing/ProjectIndex.cs
+src/Calor.Compiler/Indexing/ProjectIndexBuilder.cs
+src/Calor.Compiler/Commands/IndexCommand.cs
+
+# Index + query v1, slice S2 (docs/plans/index-query-v1-scoping.md §7) — the
+# query surface over the persisted index. Compiler-internal, same rationale as
+# the S1 entries above.
+src/Calor.Compiler/Commands/QueryCommand.cs

@@ -1,0 +1,7 @@
+§M{m002:App}
+  §F{f001:Run:pub} () -> i32
+    §E{}
+    §R §C{Scale} §A INT:5 §/C
+  §F{f002:Unused:pub} () -> i32
+    §E{}
+    §R INT:0
