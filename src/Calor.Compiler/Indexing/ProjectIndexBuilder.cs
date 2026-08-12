@@ -113,6 +113,7 @@ public static class ProjectIndexBuilder
                     File = relative,
                     Line = line,
                     Column = column,
+                    SemanticHash = HashDefinition(document.Source, symbol),
                 });
             }
         }
@@ -165,6 +166,25 @@ public static class ProjectIndexBuilder
 
         index.Canonicalize();
         return index;
+    }
+
+    /// <summary>
+    /// Hashes a declaration's own definition text. Per declaration, not per
+    /// file: file granularity was measured and rejected (see
+    /// IndexedDeclaration.SemanticHash).
+    /// </summary>
+    private static string HashDefinition(string source, Symbol symbol)
+    {
+        var span = symbol.DefinitionSpan;
+        if (span.Start < 0 || span.Length <= 0 || span.End > source.Length)
+            span = symbol.DeclarationSpan;
+        if (span.Start < 0 || span.Length <= 0 || span.End > source.Length)
+            return "";
+
+        var text = source.Substring(span.Start, span.Length);
+        return Convert.ToHexStringLower(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(text)))[..16];
     }
 
     private static string KindOf(Symbol symbol) => symbol switch

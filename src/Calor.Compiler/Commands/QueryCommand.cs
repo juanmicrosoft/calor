@@ -35,34 +35,47 @@ public static class QueryCommand
 
     private static Command CreateImpactCommand()
     {
-        var fileArgument = new Argument<string>(
-            name: "file",
-            description: "Changed file (project-relative), e.g. lib.calr");
+        var subjectArgument = new Argument<string>(
+            name: "subject",
+            description: "Declaration name to treat as changed (or a file with --file)");
         var pathOption = new Option<string>(
             aliases: ["--project"],
             description: "Project directory",
             getDefaultValue: () => ".");
+        var inFileOption = new Option<string?>(
+            aliases: ["--in-file"],
+            description: "Disambiguate when several files declare the name");
+        var fileOption = new Option<bool>(
+            aliases: ["--file"],
+            description: "Treat the subject as a whole changed FILE rather than one declaration");
         var noBuildOption = new Option<bool>(
             aliases: ["--no-build"],
             description: "Refuse a missing or stale index instead of rebuilding it");
 
-        var command = new Command("impact", "What a change to a file could affect")
+        var command = new Command("impact", "What a change could affect")
         {
-            fileArgument, pathOption, noBuildOption,
+            subjectArgument, pathOption, inFileOption, fileOption, noBuildOption,
         };
 
         command.SetHandler((InvocationContext context) =>
         {
             context.ExitCode = ExecuteImpact(
-                context.ParseResult.GetValueForArgument(fileArgument),
+                context.ParseResult.GetValueForArgument(subjectArgument),
                 context.ParseResult.GetValueForOption(pathOption)!,
+                context.ParseResult.GetValueForOption(inFileOption),
+                context.ParseResult.GetValueForOption(fileOption),
                 context.ParseResult.GetValueForOption(noBuildOption));
         });
 
         return command;
     }
 
-    private static int ExecuteImpact(string file, string projectDirectory, bool noBuild)
+    private static int ExecuteImpact(
+        string subject,
+        string projectDirectory,
+        string? inFile,
+        bool wholeFile,
+        bool noBuild)
     {
         if (!Directory.Exists(projectDirectory))
         {
@@ -77,22 +90,55 @@ public static class QueryCommand
             return 1;
         }
 
-        var normalized = file.Replace('\\', '/');
-        if (!index.Files.ContainsKey(normalized))
+        IReadOnlyList<IndexedDeclaration> affected;
+        string described;
+        if (wholeFile)
         {
-            Console.Error.WriteLine(
-                $"Error: '{file}' is not an indexed source file. Indexed files:");
-            foreach (var indexed in index.Files.Keys.Take(20))
-                Console.Error.WriteLine($"  {indexed}");
-            return 1;
+            var normalized = subject.Replace('\\', '/');
+            if (!index.Files.ContainsKey(normalized))
+            {
+                Console.Error.WriteLine($"Error: '{subject}' is not an indexed source file.");
+                return 1;
+            }
+            affected = index.FindImpactOfFile(normalized);
+            described = $"the whole file {normalized}";
         }
+        else
+        {
+            var declarations = index.FindDeclarations(subject);
+            if (declarations.Count == 0)
+            {
+                Console.Error.WriteLine(
+                    $"Error: no declaration named '{subject}'. Use --file to ask about a file.");
+                return 1;
+            }
 
-        var affected = index.FindImpactOfFile(normalized);
-        var affectedFiles = affected
-            .Select(declaration => declaration.File)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(name => name, StringComparer.Ordinal)
-            .ToArray();
+            IndexedDeclaration target;
+            if (declarations.Count == 1)
+            {
+                target = declarations[0];
+            }
+            else
+            {
+                var matches = inFile == null
+                    ? declarations
+                    : declarations.Where(declaration => string.Equals(
+                        declaration.File, inFile, StringComparison.Ordinal)).ToArray();
+                if (matches.Count != 1)
+                {
+                    Console.Error.WriteLine(
+                        $"Error: '{subject}' is declared in {declarations.Count} places; "
+                            + "narrow it with --in-file:");
+                    foreach (var declaration in declarations)
+                        Console.Error.WriteLine($"  {Describe(declaration)}");
+                    return 1;
+                }
+                target = matches[0];
+            }
+
+            affected = index.FindImpactOfDeclarations([target.SymbolId]);
+            described = Describe(target);
+        }
 
         foreach (var declaration in affected.OrderBy(
                      declaration => $"{declaration.File}:{declaration.Line}",
@@ -101,17 +147,23 @@ public static class QueryCommand
             Console.WriteLine($"  {Describe(declaration)}");
         }
 
+        var affectedFiles = affected
+            .Select(declaration => declaration.File)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
         Console.WriteLine(
             affected.Count == 0
-                ? $"impact: nothing else calls into {normalized}"
-                : $"impact: {affected.Count} declaration(s) in {affectedFiles.Length} file(s) "
-                    + $"could be affected by a change to {normalized}");
+                ? $"impact: nothing calls into {described}"
+                : $"impact: {affected.Count} declaration(s) in {affectedFiles} file(s) "
+                    + $"affected by a change to {described}");
 
-        // Said every time, not only when it bites: the answer is file-grained by
-        // construction, so a reader must not take it for declaration-grained.
-        Console.WriteLine(
-            "impact: file-grained — a change to ANY declaration in "
-                + $"{normalized} implicates all of these (scoping doc §9.1)");
+        if (wholeFile)
+        {
+            Console.WriteLine(
+                "impact: file-grained — a change to ANY declaration in this file "
+                    + "implicates all of these. Ask about a declaration for a precise answer.");
+        }
+
         ReportResidual(index, index.ImpactAnswerIsPartial());
         return 0;
     }

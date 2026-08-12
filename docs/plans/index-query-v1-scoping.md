@@ -151,23 +151,38 @@ complete it. **`effects` is not a slice.**
 
 ## 9. Decisions and open questions
 
-### 9.1 Semantic hash granularity — DECIDED: per file
+### 9.1 Semantic hash granularity — REVISED to per declaration
 
-**Decision (maintainer, 2026-08-11): per-file semantic hashes.** This is
-coherent with the wholesale-rebuild decision in §3 and is the cheaper build.
+**First decision (2026-08-11): per file.** Coherent with the wholesale rebuild in
+§3 and the cheaper build. Recorded with its cost stated — `impact` would answer
+at file granularity — and with an S3 checkpoint to show a real answer before
+calling the facet done.
 
-**The cost, stated plainly so nobody is surprised by it later:** `impact`
-answers at *file* granularity. Asking "what does this change affect?" returns
-"these files", not "these declarations". If one file holds twenty declarations
-and one changes, `impact` implicates all twenty's dependents.
+**The checkpoint fired, and the decision was reversed (2026-08-12).** Measured on
+the 106-file / 11k-line `fixture-10k` corpus (1,366 functions, 587 call edges,
+zero residual), file granularity gave:
 
-**This may be too coarse to be useful, and coarse-but-useless is a real
-outcome.** Rather than argue it in the abstract, S3 carries a **checkpoint**:
-the first working `impact` answer on a real project is shown to the maintainer
-before the facet is called done. If the answer is too fuzzy to act on, the
-choice is revisited then, with an actual answer in hand rather than a prediction
-about one. Per-declaration hashing remains a priced follow-up, not a rewrite:
-the storage header is versioned (§4), so granularity is a format revision.
+| | file-grained | declaration-grained |
+|---|---|---|
+| answer exactly right | **10/988 functions (1%)** | 988/988 (100%) |
+| mean reported impact | 13.17 declarations | 1.04 |
+| true impact empty, answer non-empty | **683/988 (69%)** | 0 |
+
+For roughly two functions in three, the honest answer was "nothing is affected"
+and the tool said otherwise — a ~13x over-report. That is not a blurry answer,
+it is one that trains its reader to ignore it, while still looking like it
+works.
+
+**What this cost, and why the checkpoint was worth having:** the reversal was a
+format revision, not a rewrite. `IndexedDeclaration` gained a `SemanticHash` over
+the declaration's own definition text, `Files` was narrowed to its invalidation
+role, and the format version went 1.0 → 2.0 — which the versioned header (§4)
+existed to permit. The argument would not have been settled by discussion: the
+small fixture made file granularity look tight (6 declarations), and only real
+code exposed the 1%.
+
+**Whole-file impact is retained** as `--file`, because "I rewrote this file" is a
+real question. It is no longer how a change to one declaration is answered.
 
 ### 9.2 Still open, to settle in S1
 

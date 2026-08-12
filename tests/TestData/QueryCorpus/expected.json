@@ -84,26 +84,41 @@
       "partial": true
     },
     {
-      "why": "math.calr declares Scale. ScaleTwice calls it but lives in the same file, so it is part of the change rather than affected by it; Run in app.calr is the genuine downstream. This is the case a naive impact answer gets wrong by including the seed file's own declarations.",
+      "why": "Declaration-seeded impact, the default. Changing Scale affects ScaleTwice (same file, but a DIFFERENT declaration, so genuinely affected) and Run in another file. Under the rejected file-grained scheme ScaleTwice was wrongly excluded as part of the seed.",
       "facet": "impact",
-      "name": "math.calr",
+      "name": "Scale",
+      "inFile": "math.calr",
       "expect": [
-        "app.calr:2:Run"
+        "app.calr:2:Run",
+        "math.calr:5:ScaleTwice"
       ],
       "partial": true
     },
     {
-      "why": "Nothing calls into app.calr, so a change there affects nothing else. Distinguishing 'affects nothing' from 'we could not tell' is why the residual is printed either way.",
+      "why": "Nothing calls ScaleTwice, so changing it affects nothing. Under file granularity this same question returned Run — the over-report that made the facet useless.",
       "facet": "impact",
-      "name": "app.calr",
+      "name": "ScaleTwice",
+      "inFile": "math.calr",
       "expect": [],
       "partial": true
     },
     {
-      "why": "ambiguous2.calr's only caller of its own Shared is AsksShared, in that same file — a seed, not an impact. The cross-file call from asks-across.calr is ambiguous and unattributed, which is exactly why this answer is partial rather than empty-and-complete.",
+      "why": "Only the same-file caller resolves; the cross-file call to Shared is ambiguous, which is why this is partial rather than complete.",
       "facet": "impact",
-      "name": "ambiguous2.calr",
-      "expect": [],
+      "name": "Shared",
+      "inFile": "ambiguous2.calr",
+      "expect": [
+        "ambiguous2.calr:5:AsksShared"
+      ],
+      "partial": true
+    },
+    {
+      "why": "Whole-file impact is still offered for 'I rewrote this file'. math.calr holds Scale and ScaleTwice, so only Run is downstream of the file as a unit.",
+      "facet": "impact-file",
+      "name": "math.calr",
+      "expect": [
+        "app.calr:2:Run"
+      ],
       "partial": true
     }
   ]

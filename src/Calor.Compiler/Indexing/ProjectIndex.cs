@@ -15,6 +15,18 @@ public sealed class IndexedDeclaration
     public string File { get; set; } = "";
     public int Line { get; set; }
     public int Column { get; set; }
+
+    /// <summary>
+    /// Hash of this declaration's own definition text, so "what changed?" can be
+    /// answered per declaration rather than per file.
+    ///
+    /// The file-grained alternative was measured before being rejected: on a
+    /// 106-file corpus it gave the exactly-right impact answer for 1% of
+    /// functions and claimed non-empty impact for 69% of functions whose true
+    /// impact was empty — a ~13x over-report. Precision here is what makes the
+    /// impact facet worth having.
+    /// </summary>
+    public string SemanticHash { get; set; } = "";
 }
 
 /// <summary>
@@ -98,7 +110,7 @@ public sealed class IndexResidual
 /// </summary>
 public sealed class ProjectIndex
 {
-    public const string CurrentFormatVersion = "1.0";
+    public const string CurrentFormatVersion = "2.0";
 
     public string FormatVersion { get; set; } = CurrentFormatVersion;
     public string CompilerSemanticsVersion { get; set; } =
@@ -108,8 +120,11 @@ public sealed class ProjectIndex
     public string ManifestHash { get; set; } = "";
 
     /// <summary>
-    /// Repository-relative path → content hash. Doubles as the per-file semantic
-    /// hash: v1 rebuilds wholesale, so one hash per file serves both roles.
+    /// Repository-relative path → content hash. Used for INVALIDATION only:
+    /// deciding whether the index may still answer. Semantic hashes live per
+    /// declaration (<see cref="IndexedDeclaration.SemanticHash"/>) because
+    /// file granularity made the impact facet useless — see the measurement
+    /// recorded there.
     /// </summary>
     public Dictionary<string, string> Files { get; set; } = [];
 
@@ -293,6 +308,49 @@ public sealed class ProjectIndex
     ///
     /// The cycle guard is not defensive coding: mutually recursive functions are
     /// ordinary, and following their edges without one does not terminate.
+    /// </summary>
+    public IReadOnlyList<IndexedDeclaration> FindImpactOfDeclarations(
+        IReadOnlyCollection<string> seedSymbolIds)
+    {
+        ArgumentNullException.ThrowIfNull(seedSymbolIds);
+        var seedIds = seedSymbolIds.ToHashSet(StringComparer.Ordinal);
+        if (seedIds.Count == 0)
+            return [];
+
+        var callersByCallee = CallEdges
+            .GroupBy(edge => edge.CalleeSymbolId, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(edge => edge.CallerSymbolId)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray(),
+                StringComparer.Ordinal);
+
+        var affected = new HashSet<string>(StringComparer.Ordinal);
+        var queue = new Queue<string>(seedIds);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (!callersByCallee.TryGetValue(current, out var callers))
+                continue;
+
+            foreach (var caller in callers)
+            {
+                if (seedIds.Contains(caller) || !affected.Add(caller))
+                    continue;
+                queue.Enqueue(caller);
+            }
+        }
+
+        return Declarations
+            .Where(declaration => affected.Contains(declaration.SymbolId))
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Impact of changing an entire file. Retained because "I rewrote this file"
+    /// is a real question — but it is no longer how a change to one declaration
+    /// is answered.
     /// </summary>
     public IReadOnlyList<IndexedDeclaration> FindImpactOfFile(string file)
     {
