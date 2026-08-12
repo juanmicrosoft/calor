@@ -17,6 +17,31 @@ $TEMP_DIR = Join-Path $SCRIPT_DIR "..\.z3-temp"
 # W1 Slice 2 (#789, #834 review M3): verify every downloaded archive against
 # the committed SHA-256 manifest before extracting anything from it.
 $CHECKSUM_MANIFEST = Join-Path $SCRIPT_DIR "z3-upstream-$Z3_VERSION.sha256"
+function Invoke-Download {
+    param(
+        [Parameter(Mandatory = $true)][string]$Uri,
+        [Parameter(Mandatory = $true)][string]$OutFile,
+        [int]$MaxAttempts = 8
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            Invoke-WebRequest -Uri $Uri -OutFile $OutFile
+            return
+        } catch {
+            Remove-Item -Force $OutFile -ErrorAction SilentlyContinue
+            if ($attempt -eq $MaxAttempts) {
+                throw
+            }
+
+            $delaySeconds = [Math]::Min(30, [Math]::Pow(2, $attempt - 1))
+            Write-Warning "Download attempt $attempt/$MaxAttempts failed: $($_.Exception.Message)"
+            Write-Host "Retrying in $delaySeconds second(s)..."
+            Start-Sleep -Seconds $delaySeconds
+        }
+    }
+}
+
 function Test-ArchiveChecksum {
     param([string]$ZipFile)
     $name = Split-Path -Leaf $ZipFile
@@ -120,7 +145,7 @@ if (-not $managedDllExists) {
 
     # Download if not cached
     if (-not (Test-Path $zipFile)) {
-        Invoke-WebRequest -Uri "$BASE_URL/$MANAGED_DLL_ARCHIVE.zip" -OutFile $zipFile
+        Invoke-Download -Uri "$BASE_URL/$MANAGED_DLL_ARCHIVE.zip" -OutFile $zipFile
     }
     Test-ArchiveChecksum -ZipFile $zipFile
 
@@ -163,7 +188,7 @@ foreach ($platform in $PLATFORMS) {
 
     # Download if not cached
     if (-not (Test-Path $zipFile)) {
-        Invoke-WebRequest -Uri "$BASE_URL/$archive.zip" -OutFile $zipFile
+        Invoke-Download -Uri "$BASE_URL/$archive.zip" -OutFile $zipFile
     }
     Test-ArchiveChecksum -ZipFile $zipFile
 

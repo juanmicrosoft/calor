@@ -53,6 +53,27 @@ class SupplyChainTests(unittest.TestCase):
                     f"{relative} has PackageReference items but no packages.lock.json",
                 )
 
+        for standalone_test_project in (
+            "tests/Calor.RoundTrip.Synthetic/SyntheticLib.Tests/SyntheticLib.Tests.csproj",
+            "tests/Calor.RoundTrip.Synthetic2/GeoLib.Tests/GeoLib.Tests.csproj",
+        ):
+            text = (REPO_ROOT / standalone_test_project).read_text(encoding="utf-8")
+            self.assertIn(
+                'Include="Microsoft.NET.Test.Sdk" VersionOverride="17.8.0"',
+                text,
+                f"{standalone_test_project} loses central versions when copied by the harness",
+            )
+
+    def test_z3_bootstrap_retries_transient_download_failures(self) -> None:
+        shell = (REPO_ROOT / "src/Calor.Compiler/scripts/download-z3.sh").read_text()
+        powershell = (REPO_ROOT / "src/Calor.Compiler/scripts/download-z3.ps1").read_text()
+        self.assertIn("--retry 10", shell)
+        self.assertIn("--retry-all-errors", shell)
+        self.assertIn("--retry-max-time 300", shell)
+        self.assertIn("function Invoke-Download", powershell)
+        self.assertIn("$MaxAttempts = 8", powershell)
+        self.assertEqual(2, powershell.count("Invoke-Download -Uri"))
+
     def test_z3_verifier_rejects_corrupt_truncated_and_error_page_assets(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

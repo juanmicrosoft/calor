@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 download() {
     local url="$1" out="$2"
     curl -fL -sS \
-        --retry 5 --retry-delay 3 --retry-all-errors \
+        --retry 10 --retry-all-errors --retry-max-time 300 \
         --connect-timeout 30 --max-time 600 \
         -o "$out" "$url"
 }
