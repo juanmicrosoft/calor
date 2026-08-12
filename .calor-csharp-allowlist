@@ -66,4 +66,5 @@ src/Calor.Compiler/Commands/QueryCommand.cs
 # Compiler-internal MCP protocol machinery, same class as the rest of
 # src/Calor.Compiler/Mcp/; Calor has no access to Process.WorkingSet64 or the
 # GC memory info this policy is built from.
+# pending
 src/Calor.Compiler/Mcp/McpMemoryAdmissionPolicy.cs
