@@ -76,7 +76,7 @@
   <Target Name="DownloadZ3" BeforeTargets="BeforeBuild" Condition="!Exists('$(Z3Dir)/.provenance') OR !Exists('$(Z3Dir)/Microsoft.Z3.dll') OR !Exists('$(Z3RuntimesDir)')">
     <Message Importance="high" Text="Downloading Z3 libraries..." />
     <Exec Command="bash &quot;$(MSBuildThisFileDirectory)scripts/download-z3.sh&quot;" Condition="'$(OS)' != 'Windows_NT'" />
-    <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)scripts\download-z3.ps1&quot;" Condition="'$(OS)' == 'Windows_NT'" />
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildThisFileDirectory)scripts\download-z3.ps1&quot;" Condition="'$(OS)' == 'Windows_NT'" />
   </Target>
 
   <!-- Copy Microsoft.Z3.dll to output (skip during publish since Reference already includes it) -->
