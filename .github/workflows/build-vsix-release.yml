@@ -42,6 +42,10 @@ jobs:
         with:
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
 
+      - name: Resolve built source identity
+        shell: bash
+        run: echo "BUILD_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -115,6 +119,10 @@ jobs:
         with:
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
 
+      - name: Resolve built source identity
+        shell: bash
+        run: echo "BUILD_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -129,13 +137,14 @@ jobs:
       - name: Generate SBOM and provenance
         run: |
           python3 scripts/generate-release-metadata.py \
-            --name "calor-vsix-${{ github.sha }}" \
+            --name "calor-vsix-${BUILD_COMMIT}" \
             --artifacts ./vsix-packages \
             --output ./release-metadata \
             --repository "${{ github.server_url }}/${{ github.repository }}" \
-            --commit "${{ github.sha }}"
+            --commit "${BUILD_COMMIT}"
 
       - name: Attest VSIX packages
+        if: github.event_name == 'release'
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |

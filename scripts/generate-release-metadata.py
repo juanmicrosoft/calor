@@ -52,8 +52,28 @@ def release_files(paths: list[Path], output: Path) -> list[Path]:
     return sorted(files)
 
 
-def dependencies(repo_root: Path) -> list[tuple[str, str, str]]:
-    resolved: set[tuple[str, str, str]] = set()
+def package_purl(ecosystem: str, name: str, version: str) -> str:
+    if ecosystem == "npm" and name.startswith("@") and "/" in name:
+        scope, package = name.split("/", 1)
+        encoded_name = f"{quote(scope, safe='')}/{quote(package, safe='')}"
+    else:
+        encoded_name = quote(name, safe="")
+    return f"pkg:{ecosystem}/{encoded_name}@{quote(version, safe='')}"
+
+
+def read_size_hash_manifest(path: Path) -> list[tuple[str, str, int]]:
+    entries = []
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        digest, name, size = line.split()
+        entries.append((digest, name, int(size)))
+    return entries
+
+
+def dependencies(repo_root: Path) -> list[dict[str, object]]:
+    resolved: dict[str, dict[str, object]] = {}
     for lock_path in sorted(repo_root.rglob("packages.lock.json")):
         relative = lock_path.relative_to(repo_root)
         if relative.parts[:2] == ("bench", "corpus") or (
@@ -65,7 +85,12 @@ def dependencies(repo_root: Path) -> list[tuple[str, str, str]]:
             for name, details in framework.items():
                 version = details.get("resolved")
                 if version:
-                    resolved.add(("nuget", name, version))
+                    uri = package_purl("nuget", name, version)
+                    resolved[uri] = {
+                        "name": name,
+                        "version": version,
+                        "uri": uri,
+                    }
     for lock_path in sorted(repo_root.rglob("package-lock.json")):
         if "node_modules" in lock_path.parts:
             continue
@@ -76,8 +101,43 @@ def dependencies(repo_root: Path) -> list[tuple[str, str, str]]:
             name = details.get("name") or package_path.rsplit("node_modules/", 1)[-1]
             version = details.get("version")
             if name and version:
-                resolved.add(("npm", name, version))
-    return sorted(resolved, key=lambda item: (item[0], item[1].lower(), item[2]))
+                uri = package_purl("npm", name, version)
+                resolved[uri] = {
+                    "name": name,
+                    "version": version,
+                    "uri": uri,
+                }
+
+    z3_version = "4.15.7"
+    upstream_base = f"https://github.com/Z3Prover/z3/releases/download/z3-{z3_version}"
+    upstream_manifest = (
+        repo_root / f"src/Calor.Compiler/scripts/z3-upstream-{z3_version}.sha256"
+    )
+    for digest, name, size in read_size_hash_manifest(upstream_manifest):
+        uri = f"{upstream_base}/{name}"
+        resolved[uri] = {
+            "name": name,
+            "version": z3_version,
+            "uri": uri,
+            "sha256": digest,
+            "size": size,
+        }
+
+    asset_base = (
+        f"https://github.com/juanmicrosoft/calor/releases/download/"
+        f"z3-binaries-{z3_version}"
+    )
+    asset_manifest = repo_root / f".github/z3-binaries-{z3_version}.sha256"
+    for digest, name, size in read_size_hash_manifest(asset_manifest):
+        uri = f"{asset_base}/{name}"
+        resolved[uri] = {
+            "name": name,
+            "version": z3_version,
+            "uri": uri,
+            "sha256": digest,
+            "size": size,
+        }
+    return sorted(resolved.values(), key=lambda item: str(item["uri"]))
 
 
 def main() -> int:
@@ -127,7 +187,6 @@ def main() -> int:
         },
         "documentDescribes": [
             *[f"SPDXRef-Artifact-{index}" for index in range(len(subjects))],
-            *[f"SPDXRef-Package-{index}" for index in range(len(packages))],
         ],
         "files": [
             {
@@ -144,20 +203,46 @@ def main() -> int:
         ],
         "packages": [
             {
-                "name": name,
+                "name": dependency["name"],
                 "SPDXID": f"SPDXRef-Package-{index}",
-                "versionInfo": version,
-                "downloadLocation": "NOASSERTION",
+                "versionInfo": dependency["version"],
+                "downloadLocation": (
+                    dependency["uri"]
+                    if str(dependency["uri"]).startswith("https://")
+                    else "NOASSERTION"
+                ),
                 "filesAnalyzed": False,
-                "externalRefs": [
+                **(
                     {
-                        "referenceCategory": "PACKAGE-MANAGER",
-                        "referenceType": "purl",
-                        "referenceLocator": f"pkg:{ecosystem}/{quote(name, safe='')}@{quote(version, safe='')}",
+                        "checksums": [
+                            {
+                                "algorithm": "SHA256",
+                                "checksumValue": dependency["sha256"],
+                            }
+                        ]
                     }
-                ],
+                    if "sha256" in dependency
+                    else {
+                        "externalRefs": [
+                            {
+                                "referenceCategory": "PACKAGE-MANAGER",
+                                "referenceType": "purl",
+                                "referenceLocator": dependency["uri"],
+                            }
+                        ]
+                    }
+                ),
             }
-            for index, (ecosystem, name, version) in enumerate(packages)
+            for index, dependency in enumerate(packages)
+        ],
+        "relationships": [
+            {
+                "spdxElementId": f"SPDXRef-Artifact-{artifact_index}",
+                "relationshipType": "DEPENDS_ON",
+                "relatedSpdxElement": f"SPDXRef-Package-{package_index}",
+            }
+            for artifact_index in range(len(subjects))
+            for package_index in range(len(packages))
         ],
     }
     provenance = {
@@ -174,9 +259,14 @@ def main() -> int:
                 },
                 "resolvedDependencies": [
                     {
-                        "uri": f"pkg:{ecosystem}/{quote(name, safe='')}@{quote(version, safe='')}",
+                        "uri": dependency["uri"],
+                        **(
+                            {"digest": {"sha256": dependency["sha256"]}}
+                            if "sha256" in dependency
+                            else {}
+                        ),
                     }
-                    for ecosystem, name, version in packages
+                    for dependency in packages
                 ],
             },
             "runDetails": {

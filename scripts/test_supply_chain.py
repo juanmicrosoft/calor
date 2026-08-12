@@ -139,6 +139,21 @@ class SupplyChainTests(unittest.TestCase):
             provenance = json.loads((first / provenance_name).read_text())
             self.assertEqual("calor.nupkg", provenance["subject"][0]["name"])
             self.assertEqual(64, len(provenance["subject"][0]["digest"]["sha256"]))
+            dependencies = provenance["predicate"]["buildDefinition"]["resolvedDependencies"]
+            self.assertTrue(
+                any(
+                    dependency["uri"].endswith("/Microsoft.Z3.dll")
+                    and len(dependency["digest"]["sha256"]) == 64
+                    for dependency in dependencies
+                )
+            )
+            self.assertTrue(
+                any(
+                    dependency["uri"].startswith("pkg:npm/%40types/")
+                    and "%2F" not in dependency["uri"]
+                    for dependency in dependencies
+                )
+            )
 
 
 if __name__ == "__main__":

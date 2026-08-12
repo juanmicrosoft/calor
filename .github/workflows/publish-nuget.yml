@@ -116,6 +116,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Bootstrap verified Z3 assets
+        if: runner.os != 'Windows'
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
+      - name: Bootstrap verified Z3 assets (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pwsh -NoProfile -File src/Calor.Compiler/scripts/download-z3.ps1
+
       - name: Run M-A1 consumer check
         env:
           CALOR_SDK_REQUIRE_ALL_RIDS: "1"

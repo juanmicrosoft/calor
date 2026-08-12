@@ -41,8 +41,11 @@ dotnet build --no-restore
 dotnet test --no-restore
 ```
 
-Normal build/test/pack targets never download dependencies or rewrite tracked
-source resources. To refresh embedded self-test fixtures explicitly, run
+The documented `--no-restore` build/test/pack path never downloads dependencies
+or rewrites tracked source resources. Restores are always locked; update a lock
+file intentionally with
+`dotnet restore --force-evaluate -p:RestoreLockedMode=false`. To refresh
+embedded self-test fixtures explicitly, run
 `python3 scripts/sync-self-test-resources.py`.
 
 ---
