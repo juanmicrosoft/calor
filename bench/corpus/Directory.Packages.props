@@ -1,0 +1,7 @@
+<Project>
+  <!-- Vendored third-party corpus projects retain their upstream dependency
+       declarations and are intentionally isolated from Calor's central pins. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

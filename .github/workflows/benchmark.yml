@@ -46,6 +46,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Bootstrap verified Z3 assets
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
       - name: Restore dependencies
         run: dotnet restore
 
@@ -240,6 +243,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      - name: Bootstrap verified Z3 assets
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

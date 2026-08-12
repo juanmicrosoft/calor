@@ -1,0 +1,8 @@
+<Project>
+  <!-- E2E fixture projects are copied and mutated as user inputs. Preserve
+       their standalone dependency declarations and do not generate lock files. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+  </PropertyGroup>
+</Project>

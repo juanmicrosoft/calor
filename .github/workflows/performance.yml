@@ -25,6 +25,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Bootstrap verified Z3 assets
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
       - name: Build performance tests
         run: dotnet build tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj -c Release
 

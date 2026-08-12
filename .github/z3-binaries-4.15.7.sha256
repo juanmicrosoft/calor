@@ -1,4 +1,4 @@
-# SHA-256 manifest for the repo's z3-binaries-4.15.7 release assets
+# SHA-256 and byte-size manifest for the repo's z3-binaries-4.15.7 assets
 # (W1 Slice 2, #789). publish-nuget.yml verifies every download against
 # this file before packing — a missing or corrupt native fails the release
 # instead of shipping inside the nupkg.
@@ -44,10 +44,10 @@
 # step summary; commit it in the same change that republishes. Never rehash the
 # live assets — that launders whatever is currently published into the pin and
 # defeats the entire mechanism. z3-pin-check.yml watches for drift daily.
-59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175  Microsoft.Z3.dll
-7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5  libz3-linux-arm64.so
-3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8  libz3-linux-x64.so
-8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada  libz3-osx-arm64.dylib
-f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562  libz3-win-arm64.dll
-d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56  libz3-win-x64.dll
-89d584e1e792961a5e5a9a8385f1416cf38251c48446bab8ba64f9a17000ebc9  libz3-win-x86.dll
+59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175  Microsoft.Z3.dll  260608
+7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5  libz3-linux-arm64.so  30884960
+3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8  libz3-linux-x64.so  34714776
+8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada  libz3-osx-arm64.dylib  25891768
+f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562  libz3-win-arm64.dll  17616896
+d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56  libz3-win-x64.dll  17730560
+89d584e1e792961a5e5a9a8385f1416cf38251c48446bab8ba64f9a17000ebc9  libz3-win-x86.dll  14245376

@@ -1,4 +1,4 @@
-# SHA-256 manifest for the upstream Z3Prover/z3 4.15.7 release archives
+# SHA-256 and byte-size manifest for the upstream Z3Prover/z3 4.15.7 archives
 # (W1 Slice 2, #789). download-z3.sh, download-z3.ps1, and build-z3.yml all
 # verify each archive against this file before extracting. Computed
 # 2026-07-31 (trust-on-first-use) from
@@ -14,9 +14,9 @@
 # osx-x64 is deliberately absent — upstream's x64-osx archive contains an arm64
 # binary, so Intel macOS is unsupported for verification.)
 # unverified input and is tracked separately.)
-dabee41164abf080ae3bc312d80d1d8700ef49fbfc593c8d8fa4f3cdaf7d6551  z3-4.15.7-arm64-glibc-2.38.zip
-1f4aefb345bded8b6cd6a5a92b6bb2e34110b373779bfb38145200ceeb4fa626  z3-4.15.7-arm64-osx-15.7.3.zip
-e6ef5a4f8749c0b3214a1ad72e6c5655bbda2eeebe9177277514df1fa7eed571  z3-4.15.7-arm64-win.zip
-4436ab6381f0b9c68075a267ab13a5f3ad25f7c25f7626dec959c76805c9f2cb  z3-4.15.7-x64-glibc-2.39.zip
-7b01f3987bcdab0d0622c417212ad37e7a486ea233e091a59f646e0118316187  z3-4.15.7-x64-win.zip
-40f7cc9e69b51dd77e9131eeea62cf039b560629b76a2e87f27b15f3009f9d9c  z3-4.15.7-x86-win.zip
+dabee41164abf080ae3bc312d80d1d8700ef49fbfc593c8d8fa4f3cdaf7d6551  z3-4.15.7-arm64-glibc-2.38.zip  49082602
+1f4aefb345bded8b6cd6a5a92b6bb2e34110b373779bfb38145200ceeb4fa626  z3-4.15.7-arm64-osx-15.7.3.zip  37715389
+e6ef5a4f8749c0b3214a1ad72e6c5655bbda2eeebe9177277514df1fa7eed571  z3-4.15.7-arm64-win.zip  61750798
+4436ab6381f0b9c68075a267ab13a5f3ad25f7c25f7626dec959c76805c9f2cb  z3-4.15.7-x64-glibc-2.39.zip  52404177
+7b01f3987bcdab0d0622c417212ad37e7a486ea233e091a59f646e0118316187  z3-4.15.7-x64-win.zip  66949332
+40f7cc9e69b51dd77e9131eeea62cf039b560629b76a2e87f27b15f3009f9d9c  z3-4.15.7-x86-win.zip  60053983

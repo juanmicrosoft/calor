@@ -1,0 +1,7 @@
+<Project>
+  <!-- Committed benchmark-arm snapshots preserve the dependency declarations
+       captured with each experiment and do not inherit repository package pins. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

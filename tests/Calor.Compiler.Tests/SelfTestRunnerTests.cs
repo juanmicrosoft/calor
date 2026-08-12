@@ -250,9 +250,8 @@ public class SelfTestRunnerTests
     public void SelfTestRunner_ScenariosMatchE2EDirectory()
     {
         // Verify the embedded self-test scenarios exactly match the E2E scenario directories
-        // that have both input.calr and output.g.cs. If a new E2E scenario is added,
-        // this test will fail, prompting the developer to rebuild so the SyncSelfTestFiles
-        // target picks it up.
+        // that have both input.calr and output.g.cs. Synchronization is an explicit command,
+        // never a build side effect.
         var scenariosPath = FindE2EScenariosPath();
         if (scenariosPath == null)
         {

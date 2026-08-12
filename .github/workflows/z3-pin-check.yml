@@ -71,7 +71,10 @@ jobs:
             curl -fL -sS --retry 5 --retry-delay 3 -o "$STAGING/$asset" "${RELEASE_URL}/${asset}"
           done < <(grep -v '^#' "$MANIFEST" | awk 'NF {print $2}')
 
-          if ! (cd "$STAGING" && grep -v '^#' "$GITHUB_WORKSPACE/$MANIFEST" | sha256sum --check --strict -); then
+          while read -r hash asset size; do
+            test "$(wc -c < "$STAGING/$asset" | tr -d ' ')" = "$size"
+          done < <(grep -v '^#' "$MANIFEST" | awk 'NF')
+          if ! (cd "$STAGING" && grep -v '^#' "$GITHUB_WORKSPACE/$MANIFEST" | awk 'NF {print $1 "  " $2}' | sha256sum --check --strict -); then
             echo "::error::z3-binaries release no longer matches $MANIFEST — publish-nuget WILL fail on the next release."
             echo "::error::Do NOT rehash the live assets: that launders whatever is currently published into the pin."
             echo "::error::Republish deliberately via build-z3.yml (workflow_dispatch) and commit the manifest it prints in its step summary."
@@ -97,7 +100,10 @@ jobs:
             curl -fL -sS --retry 5 --retry-delay 3 -o "$STAGING/$zip" "${BASE}/${zip}"
           done < <(grep -v '^#' "$MANIFEST" | awk 'NF {print $2}')
 
-          if ! (cd "$STAGING" && grep -v '^#' "$GITHUB_WORKSPACE/$MANIFEST" | sha256sum --check --strict -); then
+          while read -r hash asset size; do
+            test "$(wc -c < "$STAGING/$asset" | tr -d ' ')" = "$size"
+          done < <(grep -v '^#' "$MANIFEST" | awk 'NF')
+          if ! (cd "$STAGING" && grep -v '^#' "$GITHUB_WORKSPACE/$MANIFEST" | awk 'NF {print $1 "  " $2}' | sha256sum --check --strict -); then
             echo "::error::upstream Z3 ${Z3_VERSION} archives no longer match $MANIFEST — investigate before touching anything downstream."
             exit 1
           fi

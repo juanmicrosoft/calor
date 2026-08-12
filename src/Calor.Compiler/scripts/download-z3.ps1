@@ -17,18 +17,50 @@ $TEMP_DIR = Join-Path $SCRIPT_DIR "..\.z3-temp"
 # W1 Slice 2 (#789, #834 review M3): verify every downloaded archive against
 # the committed SHA-256 manifest before extracting anything from it.
 $CHECKSUM_MANIFEST = Join-Path $SCRIPT_DIR "z3-upstream-$Z3_VERSION.sha256"
+function Invoke-Download {
+    param(
+        [Parameter(Mandatory = $true)][string]$Uri,
+        [Parameter(Mandatory = $true)][string]$OutFile,
+        [int]$MaxAttempts = 8
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            Invoke-WebRequest -Uri $Uri -OutFile $OutFile
+            return
+        } catch {
+            Remove-Item -Force $OutFile -ErrorAction SilentlyContinue
+            if ($attempt -eq $MaxAttempts) {
+                throw
+            }
+
+            $delaySeconds = [Math]::Min(30, [Math]::Pow(2, $attempt - 1))
+            Write-Warning "Download attempt $attempt/$MaxAttempts failed: $($_.Exception.Message)"
+            Write-Host "Retrying in $delaySeconds second(s)..."
+            Start-Sleep -Seconds $delaySeconds
+        }
+    }
+}
+
 function Test-ArchiveChecksum {
     param([string]$ZipFile)
     $name = Split-Path -Leaf $ZipFile
     if (-not (Test-Path $CHECKSUM_MANIFEST)) {
         throw "Checksum manifest $CHECKSUM_MANIFEST missing - refusing to use unverified Z3 archives"
     }
-    $expected = (Get-Content $CHECKSUM_MANIFEST |
+    $entry = (Get-Content $CHECKSUM_MANIFEST |
         Where-Object { $_ -notmatch '^#' -and (($_ -split '\s+')[1]) -eq $name } |
-        ForEach-Object { ($_ -split '\s+')[0] } |
         Select-Object -First 1)
-    if (-not $expected) {
+    if (-not $entry) {
         throw "No checksum entry for $name in $CHECKSUM_MANIFEST"
+    }
+    $parts = $entry -split '\s+'
+    $expected = $parts[0]
+    $expectedSize = [int64]$parts[2]
+    $actualSize = (Get-Item $ZipFile).Length
+    if ($actualSize -ne $expectedSize) {
+        Remove-Item -Force $ZipFile
+        throw "Unexpected size for ${name}: expected $expectedSize, got $actualSize"
     }
     $actual = (Get-FileHash -Algorithm SHA256 -Path $ZipFile).Hash.ToLowerInvariant()
     if ($actual -ne $expected.ToLowerInvariant()) {
@@ -66,26 +98,16 @@ Write-Host "====================="
 Write-Host "Version: $Z3_VERSION"
 Write-Host ""
 
-# Provenance stamp and stale-artifact invalidation. Mirrors download-z3.sh:
-# z3/ and runtimes/ are gitignored build artifacts and every check below is a
-# bare existence test, so an artifact was previously kept regardless of where it
-# came from. The stamp records which upstream archive supplied the wrapper; if
-# it is absent or different, everything is discarded and refetched, so "present"
-# and "current" cannot diverge. Calor.Compiler.csproj also gates the DownloadZ3
-# target on this file, so it must be written here too or Windows re-runs this
-# script on every build.
-$PROVENANCE_FILE = Join-Path $Z3_DIR ".provenance"
-$EXPECTED_PROVENANCE = "upstream $Z3_VERSION managed=$MANAGED_DLL_ARCHIVE"
-
+# Existing outputs are reusable only if every binary matches the committed
+# release-asset size/hash manifest.
+$REPO_ROOT = (Resolve-Path (Join-Path $SCRIPT_DIR "..\..\..")).Path
+$ASSET_VERIFIER = Join-Path $REPO_ROOT "scripts\verify-z3-assets.py"
 if ((Test-Path (Join-Path $Z3_DIR "Microsoft.Z3.dll")) -or (Test-Path $RUNTIMES_DIR)) {
-    $actualProvenance = if (Test-Path $PROVENANCE_FILE) { (Get-Content $PROVENANCE_FILE -Raw).Trim() } else { "" }
-    if ($actualProvenance -ne $EXPECTED_PROVENANCE) {
-        Write-Host "Existing Z3 artifacts do not carry the current provenance stamp:"
-        Write-Host "  expected: $EXPECTED_PROVENANCE"
-        Write-Host "  found:    $(if ($actualProvenance) { $actualProvenance } else { '<unstamped: pre-stamp or source-built checkout>' })"
-        Write-Host "Discarding them and refetching from the verified upstream archives."
-        Write-Host ""
-        Remove-Item -Path (Join-Path $Z3_DIR "Microsoft.Z3.dll") -Force -ErrorAction SilentlyContinue
+    & python $ASSET_VERIFIER *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Existing Z3 assets failed committed size/hash verification."
+        Write-Host "Discarding them and refetching verified upstream archives."
+        Remove-Item -Path $Z3_DIR -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path $RUNTIMES_DIR -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
@@ -106,6 +128,8 @@ foreach ($platform in $PLATFORMS) {
 
 if ($managedDllExists -and $allNativesExist) {
     Write-Host "All Z3 libraries already present. Skipping download."
+    & python $ASSET_VERIFIER --write-provenance
+    if ($LASTEXITCODE -ne 0) { throw "Z3 output verification failed" }
     exit 0
 }
 
@@ -121,7 +145,7 @@ if (-not $managedDllExists) {
 
     # Download if not cached
     if (-not (Test-Path $zipFile)) {
-        Invoke-WebRequest -Uri "$BASE_URL/$MANAGED_DLL_ARCHIVE.zip" -OutFile $zipFile
+        Invoke-Download -Uri "$BASE_URL/$MANAGED_DLL_ARCHIVE.zip" -OutFile $zipFile
     }
     Test-ArchiveChecksum -ZipFile $zipFile
 
@@ -139,7 +163,7 @@ if (-not $managedDllExists) {
         Copy-Item -Path $foundDll.FullName -Destination $managedDllPath -Force
         Write-Host "[Managed] Done."
     } else {
-        Write-Warning "[Managed] Could not find Microsoft.Z3.dll in archive"
+        throw "Could not find Microsoft.Z3.dll in $MANAGED_DLL_ARCHIVE"
     }
 }
 
@@ -164,7 +188,7 @@ foreach ($platform in $PLATFORMS) {
 
     # Download if not cached
     if (-not (Test-Path $zipFile)) {
-        Invoke-WebRequest -Uri "$BASE_URL/$archive.zip" -OutFile $zipFile
+        Invoke-Download -Uri "$BASE_URL/$archive.zip" -OutFile $zipFile
     }
     Test-ArchiveChecksum -ZipFile $zipFile
 
@@ -184,14 +208,13 @@ foreach ($platform in $PLATFORMS) {
         Copy-Item -Path $foundLib.FullName -Destination $targetFile -Force
         Write-Host "[$rid] Done."
     } else {
-        Write-Warning "[$rid] Could not find $lib in archive"
+        throw "Could not find $lib in $archive"
     }
 }
 
-# Record what these artifacts are, so a later run can tell "present" from
-# "current". Written only after every download succeeded.
-New-Item -ItemType Directory -Force -Path $Z3_DIR | Out-Null
-Set-Content -Path $PROVENANCE_FILE -Value $EXPECTED_PROVENANCE -NoNewline
+# Verify the extracted outputs themselves and record their source/manifests.
+& python $ASSET_VERIFIER --write-provenance
+if ($LASTEXITCODE -ne 0) { throw "Z3 output verification failed" }
 
 # Cleanup
 Remove-Item -Path $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue

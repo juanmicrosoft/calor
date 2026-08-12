@@ -117,10 +117,12 @@ jobs:
           curl -fL -sS --retry 5 --retry-delay 3 -o z3.zip "${BASE_URL}/${ARCHIVE}.zip"
 
           EXPECTED="$(grep -v '^#' "$MANIFEST" | awk -v n="${ARCHIVE}.zip" '$2 == n {print $1}')"
-          if [ -z "$EXPECTED" ]; then
+          EXPECTED_SIZE="$(grep -v '^#' "$MANIFEST" | awk -v n="${ARCHIVE}.zip" '$2 == n {print $3}')"
+          if [ -z "$EXPECTED" ] || [ -z "$EXPECTED_SIZE" ]; then
             echo "::error::no checksum entry for ${ARCHIVE}.zip in $MANIFEST"
             exit 1
           fi
+          test "$(wc -c < z3.zip | tr -d ' ')" = "$EXPECTED_SIZE"
           echo "$EXPECTED  z3.zip" | sha256sum --check --strict -
 
           unzip -q z3.zip
@@ -204,8 +206,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -266,7 +273,27 @@ jobs:
           set -euo pipefail
           cd release
           echo "::notice::Copy the block below into .github/z3-binaries-${{ env.Z3_VERSION }}.sha256 (keeping its header comment)"
-          sha256sum Microsoft.Z3.dll libz3-*.so libz3-*.dylib libz3-*.dll | tee "$GITHUB_STEP_SUMMARY"
+          for asset in Microsoft.Z3.dll libz3-*.so libz3-*.dylib libz3-*.dll; do
+            printf '%s  %s  %s\n' \
+              "$(sha256sum "$asset" | cut -d' ' -f1)" \
+              "$asset" \
+              "$(wc -c < "$asset" | tr -d ' ')"
+          done | tee "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate SBOM and provenance
+        run: |
+          python3 scripts/generate-release-metadata.py \
+            --name "z3-binaries-${{ env.Z3_VERSION }}" \
+            --artifacts ./release \
+            --output ./release-metadata \
+            --repository "${{ github.server_url }}/${{ github.repository }}" \
+            --commit "${{ github.sha }}"
+          cp release-metadata/*.json release/
+
+      - name: Attest Z3 release assets
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release/*
 
       - name: Create or update release
         uses: softprops/action-gh-release@v1

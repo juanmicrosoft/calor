@@ -33,6 +33,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Bootstrap verified Z3 assets
+        run: bash src/Calor.Compiler/scripts/download-z3.sh
+
       - name: Restore and build
         run: |
           dotnet restore

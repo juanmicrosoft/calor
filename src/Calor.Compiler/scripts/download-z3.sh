@@ -18,7 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 download() {
     local url="$1" out="$2"
     curl -fL -sS \
-        --retry 5 --retry-delay 3 --retry-all-errors \
+        --retry 10 --retry-all-errors --retry-max-time 300 \
         --connect-timeout 30 --max-time 600 \
         -o "$out" "$url"
 }
@@ -35,10 +35,20 @@ verify_archive() {
         echo "ERROR: checksum manifest $CHECKSUM_MANIFEST missing — refusing to use unverified Z3 archives" >&2
         exit 1
     fi
-    local expected
+    local expected expected_size
     expected="$(grep -v '^#' "$CHECKSUM_MANIFEST" | awk -v n="$name" '$2 == n {print $1}')"
-    if [ -z "$expected" ]; then
+    expected_size="$(grep -v '^#' "$CHECKSUM_MANIFEST" | awk -v n="$name" '$2 == n {print $3}')"
+    if [ -z "$expected" ] || [ -z "$expected_size" ]; then
         echo "ERROR: no checksum entry for $name in $CHECKSUM_MANIFEST" >&2
+        exit 1
+    fi
+    local actual_size
+    actual_size="$(wc -c < "$zip_file" | tr -d ' ')"
+    if [ "$actual_size" != "$expected_size" ]; then
+        echo "ERROR: unexpected size for $name" >&2
+        echo "  expected: $expected_size" >&2
+        echo "  actual:   $actual_size" >&2
+        rm -f "$zip_file"
         exit 1
     fi
     local actual
@@ -123,37 +133,15 @@ echo "====================="
 echo "Version: $Z3_VERSION"
 echo ""
 
-# ---------------------------------------------------------------------------
-# Provenance stamp and stale-artifact invalidation.
-#
-# z3/ and runtimes/ are gitignored build artifacts, and nothing used to record
-# WHERE their contents came from. Every check below is a bare existence test, so
-# an artifact — however it was produced — was kept forever. That became a real
-# hazard when the source of the managed wrapper changed: a checkout that had
-# previously run the ARM64-macOS source build kept its Debug, source-compiled
-# wrapper and its source-built osx-arm64 native indefinitely, while newly added
-# RIDs came from upstream. The result was a silent MIX, and a local `dotnet
-# pack` from such a tree shipped the Debug wrapper this project has since gone
-# to some trouble to stop publishing.
-#
-# The stamp records which upstream archive supplied the wrapper. If it is
-# missing (a pre-stamp or source-built checkout) or differs (the designated
-# archive changed), every artifact is discarded and refetched — so "present" and
-# "up to date" stop being different things.
-# ---------------------------------------------------------------------------
-PROVENANCE_FILE="$Z3_DIR/.provenance"
-EXPECTED_PROVENANCE="upstream ${Z3_VERSION} managed=${MANAGED_DLL_ARCHIVE}"
-
+# Existing outputs are reusable only when every binary still matches the
+# committed release-asset size/hash manifest.
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+ASSET_VERIFIER="$REPO_ROOT/scripts/verify-z3-assets.py"
 if [ -f "$Z3_DIR/Microsoft.Z3.dll" ] || [ -d "$RUNTIMES_DIR" ]; then
-    actual_provenance="$(cat "$PROVENANCE_FILE" 2>/dev/null || true)"
-    if [ "$actual_provenance" != "$EXPECTED_PROVENANCE" ]; then
-        echo "Existing Z3 artifacts do not carry the current provenance stamp:"
-        echo "  expected: $EXPECTED_PROVENANCE"
-        echo "  found:    ${actual_provenance:-<unstamped: pre-stamp or source-built checkout>}"
-        echo "Discarding them and refetching from the verified upstream archives."
-        echo ""
-        rm -f "$Z3_DIR/Microsoft.Z3.dll"
-        rm -rf "$RUNTIMES_DIR"
+    if ! python3 "$ASSET_VERIFIER" >/dev/null 2>&1; then
+        echo "Existing Z3 assets failed committed size/hash verification."
+        echo "Discarding them and refetching verified upstream archives."
+        rm -rf "$Z3_DIR" "$RUNTIMES_DIR"
     fi
 fi
 
@@ -175,6 +163,7 @@ done
 
 if [ "$managed_dll_exists" = true ] && [ "$all_natives_exist" = true ]; then
     echo "All Z3 libraries already present. Skipping download."
+    python3 "$ASSET_VERIFIER" --write-provenance
     exit 0
 fi
 
@@ -211,7 +200,8 @@ if [ "$managed_dll_exists" = false ]; then
         mv "$found_dll" "$Z3_DIR/Microsoft.Z3.dll"
         echo "[Managed] Done."
     else
-        echo "[Managed] WARNING: Could not find Microsoft.Z3.dll in archive"
+        echo "ERROR: Could not find Microsoft.Z3.dll in $MANAGED_DLL_ARCHIVE" >&2
+        exit 1
     fi
 fi
 
@@ -264,14 +254,13 @@ for platform in "${PLATFORMS[@]}"; do
         mv "$found_lib" "$target_file"
         echo "[$rid] Done."
     else
-        echo "[$rid] WARNING: Could not find $lib_in in archive"
+        echo "ERROR: Could not find $lib_in in $archive" >&2
+        exit 1
     fi
 done
 
-# Record what these artifacts are, so a later run can tell "present" from
-# "current". Written only after every download succeeded.
-mkdir -p "$Z3_DIR"
-printf '%s\n' "$EXPECTED_PROVENANCE" > "$PROVENANCE_FILE"
+# Verify the extracted outputs themselves and record their source/manifests.
+python3 "$ASSET_VERIFIER" --write-provenance
 
 # Cleanup (the EXIT trap also covers the failure paths)
 rm -rf "$TEMP_DIR"
