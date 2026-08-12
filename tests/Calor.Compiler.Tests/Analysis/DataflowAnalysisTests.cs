@@ -276,7 +276,7 @@ public class DataflowAnalysisTests
     }
 
     [Fact]
-    public void LiveVariables_GetAtExit_ReturnsSet()
+    public void LiveVariables_ExitBoundary_IsEmpty()
     {
         var source = @"
 §M{m001:Test}
@@ -290,7 +290,7 @@ public class DataflowAnalysisTests
         var analysis = new LiveVariablesAnalysis(cfg);
 
         var exitLive = analysis.GetLiveVariablesAtExit(cfg.Exit).ToList();
-        Assert.Contains("x", exitLive);
+        Assert.Empty(exitLive);
     }
 
     #endregion

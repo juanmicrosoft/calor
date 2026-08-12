@@ -184,6 +184,9 @@ public static class BoundNodeHelpers
         };
     }
 
+    public static VariableSymbol? GetDefinedVariable(SyntheticOperation operation) =>
+        operation.DefinedVariable;
+
     /// <summary>
     /// Gets all variables used in a statement (excluding the defined variable).
     /// </summary>
@@ -216,6 +219,23 @@ public static class BoundNodeHelpers
                 if (seen.Add(variable))
                     yield return variable;
             }
+        }
+    }
+
+    public static IEnumerable<VariableSymbol> GetUsedVariables(SyntheticOperation operation)
+    {
+        var seen = new HashSet<VariableSymbol>(VariableSymbolIdentityComparer.Instance);
+        if (operation.ReadsDefinedVariable
+            && operation.DefinedVariable != null
+            && seen.Add(operation.DefinedVariable))
+        {
+            yield return operation.DefinedVariable;
+        }
+
+        foreach (var variable in GetUsedVariables(operation.Expression))
+        {
+            if (seen.Add(variable))
+                yield return variable;
         }
     }
 

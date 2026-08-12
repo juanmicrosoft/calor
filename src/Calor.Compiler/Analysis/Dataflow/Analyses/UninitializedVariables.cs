@@ -28,37 +28,57 @@ public sealed class UninitializedVariablesAnalysis
     private readonly IReadOnlyDictionary<SymbolId, VariableSymbol> _allVariables;
     private readonly HashSet<SymbolId> _parameters;
     private readonly List<UninitializedUse> _uninitializedUses = new();
+    private readonly UninitializedVariablesTransfer _transfer;
     public IReadOnlyList<BoundNode> IncompleteNodes { get; }
     public bool IsComplete => IncompleteNodes.Count == 0;
+    public DataflowAnalysisResult<InitializationFacts> AnalysisResult { get; }
 
     public UninitializedVariablesAnalysis(ControlFlowGraph cfg, IEnumerable<string>? parameterNames = null)
+        : this(
+            cfg,
+            cfg.Function.Symbol.Parameters
+                .Where(parameter => parameterNames == null
+                    || parameterNames.Contains(parameter.Name, StringComparer.Ordinal))
+                .Select(parameter => parameter.Id))
     {
-        _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
-        _allVariables = CollectAllVariables(cfg);
-        IncompleteNodes = BoundNodeHelpers.GetAnalysisIncompleteNodes(cfg.Function).ToArray();
-        var names = parameterNames?.ToHashSet(StringComparer.Ordinal);
-        _parameters = cfg.Function.Symbol.Parameters
-            .Where(parameter => names == null || names.Contains(parameter.Name))
-            .Where(parameter => !parameter.Id.IsNone)
-            .Select(parameter => parameter.Id)
-            .ToHashSet();
-
-        var lattice = new InitializationLattice(_allVariables.Keys.ToHashSet(), _parameters);
-        var transfer = new UninitializedVariablesTransfer();
-        var analysis = new DataflowAnalysis<InitializationFacts>(
-            lattice, transfer, DataflowDirection.Forward);
-
-        _results = analysis.Analyze(cfg);
-
-        // Detect uninitialized uses
-        DetectUninitializedUses();
     }
 
     public UninitializedVariablesAnalysis(
         ControlFlowGraph cfg,
         IEnumerable<VariableSymbol> parameters)
-        : this(cfg, parameters.Select(parameter => parameter.Name))
+        : this(cfg, parameters.Select(parameter => parameter.Id))
     {
+    }
+
+    private UninitializedVariablesAnalysis(
+        ControlFlowGraph cfg,
+        IEnumerable<SymbolId> parameterIds)
+    {
+        _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
+        _allVariables = CollectAllVariables(cfg);
+        IncompleteNodes = BoundNodeHelpers.GetAnalysisIncompleteNodes(cfg.Function).ToArray();
+        _parameters = parameterIds
+            .Where(parameterId => !parameterId.IsNone)
+            .ToHashSet();
+
+        var lattice = new InitializationLattice(_allVariables.Keys.ToHashSet());
+        _transfer = new UninitializedVariablesTransfer();
+        var entryBoundary = InitializationFacts.Create(
+            _allVariables.Keys,
+            _parameters);
+        var analysis = new DataflowAnalysis<InitializationFacts>(
+            lattice,
+            _transfer,
+            DataflowDirection.Forward,
+            entryBoundary,
+            InitializationFacts.Empty,
+            InitializationFacts.Empty);
+
+        AnalysisResult = analysis.AnalyzeWithMetadata(cfg);
+        _results = AnalysisResult.Blocks;
+
+        // Detect uninitialized uses
+        DetectUninitializedUses();
     }
 
     /// <summary>
@@ -113,57 +133,112 @@ public sealed class UninitializedVariablesAnalysis
 
     private void DetectUninitializedUses()
     {
-        foreach (var block in _cfg.Blocks)
+        var usesByProgramPoint = new Dictionary<
+            object,
+            Dictionary<SymbolId, AggregatedUse>>(
+            ReferenceEqualityComparer.Instance);
+
+        foreach (var block in _cfg.ReachableBlocks)
         {
             if (!_results.TryGetValue(block, out var result))
                 continue;
 
             var currentFacts = result.In;
 
-            // Check condition expression
-            if (block.BranchCondition != null)
+            // Check each statement
+            for (var index = 0; index < block.Statements.Count; index++)
             {
-                foreach (var v in BoundNodeHelpers.GetUsedVariables(block.BranchCondition))
-                {
-                    if (v.IsParameter)
-                        continue;
-                    var state = currentFacts.GetState(v.Id);
-                    if (state != InitializationState.Initialized)
-                    {
-                        _uninitializedUses.Add(new UninitializedUse(v.Name, block.Span, state, v.Id));
-                    }
-                }
+                var stmt = block.Statements[index];
+                RecordUses(
+                    stmt,
+                    BoundNodeHelpers.GetUsedVariables(stmt),
+                    stmt.Span,
+                    currentFacts,
+                    usesByProgramPoint);
+                currentFacts = _transfer.Transfer(
+                    block,
+                    index,
+                    stmt,
+                    currentFacts);
             }
 
-            // Check each statement
-            foreach (var stmt in block.Statements)
+            foreach (var operation in block.SyntheticOperations)
             {
-                // Check uses first
-                foreach (var v in BoundNodeHelpers.GetUsedVariables(stmt))
-                {
-                    if (v.IsParameter)
-                        continue;
-                    var state = currentFacts.GetState(v.Id);
-                    if (state != InitializationState.Initialized)
-                    {
-                        _uninitializedUses.Add(new UninitializedUse(v.Name, stmt.Span, state, v.Id));
-                    }
-                }
+                RecordUses(
+                    operation,
+                    BoundNodeHelpers.GetUsedVariables(operation),
+                    operation.Span,
+                    currentFacts,
+                    usesByProgramPoint);
+                currentFacts = _transfer.TransferSynthetic(operation, currentFacts);
+            }
 
-                // Update facts for the next statement
-                var defined = BoundNodeHelpers.GetDefinedVariable(stmt);
-                if (defined != null)
+            if (block.Terminator.Condition != null)
+            {
+                RecordUses(
+                    block.Terminator.Condition,
+                    BoundNodeHelpers.GetUsedVariables(block.Terminator.Condition),
+                    block.Terminator.Condition.Span,
+                    currentFacts,
+                    usesByProgramPoint);
+            }
+        }
+
+        foreach (var uses in usesByProgramPoint.Values)
+        {
+            foreach (var (variableId, use) in uses)
+            {
+                if (use.State != InitializationState.Initialized)
                 {
-                    // Check if the variable has an initializer
-                    var hasInitializer = stmt is BoundBindStatement bind && bind.Initializer != null;
-                    if (hasInitializer)
-                    {
-                        currentFacts = currentFacts.SetInitialized(defined.Id);
-                    }
+                    _uninitializedUses.Add(new UninitializedUse(
+                        use.VariableName,
+                        use.Span,
+                        use.State,
+                        variableId));
                 }
             }
         }
     }
+
+    private void RecordUses(
+        object programPoint,
+        IEnumerable<VariableSymbol> variables,
+        TextSpan span,
+        InitializationFacts facts,
+        Dictionary<object, Dictionary<SymbolId, AggregatedUse>> usesByProgramPoint)
+    {
+        if (!usesByProgramPoint.TryGetValue(programPoint, out var pointUses))
+        {
+            pointUses = new Dictionary<SymbolId, AggregatedUse>();
+            usesByProgramPoint.Add(programPoint, pointUses);
+        }
+
+        foreach (var variable in variables)
+        {
+            var state = facts.GetState(variable.Id);
+            if (pointUses.TryGetValue(variable.Id, out var existing))
+            {
+                pointUses[variable.Id] = existing with
+                {
+                    State = existing.State == state
+                        ? state
+                        : InitializationState.MaybeInitialized,
+                };
+            }
+            else
+            {
+                pointUses.Add(variable.Id, new AggregatedUse(
+                    variable.Name,
+                    span,
+                    state));
+            }
+        }
+    }
+
+    private readonly record struct AggregatedUse(
+        string VariableName,
+        TextSpan Span,
+        InitializationState State);
 
     private static IReadOnlyDictionary<SymbolId, VariableSymbol> CollectAllVariables(ControlFlowGraph cfg)
     {
@@ -175,7 +250,7 @@ public sealed class UninitializedVariablesAnalysis
                 variables.TryAdd(parameter.Id, parameter);
         }
 
-        foreach (var block in cfg.Blocks)
+        foreach (var block in cfg.ReachableBlocks)
         {
             foreach (var stmt in block.Statements)
             {
@@ -190,9 +265,22 @@ public sealed class UninitializedVariablesAnalysis
                 }
             }
 
-            if (block.BranchCondition != null)
+            foreach (var operation in block.SyntheticOperations)
             {
-                foreach (var used in BoundNodeHelpers.GetUsedVariables(block.BranchCondition))
+                var defined = BoundNodeHelpers.GetDefinedVariable(operation);
+                if (defined != null && !defined.Id.IsNone)
+                    variables.TryAdd(defined.Id, defined);
+
+                foreach (var used in BoundNodeHelpers.GetUsedVariables(operation))
+                {
+                    if (!used.Id.IsNone)
+                        variables.TryAdd(used.Id, used);
+                }
+            }
+
+            if (block.Terminator.Condition != null)
+            {
+                foreach (var used in BoundNodeHelpers.GetUsedVariables(block.Terminator.Condition))
                 {
                     if (!used.Id.IsNone)
                         variables.TryAdd(used.Id, used);
@@ -322,20 +410,17 @@ public readonly struct InitializationFacts : IEquatable<InitializationFacts>
 internal sealed class InitializationLattice : IDataflowLattice<InitializationFacts>
 {
     private readonly HashSet<SymbolId> _allVariables;
-    private readonly HashSet<SymbolId> _parameters;
 
-    public InitializationLattice(HashSet<SymbolId> allVariables, HashSet<SymbolId> parameters)
+    public InitializationLattice(HashSet<SymbolId> allVariables)
     {
         _allVariables = allVariables;
-        _parameters = parameters;
     }
 
     // Empty is an explicit join identity; InitializationFacts.Join handles it
     // without interpreting missing entries as uninitialized program variables.
     public InitializationFacts Bottom => InitializationFacts.Empty;
 
-    // Top: all variables are initialized (includes parameters)
-    public InitializationFacts Top => InitializationFacts.Create(_allVariables, _parameters);
+    public InitializationFacts Top => InitializationFacts.Create(_allVariables, _allVariables);
 
     public InitializationFacts Join(InitializationFacts a, InitializationFacts b)
         => a.Join(b, _allVariables);
@@ -347,9 +432,7 @@ internal sealed class InitializationLattice : IDataflowLattice<InitializationFac
             var aState = a.GetState(v);
             var bState = b.GetState(v);
 
-            // a <= b if for all variables, a's state is "less certain" than b's
-            // Uninitialized < MaybeInitialized < Initialized
-            if ((int)aState > (int)bState)
+            if (aState != bState && bState != InitializationState.MaybeInitialized)
                 return false;
         }
         return true;
@@ -358,15 +441,29 @@ internal sealed class InitializationLattice : IDataflowLattice<InitializationFac
 
 internal sealed class UninitializedVariablesTransfer : ITransferFunction<InitializationFacts>
 {
+    public InitializationFacts Transfer(
+        BasicBlock block,
+        int statementIndex,
+        BoundStatement statement,
+        InitializationFacts input) =>
+        block.IsDefinitionDeferred(statementIndex)
+            ? input
+            : Transfer(statement, input);
+
     public InitializationFacts Transfer(BoundStatement statement, InitializationFacts input)
     {
         var defined = BoundNodeHelpers.GetDefinedVariable(statement);
         if (defined == null)
             return input;
 
-        // Check if the variable has an initializer
-        var hasInitializer = statement is BoundBindStatement bind && bind.Initializer != null;
-        if (hasInitializer)
+        var initializes = statement switch
+        {
+            BoundBindStatement bind => bind.Initializer != null,
+            BoundAssignmentStatement => true,
+            BoundCompoundAssignment => true,
+            _ => false,
+        };
+        if (initializes && !defined.Id.IsNone)
         {
             return input.SetInitialized(defined.Id);
         }
@@ -377,5 +474,15 @@ internal sealed class UninitializedVariablesTransfer : ITransferFunction<Initial
     public InitializationFacts TransferExpression(BoundExpression? expression, InitializationFacts input)
     {
         return input;
+    }
+
+    public InitializationFacts TransferSynthetic(
+        SyntheticOperation operation,
+        InitializationFacts input)
+    {
+        var defined = BoundNodeHelpers.GetDefinedVariable(operation);
+        return defined != null && !defined.Id.IsNone
+            ? input.SetInitialized(defined.Id)
+            : input;
     }
 }

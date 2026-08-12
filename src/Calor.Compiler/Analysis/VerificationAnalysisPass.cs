@@ -603,10 +603,11 @@ public sealed class VerificationAnalysisPass
         }
         catch (Exception ex)
         {
-            ReportAnalysisIncomplete(
+            _diagnostics.ReportError(
                 function.Span,
-                $"Dataflow analysis of '{function.Symbol.DisplaySignature}' did not complete: " +
-                ex.GetType().Name);
+                DiagnosticCode.AnalysisICE,
+                $"Internal dataflow analysis failure for " +
+                $"'{function.Symbol.DisplaySignature}': {ex.GetType().Name}: {ex.Message}");
         }
 
         return issueCount;

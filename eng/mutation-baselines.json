@@ -44,7 +44,7 @@
       "file": "src/Calor.Compiler/Analysis/Dataflow/Analyses/LiveVariables.cs",
       "before": "return result;",
       "after": "return ImmutableHashSet<SymbolId>.Empty;",
-      "occurrence": 2,
+      "occurrence": 3,
       "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "filter": "FullyQualifiedName~DataflowAnalysisTests.LiveVariables_VariableUsedInCondition_IsLive"
     },
