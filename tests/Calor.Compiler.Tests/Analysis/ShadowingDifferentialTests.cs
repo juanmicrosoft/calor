@@ -18,7 +18,10 @@ public class ShadowingDifferentialTests
 {
     private static (bool accepted, IReadOnlyList<string> roslynErrors) Compile(string source)
     {
-        var result = Program.Compile(source, "diff.calr");
+        var result = Program.Compile(
+            source,
+            "diff.calr",
+            new CompilationOptions { DeferGeneratedOutputValidation = true });
         if (result.Diagnostics.HasErrors)
         {
             return (false, Array.Empty<string>());

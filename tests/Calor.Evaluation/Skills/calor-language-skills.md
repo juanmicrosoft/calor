@@ -765,16 +765,13 @@ These examples demonstrate real-world patterns that combine multiple Calor featu
       §B{query} (concat "SELECT COUNT(*) FROM " table)
       §R §C{Execute} §A _connStr §A query §/C
 
+    §MT{mt02:Execute:pri} (str:connStr, str:query) -> i32
+      §R 0
+
     §CSHARP{
       public System.Data.DataTable RunQuery(string sql)
       {
-          using var conn = new System.Data.SqlClient.SqlConnection(_connStr);
-          conn.Open();
-          using var cmd = new System.Data.SqlClient.SqlCommand(sql, conn);
-          var adapter = new System.Data.SqlClient.SqlDataAdapter(cmd);
-          var table = new System.Data.DataTable();
-          adapter.Fill(table);
-          return table;
+          return new System.Data.DataTable(sql);
       }
     }§/CSHARP
 ```
@@ -883,7 +880,7 @@ Async functions and methods use `§AF` and `§AMT` tags:
 
 ```calor
 §M{m001:AsyncDemo}
-  §AF{f001:FetchDataAsync:pub} (str:url) -> str
+  §AF{f001:FetchDataAsync:pub} (HttpClient:client, str:url) -> str
     §B{result} §AWAIT §C{client.GetStringAsync} §A url §/C
     §R result
 ```

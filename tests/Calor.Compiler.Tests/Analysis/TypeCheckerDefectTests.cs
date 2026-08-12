@@ -18,7 +18,11 @@ namespace Calor.Compiler.Tests.Analysis;
 public class TypeCheckerDefectTests
 {
     private static CompilationResult Check(string source)
-        => Program.Compile(source, "t.calr", new CompilationOptions { EnableTypeChecking = true });
+        => Program.Compile(source, "t.calr", new CompilationOptions
+        {
+            EnableTypeChecking = true,
+            DeferGeneratedOutputValidation = true,
+        });
 
     private static void AssertNoErrors(string source)
     {

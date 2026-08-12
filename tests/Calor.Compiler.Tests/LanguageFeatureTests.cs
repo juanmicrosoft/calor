@@ -31,7 +31,11 @@ public class LanguageFeatureTests
 
     private static string CompileToCode(string source)
     {
-        var result = Program.Compile(source, null, new CompilationOptions { EnforceEffects = false });
+        var result = Program.Compile(source, null, new CompilationOptions
+        {
+            EnforceEffects = false,
+            UnsafeTranspileOnly = true,
+        });
         Assert.False(result.HasErrors, $"Compilation errors: {string.Join("; ", result.Diagnostics)}");
         return result.GeneratedCode ?? "";
     }

@@ -111,8 +111,11 @@ public sealed class CalorFormatter
                 "Semantic token sequence changed during formatting.");
         }
 
-        var originalCompilation = Program.Compile(original, filePath);
-        var formattedCompilation = Program.Compile(formatted, filePath);
+        // Classify generated-C# failures separately below instead of folding them
+        // into the semantic-error fallback.
+        var structuralOptions = new CompilationOptions { UnsafeTranspileOnly = true };
+        var originalCompilation = Program.Compile(original, filePath, structuralOptions);
+        var formattedCompilation = Program.Compile(formatted, filePath, structuralOptions);
         if (originalCompilation.HasErrors != formattedCompilation.HasErrors)
         {
             return SourceValidationResult.Failed(

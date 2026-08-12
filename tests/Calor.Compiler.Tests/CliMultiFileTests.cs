@@ -244,7 +244,12 @@ public class CliMultiFileTests : IDisposable
         // pass now fails closed (Calor0411 + Calor0410) instead of assuming
         // purity. This test pins EMISSION shape, so it compiles under the
         // --permissive-effects waiver; csc's CS0103 remains the honest failure.
-        RunCli("--input", aPath, "--input", bPath, "--input", cPath, "--permissive-effects");
+        RunCli(
+            "--input", aPath,
+            "--input", bPath,
+            "--input", cPath,
+            "--permissive-effects",
+            "--transpile-only");
 
         var emitted = File.ReadAllText(Path.Combine(_tempDir, "c.g.cs"));
         Assert.Contains("Emit();", emitted);

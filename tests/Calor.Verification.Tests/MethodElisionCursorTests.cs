@@ -36,7 +36,9 @@ public class MethodElisionCursorTests
 
         var result = Program.Compile(source, "test.calr", NoCache());
 
-        Assert.False(result.HasErrors);
+        Assert.False(
+            result.HasErrors,
+            string.Join("; ", result.Diagnostics.Errors.Select(error => error.Message)));
         Assert.Contains("// PROVEN: Postcondition", result.GeneratedCode);
         Assert.DoesNotContain("\"unknown\"", result.GeneratedCode);
     }
@@ -91,9 +93,11 @@ public class MethodElisionCursorTests
       §S (>= result 100)
       §R INT:0";
 
-        var result = Program.Compile(source, "test.calr", NoCache());
+        var result = Program.Compile(source, "test.calr", NoCache(unsafeTranspileOnly: true));
 
-        Assert.False(result.HasErrors);
+        Assert.False(
+            result.HasErrors,
+            string.Join("; ", result.Diagnostics.Errors.Select(error => error.Message)));
         Assert.Contains("__result__ >= 100)) throw", result.GeneratedCode);
         Assert.DoesNotContain(
             "// PROVEN: Postcondition statically verified: __result__ >= 100",
@@ -223,10 +227,11 @@ public class MethodElisionCursorTests
             d => d.Code == DiagnosticCode.PostconditionProven && d.Message.Contains("kept"));
     }
 
-    private static CompilationOptions NoCache() => new()
+    private static CompilationOptions NoCache(bool unsafeTranspileOnly = false) => new()
     {
         VerifyContracts = true,
         ElideProvenGuards = true,
+        UnsafeTranspileOnly = unsafeTranspileOnly,
         VerificationCacheOptions = new VerificationCacheOptions { Enabled = false }
     };
 }

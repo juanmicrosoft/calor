@@ -44,7 +44,8 @@ public class ConstructorOverloadingTests
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
-            EnforceEffects = false
+            EnforceEffects = false,
+            UnsafeTranspileOnly = true,
         });
 
         Assert.False(result.HasErrors, FormatDiagnostics(result));
@@ -85,7 +86,8 @@ public class ConstructorOverloadingTests
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
-            EnforceEffects = false
+            EnforceEffects = false,
+            UnsafeTranspileOnly = true,
         });
 
         Assert.False(result.HasErrors, FormatDiagnostics(result));
@@ -160,7 +162,8 @@ public class ConstructorOverloadingTests
 
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
-            EnforceEffects = false
+            EnforceEffects = false,
+            UnsafeTranspileOnly = true,
         });
 
         Assert.False(result.HasErrors, FormatDiagnostics(result));
@@ -192,7 +195,8 @@ public class ConstructorOverloadingTests
         var result = Program.Compile(source, "test.calr", new CompilationOptions
         {
             EnforceEffects = false,
-            ContractMode = ContractMode.Debug
+            ContractMode = ContractMode.Debug,
+            UnsafeTranspileOnly = true,
         });
 
         Assert.False(result.HasErrors, FormatDiagnostics(result));

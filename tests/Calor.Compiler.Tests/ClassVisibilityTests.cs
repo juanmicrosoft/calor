@@ -205,7 +205,10 @@ public class ClassVisibilityTests
                 §CL{c1:Foo:int:static}
             """;
 
-        var compilationResult = Program.Compile(calorSource);
+        var compilationResult = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { UnsafeTranspileOnly = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 
@@ -223,7 +226,10 @@ public class ClassVisibilityTests
                 §CL{c1:Inner:pri}
             """;
 
-        var compilationResult = Program.Compile(calorSource);
+        var compilationResult = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { UnsafeTranspileOnly = true });
         Assert.False(compilationResult.HasErrors,
             string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message)));
 

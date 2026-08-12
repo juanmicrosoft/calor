@@ -1,10 +1,13 @@
 using Xunit;
+using Calor.Compiler.Diagnostics;
 
 namespace Calor.Compiler.Tests;
 
 /// <summary>
 /// PP-A1 item 9 regression pins: the type checker defaults ON as of v0.12, with
-/// <c>--no-type-check</c> and <c>CALOR_NO_TYPE_CHECK=1</c> as the explicit opt-outs.
+/// <c>--no-type-check</c> and <c>CALOR_NO_TYPE_CHECK=1</c> as type-checker opt-outs.
+/// Generated C# validation remains mandatory unless the explicitly unsafe
+/// <c>--transpile-only</c> mode is selected.
 ///
 /// These run the real CLI on purpose. The release review of v0.12 caught a pin that set
 /// <c>CompilationOptions.EnableTypeChecking = false</c> directly and therefore passed with the
@@ -58,15 +61,16 @@ public class CliTypeCheckDefaultTests : IDisposable
     }
 
     [Fact]
-    public void Cli_NoTypeCheckFlag_OptsOut()
+    public void Cli_NoTypeCheckFlag_StillValidatesGeneratedCSharp()
     {
         var path = WriteTypeViolation();
 
         var (exitCode, stdOut, stdErr) = CliTestHarness.RunCli(
             _tempDir, "--input", path, "--no-type-check");
 
-        Assert.Equal(0, exitCode);
+        Assert.NotEqual(0, exitCode);
         Assert.DoesNotContain("Calor0202", stdOut + stdErr);
+        Assert.Contains(DiagnosticCode.CodeGenCompilationError, stdOut + stdErr);
     }
 
     /// <summary>
@@ -89,10 +93,12 @@ public class CliTypeCheckDefaultTests : IDisposable
             new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "1" },
             "run", path);
         Assert.DoesNotContain("Calor0202", off.StdOut + off.StdErr);
+        Assert.NotEqual(0, off.ExitCode);
+        Assert.Contains(DiagnosticCode.CodeGenCompilationError, off.StdOut + off.StdErr);
     }
 
     [Fact]
-    public void EnvVar_OptsOut_OnBuildToo()
+    public void EnvVar_OptsOutOfTypeChecker_ButNotGeneratedValidation()
     {
         var path = WriteTypeViolation();
 
@@ -101,8 +107,25 @@ public class CliTypeCheckDefaultTests : IDisposable
             new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "1" },
             "--input", path);
 
-        Assert.Equal(0, exitCode);
+        Assert.NotEqual(0, exitCode);
         Assert.DoesNotContain("Calor0202", stdOut + stdErr);
+        Assert.Contains(DiagnosticCode.CodeGenCompilationError, stdOut + stdErr);
+    }
+
+    [Fact]
+    public void TranspileOnly_IsExplicitlyUnsafeAndDoesNotCache()
+    {
+        var path = WriteTypeViolation();
+
+        var (exitCode, stdOut, stdErr) = CliTestHarness.RunCli(
+            _tempDir, "--input", path, "--transpile-only", "--cache");
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Unsafe transpilation output written", stdOut + stdErr);
+        Assert.DoesNotContain("Compilation successful", stdOut + stdErr);
+        Assert.Contains("Roslyn-validated", stdErr);
+        Assert.True(File.Exists(Path.ChangeExtension(path, ".g.cs")));
+        Assert.False(File.Exists(Path.Combine(_tempDir, ".calor-build-state.json")));
     }
 
     /// <summary>

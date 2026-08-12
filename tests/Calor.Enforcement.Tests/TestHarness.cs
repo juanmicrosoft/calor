@@ -23,6 +23,7 @@ public static class TestHarness
     public static Calor.Compiler.CompilationResult Compile(string source, CompilationOptions? options = null)
     {
         options ??= new CompilationOptions();  // EnforceEffects = true by default
+        options.UnsafeTranspileOnly = true;
         return Calor.Compiler.Program.Compile(source, "test.calr", options);
     }
 
@@ -37,6 +38,7 @@ public static class TestHarness
         var options = new CompilationOptions
         {
             EnforceEffects = enforceEffects,
+            UnsafeTranspileOnly = true,
             UnknownCallPolicy = policy
         };
         return Calor.Compiler.Program.Compile(source, "test.calr", options);

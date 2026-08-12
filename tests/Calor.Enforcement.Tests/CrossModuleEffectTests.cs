@@ -29,7 +29,8 @@ public class CrossModuleEffectTests
         {
             var result = Program.Compile(source, path, new CompilationOptions
             {
-                EnforceEffects = false
+                EnforceEffects = false,
+                UnsafeTranspileOnly = true
             });
             Assert.NotNull(result.Ast);
             Assert.False(result.HasErrors,
@@ -335,6 +336,7 @@ public class CrossModuleEffectTests
             var result = Program.Compile(source, path, new CompilationOptions
             {
                 EnforceEffects = true,
+                UnsafeTranspileOnly = true,
                 UnknownCallPolicy = UnknownCallPolicy.Permissive
             });
             Assert.NotNull(result.Ast);
@@ -411,7 +413,11 @@ public class CrossModuleEffectTests
         var modules = new List<(ModuleNode, string)>();
         foreach (var (path, source) in new[] { ("a.calr", good), ("b.calr", caller) })
         {
-            var result = Program.Compile(source, path, new CompilationOptions { EnforceEffects = false });
+            var result = Program.Compile(source, path, new CompilationOptions
+            {
+                EnforceEffects = false,
+                UnsafeTranspileOnly = true
+            });
             if (!result.HasErrors && result.Ast != null)
             {
                 modules.Add((result.Ast, path));
@@ -555,7 +561,11 @@ public class CrossModuleEffectTests
         var modules = new List<(ModuleNode, string)>();
         foreach (var (path, source) in new[] { ("a.calr", a), ("b.calr", b) })
         {
-            var result = Program.Compile(source, path, new CompilationOptions { EnforceEffects = false });
+            var result = Program.Compile(source, path, new CompilationOptions
+            {
+                EnforceEffects = false,
+                UnsafeTranspileOnly = true
+            });
             modules.Add((result.Ast!, path));
         }
         var crossDiags = RunCrossModulePass(modules);

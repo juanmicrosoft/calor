@@ -5,10 +5,38 @@ using Xunit.Abstractions;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// Bulk compilation test that verifies all 202 benchmark .calr files parse and compile without errors.
+/// Bulk compilation test that validates every benchmark through the production
+/// generated-C# gate. Known emitter defects remain explicit until their owning
+/// issues remove them; they may not silently report success.
 /// </summary>
 public class BulkBenchmarkCompilationTests
 {
+    private static readonly HashSet<string> KnownGeneratedCSharpFailures =
+    [
+        "TokenEconomics/TemperatureConverter.calr",
+        "TokenEconomics/Power.calr",
+        "DesignPatterns/Factory.calr",
+        "TokenEconomics/Average.calr",
+        "TokenEconomics/CelsiusToKelvin.calr",
+        "TokenEconomics/AreaOfCircle.calr",
+        "TokenEconomics/CompoundInterest.calr",
+        "DataStructures/HashMap.calr",
+        "TokenEconomics/TemperatureRange.calr",
+        "DesignPatterns/Adapter.calr",
+        "DomainProblems/VotingSystem.calr",
+        "DomainProblems/UnitConverter.calr",
+        "DomainProblems/ScoreBoard.calr",
+        "DomainProblems/TaxCalculator.calr",
+        "DomainProblems/CurrencyConverter.calr",
+        "DesignPatterns/Visitor.calr",
+        "DesignPatterns/TemplateMethod.calr",
+        "EffectSoundness/NetworkEffect.calr",
+        "InteropEffectCoverage/PureFunctions.calr",
+        "OOPGenerics/InterfaceImpl.calr",
+        "OOPGenerics/Composition.calr",
+        "OOPGenerics/Polymorphism.calr",
+    ];
+
     private readonly ITestOutputHelper _output;
 
     public BulkBenchmarkCompilationTests(ITestOutputHelper output) => _output = output;
@@ -43,7 +71,7 @@ public class BulkBenchmarkCompilationTests
 
     [Theory]
     [MemberData(nameof(AllBenchmarks))]
-    public void BenchmarkFile_Compiles(string id, string name, string category, string calorFile)
+    public void BenchmarkFile_HasExpectedValidatedOutcome(string id, string name, string category, string calorFile)
     {
         var benchmarksDir = GetBenchmarksDir();
         var fullPath = Path.Combine(benchmarksDir, calorFile);
@@ -60,6 +88,18 @@ public class BulkBenchmarkCompilationTests
         };
 
         var result = Program.Compile(source, fullPath, options);
+
+        if (KnownGeneratedCSharpFailures.Contains(calorFile))
+        {
+            Assert.True(result.HasErrors, $"Known invalid fixture unexpectedly validated: {calorFile}");
+            Assert.All(
+                result.Diagnostics.Where(d => d.IsError),
+                diagnostic => Assert.Equal(
+                    Calor.Compiler.Diagnostics.DiagnosticCode.CodeGenCompilationError,
+                    diagnostic.Code));
+            _output.WriteLine($"KNOWN INVALID [{id}] {category}/{name}");
+            return;
+        }
 
         if (result.HasErrors)
         {

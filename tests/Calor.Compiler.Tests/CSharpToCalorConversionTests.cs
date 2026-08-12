@@ -1468,7 +1468,11 @@ public class CSharpToCalorConversionTests
         // converted code carries no §E declarations — compile converted output
         // with enforcement off per this file's converted-code precedent.
         var compilationResult = Program.Compile(conversionResult.CalorSource!, null,
-            new CompilationOptions { EnforceEffects = false });
+            new CompilationOptions
+            {
+                EnforceEffects = false,
+                UnsafeTranspileOnly = true,
+            });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
 
@@ -1503,7 +1507,11 @@ public class CSharpToCalorConversionTests
         // converted code carries no §E declarations — compile converted output
         // with enforcement off per this file's converted-code precedent.
         var compilationResult = Program.Compile(conversionResult.CalorSource!, null,
-            new CompilationOptions { EnforceEffects = false });
+            new CompilationOptions
+            {
+                EnforceEffects = false,
+                UnsafeTranspileOnly = true,
+            });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
 
@@ -1539,7 +1547,11 @@ public class CSharpToCalorConversionTests
         // converted code carries no §E declarations — compile converted output
         // with enforcement off per this file's converted-code precedent.
         var compilationResult = Program.Compile(conversionResult.CalorSource!, null,
-            new CompilationOptions { EnforceEffects = false });
+            new CompilationOptions
+            {
+                EnforceEffects = false,
+                UnsafeTranspileOnly = true,
+            });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
 
@@ -1688,7 +1700,10 @@ public class CSharpToCalorConversionTests
         var conversionResult = _converter.Convert(csharpSource);
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
 
-        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        var compilationResult = Program.Compile(
+            conversionResult.CalorSource!,
+            null,
+            new CompilationOptions { UnsafeTranspileOnly = true });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\nCalor: {conversionResult.CalorSource}\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
         Assert.Contains("new int[]", compilationResult.GeneratedCode);
@@ -2018,7 +2033,11 @@ public class CSharpToCalorConversionTests
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
 
         var compilationResult = Program.Compile(conversionResult.CalorSource!, null,
-            new CompilationOptions { EnforceEffects = false });
+            new CompilationOptions
+            {
+                EnforceEffects = false,
+                UnsafeTranspileOnly = true,
+            });
         Assert.False(compilationResult.HasErrors,
             $"Roundtrip failed:\nCalor: {conversionResult.CalorSource}\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
     }
@@ -2393,7 +2412,10 @@ public class CSharpToCalorConversionTests
         Assert.DoesNotContain("→", conversionResult.CalorSource);
 
         // Calor -> C#
-        var compilationResult = Program.Compile(conversionResult.CalorSource!);
+        var compilationResult = Program.Compile(
+            conversionResult.CalorSource!,
+            null,
+            new CompilationOptions { UnsafeTranspileOnly = true });
         Assert.False(compilationResult.HasErrors,
             $"Lambda roundtrip failed:\nCalor:\n{conversionResult.CalorSource}\nErrors:\n{string.Join("\n", compilationResult.Diagnostics.Select(d => d.Message))}");
     }

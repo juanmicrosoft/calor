@@ -71,6 +71,7 @@ public sealed class ReviewPacketBuilder
         var hasCompileErrors = false;
         var anyRefinements = false;
         var compiledModules = new List<(InputFile File, ModuleNode Module)>();
+        var generatedSources = new List<CodeGen.GeneratedCSharpSource>();
 
         // Multi-file invocations mirror the CLI driver's cross-module map
         // (G3/#809): without it, a cross-file internal call is an unknown
@@ -84,6 +85,7 @@ public sealed class ReviewPacketBuilder
             var compileOptions = new CompilationOptions
             {
                 VerifyContracts = true,
+                DeferGeneratedOutputValidation = true,
                 VerificationTimeoutMs = options.VerificationTimeoutMs,
                 EnforceEffects = true,
                 UnknownCallPolicy = options.PermissiveEffects
@@ -109,9 +111,24 @@ public sealed class ReviewPacketBuilder
             var module = result.Ast;
             anyRefinements |= module.RefinementTypes.Count > 0;
             compiledModules.Add((file, module));
+            generatedSources.Add(new CodeGen.GeneratedCSharpSource(
+                result.GeneratedCode, file.Path));
 
             CollectContracts(packet, file, module, compileOptions.VerificationResults);
             CollectModuleDisclosure(packet, file, module, options);
+        }
+
+        if (!hasCompileErrors && generatedSources.Count > 0)
+        {
+            var validation = CodeGen.GeneratedCSharpCompiler.Validate(generatedSources);
+            if (!validation.CompilationSuccess)
+            {
+                var diagnostics = new DiagnosticBag();
+                Program.AddGeneratedOutputDiagnostics(
+                    validation, diagnostics, generatedSources[0].Path);
+                compileDiagnostics.AddRange(diagnostics);
+                hasCompileErrors = true;
+            }
         }
 
         // Caller impact runs over the UNION of all files in the invocation —

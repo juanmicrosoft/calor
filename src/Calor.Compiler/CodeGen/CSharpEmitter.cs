@@ -845,6 +845,21 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     /// </summary>
     private string QualifyCrossModuleTarget(string target)
     {
+        if (CrossModuleFunctionModules != null && target.Contains('.'))
+        {
+            var separator = target.LastIndexOf('.');
+            var module = target[..separator];
+            var function = target[(separator + 1)..];
+            if (CrossModuleFunctionModules.TryGetValue(function, out var explicitModule) &&
+                explicitModule == module &&
+                explicitModule != _currentModuleName)
+            {
+                var explicitNamespace = SanitizeNamespace(explicitModule);
+                var explicitClass = SanitizeIdentifier(explicitModule.Split('.').Last()) + "Module";
+                return $"global::{explicitNamespace}.{explicitClass}.{function}";
+            }
+        }
+
         if (CrossModuleFunctionModules == null
             || _suppressCrossModuleQualification
             || target.Length == 0
@@ -1243,7 +1258,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(ReferenceNode node)
     {
         // Handle C# keywords that are used as literals (not identifiers)
-        if (node.Name is "null" or "true" or "false")
+        if (node.Name is "null" or "true" or "false" or "default")
         {
             return node.Name;
         }
@@ -5885,6 +5900,9 @@ public sealed class GeneratedCSharpValidation
     }
 }
 
+/// <summary>A generated C# source and the path Roslyn should associate with it.</summary>
+public sealed record GeneratedCSharpSource(string Text, string Path);
+
 /// <summary>
 /// Shared Roslyn compilation helper for validating generated C# (#771/#761).
 ///
@@ -5953,12 +5971,24 @@ public static class GeneratedCSharpCompiler
     /// error diagnostics. Warnings are ignored.
     /// </summary>
     public static GeneratedCSharpValidation Validate(params string[] csharpSources)
+        => Validate(
+            csharpSources.Select((source, index) =>
+                new GeneratedCSharpSource(source, $"generated-{index}.g.cs")));
+
+    /// <summary>
+    /// Parses and compiles generated sources together using the process framework
+    /// references plus project references supplied by the invoking surface.
+    /// </summary>
+    public static GeneratedCSharpValidation Validate(
+        IEnumerable<GeneratedCSharpSource> csharpSources,
+        IEnumerable<string>? projectReferencePaths = null)
     {
         var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
             Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview);
 
         var sourceTrees = csharpSources
-            .Select(s => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(s, parseOptions))
+            .Select(source => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                source.Text, parseOptions, source.Path))
             .ToList();
 
         var syntaxErrors = sourceTrees
@@ -5975,7 +6005,7 @@ public static class GeneratedCSharpCompiler
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
             "GeneratedCSharpValidation",
             trees,
-            References,
+            BuildProjectReferences(projectReferencePaths),
             new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(
                 Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
 
@@ -5984,5 +6014,69 @@ public static class GeneratedCSharpCompiler
             .ToList();
 
         return new GeneratedCSharpValidation(syntaxErrors, compilationErrors);
+    }
+
+    private static IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference> BuildProjectReferences(
+        IEnumerable<string>? projectReferencePaths)
+    {
+        var explicitPaths = (projectReferencePaths ?? [])
+            .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            .Select(Path.GetFullPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (explicitPaths.Count == 0)
+            return References;
+
+        var explicitNames = explicitPaths
+            .Select(TryGetAssemblyName)
+            .Where(name => name != null)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (explicitNames.Contains("System.Runtime"))
+        {
+            var projectReferences = explicitPaths
+                .Select(path => Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path))
+                .ToList();
+            var calorRuntime = typeof(Calor.Runtime.ContractKind).Assembly.Location;
+            if (!string.IsNullOrEmpty(calorRuntime) &&
+                !explicitNames.Contains(
+                    System.Reflection.AssemblyName.GetAssemblyName(calorRuntime).Name))
+            {
+                projectReferences.Add(
+                    Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(calorRuntime));
+            }
+            return projectReferences;
+        }
+
+        var references = References
+            .Where(reference =>
+            {
+                var path = (reference as Microsoft.CodeAnalysis.PortableExecutableReference)?.FilePath;
+                var name = path == null ? null : TryGetAssemblyName(path);
+                return name == null || !explicitNames.Contains(name);
+            })
+            .ToList();
+        references.AddRange(explicitPaths.Select(path =>
+            Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(path)));
+        return references;
+    }
+
+    private static string? TryGetAssemblyName(string path)
+    {
+        try
+        {
+            return System.Reflection.AssemblyName.GetAssemblyName(path).Name;
+        }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+        catch (FileLoadException)
+        {
+            return null;
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
     }
 }

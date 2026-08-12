@@ -29,7 +29,6 @@
           §C{sb.Append} §A "Y" §/C
         §EL
           §C{sb.Append} §A ch §/C
-      §C{Console.WriteLine} §A §NEW{StringBuilder} §/NEW §A §NEW{StringBuilder} §/NEW §/C
+      §C{Console.WriteLine} §A "{0} {1}" §A §NEW{StringBuilder} §/NEW §A §NEW{StringBuilder} §/NEW §/C
       §R §C{sb.ToString} §/C
-
 

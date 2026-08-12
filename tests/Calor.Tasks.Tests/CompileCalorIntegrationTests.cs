@@ -265,6 +265,71 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.Empty(cache2.Files);
     }
 
+    [Fact]
+    public void GeneratedCSharpFailure_FailsBuildAndIsNotCached()
+    {
+        var src = CreateSourceFile(
+            "GeneratedError.calr",
+            """
+            §M{m001:GeneratedError}
+              §F{f001:Main:pub} () -> void
+                §B{x:i32} STR:"not an int"
+            """);
+        var task = CreateTask(src);
+        task.TypeCheck = false;
+
+        Assert.False(task.Execute());
+        var engine = (TestBuildEngine)task.BuildEngine;
+        Assert.Contains(
+            engine.Errors,
+            error => error.Contains("Generated C# failed compilation", StringComparison.Ordinal));
+        Assert.Empty(task.GeneratedFiles);
+        Assert.False(File.Exists(Path.Combine(_outputDir, "GeneratedError.g.cs")));
+        Assert.Null(BuildStateCache.Load(_outputDir));
+    }
+
+    [Fact]
+    public void GeneratedCSharpFailure_RemovesPriorValidOutputWithoutReplacingIt()
+    {
+        var src = CreateSourceFile("GeneratedError.calr", ValidCalorSource);
+        var successfulTask = CreateTask(src);
+        Assert.True(successfulTask.Execute());
+        var outputPath = successfulTask.GeneratedFiles.Single().ItemSpec;
+        Assert.True(File.Exists(outputPath));
+
+        File.WriteAllText(
+            src,
+            """
+            §M{m001:GeneratedError}
+              §F{f001:Main:pub} () -> void
+                §B{x:i32} STR:"not an int"
+            """);
+        var failingTask = CreateTask(src);
+        failingTask.TypeCheck = false;
+
+        Assert.False(failingTask.Execute());
+        Assert.Empty(failingTask.GeneratedFiles);
+        Assert.False(File.Exists(outputPath));
+    }
+
+    [Fact]
+    public void TranspileOnly_EmitsWithoutCreatingCache()
+    {
+        var src = CreateSourceFile(
+            "Unsafe.calr",
+            """
+            §M{m001:Unsafe}
+              §F{f001:Main:pub} () -> void
+                §B{x:i32} STR:"not an int"
+            """);
+        var task = CreateTask(src);
+        task.TranspileOnly = true;
+
+        Assert.True(task.Execute());
+        Assert.Single(task.GeneratedFiles);
+        Assert.Null(BuildStateCache.Load(_outputDir));
+    }
+
     // Test 22c: Exception path — source deleted between cache check and compile
     [Fact]
     public void CompileFailure_Exception_PriorOutputDeleted()

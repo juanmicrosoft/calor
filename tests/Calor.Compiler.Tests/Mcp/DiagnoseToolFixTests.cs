@@ -69,7 +69,7 @@ public class DiagnoseToolFixTests
         var args = JsonDocument.Parse("""
             {
                 "action": "diagnose",
-                "source": "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x)"
+                "source": "§M{m001:Test} §F{f001:Fn} (i32:x) -> str §R (nameof x)"
             }
             """).RootElement;
 

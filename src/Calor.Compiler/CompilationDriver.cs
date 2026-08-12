@@ -1,4 +1,5 @@
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Effects;
 using Calor.Compiler.Incremental;
@@ -25,6 +26,15 @@ namespace Calor.Compiler;
 internal static class CompilationDriver
 {
     internal sealed record FileResult(FileInfo File, CompilationResult Result);
+
+    private sealed record PendingFile(
+        FileInfo File,
+        CompilationResult Result,
+        CompilationOptions Options,
+        string? RelativeKey,
+        BuildStateCache.FileStat StatBeforeRead,
+        byte[] SourceBytes,
+        EffectSummary? EffectSummary);
 
     internal sealed record DriverResult(List<FileResult> Compiled, bool AnyErrors, List<FileInfo> Skipped);
 
@@ -88,7 +98,9 @@ internal static class CompilationDriver
         Action<FileInfo, string, ModuleNode>? onAst = null)
     {
         var compiled = new List<FileResult>();
+        var pending = new List<PendingFile>();
         var skipped = new List<FileInfo>();
+        var skippedGeneratedSources = new List<GeneratedCSharpSource>();
         // Per-module effect summaries feeding cross-module enforcement: fresh
         // summaries for compiled files, cache-restored summaries for skipped ones.
         var moduleSummaries = new List<(EffectSummary Summary, string FilePath)>();
@@ -193,6 +205,9 @@ internal static class CompilationDriver
                     {
                         newState.Files[relativeKey] = cachedEntry;
                         skipped.Add(file);
+                        skippedGeneratedSources.Add(new GeneratedCSharpSource(
+                            File.ReadAllText(outputPath),
+                            file.FullName));
                         moduleSummaries.Add((cachedEntry.EffectSummary, file.FullName));
                         onSkipped?.Invoke(file, outputPath);
                         continue;
@@ -202,6 +217,7 @@ internal static class CompilationDriver
 
             var options = optionsFactory(file);
             options.CrossModuleFunctionModules = crossModuleMap;
+            options.DeferGeneratedOutputValidation = true;
             if (options.Verbose)
             {
                 (options.StatusWriter ?? Console.Out).WriteLine($"Compiling: {file.FullName}");
@@ -236,12 +252,15 @@ internal static class CompilationDriver
             {
                 // Failed files are never cached — the next run recompiles them
                 // and re-reports their diagnostics.
+                Program.TrackCompilationOutcome(
+                    Calor.Compiler.Telemetry.CalorTelemetry.IsInitialized
+                        ? Calor.Compiler.Telemetry.CalorTelemetry.Instance
+                        : null,
+                    result.Diagnostics,
+                    validated: false);
                 anyErrors = true;
                 continue;
             }
-
-            compiled.Add(new FileResult(file, result));
-            onCompiled?.Invoke(file, result);
 
             EffectSummary? summary = null;
             if (result.Ast != null && (crossModuleEnforcement || newState != null))
@@ -250,25 +269,64 @@ internal static class CompilationDriver
                 moduleSummaries.Add((summary, file.FullName));
             }
 
-            // Only diagnostic-clean files are cached: a skipped file emits nothing,
-            // so caching a file with warnings/info would silently drop those
-            // diagnostics from warm builds. (Cross-module diagnostics are exempt —
-            // they are recomputed from summaries every run, so skipped files still
-            // surface them.)
-            if (newState != null && relativeKey != null && cache != null
-                && result.Diagnostics.Count == 0)
+            pending.Add(new PendingFile(
+                file, result, options, relativeKey, statBeforeRead, sourceBytes, summary));
+        }
+
+        var generatedValidationFailed = false;
+        if (pending.Count > 0 && pending.Any(item => !item.Options.UnsafeTranspileOnly))
+        {
+            var generatedSources = pending
+                .Select(item => new GeneratedCSharpSource(
+                    item.Result.GeneratedCode, item.File.FullName))
+                .Concat(skippedGeneratedSources)
+                .ToList();
+            var references = pending
+                .SelectMany(item => item.Options.ReferencedAssemblyPaths ?? [])
+                .Distinct(BuildStateCache.GetPathComparer());
+            var validation = GeneratedCSharpCompiler.Validate(generatedSources, references);
+            if (!validation.CompilationSuccess)
             {
-                var entry = BuildStateCache.CreateFileEntry(statBeforeRead, sourceBytes);
-                entry.EffectSummary = summary;
-                // Record what the output actually contains after onCompiled wrote
-                // it; warm builds only skip when the on-disk output still hashes
-                // to this value. No output observed -> entry never skips.
-                var writtenOutputPath = cache.OutputPathFor(file);
-                entry.OutputContentHash = File.Exists(writtenOutputPath)
-                    ? BuildStateCache.ComputeFileHash(writtenOutputPath)
-                    : null;
-                newState.Files[relativeKey] = entry;
+                generatedValidationFailed = true;
+                anyErrors = true;
+                var validationDiagnostics = new DiagnosticBag();
+                Program.AddGeneratedOutputDiagnostics(
+                    validation, validationDiagnostics, pending[0].File.FullName);
+                foreach (var diagnostic in validationDiagnostics)
+                {
+                    var owner = pending.FirstOrDefault(item =>
+                        BuildStateCache.GetPathComparer().Equals(
+                            Path.GetFullPath(item.File.FullName),
+                            Path.GetFullPath(diagnostic.FilePath ?? item.File.FullName)))
+                        ?? pending[0];
+                    owner.Result.Diagnostics.Add(diagnostic);
+                    if (diagnosticSink != null)
+                    {
+                        diagnosticSink.Add(diagnostic);
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine(diagnostic);
+                    }
+                }
+                if (Calor.Compiler.Telemetry.CalorTelemetry.IsInitialized)
+                {
+                    Program.TrackDiagnostics(
+                        Calor.Compiler.Telemetry.CalorTelemetry.Instance,
+                        validationDiagnostics);
+                }
             }
+        }
+
+        var telemetry = Calor.Compiler.Telemetry.CalorTelemetry.IsInitialized
+            ? Calor.Compiler.Telemetry.CalorTelemetry.Instance
+            : null;
+        foreach (var item in pending)
+        {
+            Program.TrackCompilationOutcome(
+                telemetry,
+                item.Result.Diagnostics,
+                validated: !item.Options.UnsafeTranspileOnly && !generatedValidationFailed);
         }
 
         // Cross-module effect enforcement over successfully compiled modules —
@@ -311,7 +369,33 @@ internal static class CompilationDriver
             }
         }
 
-        if (newState != null && cache != null)
+        if (!generatedValidationFailed)
+        {
+            foreach (var item in pending)
+            {
+                compiled.Add(new FileResult(item.File, item.Result));
+                onCompiled?.Invoke(item.File, item.Result);
+
+                // Only diagnostic-clean files are cached: a skipped file emits nothing,
+                // so caching a file with warnings/info would silently drop those
+                // diagnostics from warm builds.
+                if (newState != null && item.RelativeKey != null && cache != null
+                    && !item.Options.UnsafeTranspileOnly
+                    && item.Result.Diagnostics.Count == 0)
+                {
+                    var entry = BuildStateCache.CreateFileEntry(
+                        item.StatBeforeRead, item.SourceBytes);
+                    entry.EffectSummary = item.EffectSummary;
+                    var writtenOutputPath = cache.OutputPathFor(item.File);
+                    entry.OutputContentHash = File.Exists(writtenOutputPath)
+                        ? BuildStateCache.ComputeFileHash(writtenOutputPath)
+                        : null;
+                    newState.Files[item.RelativeKey] = entry;
+                }
+            }
+        }
+
+        if (newState != null && cache != null && !generatedValidationFailed)
         {
             BuildStateCache.Save(newState, cache.StateDirectory);
         }

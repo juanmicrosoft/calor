@@ -56,6 +56,17 @@ public class StructuredOutputTests : IDisposable
         return file;
     }
 
+    private string WriteGeneratedTypeError()
+    {
+        var file = Path.Combine(_tempDir, "generated-error.calr");
+        File.WriteAllText(file, """
+            §M{m001:GeneratedError}
+              §F{f001:Main:pub} () -> void
+                §B{x:i32} STR:"not an int"
+            """);
+        return file;
+    }
+
     // ------------------------------------------------------------------
     // calor --input <file> --format json
     // ------------------------------------------------------------------
@@ -126,6 +137,30 @@ public class StructuredOutputTests : IDisposable
 
         Assert.Contains("Lexer produced", stdErr);
         Assert.Contains("Code generation completed", stdErr);
+    }
+
+    [Fact]
+    public void Compile_FormatJson_MapsGeneratedCSharpErrorToCalorSource()
+    {
+        var file = WriteGeneratedTypeError();
+
+        var (exitCode, stdOut, _) = RunCli(
+            "--input", file, "--no-type-check", "--format", "json");
+
+        Assert.Equal(1, exitCode);
+        using var doc = JsonDocument.Parse(stdOut);
+        var diagnostic = Assert.Single(
+            doc.RootElement.GetProperty("diagnostics")
+                .EnumerateArray()
+                .Where(item =>
+                    item.GetProperty("code").GetString() ==
+                    DiagnosticCode.CodeGenCompilationError));
+        Assert.EndsWith(
+            "generated-error.calr",
+            diagnostic.GetProperty("location").GetProperty("file").GetString());
+        Assert.True(
+            diagnostic.GetProperty("location").GetProperty("line").GetInt32() >= 1);
+        Assert.Contains("CS0029", diagnostic.GetProperty("message").GetString());
     }
 
     [Fact]
@@ -203,6 +238,24 @@ public class StructuredOutputTests : IDisposable
         var rules = driver.GetProperty("rules");
         Assert.True(rules.GetArrayLength() >= 1);
         Assert.StartsWith("Calor", rules[0].GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public void Compile_FormatSarif_ReportsGeneratedCSharpError()
+    {
+        var file = WriteGeneratedTypeError();
+
+        var (exitCode, stdOut, _) = RunCli(
+            "--input", file, "--no-type-check", "--format", "sarif");
+
+        Assert.Equal(1, exitCode);
+        using var doc = JsonDocument.Parse(stdOut);
+        var results = doc.RootElement.GetProperty("runs")[0].GetProperty("results");
+        Assert.Contains(
+            results.EnumerateArray(),
+            result =>
+                result.GetProperty("ruleId").GetString() ==
+                DiagnosticCode.CodeGenCompilationError);
     }
 
     // ------------------------------------------------------------------

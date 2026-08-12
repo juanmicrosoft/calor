@@ -421,6 +421,7 @@ public class CodeGenBugFixTests
                   §/C
 
           §C{Console.WriteLine}
+            §A ""{0} {1}""
             §A §NEW{StringBuilder}
             §A §NEW{StringBuilder}
           §/C
@@ -454,7 +455,7 @@ public class CodeGenBugFixTests
 
         // Bug 6: §C{...} §A §NEW{StringBuilder} §A §NEW{StringBuilder} §/C
         // Both NEWs should be separate args, not nested
-        Assert.Contains("new StringBuilder(), new StringBuilder()", result);
+        Assert.Contains("\"{0} {1}\", new StringBuilder(), new StringBuilder()", result);
 
         // Bug 7: (char-lit "Y") → 'Y'
         Assert.Contains("'Y'", result);

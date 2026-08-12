@@ -1,6 +1,6 @@
 {
   "trackedFileCount": 876,
-  "successfulTransformationCount": 641,
+  "successfulTransformationCount": 643,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -211,7 +211,6 @@
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m33.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m34.calr",
       "bench/phase0-agent-native/latency/fixture-10k/src/l3m35.calr",
-      "src/Calor.Compiler/Resources/SelfTest/09_codegen_bugfixes.calr",
       "tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/09-03.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/11-03.approved.calr",
@@ -219,7 +218,6 @@
       "tests/Calor.Conversion.Tests/Snapshots/13-02.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/13-05.approved.calr",
       "tests/Calor.Conversion.Tests/Snapshots/13-10.approved.calr",
-      "tests/E2E/scenarios/09_codegen_bugfixes/input.calr",
       "tests/TestData/Benchmarks/DataStructures/HashMap.calr",
       "tests/TestData/Benchmarks/DesignPatterns/Adapter.calr",
       "tests/TestData/Benchmarks/DesignPatterns/Factory.calr",

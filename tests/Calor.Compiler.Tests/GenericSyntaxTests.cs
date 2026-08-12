@@ -20,7 +20,10 @@ public class GenericSyntaxTests
 
     private static string CompileToCS(string calorSource)
     {
-        var result = Program.Compile(calorSource);
+        var result = Program.Compile(
+            calorSource,
+            null,
+            new CompilationOptions { UnsafeTranspileOnly = true });
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
         return result.GeneratedCode;
     }

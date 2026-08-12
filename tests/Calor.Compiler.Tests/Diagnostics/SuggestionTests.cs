@@ -136,7 +136,10 @@ public class SuggestionTests
     public void Parser_UnknownOperator_WithTypo_ShowsSuggestion()
     {
         var source = "§M{m001:Test} §F{f001:Fn} §O{i32} §R (cotains \"hello\" \"h\")";
-        var result = Program.Compile(source, "test.calr");
+        var result = Program.Compile(
+            source,
+            "test.calr",
+            new CompilationOptions { UnsafeTranspileOnly = true });
 
         Assert.True(result.HasErrors);
         var error = result.Diagnostics.First(d => d.IsError);
@@ -148,7 +151,7 @@ public class SuggestionTests
     [Fact]
     public void Parser_NameofOperator_CompilesSuccessfully()
     {
-        var source = "§M{m001:Test} §F{f001:Fn} §O{str} §R (nameof x)";
+        var source = "§M{m001:Test} §F{f001:Fn} (i32:x) -> str §R (nameof x)";
         var result = Program.Compile(source, "test.calr");
 
         Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
@@ -592,7 +595,10 @@ public class SuggestionTests
     public void Parser_ShortOperators_HandleCorrectly(string op, bool shouldError)
     {
         var source = $"§M{{m001:Test}} §F{{f001:Fn}} §O{{i32}} §R ({op} 5 3)";
-        var result = Program.Compile(source, "test.calr");
+        var result = Program.Compile(
+            source,
+            "test.calr",
+            new CompilationOptions { UnsafeTranspileOnly = true });
 
         Assert.Equal(shouldError, result.HasErrors);
     }

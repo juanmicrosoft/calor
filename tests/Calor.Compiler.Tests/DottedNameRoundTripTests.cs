@@ -120,7 +120,8 @@ public class DottedNameRoundTripTests
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
         {
-            EnforceEffects = false
+            EnforceEffects = false,
+            UnsafeTranspileOnly = true,
         });
 
         Assert.False(result.HasErrors, FormatDiagnostics(result));
@@ -392,7 +393,8 @@ public class DottedNameRoundTripTests
 
         var result = Program.Compile(calor, "test.calr", new CompilationOptions
         {
-            EnforceEffects = false
+            EnforceEffects = false,
+            UnsafeTranspileOnly = true,
         });
 
         Assert.False(result.HasErrors, FormatDiagnostics(result));

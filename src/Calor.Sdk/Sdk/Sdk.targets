@@ -10,6 +10,7 @@
     <CalorEnforceEffects Condition="'$(CalorEnforceEffects)' == ''">true</CalorEnforceEffects>
     <!-- Type checking: default true, matching CompilationOptions.EnableTypeChecking (v0.12) -->
     <CalorTypeCheck Condition="'$(CalorTypeCheck)' == ''">true</CalorTypeCheck>
+    <CalorTranspileOnly Condition="'$(CalorTranspileOnly)' == ''">false</CalorTranspileOnly>
   </PropertyGroup>
 
   <!-- When consumed from the Calor.Sdk package, the bundled Calor.Runtime.dll
@@ -41,7 +42,7 @@
     </PropertyGroup>
   </Target>
 
-  <PropertyGroup Condition="'$(CalorEnableILAnalysis)' == 'true'">
+  <PropertyGroup>
     <_CalorCompileCalorDependsOn>ResolveAssemblyReferences</_CalorCompileCalorDependsOn>
   </PropertyGroup>
 
@@ -73,6 +74,7 @@
         Verbose="$(CalorVerbose)"
         EnforceEffects="$(CalorEnforceEffects)"
         TypeCheck="$(CalorTypeCheck)"
+        TranspileOnly="$(CalorTranspileOnly)"
         Verify="$(CalorVerify)"
         ElideProvenGuards="$(CalorElideProvenGuards)"
         EnableILAnalysis="$(CalorEnableILAnalysis)"

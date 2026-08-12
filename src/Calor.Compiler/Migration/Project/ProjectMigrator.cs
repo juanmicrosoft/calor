@@ -340,6 +340,8 @@ public sealed class ProjectMigrator
                 {
                     EnforceEffects = false,
                     UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                    DeferGeneratedOutputValidation =
+                        _options.Fidelity == ConversionFidelity.Lossless,
                     CancellationToken = cancellationToken
                 });
             if (compileResult.HasErrors)
@@ -382,6 +384,8 @@ public sealed class ProjectMigrator
                     {
                         EnforceEffects = false,
                         UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                        DeferGeneratedOutputValidation =
+                            _options.Fidelity == ConversionFidelity.Lossless,
                         CancellationToken = cancellationToken
                     };
                     var compileResult = Program.Compile(result.CalorSource, entry.OutputPath, compileOptions);
