@@ -41,6 +41,17 @@ require "tasks/net10.0/Microsoft.CodeAnalysis.dll"
 require "tasks/net10.0/Microsoft.CodeAnalysis.CSharp.dll"
 require "tasks/net10.0/Calor.Tasks.deps.json"
 
+# Self-contained topology: task dependencies are bundled, never left for the
+# consumer's NuGet graph to resolve in an isolated MSBuild load context.
+NUSPEC="$(unzip -Z1 "$NUPKG" | grep -E '^Calor\.Sdk(\.[^/]+)?\.nuspec$' | head -1 || true)"
+if [ -z "$NUSPEC" ]; then
+  echo "ERROR: Calor.Sdk package contains no nuspec" >&2
+  MISSING=1
+elif unzip -p "$NUPKG" "$NUSPEC" | grep -q '<dependency '; then
+  echo "ERROR: self-contained Calor.Sdk package must not declare external package dependencies" >&2
+  MISSING=1
+fi
+
 # At least one Z3 native must be present (the packing machine's RID)
 if ! grep -qE '^tasks/net10\.0/runtimes/(linux-(x64|arm64)/native/libz3\.so|osx-(x64|arm64)/native/libz3\.dylib|win-(x64|arm64)/native/libz3\.dll)$' <<<"$LISTING"; then
   echo "ERROR: Calor.Sdk package contains no Z3 native library under tasks/net10.0/runtimes/" >&2

@@ -64,7 +64,22 @@ jobs:
   sdk-consumer:
     # M-A1: a template consumer restores/builds/tests green against the
     # packaged Calor.Sdk from a local feed (wedge plan v0.11 D-W1.2, PP-A1).
-    runs-on: ubuntu-latest
+    name: sdk-consumer (${{ matrix.rid }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            rid: linux-x64
+          - runner: ubuntu-24.04-arm
+            rid: linux-arm64
+          - runner: macos-14
+            rid: osx-arm64
+          - runner: windows-latest
+            rid: win-x64
+          - runner: windows-11-arm
+            rid: win-arm64
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
@@ -78,6 +93,8 @@ jobs:
       - name: Run M-A1 consumer check
         env:
           CALOR_SDK_REQUIRE_ALL_RIDS: "1"
+          CALOR_SDK_VERSION: ${{ github.event.inputs.version }}
+          CALOR_SDK_EXPECTED_RID: ${{ matrix.rid }}
         run: bash .github/scripts/test-sdk-package.sh
 
   publish:

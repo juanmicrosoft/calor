@@ -36,24 +36,11 @@ code** — start there, not with your most delegate-heavy service layer.
 
 ### 1. Install the SDK
 
-The consumer shape (this is the exact shape CI tests against the published
-package — see `tests/SdkConsumer/`):
-
-`global.json`:
-
-```json
-{
-  "msbuild-sdks": {
-    "Calor.Sdk": "<version>"
-  }
-}
-```
-
-Your module project:
+The consumer shape below is the exact shape CI tests against the packed
+artifact (see `tests/SdkConsumer/`):
 
 ```xml
-<Project Sdk="Microsoft.NET.Sdk">
-  <Sdk Name="Calor.Sdk" />
+<Project Sdk="Microsoft.NET.Sdk;Calor.Sdk/<version>">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <CalorVerify>true</CalorVerify>
@@ -63,6 +50,12 @@ Your module project:
 
 `.calr` files in the project compile to C# during build; `CalorVerify=true`
 turns on the Z3 verify gate so contract refutations surface at build time.
+
+`Calor.Sdk` is a self-contained MSBuild SDK: the package bundles
+`Calor.Tasks`, the compiler/runtime managed closure, and Z3 native assets for
+Linux x64/arm64, macOS arm64, and Windows x64/arm64. CI restores from a local
+feed, repeats restore offline, and performs clean Debug/Release, incremental,
+design-time, and runtime consumer checks on every supported RID.
 
 ### 2. Write the first module
 

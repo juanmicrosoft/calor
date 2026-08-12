@@ -583,7 +583,22 @@ jobs:
     # consumer project restores, builds, and tests green against the PACKAGED
     # Calor.Sdk from a local feed — never a source-tree ProjectReference.
     # Includes package-content inspection and the in-task Z3 verify canary.
-    runs-on: ubuntu-latest
+    name: sdk-package-consumer (${{ matrix.rid }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            rid: linux-x64
+          - runner: ubuntu-24.04-arm
+            rid: linux-arm64
+          - runner: macos-14
+            rid: osx-arm64
+          - runner: windows-latest
+            rid: win-x64
+          - runner: windows-11-arm
+            rid: win-arm64
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout code
@@ -599,6 +614,7 @@ jobs:
           # download-z3.sh populates all supported RIDs on CI, so the packed
           # nupkg must carry every one of them.
           CALOR_SDK_REQUIRE_ALL_RIDS: "1"
+          CALOR_SDK_EXPECTED_RID: ${{ matrix.rid }}
         run: bash .github/scripts/test-sdk-package.sh
 
   verify-phase1:
