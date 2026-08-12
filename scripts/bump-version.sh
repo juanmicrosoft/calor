@@ -14,7 +14,6 @@ if [ -z "$1" ]; then
     echo ""
     echo "Current versions:"
     echo "  Directory.Build.props: $(grep -oP '(?<=<Version>)[^<]+' "$ROOT_DIR/Directory.Build.props")"
-    echo "  VS Code extension:     $(grep -oP '(?<="version": ")[^"]+' "$ROOT_DIR/editors/vscode/package.json")"
     exit 1
 fi
 
@@ -34,14 +33,10 @@ sed -i.bak "s|<Version>[^<]*</Version>|<Version>$NEW_VERSION</Version>|" "$ROOT_
 rm -f "$ROOT_DIR/Directory.Build.props.bak"
 
 # Update VS Code extension package.json
-echo "  Updating editors/vscode/package.json..."
-sed -i.bak "s|\"version\": \"[^\"]*\"|\"version\": \"$NEW_VERSION\"|" "$ROOT_DIR/editors/vscode/package.json"
-rm -f "$ROOT_DIR/editors/vscode/package.json.bak"
 
 echo ""
 echo "Version bumped to $NEW_VERSION in:"
 echo "  - Directory.Build.props (affects all .NET projects)"
-echo "  - editors/vscode/package.json"
 echo ""
 echo "Don't forget to:"
 echo "  1. Update CHANGELOG.md"

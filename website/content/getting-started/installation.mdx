@@ -92,32 +92,18 @@ See [`calor init`](/docs/cli/init/) for complete documentation.
 
 ---
 
-## VS Code Extension
+## Editor Support
 
-Install the current extension from a platform-specific VSIX attached to the
-[GitHub release](https://github.com/juanmicrosoft/calor/releases):
+Calor ships a **language server** (`calor lsp`) speaking standard LSP over stdio:
+diagnostics, go-to-definition, references, symbol-exact rename, formatting, and
+semantic tokens. Any LSP-capable editor can use it.
 
-1. Download the `.vsix` for your operating system and architecture.
-2. Open the VS Code Command Palette (Cmd+Shift+P / Ctrl+Shift+P).
-3. Run **Extensions: Install from VSIX...** and select the downloaded file.
-
-This release artifact is the supported distribution path. The Marketplace
-listing deliberately remains at v0.3.8, which has a known activation defect.
-Marketplace updates are opportunistic and occur only if a publishing token is
-minted; Marketplace freshness is not a release obligation.
-
-The extension provides:
-
-- Syntax highlighting for `.calr` files
-- Calor file icon in the explorer
-- Language configuration for comments and brackets
-
-![Calor syntax highlighting in VS Code](/images/calor-vscode.png)
-
-The source is available in [`editors/vscode`](https://github.com/juanmicrosoft/calor/tree/main/editors/vscode)
-for contributors who want to build the extension locally.
-
----
+<Callout type="warning">
+VS Code extension support was withdrawn after v0.13.1. The extension was
+distributed as VSIX assets attached to each release; that channel no longer
+exists, and the Marketplace listing (frozen at v0.3.8) is not maintained. The
+language server is unaffected — point your editor at `calor lsp` directly.
+</Callout>
 
 ## Prerequisites
 
