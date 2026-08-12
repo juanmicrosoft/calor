@@ -101,6 +101,35 @@ public class ConvertToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ValidateMode_WriteFailureReturnsError()
+    {
+        var outputDirectory = Path.Combine(Path.GetTempPath(), $"calor-convert-output-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outputDirectory);
+
+        try
+        {
+            var args = JsonSerializer.SerializeToElement(new
+            {
+                source = "public class Calculator { public int Value() => 42; }",
+                moduleName = "TestModule",
+                mode = "validate",
+                outputPath = outputDirectory
+            });
+
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.True(result.IsError);
+            var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.False(root.GetProperty("success").GetBoolean());
+            Assert.Equal("write", root.GetProperty("stage").GetString());
+        }
+        finally
+        {
+            Directory.Delete(outputDirectory);
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Issues_AreEnvelopeDiagnostics()
     {
         // Envelope schema v1.1 (loop plan D1.3): conversion issues are

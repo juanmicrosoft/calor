@@ -145,16 +145,8 @@ public sealed class PartialClassMerger
         var nestedInterfaces = partials.SelectMany(p => p.NestedInterfaces).ToList();
         var nestedEnums = partials.SelectMany(p => p.NestedEnums).ToList();
 
-        // Merge attributes: union all, deduplicating by name
-        var seenAttrNames = new HashSet<string>();
-        var csharpAttributes = new List<CalorAttributeNode>();
-        foreach (var attr in partials.SelectMany(p => p.CSharpAttributes))
-        {
-            if (seenAttrNames.Add(attr.Name))
-            {
-                csharpAttributes.Add(attr);
-            }
-        }
+        // Attribute multiplicity and arguments are semantically significant.
+        var csharpAttributes = partials.SelectMany(p => p.CSharpAttributes).ToList();
 
         // Use the most permissive visibility
         var visibility = partials.Select(p => p.Visibility).OrderByDescending(VisibilityRank).First();

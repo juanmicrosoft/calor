@@ -571,18 +571,19 @@ public sealed class ConvertTool : McpToolBase
             {
                 try
                 {
-                    var outputDir = Path.GetDirectoryName(outputPath);
-                    if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
-                    {
-                        Directory.CreateDirectory(outputDir);
-                    }
-                    File.WriteAllText(outputPath, calorSource);
+                    ConversionFileWriter.WriteAtomic(outputPath, calorSource);
                 }
                 catch (Exception ex)
                 {
                     conversionIssues.Add(ConversionIssueEnvelope.Message(
-                        DiagnosticCode.ConversionIssue, "warning",
+                        DiagnosticCode.ConversionIssue, "error",
                         $"Failed to write output file: {ex.Message}", inputPath));
+                    sw.Stop();
+                    return Task.FromResult(McpToolResult.Json(BuildValidatedOutput(
+                        success: false, stage: "write",
+                        calorSource: calorSource, generatedCSharp: generatedCSharp,
+                        conversionIssues, autoFixes, diagnosticEntries, compatIssues,
+                        convResult.Context.Stats, sw.Elapsed), isError: true));
                 }
             }
 

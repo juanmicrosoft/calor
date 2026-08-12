@@ -4014,6 +4014,38 @@ public class CSharpToCalorConversionTests
     }
 
     [Fact]
+    public void PartialClassMerger_PreservesRepeatableAttributeInstances()
+    {
+        const string csharp1 = """
+            [Tag("one")]
+            public partial class Tagged
+            {
+            }
+            """;
+        const string csharp2 = """
+            [Tag("two")]
+            public partial class Tagged
+            {
+            }
+            """;
+
+        var options = new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            ModuleName = "Attributes"
+        };
+        var result1 = new CSharpToCalorConverter(options).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(options).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merged = new PartialClassMerger().Merge(new[] { result1.Ast!, result2.Ast! });
+        var mergedClass = merged.SelectMany(module => module.Classes).Single(cls => cls.Name == "Tagged");
+
+        Assert.Equal(2, mergedClass.CSharpAttributes.Count);
+    }
+
+    [Fact]
     public void PartialClassMerger_NonPartialClassesUnchanged()
     {
         var csharp1 = """

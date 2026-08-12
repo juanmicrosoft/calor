@@ -311,16 +311,6 @@ public sealed class ProjectMigrator
             metrics = BenchmarkIntegration.CalculateMetrics(originalSource, result.CalorSource);
         }
 
-        if (!dryRun &&
-            _options.Fidelity == ConversionFidelity.Lossy &&
-            result.Success &&
-            result.CalorSource != null)
-        {
-            // Use replacement fallback for files with unpairable surrogates (e.g., regex patterns with \uD800)
-            var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-            await ConversionFileWriter.WriteAtomicAsync(entry.OutputPath, result.CalorSource, writeEncoding);
-        }
-
         var status = result.Success
             ? (result.Context.HasWarnings ? FileMigrationStatus.Partial : FileMigrationStatus.Success)
             : FileMigrationStatus.Failed;
@@ -362,7 +352,7 @@ public sealed class ProjectMigrator
             var parseResult = CalorSourceHelper.Parse(result.CalorSource, entry.OutputPath);
             if (!parseResult.IsSuccess)
             {
-                status = FileMigrationStatus.Partial;
+                status = FileMigrationStatus.Failed;
                 foreach (var error in parseResult.Errors)
                 {
                     issues.Add(new ConversionIssue
@@ -384,7 +374,7 @@ public sealed class ProjectMigrator
                     var compileResult = Program.Compile(result.CalorSource, entry.OutputPath, compileOptions);
                     if (compileResult.HasErrors)
                     {
-                        status = FileMigrationStatus.Partial;
+                        status = FileMigrationStatus.Failed;
                         foreach (var diag in compileResult.Diagnostics.Errors)
                         {
                             issues.Add(new ConversionIssue
@@ -399,14 +389,24 @@ public sealed class ProjectMigrator
                 }
                 catch (Exception ex)
                 {
-                    status = FileMigrationStatus.Partial;
+                    status = FileMigrationStatus.Failed;
                     issues.Add(new ConversionIssue
                     {
-                        Severity = ConversionIssueSeverity.Warning,
+                        Severity = ConversionIssueSeverity.Error,
                         Message = $"Validation compile exception: {ex.Message}"
                     });
                 }
             }
+        }
+
+        if (!dryRun &&
+            _options.Fidelity == ConversionFidelity.Lossy &&
+            status is FileMigrationStatus.Success or FileMigrationStatus.Partial &&
+            result.CalorSource != null)
+        {
+            // Use replacement fallback for files with unpairable surrogates (e.g., regex patterns with \uD800)
+            var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
+            await ConversionFileWriter.WriteAtomicAsync(entry.OutputPath, result.CalorSource, writeEncoding);
         }
 
         // Attach per-file analysis if available from a prior AnalyzeAsync call
