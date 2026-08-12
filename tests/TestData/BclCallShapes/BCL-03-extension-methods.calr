@@ -1,0 +1,7 @@
+§M{m003:Bcl03}
+  §F{f001:Shapes:pub} () -> i32
+    §E{mut}
+    §LIST{items:i32}
+    §/LIST{items}
+    §PUSH{items} INT:1
+    §R §C{items.Count} §/C

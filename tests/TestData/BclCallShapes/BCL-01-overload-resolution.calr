@@ -1,0 +1,6 @@
+§M{m001:Bcl01}
+  §F{f001:Shapes:pub} () -> void
+    §E{cw}
+    §C{Console.WriteLine} §A STR:"text" §/C
+    §C{Console.WriteLine} §A INT:42 §/C
+    §C{Console.WriteLine} §A BOOL:true §/C
