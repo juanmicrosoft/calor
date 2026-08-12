@@ -1,34 +1,139 @@
 {
   "schemaVersion": 1,
   "projects": [
-    { "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 6806, "expectedSkipped": 2 },
-    { "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 374, "expectedSkipped": 0 },
-    { "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 309, "expectedSkipped": 0 },
-    { "path": "tests/Calor.Evaluation/Calor.Evaluation.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 202, "expectedSkipped": 0 },
-    { "path": "tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 21, "expectedSkipped": 0 },
-    { "path": "tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 389, "expectedSkipped": 0 },
-    { "path": "tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 42, "expectedSkipped": 0 },
-    { "path": "tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 436, "expectedSkipped": 0 },
-    { "path": "tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj", "workflow": ".github/workflows/performance.yml", "releaseCritical": true, "expectedTotal": 19, "expectedSkipped": 0 },
-    { "path": "tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 204, "expectedSkipped": 0 },
-    { "path": "tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 37, "expectedSkipped": 0 },
-    { "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 94, "expectedSkipped": 0 },
-    { "path": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj", "workflow": ".github/workflows/test.yml", "releaseCritical": true, "expectedTotal": 388, "expectedSkipped": 0 }
+    {
+      "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 6810,
+      "expectedSkipped": 2
+    },
+    {
+      "path": "tests/Calor.Conversion.Tests/Calor.Conversion.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 374,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.Enforcement.Tests/Calor.Enforcement.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 309,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.Evaluation/Calor.Evaluation.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 202,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 21,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.Ids.Tests/Calor.Ids.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 389,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.ILAnalysis.Tests/Calor.ILAnalysis.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 42,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.LanguageServer.Tests/Calor.LanguageServer.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 436,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj",
+      "workflow": ".github/workflows/performance.yml",
+      "releaseCritical": true,
+      "expectedTotal": 19,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 204,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 37,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 94,
+      "expectedSkipped": 0
+    },
+    {
+      "path": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj",
+      "workflow": ".github/workflows/test.yml",
+      "releaseCritical": true,
+      "expectedTotal": 388,
+      "expectedSkipped": 0
+    }
   ],
   "excludedProjects": [
-    { "path": "tests/DebugRT/DebugRT.csproj", "reason": "manual scratch console harness" },
-    { "path": "tests/Calor.RoundTrip.Synthetic/SyntheticLib.Tests/SyntheticLib.Tests.csproj", "reason": "round-trip corpus fixture" },
-    { "path": "tests/Calor.RoundTrip.Synthetic2/GeoLib.Tests/GeoLib.Tests.csproj", "reason": "round-trip corpus fixture" },
-    { "path": "tests/SdkConsumer/CalorLib.Tests/CalorLib.Tests.csproj", "reason": "SDK package consumer executable gate" }
+    {
+      "path": "tests/DebugRT/DebugRT.csproj",
+      "reason": "manual scratch console harness"
+    },
+    {
+      "path": "tests/Calor.RoundTrip.Synthetic/SyntheticLib.Tests/SyntheticLib.Tests.csproj",
+      "reason": "round-trip corpus fixture"
+    },
+    {
+      "path": "tests/Calor.RoundTrip.Synthetic2/GeoLib.Tests/GeoLib.Tests.csproj",
+      "reason": "round-trip corpus fixture"
+    },
+    {
+      "path": "tests/SdkConsumer/CalorLib.Tests/CalorLib.Tests.csproj",
+      "reason": "SDK package consumer executable gate"
+    }
   ],
   "allowedSkippedTests": [
-    { "reason": "Integration test - requires network access", "count": 2 }
+    {
+      "reason": "Integration test - requires network access",
+      "count": 2
+    }
   ],
   "allowedRuntimeSkipSites": [
-    { "reason": "Benchmark file not found", "count": 7 },
-    { "reason": "Calor syntax not supported by parser", "count": 5 },
-    { "reason": "Z3 not available", "count": 376 },
-    { "reason": "corpus submodules not initialized", "count": 1 }
+    {
+      "reason": "Benchmark file not found",
+      "count": 7
+    },
+    {
+      "reason": "Calor syntax not supported by parser",
+      "count": 5
+    },
+    {
+      "reason": "Z3 not available",
+      "count": 376
+    },
+    {
+      "reason": "corpus submodules not initialized",
+      "count": 1
+    }
   ],
   "releaseGates": [
     "test",
