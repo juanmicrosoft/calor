@@ -149,14 +149,31 @@ complete it. **`effects` is not a slice.**
 - Any query surface in the LSP or MCP — both are consumers, and §2.3 already
   sequences them after the spine.
 
-## 9. Open questions to settle in S1
+## 9. Decisions and open questions
+
+### 9.1 Semantic hash granularity — DECIDED: per file
+
+**Decision (maintainer, 2026-08-11): per-file semantic hashes.** This is
+coherent with the wholesale-rebuild decision in §3 and is the cheaper build.
+
+**The cost, stated plainly so nobody is surprised by it later:** `impact`
+answers at *file* granularity. Asking "what does this change affect?" returns
+"these files", not "these declarations". If one file holds twenty declarations
+and one changes, `impact` implicates all twenty's dependents.
+
+**This may be too coarse to be useful, and coarse-but-useless is a real
+outcome.** Rather than argue it in the abstract, S3 carries a **checkpoint**:
+the first working `impact` answer on a real project is shown to the maintainer
+before the facet is called done. If the answer is too fuzzy to act on, the
+choice is revisited then, with an actual answer in hand rather than a prediction
+about one. Per-declaration hashing remains a priced follow-up, not a rewrite:
+the storage header is versioned (§4), so granularity is a format revision.
+
+### 9.2 Still open, to settle in S1
 
 1. Does `calor query` build the index on demand when absent, or fail with a
    pointer to `calor index`? (Recommendation: build on demand, with `--no-build`
    for CI timing runs, so gate 8 measures a warm query rather than a build.)
-2. Does the index store the bound tree's semantic hashes per declaration, or per
-   file? Per-declaration is what makes `impact` precise; per-file is what
-   wholesale rebuild makes cheap.
-3. Is the fixture project for gate 3 a new corpus, or an existing one
+2. Is the fixture project for gate 3 a new corpus, or an existing one
    (`tests/TestData/EditScripts` is already registered and small)? Reusing it
    keeps one denominator; a purpose-built one gives better `impact` shapes.
