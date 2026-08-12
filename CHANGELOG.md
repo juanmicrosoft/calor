@@ -28,6 +28,14 @@ that version is abandoned and its contents ship here, described accurately. Noth
 to nuget.org under 0.13.1.
 
 ### Changed
+- **Z3 translation aligned with executable C# semantics (#961, closes #780).** Integral literal width
+  and signedness are preserved through translation, and C# binary/unary numeric promotions are
+  applied across arithmetic, comparison, equality, shifts and overflow. Operations with no
+  executable C# semantics stay fail-closed as `Unsupported` rather than being approximated. The
+  translator's semantics are now versioned in proof results and in verification-cache validity, so
+  **existing verification caches are invalidated by this release** and proofs are re-established
+  under the corrected semantics. Backed by a 576-case runtime differential promotion matrix across
+  every integral type and its boundaries.
 - **CFG and dataflow rebuilt around explicit semantics (#960).** Control flow is constructed from
   explicit terminators and typed edges instead of positional inference; loop, exception, catch,
   finally, using, return, throw, break and continue now route structurally. Dataflow boundaries are
