@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Calor.Compiler.Mcp;
 using Calor.Compiler.Mcp.Tools;
+using Calor.Compiler.Migration;
 using Xunit;
 
 namespace Calor.Compiler.Tests.Mcp;
@@ -226,6 +227,35 @@ public class MigrateToolTests
                 json.GetProperty("perFile").EnumerateArray(),
                 file => file.GetProperty("path").GetString() == "Stale.calr");
             Assert.Equal(staleSource, await File.ReadAllTextAsync(stalePath));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FullPreservesConversionLossLedgerAfterCompile()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-losses-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        await File.WriteAllTextAsync(
+            Path.Combine(tempDir, "Interop.cs"),
+            "public class Interop { public int Get() { int Local() => 42; return Local(); } }");
+
+        try
+        {
+            var args = JsonDocument.Parse(
+                $$"""{"projectPath": "{{tempDir.Replace("\\", "\\\\")}}", "phase": "full"}""").RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            var file = Assert.Single(json.GetProperty("perFile").EnumerateArray());
+            Assert.Contains(file.GetProperty("status").GetString(), new[] { "compiled", "fixed" });
+            var loss = Assert.Single(file.GetProperty("losses").EnumerateArray());
+            Assert.Equal((int)ConversionLossKind.InteropPreserved, loss.GetProperty("kind").GetInt32());
+            Assert.True(loss.GetProperty("line").GetInt32() > 0);
         }
         finally
         {

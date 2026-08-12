@@ -71,6 +71,24 @@ public sealed class LosslessConversionContractTests
     }
 
     [Fact]
+    public void NativeMarkerTextInsideStringDoesNotCreateFallbackLoss()
+    {
+        const string source = """
+            public class Example
+            {
+                public string Get() => "§RAW §CS{ §CSHARP{";
+            }
+            """;
+
+        var result = new CSharpToCalorConverter().Convert(source, "Example.cs");
+
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
+        Assert.DoesNotContain(
+            result.Losses,
+            loss => loss.Kind == ConversionLossKind.EmitterFallback);
+    }
+
+    [Fact]
     public void GeneratedCalorValidation_IsMandatoryInLossyMode()
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions

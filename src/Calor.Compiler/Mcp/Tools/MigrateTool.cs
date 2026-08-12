@@ -473,7 +473,8 @@ public sealed class MigrateTool : McpToolBase
                         Status = "compile_failed",
                         Score = existing?.Score,
                         Errors = compileErrors,
-                        Warnings = existing?.Warnings
+                        Warnings = existing?.Warnings,
+                        Losses = existing?.Losses
                     };
                 }
                 else if (sourceKey != null)
@@ -487,7 +488,8 @@ public sealed class MigrateTool : McpToolBase
                             Status = "compiled",
                             Score = existing.Score,
                             Errors = existing.Errors,
-                            Warnings = existing.Warnings
+                            Warnings = existing.Warnings,
+                            Losses = existing.Losses
                         };
                     }
                 }
@@ -501,6 +503,7 @@ public sealed class MigrateTool : McpToolBase
                     Path = existing?.Path ?? key,
                     Status = "compile_error",
                     Score = existing?.Score,
+                    Losses = existing?.Losses,
                     Errors = [ConversionIssueEnvelope.Message(
                         DiagnosticCode.CliInternalError, "error", ex.Message, path)]
                 };
@@ -562,6 +565,7 @@ public sealed class MigrateTool : McpToolBase
                             Path = existing?.Path ?? key,
                             Status = recompile.HasErrors ? "fix_incomplete" : "fixed",
                             Score = existing?.Score,
+                            Losses = existing?.Losses,
                             Errors = recompile.HasErrors
                                 ? BuildCompileEnvelope(recompile, path, fixedFinal)
                                     .Where(e => e.Severity == "error")

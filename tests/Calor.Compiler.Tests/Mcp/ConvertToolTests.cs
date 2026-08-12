@@ -130,6 +130,27 @@ public class ConvertToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ValidateMode_ReportsLossyDropLocations()
+    {
+        var args = JsonSerializer.SerializeToElement(new
+        {
+            source = "public interface IEvents { event System.EventHandler Changed; }",
+            moduleName = "Events",
+            mode = "validate",
+            fidelity = "lossy"
+        });
+
+        var result = await _tool.ExecuteAsync(args);
+
+        var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
+        var lossSummary = root.GetProperty("lossSummary");
+        Assert.Equal(1, lossSummary.GetProperty("drops").GetInt32());
+        Assert.True(Assert.Single(lossSummary.GetProperty("locations").EnumerateArray())
+            .GetProperty("line").GetInt32() > 0);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_Issues_AreEnvelopeDiagnostics()
     {
         // Envelope schema v1.1 (loop plan D1.3): conversion issues are

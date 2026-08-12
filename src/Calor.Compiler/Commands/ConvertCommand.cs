@@ -260,16 +260,22 @@ public static class ConvertCommand
         var converter = new CSharpToCalorConverter(
             BuildCSharpToCalorOptions(benchmark, verbose, explain, noFallback, passthrough, explicitCallClosers, lossy));
 
+        using var timeoutCts = timeoutSeconds > 0
+            ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds))
+            : null;
+        var cancellationToken = timeoutCts?.Token ?? CancellationToken.None;
+
         ConversionResult result;
-        if (timeoutSeconds > 0)
+        if (timeoutCts != null)
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
             try
             {
                 // Run on a thread pool thread so the cancellation token can
                 // interrupt even CPU-bound conversion hangs (e.g. infinite loops
                 // in preprocessor region extraction).
-                result = await Task.Run(() => converter.ConvertFileAsync(inputPath), cts.Token);
+                result = await Task.Run(
+                    () => converter.ConvertFileAsync(inputPath, cancellationToken),
+                    cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -280,7 +286,7 @@ public static class ConvertCommand
         }
         else
         {
-            result = await converter.ConvertFileAsync(inputPath);
+            result = await converter.ConvertFileAsync(inputPath, cancellationToken);
         }
 
         if (envelope != null)
@@ -356,7 +362,22 @@ public static class ConvertCommand
         }
 
         var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-        await ConversionFileWriter.WriteAtomicAsync(outputPath, result.CalorSource!, writeEncoding);
+        try
+        {
+            await ConversionFileWriter.WriteAtomicAsync(
+                outputPath,
+                result.CalorSource!,
+                writeEncoding,
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            envelope?.AddCommandError($"Conversion timed out after {timeoutSeconds}s", inputPath);
+            envelope?.Data.Success = false;
+            Console.Error.WriteLine($"Error: Conversion timed out after {timeoutSeconds}s");
+            Console.Error.WriteLine("Destination was not modified.");
+            return (1, result);
+        }
 
         // #770: structured loss accounting. The unconditional "✓ Conversion
         // successful" line was a false-success vector — it is now printed ONLY

@@ -293,12 +293,11 @@ public sealed class ConvertTool : McpToolBase
             {
                 try
                 {
-                    var outputDir = Path.GetDirectoryName(outputPath);
-                    if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
-                    {
-                        Directory.CreateDirectory(outputDir);
-                    }
-                    ConversionFileWriter.WriteAtomic(outputPath, calorSourceForOutput);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ConversionFileWriter.WriteAtomicAsync(
+                        outputPath,
+                        calorSourceForOutput,
+                        cancellationToken: cancellationToken).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -433,7 +432,7 @@ public sealed class ConvertTool : McpToolBase
                     success: false, stage: "conversion",
                     calorSource: convResult.CalorSource, generatedCSharp: null,
                     conversionIssues, autoFixes, diagnosticEntries, compatIssues,
-                    convResult.Context.Stats, sw.Elapsed), isError: true));
+                    convResult, sw.Elapsed), isError: true));
             }
 
             var calorSource = convResult.CalorSource!;
@@ -465,7 +464,7 @@ public sealed class ConvertTool : McpToolBase
                             success: false, stage: "parse",
                             calorSource: fixResult.FixedSource, generatedCSharp: null,
                             conversionIssues, autoFixes, diagnosticEntries, compatIssues,
-                            convResult.Context.Stats, sw.Elapsed), isError: true));
+                            convResult, sw.Elapsed), isError: true));
                     }
                 }
                 else
@@ -476,7 +475,7 @@ public sealed class ConvertTool : McpToolBase
                         success: false, stage: "parse",
                         calorSource: calorSource, generatedCSharp: null,
                         conversionIssues, autoFixes, diagnosticEntries, compatIssues,
-                        convResult.Context.Stats, sw.Elapsed), isError: true));
+                        convResult, sw.Elapsed), isError: true));
                 }
             }
 
@@ -509,7 +508,7 @@ public sealed class ConvertTool : McpToolBase
                         success: false, stage: "diagnose",
                         calorSource: calorSource, generatedCSharp: compileResult.GeneratedCode,
                         conversionIssues, autoFixes, diagnosticEntries, compatIssues,
-                        convResult.Context.Stats, sw.Elapsed), isError: true));
+                        convResult, sw.Elapsed), isError: true));
                 }
 
                 generatedCSharp = compileResult.GeneratedCode;
@@ -524,7 +523,7 @@ public sealed class ConvertTool : McpToolBase
                     success: false, stage: "compile",
                     calorSource: calorSource, generatedCSharp: null,
                     conversionIssues, autoFixes, diagnosticEntries, compatIssues,
-                    convResult.Context.Stats, sw.Elapsed), isError: true));
+                    convResult, sw.Elapsed), isError: true));
             }
 
             // Stage 4: Compat check — verify generated C# matches expectations
@@ -562,7 +561,7 @@ public sealed class ConvertTool : McpToolBase
                         success: false, stage: "compat",
                         calorSource: calorSource, generatedCSharp: generatedCSharp,
                         conversionIssues, autoFixes, diagnosticEntries, compatIssues,
-                        convResult.Context.Stats, sw.Elapsed), isError: true));
+                        convResult, sw.Elapsed), isError: true));
                 }
             }
 
@@ -571,7 +570,11 @@ public sealed class ConvertTool : McpToolBase
             {
                 try
                 {
-                    ConversionFileWriter.WriteAtomic(outputPath, calorSource);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ConversionFileWriter.WriteAtomicAsync(
+                        outputPath,
+                        calorSource,
+                        cancellationToken: cancellationToken).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {
@@ -583,7 +586,7 @@ public sealed class ConvertTool : McpToolBase
                         success: false, stage: "write",
                         calorSource: calorSource, generatedCSharp: generatedCSharp,
                         conversionIssues, autoFixes, diagnosticEntries, compatIssues,
-                        convResult.Context.Stats, sw.Elapsed), isError: true));
+                        convResult, sw.Elapsed), isError: true));
                 }
             }
 
@@ -593,7 +596,7 @@ public sealed class ConvertTool : McpToolBase
                 success: true, stage: "complete",
                 calorSource: calorSource, generatedCSharp: generatedCSharp,
                 conversionIssues, autoFixes, diagnosticEntries, compatIssues,
-                convResult.Context.Stats, sw.Elapsed)));
+                convResult, sw.Elapsed)));
         }
         catch (Exception ex)
         {
@@ -847,15 +850,17 @@ public sealed class ConvertTool : McpToolBase
         List<string> autoFixes,
         List<EnvelopeDiagnostic> diagnostics,
         List<string> compatIssues,
-        ConversionStats stats,
+        ConversionResult result,
         TimeSpan duration)
     {
         var featureHints = InteropHintAnalyzer.AnalyzeInteropBlocks(calorSource);
+        var stats = result.Context.Stats;
 
         return new ValidatedOutput
         {
             Success = success,
             Stage = stage,
+            Fidelity = result.Context.Fidelity.ToString().ToLowerInvariant(),
             CalorSource = calorSource,
             GeneratedCSharp = generatedCSharp,
             ConversionIssues = conversionIssues,
@@ -874,7 +879,8 @@ public sealed class ConvertTool : McpToolBase
                 DurationMs = (int)duration.TotalMilliseconds
             },
             DurationMs = (int)duration.TotalMilliseconds,
-            FeatureHints = featureHints.Count > 0 ? featureHints : null
+            FeatureHints = featureHints.Count > 0 ? featureHints : null,
+            LossSummary = ConversionLossSummaryOutput.From(result)
         };
     }
 
@@ -1034,6 +1040,9 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("stage")]
         public required string Stage { get; init; }
 
+        [JsonPropertyName("fidelity")]
+        public required string Fidelity { get; init; }
+
         [JsonPropertyName("calorSource")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? CalorSource { get; init; }
@@ -1065,6 +1074,9 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("featureHints")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<string>? FeatureHints { get; init; }
+
+        [JsonPropertyName("lossSummary")]
+        public required ConversionLossSummaryOutput LossSummary { get; init; }
     }
 
     // mode=roundtrip output

@@ -470,7 +470,7 @@ public sealed class CSharpToCalorConverter
     /// </summary>
     private static void ReconcileEmitterFallbacks(string calorSource, ConversionContext context)
     {
-        var markerLines = FindMarkerLines(calorSource);
+        var markerLines = FindFallbackTokenLines(calorSource);
         var ledgered = context.Losses.Count(loss =>
             loss.Kind is ConversionLossKind.InteropPreserved or ConversionLossKind.EmitterFallback);
         foreach (var line in markerLines.Skip(ledgered))
@@ -482,21 +482,23 @@ public sealed class CSharpToCalorConverter
         }
     }
 
-    private static List<int> FindMarkerLines(string text)
+    private static List<int> FindFallbackTokenLines(string text)
     {
-        var markers = new[] { "§CSHARP{", "§CS{", "§RAW" };
-        var lines = new List<int>();
-        foreach (var marker in markers)
+        var diagnostics = new Diagnostics.DiagnosticBag();
+        var tokens = new Parsing.Lexer(text, diagnostics).TokenizeAllForParser();
+        if (diagnostics.HasErrors)
         {
-            var index = 0;
-            while ((index = text.IndexOf(marker, index, StringComparison.Ordinal)) >= 0)
-            {
-                lines.Add(1 + text.AsSpan(0, index).Count('\n'));
-                index += marker.Length;
-            }
+            return [];
         }
-        lines.Sort();
-        return lines;
+
+        return tokens
+            .Where(token => token.Kind is
+                Parsing.TokenKind.RawCSharp or
+                Parsing.TokenKind.RawCSharpExpression or
+                Parsing.TokenKind.CSharpInterop)
+            .Select(token => token.Span.Line)
+            .OrderBy(line => line)
+            .ToList();
     }
 
     /// <summary>True if <paramref name="calorSource"/> lexes and parses without errors.</summary>
