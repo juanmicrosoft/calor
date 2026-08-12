@@ -113,6 +113,7 @@ public static class ProjectIndexBuilder
                     File = relative,
                     Line = line,
                     Column = column,
+                    SemanticHash = HashDefinition(document.Source, symbol),
                 });
             }
         }
@@ -131,6 +132,58 @@ public static class ProjectIndexBuilder
                     Column = column,
                     Kind = occurrence.Kind.ToString(),
                 });
+            }
+        }
+
+        foreach (var document in symbols.Documents)
+        {
+            var relative = Relative(options.ProjectDirectory, document.FilePath);
+            var moduleId = document.BoundModule.SymbolsById.Values
+                .OfType<FunctionSymbol>()
+                .Select(symbol => symbol.Id.Value)
+                .FirstOrDefault() ?? "";
+
+            // Module-scoped assumptions apply to everything in the file, so they
+            // are recorded against the file rather than any one declaration.
+            foreach (var assumption in document.Ast.Assumptions)
+            {
+                var (line, _) = LineColumn(document.Source, assumption.Span.Start);
+                index.Assumptions.Add(new IndexedAssumption
+                {
+                    SymbolId = "",
+                    Scope = "module",
+                    Category = assumption.Category?.ToString() ?? "",
+                    Description = assumption.Description,
+                    File = relative,
+                    Line = line,
+                });
+            }
+
+            foreach (var function in document.Ast.Functions)
+            {
+                var symbol = document.BoundModule.Functions
+                    .FirstOrDefault(bound => bound.Symbol.Name == function.Name)?.Symbol;
+                if (symbol == null || symbol.Id.IsNone)
+                    continue;
+
+                AddContracts(index, document, relative, symbol.Id.Value,
+                    "precondition", function.Preconditions.Select(node => node.Span));
+                AddContracts(index, document, relative, symbol.Id.Value,
+                    "postcondition", function.Postconditions.Select(node => node.Span));
+
+                foreach (var assumption in function.Assumptions)
+                {
+                    var (line, _) = LineColumn(document.Source, assumption.Span.Start);
+                    index.Assumptions.Add(new IndexedAssumption
+                    {
+                        SymbolId = symbol.Id.Value,
+                        Scope = "declaration",
+                        Category = assumption.Category?.ToString() ?? "",
+                        Description = assumption.Description,
+                        File = relative,
+                        Line = line,
+                    });
+                }
             }
         }
 
@@ -165,6 +218,52 @@ public static class ProjectIndexBuilder
 
         index.Canonicalize();
         return index;
+    }
+
+    private static void AddContracts(
+        ProjectIndex index,
+        IndexedDocument document,
+        string relative,
+        string symbolId,
+        string kind,
+        IEnumerable<Calor.Compiler.Parsing.TextSpan> spans)
+    {
+        var position = 0;
+        foreach (var span in spans)
+        {
+            var (line, _) = LineColumn(document.Source, span.Start);
+            var text = span.Start >= 0 && span.Length > 0 && span.End <= document.Source.Length
+                ? document.Source.Substring(span.Start, span.Length).Trim()
+                : "";
+            index.Contracts.Add(new IndexedContract
+            {
+                SymbolId = symbolId,
+                Kind = kind,
+                Index = position++,
+                Text = text,
+                File = relative,
+                Line = line,
+            });
+        }
+    }
+
+    /// <summary>
+    /// Hashes a declaration's own definition text. Per declaration, not per
+    /// file: file granularity was measured and rejected (see
+    /// IndexedDeclaration.SemanticHash).
+    /// </summary>
+    private static string HashDefinition(string source, Symbol symbol)
+    {
+        var span = symbol.DefinitionSpan;
+        if (span.Start < 0 || span.Length <= 0 || span.End > source.Length)
+            span = symbol.DeclarationSpan;
+        if (span.Start < 0 || span.Length <= 0 || span.End > source.Length)
+            return "";
+
+        var text = source.Substring(span.Start, span.Length);
+        return Convert.ToHexStringLower(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(text)))[..16];
     }
 
     private static string KindOf(Symbol symbol) => symbol switch

@@ -82,6 +82,84 @@
       "inFile": "asks-across.calr",
       "expect": [],
       "partial": true
+    },
+    {
+      "why": "Declaration-seeded impact, the default. Changing Scale affects ScaleTwice (same file, but a DIFFERENT declaration, so genuinely affected) and Run in another file. Under the rejected file-grained scheme ScaleTwice was wrongly excluded as part of the seed.",
+      "facet": "impact",
+      "name": "Scale",
+      "inFile": "math.calr",
+      "expect": [
+        "app.calr:2:Run",
+        "math.calr:5:ScaleTwice"
+      ],
+      "partial": true
+    },
+    {
+      "why": "Nothing calls ScaleTwice, so changing it affects nothing. Under file granularity this same question returned Run — the over-report that made the facet useless.",
+      "facet": "impact",
+      "name": "ScaleTwice",
+      "inFile": "math.calr",
+      "expect": [],
+      "partial": true
+    },
+    {
+      "why": "Only the same-file caller resolves; the cross-file call to Shared is ambiguous, which is why this is partial rather than complete.",
+      "facet": "impact",
+      "name": "Shared",
+      "inFile": "ambiguous2.calr",
+      "expect": [
+        "ambiguous2.calr:5:AsksShared"
+      ],
+      "partial": true
+    },
+    {
+      "why": "Whole-file impact is still offered for 'I rewrote this file'. math.calr holds Scale and ScaleTwice, so only Run is downstream of the file as a unit.",
+      "facet": "impact-file",
+      "name": "math.calr",
+      "expect": [
+        "app.calr:2:Run"
+      ],
+      "partial": true
+    },
+    {
+      "why": "Contracts declared on a function, in source order and kind. The index records what is DECLARED — a proof status would have to come from the verifier, and a stale 'Proven' is worse than none.",
+      "facet": "contracts",
+      "name": "Bounded",
+      "inFile": "contracts.calr",
+      "expect": [
+        "contracts.calr:5:precondition",
+        "contracts.calr:6:postcondition"
+      ],
+      "partial": false
+    },
+    {
+      "why": "A function with no contracts reports none, rather than inheriting its neighbour's.",
+      "facet": "contracts",
+      "name": "Plain",
+      "inFile": "contracts.calr",
+      "expect": [],
+      "partial": false
+    },
+    {
+      "why": "Assumptions in force = the declaration's own PLUS the module-wide one. Omitting module scope would under-report what a reader is being asked to trust.",
+      "facet": "assumptions",
+      "name": "Bounded",
+      "inFile": "contracts.calr",
+      "expect": [
+        "contracts.calr:2:module",
+        "contracts.calr:7:declaration"
+      ],
+      "partial": false
+    },
+    {
+      "why": "The discriminating pair: Plain inherits the MODULE assumption but not Bounded's declaration-scoped one. A scope-blind implementation returns both and passes the Bounded case while failing here.",
+      "facet": "assumptions",
+      "name": "Plain",
+      "inFile": "contracts.calr",
+      "expect": [
+        "contracts.calr:2:module"
+      ],
+      "partial": false
     }
   ]
 }

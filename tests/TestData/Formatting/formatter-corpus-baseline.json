@@ -1,6 +1,6 @@
 {
-  "trackedFileCount": 876,
-  "successfulTransformationCount": 643,
+  "trackedFileCount": 877,
+  "successfulTransformationCount": 644,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
