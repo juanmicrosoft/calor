@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **MCP heavy-tool admission control no longer charges a host process's memory to the next tool
+  call (#897).** `calor_compile`, `calor_convert`, `calor_analyze` and `calor_batch` are gated on
+  process memory before they start, measured with `Process.WorkingSet64` — the *whole* process.
+  Under `calor mcp` that is sound, because the server owns its process. It was applied
+  unconditionally, so in any host the handler does not own it attributed that host's memory to the
+  next MCP tool, waited its full 30s, and refused with *"Server under memory pressure"*.
+
+  This is what six `McpServerTests` had been failing on since 2026-08-10 — only on Linux CI, where
+  the test host (thousands of tests plus Roslyn and Z3 in memory) crossed the 50%-of-RAM threshold
+  that a higher-memory dev machine never reached. It was filed and re-run as a flake for two weeks;
+  it is deterministic given the memory condition.
+
+  The gate is now scoped by an explicit policy: enabled for the stdio server, disabled for direct
+  construction. **Behaviour change for embedders:** code that constructs `McpMessageHandler` (or
+  `McpServer`) itself no longer gates tool calls on process memory. No public signature changed.
+  `CALOR_MCP_MAX_MEMORY_MB` still tunes the server's ceiling, and is now read per construction
+  rather than once per process.
+
 ### Removed
 - **VS Code extension support is withdrawn.** The `editors/vscode` tree, the VSIX release-asset
   workflow, the Marketplace publishing workflow, and the single-file publish guard are all removed.

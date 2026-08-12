@@ -435,7 +435,7 @@ public class McpServerTests
         using var input = new MemoryStream(Encoding.UTF8.GetBytes(inputMessage));
         using var output = new MemoryStream();
 
-        var server = new McpServer(input, output);
+        var server = NewTestServer(input, output);
 
         // Run server (it will stop when input stream ends)
         await server.RunAsync();
@@ -456,7 +456,7 @@ public class McpServerTests
         using var input = new MemoryStream(Encoding.UTF8.GetBytes(inputMessage));
         using var output = new MemoryStream();
 
-        var server = new McpServer(input, output);
+        var server = NewTestServer(input, output);
         await server.RunAsync();
 
         output.Position = 0;
@@ -484,7 +484,7 @@ public class McpServerTests
         using var input = new MemoryStream(Encoding.UTF8.GetBytes(fullInput));
         using var output = new MemoryStream();
 
-        var server = new McpServer(input, output);
+        var server = NewTestServer(input, output);
         await server.RunAsync();
 
         output.Position = 0;
@@ -571,7 +571,7 @@ public class McpServerTests
         using var input = new MemoryStream(Encoding.UTF8.GetBytes(inputMessage));
         using var output = new MemoryStream();
 
-        var server = new McpServer(input, output);
+        var server = NewTestServer(input, output);
         await server.RunAsync();
 
         output.Position = 0;
@@ -586,6 +586,21 @@ public class McpServerTests
 
     /// <summary>#897 observability: on failure, carry the FULL response so the next CI
     /// hit shows the server's actual error instead of a truncated prefix.</summary>
+    /// <summary>
+    /// A server for tests. Memory admission is disabled because the xUnit host does not
+    /// own its process on the server's behalf: it holds thousands of tests' worth of heap
+    /// plus Roslyn and Z3, and the gate measures the whole process. Leaving it on is what
+    /// made these tests fail only on CI, each after the full 30s wait (#897). The real
+    /// `calor mcp` path keeps the gate — pinned by
+    /// McpMemoryAdmissionTests.StdioServer_DoesGateHeavyToolsOnProcessMemory.
+    /// </summary>
+    private static McpServer NewTestServer(Stream input, Stream output) =>
+        new(McpMemoryAdmissionPolicy.Disabled,
+            new StreamReader(input, Encoding.UTF8, leaveOpen: true), output);
+
+    private static McpServer NewTestServer(TextReader reader, Stream output) =>
+        new(McpMemoryAdmissionPolicy.Disabled, reader, output);
+
     private static void AssertResponseContains(string response, string expected) =>
         Assert.True(response.Contains(expected),
             $"Expected substring '{expected}' not found. FULL RESPONSE:\n{response}");
@@ -673,7 +688,7 @@ public class McpServerTests
         using var input = new MemoryStream(Encoding.UTF8.GetBytes(inputMessage));
         using var output = new MemoryStream();
 
-        var server = new McpServer(input, output);
+        var server = NewTestServer(input, output);
         await server.RunAsync();
 
         output.Position = 0;
@@ -764,7 +779,7 @@ public class McpServerTests
         var idleReader = new NonBlockingIdleReader();
         using var output = new MemoryStream();
 
-        var server = new McpServer(idleReader, output);
+        var server = NewTestServer(idleReader, output);
 
         using var cts = new CancellationTokenSource();
         var serverTask = server.RunAsync(cts.Token);
@@ -788,7 +803,7 @@ public class McpServerTests
         var idleStream = new NonBlockingIdleStream();
         using var output = new MemoryStream();
 
-        var server = new McpServer(idleStream, output);
+        var server = NewTestServer(idleStream, output);
         await server.RunAsync();
 
         // StreamReader treats 0-byte read as EOF → ReadLineAsync returns null → server exits

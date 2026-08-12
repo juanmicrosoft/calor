@@ -114,7 +114,7 @@ jobs:
 
           mkdir -p artifacts
 
-          curl -fL -sS --retry 5 --retry-delay 3 -o z3.zip "${BASE_URL}/${ARCHIVE}.zip"
+          curl -fL -sS --retry 10 --retry-all-errors --retry-max-time 300 -o z3.zip "${BASE_URL}/${ARCHIVE}.zip"
 
           EXPECTED="$(grep -v '^#' "$MANIFEST" | awk -v n="${ARCHIVE}.zip" '$2 == n {print $1}')"
           EXPECTED_SIZE="$(grep -v '^#' "$MANIFEST" | awk -v n="${ARCHIVE}.zip" '$2 == n {print $3}')"
