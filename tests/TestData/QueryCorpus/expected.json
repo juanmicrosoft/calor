@@ -1,0 +1,87 @@
+{
+  "note": "Ground truth for the index/query gate (roadmap §2.5 gate 3), authored by reading project/*.calr — NOT recorded from the implementation's output. Results are 'file:line:name' for the declaration, sorted ordinal. 'partial' is true when the residual could change what the answer means.",
+  "queries": [
+    {
+      "why": "A single declaration, found by name.",
+      "facet": "symbol",
+      "name": "Scale",
+      "expect": [
+        "math.calr:2:Scale"
+      ],
+      "partial": false
+    },
+    {
+      "why": "Two files declare Shared. The index must return BOTH — collapsing them to one is the failure a name-keyed index makes. The DECLARATION list is complete, so this answer is not partial: the ambiguity affects which calls can be attributed, not which declarations exist. (Corrected while authoring: the first draft called it partial, conflating the two.)",
+      "facet": "symbol",
+      "name": "Shared",
+      "expect": [
+        "ambiguous.calr:2:Shared",
+        "ambiguous2.calr:2:Shared"
+      ],
+      "partial": false
+    },
+    {
+      "why": "Callers span files: ScaleTwice calls Scale in the same file, Run calls it from another. A per-file view misses the second.",
+      "facet": "callers",
+      "name": "Scale",
+      "inFile": "math.calr",
+      "expect": [
+        "app.calr:2:Run",
+        "math.calr:5:ScaleTwice"
+      ],
+      "partial": false
+    },
+    {
+      "why": "Only the same-file call to Shared resolves. The cross-file one is ambiguous and dropped, so the answer is PARTIAL — reporting AsksShared alone as if complete would be the silent hole.",
+      "facet": "callers",
+      "name": "Shared",
+      "inFile": "ambiguous2.calr",
+      "expect": [
+        "ambiguous2.calr:5:AsksShared"
+      ],
+      "partial": true
+    },
+    {
+      "why": "The other Shared has no resolvable callers at all, and that is still a partial answer, not an empty fact.",
+      "facet": "callers",
+      "name": "Shared",
+      "inFile": "ambiguous.calr",
+      "expect": [],
+      "partial": true
+    },
+    {
+      "why": "Callees of a function that calls one thing twice — the answer is the declaration set, not the call count.",
+      "facet": "callees",
+      "name": "ScaleTwice",
+      "inFile": "math.calr",
+      "expect": [
+        "math.calr:2:Scale"
+      ],
+      "partial": false
+    },
+    {
+      "why": "A function nothing calls has no callers. Distinguishing 'none' from 'unknown' is the point of the residual.",
+      "facet": "callers",
+      "name": "Unused",
+      "inFile": "app.calr",
+      "expect": [],
+      "partial": false
+    },
+    {
+      "why": "A function that calls nothing.",
+      "facet": "callees",
+      "name": "Unused",
+      "inFile": "app.calr",
+      "expect": [],
+      "partial": false
+    },
+    {
+      "why": "A call to a name that does not exist anywhere resolves to nothing, so the caller has no callees and the answer is partial.",
+      "facet": "callees",
+      "name": "AsksMissing",
+      "inFile": "asks-across.calr",
+      "expect": [],
+      "partial": true
+    }
+  ]
+}

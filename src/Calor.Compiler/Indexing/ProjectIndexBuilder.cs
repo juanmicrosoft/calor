@@ -152,7 +152,14 @@ public static class ProjectIndexBuilder
         }
 
         foreach (var unresolved in symbols.Residual.UnresolvedCalls)
-            index.Residual.UnresolvedCalls.Add(RelativePrefix(options.ProjectDirectory, unresolved));
+        {
+            index.Residual.UnresolvedCalls.Add(new IndexedUnresolvedCall
+            {
+                CallerSymbolId = unresolved.CallerSymbolId.Value,
+                Target = unresolved.Target,
+                File = Relative(options.ProjectDirectory, unresolved.FilePath),
+            });
+        }
         foreach (var ambiguous in symbols.Residual.AmbiguousCallees)
             index.Residual.AmbiguousCallees.Add(ambiguous);
 
@@ -176,14 +183,6 @@ public static class ProjectIndexBuilder
         var full = Path.GetFullPath(path);
         var root = Path.GetFullPath(projectDirectory);
         return Path.GetRelativePath(root, full).Replace('\\', '/');
-    }
-
-    private static string RelativePrefix(string projectDirectory, string entry)
-    {
-        var separator = entry.IndexOf(": ", StringComparison.Ordinal);
-        return separator < 0
-            ? entry
-            : Relative(projectDirectory, entry[..separator]) + entry[separator..];
     }
 
     private static (int Line, int Column) LineColumn(string source, int offset)

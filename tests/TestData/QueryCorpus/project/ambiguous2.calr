@@ -1,0 +1,7 @@
+§M{m004:Alt2}
+  §F{f001:Shared:pub} () -> i32
+    §E{}
+    §R INT:2
+  §F{f002:AsksShared:pub} () -> i32
+    §E{}
+    §R §C{Shared} §/C

@@ -156,7 +156,7 @@ public static class IndexCommand
         foreach (var file in index.Residual.UnreadableFiles)
             Console.WriteLine($"  unreadable: {file}");
         foreach (var call in index.Residual.UnresolvedCalls)
-            Console.WriteLine($"  unresolved call: {call}");
+            Console.WriteLine($"  unresolved call: {call.File}: {call.Target}");
         foreach (var name in index.Residual.AmbiguousCallees)
             Console.WriteLine($"  ambiguous callee: {name} (several declarations share the name)");
     }
