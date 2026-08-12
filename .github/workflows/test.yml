@@ -120,7 +120,8 @@ jobs:
       - name: Run all tests
         run: |
           set -euo pipefail
-          dotnet test -c Release --no-build --verbosity normal 2>&1 | tee test-output.log
+          dotnet test -c Release --no-build --verbosity normal \
+            --blame-hang --blame-hang-timeout 60s 2>&1 | tee test-output.log
 
       # Assert the PROPERTY that matters (no Z3-gated test skipped), not the presence of a
       # filename. An earlier version of this step checked only that some libz3.so existed
