@@ -599,7 +599,7 @@ public class KInductionTests
     [Fact]
     public void InvariantTemplate_AccumulatorNonNegative_DetectsAccumulatorNames()
     {
-        var accumulatorNames = new[] { "sum", "total", "result", "acc" };
+        var accumulatorNames = new[] { "sum", "total", "count", "acc" };
 
         foreach (var name in accumulatorNames)
         {
@@ -610,11 +610,9 @@ public class KInductionTests
 
             var invariant = InvariantTemplates.AccumulatorNonNegative.Generate(context);
 
-            if (invariant != null)
-            {
-                Assert.Contains(name, invariant);
-                Assert.Contains(">=", invariant);
-            }
+            Assert.NotNull(invariant);
+            Assert.Contains(name, invariant);
+            Assert.Contains(">=", invariant);
         }
     }
 

@@ -24,6 +24,12 @@
   "allowedSkippedTests": [
     { "reason": "Integration test - requires network access", "count": 2 }
   ],
+  "allowedRuntimeSkipSites": [
+    { "reason": "Benchmark file not found", "count": 7 },
+    { "reason": "Calor syntax not supported by parser", "count": 5 },
+    { "reason": "Z3 not available", "count": 376 },
+    { "reason": "corpus submodules not initialized", "count": 1 }
+  ],
   "releaseGates": [
     "test",
     "sdk-consumer",

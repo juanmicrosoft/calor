@@ -30,6 +30,7 @@ public class RoundTripExitPolicyTests
     [InlineData(ComparisonStatus.MinorRegressions)]
     [InlineData(ComparisonStatus.MajorRegressions)]
     [InlineData(ComparisonStatus.BuildFailed)]
+    [InlineData(ComparisonStatus.Incomplete)]
     public void EveryNonPassVerdict_IsBlocking(ComparisonStatus status)
     {
         var report = new RoundTripReport

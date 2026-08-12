@@ -150,6 +150,7 @@ jobs:
           python3 scripts/check_coverage.py --self-test
           python3 scripts/run_mutation_gate.py --self-test
           python3 scripts/run_performance_gate.py --self-test
+          python3 scripts/run_flake_gate.py --self-test
 
       - name: Check manifest, skips, assertions, and sample IDs
         run: |

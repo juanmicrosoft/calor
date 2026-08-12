@@ -48,6 +48,13 @@ public class VerificationPerformanceTests
         }
     }
 
+    private static BoundModule RequireParsedAndBound(string source)
+    {
+        var module = ParseAndBind(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        return Assert.IsType<BoundModule>(module);
+    }
+
     private static void RunFullAnalysis(BoundModule module)
     {
         var diagnostics = new DiagnosticBag();
@@ -158,7 +165,7 @@ public class VerificationPerformanceTests
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var ast = parser.Parse();
-        if (diagnostics.HasErrors) return;
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var sw = Stopwatch.StartNew();
         var binder = new Binder(diagnostics);
@@ -181,7 +188,7 @@ public class VerificationPerformanceTests
         var tokens = lexer.TokenizeAllForParser();
         var parser = new Parser(tokens, diagnostics);
         var ast = parser.Parse();
-        if (diagnostics.HasErrors) return;
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
 
         var sw = Stopwatch.StartNew();
         var binder = new Binder(diagnostics);
@@ -203,8 +210,7 @@ public class VerificationPerformanceTests
     {
         var source = SyntheticCodeGenerator.Generate(functions: 10, statementsPerFunction: 50);
 
-        var module = ParseAndBind(source, out var diagnostics);
-        if (diagnostics.HasErrors || module == null) return;
+        var module = RequireParsedAndBound(source);
 
         var sw = Stopwatch.StartNew();
         RunFullAnalysis(module);
@@ -221,8 +227,7 @@ public class VerificationPerformanceTests
     {
         var source = SyntheticCodeGenerator.Generate(functions: 50, statementsPerFunction: 100);
 
-        var module = ParseAndBind(source, out var diagnostics);
-        if (diagnostics.HasErrors || module == null) return;
+        var module = RequireParsedAndBound(source);
 
         var sw = Stopwatch.StartNew();
         RunFullAnalysis(module);
@@ -239,8 +244,7 @@ public class VerificationPerformanceTests
     {
         var source = SyntheticCodeGenerator.Generate(functions: 200, statementsPerFunction: 200);
 
-        var module = ParseAndBind(source, out var diagnostics);
-        if (diagnostics.HasErrors || module == null) return;
+        var module = RequireParsedAndBound(source);
 
         var sw = Stopwatch.StartNew();
         RunFullAnalysis(module);
@@ -262,8 +266,7 @@ public class VerificationPerformanceTests
     {
         var source = SyntheticCodeGenerator.GenerateTaintModule(functions: 20, dataFlowDepth: 50);
 
-        var module = ParseAndBind(source, out var diagnostics);
-        if (diagnostics.HasErrors || module == null) return;
+        var module = RequireParsedAndBound(source);
 
         var sw = Stopwatch.StartNew();
         var taintDiagnostics = new DiagnosticBag();
@@ -283,8 +286,7 @@ public class VerificationPerformanceTests
     {
         var source = SyntheticCodeGenerator.GenerateTaintModule(functions: 100, dataFlowDepth: 10);
 
-        var module = ParseAndBind(source, out var diagnostics);
-        if (diagnostics.HasErrors || module == null) return;
+        var module = RequireParsedAndBound(source);
 
         var sw = Stopwatch.StartNew();
         var taintDiagnostics = new DiagnosticBag();
@@ -308,8 +310,7 @@ public class VerificationPerformanceTests
     {
         var source = SyntheticCodeGenerator.GenerateControlFlowModule(functions: 20, branchDepth: 10);
 
-        var module = ParseAndBind(source, out var diagnostics);
-        if (diagnostics.HasErrors || module == null) return;
+        var module = RequireParsedAndBound(source);
 
         var sw = Stopwatch.StartNew();
         // Build CFGs for all functions (dataflow analysis foundation)
@@ -332,8 +333,7 @@ public class VerificationPerformanceTests
     {
         var source = SyntheticCodeGenerator.GenerateLoopModule(functions: 20, loopsPerFunction: 5, nestingDepth: 3);
 
-        var module = ParseAndBind(source, out var diagnostics);
-        if (diagnostics.HasErrors || module == null) return;
+        var module = RequireParsedAndBound(source);
 
         var sw = Stopwatch.StartNew();
         // Build CFGs for all functions with nested loops
@@ -429,8 +429,7 @@ public class VerificationPerformanceTests
         foreach (var funcCount in new[] { 10, 20, 40, 80 })
         {
             var source = SyntheticCodeGenerator.Generate(functions: funcCount, statementsPerFunction: 50);
-            var module = ParseAndBind(source, out var diagnostics);
-            if (module == null) continue;
+            var module = RequireParsedAndBound(source);
 
             var sw = Stopwatch.StartNew();
             RunFullAnalysis(module);
@@ -440,15 +439,12 @@ public class VerificationPerformanceTests
             _output.WriteLine($"Functions: {funcCount}, Time: {sw.ElapsedMilliseconds}ms");
         }
 
-        // Check that doubling functions doesn't more than quadruple time (O(n^2) or better)
-        if (times.Count >= 4)
-        {
-            var ratio = (double)times[3].TimeMs / times[1].TimeMs;
-            _output.WriteLine($"Time ratio (80/20 functions): {ratio:F2}x");
+        Assert.Equal(4, times.Count);
+        var ratio = (double)times[3].TimeMs / times[1].TimeMs;
+        _output.WriteLine($"Time ratio (80/20 functions): {ratio:F2}x");
 
-            Assert.True(ratio < 16,
-                $"Analysis scaling is worse than O(n^2): ratio = {ratio:F2}");
-        }
+        Assert.True(ratio < 16,
+            $"Analysis scaling is worse than O(n^2): ratio = {ratio:F2}");
     }
 
     [Fact]
@@ -459,8 +455,7 @@ public class VerificationPerformanceTests
         foreach (var stmtCount in new[] { 25, 50, 100, 200 })
         {
             var source = SyntheticCodeGenerator.Generate(functions: 20, statementsPerFunction: stmtCount);
-            var module = ParseAndBind(source, out var diagnostics);
-            if (module == null) continue;
+            var module = RequireParsedAndBound(source);
 
             var sw = Stopwatch.StartNew();
             RunFullAnalysis(module);
@@ -470,15 +465,12 @@ public class VerificationPerformanceTests
             _output.WriteLine($"Statements/function: {stmtCount}, Time: {sw.ElapsedMilliseconds}ms");
         }
 
-        // Check that doubling statements doesn't more than quadruple time
-        if (times.Count >= 4)
-        {
-            var ratio = (double)times[3].TimeMs / times[1].TimeMs;
-            _output.WriteLine($"Time ratio (200/50 statements): {ratio:F2}x");
+        Assert.Equal(4, times.Count);
+        var ratio = (double)times[3].TimeMs / times[1].TimeMs;
+        _output.WriteLine($"Time ratio (200/50 statements): {ratio:F2}x");
 
-            Assert.True(ratio < 16,
-                $"Analysis scaling is worse than O(n^2): ratio = {ratio:F2}");
-        }
+        Assert.True(ratio < 16,
+            $"Analysis scaling is worse than O(n^2): ratio = {ratio:F2}");
     }
 
     #endregion
@@ -491,16 +483,14 @@ public class VerificationPerformanceTests
         var source = @"
 §M{m001:Test}
   §F{f001:SmallFunc:pub}
-      §I{i32:x}
-      §O{i32}
-      §IF (> x INT:0)
-        §R x
-      §EL
-        §R (- INT:0 x)
-      §/IF";
+    §I{i32:x}
+    §O{i32}
+    §IF{if1} (> x INT:0)
+      §R x
+    §EL
+      §R (- INT:0 x)";
 
-        var module = ParseAndBind(source, out var diagnostics);
-        if (module == null) return;
+        var module = RequireParsedAndBound(source);
 
         var func = module.Functions.First();
 
@@ -523,8 +513,7 @@ public class VerificationPerformanceTests
     {
         var source = SyntheticCodeGenerator.GenerateControlFlowModule(functions: 1, branchDepth: 10);
 
-        var module = ParseAndBind(source, out var diagnostics);
-        if (module == null) return;
+        var module = RequireParsedAndBound(source);
 
         var func = module.Functions.First();
 

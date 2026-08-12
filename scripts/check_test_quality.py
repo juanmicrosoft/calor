@@ -14,6 +14,15 @@ TEST_PROJECT_MARKERS = ("Microsoft.NET.Test.Sdk", "<IsTestProject>true</IsTestPr
 SKIP_PATTERN = re.compile(
     r"\[(?:Fact|Theory)\s*\(\s*Skip\s*=\s*\"([^\"]+)\"\s*\)\]"
 )
+RUNTIME_SKIP_PATTERN = re.compile(
+    r"Skip\.(?:If|IfNot)\((?:(?!;).)*?,\s*\"([^\"]+)\"\s*\)", re.DOTALL
+)
+PROVABLY_NONNULL_PATTERN = re.compile(
+    r"var\s+(?P<name>\w+)\s*=\s*[^;]+\.ToList\(\)\s*;"
+    r"(?:(?!\[(?:Fact|Theory)).)*?"
+    r"Assert\.NotNull\(\s*(?P=name)\s*\)",
+    re.DOTALL,
+)
 VACUOUS_PATTERNS = (
     (
         re.compile(r"Assert\.True\s*\((?:(?!;).)*\|\|\s*true\b", re.DOTALL),
@@ -59,8 +68,27 @@ def check_manifest(root: Path, manifest: dict) -> list[str]:
         if not workflow.is_file():
             errors.append(f"workflow does not exist for {item['path']}: {item['workflow']}")
             continue
-        if item["path"] not in workflow.read_text(encoding="utf-8"):
+        workflow_text = workflow.read_text(encoding="utf-8")
+        active_text = "\n".join(
+            line for line in workflow_text.splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        if item["path"] not in active_text:
             errors.append(f"workflow does not reference declared test project: {item['path']}")
+            continue
+        if "dotnet test" not in active_text:
+            script_executes_project = False
+            for script_ref in re.findall(r"(scripts/[A-Za-z0-9_.-]+)", active_text):
+                script = root / script_ref
+                if script.is_file():
+                    script_text = script.read_text(encoding="utf-8")
+                    if item["path"] in script_text and "dotnet" in script_text and "test" in script_text:
+                        script_executes_project = True
+                        break
+            if not script_executes_project:
+                errors.append(
+                    f"workflow does not execute tests for declared project: {item['path']}"
+                )
 
     release_workflow = root / ".github/workflows/publish-nuget.yml"
     if not release_workflow.is_file():
@@ -70,7 +98,12 @@ def check_manifest(root: Path, manifest: dict) -> list[str]:
         for gate in manifest.get("releaseGates", []):
             if not re.search(rf"(?m)^  {re.escape(gate)}:", release_text):
                 errors.append(f"release workflow is missing declared gate job: {gate}")
-        needs_match = re.search(r"(?m)^    needs:\s*\[([^\]]+)\]", release_text)
+        publish_match = re.search(
+            r"(?ms)^  publish:\s*\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:|\Z)",
+            release_text,
+        )
+        publish_body = publish_match.group("body") if publish_match else ""
+        needs_match = re.search(r"(?m)^    needs:\s*\[([^\]]+)\]", publish_body)
         needs = (
             {item.strip() for item in needs_match.group(1).split(",")}
             if needs_match
@@ -109,6 +142,26 @@ def check_skips(root: Path, manifest: dict) -> list[str]:
             errors.append(
                 f"allowed skip inventory missing '{reason}': expected {count}, got {len(actual.get(reason, []))}"
             )
+
+    runtime_actual: dict[str, int] = {}
+    for source in (root / "tests").rglob("*.cs"):
+        text = source.read_text(encoding="utf-8")
+        for match in RUNTIME_SKIP_PATTERN.finditer(text):
+            runtime_actual[match.group(1)] = runtime_actual.get(match.group(1), 0) + 1
+    runtime_allowed = {
+        item["reason"]: item["count"]
+        for item in manifest.get("allowedRuntimeSkipSites", [])
+    }
+    for reason in sorted(set(runtime_actual) | set(runtime_allowed)):
+        actual_count = runtime_actual.get(reason, 0)
+        expected_count = runtime_allowed.get(reason)
+        if expected_count is None:
+            errors.append(f"unapproved runtime skip site: {reason} ({actual_count})")
+        elif actual_count != expected_count:
+            errors.append(
+                f"runtime skip site count changed for '{reason}': "
+                f"expected {expected_count}, got {actual_count}"
+            )
     return errors
 
 
@@ -121,6 +174,19 @@ def check_vacuous_assertions(root: Path) -> list[str]:
                 line = text.count("\n", 0, match.start()) + 1
                 errors.append(
                     f"{source.relative_to(root).as_posix()}:{line}: {description}"
+                )
+        for match in PROVABLY_NONNULL_PATTERN.finditer(text):
+            line = text.count("\n", 0, match.start()) + 1
+            errors.append(
+                f"{source.relative_to(root).as_posix()}:{line}: "
+                "Assert.NotNull targets a value guaranteed non-null by construction"
+            )
+        if source.name == "VerificationPerformanceTests.cs":
+            for match in re.finditer(r"\bif\s*\([^;{}]*\)\s*(?:return|continue)\s*;", text):
+                line = text.count("\n", 0, match.start()) + 1
+                errors.append(
+                    f"{source.relative_to(root).as_posix()}:{line}: "
+                    "performance test can bypass its measurement"
                 )
     return errors
 
@@ -145,13 +211,19 @@ def self_test(root: Path, manifest_path: Path) -> None:
         )
         (fixture / "tests" / "Missing.Tests" / "BadTests.cs").write_text(
             '[Fact(Skip = "hidden skip")] void Skipped() { }\n'
-            "void Vacuous() { Assert.True(items.Count >= 0); }\n",
+            '[Fact] public void Vacuous() { Assert.True(items.Count >= 0); }\n'
+            '[Fact] public void NotNullOnly() { var value = items.ToList(); Assert.NotNull(value); }\n',
             encoding="utf-8",
         )
         fixture_manifest = fixture / "manifest.json"
         fixture_manifest.write_text(json.dumps(manifest), encoding="utf-8")
         errors = run_checks(fixture, fixture_manifest)
-        expected = ("omitted from manifest", "unapproved skipped tests", "always non-negative")
+        expected = (
+            "omitted from manifest",
+            "unapproved skipped tests",
+            "always non-negative",
+            "guaranteed non-null",
+        )
         for fragment in expected:
             if not any(fragment in error for error in errors):
                 raise SystemExit(f"self-test failed to detect: {fragment}")

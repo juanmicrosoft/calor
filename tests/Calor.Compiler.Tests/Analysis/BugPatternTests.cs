@@ -411,7 +411,7 @@ public class BugPatternTests
       §R (CALL opt.unwrap_or INT:0)";
 
         var func = GetFunction(source, out var parseDiag);
-        if (parseDiag.HasErrors) return;
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag.Select(d => d.Message)));
 
         var diagnostics = new DiagnosticBag();
         var checker = new NullDereferenceChecker(DefaultOptions);

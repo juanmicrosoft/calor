@@ -4,6 +4,7 @@ import json
 import statistics
 import subprocess
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -32,18 +33,8 @@ def main() -> int:
     baseline = json.loads(Path(args.baseline).read_text(encoding="utf-8"))
     warmups = int(baseline["warmupRuns"])
     measured = int(baseline["measuredRuns"])
+    expected_tests = int(baseline["expectedTestCount"])
     metric = baseline["metrics"]["performance-suite-seconds"]
-    command = [
-        "dotnet",
-        "test",
-        "tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj",
-        "-c",
-        "Release",
-        "--no-build",
-        "--no-restore",
-        "--verbosity",
-        "quiet",
-    ]
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     log_dir = output.parent / "logs"
@@ -51,6 +42,22 @@ def main() -> int:
 
     samples: list[float] = []
     for index in range(warmups + measured):
+        results_dir = log_dir / f"results-{index + 1}"
+        command = [
+            "dotnet",
+            "test",
+            "tests/Calor.Performance.Tests/Calor.Performance.Tests.csproj",
+            "-c",
+            "Release",
+            "--no-build",
+            "--no-restore",
+            "--logger",
+            "trx;LogFileName=results.trx",
+            "--results-directory",
+            str(results_dir),
+            "--verbosity",
+            "quiet",
+        ]
         started = time.monotonic()
         result = subprocess.run(command, text=True, capture_output=True, check=False)
         elapsed = time.monotonic() - started
@@ -59,6 +66,19 @@ def main() -> int:
         log.write_text(result.stdout + result.stderr, encoding="utf-8")
         if result.returncode != 0:
             print(f"ERROR: performance test run failed; see {log}")
+            return 1
+        trx = results_dir / "results.trx"
+        if not trx.is_file():
+            print(f"ERROR: performance test run produced no TRX report; see {log}")
+            return 1
+        counters = ET.parse(trx).find(".//{*}Counters")
+        executed = int(counters.attrib.get("executed", "0")) if counters is not None else 0
+        passed = int(counters.attrib.get("passed", "0")) if counters is not None else 0
+        if executed != expected_tests or passed != expected_tests:
+            print(
+                f"ERROR: performance run executed {executed}/{expected_tests} "
+                f"expected tests with {passed} passing; see {trx}"
+            )
             return 1
         if index >= warmups:
             samples.append(elapsed)

@@ -197,6 +197,7 @@ jobs:
           python3 scripts/check_coverage.py --self-test
           python3 scripts/run_mutation_gate.py --self-test
           python3 scripts/run_performance_gate.py --self-test
+          python3 scripts/run_flake_gate.py --self-test
 
       - name: Collect component coverage
         run: |
@@ -270,6 +271,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: ${{ matrix.name == 'compiler' && 'recursive' || 'false' }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -400,7 +403,9 @@ jobs:
             conversion-scorecard.md
 
       - name: Post PR comment with scorecard
-        if: github.event_name == 'pull_request'
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         with:
           script: |
@@ -532,7 +537,9 @@ jobs:
             --output ./conversion-reports/
 
       - name: Post round-trip results to PR
-        if: github.event_name == 'pull_request'
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         with:
           script: |

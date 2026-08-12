@@ -630,6 +630,35 @@ public sealed class RoundTripPipeline
             RoundTripPassed = roundTrip.Passed,
         };
 
+        if (baseline.TotalTests == 0 || roundTrip.TotalTests == 0 ||
+            (baseline.ExitCode != 0 && baseline.Failed == 0) ||
+            (roundTrip.ExitCode != 0 && roundTrip.Failed == 0))
+        {
+            comparison.Status = ComparisonStatus.Incomplete;
+            return comparison;
+        }
+
+        if (baseline.UsedConsoleFallback || roundTrip.UsedConsoleFallback)
+        {
+            comparison.Status =
+                baseline.UsedConsoleFallback == roundTrip.UsedConsoleFallback &&
+                baseline.TotalTests == roundTrip.TotalTests &&
+                baseline.Passed == roundTrip.Passed &&
+                baseline.Failed == roundTrip.Failed &&
+                baseline.Skipped == roundTrip.Skipped
+                    ? ComparisonStatus.Pass
+                    : ComparisonStatus.Incomplete;
+            return comparison;
+        }
+
+        var baselineInventory = baseline.Results.Select(t => t.Identity).ToHashSet();
+        var roundTripInventory = roundTrip.Results.Select(t => t.Identity).ToHashSet();
+        if (!baselineInventory.SetEquals(roundTripInventory))
+        {
+            comparison.Status = ComparisonStatus.Incomplete;
+            return comparison;
+        }
+
         // Find regressions: passing in baseline, failing after round-trip.
         // Match on the robust Identity (assembly + executor + class + display name)
         // so duplicate display names across test assemblies never collide.

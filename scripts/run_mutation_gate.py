@@ -103,6 +103,19 @@ def main() -> int:
         )
         print(f"{mutant['component']}: {status} ({elapsed:.2f}s)")
 
+    original_build = subprocess.run(
+        ["dotnet", "build", "-c", "Release", "--no-restore", "--verbosity", "quiet"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    (logs / "original-rebuild.log").write_text(
+        original_build.stdout + original_build.stderr, encoding="utf-8"
+    )
+    if original_build.returncode != 0:
+        print("ERROR: failed to rebuild original outputs after mutation testing")
+        return 1
+
     killed = sum(result["status"] == "killed" for result in results)
     total = len(results)
     score = 100 * killed / total if total else 0

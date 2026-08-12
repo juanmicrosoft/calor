@@ -107,6 +107,7 @@ async Task<int> RunCommand(string[] runArgs)
         if (config == null)
         {
             Console.Error.WriteLine($"Unknown project: {projectName}. Use 'list' to see known projects.");
+            anyFailure = true;
             continue;
         }
 

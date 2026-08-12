@@ -122,6 +122,38 @@ public class ComparisonTests
     }
 
     [Fact]
+    public void ZeroTestRun_ReturnsIncomplete()
+    {
+        var empty = new TestRunResult { ExitCode = 0 };
+
+        var result = Compare(empty, empty, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+    }
+
+    [Fact]
+    public void AbortedTesthostWithoutFailures_ReturnsIncomplete()
+    {
+        var baseline = MakeTestRun("Test1:Passed");
+        var aborted = new TestRunResult { ExitCode = 1 };
+
+        var result = Compare(baseline, aborted, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+    }
+
+    [Fact]
+    public void ReducedTestInventory_ReturnsIncomplete()
+    {
+        var baseline = MakeTestRun("Test1:Passed", "Test2:Passed");
+        var roundTrip = MakeTestRun("Test1:Passed");
+
+        var result = Compare(baseline, roundTrip, new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.Incomplete, result.Status);
+    }
+
+    [Fact]
     public void DuplicateDisplayNames_AcrossAssemblies_NotConflated()
     {
         // Same display name "SharedName" in two assemblies: passing in alpha,

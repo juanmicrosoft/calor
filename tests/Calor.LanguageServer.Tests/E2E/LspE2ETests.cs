@@ -312,11 +312,12 @@ public class LspE2ETests : IDisposable
         var response = await SendRequestAsync("textDocument/hover", new
         {
             textDocument = new { uri = "file:///test/test.calr" },
-            position = new { line = 1, character = 8 } // Should be on "Add"
+            position = new { line = 1, character = 11 }
         });
 
         Assert.True(response.RootElement.TryGetProperty("result", out var result));
         Assert.NotEqual(JsonValueKind.Null, result.ValueKind);
+        Assert.Contains("Add", result.GetRawText(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -355,7 +356,11 @@ public class LspE2ETests : IDisposable
         });
 
         Assert.True(response.RootElement.TryGetProperty("result", out var result));
-        Assert.NotEqual(JsonValueKind.Null, result.ValueKind);
+        Assert.Equal(JsonValueKind.Array, result.ValueKind);
+        Assert.NotEmpty(result.EnumerateArray());
+        Assert.Contains(
+            result.EnumerateArray(),
+            item => item.TryGetProperty("label", out var label) && label.GetString() == "§M");
     }
 
     [Fact]

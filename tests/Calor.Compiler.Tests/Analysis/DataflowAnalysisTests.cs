@@ -164,9 +164,8 @@ public class DataflowAnalysisTests
         var cfg = ControlFlowGraph.Build(func);
         var analysis = new ReachingDefinitionsAnalysis(cfg);
 
-        // The definition of x should reach the exit
         var exitDefs = analysis.GetReachingDefinitionsAtExit(cfg.Exit).ToList();
-        Assert.NotNull(exitDefs);
+        Assert.Contains(exitDefs, definition => definition.VariableName == "x");
     }
 
     [Fact]
@@ -249,9 +248,8 @@ public class DataflowAnalysisTests
         var cfg = ControlFlowGraph.Build(func);
         var analysis = new LiveVariablesAnalysis(cfg);
 
-        // x should be live at entry since it's used in return
         var entryLive = analysis.GetLiveVariablesAtEntry(cfg.Entry).ToList();
-        Assert.NotNull(entryLive);
+        Assert.Contains("x", entryLive);
     }
 
     [Fact]
@@ -292,7 +290,7 @@ public class DataflowAnalysisTests
         var analysis = new LiveVariablesAnalysis(cfg);
 
         var exitLive = analysis.GetLiveVariablesAtExit(cfg.Exit).ToList();
-        Assert.NotNull(exitLive);
+        Assert.Contains("x", exitLive);
     }
 
     #endregion
