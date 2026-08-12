@@ -28,6 +28,11 @@
       §R BOOL:true
     §R §C{StartsWith} §A t §A "#" §/C
 
+  §F{f007:IsPendingMarker:pri} (str:line) -> bool
+    §E{}
+    §B{t:str} (trim line)
+    §R §C{StartsWith} §A t §A "# pending" §/C
+
   §F{f004:IsStructurallyExempt:pri} (str:path) -> bool
     §E{}
     §IF{if4} §C{StartsWith} §A path §A "tests/" §/C
@@ -56,9 +61,18 @@
     §B{~findings:i32} INT:0
     §B{~entries:i32} INT:0
 
+    §B{~pending:bool} BOOL:false
     §P "allowlist-audit: checking .calor-csharp-allowlist"
     §EACH{e1:raw} lines
       §B{skip:bool} §C{IsSkippable} §A raw §/C
+      §IF{if17} skip
+        // A "# pending" comment marks the entry on the NEXT line as
+        // pre-registered for code that has not merged yet. The Calor-first
+        // guard requires the entry to land before the file, so without this the
+        // two controls deadlock: the guard demands the entry first, and this
+        // audit fails it for not existing. Any other comment, or a blank line,
+        // clears the mark — the marker must sit immediately above its entry.
+        §ASSIGN pending §C{IsPendingMarker} §A raw §/C
       §IF{if8} (! skip)
         §B{entry:str} (trim raw)
         §ASSIGN entries (+ entries INT:1)
@@ -89,9 +103,23 @@
         §IF{if13} (! wild)
           §IF{if14} isCs
             §B{onDisk:bool} §C{File.Exists} §A entry §/C
+            // Pending is a temporary state and clears itself: once the file
+            // exists the marker must go, or the entry would keep its exemption
+            // from the staleness check forever — which is the hole this audit
+            // exists to close, reopened by the workaround for it.
+            §IF{if18} onDisk
+              §IF{if19} pending
+                §C{Report} §A entry §A "is marked pending but now exists; remove the pending marker" §/C
+                §ASSIGN findings (+ findings INT:1)
             §IF{if15} (! onDisk)
-              §C{Report} §A entry §A "does not exist; a stale entry keeps permission alive for a path nothing occupies" §/C
-              §ASSIGN findings (+ findings INT:1)
+              §IF{if20} pending
+                §P (+ "  " (+ entry " — pending: pre-registered, file not merged yet"))
+              §IF{if21} (! pending)
+                §C{Report} §A entry §A "does not exist; a stale entry keeps permission alive for a path nothing occupies" §/C
+                §ASSIGN findings (+ findings INT:1)
+
+        // The mark applies to exactly one entry, never to the rest of the file.
+        §ASSIGN pending BOOL:false
 
     §P (+ (+ (+ (+ "allowlist-audit: " entries) " entries, ") findings) " finding(s)")
     §IF{if16} (> findings INT:0)
