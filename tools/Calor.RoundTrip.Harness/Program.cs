@@ -60,6 +60,8 @@ async Task<int> RunCommand(string[] runArgs)
     var buildTimeout = double.TryParse(GetOption(runArgs, "--build-timeout"), out var bt) && bt > 0
         ? TimeSpan.FromMinutes(bt)
         : (TimeSpan?)null;
+    var minimumCoverage = ParseFractionOption(runArgs, "--min-coverage");
+    var minimumNative = ParseFractionOption(runArgs, "--min-native");
 
     // Resolve paths
     projectsDir = Path.GetFullPath(projectsDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
@@ -72,7 +74,11 @@ async Task<int> RunCommand(string[] runArgs)
     Directory.CreateDirectory(outputDir);
 
     // Collect project names: skip flags and their values
-    var optionsWithValues = new HashSet<string> { "--projects-dir", "--output", "--dotnet", "--build-timeout" };
+    var optionsWithValues = new HashSet<string>
+    {
+        "--projects-dir", "--output", "--dotnet", "--build-timeout",
+        "--min-coverage", "--min-native"
+    };
     var projectNames = new List<string>();
     if (runAll)
     {
@@ -126,7 +132,10 @@ async Task<int> RunCommand(string[] runArgs)
             ExcludePatterns = config.ExcludePatterns,
             TestTimeout = config.TestTimeout,
             BuildTimeout = buildTimeout ?? config.BuildTimeout,
+            ConversionTimeout = config.ConversionTimeout,
             TestFilter = config.TestFilter,
+            MinimumCoverageFraction = minimumCoverage ?? config.MinimumCoverageFraction,
+            MinimumNativeFraction = minimumNative ?? config.MinimumNativeFraction,
         };
 
         Console.WriteLine();
@@ -141,7 +150,22 @@ async Task<int> RunCommand(string[] runArgs)
         // which would make `dotnet` refuse to start in that directory. The working
         // copy neutralizes corpus global.json so every subject builds on Calor's
         // pinned .NET 10 SDK.
-        var report = await pipeline.RunAsync(config);
+        using var cancellation = new CancellationTokenSource();
+        ConsoleCancelEventHandler cancelHandler = (_, eventArgs) =>
+        {
+            eventArgs.Cancel = true;
+            cancellation.Cancel();
+        };
+        Console.CancelKeyPress += cancelHandler;
+        RoundTripReport report;
+        try
+        {
+            report = await pipeline.RunAsync(config, cancellation.Token);
+        }
+        finally
+        {
+            Console.CancelKeyPress -= cancelHandler;
+        }
 
         // Write reports
         var mdPath = Path.Combine(outputDir, $"{config.ProjectName}-roundtrip.md");
@@ -150,14 +174,8 @@ async Task<int> RunCommand(string[] runArgs)
         await File.WriteAllTextAsync(jsonPath, ReportGenerator.GenerateJson(report));
 
         // Print summary
-        var verdictEmoji = report.Comparison?.Status switch
-        {
-            ComparisonStatus.Pass => "PASS",
-            ComparisonStatus.MinorRegressions => "WARN",
-            ComparisonStatus.MajorRegressions => "FAIL",
-            ComparisonStatus.BuildFailed => "FAIL",
-            _ => "???",
-        };
+        var gateFailures = RoundTripExitPolicy.GetFailureReasons(report);
+        var verdictEmoji = gateFailures.Count == 0 ? "PASS" : "FAIL";
 
         Console.WriteLine($"\n{verdictEmoji} {config.ProjectName}: {report.Comparison?.Status}");
         Console.WriteLine($"   Baseline: {report.Baseline?.Passed}/{report.Baseline?.TotalTests} passing");
@@ -175,12 +193,24 @@ async Task<int> RunCommand(string[] runArgs)
             Console.WriteLine($"   Interop blocks: {cov.TotalInteropBlocks}; distinct gaps: {cov.DistinctGaps.Count}");
         }
         Console.WriteLine($"   Report: {mdPath}");
+        foreach (var reason in gateFailures)
+            Console.WriteLine($"   BLOCKED: {reason}");
 
-        if (RoundTripExitPolicy.IsFailure(report))
+        if (gateFailures.Count > 0)
             anyFailure = true;
     }
 
     return anyFailure ? 1 : 0;
+}
+
+double? ParseFractionOption(string[] args, string name)
+{
+    var value = GetOption(args, name);
+    if (value == null)
+        return null;
+    if (!double.TryParse(value, out var parsed) || parsed < 0 || parsed > 1)
+        throw new ArgumentException($"{name} must be a number between 0 and 1.");
+    return parsed;
 }
 
 async Task<int> GenTasksCommand(string[] genArgs)
@@ -315,8 +345,8 @@ async Task<int> FailureCensusCommand(string[] args)
         foreach (var fd in detail.EnumerateArray())
         {
             var status = fd.GetProperty("status").GetString() ?? "?";
-            // The non-native gap: everything that is not a zero-loss Replaced file. Excluded files
-            // are outside the denominator by construction (they are not convertible).
+            // The attempted-file cause census excludes configured source exclusions;
+            // coverage reports disclose them separately as denominator failures.
             if (status is "Replaced" or "Excluded") continue;
 
             var path = fd.GetProperty("path").GetString() ?? "?";
@@ -836,6 +866,8 @@ static void PrintUsage()
           --output <path>          Output directory for reports (default: conversion-reports)
           --dotnet <path>          Path to dotnet executable (or a bare 'dotnet' on PATH)
           --build-timeout <min>    Per-build timeout in minutes (default 15)
+          --min-coverage <0..1>    Override the project's minimum total coverage
+          --min-native <0..1>      Override the project's minimum native coverage
           --bisect                 Enable regression bisection
 
         Options (gen-tasks):

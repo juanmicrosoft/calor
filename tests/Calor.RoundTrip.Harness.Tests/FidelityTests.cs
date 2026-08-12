@@ -11,6 +11,26 @@ namespace Calor.RoundTrip.Harness.Tests;
 /// </summary>
 public class FidelityTests
 {
+    [Theory]
+    [InlineData("Synthetic", 0.625, 0.625)]
+    [InlineData("Synthetic2", 0.25, 0.25)]
+    [InlineData("MediatR", 0.55, 0.40)]
+    [InlineData("Serilog", 0.30, 0.25)]
+    [InlineData("FluentValidation", 0.50, 0.48)]
+    public void KnownProjects_HaveExplicitCoverageThresholds(
+        string project,
+        double minimumCoverage,
+        double minimumNative)
+    {
+        var config = Assert.IsType<RoundTripConfig>(
+            ProjectConfigs.Get(project, "/corpus", "dotnet"));
+
+        Assert.Equal(minimumCoverage, config.MinimumCoverageFraction);
+        Assert.Equal(minimumNative, config.MinimumNativeFraction);
+        Assert.True(config.MinimumCoverageFraction > 0);
+        Assert.True(config.MinimumNativeFraction > 0);
+    }
+
     // ---- Coverage: reverted-file-in-denominator accounting ----
 
     [Fact]
@@ -52,7 +72,7 @@ public class FidelityTests
     }
 
     [Fact]
-    public void Coverage_ExcludedFiles_OutsideDenominator_ButReported()
+    public void Coverage_ExcludedFiles_StayInDenominator_AsFailures()
     {
         var files = new List<FileConversionResult>
         {
@@ -62,8 +82,9 @@ public class FidelityTests
 
         var cov = ConversionCoverage.Compute(files, excludedFileCount: 3);
 
-        Assert.Equal(1, cov.TotalConvertibleFiles);
-        Assert.Equal(1.0, cov.CoverageFraction);
+        Assert.Equal(5, cov.TotalConvertibleFiles);
+        Assert.Equal(0.2, cov.CoverageFraction);
+        Assert.Equal(0.2, cov.NativeFraction);
         Assert.Equal(4, cov.ExcludedFiles); // 3 pattern-skipped + 1 explicit Excluded status
     }
 
@@ -133,6 +154,22 @@ public class FidelityTests
         Assert.Equal(2, cov.LossKindCounts["InteropPreserved"]);
         Assert.Equal(2, cov.LossKindCounts["FallbackTodo"]);
         Assert.Equal(1, cov.LossKindCounts["PreprocessorStripped"]);
+    }
+
+    [Fact]
+    public void Coverage_AllInterop_HasZeroNativeFraction()
+    {
+        var first = Converted("Lib/A.cs");
+        first.ApplyLossLedger([Loss(ConversionLossKind.InteropPreserved, "record")]);
+        var second = Converted("Lib/B.cs");
+        second.ApplyLossLedger([Loss(ConversionLossKind.EmitterFallback, "raw-csharp")]);
+
+        var coverage = ConversionCoverage.Compute([first, second], excludedFileCount: 0);
+
+        Assert.Equal(1.0, coverage.CoverageFraction);
+        Assert.Equal(0.0, coverage.NativeFraction);
+        Assert.Equal(2, coverage.ConvertedWithLosses);
+        Assert.Equal(2, coverage.TotalInteropBlocks);
     }
 
     // ---- Separated verdict dimensions ----

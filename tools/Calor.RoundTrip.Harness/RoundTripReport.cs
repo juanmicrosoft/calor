@@ -15,9 +15,10 @@ public sealed class RoundTripReport
     public TimeSpan Duration => FinishedAt - StartedAt;
 
     public TestRunResult? Baseline { get; set; }
+    public BuildResult? BaselineBuildResult { get; set; }
     public List<FileConversionResult> FileResults { get; set; } = [];
 
-    /// <summary>Count of candidate .cs files skipped by exclude patterns (generated code etc.). Not in the coverage denominator, but reported so nothing disappears silently.</summary>
+    /// <summary>Count of candidate .cs files skipped by exclude patterns. Exclusions remain in the coverage denominator.</summary>
     public int ExcludedFileCount { get; set; }
 
     public BuildResult? BuildResult { get; set; }
@@ -26,6 +27,8 @@ public sealed class RoundTripReport
 
     /// <summary>Separated verdict dimensions (#776): coverage, build, tests — the substrate the A-1.4 fidelity gate thresholds on.</summary>
     public ProjectFidelity? Fidelity { get; set; }
+    public double MinimumCoverageFraction { get; set; }
+    public double MinimumNativeFraction { get; set; }
 
     /// <summary>
     /// True when the run could NOT be adjudicated: the post-conversion build failed but
@@ -136,7 +139,9 @@ public enum FileStatus
 {
     Replaced,
     ConversionFailed,
+    ConversionTimedOut,
     EmitSyntaxError,
+    EmitCompilationError,
     CompileError,
     Crashed,
     Excluded,
@@ -187,8 +192,14 @@ public sealed class TestResult
     /// <summary>Test assembly file name (from the TRX TestDefinitions storage attribute).</summary>
     public string Assembly { get; init; } = "";
 
+    /// <summary>Project identity inferred from the TRX path relative to the harness working directory.</summary>
+    public string Project { get; init; } = "";
+
     /// <summary>Fully qualified class name (from the TRX TestMethod className attribute).</summary>
     public string ClassName { get; init; } = "";
+
+    /// <summary>Fully qualified test name from the TRX definition.</summary>
+    public string FullyQualifiedName { get; init; } = "";
 
     /// <summary>Executor URI (adapter identity) from the TRX definition, when present.</summary>
     public string ExecutorUri { get; init; } = "";
@@ -204,7 +215,8 @@ public sealed class TestResult
     /// same display name in different assemblies/classes never collide.
     /// </summary>
     [JsonIgnore]
-    public string Identity => $"{Assembly}::{ExecutorUri}::{ClassName}::{TestName}";
+    public string Identity =>
+        $"{Project}::{Assembly}::{ExecutorUri}::{FullyQualifiedName}::{TestName}";
 }
 
 public sealed class TestComparison
@@ -249,7 +261,10 @@ public sealed class ProjectFidelity
         return new ProjectFidelity
         {
             Coverage = ConversionCoverage.Compute(report.FileResults, report.ExcludedFileCount),
-            Build = BuildOutcomeSummary.Compute(report.BuildResult, report.FileResults),
+            Build = BuildOutcomeSummary.Compute(
+                report.BaselineBuildResult,
+                report.BuildResult,
+                report.FileResults),
             Tests = TestOutcomeSummary.Compute(report.Baseline, report.RoundTripTests, report.Comparison),
         };
     }
@@ -261,7 +276,7 @@ public sealed class ProjectFidelity
 /// </summary>
 public sealed class ConversionCoverage
 {
-    /// <summary>All convertible files (everything attempted, including reverted and failed). The denominator.</summary>
+    /// <summary>All candidate files, including excluded, reverted, and failed files. The denominator.</summary>
     public int TotalConvertibleFiles { get; init; }
 
     /// <summary>Converted, kept, zero ledger losses.</summary>
@@ -276,7 +291,7 @@ public sealed class ConversionCoverage
     /// <summary>Never replaced: conversion / emit / compile failures and crashes.</summary>
     public int FailedConversion { get; init; }
 
-    /// <summary>Files skipped by exclude patterns (not in the denominator, reported for honesty).</summary>
+    /// <summary>Files skipped by exclude patterns. They remain coverage failures in the denominator.</summary>
     public int ExcludedFiles { get; init; }
 
     /// <summary>(ConvertedNative + ConvertedWithLosses) / TotalConvertibleFiles.</summary>
@@ -300,7 +315,8 @@ public sealed class ConversionCoverage
         var native = counted.Count(f => f.ConvertedNative);
         var withLosses = counted.Count(f => f.ConvertedAndKept && f.LossCount > 0);
         var reverted = counted.Count(f => f.Status == FileStatus.Reverted);
-        var total = counted.Count;
+        var excluded = excludedFileCount + files.Count(f => f.Status == FileStatus.Excluded);
+        var total = counted.Count + excluded;
 
         return new ConversionCoverage
         {
@@ -308,8 +324,8 @@ public sealed class ConversionCoverage
             ConvertedNative = native,
             ConvertedWithLosses = withLosses,
             Reverted = reverted,
-            FailedConversion = total - native - withLosses - reverted,
-            ExcludedFiles = excludedFileCount + files.Count(f => f.Status == FileStatus.Excluded),
+            FailedConversion = counted.Count - native - withLosses - reverted,
+            ExcludedFiles = excluded,
             CoverageFraction = total > 0 ? (double)(native + withLosses) / total : 0.0,
             NativeFraction = total > 0 ? (double)native / total : 0.0,
             LossKindCounts = counted
@@ -329,6 +345,7 @@ public sealed class ConversionCoverage
 /// <summary>Post-conversion build state, including how much recovery it took.</summary>
 public sealed class BuildOutcomeSummary
 {
+    public bool BaselineSucceeded { get; init; }
     public bool Succeeded { get; init; }
     public int ExitCode { get; init; }
 
@@ -337,10 +354,14 @@ public sealed class BuildOutcomeSummary
 
     public int ErrorCount { get; init; }
 
-    public static BuildOutcomeSummary Compute(BuildResult? build, IReadOnlyList<FileConversionResult> files)
+    public static BuildOutcomeSummary Compute(
+        BuildResult? baselineBuild,
+        BuildResult? build,
+        IReadOnlyList<FileConversionResult> files)
     {
         return new BuildOutcomeSummary
         {
+            BaselineSucceeded = baselineBuild?.Succeeded ?? false,
             Succeeded = build?.Succeeded ?? false,
             ExitCode = build?.ExitCode ?? -1,
             RecoveryRevertedFiles = files.Count(f => f.Status == FileStatus.Reverted),

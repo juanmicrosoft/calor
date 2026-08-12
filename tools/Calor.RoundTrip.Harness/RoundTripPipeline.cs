@@ -1,6 +1,6 @@
+using System.Collections.Concurrent;
 using Calor.Compiler.Migration;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
+using Calor.Compiler.CodeGen;
 
 namespace Calor.RoundTrip.Harness;
 
@@ -13,18 +13,22 @@ public sealed class RoundTripPipeline
     /// <summary>
     /// Run the full round-trip pipeline for a target project.
     /// </summary>
-    public async Task<RoundTripReport> RunAsync(RoundTripConfig config)
+    public async Task<RoundTripReport> RunAsync(
+        RoundTripConfig config,
+        CancellationToken cancellationToken = default)
     {
         var report = new RoundTripReport
         {
             ProjectName = config.ProjectName,
             CalorVersion = GetCalorVersion(),
             StartedAt = DateTimeOffset.UtcNow,
+            MinimumCoverageFraction = config.MinimumCoverageFraction,
+            MinimumNativeFraction = config.MinimumNativeFraction,
         };
 
         // Step 1: Snapshot
         Console.WriteLine($"Phase 1/5: Creating working copy of {config.ProjectName}...");
-        var workDir = PrepareWorkingCopy(config);
+        var workDir = PrepareWorkingCopy(config, cancellationToken);
         Console.WriteLine($"  Working directory: {workDir}");
 
         // No separate pre-restore step: `dotnet build`/`dotnet test` restore the graph
@@ -36,31 +40,39 @@ public sealed class RoundTripPipeline
         // against a known-good baseline.
         Console.WriteLine("\nPhase 2/5: Running baseline tests...");
         TrxParser.CleanTrxFiles(workDir);
-        var baselineBuild = await BuildProjectAsync(workDir, config);
-        if (!baselineBuild.Succeeded)
+        report.BaselineBuildResult = await BuildProjectAsync(
+            workDir, config, cancellationToken);
+        if (!report.BaselineBuildResult.Succeeded)
             Console.WriteLine("  WARNING: baseline build failed (the vendored subject does not build clean here)");
-        report.Baseline = await RunTestsAsync(workDir, config, noBuild: baselineBuild.Succeeded);
+        report.Baseline = await RunTestsAsync(
+            workDir,
+            config,
+            noBuild: report.BaselineBuildResult.Succeeded,
+            cancellationToken);
         Console.WriteLine($"  Baseline: {report.Baseline.Passed}/{report.Baseline.TotalTests} passed, {report.Baseline.Failed} failed, {report.Baseline.Skipped} skipped");
 
         // Step 3: Convert & Replace
         Console.WriteLine("\nPhase 3/5: Converting library source files...");
-        report.FileResults = await ConvertAndReplaceAsync(workDir, config, report);
+        report.FileResults = await ConvertAndReplaceAsync(
+            workDir, config, report, cancellationToken);
         var replaced = report.FileResults.Count(f => f.Status == FileStatus.Replaced);
         var total = report.FileResults.Count;
         Console.WriteLine($"  Converted: {replaced}/{total} files replaced");
 
         // Step 4: Build (with recovery — revert files that cause build errors)
         Console.WriteLine("\nPhase 4/5: Building modified project...");
-        report.BuildResult = await BuildProjectAsync(workDir, config);
+        report.BuildResult = await BuildProjectAsync(workDir, config, cancellationToken);
 
         if (!report.BuildResult.Succeeded)
         {
             Console.WriteLine("  Build failed — attempting recovery by reverting problematic files...");
-            var revertedCount = await RecoverBuildAsync(workDir, config, report.FileResults);
+            var revertedCount = await RecoverBuildAsync(
+                workDir, config, report.FileResults, cancellationToken);
             if (revertedCount > 0)
             {
                 Console.WriteLine($"  Reverted {revertedCount} file(s), rebuilding...");
-                report.BuildResult = await BuildProjectAsync(workDir, config);
+                report.BuildResult = await BuildProjectAsync(
+                    workDir, config, cancellationToken);
             }
         }
 
@@ -84,7 +96,8 @@ public sealed class RoundTripPipeline
         {
             Console.WriteLine("\nPhase 5/5: Running round-trip tests...");
             TrxParser.CleanTrxFiles(workDir);
-            report.RoundTripTests = await RunTestsAsync(workDir, config);
+            report.RoundTripTests = await RunTestsAsync(
+                workDir, config, cancellationToken: cancellationToken);
             Console.WriteLine($"  Round-trip: {report.RoundTripTests.Passed}/{report.RoundTripTests.TotalTests} passed, {report.RoundTripTests.Failed} failed");
         }
         else
@@ -118,14 +131,20 @@ public sealed class RoundTripPipeline
         {
             Console.WriteLine($"\nBisecting {report.Comparison.Regressions.Count} regressions...");
             report.BisectResults = await BisectRegressionsAsync(
-                workDir, config, report.Comparison.Regressions, report.FileResults);
+                workDir,
+                config,
+                report.Comparison.Regressions,
+                report.FileResults,
+                cancellationToken);
         }
 
         report.FinishedAt = DateTimeOffset.UtcNow;
         return report;
     }
 
-    internal string PrepareWorkingCopy(RoundTripConfig config)
+    internal string PrepareWorkingCopy(
+        RoundTripConfig config,
+        CancellationToken cancellationToken = default)
     {
         var workDir = config.WorkingDirectory
             ?? Path.Combine(Path.GetTempPath(), "calor-roundtrip", config.ProjectName, Guid.NewGuid().ToString("N")[..8]);
@@ -133,16 +152,21 @@ public sealed class RoundTripPipeline
         if (Directory.Exists(workDir))
             Directory.Delete(workDir, recursive: true);
 
-        CopyDirectory(config.OriginalProjectPath, workDir);
+        CopyDirectory(config.OriginalProjectPath, workDir, cancellationToken);
         return workDir;
     }
 
-    private static void CopyDirectory(string source, string destination)
+    private static void CopyDirectory(
+        string source,
+        string destination,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         Directory.CreateDirectory(destination);
 
         foreach (var file in Directory.GetFiles(source))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var fileName = Path.GetFileName(file);
             // Skip the submodule gitlink: for a git submodule, `.git` is a FILE
             // ("gitdir: …"), not a directory, so the directory-exclusion below misses
@@ -164,15 +188,20 @@ public sealed class RoundTripPipeline
 
         foreach (var dir in Directory.GetDirectories(source))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var dirName = Path.GetFileName(dir);
             // Skip .git, bin, obj to speed up copy
             if (dirName is ".git" or "bin" or "obj" or ".vs" or ".idea")
                 continue;
-            CopyDirectory(dir, Path.Combine(destination, dirName));
+            CopyDirectory(dir, Path.Combine(destination, dirName), cancellationToken);
         }
     }
 
-    internal async Task<TestRunResult> RunTestsAsync(string workDir, RoundTripConfig config, bool noBuild = false)
+    internal async Task<TestRunResult> RunTestsAsync(
+        string workDir,
+        RoundTripConfig config,
+        bool noBuild = false,
+        CancellationToken cancellationToken = default)
     {
         // Pass the project RELATIVE to workDir (which is the process working directory),
         // never an absolute path. On macOS the temp root is /var/folders/… — a symlink
@@ -183,7 +212,7 @@ public sealed class RoundTripPipeline
         // path keeps every path in one canonical form.
         var target = config.SolutionOrProjectFile;
 
-        var args = $"test \"{target}\" --logger \"trx;LogFileName=results.trx\" --logger \"console;verbosity=normal\"";
+        var args = $"test \"{target}\" --logger \"trx;LogFilePrefix=roundtrip\" --logger \"console;verbosity=normal\"";
         if (config.TargetFramework != null)
             args += $" --framework {config.TargetFramework}";
         if (noBuild)
@@ -194,7 +223,11 @@ public sealed class RoundTripPipeline
             args += $" {config.ExtraBuildProperties}";
 
         var (exitCode, stdout, stderr) = await ProcessRunner.RunAsync(
-            config.DotnetPath, args, workDir, config.TestTimeout);
+            config.DotnetPath,
+            args,
+            workDir,
+            config.TestTimeout,
+            cancellationToken: cancellationToken);
 
         // Parse and aggregate ALL TRX files (one per test assembly)
         var (testResults, trxFiles, parseErrors) = TrxParser.ParseAll(workDir);
@@ -262,18 +295,22 @@ public sealed class RoundTripPipeline
     }
 
     internal async Task<List<FileConversionResult>> ConvertAndReplaceAsync(
-        string workDir, RoundTripConfig config, RoundTripReport report)
+        string workDir,
+        RoundTripConfig config,
+        RoundTripReport report,
+        CancellationToken cancellationToken = default)
     {
-        var results = new List<FileConversionResult>();
+        var results = new ConcurrentBag<FileConversionResult>();
         var libDir = Path.Combine(workDir, config.LibrarySourceRelativePath);
 
         if (!Directory.Exists(libDir))
         {
             Console.Error.WriteLine($"  ERROR: Library source directory not found: {libDir}");
-            return results;
+            return [];
         }
 
         var allCsFiles = Directory.GetFiles(libDir, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutputPath(path))
             .OrderBy(f => f)
             .ToList();
         var csFiles = allCsFiles
@@ -283,26 +320,43 @@ public sealed class RoundTripPipeline
 
         Console.WriteLine($"  Found {csFiles.Count} C# files to convert ({report.ExcludedFileCount} excluded by pattern)");
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions
-        {
-            Fidelity = ConversionFidelity.Lossy,
-            GracefulFallback = true,
-            PreserveComments = true,
-            AutoGenerateIds = true,
-        });
-
-        var convertedCount = 0;
-        foreach (var csFile in csFiles)
+        var completedCount = 0;
+        await Parallel.ForEachAsync(
+            csFiles,
+            new ParallelOptions
+            {
+                CancellationToken = cancellationToken,
+                MaxDegreeOfParallelism = Math.Min(2, Math.Max(1, Environment.ProcessorCount)),
+            },
+            async (csFile, token) =>
         {
             var relativePath = Path.GetRelativePath(workDir, csFile);
             var result = new FileConversionResult { FilePath = relativePath };
+            config.FileConversionStarted?.Invoke(relativePath);
 
             try
             {
-                var originalSource = await File.ReadAllTextAsync(csFile);
+                var originalSource = await File.ReadAllTextAsync(csFile, token);
+                var converter = new CSharpToCalorConverter(new ConversionOptions
+                {
+                    Fidelity = ConversionFidelity.Lossless,
+                    GracefulFallback = true,
+                    PassthroughOnError = true,
+                    // The harness compiles the exact post-processed generated bytes
+                    // below before writing them.
+                    ValidateRoundTripCSharp = false,
+                    PreserveComments = true,
+                    AutoGenerateIds = true,
+                });
 
                 // Step 3a: Convert C# → Calor
-                var conversionResult = converter.Convert(originalSource, csFile);
+                var conversionTask = Task.Run(
+                    () => converter.Convert(originalSource, csFile),
+                    token);
+                var conversionResult = await conversionTask.WaitAsync(
+                    config.ConversionTimeout,
+                    token);
+                token.ThrowIfCancellationRequested();
 
                 result.ConversionSuccess = conversionResult.Success;
                 result.ConversionRate = conversionResult.Context.Stats.ConversionRate;
@@ -318,33 +372,39 @@ public sealed class RoundTripPipeline
                     {
                         EnforceEffects = false,
                         ContractMode = Compiler.ContractMode.Off,
+                        DeferGeneratedOutputValidation = true,
+                        CancellationToken = token,
                     };
                     var compileResult = Compiler.Program.Compile(
                         conversionResult.CalorSource, csFile, compileOptions);
+                    token.ThrowIfCancellationRequested();
 
                     if (!compileResult.HasErrors && !string.IsNullOrWhiteSpace(compileResult.GeneratedCode))
                     {
                         // Step 3c: Post-process emitted C# for round-trip compatibility
                         var emitted = PostProcessEmittedCSharp(compileResult.GeneratedCode, originalSource);
 
-                        // Step 3d: Verify emitted C# parses
-                        var syntaxTree = CSharpSyntaxTree.ParseText(emitted);
-                        var parseDiags = syntaxTree.GetDiagnostics()
-                            .Where(d => d.Severity == DiagnosticSeverity.Error)
+                        // Step 3d: Syntax-check now. All emitted files are compiled
+                        // together with project sources/references below before any
+                        // project file is replaced.
+                        var syntaxErrors = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree
+                            .ParseText(emitted)
+                            .GetDiagnostics()
+                            .Where(diagnostic =>
+                                diagnostic.Severity ==
+                                Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
                             .ToList();
-
-                        if (parseDiags.Count > 0)
+                        if (syntaxErrors.Count > 0)
                         {
                             result.Status = FileStatus.EmitSyntaxError;
-                            result.Errors = parseDiags.Select(d => d.GetMessage()).ToList();
+                            result.Errors = syntaxErrors
+                                .Select(FormatDiagnostic)
+                                .ToList();
                         }
                         else
                         {
-                            // Step 3e: Replace the file
-                            await File.WriteAllTextAsync(csFile, emitted);
                             result.Status = FileStatus.Replaced;
                             result.EmittedCSharp = emitted;
-                            convertedCount++;
                         }
                     }
                     else
@@ -362,6 +422,18 @@ public sealed class RoundTripPipeline
                         .Select(i => i.Message).ToList();
                 }
             }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (TimeoutException)
+            {
+                result.Status = FileStatus.ConversionTimedOut;
+                result.Errors =
+                [
+                    $"Conversion exceeded {config.ConversionTimeout.TotalSeconds:F0}s timeout"
+                ];
+            }
             catch (Exception ex)
             {
                 result.Status = FileStatus.Crashed;
@@ -369,19 +441,343 @@ public sealed class RoundTripPipeline
             }
 
             results.Add(result);
-
-            if (convertedCount % 10 == 0 && convertedCount > 0)
-                Console.Write(".");
-        }
+            var completed = Interlocked.Increment(ref completedCount);
+            if (completed % 10 == 0 || completed == csFiles.Count)
+                Console.Write($" {completed}/{csFiles.Count}");
+        });
         Console.WriteLine();
 
+        var orderedResults = results
+            .OrderBy(result => result.FilePath, StringComparer.Ordinal)
+            .ToList();
+        await ValidateAndPublishGeneratedFilesAsync(
+            workDir,
+            orderedResults,
+            allCsFiles,
+            cancellationToken);
+        if (File.Exists(Path.Combine(workDir, config.SolutionOrProjectFile)))
+        {
+            await ValidatePublishedProjectAsync(
+                workDir,
+                config,
+                orderedResults,
+                cancellationToken);
+        }
+
         // Print status summary
-        foreach (var group in results.GroupBy(r => r.Status).OrderByDescending(g => g.Count()))
+        foreach (var group in orderedResults
+            .GroupBy(r => r.Status)
+            .OrderByDescending(g => g.Count()))
         {
             Console.WriteLine($"  {group.Key}: {group.Count()}");
         }
 
-        return results;
+        return orderedResults;
+    }
+
+    private async Task ValidatePublishedProjectAsync(
+        string workDir,
+        RoundTripConfig config,
+        List<FileConversionResult> results,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var build = await BuildProjectAsync(workDir, config, cancellationToken);
+            if (build.Succeeded)
+                return;
+
+            var active = results
+                .Where(result => result.Status == FileStatus.Replaced)
+                .ToList();
+            var failed = active
+                .Where(candidate => build.Errors.Any(error =>
+                    BuildErrorReferencesFile(workDir, candidate.FilePath, error) ||
+                    CandidateIsReferenced(candidate, error)))
+                .ToList();
+            if (failed.Count == 0)
+            {
+                Console.WriteLine(
+                    $"  Project validation could not attribute {build.Errors.Count} build error(s); rejecting all {active.Count} remaining candidates");
+                failed = active;
+            }
+            else
+            {
+                Console.WriteLine(
+                    $"  Project validation rejected {failed.Count} candidate(s): " +
+                    string.Join(", ", failed.Select(candidate => candidate.FilePath)));
+            }
+
+            foreach (var candidate in failed)
+            {
+                var originalPath = Path.Combine(
+                    config.OriginalProjectPath,
+                    candidate.FilePath);
+                var workPath = Path.Combine(workDir, candidate.FilePath);
+                if (File.Exists(originalPath))
+                {
+                    var original = await File.ReadAllTextAsync(
+                        originalPath,
+                        cancellationToken);
+                    await File.WriteAllTextAsync(
+                        workPath,
+                        original,
+                        cancellationToken);
+                }
+                candidate.Status = FileStatus.EmitCompilationError;
+                candidate.Errors = build.Errors
+                    .Where(error =>
+                        BuildErrorReferencesFile(workDir, candidate.FilePath, error) ||
+                        CandidateIsReferenced(candidate, error))
+                    .Take(10)
+                    .ToList();
+                if (candidate.Errors.Count == 0)
+                    candidate.Errors = build.Errors.Take(10).ToList();
+            }
+
+            if (failed.Count == active.Count)
+                return;
+        }
+    }
+
+    private static bool BuildErrorReferencesFile(
+        string workDir,
+        string relativePath,
+        string error)
+    {
+        var parenIndex = error.IndexOf('(');
+        if (parenIndex <= 0)
+            return false;
+
+        var errorPath = error[..parenIndex]
+            .Trim()
+            .Replace("/private/var/", "/var/");
+        var expectedPath = Path.GetFullPath(Path.Combine(workDir, relativePath))
+            .Replace("/private/var/", "/var/");
+        return string.Equals(
+            Path.GetFullPath(errorPath),
+            expectedPath,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static async Task ValidateAndPublishGeneratedFilesAsync(
+        string workDir,
+        IReadOnlyList<FileConversionResult> results,
+        IReadOnlyList<string> projectSourcePaths,
+        CancellationToken cancellationToken)
+    {
+        var candidates = results
+            .Where(result =>
+                result.Status == FileStatus.Replaced &&
+                result.EmittedCSharp != null)
+            .ToList();
+        if (candidates.Count == 0)
+            return;
+
+        var projectSources = projectSourcePaths
+            .ToDictionary(
+                Path.GetFullPath,
+                File.ReadAllText,
+                StringComparer.OrdinalIgnoreCase);
+        var referencePaths = DiscoverProjectReferencePaths(workDir);
+
+        var active = candidates.ToList();
+        while (active.Count > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var activePaths = active
+                .Select(result => Path.GetFullPath(
+                    Path.Combine(workDir, result.FilePath)))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var generatedSources = active.Select(result => new GeneratedCSharpSource(
+                result.EmittedCSharp!,
+                Path.GetFullPath(Path.Combine(workDir, result.FilePath))));
+            var additionalSources = projectSources
+                .Where(pair => !activePaths.Contains(pair.Key))
+                .Select(pair => new GeneratedCSharpSource(pair.Value, pair.Key));
+            var validation = GeneratedCSharpCompiler.Validate(
+                generatedSources,
+                new GeneratedCSharpCompilationContext
+                {
+                    AdditionalSources = additionalSources,
+                    ReferencePaths = referencePaths,
+                });
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (validation.CompilationSuccess)
+            {
+                foreach (var candidate in active)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var path = Path.Combine(workDir, candidate.FilePath);
+                    await File.WriteAllTextAsync(
+                        path,
+                        candidate.EmittedCSharp!,
+                        cancellationToken);
+                }
+                return;
+            }
+
+            var errorsByPath = validation.CompilationErrors
+                .Where(diagnostic => diagnostic.Location.IsInSource)
+                .GroupBy(
+                    diagnostic => Path.GetFullPath(
+                        diagnostic.Location.SourceTree?.FilePath ?? workDir),
+                    StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(FormatDiagnostic).ToList(),
+                    StringComparer.OrdinalIgnoreCase);
+            var failed = active
+                .Where(candidate => errorsByPath.ContainsKey(Path.GetFullPath(
+                    Path.Combine(workDir, candidate.FilePath))))
+                .ToList();
+            if (failed.Count == 0)
+            {
+                failed = FindCandidatesReferencedByDiagnostics(
+                    active,
+                    validation.CompilationErrors);
+                if (failed.Count == 0)
+                {
+                    var errors = validation.FormattedCompilationErrors.ToList();
+                    foreach (var candidate in active)
+                    {
+                        candidate.Status = FileStatus.EmitCompilationError;
+                        candidate.Errors = errors;
+                    }
+                    return;
+                }
+            }
+
+            foreach (var candidate in failed)
+            {
+                var path = Path.GetFullPath(Path.Combine(workDir, candidate.FilePath));
+                candidate.Status = FileStatus.EmitCompilationError;
+                candidate.Errors = errorsByPath.TryGetValue(path, out var directErrors)
+                    ? directErrors
+                    : validation.CompilationErrors
+                        .Where(diagnostic => CandidateIsReferenced(
+                            candidate,
+                            diagnostic.GetMessage()))
+                        .Select(FormatDiagnostic)
+                        .ToList();
+                active.Remove(candidate);
+            }
+        }
+
+    }
+
+    private static List<FileConversionResult> FindCandidatesReferencedByDiagnostics(
+        IEnumerable<FileConversionResult> candidates,
+        IEnumerable<Microsoft.CodeAnalysis.Diagnostic> diagnostics)
+    {
+        var messages = diagnostics.Select(diagnostic => diagnostic.GetMessage()).ToList();
+        return candidates
+            .Where(candidate => messages.Any(message =>
+                CandidateIsReferenced(candidate, message)))
+            .ToList();
+    }
+
+    internal static bool CandidateIsReferenced(
+        FileConversionResult candidate,
+        string diagnosticMessage)
+    {
+        if (candidate.EmittedCSharp == null)
+            return false;
+
+        var syntaxNames = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree
+            .ParseText(candidate.EmittedCSharp)
+            .GetRoot()
+            .DescendantNodes()
+            .Select(node => node switch
+            {
+                Microsoft.CodeAnalysis.CSharp.Syntax.BaseTypeDeclarationSyntax type =>
+                    type.Identifier.ValueText,
+                Microsoft.CodeAnalysis.CSharp.Syntax.DelegateDeclarationSyntax declaration =>
+                    declaration.Identifier.ValueText,
+                _ => null,
+            })
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!);
+        var lexicalNames = System.Text.RegularExpressions.Regex
+            .Matches(
+                candidate.EmittedCSharp,
+                @"\b(?:class|struct|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)|\brecord(?:\s+(?:class|struct))?\s+([A-Za-z_][A-Za-z0-9_]*)")
+            .Select(match => match.Groups[1].Success
+                ? match.Groups[1].Value
+                : match.Groups[2].Value);
+        var declaredNames = syntaxNames
+            .Concat(lexicalNames)
+            .Distinct(StringComparer.Ordinal);
+        return declaredNames.Any(name =>
+            diagnosticMessage.Contains(
+                $"'{name}'",
+                StringComparison.Ordinal));
+    }
+
+    internal static IReadOnlyList<string> DiscoverProjectReferencePaths(string workDir)
+    {
+        var platformAssemblyNames = ((string?)AppContext.GetData(
+                "TRUSTED_PLATFORM_ASSEMBLIES") ?? "")
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Select(TryGetAssemblyName)
+            .Where(name => name != null)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var projectAssemblyNames = Directory
+            .GetFiles(workDir, "*.*proj", SearchOption.AllDirectories)
+            .Select(path =>
+            {
+                try
+                {
+                    var document = System.Xml.Linq.XDocument.Load(path);
+                    return document
+                        .Descendants()
+                        .FirstOrDefault(element =>
+                            element.Name.LocalName == "AssemblyName")
+                        ?.Value;
+                }
+                catch (System.Xml.XmlException)
+                {
+                    return null;
+                }
+            })
+            .Concat(Directory
+                .GetFiles(workDir, "*.*proj", SearchOption.AllDirectories)
+                .Select(Path.GetFileNameWithoutExtension))
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return Directory
+            .GetFiles(workDir, "*.dll", SearchOption.AllDirectories)
+            .Select(path => (Path: path, Name: TryGetAssemblyName(path)))
+            .Where(item =>
+                item.Name != null &&
+                !item.Name.EndsWith(".resources", StringComparison.OrdinalIgnoreCase) &&
+                !platformAssemblyNames.Contains(item.Name) &&
+                !projectAssemblyNames.Contains(item.Name))
+            .GroupBy(item => item.Name!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First().Path)
+            .ToList();
+
+        static string? TryGetAssemblyName(string path)
+        {
+            try
+            {
+                return System.Reflection.AssemblyName.GetAssemblyName(path).Name;
+            }
+            catch (Exception ex) when (
+                ex is BadImageFormatException or FileLoadException or FileNotFoundException)
+            {
+                return null;
+            }
+        }
+    }
+
+    private static string FormatDiagnostic(Microsoft.CodeAnalysis.Diagnostic diagnostic)
+    {
+        var line = diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1;
+        return $"{diagnostic.Id}: {diagnostic.GetMessage()} (line {line})";
     }
 
     /// <summary>
@@ -396,8 +792,10 @@ public sealed class RoundTripPipeline
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
-            Fidelity = ConversionFidelity.Lossy,
+            Fidelity = ConversionFidelity.Lossless,
             GracefulFallback = true,
+            PassthroughOnError = true,
+            ValidateRoundTripCSharp = false,
             PreserveComments = true,
             AutoGenerateIds = true,
         });
@@ -411,14 +809,15 @@ public sealed class RoundTripPipeline
             {
                 EnforceEffects = false,
                 ContractMode = Compiler.ContractMode.Off,
+                DeferGeneratedOutputValidation = true,
             });
         if (compileResult.HasErrors || string.IsNullOrWhiteSpace(compileResult.GeneratedCode))
             return null;
 
         var emitted = PostProcessEmittedCSharp(compileResult.GeneratedCode, originalSource);
-        var parseDiags = CSharpSyntaxTree.ParseText(emitted).GetDiagnostics()
-            .Where(d => d.Severity == DiagnosticSeverity.Error);
-        return parseDiags.Any() ? null : emitted;
+        return GeneratedCSharpCompiler.Validate(emitted).CompilationSuccess
+            ? emitted
+            : null;
     }
 
     /// <summary>
@@ -426,13 +825,17 @@ public sealed class RoundTripPipeline
     /// to their originals, and update their status. Iterates up to 5 times.
     /// </summary>
     internal async Task<int> RecoverBuildAsync(
-        string workDir, RoundTripConfig config, List<FileConversionResult> fileResults)
+        string workDir,
+        RoundTripConfig config,
+        List<FileConversionResult> fileResults,
+        CancellationToken cancellationToken = default)
     {
         var totalReverted = 0;
 
         for (int attempt = 0; attempt < 5; attempt++)
         {
-            var buildResult = await BuildProjectAsync(workDir, config);
+            cancellationToken.ThrowIfCancellationRequested();
+            var buildResult = await BuildProjectAsync(workDir, config, cancellationToken);
             if (buildResult.Succeeded) break;
 
             // Extract file paths from build error lines, KEEPING the diagnostics per file. The
@@ -476,8 +879,8 @@ public sealed class RoundTripPipeline
                 var workPath = Path.Combine(workDir, relPath);
                 if (!File.Exists(originalPath)) continue;
 
-                var original = await File.ReadAllTextAsync(originalPath);
-                await File.WriteAllTextAsync(workPath, original);
+                var original = await File.ReadAllTextAsync(originalPath, cancellationToken);
+                await File.WriteAllTextAsync(workPath, original, cancellationToken);
                 // A reverted file is a coverage FAILURE: it stays in the denominator
                 // and is never counted as converted. Do NOT relabel it CompileError —
                 // it compiled standalone; the round-tripped output broke the build.
@@ -584,7 +987,17 @@ public sealed class RoundTripPipeline
         return path.Contains(pattern);
     }
 
-    internal async Task<BuildResult> BuildProjectAsync(string workDir, RoundTripConfig config)
+    private static bool IsBuildOutputPath(string path)
+    {
+        var normalized = path.Replace('\\', '/');
+        return normalized.Contains("/bin/", StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains("/obj/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal async Task<BuildResult> BuildProjectAsync(
+        string workDir,
+        RoundTripConfig config,
+        CancellationToken cancellationToken = default)
     {
         // Relative target (see RunTestsAsync) — absolute /var-symlink paths break
         // MSBuild path identity on macOS.
@@ -597,7 +1010,11 @@ public sealed class RoundTripPipeline
             args += $" {config.ExtraBuildProperties}";
 
         var (exitCode, stdout, stderr) = await ProcessRunner.RunAsync(
-            config.DotnetPath, args, workDir, config.BuildTimeout);
+            config.DotnetPath,
+            args,
+            workDir,
+            config.BuildTimeout,
+            cancellationToken: cancellationToken);
 
         var errors = new List<string>();
         foreach (var line in (stdout + "\n" + stderr).Split('\n'))
@@ -641,8 +1058,9 @@ public sealed class RoundTripPipeline
         };
 
         if (baseline.TotalTests == 0 || roundTrip.TotalTests == 0 ||
-            (baseline.ExitCode != 0 && baseline.Failed == 0) ||
-            (roundTrip.ExitCode != 0 && roundTrip.Failed == 0))
+            baseline.ExitCode != 0 ||
+            baseline.ParseErrors.Count > 0 ||
+            roundTrip.ParseErrors.Count > 0)
         {
             comparison.Status = ComparisonStatus.Incomplete;
             return comparison;
@@ -732,22 +1150,23 @@ public sealed class RoundTripPipeline
         string workDir,
         RoundTripConfig config,
         List<TestResult> regressions,
-        List<FileConversionResult> convertedFiles)
+        List<FileConversionResult> convertedFiles,
+        CancellationToken cancellationToken)
     {
         var culprits = new Dictionary<string, List<string>>();
         var failingTestNames = regressions.Select(t => t.TestName).ToHashSet();
-        var testFilter = string.Join("|", failingTestNames);
 
         foreach (var file in convertedFiles.Where(f => f.Status == FileStatus.Replaced && f.EmittedCSharp != null))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var fullPath = Path.Combine(workDir, file.FilePath);
-            var emittedContent = await File.ReadAllTextAsync(fullPath);
+            var emittedContent = await File.ReadAllTextAsync(fullPath, cancellationToken);
 
             // Revert this one file to original
             var originalPath = Path.Combine(config.OriginalProjectPath, file.FilePath);
             if (!File.Exists(originalPath)) continue;
-            var originalContent = await File.ReadAllTextAsync(originalPath);
-            await File.WriteAllTextAsync(fullPath, originalContent);
+            var originalContent = await File.ReadAllTextAsync(originalPath, cancellationToken);
+            await File.WriteAllTextAsync(fullPath, originalContent, cancellationToken);
 
             // Re-run just the failing tests
             TrxParser.CleanTrxFiles(workDir);
@@ -760,10 +1179,14 @@ public sealed class RoundTripPipeline
                 DotnetPath = config.DotnetPath,
                 TargetFramework = config.TargetFramework,
                 ExtraBuildProperties = config.ExtraBuildProperties,
-                TestFilter = testFilter,
+                TestFilter = null,
                 TestTimeout = config.TestTimeout,
+                ConversionTimeout = config.ConversionTimeout,
+                MinimumCoverageFraction = config.MinimumCoverageFraction,
+                MinimumNativeFraction = config.MinimumNativeFraction,
             };
-            var result = await RunTestsAsync(workDir, bisectConfig);
+            var result = await RunTestsAsync(
+                workDir, bisectConfig, cancellationToken: cancellationToken);
 
             // Check if any previously-failing tests now pass
             var nowPassing = result.Results
@@ -778,7 +1201,7 @@ public sealed class RoundTripPipeline
             }
 
             // Restore the emitted version
-            await File.WriteAllTextAsync(fullPath, emittedContent);
+            await File.WriteAllTextAsync(fullPath, emittedContent, cancellationToken);
         }
 
         return culprits;

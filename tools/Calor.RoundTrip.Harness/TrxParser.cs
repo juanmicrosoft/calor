@@ -12,7 +12,7 @@ public static class TrxParser
     /// entry so results carry assembly, class, and executor identity — display names
     /// alone collide across assemblies.
     /// </summary>
-    public static List<TestResult> Parse(string trxPath)
+    public static List<TestResult> Parse(string trxPath, string project = "")
     {
         var doc = XDocument.Load(trxPath);
         var root = doc.Root ?? throw new InvalidDataException("TRX has no document element.");
@@ -28,7 +28,9 @@ public static class TrxParser
             ?? throw new InvalidDataException("TRX is missing ResultSummary/Counters.");
 
         // Index TestDefinitions by test id for identity joining.
-        var definitions = new Dictionary<string, (string Assembly, string ClassName, string ExecutorUri)>();
+        var definitions = new Dictionary<
+            string,
+            (string Assembly, string ClassName, string ExecutorUri, string FullyQualifiedName)>();
         foreach (var unitTest in definitionsElement.Elements(ns + "UnitTest"))
         {
             var id = unitTest.Attribute("id")?.Value;
@@ -38,10 +40,16 @@ public static class TrxParser
             var assembly = storage.Length > 0 ? Path.GetFileName(storage) : "";
             var testMethod = unitTest.Element(ns + "TestMethod");
             var className = testMethod?.Attribute("className")?.Value ?? "";
+            var methodName = testMethod?.Attribute("name")?.Value
+                ?? unitTest.Attribute("name")?.Value
+                ?? "";
             // The adapter type is the closest thing TRX carries to an executor URI.
             var adapter = testMethod?.Attribute("adapterTypeName")?.Value ?? "";
+            var fullyQualifiedName = string.IsNullOrWhiteSpace(className)
+                ? methodName
+                : $"{className}.{methodName}";
 
-            definitions[id] = (assembly, className, adapter);
+            definitions[id] = (assembly, className, adapter, fullyQualifiedName);
         }
 
         var results = resultsElement.Elements(ns + "UnitTestResult")
@@ -60,9 +68,11 @@ public static class TrxParser
                 return new TestResult
                 {
                     TestName = e.Attribute("testName")?.Value ?? "",
+                    Project = project,
                     Assembly = def.Item1,
                     ClassName = def.Item2,
                     ExecutorUri = def.Item3,
+                    FullyQualifiedName = def.Item4,
                     Outcome = outcome,
                     Duration = TimeSpan.TryParse(e.Attribute("duration")?.Value, out var dur) ? dur : TimeSpan.Zero,
                     ErrorMessage = e.Descendants(ns + "Message").FirstOrDefault()?.Value,
@@ -131,7 +141,7 @@ public static class TrxParser
         {
             try
             {
-                results.AddRange(Parse(trx));
+                results.AddRange(Parse(trx, InferProjectIdentity(workDir, trx)));
                 parsed.Add(trx);
             }
             catch (Exception ex)
@@ -145,14 +155,29 @@ public static class TrxParser
         return (results, parsed, parseErrors);
     }
 
+    private static string InferProjectIdentity(string workDir, string trxPath)
+    {
+        var relative = Path.GetRelativePath(workDir, trxPath);
+        var segments = relative.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        var testResultsIndex = Array.FindIndex(
+            segments,
+            segment => string.Equals(
+                segment,
+                "TestResults",
+                StringComparison.OrdinalIgnoreCase));
+        if (testResultsIndex > 0)
+            return string.Join('/', segments[..testResultsIndex]);
+        return Path.GetDirectoryName(relative)?.Replace('\\', '/') ?? ".";
+    }
+
     /// <summary>
     /// Delete all TRX files under the working directory to avoid stale results.
     /// </summary>
     public static void CleanTrxFiles(string workDir)
     {
         foreach (var trx in Directory.GetFiles(workDir, "*.trx", SearchOption.AllDirectories))
-        {
-            try { File.Delete(trx); } catch { }
-        }
+            File.Delete(trx);
     }
 }

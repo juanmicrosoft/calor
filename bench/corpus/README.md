@@ -111,11 +111,12 @@ submodules are benchmark infra, and `dotnet build` / `dotnet test` are green
 without initializing them. Only the CI `roundtrip-verification` job checks out with
 `submodules: recursive`.
 
-## First fidelity measurement (D-W4.3 substrate — data, NOT a frozen bar)
+## Historical first fidelity measurement
 
-Measured on this vendoring; NativeFraction keeps reverted files in the denominator
-as failures (#776 anti-masking). **No threshold is frozen here** — the A-1.4
-tranche-2 fidelity bar is set later, from the dry-run, not from this snapshot.
+The table below predates the failure-safe #776 gate and is retained as historical
+context only. The current harness uses lossless conversion, counts excluded and
+reverted files in the denominator, and enforces the per-project thresholds in
+`ProjectConfigs.cs`; current CI reports are authoritative.
 
 | Project | Baseline | Round-trip | Convertible files | Native | NativeFraction | With-losses | Reverted | Failed-conv |
 |---------|----------|-----------|-------------------|--------|----------------|-------------|----------|-------------|
@@ -123,9 +124,25 @@ tranche-2 fidelity bar is set later, from the dry-run, not from this snapshot.
 | Serilog | 811/811 green | 811/811 | 110 | 44 | **0.400** | 2 | 43 | 21 |
 | FluentValidation | 865/866 green | 865/866 | 139 | 74 | **0.532** | 1 | 38 | 26 |
 
-All three baselines are green (≥2 required to adjudicate). NativeFraction lands
-**0.40–0.53**, below the provisional 0.70 steer — the empirical basis the A-1.4
-tranche-2 bar will be set from.
+These legacy fractions must not be compared directly with current reports because
+their conversion mode and denominator differ.
+
+The blocking thresholds are explicit and overridable with `--min-coverage` and
+`--min-native`:
+
+| Project | Minimum total | Minimum native |
+|---------|---------------|----------------|
+| Synthetic | 62.5% | 62.5% |
+| Synthetic2 | 25.0% | 25.0% |
+| MediatR | 55.0% | 40.0% |
+| Serilog | 30.0% | 25.0% |
+| FluentValidation | 50.0% | 48.0% |
+
+Serilog's `Core/Logger.cs` is an explicit conversion exclusion because its
+conversion exceeds the per-file timeout. `Rendering/ReusableStringWriter.cs` is
+also excluded because regression bisect attributes 43 test failures to its
+round-tripped output. Both remain in the denominator as coverage failures; they
+are not silently removed from the measurement.
 
 Notes for the tranche-2 bar-setters:
 

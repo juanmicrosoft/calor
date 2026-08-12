@@ -28,6 +28,14 @@ public static class ReportGenerator
         sb.AppendLine($"**Duration:** {report.Duration.TotalSeconds:F1}s");
         sb.AppendLine($"**Verdict:** {verdict}");
         sb.AppendLine();
+        var gateFailures = RoundTripExitPolicy.GetFailureReasons(report);
+        if (gateFailures.Count > 0)
+        {
+            sb.AppendLine("**Blocking gate failures:**");
+            foreach (var reason in gateFailures)
+                sb.AppendLine($"- {reason}");
+            sb.AppendLine();
+        }
 
         // Pipeline Summary
         sb.AppendLine("## Pipeline Summary");
@@ -83,7 +91,9 @@ public static class ReportGenerator
             sb.AppendLine($"| Converted with losses | {cov.ConvertedWithLosses} |");
             sb.AppendLine($"| Reverted by recovery (coverage failures) | {cov.Reverted} |");
             sb.AppendLine($"| Failed conversion | {cov.FailedConversion} |");
-            sb.AppendLine($"| Excluded by pattern (outside denominator) | {cov.ExcludedFiles} |");
+            sb.AppendLine($"| Excluded by pattern (coverage failures in denominator) | {cov.ExcludedFiles} |");
+            sb.AppendLine($"| Minimum total coverage | {report.MinimumCoverageFraction:P1} |");
+            sb.AppendLine($"| Minimum native coverage | {report.MinimumNativeFraction:P1} |");
             sb.AppendLine($"| Interop blocks (raw C# preserved) | {cov.TotalInteropBlocks} |");
             sb.AppendLine($"| Distinct semantic gaps | {cov.DistinctGaps.Count} |");
             if (cov.LossKindCounts.Count > 0)
@@ -103,7 +113,8 @@ public static class ReportGenerator
             sb.AppendLine();
             sb.AppendLine("### Build Outcome");
             sb.AppendLine();
-            sb.AppendLine($"- Succeeded: {build.Succeeded} (exit {build.ExitCode})");
+            sb.AppendLine($"- Baseline succeeded: {build.BaselineSucceeded}");
+            sb.AppendLine($"- Round-trip succeeded: {build.Succeeded} (exit {build.ExitCode})");
             sb.AppendLine($"- Files reverted to reach this outcome: {build.RecoveryRevertedFiles}");
             sb.AppendLine($"- Build errors: {build.ErrorCount}");
             sb.AppendLine();
@@ -217,7 +228,10 @@ public static class ReportGenerator
             calor_version = report.CalorVersion,
             timestamp = report.StartedAt.ToString("o"),
             duration_seconds = report.Duration.TotalSeconds,
-            verdict = report.Inconclusive ? "inconclusive" : report.Comparison?.Status.ToString().ToLowerInvariant() ?? "incomplete",
+            verdict = report.Inconclusive
+                ? "inconclusive"
+                : RoundTripExitPolicy.IsFailure(report) ? "fail" : "pass",
+            gate_failures = RoundTripExitPolicy.GetFailureReasons(report),
             // When inconclusive, no coverage fraction is trustworthy — see below (fidelity is nulled).
             inconclusive = report.Inconclusive,
             inconclusive_reason = report.InconclusiveReason,
@@ -242,7 +256,9 @@ public static class ReportGenerator
                 replaced = report.FileResults.Count(f => f.Status == FileStatus.Replaced),
                 reverted = report.FileResults.Count(f => f.Status == FileStatus.Reverted),
                 conversion_failed = report.FileResults.Count(f => f.Status == FileStatus.ConversionFailed),
+                conversion_timed_out = report.FileResults.Count(f => f.Status == FileStatus.ConversionTimedOut),
                 emit_error = report.FileResults.Count(f => f.Status == FileStatus.EmitSyntaxError),
+                emit_compilation_error = report.FileResults.Count(f => f.Status == FileStatus.EmitCompilationError),
                 compile_error = report.FileResults.Count(f => f.Status == FileStatus.CompileError),
                 crashed = report.FileResults.Count(f => f.Status == FileStatus.Crashed),
                 excluded_by_pattern = report.ExcludedFileCount,
@@ -269,9 +285,12 @@ public static class ReportGenerator
                     loss_kind_counts = report.Fidelity.Coverage.LossKindCounts,
                     total_interop_blocks = report.Fidelity.Coverage.TotalInteropBlocks,
                     distinct_gaps = report.Fidelity.Coverage.DistinctGaps,
+                    minimum_coverage_fraction = report.MinimumCoverageFraction,
+                    minimum_native_fraction = report.MinimumNativeFraction,
                 },
                 build = new
                 {
+                    baseline_succeeded = report.Fidelity.Build.BaselineSucceeded,
                     succeeded = report.Fidelity.Build.Succeeded,
                     exit_code = report.Fidelity.Build.ExitCode,
                     recovery_reverted_files = report.Fidelity.Build.RecoveryRevertedFiles,
@@ -319,17 +338,10 @@ public static class ReportGenerator
 
     private static string GetVerdict(RoundTripReport report)
     {
-        if (report.Inconclusive) return $"INCONCLUSIVE — {report.InconclusiveReason}";
-        if (report.Comparison == null) return "INCOMPLETE";
-        return report.Comparison.Status switch
-        {
-            ComparisonStatus.Pass => $"PASS — 0 regressions",
-            ComparisonStatus.MinorRegressions => $"MINOR — {report.Comparison.Regressions.Count} regressions (<5%)",
-            ComparisonStatus.MajorRegressions => $"FAIL — {report.Comparison.Regressions.Count} regressions",
-            ComparisonStatus.BuildFailed => "FAIL — build failed after conversion",
-            ComparisonStatus.Incomplete => "INCOMPLETE",
-            _ => "UNKNOWN",
-        };
+        var failures = RoundTripExitPolicy.GetFailureReasons(report);
+        return failures.Count == 0
+            ? "PASS — 0 regressions"
+            : $"FAIL — {string.Join("; ", failures)}";
     }
 }
 

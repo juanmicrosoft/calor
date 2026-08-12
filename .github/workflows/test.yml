@@ -585,22 +585,27 @@ jobs:
             const marker = '<!-- calor-roundtrip-verification -->';
 
             let body = `${marker}\n## Round-Trip Verification\n\n`;
-            body += '| Project | Verdict | Baseline | Round-Trip | Regressions | Files Converted |\n';
-            body += '|---------|---------|----------|------------|-------------|----------------|\n';
+            body += '| Project | Verdict | Tests | Inventory Δ | Native | Total coverage | Interop | Gaps |\n';
+            body += '|---------|---------|-------|-------------|--------|----------------|---------|------|\n';
 
             const files = fs.readdirSync('conversion-reports')
               .filter(f => f.endsWith('-roundtrip.json'));
 
             for (const file of files) {
               const data = JSON.parse(fs.readFileSync(`conversion-reports/${file}`));
-              const emoji = data.verdict === 'pass' ? ':white_check_mark:' :
-                           data.verdict === 'minor_regressions' ? ':warning:' : ':x:';
+              const emoji = data.verdict === 'pass' ? ':white_check_mark:' : ':x:';
+              const fidelity = data.fidelity;
 
               body += `| ${data.project} | ${emoji} ${data.verdict} | `;
-              body += `${data.baseline?.passed ?? '—'}/${data.baseline?.total ?? '—'} | `;
               body += `${data.round_trip?.passed ?? '—'}/${data.round_trip?.total ?? '—'} | `;
-              body += `**${data.regressions}** | `;
-              body += `${data.files?.replaced}/${data.files?.total} |\n`;
+              body += `${fidelity?.tests?.inventory_delta ?? '—'} | `;
+              body += `${fidelity ? (100 * fidelity.coverage.native_fraction).toFixed(1) + '%' : '—'} | `;
+              body += `${fidelity ? (100 * fidelity.coverage.coverage_fraction).toFixed(1) + '%' : '—'} | `;
+              body += `${fidelity?.coverage?.total_interop_blocks ?? '—'} | `;
+              body += `${fidelity?.coverage?.distinct_gaps?.length ?? '—'} |\n`;
+              if (data.gate_failures?.length) {
+                body += `\n**${data.project} blockers:** ${data.gate_failures.join('; ')}\n\n`;
+              }
             }
 
             const { data: comments } = await github.rest.issues.listComments({

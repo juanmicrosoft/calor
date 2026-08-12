@@ -13,7 +13,8 @@ public static class ProcessRunner
         string arguments,
         string workingDirectory,
         TimeSpan timeout,
-        Dictionary<string, string>? environmentVariables = null)
+        Dictionary<string, string>? environmentVariables = null,
+        CancellationToken cancellationToken = default)
     {
         var stdout = new StringBuilder();
         var stderr = new StringBuilder();
@@ -64,7 +65,10 @@ public static class ProcessRunner
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        using var cts = new CancellationTokenSource(timeout);
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(
+            timeoutCts.Token,
+            cancellationToken);
         try
         {
             await process.WaitForExitAsync(cts.Token);
@@ -72,6 +76,7 @@ public static class ProcessRunner
         catch (OperationCanceledException)
         {
             try { process.Kill(entireProcessTree: true); } catch { }
+            cancellationToken.ThrowIfCancellationRequested();
             return (-1, stdout.ToString(), $"Process timed out after {timeout.TotalSeconds}s\n{stderr}");
         }
 

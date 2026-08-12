@@ -143,6 +143,32 @@ public class ComparisonTests
     }
 
     [Fact]
+    public void NonzeroExitWithCompleteStructuredFailures_ReportsRegressions()
+    {
+        var baseline = MakeTestRun("Test1:Passed", "Test2:Passed");
+        var roundTrip = new TestRunResult
+        {
+            ExitCode = 1,
+            TotalTests = 2,
+            Passed = 1,
+            Failed = 1,
+            Results =
+            [
+                new TestResult { TestName = "Test1", Outcome = "Passed" },
+                new TestResult { TestName = "Test2", Outcome = "Failed" },
+            ],
+        };
+
+        var result = Compare(
+            baseline,
+            roundTrip,
+            new BuildResult { Succeeded = true });
+
+        Assert.Equal(ComparisonStatus.MajorRegressions, result.Status);
+        Assert.Equal("Test2", Assert.Single(result.Regressions).TestName);
+    }
+
+    [Fact]
     public void ReducedTestInventory_ReturnsIncomplete()
     {
         var baseline = MakeTestRun("Test1:Passed", "Test2:Passed");
@@ -277,7 +303,7 @@ public class ComparisonTests
 
         return new TestRunResult
         {
-            ExitCode = results.Any(r => r.Outcome == "Failed") ? 1 : 0,
+            ExitCode = 0,
             TotalTests = results.Count,
             Passed = results.Count(r => r.Outcome == "Passed"),
             Failed = results.Count(r => r.Outcome == "Failed"),
@@ -295,7 +321,7 @@ public class ComparisonTests
 
         return new TestRunResult
         {
-            ExitCode = results.Any(r => r.Outcome == "Failed") ? 1 : 0,
+            ExitCode = 0,
             TotalTests = results.Count,
             Passed = results.Count(r => r.Outcome == "Passed"),
             Failed = results.Count(r => r.Outcome == "Failed"),
