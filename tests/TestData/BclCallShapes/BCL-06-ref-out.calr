@@ -1,0 +1,5 @@
+§M{m006:Bcl06}
+  §F{f001:Shapes:pub} (str:text) -> bool
+    §E{}
+    §B{~value:i32} INT:0
+    §R §C{Int32.TryParse} §A text §A §O value §/C

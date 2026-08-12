@@ -1,0 +1,7 @@
+§M{m002:Bcl02}
+  §F{f001:Shapes:pub} () -> i32
+    §E{mut}
+    §LIST{items:str}
+    §/LIST{items}
+    §PUSH{items} STR:"a"
+    §R §CNT{items}

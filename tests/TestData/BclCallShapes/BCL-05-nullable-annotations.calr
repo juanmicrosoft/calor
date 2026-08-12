@@ -1,0 +1,7 @@
+§M{m005:Bcl05}
+  §F{f001:Shapes:pub} (str:key) -> str
+    §E{}
+    §B{found:?str} §C{Environment.GetEnvironmentVariable} §A key §/C
+    §IF{if1} (== found NULL)
+      §R STR:"missing"
+    §R found

@@ -1,0 +1,4 @@
+§M{m004:Bcl04}
+  §F{f001:Shapes:pub} () -> str
+    §E{}
+    §R §C{String.Format} §A STR:"{0}-{1}" §A STR:"a" §A STR:"b" §/C

@@ -45,6 +45,14 @@ public class BinderIncompleteRatchetTests
             ["tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr"] =
                 "error fixture (NOTE: currently fails on Calor0830 legacy closers, not the " +
                 "mismatched ids it was built for — stale in its own way, see #901's pattern)",
+            // §3.1 entry-spike shape that the LANGUAGE cannot express yet (#943):
+            // Calor can declare an `out` parameter but has no call-site form for
+            // passing one, so Int32.TryParse is unwritable. Registered rather than
+            // deleted so the gap stays visible and is re-tested the moment the
+            // syntax lands — deleting it would quietly shrink the spike's
+            // denominator to the shapes that happen to work.
+            ["tests/TestData/BclCallShapes/BCL-06-ref-out.calr"] =
+                "#943 no call-site ref/out syntax; registered §3.1 spike shape",
             // Known-stale intended-valid benchmark subjects — #901, list shrinks as repaired:
             ["benchmarks/arithmetic/div-by-zero.calr"] = "#901 multi-generation stale",
             ["benchmarks/loops/bounds-violation.calr"] = "#901 multi-generation stale",

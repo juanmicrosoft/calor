@@ -1,6 +1,6 @@
 {
-  "trackedFileCount": 877,
-  "successfulTransformationCount": 642,
+  "trackedFileCount": 883,
+  "successfulTransformationCount": 646,
   "parseFailurePaths": [
     "bench/mcp/tasks/01-fix-closing-tag/expected.calr",
     "bench/mcp/tasks/01-fix-closing-tag/input.calr",
@@ -41,6 +41,7 @@
     "benchmarks/security/command-injection.calr",
     "benchmarks/security/path-traversal.calr",
     "benchmarks/security/sql-injection.calr",
+    "tests/TestData/BclCallShapes/BCL-06-ref-out.calr",
     "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr",
     "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr",
     "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr"
@@ -150,6 +151,7 @@
       "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/expected/Pipeline.calr",
       "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/setup/Pipeline.calr",
       "tests/E2E/scenarios/07_collections/output.g.calr",
+      "tests/TestData/BclCallShapes/BCL-05-nullable-annotations.calr",
       "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.calr",
       "tests/TestData/Benchmarks/DesignPatterns/Visitor.calr",
       "tests/TestData/Benchmarks/EffectSoundness/ComposedEffects.calr",
