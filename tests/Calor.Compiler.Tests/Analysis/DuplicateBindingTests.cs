@@ -98,7 +98,7 @@ public class DuplicateBindingTests
     {
         var csharp = "public class Test\n{\n    void M()\n    {\n        " + body + "\n    }\n}\n";
 
-        var result = new CSharpToCalorConverter().Convert(csharp);
+        var result = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy }).Convert(csharp);
         Assert.True(result.Success, $"[{name}] conversion failed");
         Assert.NotNull(result.CalorSource);
 
@@ -130,7 +130,7 @@ public class DuplicateBindingTests
             }
             """;
 
-        var result = new CSharpToCalorConverter().Convert(csharp);
+        var result = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy }).Convert(csharp);
         Assert.True(result.Success);
         Assert.NotNull(result.CalorSource);
 

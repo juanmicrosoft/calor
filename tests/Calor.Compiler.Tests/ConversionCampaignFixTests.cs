@@ -59,7 +59,7 @@ public class ConversionCampaignFixTests
         return ast;
     }
 
-    private readonly CSharpToCalorConverter _converter = new();
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
     /// <summary>
     /// Compiles Calor source back to C# (for round-trip testing).

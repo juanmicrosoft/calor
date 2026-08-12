@@ -9,7 +9,7 @@ namespace Calor.Compiler.Tests;
 
 public class ExtensionMethodTests
 {
-    private readonly CSharpToCalorConverter _converter = new();
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
     private static List<Token> Tokenize(string source, out DiagnosticBag diagnostics)
     {

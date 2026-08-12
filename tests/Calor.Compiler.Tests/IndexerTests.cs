@@ -330,7 +330,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -353,7 +353,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -373,7 +373,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -394,7 +394,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -412,7 +412,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -437,7 +437,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -461,7 +461,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
 
@@ -509,7 +509,7 @@ public class IndexerTests
             """;
 
         // Convert C# to Calor
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
 
@@ -548,7 +548,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -570,7 +570,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
         Assert.True(result.Success);
 
@@ -595,7 +595,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));
@@ -613,7 +613,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
         Assert.True(result.Success);
 
@@ -637,7 +637,7 @@ public class IndexerTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues.Select(d => d.ToString())));

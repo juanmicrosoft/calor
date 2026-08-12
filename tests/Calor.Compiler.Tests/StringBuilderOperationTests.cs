@@ -404,7 +404,7 @@ public class StringBuilderOperationTests
         var csharp = @"
 using System.Text;
 public class Test { public StringBuilder M() { return new StringBuilder(); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -422,7 +422,7 @@ public class Test { public StringBuilder M() { return new StringBuilder(); } }";
         var csharp = @"
 using System.Text;
 public class Test { public StringBuilder M() { return new StringBuilder(""init""); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -443,7 +443,7 @@ public class Test { public StringBuilder M() { return new StringBuilder(""init""
         var csharp = $@"
 using System.Text;
 public class Test {{ public object M(StringBuilder sb) {{ return {csharpExpr}; }} }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -461,7 +461,7 @@ public class Test {{ public object M(StringBuilder sb) {{ return {csharpExpr}; }
         var csharp = @"
 using System.Text;
 public class Test { public StringBuilder M(StringBuilder sb) { return sb.Insert(0, ""text""); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -479,7 +479,7 @@ public class Test { public StringBuilder M(StringBuilder sb) { return sb.Insert(
         var csharp = @"
 using System.Text;
 public class Test { public StringBuilder M(StringBuilder sb) { return sb.Remove(0, 5); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -497,7 +497,7 @@ public class Test { public StringBuilder M(StringBuilder sb) { return sb.Remove(
         var csharp = @"
 using System.Text;
 public class Test { public int M(StringBuilder sb) { return sb.Length; } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -516,7 +516,7 @@ public class Test { public int M(StringBuilder sb) { return sb.Length; } }";
         var csharp = $@"
 using System.Text;
 public class Test {{ public StringBuilder M() => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -539,7 +539,7 @@ public class Test {{ public StringBuilder M() => {csharpExpr}; }}";
         var csharp = $@"
 using System.Text;
 public class Test {{ public object M(StringBuilder sb) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -557,7 +557,7 @@ public class Test {{ public object M(StringBuilder sb) => {csharpExpr}; }}";
         var csharp = @"
 using System.Text;
 public class Test { public string M() { return new StringBuilder().Append(""a"").Append(""b"").ToString(); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -578,7 +578,7 @@ public class Test { public string M() { return new StringBuilder().Append(""a"")
         var csharp = @"
 using System.Text;
 public class Test { public string M(StringBuilder builder) { return builder.ToString(); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));

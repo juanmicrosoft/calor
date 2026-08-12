@@ -2,6 +2,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Calor.Compiler.Ast;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Effects;
 
 namespace Calor.Compiler.Migration;
 
@@ -19,6 +21,30 @@ public sealed class ConversionResult
     public bool HasErrors => Context.HasErrors;
     public bool HasWarnings => Context.HasWarnings;
     public IReadOnlyList<ConversionIssue> Issues => Context.Issues;
+    public IReadOnlyList<ConversionLoss> Losses => Context.Losses;
+    public int NativeConversionCount => Context.Stats.ConvertedNodes;
+    public int InteropPreservationCount => Context.Losses.Count(
+        loss => loss.Kind is ConversionLossKind.InteropPreserved or ConversionLossKind.EmitterFallback);
+    public int LossySubstitutionCount => Context.Losses.Count(
+        loss => loss.Kind is ConversionLossKind.FallbackTodo or ConversionLossKind.PreprocessorStripped);
+    public int DropCount => Context.Losses.Count(loss => loss.Kind == ConversionLossKind.Dropped);
+}
+
+/// <summary>
+/// Fidelity contract for C# to Calor conversion.
+/// </summary>
+public enum ConversionFidelity
+{
+    /// <summary>
+    /// Unsupported code must be preserved verbatim at a compilable boundary.
+    /// Emitted Calor and its generated C# must validate before success is reported.
+    /// </summary>
+    Lossless,
+
+    /// <summary>
+    /// Explicit opt-in allowing substitutions or drops. Every loss remains recorded.
+    /// </summary>
+    Lossy
 }
 
 /// <summary>
@@ -43,6 +69,12 @@ public enum ConversionMode
 /// </summary>
 public sealed class ConversionOptions
 {
+    /// <summary>
+    /// Fidelity contract for conversion. Lossless is the safe default; lossy
+    /// substitutions and drops require explicit caller opt-in.
+    /// </summary>
+    public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
+
     /// <summary>
     /// The module name to use in the generated Calor code.
     /// If not specified, derived from the source file name.
@@ -104,6 +136,12 @@ public sealed class ConversionOptions
     /// Default is <c>true</c> (matches <see cref="ConversionContext.UseImplicitCallCloser"/>).
     /// </summary>
     public bool UseImplicitCallCloser { get; set; } = true;
+
+    /// <summary>
+    /// Whether lossless conversion validates generated C# as a standalone unit.
+    /// Project migration disables this per file and validates all generated files together.
+    /// </summary>
+    public bool ValidateRoundTripCSharp { get; set; } = true;
 }
 
 /// <summary>
@@ -134,7 +172,7 @@ public sealed class CSharpToCalorConverter
             // Step 0: Strip preprocessor directives to avoid Roslyn hangs/OOM.
             // Stripping keeps the first #if branch UNEVALUATED and deletes the
             // alternates — a semantic loss, recorded per directive (#770/#773).
-            if (_options.StripPreprocessor)
+            if (_options.StripPreprocessor && _options.Fidelity == ConversionFidelity.Lossy)
             {
                 try
                 {
@@ -297,6 +335,27 @@ public sealed class CSharpToCalorConverter
             // ledgered interop preservations is counted as an EmitterFallback loss.
             ReconcileEmitterFallbacks(calorSource, context);
 
+            if (!ParsesCleanly(calorSource))
+            {
+                context.AddError(
+                    "Generated Calor failed mandatory parse validation.",
+                    feature: "generated-calor-validation");
+            }
+
+            if (_options.Fidelity == ConversionFidelity.Lossless)
+            {
+                ValidateLosslessRoundTrip(calorSource, context, _options.ValidateRoundTripCSharp);
+            }
+
+            var destructiveLosses = context.Losses.Count(loss => loss.IsSemanticLoss);
+            if (_options.Fidelity == ConversionFidelity.Lossless && destructiveLosses > 0)
+            {
+                context.AddError(
+                    $"Lossless conversion refused {destructiveLosses} lossy substitution(s) or drop(s). " +
+                    "Use explicit lossy mode to acknowledge semantic loss.",
+                    feature: "lossless-contract");
+            }
+
             if (_options.Verbose)
             {
                 Console.WriteLine($"Converted {context.Stats.ConvertedNodes} nodes");
@@ -309,7 +368,7 @@ public sealed class CSharpToCalorConverter
 
             return new ConversionResult
             {
-                Success = true,
+                Success = !context.HasErrors,
                 CalorSource = calorSource,
                 Ast = calorAst,
                 Context = context,
@@ -336,7 +395,9 @@ public sealed class CSharpToCalorConverter
     /// <summary>
     /// Converts a C# file to Calor.
     /// </summary>
-    public async Task<ConversionResult> ConvertFileAsync(string csharpFilePath)
+    public async Task<ConversionResult> ConvertFileAsync(
+        string csharpFilePath,
+        CancellationToken cancellationToken = default)
     {
         if (!File.Exists(csharpFilePath))
         {
@@ -348,22 +409,31 @@ public sealed class CSharpToCalorConverter
         // Use replacement fallback to handle files with unpaired surrogates
         // (e.g., regex patterns containing \uD800-\uDBFF in string literals)
         var encoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-        var source = await File.ReadAllTextAsync(csharpFilePath, encoding);
-        return Convert(source, csharpFilePath);
+        var source = await File.ReadAllTextAsync(csharpFilePath, encoding, cancellationToken);
+        var result = Convert(source, csharpFilePath);
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
     }
 
     /// <summary>
     /// Converts a C# file and writes the output to an Calor file.
     /// </summary>
-    public async Task<ConversionResult> ConvertFileAndSaveAsync(string csharpFilePath, string? outputPath = null)
+    public async Task<ConversionResult> ConvertFileAndSaveAsync(
+        string csharpFilePath,
+        string? outputPath = null,
+        CancellationToken cancellationToken = default)
     {
-        var result = await ConvertFileAsync(csharpFilePath);
+        var result = await ConvertFileAsync(csharpFilePath, cancellationToken);
 
         if (result.Success && result.CalorSource != null)
         {
             var calorPath = outputPath ?? Path.ChangeExtension(csharpFilePath, ".calr");
             var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-            await File.WriteAllTextAsync(calorPath, result.CalorSource, writeEncoding);
+            await ConversionFileWriter.WriteAtomicAsync(
+                calorPath,
+                result.CalorSource,
+                writeEncoding,
+                cancellationToken);
         }
 
         return result;
@@ -400,30 +470,35 @@ public sealed class CSharpToCalorConverter
     /// </summary>
     private static void ReconcileEmitterFallbacks(string calorSource, ConversionContext context)
     {
-        var markers = CountOccurrences(calorSource, "§CSHARP{")
-                    + CountOccurrences(calorSource, "§CS{")
-                    + CountOccurrences(calorSource, "§RAW"); // "§/RAW" does not contain "§RAW"
-
-        var ledgered = context.Losses.Count(l => l.Kind == ConversionLossKind.InteropPreserved);
-        var unledgered = markers - ledgered;
-        for (var i = 0; i < unledgered; i++)
+        var markerLines = FindFallbackTokenLines(calorSource);
+        var ledgered = context.Losses.Count(loss =>
+            loss.Kind is ConversionLossKind.InteropPreserved or ConversionLossKind.EmitterFallback);
+        foreach (var line in markerLines.Skip(ledgered))
         {
             context.RecordLoss(ConversionLossKind.EmitterFallback, "emitter-fallback",
                 "Raw C# fallback (§CS{…}/§RAW/§CSHARP) present in the emitted Calor without a ledger entry — " +
-                "produced by an emitter-internal fallback path; the output is not fully native");
+                "produced by an emitter-internal fallback path; location is in the generated Calor",
+                line);
         }
     }
 
-    private static int CountOccurrences(string text, string value)
+    private static List<int> FindFallbackTokenLines(string text)
     {
-        var count = 0;
-        var index = 0;
-        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        var diagnostics = new Diagnostics.DiagnosticBag();
+        var tokens = new Parsing.Lexer(text, diagnostics).TokenizeAllForParser();
+        if (diagnostics.HasErrors)
         {
-            count++;
-            index += value.Length;
+            return [];
         }
-        return count;
+
+        return tokens
+            .Where(token => token.Kind is
+                Parsing.TokenKind.RawCSharp or
+                Parsing.TokenKind.RawCSharpExpression or
+                Parsing.TokenKind.CSharpInterop)
+            .Select(token => token.Span.Line)
+            .OrderBy(line => line)
+            .ToList();
     }
 
     /// <summary>True if <paramref name="calorSource"/> lexes and parses without errors.</summary>
@@ -664,10 +739,76 @@ public sealed class CSharpToCalorConverter
             AutoGenerateIds = _options.AutoGenerateIds,
             ModuleName = _options.ModuleName,
             GracefulFallback = _options.GracefulFallback,
+            Fidelity = _options.Fidelity,
             Mode = _options.Mode,
             PassthroughOnError = _options.PassthroughOnError,
             UseImplicitCallCloser = _options.UseImplicitCallCloser
         };
+    }
+
+    private static void ValidateLosslessRoundTrip(
+        string calorSource,
+        ConversionContext context,
+        bool validateGeneratedCSharp)
+    {
+        CompilationResult compileResult;
+        if (!validateGeneratedCSharp)
+        {
+            return;
+        }
+
+        try
+        {
+            compileResult = global::Calor.Compiler.Program.Compile(
+                calorSource,
+                context.SourceFile ?? "converted-output.calr",
+                new CompilationOptions
+                {
+                    EnforceEffects = false,
+                    UnknownCallPolicy = UnknownCallPolicy.Permissive
+                });
+        }
+        catch (Exception ex)
+        {
+            context.AddError(
+                $"Generated Calor validation crashed: {ex.GetType().Name}: {ex.Message}",
+                feature: "roundtrip-calor-validation");
+            return;
+        }
+
+        foreach (var diagnostic in compileResult.Diagnostics.Errors)
+        {
+            context.AddError(
+                $"Generated Calor failed compilation: {diagnostic.Message}",
+                line: diagnostic.Span.Line,
+                column: diagnostic.Span.Column,
+                feature: "roundtrip-calor-validation");
+        }
+
+        if (compileResult.HasErrors)
+        {
+            return;
+        }
+
+        try
+        {
+            var validation = GeneratedCSharpCompiler.Validate(compileResult.GeneratedCode);
+            foreach (var diagnostic in validation.SyntaxErrors.Concat(validation.CompilationErrors))
+            {
+                var span = diagnostic.Location.GetLineSpan().StartLinePosition;
+                context.AddError(
+                    $"Round-tripped C# failed compilation ({diagnostic.Id}): {diagnostic.GetMessage()}",
+                    line: span.Line + 1,
+                    column: span.Character + 1,
+                    feature: "roundtrip-csharp-validation");
+            }
+        }
+        catch (Exception ex)
+        {
+            context.AddError(
+                $"Round-tripped C# validation crashed: {ex.GetType().Name}: {ex.Message}",
+                feature: "roundtrip-csharp-validation");
+        }
     }
 
     [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("SingleFile", "IL3000",
@@ -747,6 +888,59 @@ public enum ConversionDirection
     CalorToCSharp
 }
 
+internal static class ConversionFileWriter
+{
+    public static void WriteAtomic(
+        string path,
+        string content,
+        System.Text.Encoding? encoding = null)
+    {
+        WriteAtomicAsync(path, content, encoding).GetAwaiter().GetResult();
+    }
+
+    public static async Task WriteAtomicAsync(
+        string path,
+        string content,
+        System.Text.Encoding? encoding = null,
+        CancellationToken cancellationToken = default)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(fullPath)
+            ?? throw new InvalidOperationException($"Output path has no directory: {path}");
+        Directory.CreateDirectory(directory);
+
+        var tempPath = Path.Combine(
+            directory,
+            $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+        UnixFileMode? existingMode = null;
+        if (!OperatingSystem.IsWindows() && File.Exists(fullPath))
+        {
+            existingMode = File.GetUnixFileMode(fullPath);
+        }
+
+        try
+        {
+            await File.WriteAllTextAsync(
+                tempPath,
+                content,
+                encoding ?? new System.Text.UTF8Encoding(false),
+                cancellationToken);
+            if (!OperatingSystem.IsWindows() && existingMode.HasValue)
+            {
+                File.SetUnixFileMode(tempPath, existingMode.Value);
+            }
+            File.Move(tempPath, fullPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
+    }
+}
+
 /// <summary>
 /// Provides a simple facade for bidirectional conversion.
 /// </summary>
@@ -792,7 +986,7 @@ public static class Converter
         if (result.Success && result.CalorSource != null)
         {
             var calorPath = outputPath ?? Path.ChangeExtension(csharpPath, ".calr");
-            await File.WriteAllTextAsync(calorPath, result.CalorSource);
+            await ConversionFileWriter.WriteAtomicAsync(calorPath, result.CalorSource);
         }
 
         return result;
@@ -809,7 +1003,7 @@ public static class Converter
         if (!result.HasErrors && !string.IsNullOrEmpty(result.GeneratedCode))
         {
             var csPath = outputPath ?? Path.ChangeExtension(calorPath, ".g.cs");
-            await File.WriteAllTextAsync(csPath, result.GeneratedCode);
+            await ConversionFileWriter.WriteAtomicAsync(csPath, result.GeneratedCode);
         }
 
         return result;

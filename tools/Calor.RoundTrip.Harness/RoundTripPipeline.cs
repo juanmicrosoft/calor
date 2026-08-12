@@ -275,6 +275,7 @@ public sealed class RoundTripPipeline
 
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             GracefulFallback = true,
             PreserveComments = true,
             AutoGenerateIds = true,
@@ -385,6 +386,7 @@ public sealed class RoundTripPipeline
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             GracefulFallback = true,
             PreserveComments = true,
             AutoGenerateIds = true,

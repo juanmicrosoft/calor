@@ -10,6 +10,7 @@ public class PassthroughOnErrorTests
     {
         var options = new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             PassthroughOnError = true,
             GracefulFallback = true
         };
@@ -29,6 +30,7 @@ public class Foo
     {
         var options = new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             PassthroughOnError = false,
             GracefulFallback = true
         };

@@ -13,7 +13,7 @@ public class ConverterRobustnessTests
     {
         try
         {
-            var converter = new CSharpToCalorConverter();
+            var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
             var result = converter.Convert(csharp, "test.cs");
             return (result.Success, result.CalorSource ?? "", null);
         }

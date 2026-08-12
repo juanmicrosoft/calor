@@ -795,7 +795,7 @@ public class StringOperationTests
     public void Migration_InstanceMethodNoArgs_ConvertsToStringOp(string csharpExpr, StringOp expectedOp)
     {
         var csharp = $"public class Test {{ public string M(string s) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -812,7 +812,7 @@ public class StringOperationTests
     public void Migration_InstanceMethodOneArg_ConvertsToStringOp(string csharpExpr, StringOp expectedOp)
     {
         var csharp = $"public class Test {{ public object M(string s) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -828,7 +828,7 @@ public class StringOperationTests
     public void Migration_InstanceMethodIntArg_ConvertsToStringOp(string csharpExpr, StringOp expectedOp)
     {
         var csharp = $"public class Test {{ public string M(string s) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -843,7 +843,7 @@ public class StringOperationTests
     public void Migration_InstanceMethodTwoArgs_ConvertsToStringOp(string csharpExpr, StringOp expectedOp)
     {
         var csharp = $"public class Test {{ public string M(string s) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -858,7 +858,7 @@ public class StringOperationTests
     public void Migration_StaticStringMethod_ConvertsToStringOp(string csharpExpr, StringOp expectedOp)
     {
         var csharp = $"public class Test {{ public bool M(string s) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -871,7 +871,7 @@ public class StringOperationTests
     public void Migration_StringLength_ConvertsToLenOp()
     {
         var csharp = "public class Test { public int M(string s) => s.Length; }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -884,7 +884,7 @@ public class StringOperationTests
     public void Migration_StringConcat_ConvertsToStringOp()
     {
         var csharp = "public class Test { public string M(string a, string b) => string.Concat(a, b); }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -897,7 +897,7 @@ public class StringOperationTests
     public void Migration_StringJoin_ConvertsToStringOp()
     {
         var csharp = "public class Test { public string M(string[] items) => string.Join(\",\", items); }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -910,7 +910,7 @@ public class StringOperationTests
     public void Migration_StringFormat_ConvertsToStringOp()
     {
         var csharp = "public class Test { public string M(string name) => string.Format(\"Hello {0}\", name); }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -931,7 +931,7 @@ public class StringOperationTests
     public void Migration_StringMethodWithComparison_ConvertsWithMode(string csharpExpr, StringOp expectedOp, StringComparisonMode expectedMode)
     {
         var csharp = $"public class Test {{ public object M(string s) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -946,7 +946,7 @@ public class StringOperationTests
     {
         // The C# to Calor converter converts string.Equals(a, b, comparison) to equals with mode
         var csharp = "public class Test { public bool M(string a, string b) { return string.Equals(a, b, StringComparison.OrdinalIgnoreCase); } }";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -967,7 +967,7 @@ public class StringOperationTests
     public void Migration_StringComparisonMode_RoundTripsToCalor(string csharpExpr, string expectedKeyword)
     {
         var csharp = $"public class Test {{ public object M(string s) => {csharpExpr}; }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));
@@ -985,7 +985,7 @@ public class StringOperationTests
     {
         // CurrentCulture modes are not supported - should fall back to interop
         var csharp = $"public class Test {{ public bool M(string s) {{ return {csharpExpr}; }} }}";
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
 
         Assert.True(result.Success, string.Join(", ", result.Issues));

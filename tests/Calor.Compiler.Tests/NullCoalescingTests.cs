@@ -112,7 +112,10 @@ public static class NullHandling
         return a ?? b ?? c;
     }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy
+        });
         var convResult = converter.Convert(csharp, "Test.cs");
         Assert.True(convResult.Success, "C# to Calor conversion should succeed: " +
             string.Join(", ", convResult.Issues.Select(i => i.Message)));

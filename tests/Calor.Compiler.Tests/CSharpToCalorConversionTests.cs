@@ -12,7 +12,10 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class CSharpToCalorConversionTests
 {
-    private readonly CSharpToCalorConverter _converter = new();
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions
+    {
+        Fidelity = ConversionFidelity.Lossy
+    });
 
     #region Top-Level Statement Tests
 
@@ -1153,7 +1156,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = true });
         var result = converter.Convert(csharpSource);
 
         Assert.True(result.Success, GetErrorMessage(result));
@@ -1180,7 +1183,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { GracefulFallback = false });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, GracefulFallback = false });
         var result = converter.Convert(csharpSource);
 
         // __makeref is now supported, so conversion should succeed
@@ -1202,7 +1205,11 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { Explain = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Explain = true,
+            Fidelity = ConversionFidelity.Lossy
+        });
         var result = converter.Convert(csharpSource);
 
         Assert.True(result.Success);
@@ -1225,7 +1232,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharpSource);
 
         Assert.True(result.Success);
@@ -1246,7 +1253,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var conversionResult = converter.Convert(csharpSource);
 
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
@@ -1275,15 +1282,16 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter(new ConversionOptions { Explain = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Explain = true,
+            Fidelity = ConversionFidelity.Lossy
+        });
         var result = converter.Convert(csharpSource);
 
-        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.False(result.Success);
         Assert.NotNull(result.CalorSource);
-
-        // Should emit and-pattern, not raw C# text or wildcard fallback
-        Assert.DoesNotContain("string s and", result.CalorSource);
-        Assert.Contains("and", result.CalorSource);
+        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation");
     }
 
     [Fact]
@@ -1306,7 +1314,7 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var conversionResult = converter.Convert(csharpSource);
 
         Assert.True(conversionResult.Success, GetErrorMessage(conversionResult));
@@ -3909,8 +3917,16 @@ public class CSharpToCalorConversionTests
             """;
 
         // Same module name = same namespace — should merge
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
+        var result1 = new CSharpToCalorConverter(new ConversionOptions
+        {
+            ModuleName = "MyApp",
+            Fidelity = ConversionFidelity.Lossy
+        }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions
+        {
+            ModuleName = "MyApp",
+            Fidelity = ConversionFidelity.Lossy
+        }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 
@@ -3945,8 +3961,16 @@ public class CSharpToCalorConversionTests
             """;
 
         // Same module name = same namespace — should merge
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
+        var result1 = new CSharpToCalorConverter(new ConversionOptions
+        {
+            ModuleName = "MyApp",
+            Fidelity = ConversionFidelity.Lossy
+        }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions
+        {
+            ModuleName = "MyApp",
+            Fidelity = ConversionFidelity.Lossy
+        }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 
@@ -3976,8 +4000,8 @@ public class CSharpToCalorConversionTests
             """;
 
         // Same module name = same namespace — should merge
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "MyApp" }).Convert(csharp2);
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "MyApp" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "MyApp" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 
@@ -3987,6 +4011,38 @@ public class CSharpToCalorConversionTests
         var mergedClass = merged.SelectMany(m => m.Classes).First(c => c.Name == "Baz");
         Assert.Contains("IDisposable", mergedClass.ImplementedInterfaces);
         Assert.Contains("ICloneable", mergedClass.ImplementedInterfaces);
+    }
+
+    [Fact]
+    public void PartialClassMerger_PreservesRepeatableAttributeInstances()
+    {
+        const string csharp1 = """
+            [Tag("one")]
+            public partial class Tagged
+            {
+            }
+            """;
+        const string csharp2 = """
+            [Tag("two")]
+            public partial class Tagged
+            {
+            }
+            """;
+
+        var options = new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            ModuleName = "Attributes"
+        };
+        var result1 = new CSharpToCalorConverter(options).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(options).Convert(csharp2);
+        Assert.True(result1.Success, GetErrorMessage(result1));
+        Assert.True(result2.Success, GetErrorMessage(result2));
+
+        var merged = new PartialClassMerger().Merge(new[] { result1.Ast!, result2.Ast! });
+        var mergedClass = merged.SelectMany(module => module.Classes).Single(cls => cls.Name == "Tagged");
+
+        Assert.Equal(2, mergedClass.CSharpAttributes.Count);
     }
 
     [Fact]
@@ -4006,8 +4062,8 @@ public class CSharpToCalorConversionTests
             }
             """;
 
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Reg" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "Other" }).Convert(csharp2);
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "Reg" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "Other" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 
@@ -4037,8 +4093,8 @@ public class CSharpToCalorConversionTests
             """;
 
         // Different module names = different namespaces — should NOT merge
-        var result1 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "App.Models" }).Convert(csharp1);
-        var result2 = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "App.Views" }).Convert(csharp2);
+        var result1 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "App.Models" }).Convert(csharp1);
+        var result2 = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, ModuleName = "App.Views" }).Convert(csharp2);
         Assert.True(result1.Success, GetErrorMessage(result1));
         Assert.True(result2.Success, GetErrorMessage(result2));
 

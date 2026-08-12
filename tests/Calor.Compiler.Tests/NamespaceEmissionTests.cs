@@ -87,7 +87,7 @@ public class NamespaceEmissionTests
             """;
 
         // Act: Convert C# to Calor
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var conversionResult = converter.Convert(csharpSource);
         Assert.True(conversionResult.Success, GetConversionErrors(conversionResult));
 

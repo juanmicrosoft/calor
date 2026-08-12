@@ -47,7 +47,7 @@ public class PostValidationFallbackTests
     [Fact]
     public void UnparseableMember_IsWrappedInCSharpBlock_UnderPassthrough()
     {
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true })
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true })
         {
             ParseValidatorOverride = CondemnOutsideCSharp("Breakme"),
         };
@@ -80,7 +80,7 @@ public class PostValidationFallbackTests
         const string src =
             "namespace N1 { public class Foo { public int A() => 1; } } " +
             "namespace N2 { public class Foo { public int B() => 2; } }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true });
 
         var result = converter.Convert(src);
 
@@ -108,7 +108,7 @@ public class PostValidationFallbackTests
         // be rewrapped. With everything declared unparseable, the output stays invalid —
         // and passthrough must return failure WITH a warning, never Success=true + broken
         // text (which is exactly the pre-#717 behavior).
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true })
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true })
         {
             ParseValidatorOverride = _ => false,
         };
@@ -126,14 +126,18 @@ public class PostValidationFallbackTests
         // Default mode (no passthrough / not Interop): the fallback is gated off, so the
         // output is left as the converter produced it (here real-valid) and no §CSHARP is
         // emitted. Guards that the fallback does not change default-mode behavior.
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = false })
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PassthroughOnError = false
+        })
         {
             ParseValidatorOverride = CondemnOutsideCSharp("Breakme"),
         };
 
         var result = converter.Convert(TwoClasses);
 
-        Assert.True(result.Success);
+        Assert.False(result.Success);
         Assert.NotNull(result.CalorSource);
         Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
         Assert.DoesNotContain("§CSHARP", result.CalorSource!);
@@ -142,7 +146,7 @@ public class PostValidationFallbackTests
     [Fact]
     public void CleanConversion_TriggersNoFallback()
     {
-        var converter = new CSharpToCalorConverter(new ConversionOptions { PassthroughOnError = true });
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true });
 
         var result = converter.Convert(TwoClasses);
 

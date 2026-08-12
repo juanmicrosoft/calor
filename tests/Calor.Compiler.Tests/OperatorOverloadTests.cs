@@ -962,7 +962,7 @@ public class Wrapper
 
     private static string ConvertCSharpToCalor(string csharpCode)
     {
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharpCode, "test.cs");
 
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.ToString())));
@@ -1111,7 +1111,7 @@ public class Wrapper
 
     private static string ConvertAndRoundTrip(string csharp)
     {
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharp);
         Assert.True(result.Success, string.Join("\n", result.Issues.Select(i => i.ToString())));
 

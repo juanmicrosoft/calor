@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Calor.Compiler.Mcp;
 using Calor.Compiler.Mcp.Tools;
+using Calor.Compiler.Migration;
 using Xunit;
 
 namespace Calor.Compiler.Tests.Mcp;
@@ -169,6 +170,92 @@ public class MigrateToolTests
 
             Assert.True(result.IsError);
             Assert.Contains(".calr", result.Content[0].Text!);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FixPhase_InvalidFixLeavesExistingFileUnchanged()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-invalid-fix-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var path = Path.Combine(tempDir, "Invalid.calr");
+        const string source = "§M{m1:Test}\n§B{b1:value:StringBuilder} §NEW{object}§/NEW";
+        await File.WriteAllTextAsync(path, source);
+
+        try
+        {
+            var args = JsonDocument.Parse(
+                $$"""{"projectPath": "{{tempDir.Replace("\\", "\\\\")}}", "phase": "fix"}""").RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            var file = Assert.Single(json.GetProperty("perFile").EnumerateArray());
+            Assert.Equal("fix_incomplete", file.GetProperty("status").GetString());
+            Assert.True(file.GetProperty("fixesApplied").GetInt32() > 0);
+            Assert.Equal(source, await File.ReadAllTextAsync(path));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FullLosslessFailureIgnoresPreExistingCalorFiles()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-stale-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var stalePath = Path.Combine(tempDir, "Stale.calr");
+        const string staleSource = "not valid Calor";
+        await File.WriteAllTextAsync(Path.Combine(tempDir, "Broken.cs"), "public class {");
+        await File.WriteAllTextAsync(stalePath, staleSource);
+
+        try
+        {
+            var args = JsonDocument.Parse(
+                $$"""{"projectPath": "{{tempDir.Replace("\\", "\\\\")}}", "phase": "full"}""").RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.DoesNotContain(
+                json.GetProperty("perFile").EnumerateArray(),
+                file => file.GetProperty("path").GetString() == "Stale.calr");
+            Assert.Equal(staleSource, await File.ReadAllTextAsync(stalePath));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FullPreservesConversionLossLedgerAfterCompile()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-losses-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        await File.WriteAllTextAsync(
+            Path.Combine(tempDir, "Interop.cs"),
+            "public class Interop { public int Get() { int Local() => 42; return Local(); } }");
+
+        try
+        {
+            var args = JsonDocument.Parse(
+                $$"""{"projectPath": "{{tempDir.Replace("\\", "\\\\")}}", "phase": "full"}""").RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            var file = Assert.Single(json.GetProperty("perFile").EnumerateArray());
+            Assert.Contains(file.GetProperty("status").GetString(), new[] { "compiled", "fixed" });
+            var loss = Assert.Single(file.GetProperty("losses").EnumerateArray());
+            Assert.Equal((int)ConversionLossKind.InteropPreserved, loss.GetProperty("kind").GetInt32());
+            Assert.True(loss.GetProperty("line").GetInt32() > 0);
         }
         finally
         {
@@ -368,4 +455,3 @@ public class MigrateToolTests
         }
     }
 }
-

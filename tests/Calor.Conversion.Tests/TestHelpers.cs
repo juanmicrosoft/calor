@@ -19,6 +19,7 @@ public static class TestHelpers
     {
         var options = new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = moduleName,
             GracefulFallback = true,
             AutoGenerateIds = true,

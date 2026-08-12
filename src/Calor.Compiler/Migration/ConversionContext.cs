@@ -158,6 +158,9 @@ public sealed class ConversionLoss
     public required string Description { get; init; }
     public int? Line { get; init; }
     public string? File { get; init; }
+    public bool IsSemanticLoss => Kind is ConversionLossKind.FallbackTodo
+        or ConversionLossKind.Dropped
+        or ConversionLossKind.PreprocessorStripped;
 
     public override string ToString()
     {
@@ -264,6 +267,9 @@ public sealed class ConversionContext
     /// </summary>
     public bool GracefulFallback { get; set; } = true;
 
+    /// <summary>The fidelity contract applied to this conversion.</summary>
+    public ConversionFidelity Fidelity { get; set; } = ConversionFidelity.Lossless;
+
     /// <summary>
     /// The module name to use (derived from file name if not set).
     /// </summary>
@@ -291,7 +297,10 @@ public sealed class ConversionContext
     /// Whether unsupported constructs should be preserved as C# passthrough blocks.
     /// True when Mode is Interop or PassthroughOnError is enabled.
     /// </summary>
-    public bool ShouldPreserveCSharp => Mode == ConversionMode.Interop || PassthroughOnError;
+    public bool ShouldPreserveCSharp =>
+        Fidelity == ConversionFidelity.Lossless ||
+        Mode == ConversionMode.Interop ||
+        PassthroughOnError;
 
     /// <summary>
     /// Current namespace being processed.

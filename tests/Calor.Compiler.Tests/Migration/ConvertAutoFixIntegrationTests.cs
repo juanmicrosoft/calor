@@ -20,6 +20,7 @@ public class ConvertAutoFixIntegrationTests
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             GracefulFallback = true,
             PreserveComments = true,
             AutoGenerateIds = true

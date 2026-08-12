@@ -807,12 +807,8 @@ public class McpServerTests
 
         try { await serverTask; } catch (OperationCanceledException) { }
 
-        // The cancellation check at the top of each loop iteration limits reads.
-        // Without cancellationToken.ThrowIfCancellationRequested(), a spin loop
-        // would call ReadLineAsync 100,000+ times. With it, the CancellationToken
-        // fires cooperatively and limits iterations. This test ensures the empty-string
-        // path doesn't cause unbounded recursion or stack overflow.
-        Assert.True(idleReader.ReadCount < 50_000,
+        // Empty reads are throttled so a non-blocking reader cannot consume a core.
+        Assert.True(idleReader.ReadCount < 50,
             $"ReadLineAsync called {idleReader.ReadCount} times in 100ms — possible spin loop");
     }
 

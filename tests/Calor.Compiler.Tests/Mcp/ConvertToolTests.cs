@@ -46,6 +46,7 @@ public class ConvertToolTests
         Assert.True(schema.TryGetProperty("properties", out var props));
         Assert.True(props.TryGetProperty("source", out _));
         Assert.True(props.TryGetProperty("moduleName", out _));
+        Assert.True(props.TryGetProperty("fidelity", out _));
     }
 
     [Fact]
@@ -97,6 +98,56 @@ public class ConvertToolTests
         Assert.True(result.IsError);
         var text = result.Content[0].Text!;
         Assert.Contains("issues", text);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ValidateMode_WriteFailureReturnsError()
+    {
+        var outputDirectory = Path.Combine(Path.GetTempPath(), $"calor-convert-output-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outputDirectory);
+
+        try
+        {
+            var args = JsonSerializer.SerializeToElement(new
+            {
+                source = "public class Calculator { public int Value() => 42; }",
+                moduleName = "TestModule",
+                mode = "validate",
+                outputPath = outputDirectory
+            });
+
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.True(result.IsError);
+            var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.False(root.GetProperty("success").GetBoolean());
+            Assert.Equal("write", root.GetProperty("stage").GetString());
+        }
+        finally
+        {
+            Directory.Delete(outputDirectory);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ValidateMode_ReportsLossyDropLocations()
+    {
+        var args = JsonSerializer.SerializeToElement(new
+        {
+            source = "public interface IEvents { event System.EventHandler Changed; }",
+            moduleName = "Events",
+            mode = "validate",
+            fidelity = "lossy"
+        });
+
+        var result = await _tool.ExecuteAsync(args);
+
+        var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+        Assert.Equal("lossy", root.GetProperty("fidelity").GetString());
+        var lossSummary = root.GetProperty("lossSummary");
+        Assert.Equal(1, lossSummary.GetProperty("drops").GetInt32());
+        Assert.True(Assert.Single(lossSummary.GetProperty("locations").EnumerateArray())
+            .GetProperty("line").GetInt32() > 0);
     }
 
     [Fact]
@@ -158,6 +209,35 @@ public class ConvertToolTests
         Assert.Contains("classesConverted", text);
         Assert.Contains("methodsConverted", text);
         Assert.Contains("propertiesConverted", text);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DefaultsToLosslessAndReportsInteropLocations()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"Example-{Guid.NewGuid():N}.cs");
+        await File.WriteAllTextAsync(
+            path,
+            "public class Example { public int Get() { int Local() => 42; return Local(); } }");
+        try
+        {
+            var args = JsonSerializer.SerializeToElement(new { inputPath = path });
+            var result = await _tool.ExecuteAsync(args);
+
+            Assert.False(result.IsError);
+            var root = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.Equal("lossless", root.GetProperty("fidelity").GetString());
+            var summary = root.GetProperty("lossSummary");
+            Assert.Equal(1, summary.GetProperty("interopPreservations").GetInt32());
+            Assert.Equal(0, summary.GetProperty("lossySubstitutions").GetInt32());
+            Assert.Equal(0, summary.GetProperty("drops").GetInt32());
+            var location = Assert.Single(summary.GetProperty("locations").EnumerateArray());
+            Assert.Equal(path, location.GetProperty("file").GetString());
+            Assert.True(location.GetProperty("line").GetInt32() >= 1);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

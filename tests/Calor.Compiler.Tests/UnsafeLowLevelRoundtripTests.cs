@@ -36,7 +36,7 @@ public class UnsafeLowLevelRoundtripTests
 
     private static string ConvertToCalor(string csharpSource)
     {
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharpSource);
         Assert.True(result.Success,
             $"Conversion failed:\n{string.Join("\n", result.Issues.Select(i => i.Message))}");
@@ -51,7 +51,7 @@ public class UnsafeLowLevelRoundtripTests
     /// </summary>
     private static (string calor, string csharp) ConvertAndEmit(string csharpSource)
     {
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharpSource);
         Assert.True(result.Success,
             $"Conversion failed:\n{string.Join("\n", result.Issues.Select(i => i.Message))}");
@@ -105,7 +105,7 @@ public class UnsafeLowLevelRoundtripTests
     /// </summary>
     private static string FullRoundTrip(string csharpInput, string expectedCalorTag)
     {
-        var converter = new CSharpToCalorConverter();
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
         var result = converter.Convert(csharpInput);
         Assert.True(result.Success,
             $"Conversion failed:\n{string.Join("\n", result.Issues.Select(i => i.Message))}");

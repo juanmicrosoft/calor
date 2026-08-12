@@ -45,7 +45,7 @@ public class Foo
         }
     }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = CreateConverter();
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
         Assert.NotNull(result.CalorSource);
@@ -69,7 +69,7 @@ public class Foo
         }
     }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = CreateConverter();
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
         Assert.NotNull(result.CalorSource);
@@ -95,7 +95,7 @@ public class Foo
         }
     }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = CreateConverter();
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
         Assert.Contains("§GOTO{CASE:2}", result.CalorSource!);
@@ -119,7 +119,7 @@ public class Foo
         }
     }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = CreateConverter();
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
         Assert.Contains("§GOTO{DEFAULT}", result.CalorSource!);
@@ -238,10 +238,13 @@ public class Foo
         }
     }
 }";
-        var converter = new CSharpToCalorConverter(new ConversionOptions());
+        var converter = CreateConverter();
         var result = converter.Convert(csharp, "Test.cs");
         Assert.True(result.Success, string.Join("; ", result.Issues));
         Assert.Contains("§GOTO{CASE:", result.CalorSource!);
         Assert.DoesNotContain("§CSHARP", result.CalorSource!);
     }
+
+    private static CSharpToCalorConverter CreateConverter() =>
+        new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 }

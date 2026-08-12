@@ -144,6 +144,7 @@ public sealed class VerificationAddressability
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             GracefulFallback = true,
             PreserveComments = true,
             AutoGenerateIds = true,

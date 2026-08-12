@@ -131,17 +131,20 @@ public sealed class McpServer
             if (line == null)
                 return null;
 
-            if (!string.IsNullOrWhiteSpace(line))
+            if (string.IsNullOrWhiteSpace(line))
             {
-                if (line.Length > MaxMessageSize)
-                {
-                    Log($"Rejected oversized message: {line.Length} bytes (max {MaxMessageSize})");
-                    continue;
-                }
-
-                Log($"Read message: {line.Length} bytes");
-                return line;
+                await Task.Delay(10, cancellationToken);
+                continue;
             }
+
+            if (line.Length > MaxMessageSize)
+            {
+                Log($"Rejected oversized message: {line.Length} bytes (max {MaxMessageSize})");
+                continue;
+            }
+
+            Log($"Read message: {line.Length} bytes");
+            return line;
         }
     }
 

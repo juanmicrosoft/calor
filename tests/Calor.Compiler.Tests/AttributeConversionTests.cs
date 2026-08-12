@@ -12,7 +12,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class AttributeConversionTests
 {
-    private readonly CSharpToCalorConverter _converter = new();
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
     #region C# to Calor Attribute Conversion Tests
 

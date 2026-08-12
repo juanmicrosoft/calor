@@ -14,7 +14,11 @@ public class PreprocessorConversionTests
 {
     private static string ConvertToCalor(string csharpSource)
     {
-        var converter = new CSharpToCalorConverter(new ConversionOptions { StripPreprocessor = false });
+        var converter = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            StripPreprocessor = false
+        });
         var result = converter.Convert(csharpSource);
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
@@ -337,7 +341,14 @@ public class Test
     public void Legacy() { }
 #endif
 }";
-        var calor = ConvertToCalor(csharp);
+        var result = new CSharpToCalorConverter(new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            StripPreprocessor = false
+        }).Convert(csharp);
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation");
+        var calor = new CalorEmitter().Emit(result.Ast!);
         Assert.Contains("§PP{NET8_0_OR_GREATER}", calor);
         Assert.Contains("§/PP{NET8_0_OR_GREATER}", calor);
     }

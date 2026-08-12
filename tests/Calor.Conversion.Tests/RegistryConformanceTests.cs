@@ -24,6 +24,7 @@ public class RegistryConformanceTests
     {
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = "ConformanceTest",
             GracefulFallback = true,
             AutoGenerateIds = true,
@@ -722,6 +723,7 @@ public class RegistryConformanceTests
 
         var converter = new CSharpToCalorConverter(new ConversionOptions
         {
+            Fidelity = ConversionFidelity.Lossy,
             ModuleName = "ConformanceTest",
             GracefulFallback = true,
             AutoGenerateIds = true,

@@ -44,8 +44,7 @@ public class ConvertCommandPassthroughTests
     [Fact]
     public void DefaultFlags_MapToExpectedOptions()
     {
-        // Default CLI behavior unchanged: passthrough off, graceful fallback on,
-        // implicit call closers on.
+        // CLI defaults to the lossless contract.
         var opts = ConvertCommand.BuildCSharpToCalorOptions(
             benchmark: false, verbose: false, explain: false, noFallback: false,
             passthrough: false, explicitCallClosers: false);
@@ -53,6 +52,7 @@ public class ConvertCommandPassthroughTests
         Assert.False(opts.PassthroughOnError);
         Assert.True(opts.GracefulFallback);
         Assert.True(opts.UseImplicitCallCloser);
+        Assert.Equal(ConversionFidelity.Lossless, opts.Fidelity);
     }
 
     [Fact]
@@ -127,13 +127,14 @@ public class ConvertCommandPassthroughTests
         var converter = new CSharpToCalorConverter(
             ConvertCommand.BuildCSharpToCalorOptions(
                 benchmark: false, verbose: false, explain: false, noFallback: false,
-                passthrough: false, explicitCallClosers: false))
+                passthrough: false, explicitCallClosers: false, lossy: true))
         {
             ParseValidatorOverride = CondemnOutsideCSharp("Breakme"),
         };
 
         var result = converter.Convert(TwoClasses);
 
+        Assert.False(result.Success);
         Assert.Equal(0, result.Context!.Stats.InteropBlocksEmitted);
         Assert.DoesNotContain("§CSHARP", result.CalorSource!);
     }

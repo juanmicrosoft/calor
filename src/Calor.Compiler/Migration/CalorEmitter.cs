@@ -2505,6 +2505,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 .Replace("\r\n", "\n");
             innerCode = System.Text.RegularExpressions.Regex.Replace(innerCode, @"//[^\n]*", " ");
             innerCode = innerCode.Replace("\n", " ");
+            RecordEmitterFallback(
+                node,
+                "raw-call-target",
+                "Call target could not be represented natively and was preserved as §CS");
             return $"§CS{{{innerCode}}}";
         }
 
@@ -2784,6 +2788,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 if (ContainsSectionMarker(size) || size.Contains('('))
                 {
                     var rawExpr = $"new {node.ElementType}[{size}]";
+                    RecordEmitterFallback(
+                        node,
+                        "raw-array-size",
+                        "Array size could not be represented natively and was preserved as §CS");
                     return $"§CS{{{rawExpr}}}";
                 }
             }
@@ -4082,6 +4090,15 @@ public sealed class CalorEmitter : IAstVisitor<string>
         foreach (var iface in node.Interfaces) { Visit(iface); AppendLine(); }
         foreach (var en in node.Enums) { Visit(en); AppendLine(); }
         foreach (var del in node.Delegates) { Visit(del); AppendLine(); }
+    }
+
+    private void RecordEmitterFallback(AstNode node, string feature, string description)
+    {
+        _context?.RecordLoss(
+            ConversionLossKind.EmitterFallback,
+            feature,
+            description,
+            node.Span.Line);
     }
 
     public string Visit(CSharpInteropBlockNode node)

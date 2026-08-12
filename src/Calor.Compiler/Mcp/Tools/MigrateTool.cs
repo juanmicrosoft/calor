@@ -55,6 +55,12 @@ public sealed class MigrateTool : McpToolBase
                     "type": "boolean",
                     "description": "Emit explicit §/C for every §C call (v0.6.0-compatible output); disables zero-arg §/C elision (default: false — v0.6.1 default elides zero-arg §/C)",
                     "default": false
+                },
+                "fidelity": {
+                    "type": "string",
+                    "enum": ["lossless", "lossy"],
+                    "description": "Fidelity contract. Lossless is the default.",
+                    "default": "lossless"
                 }
             },
             "required": ["projectPath"],
@@ -75,6 +81,10 @@ public sealed class MigrateTool : McpToolBase
         var maxFiles = GetInt(arguments, "maxFiles", defaultValue: 0);
         var autoFix = GetBool(arguments, "autoFix", defaultValue: true);
         var explicitCallClosers = GetBool(arguments, "explicitCallClosers", defaultValue: false);
+        var fidelity = (GetString(arguments, "fidelity") ?? "lossless")
+            .Equals("lossy", StringComparison.OrdinalIgnoreCase)
+            ? ConversionFidelity.Lossy
+            : ConversionFidelity.Lossless;
 
         // Resolve directory from .csproj or directory path
         var directory = ResolveDirectory(projectPath);
@@ -86,10 +96,10 @@ public sealed class MigrateTool : McpToolBase
             return phase switch
             {
                 "assess" => RunAssess(directory, maxFiles, cancellationToken),
-                "convert" => await RunConvertAsync(directory, projectPath, maxFiles, explicitCallClosers, cancellationToken),
+                "convert" => await RunConvertAsync(directory, projectPath, maxFiles, explicitCallClosers, fidelity, cancellationToken),
                 "compile" => RunCompile(directory, maxFiles, cancellationToken),
                 "fix" => await RunFixAsync(directory, maxFiles, cancellationToken),
-                "full" => await RunFullAsync(directory, projectPath, maxFiles, autoFix, explicitCallClosers, cancellationToken),
+                "full" => await RunFullAsync(directory, projectPath, maxFiles, autoFix, explicitCallClosers, fidelity, cancellationToken),
                 _ => McpToolResult.Error($"Unknown phase: '{phase}'. Must be 'assess', 'convert', 'compile', 'fix', or 'full'.")
             };
         }
@@ -155,12 +165,13 @@ public sealed class MigrateTool : McpToolBase
 
     // ── Phase: convert ──────────────────────────────────────────────
 
-    internal async Task<McpToolResult> RunConvertAsync(string directory, string projectPath, int maxFiles, bool explicitCallClosers, CancellationToken ct)
+    internal async Task<McpToolResult> RunConvertAsync(string directory, string projectPath, int maxFiles, bool explicitCallClosers, ConversionFidelity fidelity, CancellationToken ct)
     {
         var options = new MigrationPlanOptions
         {
             IncludeTests = true,
             MaxFiles = maxFiles,
+            Fidelity = fidelity,
             PassthroughOnError = false,
             UseImplicitCallCloser = !explicitCallClosers
         };
@@ -181,6 +192,7 @@ public sealed class MigrateTool : McpToolBase
                 FileMigrationStatus.Skipped => "skipped",
                 _ => "failed"
             },
+            Losses = f.Losses.Count > 0 ? f.Losses : null,
             Errors = f.Issues
                 .Where(i => i.Severity == ConversionIssueSeverity.Error)
                 .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
@@ -193,6 +205,20 @@ public sealed class MigrateTool : McpToolBase
 
         return BuildOutput("convert", perFile);
     }
+
+    internal Task<McpToolResult> RunConvertAsync(
+        string directory,
+        string projectPath,
+        int maxFiles,
+        bool explicitCallClosers,
+        CancellationToken ct) =>
+        RunConvertAsync(
+            directory,
+            projectPath,
+            maxFiles,
+            explicitCallClosers,
+            ConversionFidelity.Lossless,
+            ct);
 
     // ── Phase: compile ──────────────────────────────────────────────
 
@@ -269,7 +295,33 @@ public sealed class MigrateTool : McpToolBase
                 var totalFixes = fixes1.Count + fixes2.Count + fixes3.Count;
 
                 if (totalFixes > 0)
-                    await File.WriteAllTextAsync(path, fixedFinal, ct);
+                {
+                    var validation = Program.Compile(
+                        fixedFinal,
+                        path,
+                        new CompilationOptions
+                        {
+                            ContractMode = ContractMode.Off,
+                            UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                            CancellationToken = ct
+                        });
+                    if (validation.HasErrors)
+                    {
+                        perFile.Add(new MigrateFileResult
+                        {
+                            Path = Path.GetRelativePath(directory, path),
+                            Status = "fix_incomplete",
+                            Errors = BuildCompileEnvelope(validation, path, fixedFinal)
+                                .Where(entry => entry.Severity == "error")
+                                .ToList(),
+                            FixesApplied = totalFixes
+                        });
+                        continue;
+                    }
+
+                    await ConversionFileWriter.WriteAtomicAsync(path, fixedFinal, cancellationToken: ct);
+                }
 
                 perFile.Add(new MigrateFileResult
                 {
@@ -296,7 +348,8 @@ public sealed class MigrateTool : McpToolBase
     // ── Phase: full ─────────────────────────────────────────────────
 
     internal async Task<McpToolResult> RunFullAsync(
-        string directory, string projectPath, int maxFiles, bool autoFix, bool explicitCallClosers, CancellationToken ct)
+        string directory, string projectPath, int maxFiles, bool autoFix, bool explicitCallClosers,
+        ConversionFidelity fidelity, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         var allPerFile = new Dictionary<string, MigrateFileResult>(StringComparer.OrdinalIgnoreCase);
@@ -337,6 +390,7 @@ public sealed class MigrateTool : McpToolBase
         {
             IncludeTests = true,
             MaxFiles = maxFiles,
+            Fidelity = fidelity,
             PassthroughOnError = false,
             UseImplicitCallCloser = !explicitCallClosers
         };
@@ -371,13 +425,20 @@ public sealed class MigrateTool : McpToolBase
                     _ => "convert_failed"
                 },
                 Score = existing?.Score,
+                Losses = f.Losses.Count > 0 ? f.Losses : null,
                 Errors = errors.Count > 0 ? errors : null,
                 Warnings = warnings.Count > 0 ? warnings : null
             };
         }
 
         // Step 3: Compile converted .calr files
-        var calrFiles = DiscoverCalrFiles(directory, maxFiles);
+        var calrFiles = report.FileResults
+            .Where(file => file.Status is FileMigrationStatus.Success or FileMigrationStatus.Partial)
+            .Select(file => file.OutputPath)
+            .Where(path => path != null && File.Exists(path))
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         foreach (var path in calrFiles)
         {
             ct.ThrowIfCancellationRequested();
@@ -412,7 +473,8 @@ public sealed class MigrateTool : McpToolBase
                         Status = "compile_failed",
                         Score = existing?.Score,
                         Errors = compileErrors,
-                        Warnings = existing?.Warnings
+                        Warnings = existing?.Warnings,
+                        Losses = existing?.Losses
                     };
                 }
                 else if (sourceKey != null)
@@ -426,7 +488,8 @@ public sealed class MigrateTool : McpToolBase
                             Status = "compiled",
                             Score = existing.Score,
                             Errors = existing.Errors,
-                            Warnings = existing.Warnings
+                            Warnings = existing.Warnings,
+                            Losses = existing.Losses
                         };
                     }
                 }
@@ -440,6 +503,7 @@ public sealed class MigrateTool : McpToolBase
                     Path = existing?.Path ?? key,
                     Status = "compile_error",
                     Score = existing?.Score,
+                    Losses = existing?.Losses,
                     Errors = [ConversionIssueEnvelope.Message(
                         DiagnosticCode.CliInternalError, "error", ex.Message, path)]
                 };
@@ -474,9 +538,6 @@ public sealed class MigrateTool : McpToolBase
 
                     if (totalFixes > 0)
                     {
-                        await File.WriteAllTextAsync(path, fixedFinal, ct);
-
-                        // Re-compile
                         var compileOptions = new CompilationOptions
                         {
                             ContractMode = ContractMode.Off,
@@ -485,6 +546,13 @@ public sealed class MigrateTool : McpToolBase
                             CancellationToken = ct
                         };
                         var recompile = Program.Compile(fixedFinal, path, compileOptions);
+                        if (!recompile.HasErrors)
+                        {
+                            await ConversionFileWriter.WriteAtomicAsync(
+                                path,
+                                fixedFinal,
+                                cancellationToken: ct);
+                        }
 
                         var relativePath = Path.GetRelativePath(directory, path);
                         var sourceKey = allPerFile.Keys
@@ -497,6 +565,7 @@ public sealed class MigrateTool : McpToolBase
                             Path = existing?.Path ?? key,
                             Status = recompile.HasErrors ? "fix_incomplete" : "fixed",
                             Score = existing?.Score,
+                            Losses = existing?.Losses,
                             Errors = recompile.HasErrors
                                 ? BuildCompileEnvelope(recompile, path, fixedFinal)
                                     .Where(e => e.Severity == "error")
@@ -518,6 +587,22 @@ public sealed class MigrateTool : McpToolBase
         var perFile = allPerFile.Values.ToList();
         return BuildOutput("full", perFile, (int)sw.ElapsedMilliseconds);
     }
+
+    internal Task<McpToolResult> RunFullAsync(
+        string directory,
+        string projectPath,
+        int maxFiles,
+        bool autoFix,
+        bool explicitCallClosers,
+        CancellationToken ct) =>
+        RunFullAsync(
+            directory,
+            projectPath,
+            maxFiles,
+            autoFix,
+            explicitCallClosers,
+            ConversionFidelity.Lossless,
+            ct);
 
     // ── Helpers ──────────────────────────────────────────────────────
 
@@ -650,6 +735,10 @@ public sealed class MigrateTool : McpToolBase
         [JsonPropertyName("warnings")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<EnvelopeDiagnostic>? Warnings { get; init; }
+
+        [JsonPropertyName("losses")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public IReadOnlyList<ConversionLoss>? Losses { get; init; }
 
         /// <summary>Number of auto-fixes applied (fix / full phases); replaces the old pseudo-warning string.</summary>
         [JsonPropertyName("fixesApplied")]

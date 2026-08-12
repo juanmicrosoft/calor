@@ -10,7 +10,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class SwitchExpressionConversionTests
 {
-    private readonly CSharpToCalorConverter _converter = new();
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
 
     #region Basic Switch Expression
 
@@ -417,7 +417,8 @@ public class SwitchExpressionConversionTests
 
         var result = _converter.Convert(csharpSource);
 
-        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation");
 
         var classNode = Assert.Single(result.Ast!.Classes);
         var method = Assert.Single(classNode.Methods);

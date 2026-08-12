@@ -13,7 +13,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public class MigrationLearningFixTests
 {
-    private readonly CSharpToCalorConverter _converter = new();
+    private readonly CSharpToCalorConverter _converter = new(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
     private static TextSpan Span => new(0, 1, 1, 1);
 
     #region Helpers
@@ -331,7 +331,8 @@ public class MigrationLearningFixTests
             """;
 
         var result = _converter.Convert(csharpSource);
-        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.False(result.Success);
+        Assert.Contains(result.Issues, issue => issue.Feature == "generated-calor-validation");
 
         var emitted = Emit(result.Ast!);
         // Keywords should be sanitized with @ prefix in emitted C#

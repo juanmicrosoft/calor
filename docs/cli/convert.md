@@ -60,6 +60,9 @@ calor convert MyService.cs --benchmark
 | `--output` | `-o` | Auto-detected | Output file path |
 | `--benchmark` | `-b` | `false` | Include benchmark metrics comparison |
 | `--verbose` | `-v` | `false` | Enable verbose output |
+| `--lossy` | — | `false` | Explicitly allow reported substitutions or drops. Without this flag, unsupported code is preserved verbatim and both generated Calor and round-tripped C# must validate before the destination is replaced. |
+| `--validate` | — | — | Compatibility flag. Generated Calor validation is now mandatory in every mode. |
+| `--passthrough` | — | `false` | Preserve unconvertible members as raw C# interop blocks. Lossless mode already preserves unsupported descendants at the nearest complete boundary. |
 | `--explicit-call-closers` | — | `false` | Emit explicit `§/C` for every `§C` call (v0.6.0-compatible output). Use when regenerating `.calr` files intended to parse on v0.6.0 toolchains. By default v0.6.1 elides `§/C` for zero-arg calls. |
 | `--format` | — | `text` | Output format: `text` or `json` (envelope document on stdout) — see [JSON Output](#json-output---format-json). No `-f` short alias |
 
@@ -87,17 +90,17 @@ timeout, crash). Exit codes are unchanged.
     "inputPath": "/abs/Sample.cs",
     "outputPath": "/abs/Sample.calr",
     "success": true,
+    "fidelity": "lossless",
     "unsupportedFeatureCount": 1,
     "featureCounts": { "local-functions": 1 },
-    "validated": false
+    "validated": true
   }
 }
 ```
 
 - `diagnostics[]` — conversion issues (`Calor1343`, severity mirrors the
-  issue, message prefixed with the feature name when known), `--validate`
-  parse errors in the generated output (`Calor1344`, warning — the output was
-  still written, with `data.validated` / `data.validationErrorCount` set), and
+  issue, message prefixed with the feature name when known), generated-output
+  parse errors (`Calor1344`, error — the destination remains unchanged), and
   command-level failures (`Calor1345`: input not found, unknown file type,
   timeout, crash). Converting Calor → C#, compiler diagnostics appear with
   their own codes.
@@ -106,7 +109,8 @@ timeout, crash). Exit codes are unchanged.
   accounting: every §CSHARP interop preservation, TODO fallback, dropped
   construct, and stripped preprocessor directive, each with
   `kind`, `feature`, `file`, `line`, and `description`. `lossCount: 0` means
-  the output is fully native Calor. In text mode a conversion with losses
+  the output is fully native Calor. Interop preservation is lossless but not
+  native; substitutions and drops require `--lossy`. In text mode a conversion with losses
   prints a located loss summary instead of the `✓ Conversion successful` line.
 - `data.benchmark` — present with `--benchmark`: token/line/character counts
   before and after, reduction percentages, and the advantage ratio.
@@ -130,6 +134,13 @@ When converting C# to Calor, the converter:
 4. Generates unique IDs for all structural elements
 5. Adds effect declarations based on detected side effects
 6. Suggests contracts based on validation patterns
+
+The default contract is **lossless**: unsupported descendants bubble to the
+nearest complete member or type and are preserved verbatim as C# interop.
+Success means the emitted Calor parses and compiles, and its generated C#
+compiles through Roslyn. Output files are replaced atomically only after these
+checks pass. `--lossy` permits substitutions or drops, but every occurrence is
+reported with its source location.
 
 ### Supported Constructs
 

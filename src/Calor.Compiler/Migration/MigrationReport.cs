@@ -56,13 +56,16 @@ public sealed class MigrationSummary
 public sealed class FileMigrationResult
 {
     public required string SourcePath { get; init; }
-    public required string? OutputPath { get; init; }
-    public required FileMigrationStatus Status { get; init; }
+    public required string? OutputPath { get; set; }
+    public required FileMigrationStatus Status { get; set; }
     public TimeSpan Duration { get; init; }
     public List<ConversionIssue> Issues { get; init; } = new();
+    public IReadOnlyList<ConversionLoss> Losses { get; init; } = Array.Empty<ConversionLoss>();
     public FileMetrics? Metrics { get; init; }
     public FileAnalysisResult? Analysis { get; init; }
     public FileVerificationSummary? Verification { get; set; }
+    internal string? ConvertedSource { get; init; }
+    internal string? GeneratedCSharp { get; init; }
 }
 
 /// <summary>
