@@ -34,6 +34,10 @@ public static class TestHelpers
     /// Returns null if there are parse errors or parser throws.
     /// </summary>
     public static string? CompileCalorToCSharp(string calorSource)
+        => CompileCalorToCSharpWithDiagnostics(calorSource).GeneratedCode;
+
+    public static CalorCompilationAttempt CompileCalorToCSharpWithDiagnostics(
+        string calorSource)
     {
         try
         {
@@ -42,20 +46,28 @@ public static class TestHelpers
 
             var lexer = new Lexer(calorSource, diagnostics);
             var tokens = lexer.TokenizeAllForParser();
-            if (diagnostics.HasErrors) return null;
+            if (diagnostics.HasErrors)
+                return new CalorCompilationAttempt(null, FormatDiagnostics(diagnostics));
 
             var parser = new Parser(tokens, diagnostics);
             var module = parser.Parse();
-            if (diagnostics.HasErrors) return null;
+            if (diagnostics.HasErrors)
+                return new CalorCompilationAttempt(null, FormatDiagnostics(diagnostics));
 
             var emitter = new CSharpEmitter();
-            return emitter.Emit(module);
+            return new CalorCompilationAttempt(
+                emitter.Emit(module),
+                FormatDiagnostics(diagnostics));
         }
-        catch
+        catch (Exception ex)
         {
-            // Parser may throw for unsupported Calor syntax
-            return null;
+            return new CalorCompilationAttempt(
+                null,
+                [$"Compiler exception: {ex.GetType().Name}: {ex.Message}"]);
         }
+
+        static IReadOnlyList<string> FormatDiagnostics(DiagnosticBag diagnostics)
+            => diagnostics.Select(diagnostic => diagnostic.ToString()).ToList();
     }
 
     /// <summary>
@@ -85,7 +97,9 @@ public static class TestHelpers
             };
         }
 
-        var emittedCSharp = CompileCalorToCSharp(conversionResult.CalorSource);
+        var calorCompilation = CompileCalorToCSharpWithDiagnostics(
+            conversionResult.CalorSource);
+        var emittedCSharp = calorCompilation.GeneratedCode;
 
         if (emittedCSharp == null)
         {
@@ -94,6 +108,7 @@ public static class TestHelpers
                 ConversionSuccess = true,
                 CalorSource = conversionResult.CalorSource,
                 CalorParseSuccess = false,
+                CalorDiagnostics = calorCompilation.Diagnostics.ToList(),
             };
         }
 
@@ -104,6 +119,7 @@ public static class TestHelpers
             ConversionSuccess = true,
             CalorSource = conversionResult.CalorSource,
             CalorParseSuccess = true,
+            CalorDiagnostics = calorCompilation.Diagnostics.ToList(),
             EmittedCSharp = emittedCSharp,
             RoslynErrors = validation.FormattedCompilationErrors.ToList(),
             CSharpSyntaxSuccess = validation.SyntaxSuccess,
@@ -127,6 +143,7 @@ public sealed class RoundTripResult
     public List<string> ConversionIssues { get; init; } = new();
     public string? CalorSource { get; init; }
     public bool CalorParseSuccess { get; init; }
+    public List<string> CalorDiagnostics { get; init; } = new();
     public string? EmittedCSharp { get; init; }
     public List<string> RoslynErrors { get; init; } = new();
 
@@ -136,5 +153,11 @@ public sealed class RoundTripResult
     /// <summary>The emitted C# compiles with zero Roslyn errors (full semantic compilation).</summary>
     public bool RoslynSuccess { get; init; }
 
+    public bool CSharpCompilationSuccess => RoslynSuccess;
+
     public bool FullSuccess => ConversionSuccess && CalorParseSuccess && RoslynSuccess;
 }
+
+public sealed record CalorCompilationAttempt(
+    string? GeneratedCode,
+    IReadOnlyList<string> Diagnostics);

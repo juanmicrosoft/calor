@@ -97,6 +97,10 @@ public class ConversionScorecardRunner
         var conversionIssues = conversionResult.Issues
             .Select(i => i.ToString())
             .ToArray();
+        var semanticLosses = conversionResult.Losses
+            .Where(loss => loss.IsSemanticLoss)
+            .Select(loss => loss.ToString())
+            .ToArray();
         var conversionErrors = conversionResult.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error);
         var conversionWarnings = conversionResult.Issues.Count(i => i.Severity == ConversionIssueSeverity.Warning);
 
@@ -118,7 +122,11 @@ public class ConversionScorecardRunner
                 CSharpSyntaxSuccess: false,
                 CSharpCompilationSuccess: false,
                 ConversionDuration: conversionDuration,
-                CompilationDuration: TimeSpan.Zero);
+                CompilationDuration: TimeSpan.Zero)
+            {
+                SemanticLossCount = semanticLosses.Length,
+                SemanticLossDiagnostics = semanticLosses
+            };
         }
 
         // Stage 2: Calor → C#
@@ -155,7 +163,11 @@ public class ConversionScorecardRunner
                 CSharpSyntaxSuccess: false,
                 CSharpCompilationSuccess: false,
                 ConversionDuration: conversionDuration,
-                CompilationDuration: TimeSpan.Zero);
+                CompilationDuration: TimeSpan.Zero)
+            {
+                SemanticLossCount = semanticLosses.Length,
+                SemanticLossDiagnostics = semanticLosses
+            };
         }
 
         var compilationDiagnostics = compilationResult.Diagnostics.Errors
@@ -180,7 +192,11 @@ public class ConversionScorecardRunner
                 CSharpSyntaxSuccess: false,
                 CSharpCompilationSuccess: false,
                 ConversionDuration: conversionDuration,
-                CompilationDuration: compilationDuration);
+                CompilationDuration: compilationDuration)
+            {
+                SemanticLossCount = semanticLosses.Length,
+                SemanticLossDiagnostics = semanticLosses
+            };
         }
 
         // Stage 3: Roslyn validation of the generated C# — a full semantic
@@ -204,7 +220,7 @@ public class ConversionScorecardRunner
         }
 
         // FullyConverted = conversion + Calor compilation + C# COMPILATION.
-        var status = csharpCompilationSuccess
+        var status = csharpCompilationSuccess && semanticLosses.Length == 0
             ? SnippetStatus.FullyConverted
             : SnippetStatus.PartiallyConverted;
 
@@ -224,7 +240,11 @@ public class ConversionScorecardRunner
             CSharpSyntaxSuccess: csharpSyntaxSuccess,
             CSharpCompilationSuccess: csharpCompilationSuccess,
             ConversionDuration: conversionDuration,
-            CompilationDuration: compilationDuration);
+            CompilationDuration: compilationDuration)
+        {
+            SemanticLossCount = semanticLosses.Length,
+            SemanticLossDiagnostics = semanticLosses
+        };
     }
 
     private static ConversionScorecard Aggregate(List<SnippetResult> results, string? commitHash)

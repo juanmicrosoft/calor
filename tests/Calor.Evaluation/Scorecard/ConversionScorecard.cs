@@ -28,10 +28,16 @@ public record SnippetResult(
     TimeSpan ConversionDuration,
     TimeSpan CompilationDuration)
 {
+    public int SemanticLossCount { get; init; }
+    public string[] SemanticLossDiagnostics { get; init; } = Array.Empty<string>();
+
     // #771: round-trip success requires the generated C# to COMPILE (full
     // Roslyn semantic compilation), not merely parse — syntax-valid but
     // type-invalid output no longer counts.
-    public bool RoundTripSuccess => ConversionSuccess && CompilationSuccess && CSharpCompilationSuccess;
+    public bool RoundTripSuccess => ConversionSuccess &&
+        CompilationSuccess &&
+        CSharpCompilationSuccess &&
+        SemanticLossCount == 0;
 }
 
 public record ConversionScorecard(

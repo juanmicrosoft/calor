@@ -6900,7 +6900,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     _context.RecordFeatureUsage("collection-spread");
                     var spreadTarget = spread.Expression.ToString();
                     return new CallExpressionNode(GetTextSpan(collection),
-                        $"{spreadTarget}.ToList", Array.Empty<ExpressionNode>());
+                        $"{spreadTarget}.{GetCollectionMaterializer(collection)}",
+                        Array.Empty<ExpressionNode>());
                 }
                 // Mixed spread [..a, ..b] or [1, ..a] — convert to Concat chain
                 _context.RecordFeatureUsage("collection-spread");
@@ -6976,12 +6977,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 new ExpressionNode[] { result, chunks[i] });
         }
 
-        // .ToList() at the end — wrap the Concat chain in a member access
-        result = new CallExpressionNode(span, "Enumerable.ToList",
+        // Materialize to the target collection shape. Array targets must not
+        // silently become List<T>, which is syntax-valid but type-invalid C#.
+        result = new CallExpressionNode(span, $"Enumerable.{GetCollectionMaterializer(collection)}",
             new ExpressionNode[] { result });
 
         return result;
     }
+
+    private string GetCollectionMaterializer(CollectionExpressionSyntax collection)
+        => _semanticModel?.GetTypeInfo(collection).ConvertedType is IArrayTypeSymbol
+            ? "ToArray"
+            : "ToList";
 
     private string? InferTypeFromExpression(ExpressionSyntax expr)
     {

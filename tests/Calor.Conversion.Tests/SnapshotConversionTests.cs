@@ -56,27 +56,12 @@ public class SnapshotConversionTests
             string.Join("; ", result.Issues.Select(i => i.Message)));
         Assert.NotNull(result.CalorSource);
 
-        // If running in update mode, write the snapshot
-        if (Environment.GetEnvironmentVariable("CALOR_UPDATE_SNAPSHOTS") == "1")
-        {
-            WriteSnapshot(snapshotName, result.CalorSource!);
-            _output.WriteLine($"[{id}] Snapshot updated: {snapshotName}");
-            return;
-        }
-
-        if (approved == null)
-        {
-            // No snapshot exists yet — generate it and skip
-            WriteSnapshot(snapshotName, result.CalorSource!);
-            _output.WriteLine($"[{id}] Initial snapshot generated: {snapshotName}");
-            return;
-        }
-
-        // Normalize line endings for comparison
-        var normalizedApproved = approved.Replace("\r\n", "\n").Trim();
-        var normalizedActual = result.CalorSource!.Replace("\r\n", "\n").Trim();
-
-        Assert.Equal(normalizedApproved, normalizedActual);
+        VerifySnapshot(
+            snapshotName,
+            approved,
+            result.CalorSource!,
+            Environment.GetEnvironmentVariable("CALOR_UPDATE_SNAPSHOTS") == "1",
+            WriteSnapshot);
     }
 
     [Fact]
@@ -112,6 +97,44 @@ public class SnapshotConversionTests
         var snapshotDir = Path.Combine(projectDir, "Snapshots");
         Directory.CreateDirectory(snapshotDir);
         File.WriteAllText(Path.Combine(snapshotDir, snapshotName), content);
+    }
+
+    internal static void VerifySnapshot(
+        string snapshotName,
+        string? approved,
+        string actual,
+        bool updateMode,
+        Action<string, string> writeSnapshot)
+    {
+        if (updateMode)
+        {
+            writeSnapshot(snapshotName, actual);
+            return;
+        }
+
+        Assert.True(
+            approved != null,
+            $"Missing approved snapshot '{snapshotName}'. " +
+            "Set CALOR_UPDATE_SNAPSHOTS=1 explicitly to create it.");
+        Assert.Equal(
+            approved!.Replace("\r\n", "\n").Trim(),
+            actual.Replace("\r\n", "\n").Trim());
+    }
+
+    [Fact]
+    public void MissingSnapshot_FailsWithoutWriting()
+    {
+        var writeAttempted = false;
+
+        var exception = Record.Exception(() => VerifySnapshot(
+            "missing.approved.calr",
+            approved: null,
+            actual: "§M{m001:Missing}",
+            updateMode: false,
+            (_, _) => writeAttempted = true));
+
+        Assert.NotNull(exception);
+        Assert.False(writeAttempted);
     }
 
     private static string? FindProjectDirectory()

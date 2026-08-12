@@ -30,12 +30,16 @@ public static class ScorecardComparison
         var regressions = new List<string>();
         var improvements = new List<string>();
 
-        foreach (var (id, currentResult) in currentById)
+        foreach (var (id, baselineResult) in baselineById)
         {
-            if (!baselineById.TryGetValue(id, out var baselineResult))
+            if (!currentById.TryGetValue(id, out var currentResult))
+            {
+                regressions.Add(id);
                 continue;
+            }
 
-            if (baselineResult.RoundTripSuccess && !currentResult.RoundTripSuccess)
+            if (StatusRank(currentResult.Status) < StatusRank(baselineResult.Status) ||
+                baselineResult.RoundTripSuccess && !currentResult.RoundTripSuccess)
                 regressions.Add(id);
             else if (!baselineResult.RoundTripSuccess && currentResult.RoundTripSuccess)
                 improvements.Add(id);
@@ -48,6 +52,16 @@ public static class ScorecardComparison
             RoundTripDelta: current.RoundTripPassing - baseline.RoundTripPassing,
             Baseline: baseline,
             Current: current);
+
+        static int StatusRank(SnippetStatus status)
+            => status switch
+            {
+                SnippetStatus.Crashed => 0,
+                SnippetStatus.Blocked => 1,
+                SnippetStatus.PartiallyConverted => 2,
+                SnippetStatus.FullyConverted => 3,
+                _ => throw new ArgumentOutOfRangeException(nameof(status))
+            };
     }
 
     public static async Task<ConversionScorecard> LoadBaselineAsync(string path)

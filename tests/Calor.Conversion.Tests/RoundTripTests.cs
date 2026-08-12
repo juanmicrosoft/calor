@@ -142,4 +142,30 @@ public class RoundTripTests
         Assert.All(results, r => Assert.True(r.RoslynOk,
             $"[{r.Id}] {r.Desc}: emitted C# does not compile"));
     }
+
+    [Fact]
+    public void RoslynGate_RejectsSyntaxValidTypeInvalidOutput()
+    {
+        var validation = TestHelpers.RoslynCompile(
+            "public static class Invalid { public static int Read() => \"wrong\"; }");
+
+        Assert.True(validation.SyntaxSuccess);
+        Assert.False(validation.CompilationSuccess);
+        Assert.Contains(
+            validation.FormattedCompilationErrors,
+            error => error.Contains("CS0029", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RoslynGate_ClassifiesMissingProjectReferenceAsCompilationFailure()
+    {
+        var validation = TestHelpers.RoslynCompile(
+            "public sealed class Consumer { public External.Library.Api Read() => new(); }");
+
+        Assert.True(validation.SyntaxSuccess);
+        Assert.False(validation.CompilationSuccess);
+        Assert.Contains(
+            validation.FormattedCompilationErrors,
+            error => error.Contains("CS0246", StringComparison.Ordinal));
+    }
 }
