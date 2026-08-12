@@ -283,4 +283,58 @@ public sealed class LosslessConversionContractTests
             FileSizeBytes = new FileInfo(sourcePath).Length
         };
     }
+
+    [Fact]
+    public async Task ProjectMigration_TimedOutLossyConversionCannotWriteLater()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"calor-project-timeout-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var sourcePath = Path.Combine(directory, "Slow.cs");
+        var outputPath = Path.ChangeExtension(sourcePath, ".calr");
+        await File.WriteAllTextAsync(
+            sourcePath,
+            string.Join(
+                Environment.NewLine,
+                Enumerable.Range(0, 10_000).Select(index => $"public class Item{index} {{ }}")));
+        await File.WriteAllTextAsync(outputPath, "original");
+
+        var plan = new MigrationPlan
+        {
+            ProjectPath = directory,
+            Direction = MigrationDirection.CSharpToCalor,
+            Entries =
+            [
+                new MigrationPlanEntry
+                {
+                    SourcePath = sourcePath,
+                    OutputPath = outputPath,
+                    Convertibility = FileConvertibility.Full,
+                    FileSizeBytes = new FileInfo(sourcePath).Length
+                }
+            ]
+        };
+        var migrator = new ProjectMigrator(new MigrationPlanOptions
+        {
+            Parallel = false,
+            Fidelity = ConversionFidelity.Lossy,
+            PerFileTimeoutSeconds = 0
+        });
+
+        try
+        {
+            var report = await migrator.ExecuteAsync(plan);
+            await Task.Delay(250);
+
+            Assert.Equal(FileMigrationStatus.TimedOut, Assert.Single(report.FileResults).Status);
+            Assert.Equal("original", await File.ReadAllTextAsync(outputPath));
+        }
+        finally
+        {
+            foreach (var file in Directory.GetFiles(directory))
+            {
+                File.Delete(file);
+            }
+            Directory.Delete(directory);
+        }
+    }
 }

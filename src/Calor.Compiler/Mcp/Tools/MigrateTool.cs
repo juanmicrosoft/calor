@@ -432,7 +432,13 @@ public sealed class MigrateTool : McpToolBase
         }
 
         // Step 3: Compile converted .calr files
-        var calrFiles = DiscoverCalrFiles(directory, maxFiles);
+        var calrFiles = report.FileResults
+            .Where(file => file.Status is FileMigrationStatus.Success or FileMigrationStatus.Partial)
+            .Select(file => file.OutputPath)
+            .Where(path => path != null && File.Exists(path))
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
         foreach (var path in calrFiles)
         {
             ct.ThrowIfCancellationRequested();

@@ -238,11 +238,11 @@ public sealed class ProjectMigrator
         {
             if (direction == MigrationDirection.CSharpToCalor)
             {
-                return await ProcessCSharpToCalorAsync(entry, dryRun, startTime).WaitAsync(cts.Token);
+                return await ProcessCSharpToCalorAsync(entry, dryRun, startTime, cts.Token);
             }
             else
             {
-                return await ProcessCalorToCSharpAsync(entry, dryRun, startTime).WaitAsync(cts.Token);
+                return await ProcessCalorToCSharpAsync(entry, dryRun, startTime, cts.Token);
             }
         }
         catch (OperationCanceledException)
@@ -275,7 +275,11 @@ public sealed class ProjectMigrator
         }
     }
 
-    private async Task<FileMigrationResult> ProcessCSharpToCalorAsync(MigrationPlanEntry entry, bool dryRun, DateTime startTime)
+    private async Task<FileMigrationResult> ProcessCSharpToCalorAsync(
+        MigrationPlanEntry entry,
+        bool dryRun,
+        DateTime startTime,
+        CancellationToken cancellationToken)
     {
         var conversionOptions = new ConversionOptions
         {
@@ -293,7 +297,7 @@ public sealed class ProjectMigrator
 
         var converter = new CSharpToCalorConverter(conversionOptions);
 
-        var result = await converter.ConvertFileAsync(entry.SourcePath);
+        var result = await converter.ConvertFileAsync(entry.SourcePath, cancellationToken);
 
         // Tag partial classes with source file for merging
         if (result.Success && result.Ast != null && _options.MergePartialClasses)
@@ -307,7 +311,7 @@ public sealed class ProjectMigrator
         FileMetrics? metrics = null;
         if (result.Success && result.CalorSource != null && _options.IncludeBenchmark)
         {
-            var originalSource = await File.ReadAllTextAsync(entry.SourcePath);
+            var originalSource = await File.ReadAllTextAsync(entry.SourcePath, cancellationToken);
             metrics = BenchmarkIntegration.CalculateMetrics(originalSource, result.CalorSource);
         }
 
@@ -328,7 +332,8 @@ public sealed class ProjectMigrator
                 new CompilationOptions
                 {
                     EnforceEffects = false,
-                    UnknownCallPolicy = UnknownCallPolicy.Permissive
+                    UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                    CancellationToken = cancellationToken
                 });
             if (compileResult.HasErrors)
             {
@@ -369,7 +374,8 @@ public sealed class ProjectMigrator
                     var compileOptions = new CompilationOptions
                     {
                         EnforceEffects = false,
-                        UnknownCallPolicy = UnknownCallPolicy.Permissive
+                        UnknownCallPolicy = UnknownCallPolicy.Permissive,
+                        CancellationToken = cancellationToken
                     };
                     var compileResult = Program.Compile(result.CalorSource, entry.OutputPath, compileOptions);
                     if (compileResult.HasErrors)
@@ -406,7 +412,11 @@ public sealed class ProjectMigrator
         {
             // Use replacement fallback for files with unpairable surrogates (e.g., regex patterns with \uD800)
             var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-            await ConversionFileWriter.WriteAtomicAsync(entry.OutputPath, result.CalorSource, writeEncoding);
+            await ConversionFileWriter.WriteAtomicAsync(
+                entry.OutputPath,
+                result.CalorSource,
+                writeEncoding,
+                cancellationToken);
         }
 
         // Attach per-file analysis if available from a prior AnalyzeAsync call
@@ -539,10 +549,17 @@ public sealed class ProjectMigrator
             .Distinct());
     }
 
-    private async Task<FileMigrationResult> ProcessCalorToCSharpAsync(MigrationPlanEntry entry, bool dryRun, DateTime startTime)
+    private async Task<FileMigrationResult> ProcessCalorToCSharpAsync(
+        MigrationPlanEntry entry,
+        bool dryRun,
+        DateTime startTime,
+        CancellationToken cancellationToken)
     {
-        var source = await File.ReadAllTextAsync(entry.SourcePath);
-        var result = Program.Compile(source, entry.SourcePath);
+        var source = await File.ReadAllTextAsync(entry.SourcePath, cancellationToken);
+        var result = Program.Compile(
+            source,
+            entry.SourcePath,
+            new CompilationOptions { CancellationToken = cancellationToken });
 
         FileMetrics? metrics = null;
         if (!result.HasErrors && _options.IncludeBenchmark)
@@ -552,7 +569,10 @@ public sealed class ProjectMigrator
 
         if (!dryRun && !result.HasErrors)
         {
-            await ConversionFileWriter.WriteAtomicAsync(entry.OutputPath, result.GeneratedCode);
+            await ConversionFileWriter.WriteAtomicAsync(
+                entry.OutputPath,
+                result.GeneratedCode,
+                cancellationToken: cancellationToken);
         }
 
         var status = result.HasErrors

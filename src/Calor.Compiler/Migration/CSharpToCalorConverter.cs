@@ -395,7 +395,9 @@ public sealed class CSharpToCalorConverter
     /// <summary>
     /// Converts a C# file to Calor.
     /// </summary>
-    public async Task<ConversionResult> ConvertFileAsync(string csharpFilePath)
+    public async Task<ConversionResult> ConvertFileAsync(
+        string csharpFilePath,
+        CancellationToken cancellationToken = default)
     {
         if (!File.Exists(csharpFilePath))
         {
@@ -407,22 +409,31 @@ public sealed class CSharpToCalorConverter
         // Use replacement fallback to handle files with unpaired surrogates
         // (e.g., regex patterns containing \uD800-\uDBFF in string literals)
         var encoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-        var source = await File.ReadAllTextAsync(csharpFilePath, encoding);
-        return Convert(source, csharpFilePath);
+        var source = await File.ReadAllTextAsync(csharpFilePath, encoding, cancellationToken);
+        var result = Convert(source, csharpFilePath);
+        cancellationToken.ThrowIfCancellationRequested();
+        return result;
     }
 
     /// <summary>
     /// Converts a C# file and writes the output to an Calor file.
     /// </summary>
-    public async Task<ConversionResult> ConvertFileAndSaveAsync(string csharpFilePath, string? outputPath = null)
+    public async Task<ConversionResult> ConvertFileAndSaveAsync(
+        string csharpFilePath,
+        string? outputPath = null,
+        CancellationToken cancellationToken = default)
     {
-        var result = await ConvertFileAsync(csharpFilePath);
+        var result = await ConvertFileAsync(csharpFilePath, cancellationToken);
 
         if (result.Success && result.CalorSource != null)
         {
             var calorPath = outputPath ?? Path.ChangeExtension(csharpFilePath, ".calr");
             var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
-            await ConversionFileWriter.WriteAtomicAsync(calorPath, result.CalorSource, writeEncoding);
+            await ConversionFileWriter.WriteAtomicAsync(
+                calorPath,
+                result.CalorSource,
+                writeEncoding,
+                cancellationToken);
         }
 
         return result;

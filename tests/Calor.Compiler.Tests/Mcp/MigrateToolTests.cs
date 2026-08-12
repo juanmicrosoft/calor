@@ -205,6 +205,35 @@ public class MigrateToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FullLosslessFailureIgnoresPreExistingCalorFiles()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-stale-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var stalePath = Path.Combine(tempDir, "Stale.calr");
+        const string staleSource = "not valid Calor";
+        await File.WriteAllTextAsync(Path.Combine(tempDir, "Broken.cs"), "public class {");
+        await File.WriteAllTextAsync(stalePath, staleSource);
+
+        try
+        {
+            var args = JsonDocument.Parse(
+                $$"""{"projectPath": "{{tempDir.Replace("\\", "\\\\")}}", "phase": "full"}""").RootElement;
+
+            var result = await _tool.ExecuteAsync(args);
+
+            var json = JsonDocument.Parse(result.Content[0].Text!).RootElement;
+            Assert.DoesNotContain(
+                json.GetProperty("perFile").EnumerateArray(),
+                file => file.GetProperty("path").GetString() == "Stale.calr");
+            Assert.Equal(staleSource, await File.ReadAllTextAsync(stalePath));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
     public void ResolveDirectory_WithDirectory_ReturnsPath()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"calor-migrate-test-{Guid.NewGuid():N}");
