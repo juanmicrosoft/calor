@@ -50,6 +50,21 @@ public sealed class QueryGoldenTests : IDisposable
         var golden = LoadGoldens()[position];
         var index = BuildFixtureIndex();
 
+        if (golden.Facet == "impact")
+        {
+            // The subject is a FILE, not a declaration name.
+            var impacted = index.FindImpactOfFile(golden.Name);
+            Assert.Equal(
+                golden.Expect.OrderBy(entry => entry, StringComparer.Ordinal).ToArray(),
+                impacted
+                    .Select(declaration =>
+                        $"{declaration.File}:{declaration.Line}:{declaration.Name}")
+                    .OrderBy(entry => entry, StringComparer.Ordinal)
+                    .ToArray());
+            Assert.Equal(golden.Partial, index.ImpactAnswerIsPartial());
+            return;
+        }
+
         var declarations = index.FindDeclarations(golden.Name);
         Assert.True(
             declarations.Count > 0,

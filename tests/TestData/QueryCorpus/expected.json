@@ -82,6 +82,29 @@
       "inFile": "asks-across.calr",
       "expect": [],
       "partial": true
+    },
+    {
+      "why": "math.calr declares Scale. ScaleTwice calls it but lives in the same file, so it is part of the change rather than affected by it; Run in app.calr is the genuine downstream. This is the case a naive impact answer gets wrong by including the seed file's own declarations.",
+      "facet": "impact",
+      "name": "math.calr",
+      "expect": [
+        "app.calr:2:Run"
+      ],
+      "partial": true
+    },
+    {
+      "why": "Nothing calls into app.calr, so a change there affects nothing else. Distinguishing 'affects nothing' from 'we could not tell' is why the residual is printed either way.",
+      "facet": "impact",
+      "name": "app.calr",
+      "expect": [],
+      "partial": true
+    },
+    {
+      "why": "ambiguous2.calr's only caller of its own Shared is AsksShared, in that same file — a seed, not an impact. The cross-file call from asks-across.calr is ambiguous and unattributed, which is exactly why this answer is partial rather than empty-and-complete.",
+      "facet": "impact",
+      "name": "ambiguous2.calr",
+      "expect": [],
+      "partial": true
     }
   ]
 }

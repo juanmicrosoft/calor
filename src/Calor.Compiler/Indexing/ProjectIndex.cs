@@ -280,6 +280,72 @@ public sealed class ProjectIndex
     }
 
     /// <summary>
+    /// What a change to <paramref name="file"/> could affect: every declaration
+    /// reachable by following call edges INTO the declarations that file holds,
+    /// transitively.
+    ///
+    /// Granularity is the file, not the declaration (scoping doc §9.1). The
+    /// per-file semantic hash cannot say WHICH declaration in a file changed, so
+    /// this treats a change to any part of a file as a change to all of it. The
+    /// result is sound in the direction that matters — it never omits an
+    /// affected caller — but it over-reports: a file holding twenty
+    /// declarations implicates all twenty's callers when one changed.
+    ///
+    /// The cycle guard is not defensive coding: mutually recursive functions are
+    /// ordinary, and following their edges without one does not terminate.
+    /// </summary>
+    public IReadOnlyList<IndexedDeclaration> FindImpactOfFile(string file)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+
+        var seedIds = Declarations
+            .Where(declaration => string.Equals(
+                declaration.File, file, StringComparison.Ordinal))
+            .Select(declaration => declaration.SymbolId)
+            .ToHashSet(StringComparer.Ordinal);
+        if (seedIds.Count == 0)
+            return [];
+
+        var callersByCallee = CallEdges
+            .GroupBy(edge => edge.CalleeSymbolId, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(edge => edge.CallerSymbolId)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray(),
+                StringComparer.Ordinal);
+
+        var affected = new HashSet<string>(StringComparer.Ordinal);
+        var queue = new Queue<string>(seedIds);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            if (!callersByCallee.TryGetValue(current, out var callers))
+                continue;
+
+            foreach (var caller in callers)
+            {
+                // Seeds are the change itself, not something the change affects.
+                if (seedIds.Contains(caller) || !affected.Add(caller))
+                    continue;
+                queue.Enqueue(caller);
+            }
+        }
+
+        return Declarations
+            .Where(declaration => affected.Contains(declaration.SymbolId))
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Impact is partial whenever ANY call failed to resolve anywhere in the
+    /// project: an unresolved edge might have been the one that reached this
+    /// change. Unlike callers/callees this cannot be narrowed to the subject —
+    /// the missing edge is by definition one we cannot attribute.
+    /// </summary>
+    public bool ImpactAnswerIsPartial() => !Residual.IsEmpty;
+
+    /// <summary>
     /// Whether the residual could change what an answer MEANS. Partiality is
     /// facet-specific, which the first version of this method got wrong: it
     /// keyed on the queried name appearing in the residual, but the residual

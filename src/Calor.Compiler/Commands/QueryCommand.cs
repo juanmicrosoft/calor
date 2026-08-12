@@ -28,8 +28,92 @@ public static class QueryCommand
             CreateFacetCommand("symbol", "Where a name is declared"),
             CreateFacetCommand("callers", "What calls a declaration"),
             CreateFacetCommand("callees", "What a declaration calls"),
+            CreateImpactCommand(),
         };
         return command;
+    }
+
+    private static Command CreateImpactCommand()
+    {
+        var fileArgument = new Argument<string>(
+            name: "file",
+            description: "Changed file (project-relative), e.g. lib.calr");
+        var pathOption = new Option<string>(
+            aliases: ["--project"],
+            description: "Project directory",
+            getDefaultValue: () => ".");
+        var noBuildOption = new Option<bool>(
+            aliases: ["--no-build"],
+            description: "Refuse a missing or stale index instead of rebuilding it");
+
+        var command = new Command("impact", "What a change to a file could affect")
+        {
+            fileArgument, pathOption, noBuildOption,
+        };
+
+        command.SetHandler((InvocationContext context) =>
+        {
+            context.ExitCode = ExecuteImpact(
+                context.ParseResult.GetValueForArgument(fileArgument),
+                context.ParseResult.GetValueForOption(pathOption)!,
+                context.ParseResult.GetValueForOption(noBuildOption));
+        });
+
+        return command;
+    }
+
+    private static int ExecuteImpact(string file, string projectDirectory, bool noBuild)
+    {
+        if (!Directory.Exists(projectDirectory))
+        {
+            Console.Error.WriteLine($"Error: directory not found: {projectDirectory}");
+            return 1;
+        }
+
+        var index = Resolve(projectDirectory, noBuild, out var error);
+        if (index == null)
+        {
+            Console.Error.WriteLine(error);
+            return 1;
+        }
+
+        var normalized = file.Replace('\\', '/');
+        if (!index.Files.ContainsKey(normalized))
+        {
+            Console.Error.WriteLine(
+                $"Error: '{file}' is not an indexed source file. Indexed files:");
+            foreach (var indexed in index.Files.Keys.Take(20))
+                Console.Error.WriteLine($"  {indexed}");
+            return 1;
+        }
+
+        var affected = index.FindImpactOfFile(normalized);
+        var affectedFiles = affected
+            .Select(declaration => declaration.File)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (var declaration in affected.OrderBy(
+                     declaration => $"{declaration.File}:{declaration.Line}",
+                     StringComparer.Ordinal))
+        {
+            Console.WriteLine($"  {Describe(declaration)}");
+        }
+
+        Console.WriteLine(
+            affected.Count == 0
+                ? $"impact: nothing else calls into {normalized}"
+                : $"impact: {affected.Count} declaration(s) in {affectedFiles.Length} file(s) "
+                    + $"could be affected by a change to {normalized}");
+
+        // Said every time, not only when it bites: the answer is file-grained by
+        // construction, so a reader must not take it for declaration-grained.
+        Console.WriteLine(
+            "impact: file-grained — a change to ANY declaration in "
+                + $"{normalized} implicates all of these (scoping doc §9.1)");
+        ReportResidual(index, index.ImpactAnswerIsPartial());
+        return 0;
     }
 
     private static Command CreateFacetCommand(string facet, string description)
