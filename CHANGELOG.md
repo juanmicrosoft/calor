@@ -4,17 +4,68 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-08-12
+
+### Benchmark Results (Statistical: 30 runs)
+- **Overall Advantage**: 1.32x (Calor leads)
+- **Categories**: Calor wins 7, C# wins 1
+- **Highlights** (advantage ratio, Cohen's d where reported):
+  - Comprehension: 1.84x (Calor, d=1.80 large)
+  - ErrorDetection: 1.49x (Calor, d=1.21 large)
+  - TokenEconomics: 1.42x (Calor)
+  - RefactoringStability: 1.38x (Calor, d=7.09 large)
+  - EditPrecision: 1.36x (Calor, d=4.90 large)
+  - InformationDensity: 0.98x (C#, d=-0.52 medium)
+- **Programs Tested**: 217 Calor / 216 C# compiled successfully
+
 ### Added
-- **Exact-span LSP refactoring (#765)** now indexes every open and closed
-  workspace `.calr` file by stable `SymbolId`, resolves cursors only through
-  exact identifier-token occurrences, and incrementally reparses changed or
-  deleted closed files. Definition, references, and rename distinguish
-  overloads, shadowed locals and fields, unrelated members, and same-spelled
-  symbols across files. Rename emits versioned `documentChanges` for open
-  documents and validated unversioned edits for unchanged closed files.
+- **Persistent project index and `calor query`** (roadmap §2.2, the fourth-deferral
+  item, now shipped). `calor index build` writes a versioned index under
+  `obj/calor/`; `calor index status` reports whether it may still be trusted.
+  `calor query` answers six facets: `symbol`, `callers`, `callees`, `impact`,
+  `contracts`, `assumptions`. Two disciplines are enforced rather than
+  documented: a stale index never answers — it rebuilds, or refuses under
+  `--no-build` — and every answer carries its residual, because Calor binds one
+  file at a time and a cross-file call resolves only when exactly one
+  declaration bears the name. Answers say `PARTIAL` and name what was dropped.
+- **`calor rename`** — SymbolId-addressed rename across a project, with edits
+  derived from bound-tree identity rather than text. Refuses rather than
+  guessing on ambiguity, stale sources, name collisions, declarations split
+  across files (#922), and type declarations whose references are not yet
+  indexed.
+- **Dogfood utility** (`tools/calor-allowlist-audit/`) — a real in-repo tool
+  whose only source is Calor. It audits `.calor-csharp-allowlist` against rules
+  that file states in prose and nothing enforced, and CI both builds and runs
+  it, so a Calor regression that breaks this program breaks the build.
+- **Release gates closed**: §2.5 gate 2 (full-vs-incremental diagnostic
+  identity, over a registered ES-01..ES-07 edit-script corpus), gate 3
+  (index/query correctness, over a hand-authored golden corpus), gate 4
+  (rename, with an apply-recompile-and-run behaviour oracle), and gate 8
+  (performance envelope: index build 0.40s against a 30s budget, warm queries
+  0.0-0.3ms against 500ms, on a 106-file/11.1k-line corpus).
+- Exact-span LSP refactoring (#765) indexes every open and closed workspace
+  `.calr` file by stable `SymbolId`, resolves cursors only through exact
+  identifier-token occurrences, and incrementally reparses changed or deleted
+  closed files. Definition, references, and rename distinguish overloads,
+  shadowed locals and fields, unrelated members, and same-spelled symbols across
+  files.
 - A CI-visible exact-span refactoring gate applies adversarial multi-file edits,
   reparses and rebinds the workspace, emits C#, and requires a clean Roslyn
   compilation.
+- CI and release quality gates are now truthful (#938): a test-inventory
+  manifest pins per-project test counts, with coverage, mutation, flake and
+  performance ratchets alongside.
+- `Calor.Sdk` package consumers are release-grade (#937), and round-trip gates
+  require semantic validity (#945, #932).
+
+### Fixed
+- **Module-qualified cross-module calls resolve** (#925). Writing
+  `§C{Module.Function}` produced a *worse* result than the bare form: it fell
+  through to "unknown external call" and forbade the call inside a pure function
+  even when the callee was itself pure. The dotted path now consults the same
+  cross-module map the bare path always did.
+- Generated C# is guaranteed Roslyn-valid (#939).
+- Formatting is lossless and atomic (#918).
 
 ### Changed
 - LSP rename is advertised by default. The experimental
@@ -28,6 +79,14 @@ All notable changes to this project will be documented in this file.
   to update it. The channel has been broken since v0.4.0, five months of staleness produced zero
   complaints, and recurring token/publish-chain maintenance is not justified by demonstrated
   demand.
+
+### Note on scope
+This is a 0.13.x release. It completes the 0.13 project-model program and its
+release gates; it is **not** 0.14. The 0.14 "Null-Safe .NET" content —
+metadata-backed .NET binding, the typed semantic representation, the typed CFG
+null-state slice, enforced non-nullable reference types, and the 2.0.0
+self-migration — remains unbuilt, and 0.14 will ship as `§SEMVER{2.0.0}` when
+it does.
 
 ## [0.13.0] - 2026-08-11
 
