@@ -47,7 +47,7 @@ calor -v -i MyModule.calr -o MyModule.g.cs
 | `--verbose` | `-v` | No | Show detailed compilation output |
 | `--verify` | | No | Enable static contract verification with Z3 |
 | `--analyze` | | No | Enable static analysis (dataflow, bug patterns, taint tracking) |
-| `--all-findings` | | No | Report all findings including inconclusive (requires `--analyze`) |
+| `--all-findings` | | No | Include unverified bug-pattern hints (`Calor0940`–`Calor0944`) in addition to verified findings; incomplete typed analysis is always surfaced as `Calor0929` (requires `--analyze`) |
 | `--permissive-effects` | | No | Suppress unknown-effect warnings (recommended for converted code) |
 | `--cache` | | No | Enable the incremental-build cache — see below (opt-in) |
 | `--no-cache` | | No | Disable caching (verification results and incremental builds; overrides `--cache`) |

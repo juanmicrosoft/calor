@@ -167,15 +167,78 @@ entirely of modeled primitives still elides.
 a separate fix for the count/index operations removes D12's. Each case proved safe can have the
 demotion lifted, using D12's predicate-vs-index split above.
 
-## 5. The second translator (bug-pattern checkers) — differences
+## 5. Typed bug-pattern analysis
 
-`BoundExpressionTranslator` (in `Analysis/BugPatterns/Patterns/DivisionByZeroChecker.cs:503–694`) backs the div-by-zero/overflow/index checkers. It is **narrower and signed-only**:
+Division-by-zero, integer-overflow, index-bounds, off-by-one, and null/option
+findings do not use a second Z3 translator. `TypedBugPatternAnalysis` consumes the
+bound tree and shared CFG directly:
 
-- **Adds:** math functions via ITE — `abs`, `min`, `max`, `clamp`, `sign` (both `math.x` and bare names).
-- **Removes vs the primary:** strings, arrays, field access, quantifiers, implication, conditional, self-ref, bitwise/shift operators, all type aliases (`System.*`, `intNN`), width normalization.
-- **Signed-only everywhere** — unsigned types are **refused at declaration** (checker reports no verdict rather than a signed-semantics one; guarantees plan D-G2.3). Its `%` uses `bvsrem` (C# remainder semantics), matching the primary translator since the G1 fixes.
+- facts are keyed by `SymbolId`; assignments and `ref`/`out` calls are strong updates;
+- authoritative `SymbolId` precondition maps disable the legacy name fallback, so
+  overloads cannot inherit another declaration's guard; the maps contain only
+  constraints that prove nonzero (`!= 0`, strict sign bounds, equality to a
+  nonzero constant, or disjunctions whose every arm excludes zero);
+- true and false CFG edges receive positive and negated refinements respectively;
+- constant conditions are evaluated before edge propagation, pruning infeasible CFG
+  branches rather than analyzing dead bug seeds;
+- conditional expressions and short-circuit `&&`/`||` use expression-level control
+  flow: exact dead arms are skipped, while unknown conditions refine and join branch
+  states;
+- condition refinement itself is evaluation-ordered: `&&` evaluates its right side
+  only after a true left refinement, `||` only after a false left refinement, and
+  right-side `ref`/`out` mutations are visible in the selected branch;
+- ordinary expression operands are evaluated left-to-right, so `ref`/`out`
+  mutations in a left operand affect analysis of the right operand;
+- integral ranges retain width and signedness, apply C# integral promotions
+  including `int`/`long` constant-expression conversion beside `uint`/`ulong`,
+  and model target conversions, unchecked wraparound, and signed `MinValue / -1`;
+- narrow integral operands are promoted before mixed `u32` rules, and division
+  ranges include the interior `-1`/`1` extrema without ever evaluating a zero
+  endpoint;
+- signed `MinValue / -1` and `MinValue % -1` exceptional overflow is checked
+  for binary and compound forms;
+- binary and compound shift counts use C# low-bit masking (five bits for the
+  `int` family, six for the `long` family), including negative counts;
+- explicit numeric casts are checked against the exact target range; decimal to
+  integral overflow is exceptional, while narrowing integral casts retain their
+  emitted unchecked-wrap semantics;
+- decimal literals and constant arithmetic retain exact `decimal` values; unknown
+  decimals use a sound zero/nonzero abstraction;
+- arrays, multidimensional arrays, strings, ranges, index-from-end, array length,
+  `None`/`Some`, explicit `Ok`/`Err` variants, and exact typed Option/Result
+  operations (including inverse `UnwrapErr`) are structural bound-node semantics;
+- sequence receivers and every index operand are evaluated exactly once, left to
+  right; mutations in the receiver or an earlier multidimensional index affect
+  every later index check;
+- `None` comparisons are normalized in either operand order, and any evaluated
+  expression call with a `ref`/`out` argument strongly invalidates the referenced
+  Option/Result state;
+- compound `/=` and `%=` share the same guaranteed/possible/incomplete divisor
+  analysis as binary division and remainder;
+- direct same-symbol identities such as `x - x == 0` retain correlation without
+  inferring equality for unrelated or merely same-named symbols;
+- lattice joins treat unknown presence/variant state as top (`Maybe`), never as an
+  identity element that preserves one predecessor's proof;
+- for-loop conditions convert symbolic `Length` and `Length - 1` aliases into
+  sequence-bound facts, including unreachable empty-array loop bodies;
+- bounds facts relate an index to the identity and dimension of the sequence whose
+  length was checked, so an unrelated length cannot prove safety;
+- off-by-one findings require an inclusive loop, a real structural sequence access,
+  the induction variable in that access, the same sequence length in the bound,
+  a shared semantic constant-step direction, a feasible initial loop condition,
+  and endpoint reachability under step divisibility;
+- unresolved/interop semantics emit `Calor0929`; optional heuristic hints use
+  distinct `Calor0940`–`Calor0944` info codes and never masquerade as verified
+  `Calor0920`–`Calor0927` findings.
 
-Do not assume checker findings and contract proofs share a model; they don't.
+The adversarial typed-checker corpus enforces at least **95% precision** and
+**95% recall**, with zero known false-safety cases in that corpus. A generated-C#
+runtime oracle separately executes representative safe and failing programs.
+
+Call-target substrings and variable names are not proof facts. Exact Option/Result
+method identities are interpreted only when the receiver has the corresponding
+bound type. Contract proofs still use `ContractTranslator`; bug-pattern findings
+and contract proofs therefore remain separate analyses.
 
 ## 6. Maintenance rule
 

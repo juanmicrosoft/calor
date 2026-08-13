@@ -228,7 +228,7 @@ public sealed class VerificationAnalysisPass
 
             foreach (var pre in func.Preconditions)
             {
-                CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+                CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
             }
 
             if (guardedNames.Count > 0)
@@ -244,7 +244,7 @@ public sealed class VerificationAnalysisPass
                 var paramNames = method.Parameters.Select(p => p.Name).ToHashSet();
                 var guardedNames = new HashSet<string>();
                 foreach (var pre in method.Preconditions)
-                    CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+                    CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
                 if (guardedNames.Count > 0)
                     result[$"{cls.Name}.{method.Name}"] = guardedNames;
             }
@@ -255,7 +255,7 @@ public sealed class VerificationAnalysisPass
                 var paramNames = ctor.Parameters.Select(p => p.Name).ToHashSet();
                 var guardedNames = new HashSet<string>();
                 foreach (var pre in ctor.Preconditions)
-                    CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+                    CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
                 if (guardedNames.Count > 0)
                     result[$"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}"] = guardedNames;
             }
@@ -266,7 +266,7 @@ public sealed class VerificationAnalysisPass
                 var paramNames = op.Parameters.Select(p => p.Name).ToHashSet();
                 var guardedNames = new HashSet<string>();
                 foreach (var pre in op.Preconditions)
-                    CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+                    CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
                 if (guardedNames.Count > 0)
                     result[$"{cls.Name}.op_{op.Kind}"] = guardedNames;
             }
@@ -279,7 +279,7 @@ public sealed class VerificationAnalysisPass
                     var setterParams = new HashSet<string> { "value" };
                     var guardedNames = new HashSet<string>();
                     foreach (var pre in prop.Setter.Preconditions)
-                        CollectReferencedNames(pre.Condition, setterParams, guardedNames);
+                        CollectProvablyNonZeroNames(pre.Condition, setterParams, guardedNames);
                     if (guardedNames.Count > 0)
                         result[$"{cls.Name}.{prop.Name}.set"] = guardedNames;
                 }
@@ -301,7 +301,7 @@ public sealed class VerificationAnalysisPass
             var paramNames = method.Parameters.Select(p => p.Name).ToHashSet();
             var guardedNames = new HashSet<string>();
             foreach (var pre in method.Preconditions)
-                CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+                CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
             if (guardedNames.Count > 0)
                 result[$"{cls.Name}.{method.Name}"] = guardedNames;
         }
@@ -312,7 +312,7 @@ public sealed class VerificationAnalysisPass
             var paramNames = ctor.Parameters.Select(p => p.Name).ToHashSet();
             var guardedNames = new HashSet<string>();
             foreach (var pre in ctor.Preconditions)
-                CollectReferencedNames(pre.Condition, paramNames, guardedNames);
+                CollectProvablyNonZeroNames(pre.Condition, paramNames, guardedNames);
             if (guardedNames.Count > 0)
                 result[$"{cls.Name}.{(ctor.IsStatic ? ".cctor" : ".ctor")}"] = guardedNames;
         }
@@ -322,59 +322,118 @@ public sealed class VerificationAnalysisPass
     }
 
     /// <summary>
-    /// Recursively collects variable names from an expression that match parameter names.
+    /// Collects only parameters whose precondition logically excludes zero.
     /// </summary>
-    private static void CollectReferencedNames(
+    private static void CollectProvablyNonZeroNames(
         Ast.ExpressionNode expr,
         HashSet<string> paramNames,
         HashSet<string> collected)
     {
-        Visit(expr, new HashSet<string>(StringComparer.Ordinal));
+        collected.UnionWith(Find(expr));
 
-        void Visit(Ast.AstNode node, HashSet<string> shadowed)
+        HashSet<string> Find(Ast.ExpressionNode expression)
         {
-            switch (node)
+            if (expression is Ast.BinaryOperationNode logical
+                && logical.Operator == BinaryOperator.And)
             {
-                case Ast.ReferenceNode reference:
-                    if (paramNames.Contains(reference.Name) && !shadowed.Contains(reference.Name))
-                        collected.Add(reference.Name);
-                    return;
-
-                case Ast.ForallExpressionNode forall:
-                {
-                    var nested = new HashSet<string>(shadowed, StringComparer.Ordinal);
-                    nested.UnionWith(forall.BoundVariables.Select(variable => variable.Name));
-                    Visit(forall.Body, nested);
-                    return;
-                }
-
-                case Ast.ExistsExpressionNode exists:
-                {
-                    var nested = new HashSet<string>(shadowed, StringComparer.Ordinal);
-                    nested.UnionWith(exists.BoundVariables.Select(variable => variable.Name));
-                    Visit(exists.Body, nested);
-                    return;
-                }
-
-                case Ast.LambdaExpressionNode lambda:
-                {
-                    var nested = new HashSet<string>(shadowed, StringComparer.Ordinal);
-                    nested.UnionWith(lambda.Parameters.Select(parameter => parameter.Name));
-                    if (lambda.ExpressionBody != null)
-                        Visit(lambda.ExpressionBody, nested);
-                    if (lambda.StatementBody != null)
-                    {
-                        foreach (var statement in lambda.StatementBody)
-                            Visit(statement, nested);
-                    }
-                    return;
-                }
+                var result = Find(logical.Left);
+                result.UnionWith(Find(logical.Right));
+                return result;
             }
+            if (expression is Ast.BinaryOperationNode disjunction
+                && disjunction.Operator == BinaryOperator.Or)
+            {
+                var result = Find(disjunction.Left);
+                result.IntersectWith(Find(disjunction.Right));
+                return result;
+            }
+            if (expression is Ast.UnaryOperationNode
+                {
+                    Operator: UnaryOperator.Not,
+                    Operand: Ast.BinaryOperationNode negated,
+                })
+            {
+                return FindComparison(
+                    negated.Left,
+                    negated.Right,
+                    NegateComparison(negated.Operator));
+            }
+            if (expression is Ast.BinaryOperationNode comparison)
+            {
+                return FindComparison(
+                    comparison.Left,
+                    comparison.Right,
+                    comparison.Operator);
+            }
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
 
-            foreach (var child in RecursiveAstWalker.GetAllChildren(node))
-                Visit(child, shadowed);
+        HashSet<string> FindComparison(
+            Ast.ExpressionNode left,
+            Ast.ExpressionNode right,
+            BinaryOperator operation)
+        {
+            if (left is Ast.ReferenceNode reference
+                && paramNames.Contains(reference.Name)
+                && LoopStepSemantics.TryEvaluate(right, out var literal)
+                && ProvesNonZero(operation, literal))
+            {
+                return new HashSet<string>(StringComparer.Ordinal)
+                {
+                    reference.Name,
+                };
+            }
+            if (right is Ast.ReferenceNode reversedReference
+                && paramNames.Contains(reversedReference.Name)
+                && LoopStepSemantics.TryEvaluate(left, out var reversedLiteral)
+                && ProvesNonZero(
+                    ReverseComparison(operation),
+                    reversedLiteral))
+            {
+                return new HashSet<string>(StringComparer.Ordinal)
+                {
+                    reversedReference.Name,
+                };
+            }
+            return new HashSet<string>(StringComparer.Ordinal);
         }
     }
+
+    private static bool ProvesNonZero(
+        BinaryOperator operation,
+        System.Numerics.BigInteger literal) =>
+        operation switch
+        {
+            BinaryOperator.Equal => !literal.IsZero,
+            BinaryOperator.NotEqual => literal.IsZero,
+            BinaryOperator.GreaterThan => literal >= 0,
+            BinaryOperator.GreaterOrEqual => literal > 0,
+            BinaryOperator.LessThan => literal <= 0,
+            BinaryOperator.LessOrEqual => literal < 0,
+            _ => false,
+        };
+
+    private static BinaryOperator NegateComparison(BinaryOperator operation) =>
+        operation switch
+        {
+            BinaryOperator.Equal => BinaryOperator.NotEqual,
+            BinaryOperator.NotEqual => BinaryOperator.Equal,
+            BinaryOperator.LessThan => BinaryOperator.GreaterOrEqual,
+            BinaryOperator.LessOrEqual => BinaryOperator.GreaterThan,
+            BinaryOperator.GreaterThan => BinaryOperator.LessOrEqual,
+            BinaryOperator.GreaterOrEqual => BinaryOperator.LessThan,
+            _ => operation,
+        };
+
+    private static BinaryOperator ReverseComparison(BinaryOperator operation) =>
+        operation switch
+        {
+            BinaryOperator.LessThan => BinaryOperator.GreaterThan,
+            BinaryOperator.LessOrEqual => BinaryOperator.GreaterOrEqual,
+            BinaryOperator.GreaterThan => BinaryOperator.LessThan,
+            BinaryOperator.GreaterOrEqual => BinaryOperator.LessOrEqual,
+            _ => operation,
+        };
 
     private static IEnumerable<Ast.AstNode> DescendantsAndSelf(Ast.AstNode node)
     {
@@ -564,7 +623,7 @@ public sealed class VerificationAnalysisPass
             var parameterNames = parameters.Select(parameter => parameter.Name).ToHashSet();
             var guarded = new HashSet<string>();
             foreach (var precondition in preconditions)
-                CollectReferencedNames(precondition.Condition, parameterNames, guarded);
+                CollectProvablyNonZeroNames(precondition.Condition, parameterNames, guarded);
             if (guarded.Count > 0)
                 namesByDeclaration[span] = guarded;
         }

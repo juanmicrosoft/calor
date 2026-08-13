@@ -299,14 +299,13 @@ public class BenchmarkVerificationTests
       §I{i32:x}
       §I{i32:y}
       §O{i32}
-      §IF (!= y INT:0)
+      §IF{i1} (!= y INT:0)
         §R (/ x y)
       §EL
-        §R INT:0
-      §/IF";
+        §R INT:0";
 
         var module = ParseAndBind(source, out var parseDiag);
-        if (parseDiag.HasErrors) return; // Skip if IF syntax not yet supported
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
 
         var diagnostics = RunBugPatternAnalysis(module!);
 
@@ -343,18 +342,18 @@ public class BenchmarkVerificationTests
         var source = @"
 §M{m001:Test}
   §F{f001:VulnerableNull:pub}
-      §I{string:maybeNull}
+      §I{Option<i32>:maybeNull}
       §O{i32}
-      §R (CALL string.length maybeNull)";
+      §R §C{maybeNull.Unwrap} §/C";
 
         var module = ParseAndBind(source, out var parseDiag);
-        if (parseDiag.HasErrors) return;
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
 
         var diagnostics = RunBugPatternAnalysis(module!);
 
-        // Note: This depends on whether the bug pattern runner tracks null
-        // The test validates the runner processes the code without error
-        Assert.NotNull(diagnostics);
+        Assert.True(
+            HasDiagnosticCode(diagnostics, DiagnosticCode.UnsafeUnwrap),
+            "Unchecked Option unwrap should be reported");
     }
 
     [Fact]
@@ -363,21 +362,19 @@ public class BenchmarkVerificationTests
         var source = @"
 §M{m001:Test}
   §F{f001:SafeNull:pub}
-      §I{string:maybeNull}
+      §I{Option<i32>:maybeNull}
       §O{i32}
-      §IF (!= maybeNull NONE)
-        §R (CALL string.length maybeNull)
-      §EL
+      §IF{i1} (== maybeNull §NN{i32})
         §R INT:0
-      §/IF";
+      §R §C{maybeNull.Unwrap} §/C";
 
         var module = ParseAndBind(source, out var parseDiag);
-        if (parseDiag.HasErrors) return;
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
 
         var diagnostics = RunBugPatternAnalysis(module!);
 
-        Assert.False(HasDiagnosticCode(diagnostics, DiagnosticCode.NullDereference),
-            "Null check should prevent null dereference warning");
+        Assert.False(HasDiagnosticCode(diagnostics, DiagnosticCode.UnsafeUnwrap),
+            "Option guard should prevent unsafe unwrap warning");
     }
 
     #endregion
@@ -390,17 +387,19 @@ public class BenchmarkVerificationTests
         var source = @"
 §M{m001:Test}
   §F{f001:VulnerableBounds:pub}
+      §I{i32[]:items}
       §I{i32:index}
       §O{i32}
-      §R (CALL array.get index)";
+      §R §IDX items index";
 
         var module = ParseAndBind(source, out var parseDiag);
-        if (parseDiag.HasErrors) return;
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
 
         var diagnostics = RunBugPatternAnalysis(module!);
 
-        // Test validates the analysis runs without errors
-        Assert.NotNull(diagnostics);
+        Assert.True(
+            HasDiagnosticCode(diagnostics, DiagnosticCode.IndexOutOfBounds),
+            "Unbounded array index should be reported");
     }
 
     [Fact]
@@ -409,17 +408,17 @@ public class BenchmarkVerificationTests
         var source = @"
 §M{m001:Test}
   §F{f001:SafeBounds:pub}
+      §I{i32[]:items}
       §I{i32:index}
-      §I{i32:len}
       §O{i32}
-      §IF (&& (>= index INT:0) (< index len))
-        §R (CALL array.get index)
-      §EL
+      §IF{i1} (< index INT:0)
         §R INT:-1
-      §/IF";
+      §IF{i2} (>= index §LEN items)
+        §R INT:-1
+      §R §IDX items index";
 
         var module = ParseAndBind(source, out var parseDiag);
-        if (parseDiag.HasErrors) return;
+        Assert.False(parseDiag.HasErrors, string.Join("\n", parseDiag));
 
         var diagnostics = RunBugPatternAnalysis(module!);
 

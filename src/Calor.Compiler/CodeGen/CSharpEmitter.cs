@@ -1,4 +1,5 @@
 using System.Text;
+using Calor.Compiler.Analysis.Dataflow;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Verification;
@@ -1981,8 +1982,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var to = node.To.Accept(this);
         var step = node.Step?.Accept(this) ?? "1";
 
-        // Determine loop direction based on step (simple heuristic)
-        var isPositiveStep = !step.StartsWith("-");
+        var isPositiveStep = LoopStepSemantics.TryEvaluate(node.Step, out var stepValue)
+            ? stepValue.Sign >= 0
+            : !step.StartsWith("-");
         var comparison = isPositiveStep ? "<=" : ">=";
         var increment = step == "1" ? $"{varName}++" : $"{varName} += {step}";
 

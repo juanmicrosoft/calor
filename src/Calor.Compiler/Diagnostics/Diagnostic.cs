@@ -681,6 +681,11 @@ public static class DiagnosticCode
     /// </summary>
     public const string InferredContract = "Calor0928";
 
+    /// <summary>
+    /// Info: Typed bug-pattern analysis could not produce a complete verdict.
+    /// </summary>
+    public const string BugPatternAnalysisIncomplete = "Calor0929";
+
     // Class member analysis (Calor0930-0949)
 
     /// <summary>
@@ -698,6 +703,31 @@ public static class DiagnosticCode
     /// Error: Internal compiler error during class member analysis.
     /// </summary>
     public const string AnalysisICE = "Calor0932";
+
+    /// <summary>
+    /// Info: Unverified division-by-zero hint.
+    /// </summary>
+    public const string DivisionByZeroHint = "Calor0940";
+
+    /// <summary>
+    /// Info: Unverified index-bounds hint.
+    /// </summary>
+    public const string IndexOutOfBoundsHint = "Calor0941";
+
+    /// <summary>
+    /// Info: Unverified null/option hint.
+    /// </summary>
+    public const string NullDereferenceHint = "Calor0942";
+
+    /// <summary>
+    /// Info: Unverified integer-overflow hint.
+    /// </summary>
+    public const string IntegerOverflowHint = "Calor0943";
+
+    /// <summary>
+    /// Info: Unverified off-by-one hint.
+    /// </summary>
+    public const string OffByOneHint = "Calor0944";
 
     // K-induction / loop analysis (Calor0950-0979)
 

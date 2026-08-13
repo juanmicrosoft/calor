@@ -97,7 +97,8 @@ public sealed class BugPatternOptions
     public bool ReportOnlyVerified { get; init; } = false;
 
     /// <summary>
-    /// Use Z3 SMT solver for verification (more precise but slower).
+    /// Use Z3 SMT solver for analyses that still consume it. The typed CFG bug-pattern
+    /// engine does not require Z3; this option remains for API compatibility.
     /// </summary>
     public bool UseZ3Verification { get; init; } = true;
 
@@ -146,24 +147,28 @@ public sealed class BugPatternRunner
     private List<IBugPatternChecker> CreateCheckers()
     {
         var checkers = new List<IBugPatternChecker>();
+        var typedKinds = TypedBugPatternKind.None;
 
         if (_options.CheckDivisionByZero)
-            checkers.Add(new Patterns.DivisionByZeroChecker(_options));
+            typedKinds |= TypedBugPatternKind.DivisionByZero;
 
         if (_options.CheckIndexOutOfBounds)
-            checkers.Add(new Patterns.IndexOutOfBoundsChecker(_options));
+            typedKinds |= TypedBugPatternKind.IndexOutOfBounds;
 
         if (_options.CheckNullDereference)
-            checkers.Add(new Patterns.NullDereferenceChecker(_options));
+            typedKinds |= TypedBugPatternKind.NullDereference;
 
         if (_options.CheckOverflow)
-            checkers.Add(new Patterns.OverflowChecker(_options));
+            typedKinds |= TypedBugPatternKind.IntegerOverflow;
+
+        if (_options.CheckOffByOne)
+            typedKinds |= TypedBugPatternKind.OffByOne;
+
+        if (typedKinds != TypedBugPatternKind.None)
+            checkers.Add(new TypedBugPatternChecker(_options, typedKinds));
 
         if (_options.CheckMissingPreconditions)
             checkers.Add(new Patterns.PreconditionSuggester(_options));
-
-        if (_options.CheckOffByOne)
-            checkers.Add(new Patterns.OffByOneChecker(_options));
 
         return checkers;
     }
