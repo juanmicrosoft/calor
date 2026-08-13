@@ -1745,26 +1745,33 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         // scopes create new shadowing variables, while mutable binds reassign.
         if (node.IsMutable && IsVarDeclaredInScope(varName))
         {
+            RefinementConstraint? reboundConstraint = null;
             if (node.TypeName != null
                 && _refinementTypes.TryGetValue(node.TypeName, out var reboundRefinement))
             {
-                SetRefinementForExistingVariable(
-                    varName,
-                    new RefinementConstraint(
-                        reboundRefinement.Predicate,
-                        $"refinement type '{reboundRefinement.Name}'",
-                        reboundRefinement.BaseTypeName));
+                reboundConstraint = new RefinementConstraint(
+                    reboundRefinement.Predicate,
+                    $"refinement type '{reboundRefinement.Name}'",
+                    reboundRefinement.BaseTypeName);
             }
             var reboundIndexedBound = GetIndexedBoundForBinding(node);
+
+            // Emit the initializer against the old variable contract. It may
+            // itself mutate the target, so installing the rebound metadata
+            // first would validate nested writes against the wrong invariant.
+            var initExpr = node.Initializer?.Accept(this);
+            if (reboundConstraint != null)
+            {
+                SetRefinementForExistingVariable(varName, reboundConstraint);
+            }
             if (reboundIndexedBound != null)
             {
                 SetIndexedBoundForExistingVariable(varName, reboundIndexedBound);
             }
 
             // Mutable rebind - emit assignment only
-            if (node.Initializer != null)
+            if (initExpr != null)
             {
-                var initExpr = node.Initializer.Accept(this);
                 if (TryGetRefinementConstraint(
                         node.Name,
                         out var rebindConstraint)
@@ -1776,7 +1783,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     return EmitCheckedRefinedAssignment(
                         varName,
                         initExpr,
-                        rebindConstraint);
+                        rebindConstraint,
+                        restoreTargetOnFailure: true);
                 }
                 return $"{varName} = {initExpr};";
             }
@@ -4339,7 +4347,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         string target,
         string value,
         RefinementConstraint constraint,
-        string? compoundOperator = null)
+        string? compoundOperator = null,
+        bool restoreTargetOnFailure = false)
     {
         var candidateName = $"__refinementCandidate{_mutationGuardCounter++}";
         var continuationIndent = Environment.NewLine
@@ -4352,12 +4361,42 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         var condition = EmitRefinementCondition(
             constraint.Predicate,
             candidateName);
-        return initializeCandidate
+        var checkedAssignment = initializeCandidate
             + continuationIndent
             + $"if (!({condition})) throw new ArgumentOutOfRangeException("
             + $"nameof({target}), \"Value violates {constraint.Description}\");"
             + continuationIndent
             + $"{target} = {candidateName};";
+        if (!restoreTargetOnFailure)
+        {
+            return checkedAssignment;
+        }
+
+        var snapshotName = $"__refinementSnapshot{_mutationGuardCounter++}";
+        var nestedIndent = continuationIndent + "    ";
+        var nestedAssignment = checkedAssignment.Replace(
+            continuationIndent,
+            nestedIndent,
+            StringComparison.Ordinal);
+        return $"var {snapshotName} = {target};"
+            + continuationIndent
+            + "try"
+            + continuationIndent
+            + "{"
+            + nestedIndent
+            + nestedAssignment
+            + continuationIndent
+            + "}"
+            + continuationIndent
+            + "catch"
+            + continuationIndent
+            + "{"
+            + nestedIndent
+            + $"{target} = {snapshotName};"
+            + nestedIndent
+            + "throw;"
+            + continuationIndent
+            + "}";
     }
 
     private bool TryEmitIndexedAssignment(

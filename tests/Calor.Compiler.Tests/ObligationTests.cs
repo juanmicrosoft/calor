@@ -1516,6 +1516,26 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_FailedTypedRebind_RollsBackNestedTargetMutation()
+    {
+        var csharp = Emit("""
+            §M{m001:Test}
+              §RTYPE{r1:NonNegative:i32} (>= # INT:0)
+              §RTYPE{r2:Negative:i32} (< # INT:0)
+              §F{f001:Mutate:pub}
+                  §I{NonNegative:value:ref}
+                  §O{void}
+                  §B{~value:Negative} (post-dec value)
+            """);
+        object?[] arguments = [1];
+
+        var exception = InvokeGenerated(csharp, "Mutate", arguments);
+
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+        Assert.Equal(1, arguments[0]);
+    }
+
+    [Fact]
     public void CSharpEmit_ConstructorInitializerChecksBeforeForwarding()
     {
         var source = """
