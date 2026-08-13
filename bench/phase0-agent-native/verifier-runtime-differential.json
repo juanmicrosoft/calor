@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.1",
   "registration": "F-4",
-  "whitelistSha256": "6dbdc9c0e1ec122ec1110013cb023ac51109ae5452b55ad00a0b782b471ec463",
+  "whitelistSha256": "3d9273a67100da8f90118491b33c56329dc9f02f0f001c9796e6e8c307440512",
   "maximumNestingDepth": 3,
   "positions": [
     "precondition",

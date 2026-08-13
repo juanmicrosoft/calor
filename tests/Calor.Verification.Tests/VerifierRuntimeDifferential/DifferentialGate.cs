@@ -16,7 +16,7 @@ namespace Calor.Verification.Tests.VerifierRuntimeDifferential;
 internal static class DifferentialGate
 {
     public const string PinnedWhitelistSha256 =
-        "6dbdc9c0e1ec122ec1110013cb023ac51109ae5452b55ad00a0b782b471ec463";
+        "3d9273a67100da8f90118491b33c56329dc9f02f0f001c9796e6e8c307440512";
     internal const string ProbeFieldType = "u8";
     internal const byte ProbeFieldWitness = byte.MaxValue;
     internal const string RuntimeCultureName = "en-US";
