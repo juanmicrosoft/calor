@@ -98,7 +98,8 @@ public sealed class ContractSimplificationPass
             module.InteropBlocks,
             module.RefinementTypes,
             module.IndexedTypes,
-            module.TypePreprocessorBlocks);
+            module.TypePreprocessorBlocks,
+            module.IdentifierSpan);
     }
 
     private FunctionNode SimplifyFunction(FunctionNode function)

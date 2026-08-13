@@ -526,15 +526,12 @@ public class ContractInheritanceTests
     #region Z3 Integration Tests
 
     [SkippableFact]
-    public void Z3_ValidWithMultiplePreconditions_AtLeastOneMatches()
+    public void Z3_MultiplePreconditions_AreCheckedAsConjunction()
     {
         Skip.IfNot(Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // Interface has one precondition, implementer has two.
-        // The first implementer precondition (>= x -10) is weaker than interface (>= x 0).
-        // The second implementer precondition (< x 1000) does NOT match the interface precondition.
-        // With correct "at least one matching" semantics, this should be VALID.
-        // With incorrect "all pairs" semantics, this would report a false positive violation.
+        // The second clause makes the complete implementation requirement stronger,
+        // despite the first clause being individually weaker.
         var source = @"
 §M{m001:Test}
   §IFACE{i001:IService}
@@ -559,14 +556,12 @@ public class ContractInheritanceTests
         using var checker = new ContractInheritanceChecker(checkDiags, useZ3: true);
         var result = checker.Check(module);
 
-        // Should be valid - the first precondition (>= x -10) is weaker than interface (>= x 0)
-        // The second precondition (< x 1000) should NOT cause a false positive
-        Assert.False(result.HasViolations,
-            "Expected no violations: at least one precondition matches. " +
+        Assert.True(result.HasViolations,
+            "Expected violation: the complete implementation conjunction is stronger. " +
             $"Diagnostics: {string.Join("; ", checkDiags.Select(d => d.Message))}");
-
-        // Should have Z3 proven diagnostic for the matching precondition
-        Assert.Contains(checkDiags, d => d.Code == DiagnosticCode.ImplicationProvenByZ3);
+        Assert.Contains(
+            checkDiags,
+            diagnostic => diagnostic.Code == DiagnosticCode.StrongerPrecondition);
     }
 
     [SkippableFact]
@@ -937,6 +932,776 @@ public class ContractInheritanceTests
         Assert.False(result.HasViolations);
         // Should report Z3 unavailable
         Assert.Contains(checkDiags, d => d.Code == DiagnosticCode.Z3UnavailableForInheritance);
+    }
+
+    [SkippableFact]
+    public void UnconstrainedInterface_RejectsImplementationPrecondition()
+    {
+        Skip.IfNot(
+            Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable,
+            "Z3 not available");
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Process}
+          §I{i32:x}
+          §O{i32}
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Process:pub}
+          §I{i32:x}
+          §O{i32}
+          §Q (> x INT:0)
+          §R x
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        var result = checker.Check(module);
+
+        Assert.True(result.HasViolations);
+        Assert.Contains(
+            checkDiags,
+            diagnostic => diagnostic.Code == DiagnosticCode.StrongerPrecondition);
+    }
+
+    [Fact]
+    public void Overloads_KeepDistinctInheritedContracts()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IParser}
+      §MT{m001:Parse}
+          §I{i32:value}
+          §O{i32}
+          §Q (> value INT:0)
+      §MT{m002:Parse}
+          §I{str:value}
+          §O{str}
+          §Q (!= value null)
+  §CL{c001:Parser:pub}
+      §IMPL{IParser}
+      §MT{mt001:Parse:pub}
+          §I{i32:value}
+          §O{i32}
+          §R value
+      §MT{mt002:Parse:pub}
+          §I{str:value}
+          §O{str}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        var result = checker.Check(module);
+
+        Assert.Equal(2, result.InheritedContracts.Count);
+        Assert.NotNull(result.GetInheritedContracts(
+            "Parser",
+            module.Classes[0].Methods[0]));
+        Assert.NotNull(result.GetInheritedContracts(
+            "Parser",
+            module.Classes[0].Methods[1]));
+        Assert.Null(result.GetInheritedContracts("Parser", "Parse"));
+    }
+
+    [Fact]
+    public void MultipleInterfaces_CombineInheritedPreconditionsAsDisjunction()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IPositive}
+      §MT{m001:Use}
+          §I{i32:value}
+          §O{i32}
+          §Q (> value INT:0)
+  §IFACE{i002:INegative}
+      §MT{m002:Use}
+          §I{i32:value}
+          §O{i32}
+          §Q (< value INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IPositive}
+      §IMPL{INegative}
+      §MT{mt001:Use:pub}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+
+        var inherited = result.GetInheritedContracts(
+            "Service",
+            module.Classes[0].Methods[0]);
+        var precondition = Assert.Single(inherited!.Preconditions);
+        var disjunction = Assert.IsType<BinaryOperationNode>(
+            precondition.Condition);
+        Assert.Equal(BinaryOperator.Or, disjunction.Operator);
+
+        var code = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            result).Emit(module);
+        Assert.Contains("value < 0 || value > 0", code);
+    }
+
+    [Fact]
+    public void BaseClassContracts_AreInheritedBySignature()
+    {
+        var source = @"
+§M{m001:Test}
+  §CL{c001:Base:pub}
+      §MT{m001:Use:pub:virt}
+          §I{i32:value}
+          §O{i32}
+          §Q (> value INT:0)
+          §R value
+  §CL{c002:Derived:pub}
+      §EXT{Base}
+      §MT{m002:Use:pub:over}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        var result = checker.Check(module);
+
+        var derived = module.Classes.Single(classNode => classNode.Name == "Derived");
+        var inherited = result.GetInheritedContracts(
+            "Derived",
+            Assert.Single(derived.Methods));
+        Assert.NotNull(inherited);
+        Assert.Equal("Base", inherited!.InterfaceName);
+    }
+
+    [Fact]
+    public void InheritedContracts_RebindParameterNamesPositionally()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Use}
+          §I{i32:x}
+          §O{i32}
+          §Q (> x INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Use:pub}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+
+        var code = new CSharpEmitter(
+            ContractMode.Debug,
+            null,
+            result).Emit(module);
+
+        Assert.Contains("(value > 0)", code);
+        Assert.DoesNotContain("(x > 0)", code);
+    }
+
+    [Fact]
+    public void IntermediateOverride_PreservesEffectiveInterfaceContract()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Use}
+          §I{i32:value}
+          §O{i32}
+          §Q (> value INT:0)
+  §CL{c001:Base:pub}
+      §IMPL{IService}
+      §MT{mt001:Use:pub:virt}
+          §I{i32:value}
+          §O{i32}
+          §R value
+  §CL{c002:Derived:pub}
+      §EXT{Base}
+      §MT{mt002:Use:pub:over}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var derived = module.Classes.Single(classNode => classNode.Name == "Derived");
+
+        var inherited = result.GetInheritedContracts(
+            "Derived",
+            Assert.Single(derived.Methods));
+
+        Assert.NotNull(inherited);
+        Assert.Single(inherited!.Preconditions);
+    }
+
+    [Fact]
+    public void GenericInterface_ResolvesClosedMethodSignature()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IRepository}<T>
+      §MT{m001:Save}
+          §I{T:value}
+          §O{T}
+          §Q (!= value null)
+  §CL{c001:IntRepository:pub}
+      §IMPL{IRepository<i32>}
+      §MT{mt001:Save:pub}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(
+            parseDiags.HasErrors,
+            string.Join("\n", parseDiags.Select(diagnostic => diagnostic.Message)));
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        var result = checker.Check(module);
+
+        Assert.True(
+            result.InheritedContracts.Count == 1,
+            $"Interfaces: {string.Join(", ", module.Classes.Single().ImplementedInterfaces)}; "
+            + $"type parameters: {string.Join(", ", module.Interfaces.Single().TypeParameters.Select(parameter => parameter.Name))}; "
+            + $"contract parameter: {module.Interfaces.Single().Methods.Single().Parameters.Single().TypeName}; "
+            + $"implementation parameter: {module.Classes.Single().Methods.Single().Parameters.Single().TypeName}");
+    }
+
+    [Fact]
+    public void GenericBaseClass_ResolvesClosedMethodSignature()
+    {
+        var source = @"
+§M{m001:Test}
+  §CL{c001:Base:pub}<T>
+      §MT{mt001:Save:pub:virt}
+          §I{T:value}
+          §O{T}
+          §Q (!= value null)
+          §R value
+  §CL{c002:IntRepository:pub}
+      §EXT{Base<i32>}
+      §MT{mt002:Save:pub:over}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        var result = checker.Check(module);
+
+        Assert.Single(result.InheritedContracts);
+    }
+
+    [Fact]
+    public void ParameterModifiers_DisambiguateInheritedOverloads()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Touch}
+          §I{i32:value}
+          §O{i32}
+          §Q (> value INT:0)
+      §MT{m002:Touch}
+          §I{i32:value:ref}
+          §O{i32}
+          §Q (>= value INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Touch:pub}
+          §I{i32:value}
+          §O{i32}
+          §R value
+      §MT{mt002:Touch:pub}
+          §I{i32:value:ref}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        var result = checker.Check(module);
+
+        Assert.Equal(2, result.InheritedContracts.Count);
+    }
+
+    [Fact]
+    public void GenericMethodTypeParameters_MatchByPosition()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:ITransformer}
+      §MT{m001:Map}<T>
+          §I{T:item}
+          §I{i32:limit}
+          §O{T}
+          §Q (> limit INT:0)
+          §Q (is item T)
+  §CL{c001:Transformer:pub}
+      §IMPL{ITransformer}
+      §MT{mt001:Map:pub}<U>
+          §I{U:item}
+          §I{i32:limit}
+          §O{U}
+          §R item
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        var result = checker.Check(module);
+
+        var inherited = Assert.Single(result.InheritedContracts).Value;
+        var conjunction = Assert.IsType<BinaryOperationNode>(
+            Assert.Single(inherited.Preconditions).Condition);
+        var typeCheck = Assert.IsType<IsPatternNode>(conjunction.Right);
+        Assert.Equal("U", typeCheck.TargetType);
+    }
+
+    [Fact]
+    public void InheritedContractCalls_RebindArgumentNames()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Use}
+          §I{i32:x}
+          §O{i32}
+          §Q (IsValid x)
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Use:pub}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var inherited = Assert.Single(result.InheritedContracts).Value;
+        var call = Assert.IsType<CallExpressionNode>(
+            Assert.Single(inherited.Preconditions).Condition);
+
+        Assert.Equal("value", Assert.IsType<ReferenceNode>(Assert.Single(call.Arguments)).Name);
+    }
+
+    [Fact]
+    public void NestedNullCoalesce_RebindsParameterNames()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Use}
+          §I{str:x}
+          §O{str}
+          §Q (!= (?? x STR:""fallback"") STR:""invalid"")
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Use:pub}
+          §I{str:value}
+          §O{str}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var inherited = Assert.Single(result.InheritedContracts).Value;
+        var comparison = Assert.IsType<BinaryOperationNode>(
+            Assert.Single(inherited.Preconditions).Condition);
+        var coalesce = Assert.IsType<NullCoalesceNode>(comparison.Left);
+
+        Assert.Equal("value", Assert.IsType<ReferenceNode>(coalesce.Left).Name);
+    }
+
+    [Fact]
+    public void InterpolatedString_RebindsHoleReferences()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Use}
+          §I{str:x}
+          §O{str}
+          §Q (!= §INTERP ""id:"" §EXP x §/INTERP STR:"""")
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Use:pub}
+          §I{str:value}
+          §O{str}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var inherited = Assert.Single(result.InheritedContracts).Value;
+        var comparison = Assert.IsType<BinaryOperationNode>(
+            Assert.Single(inherited.Preconditions).Condition);
+        var interpolation = Assert.IsType<InterpolatedStringNode>(comparison.Left);
+        var hole = Assert.IsType<InterpolatedStringExpressionNode>(
+            interpolation.Parts.Single(part =>
+                part is InterpolatedStringExpressionNode));
+
+        Assert.Equal("value", Assert.IsType<ReferenceNode>(hole.Expression).Name);
+    }
+
+    [Fact]
+    public void IsPatternBinding_AvoidsParameterCapture()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Use}
+          §I{object:x}
+          §O{bool}
+          §Q (&& (is x i32 value) (> value INT:0))
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Use:pub}
+          §I{object:value}
+          §O{bool}
+          §R true
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var inherited = Assert.Single(result.InheritedContracts).Value;
+        var conjunction = Assert.IsType<BinaryOperationNode>(
+            Assert.Single(inherited.Preconditions).Condition);
+        var pattern = Assert.IsType<IsPatternNode>(conjunction.Left);
+        var comparison = Assert.IsType<BinaryOperationNode>(conjunction.Right);
+
+        Assert.NotEqual("value", pattern.VariableName);
+        Assert.Equal(
+            pattern.VariableName,
+            Assert.IsType<ReferenceNode>(comparison.Left).Name);
+    }
+
+    [Fact]
+    public void ClosedGenericBase_ComposesInheritedInterfaceSubstitutions()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IFoo}<T>
+      §MT{m001:Use}
+          §I{T:x}
+          §O{T}
+          §Q (is x T)
+  §CL{c001:Base:pub}<U>
+      §IMPL{IFoo<U>}
+      §MT{mt001:Use:pub:virt}
+          §I{U:x}
+          §O{U}
+          §R x
+  §CL{c002:Derived:pub}
+      §EXT{Base<i32>}
+      §MT{mt002:Use:pub:over}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var derived = module.Classes.Single(classNode => classNode.Name == "Derived");
+        var inherited = result.GetInheritedContracts(
+            "Derived",
+            Assert.Single(derived.Methods));
+        var pattern = Assert.IsType<IsPatternNode>(
+            Assert.Single(inherited!.Preconditions).Condition);
+
+        Assert.Equal("i32", pattern.TargetType);
+    }
+
+    [Fact]
+    public void GenericCallTypeArguments_AreSubstituted()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}<T>
+      §MT{m001:Use}
+          §I{T:x}
+          §O{T}
+          §Q §C{Check<T>} §A x §/C
+  §CL{c001:IntService:pub}
+      §IMPL{IService<i32>}
+      §MT{mt001:Use:pub}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var inherited = Assert.Single(result.InheritedContracts).Value;
+        var call = Assert.IsType<CallExpressionNode>(
+            Assert.Single(inherited.Preconditions).Condition);
+
+        Assert.Equal("i32", Assert.Single(call.TypeArguments!));
+    }
+
+    [Fact]
+    public void GenericConstructorTypeArguments_AreSubstituted()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}<T>
+      §MT{m001:Use}
+          §I{T:x}
+          §O{T}
+          §Q (!= §NEW{Box<T>} §/NEW null)
+  §CL{c001:IntService:pub}
+      §IMPL{IService<i32>}
+      §MT{mt001:Use:pub}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var inherited = Assert.Single(result.InheritedContracts).Value;
+        var comparison = Assert.IsType<BinaryOperationNode>(
+            Assert.Single(inherited.Preconditions).Condition);
+        var creation = Assert.IsType<NewExpressionNode>(comparison.Left);
+
+        Assert.Equal("i32", Assert.Single(creation.TypeArguments));
+    }
+
+    [Fact]
+    public void ExplicitInterfaceImplementation_InheritsContract()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Use}
+          §I{i32:value}
+          §O{i32}
+          §Q (> value INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:IService.Use:pri}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        var result = checker.Check(module);
+
+        Assert.Single(result.InheritedContracts);
+        Assert.DoesNotContain(
+            checkDiags,
+            diagnostic => diagnostic.Code == DiagnosticCode.InterfaceMethodNotFound);
+    }
+
+    [Fact]
+    public void QuantifierRebinding_AvoidsCapturingImplementationParameter()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Use}
+          §I{i32:limit}
+          §O{i32}
+          §Q (exists ((i i32)) (&& (>= i INT:0) (< i limit)))
+  §CL{c001:Service:pub}
+      §IMPL{IService}
+      §MT{mt001:Use:pub}
+          §I{i32:i}
+          §O{i32}
+          §R i
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var inherited = Assert.Single(result.InheritedContracts).Value;
+        var exists = Assert.IsType<ExistsExpressionNode>(
+            Assert.Single(inherited.Preconditions).Condition);
+        var body = Assert.IsType<BinaryOperationNode>(exists.Body);
+        var comparison = Assert.IsType<BinaryOperationNode>(body.Right);
+
+        Assert.NotEqual("i", Assert.Single(exists.BoundVariables).Name);
+        Assert.Equal("i", Assert.IsType<ReferenceNode>(comparison.Right).Name);
+        Assert.Equal(
+            Assert.Single(exists.BoundVariables).Name,
+            Assert.IsType<ReferenceNode>(comparison.Left).Name);
+    }
+
+    [Fact]
+    public void InterfaceImplementedOnlyByBaseMethod_FailsClosed()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IService}
+      §MT{m001:Use}
+          §I{i32:value}
+          §O{i32}
+          §Q (> value INT:0)
+  §CL{c001:Base:pub}
+      §MT{mt001:Use:pub:virt}
+          §I{i32:value}
+          §O{i32}
+          §R value
+  §CL{c002:Derived:pub}
+      §EXT{Base}
+      §IMPL{IService}
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        checker.Check(module);
+
+        Assert.Contains(
+            checkDiags,
+            diagnostic => diagnostic.Code == DiagnosticCode.InterfaceMethodNotFound
+                && diagnostic.IsError);
+    }
+
+    [Fact]
+    public void DisjointSourcePostconditions_AreQualifiedByTheirPreconditions()
+    {
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IPositive}
+      §MT{m001:Use}
+          §I{i32:value}
+          §O{i32}
+          §Q (> value INT:0)
+          §S (> result INT:0)
+  §IFACE{i002:INegative}
+      §MT{m002:Use}
+          §I{i32:value}
+          §O{i32}
+          §Q (< value INT:0)
+          §S (< result INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IPositive}
+      §IMPL{INegative}
+      §MT{mt001:Use:pub}
+          §I{i32:value}
+          §O{i32}
+          §R value
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+        var result = checker.Check(module);
+        var inherited = Assert.Single(result.InheritedContracts).Value;
+
+        Assert.Equal(2, inherited.Postconditions.Count);
+        Assert.All(
+            inherited.Postconditions,
+            contract => Assert.IsType<ImplicationExpressionNode>(contract.Condition));
+    }
+
+    [SkippableFact]
+    public void IncompatibleInheritedPostconditions_AreDiagnosed()
+    {
+        Skip.IfNot(
+            Calor.Compiler.Verification.Z3.Z3ContextFactory.IsAvailable,
+            "Z3 not available");
+        var source = @"
+§M{m001:Test}
+  §IFACE{i001:IPositive}
+      §MT{m001:Get}
+          §O{i32}
+          §S (> result INT:0)
+  §IFACE{i002:INegative}
+      §MT{m002:Get}
+          §O{i32}
+          §S (< result INT:0)
+  §CL{c001:Service:pub}
+      §IMPL{IPositive}
+      §IMPL{INegative}
+      §MT{mt001:Get:pub}
+          §O{i32}
+          §R INT:1
+";
+
+        var module = Parse(source, out var parseDiags);
+        Assert.False(parseDiags.HasErrors);
+        var checkDiags = new DiagnosticBag();
+        using var checker = new ContractInheritanceChecker(checkDiags);
+
+        var result = checker.Check(module);
+
+        Assert.True(result.HasViolations);
+        Assert.Contains(
+            checkDiags,
+            diagnostic => diagnostic.Code
+                == DiagnosticCode.IncompatibleInheritedContracts);
     }
 
     #endregion
