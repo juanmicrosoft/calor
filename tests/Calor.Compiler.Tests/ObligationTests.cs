@@ -1478,6 +1478,44 @@ public sealed class ObligationTests
     }
 
     [Fact]
+    public void CSharpEmit_FailedRefinedWrites_DoNotCommitInvalidState()
+    {
+        var assignment = Emit("""
+            §M{m001:Test}
+              §F{f001:Mutate:pub}
+                  §I{i32:value:ref} | (> # INT:0)
+                  §O{void}
+                  §ASSIGN value INT:-1
+            """);
+        object?[] assignmentArguments = [1];
+
+        var assignmentException = InvokeGenerated(
+            assignment,
+            "Mutate",
+            assignmentArguments);
+
+        Assert.IsType<ArgumentOutOfRangeException>(assignmentException);
+        Assert.Equal(1, assignmentArguments[0]);
+
+        var decrement = Emit("""
+            §M{m001:Test}
+              §F{f001:Mutate:pub}
+                  §I{i32:value:ref} | (> # INT:0)
+                  §O{void}
+                  (dec value)
+            """);
+        object?[] decrementArguments = [1];
+
+        var decrementException = InvokeGenerated(
+            decrement,
+            "Mutate",
+            decrementArguments);
+
+        Assert.IsType<ArgumentOutOfRangeException>(decrementException);
+        Assert.Equal(1, decrementArguments[0]);
+    }
+
+    [Fact]
     public void CSharpEmit_ConstructorInitializerChecksBeforeForwarding()
     {
         var source = """

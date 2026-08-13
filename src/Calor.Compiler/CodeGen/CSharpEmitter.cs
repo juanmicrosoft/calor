@@ -533,11 +533,15 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     private void EmitStatement(AstNode statement, bool skipEmptyLine = false)
     {
         var mapped = TryBeginLineMapping(statement);
+        var isMutableRebind = statement is BindStatementNode bindStatement
+            && bindStatement.IsMutable
+            && IsVarDeclaredInScope(SanitizeIdentifier(bindStatement.Name));
         var code = statement.Accept(this);
         if (!skipEmptyLine || !string.IsNullOrEmpty(code))
         {
             AppendLine(code);
             if (statement is BindStatementNode bind
+                && !isMutableRebind
                 && TryGetRefinementConstraint(bind.Name, out var bindConstraint))
             {
                 if (ShouldEmitObligationGuard(
@@ -548,40 +552,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                     EmitRefinementValueGuard(
                         bindConstraint,
                         SanitizeIdentifier(bind.Name));
-                }
-            }
-            else if (statement is AssignmentStatementNode
-                {
-                    Target: ReferenceNode target
-                }
-                && TryGetRefinementConstraint(target.Name, out var assignmentConstraint))
-            {
-                if (ShouldEmitObligationGuard(
-                    Verification.Obligations.ObligationKind.Subtype,
-                    statement.Span,
-                    target.Name))
-                {
-                    EmitRefinementValueGuard(
-                        assignmentConstraint,
-                        SanitizeIdentifier(target.Name));
-                }
-            }
-            else if (statement is CompoundAssignmentStatementNode
-                {
-                    Target: ReferenceNode compoundTarget
-                }
-                && TryGetRefinementConstraint(
-                    compoundTarget.Name,
-                    out var compoundConstraint))
-            {
-                if (ShouldEmitObligationGuard(
-                    Verification.Obligations.ObligationKind.Subtype,
-                    statement.Span,
-                    compoundTarget.Name))
-                {
-                    EmitRefinementValueGuard(
-                        compoundConstraint,
-                        SanitizeIdentifier(compoundTarget.Name));
                 }
             }
         }
@@ -1795,6 +1765,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             if (node.Initializer != null)
             {
                 var initExpr = node.Initializer.Accept(this);
+                if (TryGetRefinementConstraint(
+                        node.Name,
+                        out var rebindConstraint)
+                    && ShouldEmitObligationGuard(
+                        Verification.Obligations.ObligationKind.Subtype,
+                        node.Span,
+                        node.Name))
+                {
+                    return EmitCheckedRefinedAssignment(
+                        varName,
+                        initExpr,
+                        rebindConstraint);
+                }
                 return $"{varName} = {initExpr};";
             }
             return "";
@@ -1878,12 +1861,31 @@ public sealed class CSharpEmitter : IAstVisitor<string>
                 return operation;
             }
 
-            var resultName = $"__mutationResult{_mutationGuardCounter++}";
+            var mutationId = _mutationGuardCounter++;
+            var candidateName = $"__mutationCandidate{mutationId}";
+            var operationResultName = $"__mutationOperation{mutationId}";
             var condition = EmitRefinementCondition(
                 refinementConstraint.Predicate,
-                valueName);
-            return $"(({operation}) is var {resultName} && ({condition})"
-                + $" ? {resultName}"
+                candidateName);
+            var candidateOperation =
+                node.Operator is UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
+                    ? $"{candidateName}{node.Operator.ToCSharpOperator()}"
+                    : $"{node.Operator.ToCSharpOperator()}{candidateName}";
+            var candidateCapture = $"{valueName} is var {candidateName}"
+                + $" && ({candidateOperation}) is var {operationResultName}"
+                + $" && ({condition})";
+            if (node.Operator is UnaryOperator.PostIncrement or UnaryOperator.PostDecrement)
+            {
+                var originalName = $"__mutationOriginal{mutationId}";
+                return $"({valueName} is var {originalName}"
+                    + $" && {candidateCapture}"
+                    + $" ? (({valueName} = {candidateName}), {originalName}).Item2"
+                    + " : throw new ArgumentOutOfRangeException("
+                    + $"nameof({valueName}), \"Value violates {refinementConstraint.Description}\"))";
+            }
+
+            return $"({candidateCapture}"
+                + $" ? {valueName} = {candidateName}"
                 + " : throw new ArgumentOutOfRangeException("
                 + $"nameof({valueName}), \"Value violates {refinementConstraint.Description}\"))";
         }
@@ -4266,6 +4268,20 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var target = node.Target.Accept(this);
         var value = node.Value.Accept(this);
+        if (node.Target is ReferenceNode reference
+            && TryGetRefinementConstraint(
+                reference.Name,
+                out var refinementConstraint)
+            && ShouldEmitObligationGuard(
+                Verification.Obligations.ObligationKind.Subtype,
+                node.Span,
+                reference.Name))
+        {
+            return EmitCheckedRefinedAssignment(
+                target,
+                value,
+                refinementConstraint);
+        }
         return $"{target} = {value};";
     }
 
@@ -4301,7 +4317,47 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
         var target = node.Target.Accept(this);
         var value = node.Value.Accept(this);
+        if (node.Target is ReferenceNode reference
+            && TryGetRefinementConstraint(
+                reference.Name,
+                out var refinementConstraint)
+            && ShouldEmitObligationGuard(
+                Verification.Obligations.ObligationKind.Subtype,
+                node.Span,
+                reference.Name))
+        {
+            return EmitCheckedRefinedAssignment(
+                target,
+                value,
+                refinementConstraint,
+                op);
+        }
         return $"{target} {op} {value};";
+    }
+
+    private string EmitCheckedRefinedAssignment(
+        string target,
+        string value,
+        RefinementConstraint constraint,
+        string? compoundOperator = null)
+    {
+        var candidateName = $"__refinementCandidate{_mutationGuardCounter++}";
+        var continuationIndent = Environment.NewLine
+            + new string(' ', _indentLevel * 4);
+        var initializeCandidate = compoundOperator is null
+            ? $"{MapTypeName(constraint.TypeName)} {candidateName} = {value};"
+            : $"var {candidateName} = {target};"
+                + continuationIndent
+                + $"{candidateName} {compoundOperator} {value};";
+        var condition = EmitRefinementCondition(
+            constraint.Predicate,
+            candidateName);
+        return initializeCandidate
+            + continuationIndent
+            + $"if (!({condition})) throw new ArgumentOutOfRangeException("
+            + $"nameof({target}), \"Value violates {constraint.Description}\");"
+            + continuationIndent
+            + $"{target} = {candidateName};";
     }
 
     private bool TryEmitIndexedAssignment(
