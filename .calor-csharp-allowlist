@@ -67,3 +67,9 @@ src/Calor.Compiler/Commands/QueryCommand.cs
 # src/Calor.Compiler/Mcp/; Calor has no access to Process.WorkingSet64 or the
 # GC memory info this policy is built from.
 src/Calor.Compiler/Mcp/McpMemoryAdmissionPolicy.cs
+
+# Typed bug-pattern analysis (#786) — compiler-internal CFG/dataflow machinery
+# over bound nodes and shared loop semantics. Calor cannot inspect its own
+# bound tree or participate in the compiler's abstract interpretation.
+src/Calor.Compiler/Analysis/BugPatterns/TypedBugPatternAnalysis.cs
+src/Calor.Compiler/Analysis/Dataflow/LoopStepSemantics.cs
